@@ -1,0 +1,17 @@
+
+clocked module resetNormalizer : 
+	bool resetn -> bool reg rst, bool reg isInitialized;
+
+int reg cyclesSinceReset;
+
+if(!resetn) {
+	cyclesSinceReset = 0;
+	rst = 1;
+	isInitialized = 0;
+} else {
+	if(cyclesSinceReset > 30) rst = 0;
+	if(cyclesSinceReset > 512) isInitialized = 1;
+	cyclesSinceReset = cyclesSinceReset + 1;
+}
+
+endmodule

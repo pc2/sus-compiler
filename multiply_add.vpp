@@ -1,0 +1,10 @@
+
+module multiply_add : i32 a, i32 b, i32 c -> i32 result {
+
+	i32 tmp = a * b
+	result = tmp + c
+
+}
+
+
+
