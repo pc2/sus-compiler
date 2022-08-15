@@ -410,6 +410,16 @@ fn type_check_module(m : &mut Module) {
 
 }
 
+
+
+struct FlattenedModule {
+	
+}
+
+fn flatten_module(m : &Module) {
+
+}
+
 fn main() {
     println!("Hello, world!");
 	
@@ -425,4 +435,6 @@ fn main() {
 	let module = parse_module(&mut tokens.iter().peekable());
 	println!("Module:\n{:?}", &module);
 
+	let flattened_module = flatten_module(module);
+	println!("Flattened Module:\n{:?}", &flattened_module);
 }

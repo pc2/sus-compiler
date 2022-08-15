@@ -1,24 +1,4 @@
 
-/*
-LEVEL 1 (Data Loss): 
-	- No data loss
-	- No new invalid data
-	
-	-> every read must correspond to data destruction
-	-> data destruction must happen together with a read
-*/
-
-/*
-LEVEL 2 (Temporal safety):
-	- Operations may only happen on data of the same 'time slice' within a stream
-*/
-
-/*
-LEVEL 3 (Channel splits):
-	- Channel splits
-	- Channel merges
-*/
-
 clocked module basicPipe: 
 	in integer a'x,
 	in integer b'x,
