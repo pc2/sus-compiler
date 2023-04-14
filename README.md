@@ -12,7 +12,7 @@ A great and interesting new innovation is TL-Verilog. In this language they buil
 
 - Strong Typing
 - Eliminate common issues
-- Channels with info. Free flowing, Slowdown, Stall channels
+- Streams with info. Free flowing, Slowdown, stall streams
 - Temporal safety
 - Ease of creating and fine-tuning processing pipelines
 - Easy to test with software integration
@@ -22,7 +22,7 @@ A great and interesting new innovation is TL-Verilog. In this language they buil
 ### Terseness (Similar to many current HDLs, such as Chisel)
 - Bundles
 - Interfaces
-- Handle control signals with channels
+- Handle control signals with streams
 - Clocks are handled with dedicated syntax
 - Syntactic sugar for Resets
 
@@ -31,15 +31,25 @@ A great and interesting new innovation is TL-Verilog. In this language they buil
 
 ## Features
 
-### Channels
-Channels are 
+### Easy Pipelining
+Critical for achieving high frequencies. Computation is split up over multiple stages split by registers, such that multiple operations can be 'coming down the pipe' at the same time. This is one area where the mainstream HDLs like (System)Verilog and VHDL really suffer, as it is a lot of work to define the registers manually. Two languages have already made important strides in this regard. TL-Verilog and Filament.    
+[**TL-Verilog**](https://arxiv.org/abs/1811.01780) greatly simplifies the notation for pipeline creation. Instead of explicitly having to add registers on each wire, they divide the logic into pipeline stages notationally. Additionally they add several basic control flow structures, such as FIFOs and ring queues. Its notational simplicity could be considered the gold standard for 'simple' 1-clock-per-stage pipelines.   
+[**Filament**](https://rachitnigam.com/files/pubs/filament.pdf) has made incredible strides in improving safety for more complex pipelines, which involve processing steps taking multiple cycles. In their paper they describe a syntax of adding Delay and hold time annotations to every signal, adding module instantiations and preventing multiple uses of the same module at the same time. They were able to create a comprehensive semantic type system that captured the full timing information for statically scheduled pipelining. 
 
-### 
+I consider 'static pipelining' to be a solved problem. The one thing we can still innovate on in this area is combining these ideas. To encode the full semantic richness of Filament while keeping that terse notation that makes TL-Verilog shine. 
 
+Perhaps one thing that could still be useful here is 
+
+### Clocks as language constructs
+The oldest design languages such as Verilog and VHDL keep their RTL code and Timing Constraints separate. This is nice in one part, because the clock speed doesn't actually affect the theorethical functioning of the hardware. But on the other hand, once you have multiple clocks, their relative clock speed does have an effect on the actual functioning of the hardware. Clocks are just passed in as regular wires, and therefore can also be used as regular signals. 
+
+Timing information itself should not be part of the RTL. So the clocks' absolute frequency, rise and fall times etc, those still belong in the regular constraints file. But Clocks' relative frequency, wether they're synchronous, and other constraints that directly affect the hardware such as false paths and multicycle paths should certainly be in the RTL specification itself. 
+
+As an added benefit, hardware modules can then alter their construction based on this information, so for example, a FIFO can use a standard synchronous implementation for a single clock, but then switch to different CDC approaches for (un-)synchronized clocks. 
 
 ### Strong Standard Library
 - Avoids repeating common structures
-- Refuse to rely on "inference" for hard logic blocks, instead start from the constraints inherent in these hard logic blocks to adapt the hardware around these blocks. For example hard logic registers around multiply blocks and BRAM blocks. This integrates well with Channels for example
+- Refuse to rely on "inference" for hard logic blocks, instead start from the constraints inherent in these hard logic blocks to adapt the hardware around these blocks. For example hard logic registers around multiply blocks and BRAM blocks. This integrates well with streams for example
 
 ## Constraints
 
