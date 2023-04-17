@@ -47,7 +47,7 @@ Timing information itself should not be part of the RTL. So the clocks' absolute
 
 As an added benefit, hardware modules can then alter their construction based on this information, so for example, a FIFO can use a standard synchronous implementation for a single clock, but then switch to different CDC approaches for (un-)synchronized clocks. 
 
-By including clocks in the language itself, we can then start making statements about data rates. For example a channel may be outputting on clock A, with full bandwidth, and then be transported onto clock A*2 at half its bandwidth. One neat way of expressing the signal throughput is done by [Aetherling](https://aetherling.org/). Signals are expressed as sequences of valid and invalid elements. 
+By including clocks in the language itself, we can then start making statements about data rates. For example a channel may be outputting on clock A, with full bandwidth, and then be transported onto clock A*2 at half its bandwidth. One neat way of expressing the signal throughput is done by [Aetherling](https://aetherling.org/). Signals are expressed as sequences of valid and invalid elements. This can then again filter out bad designs, where the bandwidth from one clock may not be carryable by another clock. 
 
 ### Strong Standard Library
 - Avoids repeating common structures
