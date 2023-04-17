@@ -8,7 +8,7 @@ This project is an attempt to create a safety-first, correct-by-default yet stil
 
 Current HDLs mostly build on top of existing Software languages such as Chisel and SpinalHDL. This allows for great software integration, but throws away a lot of the terseness and extended type safety that HDLs could benefit from. 
 
-A great and interesting new innovation is TL-Verilog. In this language they built a higher level abstraction for designing hardware, moving away from the Register-Transfer level to a pipeline-focussed design. This makes TL-Verilog incredibly well-suited for the development of processing pipelines. What holds TL-Verilog back from being the language that accomplishes the goals of , and 
+A great and interesting new innovation is TL-Verilog. In this language they built a higher level abstraction for designing hardware, moving away from the Register-Transfer level to a pipeline-focussed design. This makes TL-Verilog incredibly well-suited for the development of processing pipelines. What holds TL-Verilog back from being the language that accomplishes the goals of safety, and terseness. 
 
 - Strong Typing
 - Eliminate common issues
@@ -17,7 +17,7 @@ A great and interesting new innovation is TL-Verilog. In this language they buil
 - Ease of creating and fine-tuning processing pipelines
 - Easy to test with software integration
 - Better visualization of data flow --> Eliminate Wave plots
-- Integrate most timing analyzer constraints into source files themselves. False paths, Clocks, multicycle paths, etc. All belong in 
+- Integrate most timing analyzer constraints into source files themselves. False paths, Clocks, multicycle paths, etc. All belong in the RTL specification itself, not in the timing constraints. 
 
 ### Terseness (Similar to many current HDLs, such as Chisel)
 - Bundles
@@ -47,9 +47,11 @@ Timing information itself should not be part of the RTL. So the clocks' absolute
 
 As an added benefit, hardware modules can then alter their construction based on this information, so for example, a FIFO can use a standard synchronous implementation for a single clock, but then switch to different CDC approaches for (un-)synchronized clocks. 
 
+By including clocks in the language itself, we can then start making statements about data rates. For example a channel may be outputting on clock A, with full bandwidth, and then be transported onto clock A*2 at half its bandwidth. One neat way of expressing the signal throughput is done by [Aetherling](https://aetherling.org/). Signals are expressed as sequences of valid and invalid elements. 
+
 ### Strong Standard Library
 - Avoids repeating common structures
-- Refuse to rely on "inference" for hard logic blocks, instead start from the constraints inherent in these hard logic blocks to adapt the hardware around these blocks. For example hard logic registers around multiply blocks and BRAM blocks. This integrates well with streams for example
+- Refuse to rely on "inference" for hard logic blocks, instead start from the constraints inherent in these hard logic blocks to adapt the hardware around these blocks. For example hard logic registers around multiply blocks and BRAM blocks. This integrates well with streams for example. 
 
 ## Constraints
 
@@ -66,8 +68,11 @@ As an added benefit, hardware modules can then alter their construction based on
 
 ### Strong Typing
 - Actual data types
-- sized integers
+- sized integers   (Min-max), not necessarily on power of 2 boundary
 - representation independent integers
+- Structs
+- Include Rust-style enum types?
+- operator overloading?
 
 ## Goals
 ### Formal proofs for correctness of common constructs
