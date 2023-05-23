@@ -32,9 +32,34 @@ A great and interesting new innovation is TL-Verilog. In this language they buil
 ## Features
 
 ### Channels
-Channels are 
+Channels are the main abstraction used in this language. The main channel type is the 'pipe' channel. Data traveling along a 'pipe' channel has an extra bit which denotes if the data is valid. 
 
-### 
+### Time slicing
+
+Channel data going through a pipe expects operations to only be performed on data of the same 'time slice'. This is data that has departed at the same time. Performing operations on data of different time slices is an error, unless cast explicitly (for things like FIR filters or fixed size convolutions). 
+
+A big benefit of 'time slicing' is greater ability for debugging. Instead of staring at wave plots, the whole trajectory of a data packet can be followed throughout the pipeline, making spotting errors far easier. 
+
+### Easy pipelining syntax borrowed from TL-Verilog
+TL-Verilog's main feature, the line break pipelining syntax allows for tivial manual pipelining of operations, which I am a big fan of! This integrates very nicely with the time slicing feature. 
+
+### Stricter integer types
+I propose to add one generic integer type: *int<low, high>*. Instead of specifying the bitwidth of this integer, we specify its absolute range. It is not necessary to specify this range for every integer, as in most cases it can be inferred by the compiler. This inference allows the compiler to use the minimum bitwidth necessary to represent the integer. Signed integers are just integers with a negative lower bound. 
+
+We can add functions such as `int -> to2cpl -> bool[]` and `bool[] -> from2cpl -> int`
+
+This also allows us to more strictly define our interfaces. Instead of requesting an int of so many bits, we request a specific range. 
+
+Casting integers to smaller sizes is again a place where explicitly casting is required. The simulator can then check this at runtime. 
+
+### Module instantiation syntax
+There are no functions, every function is a module. 
+
+A module is instantiated as follows: `input1, input2 -> myModule -> output1, output2`
+
+This can still change
+
+###
 
 
 ### Strong Standard Library
