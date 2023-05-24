@@ -1,7 +1,7 @@
 # SUS Language
 A Hardware Description Language focussed on strong type and temporal safety features
 
-Main Inspirations: TL-Verilog, Rust
+Main Inspirations: TL-Verilog, Filament, Rust
 
 ## Core philosophy
 This project is an attempt to create a safety-first, correct-by-default yet still with low level control HDL much like Rust is for the software industry. 

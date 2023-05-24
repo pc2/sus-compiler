@@ -1,13 +1,15 @@
 
-const ALL_KEYWORDS : [&'static str; 4] = [
+const ALL_KEYWORDS : [&'static str; 6] = [
     "module",
     "pipeline",
     "state",
-    "reg"
+    "if",
+    "while",
+    "for"
 ];
 
 // ordered by which to prefer
-const ALL_SYMBOLS : [&'static str; 30] = [
+const ALL_SYMBOLS : [&'static str; 31] = [
     // Big symbols
     "<=",
     ">=",
@@ -23,6 +25,7 @@ const ALL_SYMBOLS : [&'static str; 30] = [
     "-",
     "*",
     "/",
+    "!",
     "%",
     "&",
     "|",
@@ -43,7 +46,8 @@ const ALL_SYMBOLS : [&'static str; 30] = [
 ];
 
 const IDENTIFIER_SYMBOL_TYPE : u8 = (ALL_KEYWORDS.len() + ALL_SYMBOLS.len()) as u8;
-const NUMBER_SYMBOL_INDEX : u8 = (IDENTIFIER_SYMBOL_TYPE + 1) as u8;
+const NUMBER_SYMBOL_INDEX : u8 = IDENTIFIER_SYMBOL_TYPE + 1;
+const INVALID_SYMBOL_INDEX : u8 = NUMBER_SYMBOL_INDEX + 1;
 
 #[derive(Debug,Clone,PartialEq)]
 struct LexerPart<'a> {
@@ -68,9 +72,13 @@ impl<'a> LexerPart<'a> {
 }
 
 #[derive(Debug,Clone,PartialEq)]
-struct ParsingErr {
+struct ParsingErr<'a> {
     reason : &'static str,
-    position : usize
+    position : &'a str
+}
+
+fn is_valid_identifier_char(c : char) -> bool {
+    c.is_alphanumeric() || c == '_'
 }
 
 fn tokenize<'a>(file_data : &'a str) -> (Vec<LexerPart<'a>>, Vec<ParsingErr>) {
@@ -80,30 +88,23 @@ fn tokenize<'a>(file_data : &'a str) -> (Vec<LexerPart<'a>>, Vec<ParsingErr>) {
     let mut errors : Vec<ParsingErr> = Vec::new();
     loop {
         if let Some((mut char_i, mut cur_char)) = file_char_iter.next() {
-            if cur_char.is_digit(10) {
-                // Start of number
-                for (num_text_i, num_char) in &mut file_char_iter {
-                    if !num_char.is_numeric() {
-                        if num_char.is_alphabetic() {
-                            errors.push(ParsingErr{reason : "Unexpected letter within number", position : char_i});
-                        }
-                        let number_text = file_data.get(char_i..num_text_i).unwrap();
-                        lexer_result.push(LexerPart{typ : NUMBER_SYMBOL_INDEX, text : number_text, attached_comment : attached_comments});
-                        attached_comments = Vec::new();
-
-                        // no looping back the iterator, just continue from non-alphanumeric character
-                        char_i = num_text_i;
-                        cur_char = num_char;
-                        break;
-                    }
-                }
-            } else if cur_char.is_alphabetic() {
+            if is_valid_identifier_char(cur_char) {
                 // Start of word
                 for (word_i, word_char) in &mut file_char_iter {
-                    if !word_char.is_alphanumeric() {
+                    if !is_valid_identifier_char(word_char) {
                         // end of single line comment
                         let word = file_data.get(char_i..word_i).unwrap();
-                        let sym_type = if let Some(keyword_id) = ALL_KEYWORDS.iter().position(|&kw| kw == word) {
+                        let mut word_chars = word.chars();
+
+                        let sym_type = if word_chars.next().unwrap().is_digit(10) {
+                            // It's a number
+                            if word_chars.find(|v| !v.is_digit(10)).is_some() {
+                                errors.push(ParsingErr{reason : "Unexpected letter within number", position : word});
+                                INVALID_SYMBOL_INDEX
+                            } else {
+                                NUMBER_SYMBOL_INDEX
+                            }
+                        } else if let Some(keyword_id) = ALL_KEYWORDS.iter().position(|&kw| kw == word) {
                             keyword_id as u8
                         } else {
                             IDENTIFIER_SYMBOL_TYPE
@@ -137,7 +138,7 @@ fn tokenize<'a>(file_data : &'a str) -> (Vec<LexerPart<'a>>, Vec<ParsingErr>) {
                     lexer_result.push(LexerPart{typ : (symbol_id + ALL_KEYWORDS.len()) as u8, text : symbol_text, attached_comment : attached_comments});
                     attached_comments = Vec::new();
                 } else { // Symbol not found!
-                    errors.push(ParsingErr{reason : "Unexpected character", position : char_i});
+                    errors.push(ParsingErr{reason : "Unexpected character", position : file_data.get(char_i..char_i+1).unwrap()});
                 }
             }
         } else {
@@ -148,10 +149,12 @@ fn tokenize<'a>(file_data : &'a str) -> (Vec<LexerPart<'a>>, Vec<ParsingErr>) {
     return (lexer_result, errors);
 }
 
+use std::process::ExitCode;
+
 use console::style;
 
 fn pretty_print(file_text : &str) {
-    let (token_vec, token_errors) = tokenize(file_text);
+    let (token_vec, _token_errors) = tokenize(file_text);
 
     let mut whitespace_start : usize = 0;
 
@@ -165,29 +168,85 @@ fn pretty_print(file_text : &str) {
             } else if token.is_symbol() {
                 style(token.text).cyan()
             } else if token.is_identifier() {
-                style(token.text).green()
+                style(token.text).white()
             } else if token.is_number() {
-                style(token.text).yellow()
+                style(token.text).green()
             } else {
-                style(token.text).red().bold()
+                style(token.text).red().underlined()
             }
         );
     }
+
+    print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
 }
 
-fn main() {
-    let file_text = "module test: a, b -> c { a = b + 5; }";
-
-    let (token_vec, token_errors) = tokenize(file_text);
-
-    println!("\n{}\n", file_text);
-    //println!("{:?}\n", token_vec);
-    /*for tok in token_vec {
-        println!("{:?}", tok);
-    }*/
-    for err in token_errors {
-        println!("{}", err.reason);
+fn find_line_starts(text : &str) -> Vec<usize> {
+    let mut result : Vec<usize> = vec![0];
+    for (i, ch) in text.char_indices() {
+        if ch == '\n' {
+            result.push(i+1);
+        }
     }
+    result
+}
 
-    pretty_print(file_text);
+struct FilePosition {
+    line : usize,
+    col : usize,
+}
+
+fn to_file_position(line_start_buffer : &[usize], char_i : usize) -> FilePosition {
+    let line = match line_start_buffer.binary_search_by(|probe| probe.cmp(&char_i)) {
+        Ok(v) => v,
+        Err(v) => v-1
+    };
+    let col = char_i - line_start_buffer[line];
+    FilePosition{line : line, col : col}
+}
+
+fn pretty_print_error(line_start_buffer : &[usize], text : &str, err : &ParsingErr) {
+    let total_lines = line_start_buffer.len();
+
+    let part_start = err.position.as_ptr() as usize - text.as_ptr() as usize;
+    let part_end = part_start + err.position.len();
+
+    let err_start = to_file_position(line_start_buffer, part_start);
+    let err_end = to_file_position(line_start_buffer, part_end);
+
+    const LINES_BEFORE_MARGIN : usize = 3;
+    const LINES_AFTER_MARGIN : usize = 3;
+
+    let before_margin_line = if err_start.line < LINES_BEFORE_MARGIN {0} else {err_start.line - LINES_BEFORE_MARGIN};
+    let after_margin_line = if err_end.line > total_lines - LINES_AFTER_MARGIN {total_lines} else {err_start.line + LINES_BEFORE_MARGIN};
+
+    print!("{}", text.get(line_start_buffer[before_margin_line]..part_start).unwrap());
+    print!("{}", style(err.position).red().underlined());
+    print!("{}", text.get(part_end..line_start_buffer[err_end.line+1]).unwrap());
+    print!("{}{}\n", " ".repeat(err_start.col), style("^ ".to_owned() + err.reason).red());
+    print!("{}", text.get(line_start_buffer[err_end.line+1]..line_start_buffer[after_margin_line+1]).unwrap());
+}
+
+fn main() -> ExitCode {
+    let file_path = "multiply_add.vpp";
+    
+    match std::fs::read_to_string(file_path) {
+        Ok(file_text) => {
+            let (_token_vec, token_errors) = tokenize(&file_text);
+        
+            if !token_errors.is_empty() {
+                let line_start_buffer = find_line_starts(&file_text);
+                for err in token_errors {
+                    pretty_print_error(&line_start_buffer, &file_text, &err);
+                }
+                return ExitCode::FAILURE;
+            } else {
+                pretty_print(&file_text);
+                return ExitCode::SUCCESS;
+            }
+        },
+        Err(err) => {
+            println!("Could not open file {}: {}", style(file_path).yellow(), style(err.to_string()));
+            return ExitCode::FAILURE;
+        }
+    }
 }

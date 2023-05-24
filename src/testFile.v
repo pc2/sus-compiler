@@ -59,7 +59,7 @@ module skid_buffer #(parameter WIDTH = 8) (
     output[WIDTH-1:0] o_data,
     output o_valid,
     input i_ready
-)
+);
 
 reg ready_rg;
 reg[WIDTH-1:0] data_rg;
