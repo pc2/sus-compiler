@@ -49,13 +49,13 @@ pub const ALL_SYMBOLS : [&'static str; 31] = [
 
 pub const IDENTIFIER_SYMBOL_TYPE : u8 = (ALL_KEYWORDS.len() + ALL_SYMBOLS.len()) as u8;
 pub const NUMBER_SYMBOL_INDEX : u8 = IDENTIFIER_SYMBOL_TYPE + 1;
-pub const INVALID_SYMBOL_INDEX : u8 = NUMBER_SYMBOL_INDEX + 1;
+pub const COMENT_SYMBOL_INDEX : u8 = NUMBER_SYMBOL_INDEX + 1;
+pub const INVALID_SYMBOL_INDEX : u8 = COMENT_SYMBOL_INDEX + 1;
 
 #[derive(Debug,Clone,PartialEq)]
 pub struct LexerPart<'a> {
     pub typ : u8,
-    pub text : &'a str,
-    pub attached_comment : Vec<&'a str>
+    pub text : &'a str
 }
 
 impl<'a> LexerPart<'a> {
@@ -70,6 +70,9 @@ impl<'a> LexerPart<'a> {
     }
     pub fn is_number(&self) -> bool {
         self.typ == NUMBER_SYMBOL_INDEX
+    }
+    pub fn is_comment(&self) -> bool {
+        self.typ == COMENT_SYMBOL_INDEX
     }
 }
 
@@ -105,44 +108,56 @@ fn iter_until_comment_end(mut file_char_iter : &mut CharIndices) -> Option<usize
 	}
 }
 
+fn find_end_of_identifier(mut file_char_iter : &mut CharIndices) -> Option<(usize, char)> {
+    for (word_i, word_char) in &mut file_char_iter {
+        if !is_valid_identifier_char(word_char) {
+            return Some((word_i, word_char));
+        }
+    }
+    None // End of file
+}
+
 pub fn tokenize<'a>(file_data : &'a str) -> (Vec<LexerPart<'a>>, Vec<ParsingErr>) {
     let mut lexer_result : Vec<LexerPart<'a>> = Vec::new();
     let mut file_char_iter = file_data.char_indices();
-    let mut attached_comments : Vec<&'a str> = Vec::new();
     let mut errors : Vec<ParsingErr> = Vec::new();
     loop {
         if let Some((mut char_i, mut cur_char)) = file_char_iter.next() {
             if is_valid_identifier_char(cur_char) {
                 // Start of word
-                for (word_i, word_char) in &mut file_char_iter {
-                    if !is_valid_identifier_char(word_char) {
-                        // end of single line comment
-                        let word = file_data.get(char_i..word_i).unwrap();
-                        let mut word_chars = word.chars();
+                let end_of_identifier =  find_end_of_identifier(&mut file_char_iter);
+                let was_end_of_file = end_of_identifier.is_none();
+                let word = if let Some((word_end, next_char)) = end_of_identifier {
+                    // no looping back the iterator, just continue from non-alphanumeric character
+                    let result = file_data.get(char_i..word_end).unwrap();
+                    char_i = word_end;
+                    cur_char = next_char;
+                    result
+                } else {
+                    file_data.get(char_i..).unwrap()
+                };
 
-                        let sym_type = if word_chars.next().unwrap().is_digit(10) {
-                            // It's a number
-                            if word_chars.find(|v| !v.is_digit(10)).is_some() {
-                                errors.push(ParsingErr{reason : "Unexpected letter within number", position : word});
-                                INVALID_SYMBOL_INDEX
-                            } else {
-                                NUMBER_SYMBOL_INDEX
-                            }
-                        } else if let Some(keyword_id) = ALL_KEYWORDS.iter().position(|&kw| kw == word) {
-                            keyword_id as u8
-                        } else {
-                            IDENTIFIER_SYMBOL_TYPE
-                        };
-                        lexer_result.push(LexerPart{typ : sym_type, text : word, attached_comment : attached_comments});
-                        attached_comments = Vec::new();
+                let mut word_chars = word.chars();
 
-                        // no looping back the iterator, just continue from non-alphanumeric character
-                        char_i = word_i;
-                        cur_char = word_char;
-                        break;
+                let sym_type = if word_chars.next().unwrap().is_digit(10) {
+                    // It's a number
+                    if word_chars.find(|v| !v.is_digit(10)).is_some() {
+                        errors.push(ParsingErr{reason : "Unexpected letter within number", position : word});
+                        INVALID_SYMBOL_INDEX
+                    } else {
+                        NUMBER_SYMBOL_INDEX
                     }
+                } else if let Some(keyword_id) = ALL_KEYWORDS.iter().position(|&kw| kw == word) {
+                    keyword_id as u8
+                } else {
+                    IDENTIFIER_SYMBOL_TYPE
+                };
+                lexer_result.push(LexerPart{typ : sym_type, text : word});
+
+                if was_end_of_file {
+                    break;
                 }
-            }
+            } // no else! Continue next character
             if cur_char.is_whitespace() {
                 // Whitespace, ignore
                 continue;
@@ -154,20 +169,19 @@ pub fn tokenize<'a>(file_data : &'a str) -> (Vec<LexerPart<'a>>, Vec<ParsingErr>
 					} else {
 						file_data.get(char_i..).unwrap()
 					};
-					attached_comments.push(comment_text);
+                    lexer_result.push(LexerPart{typ : COMENT_SYMBOL_INDEX, text : comment_text});
                 } else if file_data.get(char_i..char_i+2) == Some("/*") {
                     file_char_iter.next();
                     let comment_text = if let Some(comment_i) = iter_until_comment_end(&mut file_char_iter) {
-						file_data.get(char_i..comment_i).unwrap()
+						file_data.get(char_i..comment_i+1).unwrap()
 					} else {
 						file_data.get(char_i..).unwrap()
 					};
-					attached_comments.push(comment_text);
+                    lexer_result.push(LexerPart{typ : COMENT_SYMBOL_INDEX, text : comment_text});
                 } else if let Some(symbol_id) = ALL_SYMBOLS.iter().position(|&symb| Some(symb) == file_data.get(char_i..char_i+symb.len())) {
                     let symbol_text = file_data.get(char_i..char_i+ALL_SYMBOLS[symbol_id].len()).unwrap();
                     file_char_iter.nth(symbol_text.len() - 1);
-                    lexer_result.push(LexerPart{typ : (symbol_id + ALL_KEYWORDS.len()) as u8, text : symbol_text, attached_comment : attached_comments});
-                    attached_comments = Vec::new();
+                    lexer_result.push(LexerPart{typ : (symbol_id + ALL_KEYWORDS.len()) as u8, text : symbol_text});
                 } else { // Symbol not found!
                     errors.push(ParsingErr{reason : "Unexpected character", position : file_data.get(char_i..char_i+1).unwrap()});
                 }

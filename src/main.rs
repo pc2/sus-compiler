@@ -23,7 +23,9 @@ fn pretty_print(file_text : &str) {
             } else if token.is_identifier() {
                 style(token.text).white()
             } else if token.is_number() {
-                style(token.text).green()
+                style(token.text).green().bright()
+            } else if token.is_comment() {
+                style(token.text).green().dim()
             } else {
                 style(token.text).red().underlined()
             }
