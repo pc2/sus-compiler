@@ -1,35 +1,49 @@
 
 mod tokenizer;
+mod parser;
 use tokenizer::{tokenize,ParsingErr};
 
-use std::process::ExitCode;
+use console::{style, Style};
 
-use console::style;
+fn pretty_print_chunk_with_whitespace(whitespace_start : usize, file_text : &str, text_chunk : &str, st : Style) -> usize /* next whitespace_start */ { 
+    let whitespace_end = text_chunk.as_ptr() as usize - file_text.as_ptr() as usize;
+    let whitespace_text = file_text.get(whitespace_start..whitespace_end).unwrap();
+    let new_whitespace_start = text_chunk.as_ptr() as usize + text_chunk.len() - file_text.as_ptr() as usize;
+
+    print!("{}{}", whitespace_text, st.apply_to(text_chunk));
+
+    return new_whitespace_start;
+}
 
 fn pretty_print(file_text : &str) {
-    let (token_vec, _token_errors) = tokenize(file_text);
+    let (token_vec, comments, _token_errors) = tokenize(file_text);
 
     let mut whitespace_start : usize = 0;
 
-    for token in token_vec {
-        let whitespace_end = token.text.as_ptr() as usize - file_text.as_ptr() as usize;
-        let whitespace_text = file_text.get(whitespace_start..whitespace_end).unwrap();
-        whitespace_start = token.text.as_ptr() as usize + token.text.len() - file_text.as_ptr() as usize;
-        print!("{}{}", whitespace_text, 
-            if token.is_keyword() {
-                style(token.text).blue()
-            } else if token.is_symbol() {
-                style(token.text).cyan()
-            } else if token.is_identifier() {
-                style(token.text).white()
-            } else if token.is_number() {
-                style(token.text).green().bright()
-            } else if token.is_comment() {
-                style(token.text).green().dim()
+    let mut comment_iter = comments.iter().peekable();
+    for (tok_idx, token) in token_vec.iter().enumerate() {
+        
+        while let Some(comment) = comment_iter.peek() {
+            if comment.token_idx <= tok_idx {
+                whitespace_start = pretty_print_chunk_with_whitespace(whitespace_start, file_text, comment.text, Style::new().green().dim());
+                comment_iter.next(); // Actually pop it
             } else {
-                style(token.text).red().underlined()
+                break;
             }
-        );
+        }
+
+        let st = if token.is_keyword() {
+            Style::new().blue()
+        } else if token.is_symbol() {
+            Style::new().cyan()
+        } else if token.is_identifier() {
+            Style::new().white()
+        } else if token.is_number() {
+            Style::new().green().bright()
+        } else {
+            Style::new().red().underlined()
+        };
+        whitespace_start = pretty_print_chunk_with_whitespace(whitespace_start, file_text, token.text, st);
     }
 
     print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
@@ -81,27 +95,27 @@ fn pretty_print_error(line_start_buffer : &[usize], text : &str, err : &ParsingE
     print!("{}", text.get(line_start_buffer[err_end.line+1]..line_start_buffer[after_margin_line+1]).unwrap());
 }
 
-fn main() -> ExitCode {
+fn main() {
     let file_path = "multiply_add.vpp";
     
     match std::fs::read_to_string(file_path) {
         Ok(file_text) => {
-            let (_token_vec, token_errors) = tokenize(&file_text);
+            let (_token_vec, _comments, token_errors) = tokenize(&file_text);
         
             if !token_errors.is_empty() {
                 let line_start_buffer = find_line_starts(&file_text);
                 for err in token_errors {
                     pretty_print_error(&line_start_buffer, &file_text, &err);
                 }
-                return ExitCode::FAILURE;
+                std::process::exit(1);
             } else {
                 pretty_print(&file_text);
-                return ExitCode::SUCCESS;
+                std::process::exit(0);
             }
         },
         Err(err) => {
             println!("Could not open file {}: {}", style(file_path).yellow(), style(err.to_string()));
-            return ExitCode::FAILURE;
+            std::process::exit(1);
         }
     }
 }

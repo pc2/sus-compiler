@@ -47,20 +47,34 @@ pub const ALL_SYMBOLS : [&'static str; 31] = [
     "@"
 ];
 
-pub const IDENTIFIER_SYMBOL_TYPE : u8 = (ALL_KEYWORDS.len() + ALL_SYMBOLS.len()) as u8;
-pub const NUMBER_SYMBOL_INDEX : u8 = IDENTIFIER_SYMBOL_TYPE + 1;
-pub const COMENT_SYMBOL_INDEX : u8 = NUMBER_SYMBOL_INDEX + 1;
-pub const INVALID_SYMBOL_INDEX : u8 = COMENT_SYMBOL_INDEX + 1;
+type TokenTypeIdx = u8;
 
-#[derive(Debug,Clone,PartialEq)]
-pub struct LexerPart<'a> {
-    pub typ : u8,
+#[macro_export]
+macro_rules! kw {
+    ($v:literal) => {
+        if let Some(found) = ALL_KEYWORDS.iter().position(|&a| a == $v) {
+            found as u8
+        } else if let Some(found) = ALL_SYMBOLS.iter().position(|&a| a == $v) {
+            (found + ALL_KEYWORDS.len()) as u8
+        } else {
+            unreachable!();
+        }
+    };
+}
+
+pub const IDENTIFIER_SYMBOL_TYPE : TokenTypeIdx = (ALL_KEYWORDS.len() + ALL_SYMBOLS.len()) as TokenTypeIdx;
+pub const NUMBER_SYMBOL_INDEX : TokenTypeIdx = IDENTIFIER_SYMBOL_TYPE + 1;
+pub const INVALID_SYMBOL_INDEX : TokenTypeIdx = NUMBER_SYMBOL_INDEX + 1;
+
+#[derive(Debug,Clone,PartialEq,Eq)]
+pub struct Token<'a> {
+    pub typ : TokenTypeIdx,
     pub text : &'a str
 }
 
-impl<'a> LexerPart<'a> {
+impl<'a> Token<'a> {
     pub fn is_keyword(&self) -> bool {
-        self.typ < ALL_KEYWORDS.len() as u8
+        self.typ < ALL_KEYWORDS.len() as TokenTypeIdx
     }
     pub fn is_symbol(&self) -> bool {
         self.typ < IDENTIFIER_SYMBOL_TYPE
@@ -71,12 +85,15 @@ impl<'a> LexerPart<'a> {
     pub fn is_number(&self) -> bool {
         self.typ == NUMBER_SYMBOL_INDEX
     }
-    pub fn is_comment(&self) -> bool {
-        self.typ == COMENT_SYMBOL_INDEX
-    }
 }
 
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug,Clone)]
+pub struct CommentToken<'a> {
+    pub text : &'a str,
+    pub token_idx : usize
+}
+
+#[derive(Debug,Clone)]
 pub struct ParsingErr<'a> {
     pub reason : &'static str,
     pub position : &'a str
@@ -117,15 +134,16 @@ fn find_end_of_identifier(mut file_char_iter : &mut CharIndices) -> Option<(usiz
     None // End of file
 }
 
-pub fn tokenize<'a>(file_data : &'a str) -> (Vec<LexerPart<'a>>, Vec<ParsingErr>) {
-    let mut lexer_result : Vec<LexerPart<'a>> = Vec::new();
+pub fn tokenize<'a>(file_data : &'a str) -> (Vec<Token<'a>>, Vec<CommentToken<'a>>, Vec<ParsingErr>) {
+    let mut lexer_result : Vec<Token<'a>> = Vec::new();
     let mut file_char_iter = file_data.char_indices();
     let mut errors : Vec<ParsingErr> = Vec::new();
+    let mut comments : Vec<CommentToken<'a>> = Vec::new();
     loop {
         if let Some((mut char_i, mut cur_char)) = file_char_iter.next() {
             if is_valid_identifier_char(cur_char) {
                 // Start of word
-                let end_of_identifier =  find_end_of_identifier(&mut file_char_iter);
+                let end_of_identifier = find_end_of_identifier(&mut file_char_iter);
                 let was_end_of_file = end_of_identifier.is_none();
                 let word = if let Some((word_end, next_char)) = end_of_identifier {
                     // no looping back the iterator, just continue from non-alphanumeric character
@@ -148,11 +166,11 @@ pub fn tokenize<'a>(file_data : &'a str) -> (Vec<LexerPart<'a>>, Vec<ParsingErr>
                         NUMBER_SYMBOL_INDEX
                     }
                 } else if let Some(keyword_id) = ALL_KEYWORDS.iter().position(|&kw| kw == word) {
-                    keyword_id as u8
+                    keyword_id as TokenTypeIdx
                 } else {
                     IDENTIFIER_SYMBOL_TYPE
                 };
-                lexer_result.push(LexerPart{typ : sym_type, text : word});
+                lexer_result.push(Token{typ : sym_type, text : word});
 
                 if was_end_of_file {
                     break;
@@ -169,7 +187,7 @@ pub fn tokenize<'a>(file_data : &'a str) -> (Vec<LexerPart<'a>>, Vec<ParsingErr>
 					} else {
 						file_data.get(char_i..).unwrap()
 					};
-                    lexer_result.push(LexerPart{typ : COMENT_SYMBOL_INDEX, text : comment_text});
+                    comments.push(CommentToken{text : comment_text, token_idx : lexer_result.len()});
                 } else if file_data.get(char_i..char_i+2) == Some("/*") {
                     file_char_iter.next();
                     let comment_text = if let Some(comment_i) = iter_until_comment_end(&mut file_char_iter) {
@@ -177,11 +195,11 @@ pub fn tokenize<'a>(file_data : &'a str) -> (Vec<LexerPart<'a>>, Vec<ParsingErr>
 					} else {
 						file_data.get(char_i..).unwrap()
 					};
-                    lexer_result.push(LexerPart{typ : COMENT_SYMBOL_INDEX, text : comment_text});
+                    comments.push(CommentToken{text : comment_text, token_idx : lexer_result.len()});
                 } else if let Some(symbol_id) = ALL_SYMBOLS.iter().position(|&symb| Some(symb) == file_data.get(char_i..char_i+symb.len())) {
                     let symbol_text = file_data.get(char_i..char_i+ALL_SYMBOLS[symbol_id].len()).unwrap();
                     file_char_iter.nth(symbol_text.len() - 1);
-                    lexer_result.push(LexerPart{typ : (symbol_id + ALL_KEYWORDS.len()) as u8, text : symbol_text});
+                    lexer_result.push(Token{typ : (symbol_id + ALL_KEYWORDS.len()) as TokenTypeIdx, text : symbol_text});
                 } else { // Symbol not found!
                     errors.push(ParsingErr{reason : "Unexpected character", position : file_data.get(char_i..char_i+1).unwrap()});
                 }
@@ -191,5 +209,5 @@ pub fn tokenize<'a>(file_data : &'a str) -> (Vec<LexerPart<'a>>, Vec<ParsingErr>
         }
     }
 
-    return (lexer_result, errors);
+    return (lexer_result, comments, errors);
 }
