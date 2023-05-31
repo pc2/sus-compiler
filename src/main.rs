@@ -1,7 +1,7 @@
 
 mod tokenizer;
 mod parser;
-use tokenizer::{tokenize,ParsingErr};
+use tokenizer::{tokenize, ParsingErr};
 
 use console::{style, Style};
 
@@ -96,7 +96,7 @@ fn pretty_print_error(line_start_buffer : &[usize], text : &str, err : &ParsingE
 }
 
 fn main() {
-    let file_path = "multiply_add.vpp";
+    let file_path = "multiply_add.sus";
     
     match std::fs::read_to_string(file_path) {
         Ok(file_text) => {

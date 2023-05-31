@@ -1,17 +1,61 @@
 use std::str::CharIndices;
 
-
-pub const ALL_KEYWORDS : [&'static str; 6] = [
+pub const ALL_KEYWORDS : [&'static str; 10] = [
     "module",
     "pipeline",
+    "interface",
+    "assume",
     "state",
     "if",
     "while",
-    "for"
+    "for",
+    "struct",
+    "enum"
 ];
 
+const fn const_eq_str(a: &str, b: &str) -> bool {
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+
+    if a_bytes.len() != b_bytes.len() {
+        return false;
+    }
+
+    let mut i: usize = 0;
+    while i < a_bytes.len() {
+        if a_bytes[i] != b_bytes[i] {
+            return false;
+        }
+        i += 1;
+    }
+
+    true
+}
+
+const fn const_str_position(v : &str, list : &[&str]) -> Option<usize> {
+    let mut i : usize = 0;
+
+    while i < list.len() {
+        if const_eq_str(v, list[i]) {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
+}
+
+pub const fn kw(name : &str) -> TokenTypeIdx {
+    if let Some(found) = const_str_position(name, &ALL_KEYWORDS) {
+        found as TokenTypeIdx
+    } else if let Some(found) = const_str_position(name, &ALL_SYMBOLS) {
+        (found + ALL_KEYWORDS.len()) as TokenTypeIdx
+    } else {
+        unreachable!();
+    }
+}
+
 // ordered by which to prefer
-pub const ALL_SYMBOLS : [&'static str; 31] = [
+pub const ALL_SYMBOLS : [&'static str; 29] = [
     // Big symbols
     "<=",
     ">=",
@@ -20,8 +64,6 @@ pub const ALL_SYMBOLS : [&'static str; 31] = [
     "<<",
     ">>",
     "->",
-    "&&",
-    "||",
     // small Symbols
     "+",
     "-",
@@ -49,24 +91,12 @@ pub const ALL_SYMBOLS : [&'static str; 31] = [
 
 type TokenTypeIdx = u8;
 
-#[macro_export]
-macro_rules! kw {
-    ($v:literal) => {
-        if let Some(found) = ALL_KEYWORDS.iter().position(|&a| a == $v) {
-            found as u8
-        } else if let Some(found) = ALL_SYMBOLS.iter().position(|&a| a == $v) {
-            (found + ALL_KEYWORDS.len()) as u8
-        } else {
-            unreachable!();
-        }
-    };
-}
 
 pub const IDENTIFIER_SYMBOL_TYPE : TokenTypeIdx = (ALL_KEYWORDS.len() + ALL_SYMBOLS.len()) as TokenTypeIdx;
 pub const NUMBER_SYMBOL_INDEX : TokenTypeIdx = IDENTIFIER_SYMBOL_TYPE + 1;
 pub const INVALID_SYMBOL_INDEX : TokenTypeIdx = NUMBER_SYMBOL_INDEX + 1;
 
-#[derive(Debug,Clone,PartialEq,Eq)]
+#[derive(Debug,Clone)]
 pub struct Token<'a> {
     pub typ : TokenTypeIdx,
     pub text : &'a str

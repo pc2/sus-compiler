@@ -1,8 +1,7 @@
 
 use crate::tokenizer::*;
 
-#[macro_use]
-use crate::kw;
+use crate::tokenizer::kw;
 
 struct HardwareModule {
     name : String
@@ -49,7 +48,7 @@ pub fn parse(tokens : &[Token], comments : &[CommentToken]) -> ASTRoot {
             None => return ASTRoot{modules : modules},
             Some(tok) => {
                 let t = tok.typ;
-                if t == kw!("module") {
+                if t == kw("module") {
                     
                 }
             }

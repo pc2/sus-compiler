@@ -3,7 +3,7 @@
 module multiply_add : i32 a, i32 b, i32 c -> i32 result {
 
 	// temporary variable
-	i32 tmp = a * b
-	result = tmp + c + 30
+	i32 tmp = a * b;
+	result = tmp + c + 30;
 
 }
