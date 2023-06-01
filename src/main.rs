@@ -1,7 +1,9 @@
 
 mod tokenizer;
 mod parser;
-use tokenizer::{tokenize, ParsingErr};
+mod errors;
+use parser::parse;
+use tokenizer::*;
 
 use console::{style, Style};
 
@@ -15,9 +17,7 @@ fn pretty_print_chunk_with_whitespace(whitespace_start : usize, file_text : &str
     return new_whitespace_start;
 }
 
-fn pretty_print(file_text : &str) {
-    let (token_vec, comments, _token_errors) = tokenize(file_text);
-
+fn pretty_print(file_text : &str, token_vec : &[Token], comments : &[CommentToken]) {
     let mut whitespace_start : usize = 0;
 
     let mut comment_iter = comments.iter().peekable();
@@ -32,13 +32,13 @@ fn pretty_print(file_text : &str) {
             }
         }
 
-        let st = if token.is_keyword() {
+        let st = if is_keyword(token.typ) {
             Style::new().blue()
-        } else if token.is_symbol() {
+        } else if is_symbol(token.typ) {
             Style::new().cyan()
-        } else if token.is_identifier() {
+        } else if is_identifier(token.typ) {
             Style::new().white()
-        } else if token.is_number() {
+        } else if is_number(token.typ) {
             Style::new().green().bright()
         } else {
             Style::new().red().underlined()
@@ -59,63 +59,27 @@ fn find_line_starts(text : &str) -> Vec<usize> {
     result
 }
 
-struct FilePosition {
-    pub line : usize,
-    pub col : usize,
-}
-
-fn to_file_position(line_start_buffer : &[usize], char_i : usize) -> FilePosition {
-    let line = match line_start_buffer.binary_search_by(|probe| probe.cmp(&char_i)) {
-        Ok(v) => v,
-        Err(v) => v-1
-    };
-    let col = char_i - line_start_buffer[line];
-    FilePosition{line : line, col : col}
-}
-
-fn pretty_print_error(line_start_buffer : &[usize], text : &str, err : &ParsingErr) {
-    let total_lines = line_start_buffer.len();
-
-    let part_start = err.position.as_ptr() as usize - text.as_ptr() as usize;
-    let part_end = part_start + err.position.len();
-
-    let err_start = to_file_position(line_start_buffer, part_start);
-    let err_end = to_file_position(line_start_buffer, part_end);
-
-    const LINES_BEFORE_MARGIN : usize = 3;
-    const LINES_AFTER_MARGIN : usize = 3;
-
-    let before_margin_line = if err_start.line < LINES_BEFORE_MARGIN {0} else {err_start.line - LINES_BEFORE_MARGIN};
-    let after_margin_line = if err_end.line > total_lines - LINES_AFTER_MARGIN {total_lines} else {err_start.line + LINES_BEFORE_MARGIN};
-
-    print!("{}", text.get(line_start_buffer[before_margin_line]..part_start).unwrap());
-    print!("{}", style(err.position).red().underlined());
-    print!("{}", text.get(part_end..line_start_buffer[err_end.line+1]).unwrap());
-    print!("{}{}\n", " ".repeat(err_start.col), style("^ ".to_owned() + err.reason).red());
-    print!("{}", text.get(line_start_buffer[err_end.line+1]..line_start_buffer[after_margin_line+1]).unwrap());
-}
-
 fn main() {
     let file_path = "multiply_add.sus";
     
     match std::fs::read_to_string(file_path) {
+        Err(err) => {
+            println!("Could not open file {}: {}", style(file_path).yellow(), style(err.to_string()));
+            std::process::exit(1);
+        },
         Ok(file_text) => {
-            let (_token_vec, _comments, token_errors) = tokenize(&file_text);
+            let (mut token_vec, comments, token_errors) = tokenize(&file_text);
         
             if !token_errors.is_empty() {
                 let line_start_buffer = find_line_starts(&file_text);
                 for err in token_errors {
-                    pretty_print_error(&line_start_buffer, &file_text, &err);
+                    err.pretty_print(&line_start_buffer, &file_text);
                 }
                 std::process::exit(1);
-            } else {
-                pretty_print(&file_text);
-                std::process::exit(0);
             }
-        },
-        Err(err) => {
-            println!("Could not open file {}: {}", style(file_path).yellow(), style(err.to_string()));
-            std::process::exit(1);
+            
+            parse(&mut token_vec);
+            pretty_print(&file_text, &token_vec, &comments);
         }
     }
 }
