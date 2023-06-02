@@ -3,8 +3,11 @@ name = "sus_compiler"
 version = "0.0.1"
 authors = ["VonTum <lennart.vanhirtum@gmail.com>"]
 edition = "2018"
+repository = "https://github.com/pc2/sus-compiler"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 console = "0.15.7"
+# chumsky = "0.9.2"

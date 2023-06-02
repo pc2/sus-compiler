@@ -1,12 +1,8 @@
 
-use crate::{tokenizer::*, errors::ParsingError};
+use crate::{tokenizer::*, errors::*};
 
-use std::iter::Peekable;
+use std::iter::{Peekable, Enumerate};
 use core::slice::Iter;
-use core::ops::Range;
-
-// TokenRange, denotes the range of tokens that this object encompasses
-type TR = Range<usize>;
 
 #[derive(Debug)]
 enum SignalType<'a> {
@@ -56,13 +52,13 @@ pub struct ASTRoot<'a> {
 }
 
 type TokenStream<'a> = Peekable<Iter<'a, Token<'a>>>;
-
+/*
 fn eat<'a>(mut token_stream : &mut TokenStream<'a>, expected_token_type : TokenTypeIdx) -> Result<&'a str, ParsingError<'a>> {
     let found = token_stream.next().unwrap();
     if found.typ == expected_token_type {
         Ok(found.text)
     } else {
-        Err(ParsingError::new_error_incorrect_token(expected_token_type, found, "while reading module context"))
+        Err(error_incorrect_token(expected_token_type, found, "while reading module context"))
     }
 }
 
@@ -114,19 +110,75 @@ fn parse_module<'a>(token_stream : &mut TokenStream<'a>) -> Result<HardwareModul
     // WIP TokenRange, and parsing the module implementation
 
     Ok(HardwareModule{name: module_name, interface : module_interface})
+}*/
+
+pub enum TokenTreeNode {
+    PlainToken(TokenTypeIdx, usize), // Has the index of the given token to the global Token array
+    // Code between '{' and '}', '(' and ')', or '[' and ']' exclusive. Contains sublist of tokens, index of open, index of close bracket
+    Block(TokenTypeIdx, Vec<Self>, usize, usize), 
 }
 
-pub fn parse<'a>(tokens : &'a [Token<'a>]) -> Result<ASTRoot<'a>, ParsingError<'a>> {
-    let mut token_iter : TokenStream<'a> = tokens.iter().peekable();
+struct TokenHierarchyStackElem {
+    open_bracket : TokenTypeIdx, 
+    open_bracket_pos : usize,
+    parent : Vec<TokenTreeNode>
+}
 
-    let mut modules : Vec<HardwareModule> = Vec::new();
-    loop {
-        let tok = token_iter.next().unwrap();
-        
-        if tok.typ == TOKEN_END_OF_FILE {
-            return Ok(ASTRoot{modules : modules});
-        } else if tok.typ == kw("module") {
-            modules.push(parse_module(&mut token_iter)?);
+pub fn to_token_hierarchy<'a>(tokens : &[Token<'a>]) -> (Vec<TokenTreeNode>, Vec<ParsingError<'a>>) {
+    let mut cur_token_slab : Vec<TokenTreeNode> = Vec::new();
+    let mut stack : Vec<TokenHierarchyStackElem> = Vec::new(); // Type of opening bracket, token position, Token Subtree
+    let mut errors : Vec<ParsingError<'a>> = Vec::new();
+
+    for (idx, tok) in tokens.iter().enumerate() {
+        match is_bracket(tok.typ) {
+            IsBracket::Open => {
+                stack.push(TokenHierarchyStackElem{open_bracket : tok.typ, open_bracket_pos : idx, parent : cur_token_slab});
+                cur_token_slab = Vec::new();
+            },
+            IsBracket::Close => {
+                if let Some(cur_block) = stack.pop() {
+                    if closes(cur_block.open_bracket, tok.typ) { // All is well. This bracket was closed properly. Happy path!
+                        let mut parent_cur_token_slab = cur_block.parent;
+                        parent_cur_token_slab.push(TokenTreeNode::Block(cur_block.open_bracket, cur_token_slab, cur_block.open_bracket_pos, idx));
+                        cur_token_slab = parent_cur_token_slab;
+                    } else {
+                        errors.push(error_unclosed_bracket(&tokens[idx], tok));
+                        // Is this an incorrect starting bracket, or ending bracket?
+                        // TODO add better error recovery
+                    }
+                } else {
+                    // Too many close brackets
+                    errors.push(error_basic_str(tok.text, "A close bracket had no corresponding opening bracket."));
+                    continue;
+                }
+            },
+            IsBracket::NotABracket => {
+                cur_token_slab.push(TokenTreeNode::PlainToken(tok.typ, idx));
+            }
         }
     }
+
+    while let Some(unclosed) = stack.pop() {
+        errors.push(error_basic_str(tokens[unclosed.open_bracket_pos].text, "Bracket was not closed before EOF!"))
+    }
+
+    (cur_token_slab, errors)
+}
+
+pub fn parse<'a>(tokens : &[Token<'a>]) -> Result<ASTRoot<'a>, ParsingError<'a>> {
+    let (token_hierarchy, errors) = to_token_hierarchy(tokens);
+
+
+    //let mut token_iter : TokenStream<'a> = tokens.iter().peekable();
+
+    let mut modules : Vec<HardwareModule> = Vec::new();
+
+
+
+    /*while let Some(tok) = token_iter.next() {
+        if tok.typ == kw("module") {
+            modules.push(parse_module(&mut token_iter)?);
+        }
+    }*/
+    Ok(ASTRoot{modules : modules})
 }

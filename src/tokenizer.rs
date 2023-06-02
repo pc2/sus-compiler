@@ -1,6 +1,6 @@
 use std::str::CharIndices;
 
-use crate::errors::ParsingError;
+use crate::errors::*;
 
 pub type TokenTypeIdx = u8;
 
@@ -40,29 +40,27 @@ pub const ALL_SYMBOLS : [&'static str; 29] = [
     "<",
     ">",
     "=",
-    "[",
-    "]",
-    "(",
+    "(", // Close parens are always 1 larger than their open variant, (see closes())
     ")",
     "{",
     "}",
+    "[",
+    "]",
     ",",
     ";",
     ":",
     "@"
 ];
 
-pub const MISC_TOKENS : [&'static str; 4] = [
+pub const MISC_TOKENS : [&'static str; 3] = [
     "IDENTIFIER",
     "NUMBER",
-    "EOF",
     "INVALID"
 ];
 
 pub const TOKEN_IDENTIFIER : TokenTypeIdx = (ALL_KEYWORDS.len() + ALL_SYMBOLS.len()) as TokenTypeIdx;
 pub const TOKEN_NUMBER : TokenTypeIdx = TOKEN_IDENTIFIER + 1;
-pub const TOKEN_END_OF_FILE : TokenTypeIdx = TOKEN_IDENTIFIER + 2;
-pub const TOKEN_INVALID : TokenTypeIdx = TOKEN_IDENTIFIER + 3;
+pub const TOKEN_INVALID : TokenTypeIdx = TOKEN_IDENTIFIER + 2;
 
 const fn const_eq_str(a: &str, b: &str) -> bool {
     let a_bytes = a.as_bytes();
@@ -127,6 +125,28 @@ pub fn get_token_type_name(typ : TokenTypeIdx) -> &'static str {
     }
 }
 
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
+pub enum IsBracket {
+    Open,
+    Close,
+    NotABracket
+}
+pub fn is_bracket(typ : TokenTypeIdx) -> IsBracket {
+    if typ == kw("(") || typ == kw("{") || typ == kw("[") {
+        IsBracket::Open
+    } else if typ == kw(")") || typ == kw("}") || typ == kw("]") {
+        IsBracket::Close
+    } else {
+        IsBracket::NotABracket
+    }
+}
+pub fn closes(open : TokenTypeIdx, close : TokenTypeIdx) -> bool {
+    assert!(is_bracket(open) == IsBracket::Open, "Open is not an open paren!");
+    assert!(is_bracket(close) == IsBracket::Close, "Close is not a close paren!");
+
+    close == open + 1
+}
+
 #[derive(Debug,Clone)]
 pub struct Token<'a> {
     pub typ : TokenTypeIdx,
@@ -144,25 +164,22 @@ fn is_valid_identifier_char(c : char) -> bool {
 }
 
 fn iter_until_comment_end(mut file_char_iter : &mut CharIndices) -> Option<usize> {
-	loop {
-		if let Some((_, comment_char)) = file_char_iter.next() {
-			if comment_char == '*' {
-				// end of single line comment
-				for (comment_i_2, comment_char_2) in &mut file_char_iter {
-					if comment_char_2 == '/' {
-						// End of comment
-						return Some(comment_i_2);
-					} else if comment_char_2 == '*' {
-						continue;
-					} else {
-						break;
-					}
-				}
-			}
-		} else {
-			return None
-		}
-	}
+	while let Some((_, comment_char)) = file_char_iter.next() {
+        if comment_char == '*' {
+            // end of single line comment
+            for (comment_i_2, comment_char_2) in &mut file_char_iter {
+                if comment_char_2 == '/' {
+                    // End of comment
+                    return Some(comment_i_2);
+                } else if comment_char_2 == '*' {
+                    continue;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+    return None
 }
 
 fn find_end_of_identifier(mut file_char_iter : &mut CharIndices) -> Option<(usize, char)> {
@@ -179,76 +196,71 @@ pub fn tokenize<'a>(file_data : &'a str) -> (Vec<Token<'a>>, Vec<CommentToken<'a
     let mut file_char_iter = file_data.char_indices();
     let mut errors : Vec<ParsingError<'a>> = Vec::new();
     let mut comments : Vec<CommentToken<'a>> = Vec::new();
-    loop {
-        if let Some((mut char_i, mut cur_char)) = file_char_iter.next() {
-            if is_valid_identifier_char(cur_char) {
-                // Start of word
-                let end_of_identifier = find_end_of_identifier(&mut file_char_iter);
-                let was_end_of_file = end_of_identifier.is_none();
-                let word = if let Some((word_end, next_char)) = end_of_identifier {
-                    // no looping back the iterator, just continue from non-alphanumeric character
-                    let result = file_data.get(char_i..word_end).unwrap();
-                    char_i = word_end;
-                    cur_char = next_char;
-                    result
+    while let Some((mut char_i, mut cur_char)) = file_char_iter.next() {
+        if is_valid_identifier_char(cur_char) {
+            // Start of word
+            let end_of_identifier = find_end_of_identifier(&mut file_char_iter);
+            let was_end_of_file = end_of_identifier.is_none();
+            let word = if let Some((word_end, next_char)) = end_of_identifier {
+                // no looping back the iterator, just continue from non-alphanumeric character
+                let result = file_data.get(char_i..word_end).unwrap();
+                char_i = word_end;
+                cur_char = next_char;
+                result
+            } else {
+                file_data.get(char_i..).unwrap()
+            };
+
+            let mut word_chars = word.chars();
+
+            let sym_type = if word_chars.next().unwrap().is_digit(10) {
+                // It's a number
+                if word_chars.find(|v| !v.is_digit(10)).is_some() {
+                    errors.push(error_basic_str(word, "Unexpected letter within number"));
+                    TOKEN_INVALID
+                } else {
+                    TOKEN_NUMBER
+                }
+            } else if let Some(keyword_id) = ALL_KEYWORDS.iter().position(|&kw| kw == word) {
+                keyword_id as TokenTypeIdx
+            } else {
+                TOKEN_IDENTIFIER
+            };
+            tokens.push(Token{typ : sym_type, text : word});
+
+            if was_end_of_file {
+                break;
+            }
+        } // no else! Continue next character
+        if cur_char.is_whitespace() {
+            // Whitespace, ignore
+            continue;
+        } else {
+            if file_data.get(char_i..char_i+2) == Some("//") {
+                file_char_iter.next();
+                let comment_text = if let Some((comment_i, _)) = file_char_iter.find(|&(_comment_i, comment_char)| comment_char == '\n') {
+                    file_data.get(char_i..comment_i).unwrap()
                 } else {
                     file_data.get(char_i..).unwrap()
                 };
-
-                let mut word_chars = word.chars();
-
-                let sym_type = if word_chars.next().unwrap().is_digit(10) {
-                    // It's a number
-                    if word_chars.find(|v| !v.is_digit(10)).is_some() {
-                        errors.push(ParsingError::new_unowned("P002", "Unexpected letter within number", word));
-                        TOKEN_INVALID
-                    } else {
-                        TOKEN_NUMBER
-                    }
-                } else if let Some(keyword_id) = ALL_KEYWORDS.iter().position(|&kw| kw == word) {
-                    keyword_id as TokenTypeIdx
+                comments.push(CommentToken{text : comment_text, token_idx : tokens.len()});
+            } else if file_data.get(char_i..char_i+2) == Some("/*") {
+                file_char_iter.next();
+                let comment_text = if let Some(comment_i) = iter_until_comment_end(&mut file_char_iter) {
+                    file_data.get(char_i..comment_i+1).unwrap()
                 } else {
-                    TOKEN_IDENTIFIER
+                    file_data.get(char_i..).unwrap()
                 };
-                tokens.push(Token{typ : sym_type, text : word});
-
-                if was_end_of_file {
-                    break;
-                }
-            } // no else! Continue next character
-            if cur_char.is_whitespace() {
-                // Whitespace, ignore
-                continue;
-            } else {
-                if file_data.get(char_i..char_i+2) == Some("//") {
-                    file_char_iter.next();
-					let comment_text = if let Some((comment_i, _)) = file_char_iter.find(|&(_comment_i, comment_char)| comment_char == '\n') {
-						file_data.get(char_i..comment_i).unwrap()
-					} else {
-						file_data.get(char_i..).unwrap()
-					};
-                    comments.push(CommentToken{text : comment_text, token_idx : tokens.len()});
-                } else if file_data.get(char_i..char_i+2) == Some("/*") {
-                    file_char_iter.next();
-                    let comment_text = if let Some(comment_i) = iter_until_comment_end(&mut file_char_iter) {
-						file_data.get(char_i..comment_i+1).unwrap()
-					} else {
-						file_data.get(char_i..).unwrap()
-					};
-                    comments.push(CommentToken{text : comment_text, token_idx : tokens.len()});
-                } else if let Some(symbol_id) = ALL_SYMBOLS.iter().position(|&symb| Some(symb) == file_data.get(char_i..char_i+symb.len())) {
-                    let symbol_text = file_data.get(char_i..char_i+ALL_SYMBOLS[symbol_id].len()).unwrap();
-                    file_char_iter.nth(symbol_text.len() - 1);
-                    tokens.push(Token{typ : (symbol_id + ALL_KEYWORDS.len()) as TokenTypeIdx, text : symbol_text});
-                } else { // Symbol not found!
-                    errors.push(ParsingError::new_unowned("P001", "Unexpected character", file_data.get(char_i..char_i+1).unwrap()));
-                }
+                comments.push(CommentToken{text : comment_text, token_idx : tokens.len()});
+            } else if let Some(symbol_id) = ALL_SYMBOLS.iter().position(|&symb| Some(symb) == file_data.get(char_i..char_i+symb.len())) {
+                let symbol_text = file_data.get(char_i..char_i+ALL_SYMBOLS[symbol_id].len()).unwrap();
+                file_char_iter.nth(symbol_text.len() - 1);
+                tokens.push(Token{typ : (symbol_id + ALL_KEYWORDS.len()) as TokenTypeIdx, text : symbol_text});
+            } else { // Symbol not found!
+                errors.push(error_basic_str(file_data.get(char_i..char_i+1).unwrap(), "Unexpected character"));
             }
-        } else {
-            break;
         }
     }
 
-    tokens.push(Token{typ : TOKEN_END_OF_FILE, text : file_data.get(file_data.len()-1..).unwrap()});
     return (tokens, comments, errors);
 }
