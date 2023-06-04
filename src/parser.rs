@@ -41,18 +41,18 @@ enum Statement<'a> {
 type StatementBlock<'a> = Vec<Statement<'a>>;
 
 #[derive(Debug)]
-struct HardwareModule<'a> {
+struct Module<'a> {
     name : &'a str,
     interface : Interface<'a>
 }
 
 #[derive(Debug)]
 pub struct ASTRoot<'a> {
-    modules : Vec<HardwareModule<'a>>
+    modules : Vec<Module<'a>>
 }
 
 type TokenStream<'a> = Peekable<Iter<'a, Token<'a>>>;
-/*
+
 fn eat<'a>(mut token_stream : &mut TokenStream<'a>, expected_token_type : TokenTypeIdx) -> Result<&'a str, ParsingError<'a>> {
     let found = token_stream.next().unwrap();
     if found.typ == expected_token_type {
@@ -101,7 +101,7 @@ fn parse_interface<'a>(token_stream : &mut TokenStream<'a>) -> Result<Interface<
     Ok(Interface{inputs : inputs, outputs : outputs})
 }
 
-fn parse_module<'a>(token_stream : &mut TokenStream<'a>) -> Result<HardwareModule<'a>, ParsingError<'a>> {
+fn parse_module<'a>(token_stream : &mut TokenStream<'a>) -> Result<Module<'a>, ParsingError<'a>> {
     let module_name = eat(token_stream, TOKEN_IDENTIFIER)?;
     eat(token_stream, kw(":"))?;
 
@@ -109,8 +109,8 @@ fn parse_module<'a>(token_stream : &mut TokenStream<'a>) -> Result<HardwareModul
 
     // WIP TokenRange, and parsing the module implementation
 
-    Ok(HardwareModule{name: module_name, interface : module_interface})
-}*/
+    Ok(Module{name: module_name, interface : module_interface})
+}
 
 pub enum TokenTreeNode {
     PlainToken(TokenTypeIdx, usize), // Has the index of the given token to the global Token array
@@ -165,20 +165,102 @@ pub fn to_token_hierarchy<'a>(tokens : &[Token<'a>]) -> (Vec<TokenTreeNode>, Vec
     (cur_token_slab, errors)
 }
 
-pub fn parse<'a>(tokens : &[Token<'a>]) -> Result<ASTRoot<'a>, ParsingError<'a>> {
-    let (token_hierarchy, errors) = to_token_hierarchy(tokens);
+struct AST_Parser_Context<'a> {
+    file_text : &'a str,
+    errors : Vec<ParsingError<'a>>,
+    tokens : &'a [Token<'a>]
+}
+
+type TokenIter<'it> = Iter<'it, TokenTreeNode>;
 
 
-    //let mut token_iter : TokenStream<'a> = tokens.iter().peekable();
+pub fn get_file_error_span<'a>(file_text : &'a str, tokens : &[Token<'a>], start_tok : usize, end_tok : usize) -> &'a str {
+    let start_str = tokens[start_tok].text;
+    let end_str = tokens[end_tok].text;
 
-    let mut modules : Vec<HardwareModule> = Vec::new();
+    let start = file_text.as_ptr() as usize - start_str.as_ptr() as usize;
+    let end = file_text.as_ptr() as usize - end_str.as_ptr() as usize + end_str.len();
 
+    file_text.get(start..end).unwrap()
+}
 
-
-    /*while let Some(tok) = token_iter.next() {
-        if tok.typ == kw("module") {
-            modules.push(parse_module(&mut token_iter)?);
+impl<'a> AST_Parser_Context<'a> {
+    fn eat_or_error<'b>(&mut self, iter : &mut TokenIter<'b>, prev_token_idx : usize, error_reason : &str) -> Option<&'b TokenTreeNode> {
+        if let Some(found) = iter.next() {
+            Some(found)
+        } else {
+            self.errors.push(error_basic(self.tokens[prev_token_idx].text, "Unexpected end of scope while parsing ".to_owned() + error_reason));
+            None
         }
-    }*/
-    Ok(ASTRoot{modules : modules})
+    }
+    fn eat_plain<'b>(&mut self, iter : &mut TokenIter<'b>, expected : TokenTypeIdx, prev_token_idx : usize, error_reason : &str) -> Option<(usize, &'a str)> {
+        let tok_elem : &TokenTreeNode = self.eat_or_error(iter, prev_token_idx, error_reason)?;
+        
+        match tok_elem {
+            &TokenTreeNode::PlainToken(typ, idx) => {
+                if typ == expected {
+                    Some((idx, self.tokens[idx].text))
+                } else {
+                    self.errors.push(error_basic(self.tokens[idx].text, "Unexpected token. Expected ".to_owned() + get_token_type_name(expected) + " but found " + get_token_type_name(typ)));
+                    None
+                }
+            },
+            &TokenTreeNode::Block(_, _, block_start, block_end) => {
+                self.errors.push(error_basic(get_file_error_span(self.file_text, self.tokens, block_start, block_end), "Unexpected Code Block. Expected ".to_owned() + get_token_type_name(expected) + " but found Code Block"));
+                None
+            }
+        }
+    }
+    fn eat_block<'b>(&mut self, iter : &mut TokenIter<'b>, expected_block_opener : TokenTypeIdx, prev_token_idx : usize, error_reason : &str) -> Option<(usize, usize, &'b [TokenTreeNode])> {
+        let tok_elem : &TokenTreeNode = self.eat_or_error(iter, prev_token_idx, error_reason)?;
+        
+        match tok_elem {
+            TokenTreeNode::Block(opener_typ, contents, block_start, block_end) => {
+                if *opener_typ == expected_block_opener {
+                    Some((*block_start, *block_end, contents))
+                } else {
+                    let error_span = get_file_error_span(self.file_text, self.tokens, *block_start, *block_end);
+                    self.errors.push(error_basic(error_span, "Unexpected Block of incorrect type. Expected a block starting with '".to_owned() + get_token_type_name(*opener_typ) + "'"));
+                    None
+                }
+            },
+            TokenTreeNode::PlainToken(typ, idx) => {
+                self.errors.push(error_basic(self.tokens[*idx].text, "Unexpected token. Expected Code Block but found ".to_owned() + get_token_type_name(*typ)));
+                None
+            }
+        }
+    }
+
+    fn parse_module(&mut self, iter : &mut TokenIter, first_token_idx : usize) -> Module<'a> {
+        unimplemented!()
+    }
+
+    fn parse_ast(&mut self, outer_token_iter : &mut TokenIter) -> ASTRoot<'a> {
+        let mut found_modules : Vec<Module<'a>> = Vec::new();
+
+        while let Some(t) = outer_token_iter.next() {
+            if let &TokenTreeNode::PlainToken(typ, pos) = t {
+                if typ == kw("module") {
+                    //found_modules.push(self.parse_module(outer_token_iter, pos));
+                }
+            }
+        }
+
+        ASTRoot{modules : found_modules}
+    }
+}
+
+pub fn parse<'a>(file_text : &'a str, tokens : &'a [Token<'a>]) -> (ASTRoot<'a>, Vec<TokenTreeNode>, Vec<ParsingError<'a>>) {
+    let (token_hierarchy, mut hierarchy_errors) = to_token_hierarchy(tokens);
+
+    let mut context = AST_Parser_Context{file_text : file_text, errors : Vec::new(), tokens : tokens};
+    let ast_root : ASTRoot<'a> = context.parse_ast(&mut token_hierarchy.iter());
+    
+    if hierarchy_errors.is_empty() {
+        hierarchy_errors.append(&mut context.errors);
+    } else {
+        hierarchy_errors = context.errors;
+    }
+
+    (ast_root, token_hierarchy, hierarchy_errors)
 }

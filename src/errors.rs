@@ -56,10 +56,6 @@ pub fn error_with_info<'a>(position : &'a str, reason : String, infos : Vec<Erro
     ParsingError{error : error_info(position, reason), infos : infos}
 }
 
-pub fn error_bad_char<'a>(expected : TokenTypeIdx, found : &Token<'a>, context : &str) -> ParsingError<'a> {
-    let reason = "Unexpected Token. Expected ".to_owned() + get_token_type_name(expected) + " but found " + get_token_type_name(found.typ) + " " + context;
-    error_basic(found.text, reason)
-}
 pub fn error_incorrect_token<'a>(expected : TokenTypeIdx, found : &Token<'a>, context : &str) -> ParsingError<'a> {
     let reason = "Unexpected Token. Expected ".to_owned() + get_token_type_name(expected) + " but found " + get_token_type_name(found.typ) + " " + context;
     error_basic(found.text, reason)
@@ -68,7 +64,6 @@ pub fn error_unclosed_bracket<'a>(open : &Token<'a>, close_before : &Token<'a>) 
     let reason = "Unclosed bracket. ".to_owned() + open.text + " must be closed before " + close_before.text;
     error_with_info(open.text, reason, vec![error_info_str(close_before.text, "must be closed before this token")])
 }
-
 
 struct FilePosition {
     pub line : usize,
