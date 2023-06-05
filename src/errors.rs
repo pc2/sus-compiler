@@ -56,8 +56,26 @@ pub fn error_with_info<'a>(position : &'a str, reason : String, infos : Vec<Erro
     ParsingError{error : error_info(position, reason), infos : infos}
 }
 
-pub fn error_incorrect_token<'a>(expected : TokenTypeIdx, found : &Token<'a>, context : &str) -> ParsingError<'a> {
-    let reason = "Unexpected Token. Expected ".to_owned() + get_token_type_name(expected) + " but found " + get_token_type_name(found.typ) + " " + context;
+pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
+    assert!(!expected.is_empty());
+    let mut result = String::new();
+    for exp in expected.get(..expected.len() - 1).unwrap() {
+        result += "'";
+        result += get_token_type_name(*exp);
+        result += "',";
+    }
+    if expected.len() >= 2 {
+        result += " or ";
+    }
+    result += "'";
+    result += get_token_type_name(expected[expected.len() - 1]);
+    result += "'";
+    result
+}
+
+pub fn error_incorrect_token<'a>(expected : &[TokenTypeIdx], found : &Token<'a>, context : &str) -> ParsingError<'a> {
+    let reason = "Unexpected Token. Expected ".to_owned() + &join_expected_list(expected) + " but found '" + get_token_type_name(found.typ) + "' " + context;
+
     error_basic(found.text, reason)
 }
 pub fn error_unclosed_bracket<'a>(open : &Token<'a>, close_before : &Token<'a>) -> ParsingError<'a> {

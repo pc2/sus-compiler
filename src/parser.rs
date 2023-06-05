@@ -4,118 +4,100 @@ use crate::{tokenizer::*, errors::*};
 use std::iter::{Peekable, Enumerate};
 use core::slice::Iter;
 
-#[derive(Debug)]
-enum SignalType<'a> {
-    Named(&'a str)
-}
+type TokenPos = usize;
+
+#[derive(Clone,Copy,Debug)]
+pub struct Span(TokenPos,TokenPos);
 
 #[derive(Debug)]
-struct SignalDeclaration<'a> {
-    typ : SignalType<'a>,
-    name : &'a str
+enum SignalType {
+    Named(TokenPos)
 }
-
-type Bundle<'a> = Vec<SignalDeclaration<'a>>;
+type SpanSignalType = (SignalType, Span);
 
 #[derive(Debug)]
-struct Interface<'a> {
-    inputs : Bundle<'a>,
-    outputs : Bundle<'a>
+struct SignalDeclaration {
+    span : Span,
+    typ : SpanSignalType,
+    name_token : TokenPos
 }
 
-struct InterspersedVec<T, I> {
-    first : T,
-    others : Vec<(I,T)>
-}
-
-enum Expression<'a> {
-    Named(&'a str),
-    Sum(Vec<(TokenTypeIdx, )>)
-}
-
-enum Statement<'a> {
-    Declare(SignalDeclaration<'a>),
-    Assign(&'a str, Expression<'a>)
-}
-
-type StatementBlock<'a> = Vec<Statement<'a>>;
+type Bundle = Vec<SignalDeclaration>;
 
 #[derive(Debug)]
-struct Module<'a> {
-    name : &'a str,
-    interface : Interface<'a>
+struct Interface {
+    span : Span,
+    inputs : Bundle,
+    outputs : Bundle
 }
 
 #[derive(Debug)]
-pub struct ASTRoot<'a> {
-    modules : Vec<Module<'a>>
+enum AddSubtract {
+    Add,
+    Subtract
+}
+#[derive(Debug)]
+enum MulDiv {
+    Multiply,
+    Divide,
+    Modulo
+}
+#[derive(Debug)]
+enum Expression {
+    Named(TokenPos),
+    Sum(Vec<(AddSubtract, SpanExpression)>),
+    Mul(Vec<(MulDiv, SpanExpression)>)
+}
+type SpanExpression = (Expression, Span);
+
+#[derive(Debug)]
+enum Statement {
+    Declare(SignalDeclaration),
+    Assign(TokenPos, SpanExpression)
 }
 
-type TokenStream<'a> = Peekable<Iter<'a, Token<'a>>>;
 
-fn eat<'a>(mut token_stream : &mut TokenStream<'a>, expected_token_type : TokenTypeIdx) -> Result<&'a str, ParsingError<'a>> {
-    let found = token_stream.next().unwrap();
-    if found.typ == expected_token_type {
-        Ok(found.text)
-    } else {
-        Err(error_incorrect_token(expected_token_type, found, "while reading module context"))
-    }
+#[derive(Debug)]
+enum CodeBlock {
+
 }
 
-fn parse_signal_type<'a>(token_stream : &mut TokenStream<'a>) -> Result<SignalType<'a>, ParsingError<'a>> {
-    let type_name = eat(token_stream, TOKEN_IDENTIFIER)?;
-    Ok(SignalType::Named(type_name))
+#[derive(Debug)]
+struct Module {
+    span : Span,
+    name : TokenPos,
+    interface : Interface
 }
 
-fn parse_signal_declaration<'a>(token_stream : &mut TokenStream<'a>) -> Result<SignalDeclaration<'a>, ParsingError<'a>> {
-    let sig_type = parse_signal_type(token_stream)?;
-    let sig_name = eat(token_stream, TOKEN_IDENTIFIER)?;
-    Ok(SignalDeclaration{typ : sig_type, name : sig_name})
-}
-
-fn parse_bundle<'a>(token_stream : &mut TokenStream<'a>) -> Result<Bundle<'a>, ParsingError<'a>> {
-    let mut result : Bundle<'a> = Vec::new();
-    loop {
-        result.push(parse_signal_declaration(token_stream)?);
-        if token_stream.peek().unwrap().typ != kw(",") {
-            return Ok(result);
-        }
-        token_stream.next();
-    }
-}
-
-fn parse_interface<'a>(token_stream : &mut TokenStream<'a>) -> Result<Interface<'a>, ParsingError<'a>> {
-    let inputs = if token_stream.peek().unwrap().typ != kw("->") {
-        parse_bundle(token_stream)?
-    } else {
-        Vec::new()
-    };
-
-    let outputs = if token_stream.peek().unwrap().typ == kw("->") {
-        token_stream.next();
-        parse_bundle(token_stream)?
-    } else {
-        Vec::new()
-    };
-
-    Ok(Interface{inputs : inputs, outputs : outputs})
-}
-
-fn parse_module<'a>(token_stream : &mut TokenStream<'a>) -> Result<Module<'a>, ParsingError<'a>> {
-    let module_name = eat(token_stream, TOKEN_IDENTIFIER)?;
-    eat(token_stream, kw(":"))?;
-
-    let module_interface = parse_interface(token_stream)?;
-
-    // WIP TokenRange, and parsing the module implementation
-
-    Ok(Module{name: module_name, interface : module_interface})
+#[derive(Debug)]
+pub struct ASTRoot {
+    modules : Vec<Module>
 }
 
 pub enum TokenTreeNode {
     PlainToken(TokenTypeIdx, usize), // Has the index of the given token to the global Token array
     // Code between '{' and '}', '(' and ')', or '[' and ']' exclusive. Contains sublist of tokens, index of open, index of close bracket
     Block(TokenTypeIdx, Vec<Self>, usize, usize), 
+}
+impl TokenTreeNode {
+    fn get_token_type(&self) -> TokenTypeIdx {
+        match self {
+            Self::PlainToken(typ, _) => *typ,
+            Self::Block(typ, _, _, _) => *typ
+        }
+    }
+    fn get_first_token_idx(&self) -> usize {
+        match self {
+            Self::PlainToken(_, pos) => *pos,
+            Self::Block(_, _, first, _) => *first
+        }
+    }
+    fn get_last_token_idx(&self) -> usize {
+        match self {
+            Self::PlainToken(_, pos) => *pos,
+            Self::Block(_, _, _, last) => *last
+        }
+    }
 }
 
 struct TokenHierarchyStackElem {
@@ -171,8 +153,50 @@ struct AST_Parser_Context<'a> {
     tokens : &'a [Token<'a>]
 }
 
-type TokenIter<'it> = Iter<'it, TokenTreeNode>;
+struct TokenStream<'it> {
+    iter : Peekable<Iter<'it, TokenTreeNode>>,
+    unexpected_eof_token : usize,
+    pub last_idx : usize
+}
 
+impl<'it> TokenStream<'it> {
+    // The given start idx should point to the first element in this block. unexpected_eof_token should point one past the last element
+    fn new(list : &'it [TokenTreeNode], start_idx : usize, unexpected_eof_token : usize) -> TokenStream<'it> {
+        TokenStream{iter : list.iter().peekable(), unexpected_eof_token : unexpected_eof_token, last_idx : start_idx}
+    }
+    fn next(&mut self) -> Option<&'it TokenTreeNode> {
+        if let Some(found) = self.iter.next() {
+            self.last_idx = found.get_last_token_idx();
+            Some(found)
+        } else {
+            None
+        }
+    }
+    fn peek(&mut self) -> Option<&'it TokenTreeNode> {
+        if let Some(&found) = self.iter.peek() {
+            Some(found)
+        } else {
+            None
+        }
+    }
+    fn peek_is_plain(&mut self, expected : TokenTypeIdx) -> bool {
+        if let Some(TokenTreeNode::PlainToken(typ, _place)) = self.iter.peek() {
+            if *typ == expected {
+                return true;
+            }
+        }
+        false
+    }
+    fn skip_until(&mut self, end_type : TokenTypeIdx) {
+        while let Some(found) = self.peek() {
+            if found.get_token_type() == end_type {
+                break;
+            }
+            self.next();
+        }
+    }
+}
+// type TokenIter<'it> = Iter<'it, TokenTreeNode>;
 
 pub fn get_file_error_span<'a>(file_text : &'a str, tokens : &[Token<'a>], start_tok : usize, end_tok : usize) -> &'a str {
     let start_str = tokens[start_tok].text;
@@ -185,23 +209,25 @@ pub fn get_file_error_span<'a>(file_text : &'a str, tokens : &[Token<'a>], start
 }
 
 impl<'a> AST_Parser_Context<'a> {
-    fn eat_or_error<'b>(&mut self, iter : &mut TokenIter<'b>, prev_token_idx : usize, error_reason : &str) -> Option<&'b TokenTreeNode> {
-        if let Some(found) = iter.next() {
+    fn eat_or_error<'it>(&mut self, token_stream : &mut TokenStream<'it>, error_reason : &str) -> Option<&'it TokenTreeNode> {
+        if let Some(found) = token_stream.next() {
             Some(found)
         } else {
-            self.errors.push(error_basic(self.tokens[prev_token_idx].text, "Unexpected end of scope while parsing ".to_owned() + error_reason));
+            self.errors.push(error_basic(self.tokens[token_stream.unexpected_eof_token].text, "Unexpected end of scope. ".to_owned() + error_reason));
             None
         }
     }
-    fn eat_plain<'b>(&mut self, iter : &mut TokenIter<'b>, expected : TokenTypeIdx, prev_token_idx : usize, error_reason : &str) -> Option<(usize, &'a str)> {
-        let tok_elem : &TokenTreeNode = self.eat_or_error(iter, prev_token_idx, error_reason)?;
+    fn eat_plain<'it>(&mut self, token_stream : &mut TokenStream<'it>, expected : TokenTypeIdx) -> Option<usize> {
+        assert!(is_bracket(expected) == IsBracket::NotABracket);
+        
+        let tok_elem : &TokenTreeNode = self.eat_or_error(token_stream, &("Expected ".to_owned() + get_token_type_name(expected)))?;
         
         match tok_elem {
             &TokenTreeNode::PlainToken(typ, idx) => {
                 if typ == expected {
-                    Some((idx, self.tokens[idx].text))
+                    Some(idx)
                 } else {
-                    self.errors.push(error_basic(self.tokens[idx].text, "Unexpected token. Expected ".to_owned() + get_token_type_name(expected) + " but found " + get_token_type_name(typ)));
+                    self.errors.push(error_incorrect_token(&[expected], &self.tokens[idx], ""));
                     None
                 }
             },
@@ -211,13 +237,15 @@ impl<'a> AST_Parser_Context<'a> {
             }
         }
     }
-    fn eat_block<'b>(&mut self, iter : &mut TokenIter<'b>, expected_block_opener : TokenTypeIdx, prev_token_idx : usize, error_reason : &str) -> Option<(usize, usize, &'b [TokenTreeNode])> {
-        let tok_elem : &TokenTreeNode = self.eat_or_error(iter, prev_token_idx, error_reason)?;
+    fn eat_block<'it>(&mut self, iter : &mut TokenStream<'it>, expected_block_opener : TokenTypeIdx) -> Option<(&'it [TokenTreeNode], usize, usize)> {
+        assert!(is_bracket(expected_block_opener) != IsBracket::NotABracket);
+        
+        let tok_elem : &TokenTreeNode = self.eat_or_error(iter, &("Expected Code Block ".to_owned() + get_token_type_name(expected_block_opener)))?;
         
         match tok_elem {
             TokenTreeNode::Block(opener_typ, contents, block_start, block_end) => {
                 if *opener_typ == expected_block_opener {
-                    Some((*block_start, *block_end, contents))
+                    Some((contents, *block_start, *block_end))
                 } else {
                     let error_span = get_file_error_span(self.file_text, self.tokens, *block_start, *block_end);
                     self.errors.push(error_basic(error_span, "Unexpected Block of incorrect type. Expected a block starting with '".to_owned() + get_token_type_name(*opener_typ) + "'"));
@@ -231,17 +259,92 @@ impl<'a> AST_Parser_Context<'a> {
         }
     }
 
-    fn parse_module(&mut self, iter : &mut TokenIter, first_token_idx : usize) -> Module<'a> {
-        unimplemented!()
+    fn parse_declaration_type(&mut self, token_stream : &mut TokenStream) -> Option<SpanSignalType> {
+        let token_idx = self.eat_plain(token_stream, TOKEN_IDENTIFIER)?;
+        Some((SignalType::Named(token_idx), Span(token_idx, token_idx)))
+    }
+    
+    fn parse_signal_declaration(&mut self, token_stream : &mut TokenStream) -> Option<SignalDeclaration> {
+        let sig_type = self.parse_declaration_type(token_stream)?;
+        let name_token = self.eat_plain(token_stream, TOKEN_IDENTIFIER)?;
+        Some(SignalDeclaration{span : Span(sig_type.1.0, token_stream.last_idx), typ : sig_type, name_token : name_token})
+    }
+    
+    fn parse_bundle(&mut self, token_stream : &mut TokenStream) -> Bundle {
+        let mut result : Bundle = Vec::new();
+        while token_stream.peek_is_plain(TOKEN_IDENTIFIER) {
+            if let Some(decl) = self.parse_signal_declaration(token_stream) {
+                result.push(decl);
+            } else {
+                // Error during parsing signal decl. Skip till "," or end of scope
+                token_stream.skip_until(kw(","));
+            }
+            
+            if !token_stream.peek_is_plain(kw(",")) {
+                break;
+            }
+            token_stream.next();
+        }
+        result
     }
 
-    fn parse_ast(&mut self, outer_token_iter : &mut TokenIter) -> ASTRoot<'a> {
-        let mut found_modules : Vec<Module<'a>> = Vec::new();
+    fn parse_interface(&mut self, token_stream : &mut TokenStream) -> Interface {
+        let start_idx = token_stream.last_idx + 1;
+
+        let inputs = self.parse_bundle(token_stream);
+    
+        let outputs = if token_stream.peek_is_plain(kw("->")) {
+            token_stream.next();
+            self.parse_bundle(token_stream)
+        } else {
+            Vec::new()
+        };
+        
+        Interface{span : Span(start_idx, token_stream.last_idx), inputs : inputs, outputs : outputs}
+    }
+
+    fn parse_code_block(&mut self, token_stream : &mut TokenStream) -> Vec<Statement> {
+        let statements : Vec<Statement> = Vec::new();
+        
+        /*while let Some(tok) = token_stream.next() {
+            if let TokenTreeNode(typ, pos) = tok {
+                
+            } else {
+                
+            }
+
+        }*/
+
+        statements
+    }
+
+    fn parse_module(&mut self, token_stream : &mut TokenStream, declaration_start_idx : usize) -> Option<Module> {
+        // done by caller 
+        // self.eat_plain(token_stream, kw("module"));
+        let module_name = self.eat_plain(token_stream, TOKEN_IDENTIFIER)?;
+        self.eat_plain(token_stream, kw(":"))?;
+
+        let module_interface = self.parse_interface(token_stream);
+
+        let (block_tokens, start, end) = self.eat_block(token_stream, kw("{"))?;
+
+        let module_code = self.parse_code_block(&mut TokenStream::new(block_tokens, start, end));
+
+        Some(Module{span : Span(declaration_start_idx, token_stream.last_idx), name: module_name, interface : module_interface})
+    }
+
+    fn parse_ast(&mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {
+        let mut found_modules : Vec<Module> = Vec::new();
 
         while let Some(t) = outer_token_iter.next() {
-            if let &TokenTreeNode::PlainToken(typ, pos) = t {
+            if let &TokenTreeNode::PlainToken(typ, module_kw_pos) = t {
                 if typ == kw("module") {
-                    //found_modules.push(self.parse_module(outer_token_iter, pos));
+                    if let Some(module) = self.parse_module(outer_token_iter, module_kw_pos) {
+                        found_modules.push(module);
+                    }
+                } else {
+                    // idk what to do with this. Continue until we recognise something?
+                    self.errors.push(error_incorrect_token(&[kw("module")], &self.tokens[t.get_first_token_idx()], "while parsing outer scope"));
                 }
             }
         }
@@ -250,11 +353,12 @@ impl<'a> AST_Parser_Context<'a> {
     }
 }
 
-pub fn parse<'a>(file_text : &'a str, tokens : &'a [Token<'a>]) -> (ASTRoot<'a>, Vec<TokenTreeNode>, Vec<ParsingError<'a>>) {
+pub fn parse<'a>(file_text : &'a str, tokens : &'a [Token<'a>]) -> (ASTRoot, Vec<TokenTreeNode>, Vec<ParsingError<'a>>) {
     let (token_hierarchy, mut hierarchy_errors) = to_token_hierarchy(tokens);
 
     let mut context = AST_Parser_Context{file_text : file_text, errors : Vec::new(), tokens : tokens};
-    let ast_root : ASTRoot<'a> = context.parse_ast(&mut token_hierarchy.iter());
+    let mut token_stream = TokenStream::new(&token_hierarchy, 0, tokens.len() - 1);
+    let ast_root : ASTRoot = context.parse_ast(&mut token_stream);
     
     if hierarchy_errors.is_empty() {
         hierarchy_errors.append(&mut context.errors);
@@ -264,3 +368,57 @@ pub fn parse<'a>(file_text : &'a str, tokens : &'a [Token<'a>]) -> (ASTRoot<'a>,
 
     (ast_root, token_hierarchy, hierarchy_errors)
 }
+
+
+/*
+use chumsky::prelude::*;
+use chumsky::error::*;
+
+pub fn parse_with_chumsky<'src>(tokens : &'src [TokenTypeIdx]) -> impl Parser<&'src [TokenTypeIdx], ASTRoot> {
+    let identifier = just(TOKEN_IDENTIFIER);
+    let value = just(TOKEN_NUMBER);
+    
+
+    let expression = recursive(|expression| 
+        choice((
+            identifier.map_with_span(|ident_token, span : Error::Span| Expression::Named(span.start)), // Just a named identifier
+            expression
+                .then(just(kw("+")))
+                .then(expression)
+                .map(|v| v)
+        ))
+
+    );
+
+    let signal_type = identifier;
+    let signal_decl = identifier.then(identifier);
+    let interface = 
+        signal_decl
+        .separated_by(kw(","))
+        .then(just(kw("->")))
+        .then(signal_decl.separated_by(kw(",")));
+
+    let statement = choice((
+        identifier,
+        signal_decl
+    ))
+        .then(kw("="))
+        .ignore_then(expression)
+        .then(kw(";"));
+
+    let code_block = 
+        statement
+        .repeated()
+        .delimited_by(
+            just(kw("{")), 
+            just(kw("}"))
+        );
+
+    let module = just(kw("module"))
+        .ignore_then(identifier.labelled("module name"))
+        .then(interface)
+        .then(code_block);
+    
+        module.repeat()
+}
+*/
