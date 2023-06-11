@@ -4,10 +4,12 @@ use crate::errors::*;
 
 pub type TokenTypeIdx = u8;
 
-pub const ALL_KEYWORDS : [&'static str; 10] = [
+pub const ALL_KEYWORDS : [&'static str; 12] = [
     "module",
     "pipeline",
     "interface",
+    "timeline",
+    "loop",
     "assume",
     "state",
     "if",
@@ -18,15 +20,15 @@ pub const ALL_KEYWORDS : [&'static str; 10] = [
 ];
 
 // ordered by which to prefer
-pub const ALL_SYMBOLS : [&'static str; 29] = [
+pub const ALL_SYMBOLS : [&'static str; 30] = [
     // Big symbols
-    "<=",
+    "->",
+    "<=", // Start of operators (see is_operator())
     ">=",
     "==",
     "!=",
     "<<",
     ">>",
-    "->",
     // small Symbols
     "+",
     "-",
@@ -39,6 +41,8 @@ pub const ALL_SYMBOLS : [&'static str; 29] = [
     "^",
     "<",
     ">",
+    "@", // End of operators (see is_operator())
+    "#",
     "=",
     "(", // Close parens are always 1 larger than their open variant, (see closes())
     ")",
@@ -48,8 +52,7 @@ pub const ALL_SYMBOLS : [&'static str; 29] = [
     "]",
     ",",
     ";",
-    ":",
-    "@"
+    ":"
 ];
 
 pub const MISC_TOKENS : [&'static str; 3] = [
@@ -108,6 +111,9 @@ pub fn is_keyword(typ : TokenTypeIdx) -> bool {
 }
 pub fn is_symbol(typ : TokenTypeIdx) -> bool {
     typ < TOKEN_IDENTIFIER
+}
+pub fn is_operator(typ : TokenTypeIdx) -> bool {
+    typ >= kw("<=") && typ <= kw("@")
 }
 pub fn is_identifier(typ : TokenTypeIdx) -> bool {
     typ == TOKEN_IDENTIFIER

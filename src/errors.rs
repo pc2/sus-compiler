@@ -29,10 +29,19 @@ impl<'a> ParsingError<'a> {
         let before_margin_line = if err_start.line < LINES_BEFORE_MARGIN {0} else {err_start.line - LINES_BEFORE_MARGIN};
         let after_margin_line = if err_end.line > total_lines - LINES_AFTER_MARGIN {total_lines} else {err_start.line + LINES_BEFORE_MARGIN};
 
-        print!("{}", text.get(line_start_buffer[before_margin_line]..part_start).unwrap());
+        let text_lines_before_error = text.get(line_start_buffer[before_margin_line]..part_start).unwrap();
+        let text_line_contents_before_error = text.get(line_start_buffer[err_start.line]..part_start).unwrap();
+
+        // This is to deal with any annoying tabs along the way, to properly position error
+        let mut text_whitespace = String::new();
+        for c in text_line_contents_before_error.chars() {
+            text_whitespace.push(if c == '\t' {'\t'} else {' '});
+        }
+
+        print!("{}", text_lines_before_error);
         print!("{}", style(self.error.position).red().underlined());
         print!("{}", text.get(part_end..line_start_buffer[err_end.line+1]).unwrap());
-        print!("{}{}\n", " ".repeat(err_start.col), style("^ ".to_owned() + &self.error.reason).red());
+        print!("{}{}\n", text_whitespace, style("^ ".to_owned() + &self.error.reason).red());
         print!("{}", text.get(line_start_buffer[err_end.line+1]..line_start_buffer[after_margin_line+1]).unwrap());
     }
 }
