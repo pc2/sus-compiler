@@ -58,10 +58,10 @@ pipeline multiply_add i32 a, i32 b, i32 c -> i32 result {
 Pipeline stages are separated by '@' symbols. Either at the statement level, or to add registers within expressions. This example would then compile to the following Verilog code:
 ```Verilog
 module multiply_add(
-  in wire[31:0] a,
-  in wire[31:0] b,
-  in wire[31:0] c,
-  out reg[31:0] result_DD // Note 'DD' means twice delayed signal
+  input[31:0] a,
+  input[31:0] b,
+  input[31:0] c,
+  output reg[31:0] result_DD // Note 'DD' means twice delayed signal
 ) {
   reg[31:0] tmp_D;
   reg[31:0] c_D; // Also need to delay c, to be in sync with tmp_D
@@ -96,6 +96,33 @@ pipeline blur : i32 a -> i32 result : timeline (a -> /) .. (a -> r)* {
   }
 }
 ```
+
+This could[^1] compile to the following Verilog
+```Verilog
+module blur(
+  input valid_in,
+  input[31:0] a,
+  output reg valid_out,
+  output reg[31:0] result
+) {
+  // Data path
+  reg[31:0] prev;
+
+  always @(posedge clk) begin
+    prev <= a;
+    result <= a + prev_a;
+  end
+  
+  // Control path
+  reg prev_valid;
+  always @(posedge clk) begin
+    prev_valid <= valid_in;
+    valid_out <= valid_in && prev_valid;
+  end
+}
+```
+
+[^1]: Control signals should be fully managed by the compiler. The compiler may decide not to output a certain control signal if the target module for example doesn't require it. 
 
 ### Stricter integer types
 I propose to add one generic integer type: *int<low, high>*. Instead of specifying the bitwidth of this integer, we specify its absolute range. It is not necessary to specify this range for every integer, as in most cases it can be inferred by the compiler. This inference allows the compiler to use the minimum bitwidth necessary to represent the integer. Signed integers are just integers with a negative lower bound. 
@@ -156,4 +183,3 @@ By including clocks in the language itself, we can then start making statements 
 - FIFO
 - Ready/Acknowledge Clock domain Crossing
 - Ring pipeline
-- 
