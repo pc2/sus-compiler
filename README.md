@@ -31,12 +31,12 @@ A great and interesting new innovation is TL-Verilog. In this language they buil
 
 ## Features
 
-### Channels
-Channels are the main abstraction used in this language. The main channel type is the 'pipe' channel. Data traveling along a 'pipe' channel has an extra bit which denotes if the data is valid. 
+### Streams
+Streams are the main abstraction used in this language. The main stream type is the 'pipe' stream. Data traveling along a 'pipe' stream has an extra bit which denotes if the data is valid. 
 
 ### Time slicing
 
-Channel data going through a pipe expects operations to only be performed on data of the same 'time slice'. This is data that has departed at the same time. Performing operations on data of different time slices is an error, unless cast explicitly (for things like FIR filters or fixed size convolutions). 
+Streams data going through a pipe expects operations to only be performed on data of the same 'time slice'. This is data that has departed at the same time. Performing operations on data of different time slices is an error, unless cast explicitly (for things like FIR filters or fixed size convolutions). 
 
 A big benefit of 'time slicing' is greater ability for debugging. Instead of staring at wave plots, the whole trajectory of a data packet can be followed throughout the pipeline, making spotting errors far easier. 
 
@@ -46,6 +46,56 @@ Critical for achieving high frequencies. Computation is split up over multiple s
 [**Filament**](https://rachitnigam.com/files/pubs/filament.pdf) has made incredible strides in improving safety for more complex pipelines, which involve processing steps taking multiple cycles. In their paper they describe a syntax of adding Delay and hold time annotations to every signal, adding module instantiations and preventing multiple uses of the same module at the same time. They were able to create a comprehensive semantic type system that captured the full timing information for statically scheduled pipelining. 
 
 I consider 'static pipelining' to be a solved problem. The one thing we can still innovate on in this area is combining these ideas. To encode the full semantic richness of Filament while keeping that terse notation that makes TL-Verilog shine. 
+
+An example of such static pipeline can be shown as follows: 
+```
+pipeline multiply_add i32 a, i32 b, i32 c -> i32 result {
+  i32 tmp = a * b;
+  @
+  result = @(tmp + c);
+}
+```
+Pipeline stages are separated by '@' symbols. Either at the statement level, or to add registers within expressions. This example would then compile to the following Verilog code:
+```Verilog
+module multiply_add(
+  in wire[31:0] a,
+  in wire[31:0] b,
+  in wire[31:0] c,
+  out reg[31:0] result_DD // Note 'DD' means twice delayed signal
+) {
+  reg[31:0] tmp_D;
+  reg[31:0] c_D; // Also need to delay c, to be in sync with tmp_D
+
+  always @(posedge clk) begin 
+    tmp_D <= a * b;
+    c_D <= c;
+    
+    result_DD <= tmp_D + c_D;
+  end
+}
+```
+
+### Regex-Like Timeline descriptions
+Often we will build modules that process a stream of data, where the operations are dependent on the order of the data. But where separate runs are still independent. IE there is no latent state between runs, as opposed to modules such as memory modules, or FIFOs, which do carry latent state. 
+
+If we have a proper description of the timeline of our outputs, we can match our output pattern to this stream, and throw a compiler error if it doesn't. 
+
+Making this distinction allows us to express timeline-bound operations, such as accumulators and stream processors with sufficient safety features. 
+
+For fixed-length timelines, this was already explored in Filament. We extend that to full timeline length. 
+
+Below is an example of a 2-wide blur filter. Its interface is described in the first part, and its run timeline shown on the timeline section. It takes a stream of indeterminate length. The first element is eaten without producing a result, and for all subsequent elements it outputs a result. (Note the difference between the '#' "timeline step" operator and the '@' "pipeline step" operator. This module takes a stream of length N, and outputs the first element of a stream of length (N-1) 2 clock cycles later. 
+```
+pipeline blur : i32 a -> i32 result : timeline (a -> /) .. (a -> r)* {
+  state prev = a;
+  #
+  loop {
+    result = @(a + prev) / 2;
+    prev = a;
+    #
+  }
+}
+```
 
 ### Stricter integer types
 I propose to add one generic integer type: *int<low, high>*. Instead of specifying the bitwidth of this integer, we specify its absolute range. It is not necessary to specify this range for every integer, as in most cases it can be inferred by the compiler. This inference allows the compiler to use the minimum bitwidth necessary to represent the integer. Signed integers are just integers with a negative lower bound. 
@@ -70,7 +120,7 @@ Timing information itself should not be part of the RTL. So the clocks' absolute
 
 As an added benefit, hardware modules can then alter their construction based on this information, so for example, a FIFO can use a standard synchronous implementation for a single clock, but then switch to different CDC approaches for (un-)synchronized clocks. 
 
-By including clocks in the language itself, we can then start making statements about data rates. For example a channel may be outputting on clock A, with full bandwidth, and then be transported onto clock A*2 at half its bandwidth. One neat way of expressing the signal throughput is done by [Aetherling](https://aetherling.org/). Signals are expressed as sequences of valid and invalid elements. This can then again filter out bad designs, where the bandwidth from one clock may not be carryable by another clock. 
+By including clocks in the language itself, we can then start making statements about data rates. For example a stream may be outputting on clock A, with full bandwidth, and then be transported onto clock A*2 at half its bandwidth. One neat way of expressing the signal throughput is done by [Aetherling](https://aetherling.org/). Signals are expressed as sequences of valid and invalid elements. This can then again filter out bad designs, where the bandwidth from one clock may not be carryable by another clock. 
 
 ### Strong Standard Library
 - Avoids repeating common structures
@@ -83,7 +133,7 @@ By including clocks in the language itself, we can then start making statements 
 - No new invalid data
 - every read must correspond to data destruction
 - data destruction must happen together with a read
-- Channel Splits and merges may not lose or duplicate date
+- Stream Splits and merges may not lose or duplicate date
 
 ### Temporal safety
 - Operations may only happen on data of the same 'time slice' within a stream
