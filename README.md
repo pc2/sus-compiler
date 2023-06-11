@@ -4,30 +4,58 @@ A Hardware Description Language focussed on strong type and temporal safety feat
 Main Inspirations: TL-Verilog, Filament, Rust
 
 ## Core philosophy
-This project is an attempt to create a safety-first, correct-by-default yet still with low level control HDL much like Rust is for the software industry. 
+This project is an attempt to create a safety-first, correct-by-default HDL. It must make programming easier and safer without sacrificing on low level control. Much akin to what Rust is for the software industry. 
 
 Current HDLs mostly build on top of existing Software languages such as Chisel and SpinalHDL. This allows for great software integration, but throws away a lot of the terseness and extended type safety that HDLs could benefit from. 
 
-A great and interesting new innovation is TL-Verilog. In this language they built a higher level abstraction for designing hardware, moving away from the Register-Transfer level to a pipeline-focussed design. This makes TL-Verilog incredibly well-suited for the development of processing pipelines. What holds TL-Verilog back from being the language that accomplishes the goals of safety, and terseness. 
+An interesting new innovation is TL-Verilog. In this language they built a higher level abstraction for designing hardware, by moving away from the Register-Transfer level to a pipeline-focussed design. This makes TL-Verilog well-suited for the development of multi-stage pipelines (a critical tenet of performance-oriented hardware). While TL-Verilog does this one thing far better than other languages, it lacks proper support for more complex pipelines, forcing the user to drop down to Verilog. This makes it not a replacement, but an extention of Verilog. 
 
-- Strong Typing
-- Eliminate common issues
-- Streams with info. Free flowing, Slowdown, stall streams
-- Temporal safety
-- Ease of creating and fine-tuning processing pipelines
-- Easy to test with software integration
+The main goals of the language are roughly listed below:
+- Strong and extensible Typing
+- Data loss and duplication safety
+- Easy to create and fine-tune processing pipelines
+- Easy to test
+- Testing Software Integration
 - Better visualization of data flow --> Eliminate Wave plots
-- Integrate most timing analyzer constraints into source files themselves. False paths, Clocks, multicycle paths, etc. All belong in the RTL specification itself, not in the timing constraints. 
+- Integrate timing constraints into source files. 
 
-### Terseness (Similar to many current HDLs, such as Chisel)
+### Basic constructs (Similar to many current HDLs, such as Chisel)
 - Bundles
 - Interfaces
 - Handle control signals with streams
 - Clocks are handled with dedicated syntax
 - Syntactic sugar for Resets
 
-### Integrate Timing Analizer constraints into language
-- False/multicycle paths
+## Tasks
+### Parsing
+- [x] Basic Tokenizer
+- [x] Basic Syntax Error Reporting
+- [ ] Syntax error reporting with infos
+- [x] Basic Token Highlighting in Terminal
+- [ ] Local Variable and Type Name highlighting
+- [ ] Can Parse Multiply-Add pipeline
+- [ ] Can Parse Blur2 filter
+- [ ] Multi-Interface Syntax
+- [ ] Native Module integration syntax
+- [ ] Can Parse FIFO implementation
+- [ ] Clock Domain Crossings
+- [ ] Rythm Syntax
+
+### LSP
+- [ ] Basic LSP for VSCode integration
+- [ ] Syntax Highlighting
+- [ ] Error and Warning Reporting
+- [ ] Per-Line Resource Utilization Reporting
+
+### Code Generation
+- [ ] Can Generate Verilog for Multiply-Add pipeline
+- [ ] Can Generate Verilog for Blur2 filter
+- [ ] Can Generate Verilog for FIFO
+- [ ] Timing Failure extraction from vendor tools
+
+### Simulation
+- [ ] Basic testbench
+- [ ] "Visualization"
 
 ## Features
 
@@ -127,16 +155,43 @@ module blur(
 ### Stricter integer types
 I propose to add one generic integer type: *int<low, high>*. Instead of specifying the bitwidth of this integer, we specify its absolute range. It is not necessary to specify this range for every integer, as in most cases it can be inferred by the compiler. This inference allows the compiler to use the minimum bitwidth necessary to represent the integer. Signed integers are just integers with a negative lower bound. 
 
+Integers come in two flavors: theorethically infinite integers, and modular arithmetic integers. 
+
+Integer bounds should rarely have to be specified. The compiler should be able to infer them most of the time. 
+
+Provide easy naming syntax for commonly-used integers: u8, u16, i8, i64, etc. 
+Predefined integer sizes should also include things like udsp "Preferred DSP size" or something
+
 We can add functions such as `int -> to2cpl -> bool[]` and `bool[] -> from2cpl -> int`
 
 This also allows us to more strictly define our interfaces. Instead of requesting an int of so many bits, we request a specific range. 
 
-Casting integers to smaller sizes is again a place where explicitly casting is required. The simulator can then check this at runtime. 
+Casting integers to smaller ranges is again a place where explicitly casting is required. The simulator can then check this at runtime. 
 
-### Module instantiation syntax
+### Modules
 There are no functions, every function is a module. 
 
-A module is instantiated as follows: `input1, input2 -> myModule -> output1, output2`
+Modules come in three flavors: Pipelines, multi-cycle pipelines and Modules
+Basic pipeline:
+```
+pipeline <name>: <typ> <name>, <typ> <name>, ... -> <result_typ> <result_name>, ... {
+  // Code...
+}
+```
+multi-cycle pipelines have an additional field that describes the timeline. 
+```
+pipeline <name>: <typ> <name>, <typ> <name>, ... -> <result_typ> <result_name>, ... : timeline (a -> /)*..(/ -> r) {
+  // Code that may utilize results across clock cycles...
+}
+```
+Finally, true modules may have multiple interfaces, and may contain state that is kept across calls
+```
+module <name>: <typ> <name>, <typ> <name>, ... -> <result_typ> <result_name>, ... : timeline (a -> /)*..(/ -> r) {
+  // Code that may utilize results across clock cycles...
+}
+```
+
+A module is instantiated as follows: `output1, output2 = myModule(input1, input2)`
 
 This can still change
 
@@ -169,10 +224,22 @@ Of course, connecting a data stream to a clock domain crossing without the prope
 
 Rythms can be generated through built-in opaque modules.
 ```
-rythmGenerator(Clock1, Clock2) : timeline () -> rythm v../..v../..v
+rythmGenerator(clk*5, clk*3) : 
+  [0]: () -> rythm v / v / v
+  [1]: () -> rythm v v v
 ```
 
 These either use compile-time information from the tool that implements the clocks, or it generates a module that tests the clock domain crossing for the proper rythm at initialization time. 
+
+Delayed rythms follow a modular arithmetic. For example a rythm between clocks with a ratio of `rythm(clk*3,clk*5)`, will repeat every 5 clock cycles of the first clock, and 3 clock cycles of the second clock. `@@@@@rythm(clk*3,clk*5)[0] = rythm(clk*3,clk*5)[0]`, `@@@rythm(clk*3,clk*5)[1] = rythm(clk*3,clk*5)[1]`
+
+### Integrate Timing Constraints into language text itself
+- False Paths
+- Multicycle Paths
+
+Often, false paths are used to denote constants that should be disseminated throughout the FPGA, or bits of hardware that won't affect each other, because only one will be active. Adding false paths relaxes the placement problem, leading to more optimal hardware implementations. 
+
+Constants specifically require that the modules the constant affect aren't being used when the constant changes. This should be representible in some way. 
 
 ### Strong Standard Library
 - Avoids repeating common structures
