@@ -149,6 +149,31 @@ As an added benefit, hardware modules can then alter their construction based on
 
 By including clocks in the language itself, we can then start making statements about data rates. For example a stream may be outputting on clock A, with full bandwidth, and then be transported onto clock A*2 at half its bandwidth. One neat way of expressing the signal throughput is done by [Aetherling](https://aetherling.org/). Signals are expressed as sequences of valid and invalid elements. This can then again filter out bad designs, where the bandwidth from one clock may not be carryable by another clock. 
 
+#### Rythm timelines
+Special timelines called 'rythm' timelines are used to make things like safe synchronous clock domain crossings possible. 
+
+let's take a 3-5 clock domain crossing:
+```
+Slow: !---------!---------!---------!---------!---------!---------!
+Fast:  !-----!-----!-----!-----!-----!-----!-----!-----!-----!-----!
+```
+To properly define the crossings, no two clocks may land at the exact same time. We offset the fast clock by a small amount to do this. 
+Data coming from the slow domain to the fast domain encounters no constraint on the sender. 
+A full stream of data will result in the following rythm:
+`v v v v v v v v v v v v v v v ...` -> `v _ v _ v v _ v _ v v _ v _ v ...`
+
+To send data from the fast to the slow clock, we must do the opposite. Our sender has to be careful to only send data when it will be picked up properly:
+`_ v _ v v _ v _ v v _ v _ v ...` -> `v v v v v v v v v v v v v v v ...`
+
+Of course, connecting a data stream to a clock domain crossing without the proper rythm is an error. 
+
+Rythms can be generated through built-in opaque modules.
+```
+rythmGenerator(Clock1, Clock2) : timeline () -> rythm v../..v../..v
+```
+
+These either use compile-time information from the tool that implements the clocks, or it generates a module that tests the clock domain crossing for the proper rythm at initialization time. 
+
 ### Strong Standard Library
 - Avoids repeating common structures
 - Refuse to rely on "inference" for hard logic blocks, instead start from the constraints inherent in these hard logic blocks to adapt the hardware around these blocks. For example hard logic registers around multiply blocks and BRAM blocks. This integrates well with streams for example. 
