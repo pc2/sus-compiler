@@ -4,55 +4,57 @@ use crate::errors::*;
 
 pub type TokenTypeIdx = u8;
 
-pub const ALL_KEYWORDS : [&'static str; 12] = [
-    "module",
-    "pipeline",
-    "interface",
-    "timeline",
-    "loop",
-    "assume",
-    "state",
-    "if",
-    "while",
-    "for",
-    "struct",
-    "enum"
+
+pub const ALL_KEYWORDS : [(&'static str, u8); 12] = [
+    ("module", 0),
+    ("pipeline", 0),
+    ("interface", 0),
+    ("timeline", 0),
+    ("loop", 0),
+    ("assume", 0),
+    ("state", 0),
+    ("if", 0),
+    ("while", 0),
+    ("for", 0),
+    ("struct", 0),
+    ("enum", 0)
 ];
 
-// ordered by which to prefer
-pub const ALL_SYMBOLS : [&'static str; 30] = [
+// Extra data is opreator prescedence. Lower number is higher prescedence of operators
+// ordered by which to prefer when parsing
+pub const ALL_SYMBOLS : [(&'static str, u8); 30] = [
     // Big symbols
-    "->",
-    "<=", // Start of operators (see is_operator())
-    ">=",
-    "==",
-    "!=",
-    "<<",
-    ">>",
+    ("->", 0),
+    ("<=", 1), // Start of operators (see is_operator())
+    (">=", 1),
+    ("==", 1),
+    ("!=", 1),
+    ("<<", 3),
+    (">>", 3),
     // small Symbols
-    "+",
-    "-",
-    "*",
-    "/",
-    "!",
-    "%",
-    "&",
-    "|",
-    "^",
-    "<",
-    ">",
-    "@", // End of operators (see is_operator())
-    "#",
-    "=",
-    "(", // Close parens are always 1 larger than their open variant, (see closes())
-    ")",
-    "{",
-    "}",
-    "[",
-    "]",
-    ",",
-    ";",
-    ":"
+    ("+", 5),
+    ("-", 5),
+    ("*", 4),
+    ("/", 4),
+    ("%", 4),
+    ("&", 2),
+    ("|", 2),
+    ("^", 2),
+    ("<", 1),
+    (">", 1),
+    ("!", 0),
+    ("@", 0), // End of operators (see is_operator())
+    ("#", 0),
+    ("=", 0),
+    ("(", 0), // Close parens are always 1 larger than their open variant, (see closes())
+    (")", 0),
+    ("{", 0),
+    ("}", 0),
+    ("[", 0),
+    ("]", 0),
+    (",", 0),
+    (";", 0),
+    (":", 0)
 ];
 
 pub const MISC_TOKENS : [&'static str; 3] = [
@@ -84,11 +86,11 @@ const fn const_eq_str(a: &str, b: &str) -> bool {
     true
 }
 
-const fn const_str_position(v : &str, list : &[&str]) -> Option<usize> {
+const fn const_str_position(v : &str, list : &[(&str, u8)]) -> Option<usize> {
     let mut i : usize = 0;
 
     while i < list.len() {
-        if const_eq_str(v, list[i]) {
+        if const_eq_str(v, list[i].0) {
             return Some(i);
         }
         i += 1;
@@ -123,12 +125,17 @@ pub fn is_number(typ : TokenTypeIdx) -> bool {
 }
 pub fn get_token_type_name(typ : TokenTypeIdx) -> &'static str {
     if is_keyword(typ) {
-        ALL_KEYWORDS[typ as usize]
+        ALL_KEYWORDS[typ as usize].0
     } else if is_symbol(typ) {
-        ALL_SYMBOLS[typ as usize - ALL_KEYWORDS.len()]
+        ALL_SYMBOLS[typ as usize - ALL_KEYWORDS.len()].0
     } else {
         MISC_TOKENS[typ as usize - ALL_KEYWORDS.len() - ALL_SYMBOLS.len()]
     }
+}
+pub fn get_binary_operator_prescedence(typ : TokenTypeIdx) -> u8 {
+    let result = ALL_SYMBOLS[typ as usize - ALL_KEYWORDS.len()].1;
+    assert!(result != 0);
+    result
 }
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
@@ -227,7 +234,7 @@ pub fn tokenize<'a>(file_data : &'a str) -> (Vec<Token<'a>>, Vec<CommentToken<'a
                 } else {
                     TOKEN_NUMBER
                 }
-            } else if let Some(keyword_id) = ALL_KEYWORDS.iter().position(|&kw| kw == word) {
+            } else if let Some(keyword_id) = const_str_position(word, &ALL_KEYWORDS) {
                 keyword_id as TokenTypeIdx
             } else {
                 TOKEN_IDENTIFIER
@@ -258,8 +265,8 @@ pub fn tokenize<'a>(file_data : &'a str) -> (Vec<Token<'a>>, Vec<CommentToken<'a
                     file_data.get(char_i..).unwrap()
                 };
                 comments.push(CommentToken{text : comment_text, token_idx : tokens.len()});
-            } else if let Some(symbol_id) = ALL_SYMBOLS.iter().position(|&symb| Some(symb) == file_data.get(char_i..char_i+symb.len())) {
-                let symbol_text = file_data.get(char_i..char_i+ALL_SYMBOLS[symbol_id].len()).unwrap();
+            } else if let Some(symbol_id) = ALL_SYMBOLS.iter().position(|&symb| Some(symb.0) == file_data.get(char_i..char_i+symb.0.len())) {
+                let symbol_text = file_data.get(char_i..char_i+ALL_SYMBOLS[symbol_id].0.len()).unwrap();
                 file_char_iter.nth(symbol_text.len() - 1);
                 tokens.push(Token{typ : (symbol_id + ALL_KEYWORDS.len()) as TokenTypeIdx, text : symbol_text});
             } else { // Symbol not found!

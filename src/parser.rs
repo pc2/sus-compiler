@@ -297,6 +297,8 @@ impl<'a> AST_Parser_Context<'a> {
         loop {
             match token_stream.peek() {
                 Some(TokenTreeNode::PlainToken(typ, _)) if is_operator(*typ) => {
+                    let operator_prescedence = get_binary_operator_prescedence(*typ);
+
                     
                 },
                 _other => {
