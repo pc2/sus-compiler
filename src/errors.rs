@@ -1,5 +1,7 @@
 
-use console::style;
+
+use ariadne::*;
+use std::ops::Range;
 
 use crate::tokenizer::{Token, TokenTypeIdx, get_token_type_name};
 
@@ -13,36 +15,43 @@ pub struct ParsingError<'a> {
     infos : Vec<ErrorInfo<'a>>
 }
 
+fn as_char_range(file_text : &str, position : &str) -> Range<usize> {
+    let part_start = position.as_ptr() as usize - file_text.as_ptr() as usize;
+    let part_end = part_start + position.len();
+
+    part_start..part_end
+}
+
 impl<'a> ParsingError<'a> {
-    pub fn pretty_print(&self, line_start_buffer : &[usize], text : &str) {
-        let total_lines = line_start_buffer.len();
+    pub fn pretty_print_error(&self, file_name : &str, file_text : &str) {
+        let mut colors = ColorGenerator::new();
 
-        let part_start = self.error.position.as_ptr() as usize - text.as_ptr() as usize;
-        let part_end = part_start + self.error.position.len();
+        // Generate & choose some colours for each of our elements
+        let err_color = Color::Red;
+        let info_color = Color::Blue;
 
-        let err_start = to_file_position(line_start_buffer, part_start);
-        let err_end = to_file_position(line_start_buffer, part_end);
+        let mut report = Report::build(ReportKind::Error, file_name, 12)
+            .with_message(&self.error.reason)
+            .with_label(
+                Label::new((file_name, as_char_range(file_text, self.error.position)))
+                    .with_message(&self.error.reason)
+                    .with_color(err_color)
+            );
 
-        const LINES_BEFORE_MARGIN : usize = 3;
-        const LINES_AFTER_MARGIN : usize = 3;
-
-        let before_margin_line = if err_start.line < LINES_BEFORE_MARGIN {0} else {err_start.line - LINES_BEFORE_MARGIN};
-        let after_margin_line = if err_end.line > total_lines - LINES_AFTER_MARGIN {total_lines} else {err_start.line + LINES_BEFORE_MARGIN};
-
-        let text_lines_before_error = text.get(line_start_buffer[before_margin_line]..part_start).unwrap();
-        let text_line_contents_before_error = text.get(line_start_buffer[err_start.line]..part_start).unwrap();
-
-        // This is to deal with any annoying tabs along the way, to properly position error
-        let mut text_whitespace = String::new();
-        for c in text_line_contents_before_error.chars() {
-            text_whitespace.push(if c == '\t' {'\t'} else {' '});
+        for info in &self.infos {
+            report = report.with_label(
+                Label::new((file_name, as_char_range(file_text, info.position)))
+                    .with_message(&info.reason)
+                    .with_color(info_color)
+            )
         }
-
-        print!("{}", text_lines_before_error);
-        print!("{}", style(self.error.position).red().underlined());
-        print!("{}", text.get(part_end..line_start_buffer[err_end.line+1]).unwrap());
-        print!("{}{}\n", text_whitespace, style("^ ".to_owned() + &self.error.reason).red());
-        print!("{}", text.get(line_start_buffer[err_end.line+1]..line_start_buffer[after_margin_line+1]).unwrap());
+            /*.with_note(format!(
+                "Outputs of {} expressions must coerce to the same type",
+                "match".fg(out)
+            ))*/
+        report.finish()
+        .print((file_name, Source::from(file_text)))
+        .unwrap();
     }
 }
 

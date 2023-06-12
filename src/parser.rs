@@ -305,6 +305,7 @@ impl<'a> AST_Parser_Context<'a> {
                     break;
                 }
             }
+            token_stream.next();
         }
         Some(current_expression)
     }

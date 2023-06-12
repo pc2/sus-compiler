@@ -50,16 +50,6 @@ fn pretty_print(file_text : &str, token_vec : &[IDEToken], comments : &[CommentT
     print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
 }
 
-fn find_line_starts(text : &str) -> Vec<usize> {
-    let mut result : Vec<usize> = vec![0];
-    for (i, ch) in text.char_indices() {
-        if ch == '\n' {
-            result.push(i+1);
-        }
-    }
-    result
-}
-
 enum IDETokenType {
     Keyword,
     Symbol,
@@ -124,18 +114,16 @@ fn main() {
             let (token_vec, comments, token_errors) = tokenize(&file_text);
         
             if !token_errors.is_empty() {
-                let line_start_buffer = find_line_starts(&file_text);
                 for err in token_errors {
-                    err.pretty_print(&line_start_buffer, &file_text);
+                    err.pretty_print_error(file_path, &file_text);
                 }
             }
             
             let (ast, token_hierarchy, parse_errors) = parse(&file_text, &token_vec);
 
             if !parse_errors.is_empty() {
-                let line_start_buffer = find_line_starts(&file_text);
                 for err in parse_errors {
-                    err.pretty_print(&line_start_buffer, &file_text);
+                    err.pretty_print_error(file_path, &file_text);
                 }
             }
 
