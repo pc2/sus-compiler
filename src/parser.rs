@@ -117,20 +117,29 @@ pub fn to_token_hierarchy<'a>(tokens : &[Token<'a>]) -> (Vec<TokenTreeNode>, Vec
                 cur_token_slab = Vec::new();
             },
             IsBracket::Close => {
-                if let Some(cur_block) = stack.pop() {
-                    if closes(cur_block.open_bracket, tok.typ) { // All is well. This bracket was closed properly. Happy path!
-                        let mut parent_cur_token_slab = cur_block.parent;
-                        parent_cur_token_slab.push(TokenTreeNode::Block(cur_block.open_bracket, cur_token_slab, cur_block.open_bracket_pos, idx));
-                        cur_token_slab = parent_cur_token_slab;
+                loop { // Loop for bracket stack unrolling, for correct code only runs once
+                    if let Some(cur_block) = stack.pop() {
+                        if closes(cur_block.open_bracket, tok.typ) { // All is well. This bracket was closed properly. Happy path!
+                            let mut parent_cur_token_slab = cur_block.parent;
+                            parent_cur_token_slab.push(TokenTreeNode::Block(cur_block.open_bracket, cur_token_slab, cur_block.open_bracket_pos, idx));
+                            cur_token_slab = parent_cur_token_slab;
+                            break;
+                        } else {
+                            if !stack.iter().any(|prev_bracket| closes(prev_bracket.open_bracket, tok.typ)) { // Any bracket in the stack closes this?
+                                errors.push(error_unopened_bracket(tok, &tokens[cur_block.open_bracket_pos]));
+                                stack.push(cur_block);
+                                break;
+                            } else {
+                                errors.push(error_unclosed_bracket(&tokens[cur_block.open_bracket_pos], tok));
+                            }
+                            // Is this an incorrect starting bracket, or ending bracket?
+                            // TODO add better error recovery
+                        }
                     } else {
-                        errors.push(error_unclosed_bracket(&tokens[idx], tok));
-                        // Is this an incorrect starting bracket, or ending bracket?
-                        // TODO add better error recovery
+                        // Too many close brackets
+                        errors.push(error_basic_str(tok.text, "A close bracket had no corresponding opening bracket."));
+                        break;
                     }
-                } else {
-                    // Too many close brackets
-                    errors.push(error_basic_str(tok.text, "A close bracket had no corresponding opening bracket."));
-                    continue;
                 }
             },
             IsBracket::NotABracket => {
@@ -297,8 +306,8 @@ impl<'a> AST_Parser_Context<'a> {
         loop {
             match token_stream.peek() {
                 Some(TokenTreeNode::PlainToken(typ, _)) if is_operator(*typ) => {
-                    let operator_prescedence = get_binary_operator_prescedence(*typ);
-
+                    //let operator_prescedence = get_binary_operator_prescedence(*typ);
+                    let mut expression_operator_list : Vec<((usize, TokenTypeIdx), SpanExpression)> = Vec::new();
                     
                 },
                 _other => {
@@ -461,7 +470,7 @@ pub fn parse<'a>(file_text : &'a str, tokens : &'a [Token<'a>]) -> (ASTRoot, Vec
     let mut token_stream = TokenStream::new(&token_hierarchy, 0, tokens.len() - 1);
     let ast_root : ASTRoot = context.parse_ast(&mut token_stream);
     
-    if hierarchy_errors.is_empty() {
+    if !hierarchy_errors.is_empty() {
         hierarchy_errors.append(&mut context.errors);
     } else {
         hierarchy_errors = context.errors;

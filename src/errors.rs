@@ -98,7 +98,11 @@ pub fn error_incorrect_token<'a>(expected : &[TokenTypeIdx], found : &Token<'a>,
 }
 pub fn error_unclosed_bracket<'a>(open : &Token<'a>, close_before : &Token<'a>) -> ParsingError<'a> {
     let reason = "Unclosed bracket. ".to_owned() + open.text + " must be closed before " + close_before.text;
-    error_with_info(open.text, reason, vec![error_info_str(close_before.text, "must be closed before this token")])
+    error_with_info(open.text, reason, vec![error_info_str(close_before.text, "must be closed before this")])
+}
+pub fn error_unopened_bracket<'a>(close : &Token<'a>, open_after : &Token<'a>) -> ParsingError<'a> {
+    let reason = "Unopened bracket. Closing bracket ".to_owned() + close.text + " found but was not opened. Must be opened in scope of " + open_after.text;
+    error_with_info(close.text, reason, vec![error_info_str(open_after.text, "must be opened in scope after this")])
 }
 
 struct FilePosition {
