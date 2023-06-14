@@ -26,22 +26,10 @@ struct Interface {
 }
 
 #[derive(Debug)]
-enum AddSubtract {
-    Add,
-    Subtract
-}
-#[derive(Debug)]
-enum MulDiv {
-    Multiply,
-    Divide,
-    Modulo
-}
-
-#[derive(Debug)]
 enum Expression {
     Named(TokenPos),
-    Sum(Vec<(AddSubtract, SpanExpression)>),
-    Mul(Vec<(MulDiv, SpanExpression)>)
+    Constant(TokenPos),
+    BinOp(Box<(SpanExpression, TokenTypeIdx, usize/*Operator token */, SpanExpression)>)
 }
 type SpanExpression = (Expression, Span);
 type SpanStatement = (Statement, Span);
@@ -127,13 +115,11 @@ pub fn to_token_hierarchy<'a>(tokens : &[Token<'a>]) -> (Vec<TokenTreeNode>, Vec
                         } else {
                             if !stack.iter().any(|prev_bracket| closes(prev_bracket.open_bracket, tok.typ)) { // Any bracket in the stack closes this?
                                 errors.push(error_unopened_bracket(tok, &tokens[cur_block.open_bracket_pos]));
-                                stack.push(cur_block);
+                                stack.push(cur_block); // Push the previous bracket back onto bracket stack, as we disregarded erroneous closing bracket
                                 break;
                             } else {
                                 errors.push(error_unclosed_bracket(&tokens[cur_block.open_bracket_pos], tok));
                             }
-                            // Is this an incorrect starting bracket, or ending bracket?
-                            // TODO add better error recovery
                         }
                     } else {
                         // Too many close brackets
@@ -298,23 +284,54 @@ impl<'a> AST_Parser_Context<'a> {
 
     // For expression 
     fn parse_unit_expression(&mut self ,token_stream : &mut TokenStream) -> Option<SpanExpression> {
-        let token_idx = self.eat_plain(token_stream, TOKEN_IDENTIFIER)?;
-        Some((Expression::Named(token_idx), Span(token_idx, token_idx)))
+        match self.eat_or_error(token_stream, "unexprected end of token stream while parsing unit_expression") {
+            Some(TokenTreeNode::PlainToken(typ, pos)) if *typ == TOKEN_IDENTIFIER => {
+                Some((Expression::Named(*pos), Span(*pos, *pos)))
+            },
+            Some(TokenTreeNode::PlainToken(typ, pos)) if *typ == TOKEN_NUMBER => {
+                Some((Expression::Constant(*pos), Span(*pos, *pos)))
+            },
+            Some(TokenTreeNode::Block(typ, contents, opening_bracket, closing_bracket)) if *typ == kw("(") => {
+                let mut content_token_stream = TokenStream::new(contents, *opening_bracket, *closing_bracket);
+                if let Some(result) = self.parse_expression(&mut content_token_stream) {
+                    if let Some(erroneous_found_token) = content_token_stream.peek() {
+                        // The expression should cover the whole brackets! 
+                        let infos = vec![
+                            error_info_str(get_file_error_span(self.file_text, self.tokens, *opening_bracket, *closing_bracket), "Expression should have ended with this scope"),
+                            error_info_str(get_file_error_span(self.file_text, self.tokens, result.1.0, result.1.1), "But actually only stretches this far"),
+                        ];
+                        self.errors.push(error_with_info(self.tokens[erroneous_found_token.get_first_token_idx()], "The expression should have ended at the end of the () brackets. But instead it ended here.".to_owned(), infos));
+                        None
+                    } else {
+                        Some(result)
+                    }
+                } else {
+                    None
+                }
+            }
+            _other => {
+                self.errors.push(error_incorrect_token(&[TOKEN_IDENTIFIER, TOKEN_NUMBER], &self.tokens[token_stream.last_idx], "while parsing unit expression"));
+                None
+            }
+        }
     }
     fn parse_expression(&mut self, token_stream : &mut TokenStream) -> Option<SpanExpression> {
         let mut current_expression = self.parse_unit_expression(token_stream)?;
         loop {
             match token_stream.peek() {
-                Some(TokenTreeNode::PlainToken(typ, _)) if is_operator(*typ) => {
+                Some(TokenTreeNode::PlainToken(typ, op_pos)) if is_operator(*typ) => {
                     //let operator_prescedence = get_binary_operator_prescedence(*typ);
-                    let mut expression_operator_list : Vec<((usize, TokenTypeIdx), SpanExpression)> = Vec::new();
+                    token_stream.next(); // commit peek
+                    let second_expr = self.parse_unit_expression(token_stream)?;
                     
+                    // TODO Operator prescedence
+                    let new_span = Span(current_expression.1.0, token_stream.last_idx);
+                    current_expression = (Expression::BinOp(Box::new((current_expression, *typ, *op_pos, second_expr))), new_span);
                 },
                 _other => {
                     break;
                 }
             }
-            token_stream.next();
         }
         Some(current_expression)
     }
