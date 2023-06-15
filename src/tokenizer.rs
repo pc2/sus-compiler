@@ -267,7 +267,9 @@ pub fn tokenize<'a>(file_data : &'a str) -> (Vec<Token<'a>>, Vec<CommentToken<'a
                 comments.push(CommentToken{text : comment_text, token_idx : tokens.len()});
             } else if let Some(symbol_id) = ALL_SYMBOLS.iter().position(|&symb| Some(symb.0) == file_data.get(char_i..char_i+symb.0.len())) {
                 let symbol_text = file_data.get(char_i..char_i+ALL_SYMBOLS[symbol_id].0.len()).unwrap();
-                file_char_iter.nth(symbol_text.len() - 1);
+                if symbol_text.len() > 1 {
+                    file_char_iter.nth(symbol_text.len() - 2);
+                }
                 tokens.push(Token{typ : (symbol_id + ALL_KEYWORDS.len()) as TokenTypeIdx, text : symbol_text});
             } else { // Symbol not found!
                 errors.push(error_basic_str(file_data.get(char_i..char_i+1).unwrap(), "Unexpected character"));

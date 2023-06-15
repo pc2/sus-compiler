@@ -17,6 +17,18 @@ fn pretty_print_chunk_with_whitespace(whitespace_start : usize, file_text : &str
     return new_whitespace_start;
 }
 
+fn print_tokens(file_text : &str, token_vec : &[IDEToken]) {
+    let mut whitespace_start : usize = 0;
+    for (tok_idx, token) in token_vec.iter().enumerate() {
+        let styles = [Style::new().magenta(), Style::new().yellow(), Style::new().blue()];
+        let st = styles[tok_idx % styles.len()].clone().underlined();
+        
+        whitespace_start = pretty_print_chunk_with_whitespace(whitespace_start, file_text, token.text, st);
+    }
+
+    print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
+}
+
 fn pretty_print(file_text : &str, token_vec : &[IDEToken], comments : &[CommentToken]) {
     let mut whitespace_start : usize = 0;
 
@@ -36,7 +48,12 @@ fn pretty_print(file_text : &str, token_vec : &[IDEToken], comments : &[CommentT
         let st = match token.typ {
             IDETokenType::Keyword => Style::new().blue(),
             IDETokenType::Symbol => Style::new().cyan(),
-            IDETokenType::Identifier => Style::new().white(),
+            IDETokenType::Identifier(IDEIdentifierType::Unknown) => Style::new().white(),
+            IDETokenType::Identifier(IDEIdentifierType::Local) => Style::new().blue().bright(),
+            IDETokenType::Identifier(IDEIdentifierType::State) => Style::new().blue().bright().underlined(),
+            IDETokenType::Identifier(IDEIdentifierType::Input) => Style::new().blue().bright(),
+            IDETokenType::Identifier(IDEIdentifierType::Output) => Style::new().blue(),
+            IDETokenType::Identifier(IDEIdentifierType::TypeName) => Style::new().magenta().bright(),
             IDETokenType::Number => Style::new().green().bright(),
             IDETokenType::Invalid | IDETokenType::InvalidBracket => Style::new().red().underlined(),
             IDETokenType::OpenBracket(depth) | IDETokenType::CloseBracket(depth) => {
@@ -50,10 +67,19 @@ fn pretty_print(file_text : &str, token_vec : &[IDEToken], comments : &[CommentT
     print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
 }
 
+enum IDEIdentifierType {
+    Local,
+    State,
+    Input,
+    Output,
+    TypeName,
+    Unknown
+}
+
 enum IDETokenType {
     Keyword,
     Symbol,
-    Identifier,
+    Identifier(IDEIdentifierType),
     Number,
     Invalid,
     InvalidBracket,
@@ -64,7 +90,7 @@ enum IDETokenType {
 struct IDEToken<'a> {
     text : &'a str,
     typ : IDETokenType,
-    attached_comments : &'a [CommentToken<'a>]
+    attached_comments : Vec<CommentToken<'a>>
 }
 
 fn add_ide_bracket_depths_recursive<'a>(result : &mut Vec<IDEToken<'a>>, current_depth : usize, token_hierarchy : &[TokenTreeNode]) {
@@ -88,14 +114,14 @@ fn create_token_ide_info<'a>(tokens : &[Token<'a>], token_hierarchy : &[TokenTre
         } else if is_symbol(t.typ) {
             IDETokenType::Symbol
         } else if is_identifier(t.typ) {
-            IDETokenType::Identifier
+            IDETokenType::Identifier(IDEIdentifierType::Unknown)
         } else if is_number(t.typ) {
             IDETokenType::Number
         } else {
             IDETokenType::Invalid
         };
 
-        result.push(IDEToken{text : t.text, typ : initial_typ, attached_comments : &[]})
+        result.push(IDEToken{text : t.text, typ : initial_typ, attached_comments : vec![]})
     }
 
     add_ide_bracket_depths_recursive(&mut result, 0, token_hierarchy);
@@ -112,7 +138,7 @@ fn main() {
         },
         Ok(file_text) => {
             let (token_vec, comments, token_errors) = tokenize(&file_text);
-        
+            
             if !token_errors.is_empty() {
                 for err in token_errors {
                     err.pretty_print_error(file_path, &file_text);
@@ -128,7 +154,9 @@ fn main() {
             }
 
             let ide_tokens = create_token_ide_info(&token_vec, &token_hierarchy, &comments);
-
+            
+            print_tokens(&file_text, &ide_tokens);
+            
             pretty_print(&file_text, &ide_tokens, &comments);
 
         }

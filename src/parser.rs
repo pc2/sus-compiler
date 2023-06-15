@@ -300,7 +300,7 @@ impl<'a> AST_Parser_Context<'a> {
                             error_info_str(get_file_error_span(self.file_text, self.tokens, *opening_bracket, *closing_bracket), "Expression should have ended with this scope"),
                             error_info_str(get_file_error_span(self.file_text, self.tokens, result.1.0, result.1.1), "But actually only stretches this far"),
                         ];
-                        self.errors.push(error_with_info(self.tokens[erroneous_found_token.get_first_token_idx()], "The expression should have ended at the end of the () brackets. But instead it ended here.".to_owned(), infos));
+                        self.errors.push(error_with_info(self.tokens[erroneous_found_token.get_first_token_idx()].text, "The expression should have ended at the end of the () brackets. But instead it ended here.".to_owned(), infos));
                         None
                     } else {
                         Some(result)
