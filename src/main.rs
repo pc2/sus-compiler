@@ -2,70 +2,12 @@
 mod tokenizer;
 mod parser;
 mod errors;
+mod ast;
 use parser::*;
 use tokenizer::*;
+use ast::*;
 
 use console::{style, Style};
-
-fn pretty_print_chunk_with_whitespace(whitespace_start : usize, file_text : &str, text_chunk : &str, st : Style) -> usize /* next whitespace_start */ { 
-    let whitespace_end = text_chunk.as_ptr() as usize - file_text.as_ptr() as usize;
-    let whitespace_text = file_text.get(whitespace_start..whitespace_end).unwrap();
-    let new_whitespace_start = text_chunk.as_ptr() as usize + text_chunk.len() - file_text.as_ptr() as usize;
-
-    print!("{}{}", whitespace_text, st.apply_to(text_chunk));
-
-    return new_whitespace_start;
-}
-
-fn print_tokens(file_text : &str, token_vec : &[IDEToken]) {
-    let mut whitespace_start : usize = 0;
-    for (tok_idx, token) in token_vec.iter().enumerate() {
-        let styles = [Style::new().magenta(), Style::new().yellow(), Style::new().blue()];
-        let st = styles[tok_idx % styles.len()].clone().underlined();
-        
-        whitespace_start = pretty_print_chunk_with_whitespace(whitespace_start, file_text, token.text, st);
-    }
-
-    print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
-}
-
-fn pretty_print(file_text : &str, token_vec : &[IDEToken], comments : &[CommentToken]) {
-    let mut whitespace_start : usize = 0;
-
-    let mut comment_iter = comments.iter().peekable();
-    for (tok_idx, token) in token_vec.iter().enumerate() {
-        
-        while let Some(comment) = comment_iter.peek() {
-            if comment.token_idx <= tok_idx {
-                whitespace_start = pretty_print_chunk_with_whitespace(whitespace_start, file_text, comment.text, Style::new().green().dim());
-                comment_iter.next(); // Actually pop it
-            } else {
-                break;
-            }
-        }
-
-        let bracket_styles = [Style::new().magenta(), Style::new().yellow(), Style::new().blue()];
-        let st = match token.typ {
-            IDETokenType::Keyword => Style::new().blue(),
-            IDETokenType::Symbol => Style::new().cyan(),
-            IDETokenType::Identifier(IDEIdentifierType::Unknown) => Style::new().white(),
-            IDETokenType::Identifier(IDEIdentifierType::Local) => Style::new().blue().bright(),
-            IDETokenType::Identifier(IDEIdentifierType::State) => Style::new().blue().bright().underlined(),
-            IDETokenType::Identifier(IDEIdentifierType::Input) => Style::new().blue().bright(),
-            IDETokenType::Identifier(IDEIdentifierType::Output) => Style::new().blue(),
-            IDETokenType::Identifier(IDEIdentifierType::TypeName) => Style::new().magenta().bright(),
-            IDETokenType::Number => Style::new().green().bright(),
-            IDETokenType::Invalid | IDETokenType::InvalidBracket => Style::new().red().underlined(),
-            IDETokenType::OpenBracket(depth) | IDETokenType::CloseBracket(depth) => {
-                bracket_styles[depth % bracket_styles.len()].clone()
-            }
-        };
-        
-        whitespace_start = pretty_print_chunk_with_whitespace(whitespace_start, file_text, token.text, st);
-    }
-
-    print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
-}
 
 enum IDEIdentifierType {
     Local,
@@ -73,6 +15,7 @@ enum IDEIdentifierType {
     Input,
     Output,
     TypeName,
+    ModuleName,
     Unknown
 }
 
@@ -93,6 +36,66 @@ struct IDEToken<'a> {
     attached_comments : Vec<CommentToken<'a>>
 }
 
+fn pretty_print_chunk_with_whitespace(whitespace_start : usize, file_text : &str, text_chunk : &str, st : Style) -> usize /* next whitespace_start */ { 
+    let whitespace_end = text_chunk.as_ptr() as usize - file_text.as_ptr() as usize;
+    let whitespace_text = file_text.get(whitespace_start..whitespace_end).unwrap();
+    let new_whitespace_start = text_chunk.as_ptr() as usize + text_chunk.len() - file_text.as_ptr() as usize;
+
+    print!("{}{}", whitespace_text, st.apply_to(text_chunk));
+
+    return new_whitespace_start;
+}
+
+fn print_tokens<'a>(file_text : &str, token_vec : &[Token<'a>]) {
+    let mut whitespace_start : usize = 0;
+    for (tok_idx, token) in token_vec.iter().enumerate() {
+        let styles = [Style::new().magenta(), Style::new().yellow(), Style::new().blue()];
+        let st = styles[tok_idx % styles.len()].clone().underlined();
+        
+        whitespace_start = pretty_print_chunk_with_whitespace(whitespace_start, file_text, token.text, st);
+    }
+
+    print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
+}
+
+fn pretty_print(file_text : &str, token_vec : &[IDEToken], comments : &[CommentToken]) {
+    let mut whitespace_start : usize = 0;
+
+    let mut comment_iter = comments.iter().peekable();
+    for (tok_idx, token) in token_vec.iter().enumerate() {
+        while let Some(comment) = comment_iter.peek() {
+            if comment.token_idx <= tok_idx {
+                whitespace_start = pretty_print_chunk_with_whitespace(whitespace_start, file_text, comment.text, Style::new().green().dim());
+                comment_iter.next(); // Actually pop it
+            } else {
+                break;
+            }
+        }
+
+        let bracket_styles = [Style::new().magenta(), Style::new().yellow(), Style::new().blue()];
+        let st = match token.typ {
+            IDETokenType::Keyword => Style::new().blue(),
+            IDETokenType::Symbol => Style::new().cyan(),
+            IDETokenType::Identifier(IDEIdentifierType::Unknown) => Style::new().white(),
+            IDETokenType::Identifier(IDEIdentifierType::Local) => Style::new().blue().bright(),
+            IDETokenType::Identifier(IDEIdentifierType::State) => Style::new().blue().bright().underlined(),
+            IDETokenType::Identifier(IDEIdentifierType::Input) => Style::new().blue().bright(),
+            IDETokenType::Identifier(IDEIdentifierType::Output) => Style::new().blue(),
+            IDETokenType::Identifier(IDEIdentifierType::TypeName) => Style::new().magenta().bright(),
+            IDETokenType::Identifier(IDEIdentifierType::ModuleName) => Style::new().magenta(),
+            IDETokenType::Number => Style::new().green().bright(),
+            IDETokenType::Invalid | IDETokenType::InvalidBracket => Style::new().red().underlined(),
+            IDETokenType::OpenBracket(depth) | IDETokenType::CloseBracket(depth) => {
+                bracket_styles[depth % bracket_styles.len()].clone()
+            }
+        };
+        
+        whitespace_start = pretty_print_chunk_with_whitespace(whitespace_start, file_text, token.text, st);
+    }
+
+    print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
+}
+
 fn add_ide_bracket_depths_recursive<'a>(result : &mut Vec<IDEToken<'a>>, current_depth : usize, token_hierarchy : &[TokenTreeNode]) {
     for tok in token_hierarchy {
         if let TokenTreeNode::Block(_, sub_block, left, right) = tok {
@@ -103,7 +106,7 @@ fn add_ide_bracket_depths_recursive<'a>(result : &mut Vec<IDEToken<'a>>, current
     }
 }
 
-fn create_token_ide_info<'a>(tokens : &[Token<'a>], token_hierarchy : &[TokenTreeNode], comments : &'a [CommentToken<'a>]) -> Vec<IDEToken<'a>> {
+fn create_token_ide_info<'a>(tokens : &[Token<'a>], ast : &ASTRoot, token_hierarchy : &[TokenTreeNode], comments : &'a [CommentToken<'a>]) -> Vec<IDEToken<'a>> {
     let mut result : Vec<IDEToken<'a>> = Vec::new();
 
     for t in tokens {
@@ -126,6 +129,8 @@ fn create_token_ide_info<'a>(tokens : &[Token<'a>], token_hierarchy : &[TokenTre
 
     add_ide_bracket_depths_recursive(&mut result, 0, token_hierarchy);
 
+
+
     result
 }
 
@@ -144,18 +149,17 @@ fn main() {
                     err.pretty_print_error(file_path, &file_text);
                 }
             }
-            
             let (ast, token_hierarchy, parse_errors) = parse(&file_text, &token_vec);
 
+            print_tokens(&file_text, &token_vec);
             if !parse_errors.is_empty() {
                 for err in parse_errors {
                     err.pretty_print_error(file_path, &file_text);
                 }
             }
 
-            let ide_tokens = create_token_ide_info(&token_vec, &token_hierarchy, &comments);
+            let ide_tokens = create_token_ide_info(&token_vec, &ast, &token_hierarchy, &comments);
             
-            print_tokens(&file_text, &ide_tokens);
             
             pretty_print(&file_text, &ide_tokens, &comments);
 

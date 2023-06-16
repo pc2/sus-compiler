@@ -1,65 +1,8 @@
 
-use crate::{tokenizer::*, errors::*};
+use crate::{tokenizer::*, errors::*, ast::*};
 
-use std::iter::{Peekable, Enumerate};
+use std::iter::Peekable;
 use core::slice::Iter;
-
-type TokenPos = usize;
-
-#[derive(Clone,Copy,Debug)]
-pub struct Span(TokenPos,TokenPos);
-
-#[derive(Debug)]
-struct SignalDeclaration {
-    span : Span,
-    typ : SpanExpression,
-    name_token : TokenPos
-}
-
-type Bundle = Vec<SignalDeclaration>;
-
-#[derive(Debug)]
-struct Interface {
-    span : Span,
-    inputs : Bundle,
-    outputs : Bundle
-}
-
-#[derive(Debug)]
-enum Expression {
-    Named(TokenPos),
-    Constant(TokenPos),
-    BinOp(Box<(SpanExpression, TokenTypeIdx, usize/*Operator token */, SpanExpression)>)
-}
-type SpanExpression = (Expression, Span);
-type SpanStatement = (Statement, Span);
-
-#[derive(Debug)]
-enum Statement {
-    Declare(SpanExpression, SpanExpression), // type v;
-    DeclareAssign(SpanExpression, SpanExpression, SpanExpression), // type v = expr;
-    Assign(SpanExpression, SpanExpression), // v = expr;
-    Mention(SpanExpression),
-    Block(Vec<SpanStatement>)
-}
-
-#[derive(Debug)]
-enum CodeBlock {
-
-}
-
-#[derive(Debug)]
-struct Module {
-    span : Span,
-    name : TokenPos,
-    interface : Interface,
-    code : Vec<SpanStatement>
-}
-
-#[derive(Debug)]
-pub struct ASTRoot {
-    modules : Vec<Module>
-}
 
 pub enum TokenTreeNode {
     PlainToken(TokenTypeIdx, usize), // Has the index of the given token to the global Token array
@@ -225,10 +168,26 @@ pub fn get_file_error_span<'a>(file_text : &'a str, tokens : &[Token<'a>], start
     let start_str = tokens[start_tok].text;
     let end_str = tokens[end_tok].text;
 
-    let start = file_text.as_ptr() as usize - start_str.as_ptr() as usize;
-    let end = file_text.as_ptr() as usize - end_str.as_ptr() as usize + end_str.len();
+    let start = start_str.as_ptr() as usize - file_text.as_ptr() as usize;
+    let end = end_str.as_ptr() as usize - file_text.as_ptr() as usize + end_str.len();
 
     file_text.get(start..end).unwrap()
+}
+
+fn error_unexpected_tree_node<'a>(expected : &[TokenTypeIdx], found : Option<&TokenTreeNode>, last_idx : usize, tokens : &[Token<'a>], context : &str) -> ParsingError<'a> {
+    match found {
+        None => {
+            error_basic(tokens[last_idx].text, format!("Unexpected End of Scope {context}. Expected {}", &join_expected_list(expected)))
+        },
+        Some(TokenTreeNode::PlainToken(typ, pos)) => {
+            let tok_typ_name = get_token_type_name(*typ);
+            error_basic(tokens[*pos].text, format!("Unexpected Token {tok_typ_name} {context}. Expected {}", &join_expected_list(expected)))
+        },
+        Some(TokenTreeNode::Block(typ, _, start, end)) => {
+            let tok_typ_name = get_token_type_name(*typ);
+            error_basic(tokens[*start].text, format!("Unexpected Token {tok_typ_name} {context}. Expected {}", &join_expected_list(expected)))
+        }
+    }
 }
 
 impl<'a> AST_Parser_Context<'a> {
@@ -309,8 +268,8 @@ impl<'a> AST_Parser_Context<'a> {
                     None
                 }
             }
-            _other => {
-                self.errors.push(error_incorrect_token(&[TOKEN_IDENTIFIER, TOKEN_NUMBER], &self.tokens[token_stream.last_idx], "while parsing unit expression"));
+            other => {
+                self.errors.push(error_unexpected_tree_node(&[TOKEN_IDENTIFIER, TOKEN_NUMBER], other, token_stream.last_idx, self.tokens, "while parsing unit expression"));
                 None
             }
         }
@@ -375,6 +334,11 @@ impl<'a> AST_Parser_Context<'a> {
         Interface{span : Span(start_idx, token_stream.last_idx), inputs : inputs, outputs : outputs}
     }
 
+    fn to_signal_declaration(&mut self, type_expr : SpanExpression, name_token_idx : usize) -> Option<SignalDeclaration> {
+        let decl_span = Span(type_expr.1.0, name_token_idx);
+        Some(SignalDeclaration{typ : type_expr, span : decl_span, name_token : name_token_idx})
+    }
+
     fn parse_statement(&mut self, token_stream : &mut TokenStream) -> Option<SpanStatement> {
         let expr_first = self.parse_expression(token_stream)?; // Error case
         let start_at = expr_first.1.0;
@@ -396,20 +360,20 @@ impl<'a> AST_Parser_Context<'a> {
             },
             Some(_other) => {
                 // This is a declaration!
-                let name = self.parse_expression(token_stream)?;
+                let name = self.eat_plain(token_stream, TOKEN_IDENTIFIER)?;
                 match token_stream.next() {
                     Some(TokenTreeNode::PlainToken(typ, _)) if *typ == kw("=") => {
                         let value = self.parse_expression(token_stream)?;
                         self.eat_plain(token_stream, kw(";"));
-                        Statement::DeclareAssign(expr_first, name, value)
+                        Statement::DeclareAssign(self.to_signal_declaration(expr_first, name)?, value)
                     },
                     Some(TokenTreeNode::PlainToken(typ, _)) if *typ == kw(";") => {
-                        Statement::Declare(expr_first, name)
+                        Statement::Declare(self.to_signal_declaration(expr_first, name)?)
                     },
-                    _other => {
-                        self.errors.push(error_incorrect_token(&[kw(";"), kw("=")], &self.tokens[token_stream.last_idx], "while parsing declaration")); // easy way to throw the End Of Scope error
+                    other => {
+                        self.errors.push(error_unexpected_tree_node(&[kw(";"), kw("=")], other, token_stream.last_idx, self.tokens, "while parsing declaration")); // easy way to throw the End Of Scope error
                         return None;
-                        // Statement::Declare(expr_first, name)
+                        // Statement::Declare(self.to_signal_declaration(expr_first, name)?)
                     }
                 }
             }
