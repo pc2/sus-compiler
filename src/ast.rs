@@ -4,6 +4,12 @@ use crate::tokenizer::TokenTypeIdx;
 #[derive(Clone,Copy,Debug)]
 pub struct Span(pub usize, pub usize);
 
+impl From<usize> for Span {
+    fn from(v : usize) -> Span {
+        Span(v, v)
+    }
+}
+
 #[derive(Debug)]
 pub struct SignalDeclaration {
     pub span : Span,
@@ -58,6 +64,6 @@ pub struct LocalVariableContext<'ast, 'prev> where 'prev : 'ast {
 
 pub trait ASTWalker {
     fn walk_ast(ast : &ASTRoot) {
-        
+
     }
 }

@@ -98,7 +98,7 @@ fn pretty_print(file_text : &str, token_vec : &[IDEToken], comments : &[CommentT
 
 fn add_ide_bracket_depths_recursive<'a>(result : &mut Vec<IDEToken<'a>>, current_depth : usize, token_hierarchy : &[TokenTreeNode]) {
     for tok in token_hierarchy {
-        if let TokenTreeNode::Block(_, sub_block, left, right) = tok {
+        if let TokenTreeNode::Block(_, sub_block, Span(left, right)) = tok {
             result[*left].typ = IDETokenType::OpenBracket(current_depth);
             add_ide_bracket_depths_recursive(result, current_depth+1, sub_block);
             result[*right].typ = IDETokenType::CloseBracket(current_depth);
@@ -149,12 +149,20 @@ fn main() {
                     err.pretty_print_error(file_path, &file_text);
                 }
             }
-            let (ast, token_hierarchy, parse_errors) = parse(&file_text, &token_vec);
+
+            let (token_hierarchy, hierarchy_errors) = to_token_hierarchy(&token_vec);
+            if !hierarchy_errors.is_empty() {
+                for err in hierarchy_errors {
+                    err.pretty_print_error(file_path, &file_text, &token_vec);
+                }
+            }
+
+            let (ast, parse_errors) = parse(&token_hierarchy, token_vec.len());
 
             print_tokens(&file_text, &token_vec);
             if !parse_errors.is_empty() {
                 for err in parse_errors {
-                    err.pretty_print_error(file_path, &file_text);
+                    err.pretty_print_error(file_path, &file_text, &token_vec);
                 }
             }
 

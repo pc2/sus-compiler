@@ -1,18 +1,19 @@
 
 
+use crate::ast::Span;
 use ariadne::*;
 use std::ops::Range;
 
 use crate::tokenizer::{Token, TokenTypeIdx, get_token_type_name};
 
-pub struct ErrorInfo<'a> {
-    position : &'a str,
+pub struct ErrorInfo<T> {
+    position : T,
     reason : String
 }
 
-pub struct ParsingError<'a> {
-    error : ErrorInfo<'a>,
-    infos : Vec<ErrorInfo<'a>>
+pub struct ParsingError<T> {
+    error : ErrorInfo<T>,
+    infos : Vec<ErrorInfo<T>>
 }
 
 fn as_char_range(file_text : &str, position : &str) -> Range<usize> {
@@ -22,7 +23,7 @@ fn as_char_range(file_text : &str, position : &str) -> Range<usize> {
     part_start..part_end
 }
 
-impl<'a> ParsingError<'a> {
+impl<'a> ParsingError<&'a str> {
     pub fn pretty_print_error(&self, file_name : &str, file_text : &str) {
         let mut colors = ColorGenerator::new();
 
@@ -55,22 +56,61 @@ impl<'a> ParsingError<'a> {
     }
 }
 
-pub fn error_info<'a>(position : &'a str, reason : String) -> ErrorInfo<'a> {
+impl ParsingError<Span> {
+    pub fn pretty_print_error(self, file_name : &str, file_text : &str, token_vec : &[Token]) {
+        cvt_token_error_to_str_error(self, file_text, token_vec).pretty_print_error(file_name, file_text);
+    }
+}
+
+fn get_token_text_or_eof<'a>(idx : usize, file_text : &'a str, tokens : &[Token<'a>]) -> &'a str {
+    if idx < tokens.len() {
+        tokens[idx].text
+    } else {
+        file_text.get(file_text.len() - 1..file_text.len()).unwrap()
+    }
+}
+
+fn get_file_error_span<'a>(span : Span, file_text : &'a str, tokens : &[Token<'a>]) -> &'a str {
+    let start_str = get_token_text_or_eof(span.0, file_text, tokens);
+    let end_str = get_token_text_or_eof(span.1, file_text, tokens);
+
+    let start = start_str.as_ptr() as usize - file_text.as_ptr() as usize;
+    let end = end_str.as_ptr() as usize - file_text.as_ptr() as usize + end_str.len();
+
+    file_text.get(start..end).unwrap()
+}
+
+pub fn cvt_token_err_info_to_str<'a>(err : ErrorInfo<Span>, file_text : &'a str, tokens : &[Token<'a>]) -> ErrorInfo<&'a str> {
+    ErrorInfo{position : get_file_error_span(err.position, file_text, tokens), reason : err.reason}
+}
+
+pub fn cvt_token_error_to_str_error<'a>(err : ParsingError<Span>, file_text : &'a str, tokens : &[Token<'a>]) -> ParsingError<&'a str> {
+    let mut info_vec : Vec<ErrorInfo<&'a str>> = Vec::new();
+    info_vec.reserve(err.infos.len());
+
+    for i in err.infos {
+        info_vec.push(cvt_token_err_info_to_str(i, file_text, tokens));
+    }
+
+    ParsingError{error : cvt_token_err_info_to_str(err.error, file_text, tokens), infos : info_vec}
+}
+
+pub fn error_info<T>(position : T, reason : String) -> ErrorInfo<T> {
     ErrorInfo{position : position, reason : reason}
 }
-pub fn error_info_str<'a>(position : &'a str, reason : &str) -> ErrorInfo<'a> {
+pub fn error_info_str<T>(position : T, reason : &str) -> ErrorInfo<T> {
     ErrorInfo{position : position, reason : reason.to_owned()}
 }
 
-pub fn error_basic<'a>(position : &'a str, reason : String) -> ParsingError<'a> {
+pub fn error_basic<T>(position : T, reason : String) -> ParsingError<T> {
     ParsingError{error : error_info(position, reason), infos : Vec::new()}
 }
 
-pub fn error_basic_str<'a>(position : &'a str, reason : &str) -> ParsingError<'a> {
+pub fn error_basic_str<T>(position : T, reason : &str) -> ParsingError<T> {
     ParsingError{error : error_info(position, reason.to_owned()), infos : Vec::new()}
 }
 
-pub fn error_with_info<'a>(position : &'a str, reason : String, infos : Vec<ErrorInfo<'a>>) -> ParsingError<'a> {
+pub fn error_with_info<T>(position : T, reason : String, infos : Vec<ErrorInfo<T>>) -> ParsingError<T> {
     ParsingError{error : error_info(position, reason), infos : infos}
 }
 
@@ -91,30 +131,20 @@ pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
     result
 }
 
-pub fn error_incorrect_token<'a>(expected : &[TokenTypeIdx], found : &Token<'a>, context : &str) -> ParsingError<'a> {
-    let reason = "Unexpected Token. Expected ".to_owned() + &join_expected_list(expected) + " but found '" + get_token_type_name(found.typ) + "' " + context;
+pub fn error_incorrect_token(expected : &[TokenTypeIdx], position : usize, typ : TokenTypeIdx, context : &str) -> ParsingError<Span> {
+    let expected_str = join_expected_list(expected);
+    let token_name = get_token_type_name(typ);
+    let reason = format!("Unexpected Token. Expected {expected_str} but found '{token_name}' while parsing {context}");
 
-    error_basic(found.text, reason)
+    error_basic(Span::from(position), reason)
 }
-pub fn error_unclosed_bracket<'a>(open : &Token<'a>, close_before : &Token<'a>) -> ParsingError<'a> {
-    let reason = "Unclosed bracket. ".to_owned() + open.text + " must be closed before " + close_before.text;
-    error_with_info(open.text, reason, vec![error_info_str(close_before.text, "must be closed before this")])
+pub fn error_unclosed_bracket(open_pos : usize, open_typ : TokenTypeIdx, close_before_pos : usize) -> ParsingError<Span> {
+    let open_name = get_token_type_name(open_typ);
+    let reason = format!("Unclosed bracket {open_name}");
+    error_with_info(Span::from(open_pos), reason, vec![error_info_str(Span(close_before_pos, close_before_pos), "must be closed before this")])
 }
-pub fn error_unopened_bracket<'a>(close : &Token<'a>, open_after : &Token<'a>) -> ParsingError<'a> {
-    let reason = "Unopened bracket. Closing bracket ".to_owned() + close.text + " found but was not opened. Must be opened in scope of " + open_after.text;
-    error_with_info(close.text, reason, vec![error_info_str(open_after.text, "must be opened in scope after this")])
-}
-
-struct FilePosition {
-    pub line : usize,
-    pub col : usize,
-}
-
-fn to_file_position(line_start_buffer : &[usize], char_i : usize) -> FilePosition {
-    let line = match line_start_buffer.binary_search_by(|probe| probe.cmp(&char_i)) {
-        Ok(v) => v,
-        Err(v) => v-1
-    };
-    let col = char_i - line_start_buffer[line];
-    FilePosition{line : line, col : col}
+pub fn error_unopened_bracket(close_pos : usize, close_typ : TokenTypeIdx, open_after_pos : usize) -> ParsingError<Span> {
+    let close_name = get_token_type_name(close_typ);
+    let reason = format!("Unopened bracket. Closing bracket {close_name} found but was not opened.");
+    error_with_info(Span::from(close_pos), reason, vec![error_info_str(Span(open_after_pos, open_after_pos), "must be opened in scope after this")])
 }

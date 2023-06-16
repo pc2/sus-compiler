@@ -204,10 +204,10 @@ fn find_end_of_identifier(mut file_char_iter : &mut CharIndices) -> Option<(usiz
     None // End of file
 }
 
-pub fn tokenize<'a>(file_data : &'a str) -> (Vec<Token<'a>>, Vec<CommentToken<'a>>, Vec<ParsingError<'a>>) {
+pub fn tokenize<'a>(file_data : &'a str) -> (Vec<Token<'a>>, Vec<CommentToken<'a>>, Vec<ParsingError<&'a str>>) {
     let mut tokens : Vec<Token<'a>> = Vec::new();
     let mut file_char_iter = file_data.char_indices();
-    let mut errors : Vec<ParsingError<'a>> = Vec::new();
+    let mut errors : Vec<ParsingError<&'a str>> = Vec::new();
     let mut comments : Vec<CommentToken<'a>> = Vec::new();
     while let Some((mut char_i, mut cur_char)) = file_char_iter.next() {
         if is_valid_identifier_char(cur_char) {
