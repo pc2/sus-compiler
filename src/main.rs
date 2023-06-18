@@ -10,12 +10,9 @@ use ast::*;
 use console::{style, Style};
 
 enum IDEIdentifierType {
-    Local,
-    State,
-    Input,
-    Output,
-    TypeName,
-    ModuleName,
+    Value(IdentifierType),
+    Type,
+    Interface,
     Unknown
 }
 
@@ -30,10 +27,9 @@ enum IDETokenType {
     CloseBracket(usize) // Bracket depth
 }
 
-struct IDEToken<'a> {
-    text : &'a str,
+struct IDEToken {
     typ : IDETokenType,
-    attached_comments : Vec<CommentToken<'a>>
+    attached_comments : Vec<usize> // Comment indices
 }
 
 fn pretty_print_chunk_with_whitespace(whitespace_start : usize, file_text : &str, text_chunk : &str, st : Style) -> usize /* next whitespace_start */ { 
@@ -58,11 +54,11 @@ fn print_tokens<'a>(file_text : &str, token_vec : &[Token<'a>]) {
     print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
 }
 
-fn pretty_print(file_text : &str, token_vec : &[IDEToken], comments : &[CommentToken]) {
+fn pretty_print(file_text : &str, tokens : &[Token], ide_infos : &[IDEToken], comments : &[CommentToken]) {
     let mut whitespace_start : usize = 0;
 
     let mut comment_iter = comments.iter().peekable();
-    for (tok_idx, token) in token_vec.iter().enumerate() {
+    for (tok_idx, token) in ide_infos.iter().enumerate() {
         while let Some(comment) = comment_iter.peek() {
             if comment.token_idx <= tok_idx {
                 whitespace_start = pretty_print_chunk_with_whitespace(whitespace_start, file_text, comment.text, Style::new().green().dim());
@@ -75,14 +71,14 @@ fn pretty_print(file_text : &str, token_vec : &[IDEToken], comments : &[CommentT
         let bracket_styles = [Style::new().magenta(), Style::new().yellow(), Style::new().blue()];
         let st = match token.typ {
             IDETokenType::Keyword => Style::new().blue(),
-            IDETokenType::Symbol => Style::new().cyan(),
-            IDETokenType::Identifier(IDEIdentifierType::Unknown) => Style::new().white(),
-            IDETokenType::Identifier(IDEIdentifierType::Local) => Style::new().blue().bright(),
-            IDETokenType::Identifier(IDEIdentifierType::State) => Style::new().blue().bright().underlined(),
-            IDETokenType::Identifier(IDEIdentifierType::Input) => Style::new().blue().bright(),
-            IDETokenType::Identifier(IDEIdentifierType::Output) => Style::new().blue(),
-            IDETokenType::Identifier(IDEIdentifierType::TypeName) => Style::new().magenta().bright(),
-            IDETokenType::Identifier(IDEIdentifierType::ModuleName) => Style::new().magenta(),
+            IDETokenType::Symbol => Style::new().white().bright(),
+            IDETokenType::Identifier(IDEIdentifierType::Unknown) => Style::new().red().underlined(),
+            IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Local)) => Style::new().blue().bright(),
+            IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => Style::new().blue().bright().underlined(),
+            IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Input)) => Style::new().blue().bright(),
+            IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => Style::new().blue().dim(),
+            IDETokenType::Identifier(IDEIdentifierType::Type) => Style::new().magenta().bright(),
+            IDETokenType::Identifier(IDEIdentifierType::Interface) => Style::new().magenta().dim(),
             IDETokenType::Number => Style::new().green().bright(),
             IDETokenType::Invalid | IDETokenType::InvalidBracket => Style::new().red().underlined(),
             IDETokenType::OpenBracket(depth) | IDETokenType::CloseBracket(depth) => {
@@ -90,13 +86,13 @@ fn pretty_print(file_text : &str, token_vec : &[IDEToken], comments : &[CommentT
             }
         };
         
-        whitespace_start = pretty_print_chunk_with_whitespace(whitespace_start, file_text, token.text, st);
+        whitespace_start = pretty_print_chunk_with_whitespace(whitespace_start, file_text, tokens[tok_idx].text, st);
     }
 
     print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
 }
 
-fn add_ide_bracket_depths_recursive<'a>(result : &mut Vec<IDEToken<'a>>, current_depth : usize, token_hierarchy : &[TokenTreeNode]) {
+fn add_ide_bracket_depths_recursive<'a>(result : &mut [IDEToken], current_depth : usize, token_hierarchy : &[TokenTreeNode]) {
     for tok in token_hierarchy {
         if let TokenTreeNode::Block(_, sub_block, Span(left, right)) = tok {
             result[*left].typ = IDETokenType::OpenBracket(current_depth);
@@ -106,8 +102,40 @@ fn add_ide_bracket_depths_recursive<'a>(result : &mut Vec<IDEToken<'a>>, current
     }
 }
 
-fn create_token_ide_info<'a>(tokens : &[Token<'a>], ast : &ASTRoot, token_hierarchy : &[TokenTreeNode], comments : &'a [CommentToken<'a>]) -> Vec<IDEToken<'a>> {
-    let mut result : Vec<IDEToken<'a>> = Vec::new();
+struct NameColoringWalker<'a> {
+    ide_token_info : &'a mut [IDEToken],
+    tokens : &'a [Token<'a>]
+}
+
+impl<'a> ASTWalker for NameColoringWalker<'a> {
+    fn visit_module_name(&mut self, module_name : usize) {
+        self.ide_token_info[module_name].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
+    }
+    fn visit_declaration(&mut self, decl : &SignalDeclaration, context : &VariableContext) {
+        for_each_identifier_in_expression(&decl.typ.0, &mut |tok_idx| {
+            self.ide_token_info[tok_idx].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
+        });
+        self.ide_token_info[decl.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
+    }
+    fn visit_expression(&mut self, expr : &SpanExpression, context : &VariableContext) {
+        for_each_identifier_in_expression(&expr.0, &mut |tok_idx| {
+            if let Some(tok_decl) = context.get_declaration_for(tok_idx, self.tokens) {
+                self.ide_token_info[tok_idx].typ = IDETokenType::Identifier(IDEIdentifierType::Value(tok_decl.identifier_type));
+            }
+        });
+        //self.ide_token_info[decl.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
+    }
+    fn visit_assignment(&mut self, to : &SpanExpression, expr : &SpanExpression, context : &VariableContext) {}
+}
+
+fn walk_name_color(ast : &ASTRoot, tokens : &[Token], result : &mut [IDEToken]) {
+    let mut walker = NameColoringWalker{ide_token_info : result, tokens : tokens};
+
+    walk_ast(&mut walker, ast, tokens, &VariableContext::new_initial());
+}
+
+fn create_token_ide_info<'a>(tokens : &[Token<'a>], ast : &ASTRoot, token_hierarchy : &[TokenTreeNode], comments : &'a [CommentToken<'a>]) -> Vec<IDEToken> {
+    let mut result : Vec<IDEToken> = Vec::new();
 
     for t in tokens {
         let initial_typ = if is_keyword(t.typ) {
@@ -124,12 +152,12 @@ fn create_token_ide_info<'a>(tokens : &[Token<'a>], ast : &ASTRoot, token_hierar
             IDETokenType::Invalid
         };
 
-        result.push(IDEToken{text : t.text, typ : initial_typ, attached_comments : vec![]})
+        result.push(IDEToken{typ : initial_typ, attached_comments : vec![]})
     }
 
     add_ide_bracket_depths_recursive(&mut result, 0, token_hierarchy);
 
-
+    walk_name_color(ast, &tokens, &mut result);
 
     result
 }
@@ -169,7 +197,7 @@ fn main() {
             let ide_tokens = create_token_ide_info(&token_vec, &ast, &token_hierarchy, &comments);
             
             
-            pretty_print(&file_text, &ide_tokens, &comments);
+            pretty_print(&file_text, &token_vec, &ide_tokens, &comments);
 
         }
     }

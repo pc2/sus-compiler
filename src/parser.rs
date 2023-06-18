@@ -266,16 +266,16 @@ impl ASTParserContext {
         Some(current_expression)
     }
 
-    fn parse_signal_declaration(&mut self, token_stream : &mut TokenStream) -> Option<SignalDeclaration> {
+    fn parse_signal_declaration(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType) -> Option<SignalDeclaration> {
         let sig_type = self.parse_expression(token_stream)?;
         let name_token = self.eat_plain(token_stream, TOKEN_IDENTIFIER, "signal declaration")?;
-        Some(SignalDeclaration{span : Span(sig_type.1.0, token_stream.last_idx), typ : sig_type, name_token : name_token})
+        Some(SignalDeclaration{span : Span(sig_type.1.0, token_stream.last_idx), typ : sig_type, name_token : name_token, identifier_type : identifier_type})
     }
     
-    fn parse_bundle(&mut self, token_stream : &mut TokenStream) -> Bundle {
-        let mut result : Bundle = Vec::new();
+    fn parse_bundle(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType) -> Vec<SignalDeclaration> {
+        let mut result : Vec<SignalDeclaration> = Vec::new();
         while token_stream.peek_is_plain(TOKEN_IDENTIFIER) {
-            if let Some(decl) = self.parse_signal_declaration(token_stream) {
+            if let Some(decl) = self.parse_signal_declaration(token_stream, identifier_type) {
                 result.push(decl);
             } else {
                 // Error during parsing signal decl. Skip till "," or end of scope
@@ -293,11 +293,11 @@ impl ASTParserContext {
     fn parse_interface(&mut self, token_stream : &mut TokenStream) -> Interface {
         let start_idx = token_stream.last_idx + 1;
 
-        let inputs = self.parse_bundle(token_stream);
+        let inputs = self.parse_bundle(token_stream, IdentifierType::Input);
     
         let outputs = if token_stream.peek_is_plain(kw("->")) {
             token_stream.next();
-            self.parse_bundle(token_stream)
+            self.parse_bundle(token_stream, IdentifierType::Output)
         } else {
             Vec::new()
         };
@@ -305,9 +305,9 @@ impl ASTParserContext {
         Interface{span : Span(start_idx, token_stream.last_idx), inputs : inputs, outputs : outputs}
     }
 
-    fn to_signal_declaration(&mut self, type_expr : SpanExpression, name_token_idx : usize) -> Option<SignalDeclaration> {
+    fn to_signal_declaration(&mut self, type_expr : SpanExpression, name_token_idx : usize, identifier_type : IdentifierType) -> Option<SignalDeclaration> {
         let decl_span = Span(type_expr.1.0, name_token_idx);
-        Some(SignalDeclaration{typ : type_expr, span : decl_span, name_token : name_token_idx})
+        Some(SignalDeclaration{typ : type_expr, span : decl_span, name_token : name_token_idx, identifier_type : identifier_type})
     }
 
     fn parse_statement(&mut self, token_stream : &mut TokenStream) -> Option<SpanStatement> {
@@ -336,10 +336,10 @@ impl ASTParserContext {
                     Some(TokenTreeNode::PlainToken(typ, _)) if *typ == kw("=") => {
                         let value = self.parse_expression(token_stream)?;
                         self.eat_plain(token_stream, kw(";"), "declaration");
-                        Statement::DeclareAssign(self.to_signal_declaration(expr_first, name)?, value)
+                        Statement::DeclareAssign(self.to_signal_declaration(expr_first, name, IdentifierType::Local)?, value)
                     },
                     Some(TokenTreeNode::PlainToken(typ, _)) if *typ == kw(";") => {
-                        Statement::Declare(self.to_signal_declaration(expr_first, name)?)
+                        Statement::Declare(self.to_signal_declaration(expr_first, name, IdentifierType::Local)?)
                     },
                     other => {
                         self.errors.push(error_unexpected_tree_node(&[kw(";"), kw("=")], other, token_stream.last_idx, "declaration")); // easy way to throw the End Of Scope error
