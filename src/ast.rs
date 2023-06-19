@@ -4,18 +4,18 @@ use crate::tokenizer::{Token,TokenTypeIdx};
 #[derive(Clone,Copy,Debug)]
 pub struct Span(pub usize, pub usize);
 
-impl From<usize> for Span {
-    fn from(v : usize) -> Span {
-        Span(v, v)
-    }
-}
-
 #[derive(Debug,Clone,Copy)]
 pub enum IdentifierType {
     Input,
     Output,
     Local,
     State
+}
+
+impl From<usize> for Span {
+    fn from(v : usize) -> Span {
+        Span(v, v)
+    }
 }
 
 #[derive(Debug)]
@@ -38,6 +38,13 @@ pub enum Expression {
     Named(usize),
     Constant(usize),
     BinOp(Box<(SpanExpression, TokenTypeIdx, usize/*Operator token */, SpanExpression)>)
+}
+
+impl Expression {
+    pub fn new_binop(left : SpanExpression, op : TokenTypeIdx, op_pos : usize/*Operator token */, right : SpanExpression) -> SpanExpression {
+        let span = Span(left.1.0, right.1.1);
+        (Expression::BinOp(Box::new((left, op, op_pos, right))), span)
+    }
 }
 pub type SpanExpression = (Expression, Span);
 pub type SpanStatement = (Statement, Span);
@@ -160,3 +167,63 @@ pub fn walk_ast<W : ASTWalker>(walker : &mut W, ast : &ASTRoot, tokens : &[Token
         walk_ast_code_block(walker, &module.code, tokens, &local_context);
     }
 }
+
+
+
+
+
+/*
+General AST Code, not used, but may be useful to convert to
+
+#[derive(Debug,Clone,Copy)]
+pub enum ValueIdentifierType {
+    Input,
+    Output,
+    Local,
+    State
+}
+
+#[derive(Debug,Clone,Copy)]
+pub enum TypeIdentifierType {
+    Type,
+    Module,
+    Interface
+}
+
+#[derive(Debug,Clone,Copy)]
+pub enum StatementType {
+    Declare, // (Declaration)
+    DeclareAssign, // (Declaration, 
+    Assign,
+    Mention,
+    Block
+}
+
+#[derive(Debug,Clone,Copy)]
+pub enum ExpressionType {
+    Named, // No Contents
+    BinOp(TokenTypeIdx), // (Expression, Expression)
+    UniOp(TokenTypeIdx) // (Expression)
+}
+
+#[derive(Debug,Clone,Copy)]
+pub enum NodeType {
+    Error, // Parsing error type. Always return as much info as possible. Can contain anything
+    Module, // (TypeIdentifier, ArgList (input), ArgList (output), Statement(Block))
+
+    Statement(StatementType), // Enum Statement
+    Expression(ExpressionType), // Enum Expression
+    TypeExpr,
+
+    ArgList, // Declaration[]
+    Declaration, // (TypeExpr, Expression(Named))
+}
+
+#[derive(Debug)]
+pub struct Node {
+    pub typ : NodeType,
+    pub subnodes : Box<[Node]>,
+    pub token_span : Span
+}
+
+ */

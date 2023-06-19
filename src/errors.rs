@@ -25,8 +25,6 @@ fn as_char_range(file_text : &str, position : &str) -> Range<usize> {
 
 impl<'a> ParsingError<&'a str> {
     pub fn pretty_print_error(&self, file_name : &str, file_text : &str) {
-        let mut colors = ColorGenerator::new();
-
         // Generate & choose some colours for each of our elements
         let err_color = Color::Red;
         let info_color = Color::Blue;

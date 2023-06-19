@@ -173,14 +173,6 @@ fn error_unexpected_tree_node(expected : &[TokenTypeIdx], found : Option<&TokenT
 }
 
 impl ASTParserContext {
-    fn eat_or_error<'it>(&mut self, token_stream : &mut TokenStream<'it>, error_reason : &str) -> Option<&'it TokenTreeNode> {
-        if let Some(found) = token_stream.next() {
-            Some(found)
-        } else {
-            self.errors.push(error_basic(Span::from(token_stream.unexpected_eof_token), format!("Unexpected end of scope. {error_reason}")));
-            None
-        }
-    }
     fn eat_plain(&mut self, token_stream : &mut TokenStream, expected : TokenTypeIdx, context : &str) -> Option<usize> {
         assert!(is_bracket(expected) == IsBracket::NotABracket);
         
@@ -246,24 +238,33 @@ impl ASTParserContext {
         }
     }
     fn parse_expression(&mut self, token_stream : &mut TokenStream) -> Option<SpanExpression> {
-        let mut current_expression = self.parse_unit_expression(token_stream)?;
+        // Shunting-yard algorithm with single stack
+        let mut stack : Vec<(SpanExpression, TokenTypeIdx, usize)> = Vec::new();
         loop {
+            let mut grabbed_symbol = self.parse_unit_expression(token_stream)?;
             match token_stream.peek() {
                 Some(TokenTreeNode::PlainToken(typ, op_pos)) if is_operator(*typ) => {
                     //let operator_prescedence = get_binary_operator_prescedence(*typ);
-                    token_stream.next(); // commit peek
-                    let second_expr = self.parse_unit_expression(token_stream)?;
-                    
-                    // TODO Operator prescedence
-                    let new_span = Span(current_expression.1.0, token_stream.last_idx);
-                    current_expression = (Expression::BinOp(Box::new((current_expression, *typ, *op_pos, second_expr))), new_span);
+                    while let Some((left_expr, stack_op, stack_op_pos)) = stack.pop() {
+                        if get_binary_operator_prescedence(stack_op) >= get_binary_operator_prescedence(*typ) {
+                            grabbed_symbol = Expression::new_binop(left_expr, stack_op, stack_op_pos, grabbed_symbol);
+                        } else {
+                            stack.push((left_expr, stack_op, stack_op_pos)); // oops, shouldn't have popped it
+                            break;
+                        }
+                    }
+
+                    token_stream.next(); // commit operator peek
+                    stack.push((grabbed_symbol, *typ, *op_pos));
                 },
                 _other => {
-                    break;
+                    while let Some((left_expr, stack_op, stack_op_pos)) = stack.pop() {
+                        grabbed_symbol = Expression::new_binop(left_expr, stack_op, stack_op_pos, grabbed_symbol);
+                    }
+                    return Some(grabbed_symbol);
                 }
             }
         }
-        Some(current_expression)
     }
 
     fn parse_signal_declaration(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType) -> Option<SignalDeclaration> {
@@ -422,57 +423,3 @@ pub fn parse<'a>(token_hierarchy : &Vec<TokenTreeNode>, num_tokens : usize) -> (
     
     (ast_root, context.errors)
 }
-
-
-/*
-use chumsky::prelude::*;
-use chumsky::error::*;
-
-pub fn parse_with_chumsky<'src>(tokens : &'src [TokenTypeIdx]) -> impl Parser<&'src [TokenTypeIdx], ASTRoot> {
-    let identifier = just(TOKEN_IDENTIFIER);
-    let value = just(TOKEN_NUMBER);
-    
-
-    let expression = recursive(|expression| 
-        choice((
-            identifier.map_with_span(|ident_token, span : Error::Span| Expression::Named(span.start)), // Just a named identifier
-            expression
-                .then(just(kw("+")))
-                .then(expression)
-                .map(|v| v)
-        ))
-
-    );
-
-    let signal_type = identifier;
-    let signal_decl = identifier.then(identifier);
-    let interface = 
-        signal_decl
-        .separated_by(kw(","))
-        .then(just(kw("->")))
-        .then(signal_decl.separated_by(kw(",")));
-
-    let statement = choice((
-        identifier,
-        signal_decl
-    ))
-        .then(kw("="))
-        .ignore_then(expression)
-        .then(kw(";"));
-
-    let code_block = 
-        statement
-        .repeated()
-        .delimited_by(
-            just(kw("{")), 
-            just(kw("}"))
-        );
-
-    let module = just(kw("module"))
-        .ignore_then(identifier.labelled("module name"))
-        .then(interface)
-        .then(code_block);
-    
-        module.repeat()
-}
-*/

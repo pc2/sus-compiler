@@ -12,3 +12,7 @@ license = "MIT"
 console = "0.15.7"
 # chumsky = "0.9.2"
 ariadne = "0.3.0"
+
+#lsp
+tower-lsp = "0.19.0"
+tokio = { version = "1.28.2", features = ["full"] }
