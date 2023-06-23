@@ -5,6 +5,7 @@ use ariadne::*;
 use std::ops::Range;
 
 use crate::tokenizer::{Token, TokenTypeIdx, get_token_type_name};
+use crate::parser::TokenTreeNode;
 
 pub struct ErrorInfo<T> {
     position : T,
@@ -129,13 +130,6 @@ pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
     result
 }
 
-pub fn error_incorrect_token(expected : &[TokenTypeIdx], position : usize, typ : TokenTypeIdx, context : &str) -> ParsingError<Span> {
-    let expected_str = join_expected_list(expected);
-    let token_name = get_token_type_name(typ);
-    let reason = format!("Unexpected Token. Expected {expected_str} but found '{token_name}' while parsing {context}");
-
-    error_basic(Span::from(position), reason)
-}
 pub fn error_unclosed_bracket(open_pos : usize, open_typ : TokenTypeIdx, close_before_pos : usize) -> ParsingError<Span> {
     let open_name = get_token_type_name(open_typ);
     let reason = format!("Unclosed bracket {open_name}");
@@ -145,4 +139,21 @@ pub fn error_unopened_bracket(close_pos : usize, close_typ : TokenTypeIdx, open_
     let close_name = get_token_type_name(close_typ);
     let reason = format!("Unopened bracket. Closing bracket {close_name} found but was not opened.");
     error_with_info(Span::from(close_pos), reason, vec![error_info_str(Span(open_after_pos, open_after_pos), "must be opened in scope after this")])
+}
+
+pub fn error_unexpected_tree_node(expected : &[TokenTypeIdx], found : Option<&TokenTreeNode>, unexpected_eof_idx : usize, context : &str) -> ParsingError<Span> {
+    let expected_list_str = join_expected_list(expected);
+    match found {
+        None => {
+            error_basic(Span::from(unexpected_eof_idx), format!("Unexpected End of Scope while parsing {context}. Expected {expected_list_str}"))
+        },
+        Some(TokenTreeNode::PlainToken(typ, pos)) => {
+            let tok_typ_name = get_token_type_name(*typ);
+            error_basic(Span::from(*pos), format!("Unexpected Token '{tok_typ_name}' while parsing {context}. Expected {expected_list_str}"))
+        },
+        Some(TokenTreeNode::Block(typ, _, span)) => {
+            let tok_typ_name = get_token_type_name(*typ);
+            error_basic(*span, format!("Unexpected Block '{tok_typ_name}' while parsing {context}. Expected {expected_list_str}"))
+        }
+    }
 }

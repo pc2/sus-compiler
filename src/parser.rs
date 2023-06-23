@@ -155,23 +155,6 @@ impl<'it> TokenStream<'it> {
     }
 }
 
-fn error_unexpected_tree_node(expected : &[TokenTypeIdx], found : Option<&TokenTreeNode>, unexpected_eof_idx : usize, context : &str) -> ParsingError<Span> {
-    let expected_list_str = join_expected_list(expected);
-    match found {
-        None => {
-            error_basic(Span::from(unexpected_eof_idx), format!("Unexpected End of Scope while parsing {context}. Expected {expected_list_str}"))
-        },
-        Some(TokenTreeNode::PlainToken(typ, pos)) => {
-            let tok_typ_name = get_token_type_name(*typ);
-            error_basic(Span::from(*pos), format!("Unexpected Token '{tok_typ_name}' while parsing {context}. Expected {expected_list_str}"))
-        },
-        Some(TokenTreeNode::Block(typ, _, span)) => {
-            let tok_typ_name = get_token_type_name(*typ);
-            error_basic(*span, format!("Unexpected Block '{tok_typ_name}' while parsing {context}. Expected {expected_list_str}"))
-        }
-    }
-}
-
 impl ASTParserContext {
     fn eat_plain(&mut self, token_stream : &mut TokenStream, expected : TokenTypeIdx, context : &str) -> Option<usize> {
         assert!(is_bracket(expected) == IsBracket::NotABracket);

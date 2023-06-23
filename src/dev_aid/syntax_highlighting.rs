@@ -157,45 +157,38 @@ fn create_token_ide_info<'a>(tokens : &[Token<'a>], ast : &ASTRoot, token_hierar
     result
 }
 
-
-
 pub fn syntax_highlight_file(file_path : &str) {
-    match std::fs::read_to_string(file_path) {
-        Err(err) => {
-            println!("Could not open file {}: {}", style(file_path).yellow(), style(err.to_string()));
-        },
-        Ok(file_text) => {
-            let (token_vec, comments, token_errors) = tokenize(&file_text);
-            
-            if !token_errors.is_empty() {
-                for err in token_errors {
-                    err.pretty_print_error(file_path, &file_text);
-                }
-            }
-
-            let (token_hierarchy, hierarchy_errors) = to_token_hierarchy(&token_vec);
-            if !hierarchy_errors.is_empty() {
-                for err in hierarchy_errors {
-                    err.pretty_print_error(file_path, &file_text, &token_vec);
-                }
-            }
-
-            let (ast, parse_errors) = parse(&token_hierarchy, token_vec.len());
-
-            if !parse_errors.is_empty() {
-                for err in parse_errors {
-                    err.pretty_print_error(file_path, &file_text, &token_vec);
-                }
-            }
-            
-            print_tokens(&file_text, &token_vec);
-
-            let ide_tokens = create_token_ide_info(&token_vec, &ast, &token_hierarchy, &comments);
-            
-            
-            pretty_print(&file_text, &token_vec, &ide_tokens, &comments);
-
+    let file_text = std::fs::read_to_string(file_path).expect("Could not open file!"); 
+    let (token_vec, comments, token_errors) = tokenize(&file_text);
+    
+    if !token_errors.is_empty() {
+        for err in token_errors {
+            err.pretty_print_error(file_path, &file_text);
         }
     }
+
+    let (token_hierarchy, hierarchy_errors) = to_token_hierarchy(&token_vec);
+    if !hierarchy_errors.is_empty() {
+        for err in hierarchy_errors {
+            err.pretty_print_error(file_path, &file_text, &token_vec);
+        }
+    }
+
+    let (ast, parse_errors) = parse(&token_hierarchy, token_vec.len());
+
+    if !parse_errors.is_empty() {
+        for err in parse_errors {
+            err.pretty_print_error(file_path, &file_text, &token_vec);
+        }
+    }
+    
+    print_tokens(&file_text, &token_vec);
+
+    let ide_tokens = create_token_ide_info(&token_vec, &ast, &token_hierarchy, &comments);
+    
+    
+    pretty_print(&file_text, &token_vec, &ide_tokens, &comments);
+    
+    println!("{:?}", ast);
 }
 
