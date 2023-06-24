@@ -30,32 +30,35 @@ struct TokenHierarchyStackElem {
     parent : Vec<TokenTreeNode>
 }
 
-pub fn to_token_hierarchy(tokens : &[Token]) -> (Vec<TokenTreeNode>, Vec<ParsingError<Span>>) {
+pub fn to_token_hierarchy(token_types : &[TokenTypeIdx]) -> (Vec<TokenTreeNode>, Vec<ParsingError<Span>>) {
     let mut cur_token_slab : Vec<TokenTreeNode> = Vec::new();
     let mut stack : Vec<TokenHierarchyStackElem> = Vec::new(); // Type of opening bracket, token position, Token Subtree
     let mut errors : Vec<ParsingError<Span>> = Vec::new();
 
-    for (idx, tok) in tokens.iter().enumerate() {
-        match is_bracket(tok.typ) {
+    for (idx, &tok) in token_types.iter().enumerate() {
+        if is_comment(tok) { // At this stage the comments are filtered out
+            continue;
+        }
+        match is_bracket(tok) {
             IsBracket::Open => {
-                stack.push(TokenHierarchyStackElem{open_bracket : tok.typ, open_bracket_pos : idx, parent : cur_token_slab});
+                stack.push(TokenHierarchyStackElem{open_bracket : tok, open_bracket_pos : idx, parent : cur_token_slab});
                 cur_token_slab = Vec::new();
             },
             IsBracket::Close => {
                 loop { // Loop for bracket stack unrolling, for correct code only runs once
                     if let Some(cur_block) = stack.pop() {
-                        if closes(cur_block.open_bracket, tok.typ) { // All is well. This bracket was closed properly. Happy path!
+                        if closes(cur_block.open_bracket, tok) { // All is well. This bracket was closed properly. Happy path!
                             let mut parent_cur_token_slab = cur_block.parent;
                             parent_cur_token_slab.push(TokenTreeNode::Block(cur_block.open_bracket, cur_token_slab, Span(cur_block.open_bracket_pos, idx)));
                             cur_token_slab = parent_cur_token_slab;
                             break;
                         } else {
-                            if !stack.iter().any(|prev_bracket| closes(prev_bracket.open_bracket, tok.typ)) { // Any bracket in the stack closes this?
-                                errors.push(error_unopened_bracket(idx, tok.typ, cur_block.open_bracket_pos));
+                            if !stack.iter().any(|prev_bracket| closes(prev_bracket.open_bracket, tok)) { // Any bracket in the stack closes this?
+                                errors.push(error_unopened_bracket(idx, tok, cur_block.open_bracket_pos));
                                 stack.push(cur_block); // Push the previous bracket back onto bracket stack, as we disregarded erroneous closing bracket
                                 break;
                             } else {
-                                errors.push(error_unclosed_bracket(cur_block.open_bracket_pos, tokens[cur_block.open_bracket_pos].typ, idx));
+                                errors.push(error_unclosed_bracket(cur_block.open_bracket_pos, token_types[cur_block.open_bracket_pos], idx));
                             }
                         }
                     } else {
@@ -66,7 +69,7 @@ pub fn to_token_hierarchy(tokens : &[Token]) -> (Vec<TokenTreeNode>, Vec<Parsing
                 }
             },
             IsBracket::NotABracket => {
-                cur_token_slab.push(TokenTreeNode::PlainToken(tok.typ, idx));
+                cur_token_slab.push(TokenTreeNode::PlainToken(tok, idx));
             }
         }
     }

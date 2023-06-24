@@ -1,8 +1,51 @@
 
-use crate::tokenizer::{Token,TokenTypeIdx};
+use crate::tokenizer::{TokenTypeIdx};
+use core::ops::Range;
 
-#[derive(Clone,Copy,Debug)]
+// Token span. Indices are INCLUSIVE
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub struct Span(pub usize, pub usize);
+
+// Char span, for chars in file. start is INCLUSIVE, end is EXCLUSIVE. It's a bit weird to make the distinction, but it works out
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+pub struct CharSpan(pub usize, pub usize);
+
+pub fn cvt_span_to_char_span(sp : Span, char_sp_buf : &[CharSpan]) -> CharSpan {
+    let begin = char_sp_buf[sp.0].0;
+    let end = char_sp_buf[sp.1].1;
+
+    CharSpan(begin, end)
+}
+
+impl Span {
+    pub fn as_range(&self) -> Range<usize> {
+        self.0..self.1
+    }
+    pub fn len(&self) -> usize {
+        self.1-self.0
+    }
+}
+impl CharSpan {
+    pub fn as_range(&self) -> Range<usize> {
+        self.0..self.1
+    }
+    pub fn len(&self) -> usize {
+        self.1-self.0
+    }
+}
+
+impl From<Span> for Range<usize> {
+    fn from(sp : Span) -> Self {
+        let Span(begin, end) = sp;
+        begin..end
+    }
+}
+impl From<CharSpan> for Range<usize> {
+    fn from(sp : CharSpan) -> Self {
+        let CharSpan(begin, end) = sp;
+        begin..end
+    }
+}
 
 #[derive(Debug,Clone,Copy)]
 pub enum IdentifierType {
@@ -72,8 +115,8 @@ pub struct ASTRoot {
 }
 
 pub struct VariableContext<'prev, 'ast> where 'prev : 'ast {
-    pub locals : Vec<(&'ast str, &'ast SignalDeclaration)>,
-    pub prev : Option<&'prev VariableContext<'prev, 'ast>>
+    locals : Vec<(&'ast str, &'ast SignalDeclaration)>,
+    prev : Option<&'prev VariableContext<'prev, 'ast>>
 }
 
 impl<'prev, 'ast> VariableContext<'prev, 'ast> {
@@ -85,11 +128,11 @@ impl<'prev, 'ast> VariableContext<'prev, 'ast> {
         }
         self.prev?.get_declaration_for_str(name)
     }
-    pub fn get_declaration_for(&self, tok_idx : usize, tokens : &[Token]) -> Option<&'ast SignalDeclaration> {
-        self.get_declaration_for_str(tokens[tok_idx].text)
+    pub fn get_declaration_for(&self, tok_idx : usize, token_spans : &[CharSpan], file_text : &str) -> Option<&'ast SignalDeclaration> {
+        self.get_declaration_for_str(file_text.get(token_spans[tok_idx].as_range()).unwrap())
     }
-    pub fn add_declaration(&mut self, new_local : &'ast SignalDeclaration, tokens : &[Token<'ast>]) {
-        let name = tokens[new_local.name_token].text;
+    pub fn add_declaration(&mut self, new_local : &'ast SignalDeclaration, token_spans : &[CharSpan], file_text : &'ast str) {
+        let name = file_text.get(token_spans[new_local.name_token].as_range()).unwrap();
         self.locals.push((name, new_local));
     }
     pub fn new_initial() -> Self {
@@ -112,6 +155,7 @@ pub fn for_each_identifier_in_expression<F>(expr : &Expression, func : &mut F) w
     }
 }
 
+#[allow(unused_variables)]
 pub trait ASTWalker {
     fn visit_module_name(&mut self, module_name : usize) {}
     fn visit_declaration(&mut self, decl : &SignalDeclaration, context : &VariableContext) {}
@@ -119,16 +163,16 @@ pub trait ASTWalker {
     fn visit_assignment(&mut self, to : &SpanExpression, expr : &SpanExpression, context : &VariableContext) {}
 }
 
-fn walk_ast_code_block<W : ASTWalker>(walker : &mut W, code_block : &[SpanStatement], tokens : &[Token], outer_context : &VariableContext) {
+fn walk_ast_code_block<W : ASTWalker>(walker : &mut W, code_block : &[SpanStatement], token_spans : &[CharSpan], file_text : &str, outer_context : &VariableContext) {
     let mut local_context = VariableContext::new_extend(outer_context);
     for statement in code_block {
         match &statement.0 {
             Statement::Declare(decl) => {
-                local_context.add_declaration(decl, tokens);
+                local_context.add_declaration(decl, token_spans, file_text);
                 walker.visit_declaration(&decl, &local_context);
             },
             Statement::DeclareAssign(decl, expr) => {
-                local_context.add_declaration(decl, tokens);
+                local_context.add_declaration(decl, token_spans, file_text);
                 walker.visit_declaration(decl, &local_context);
                 let tok = decl.name_token;
                 let tmp_local_expr = (Expression::Named(tok), Span::from(tok));
@@ -145,26 +189,26 @@ fn walk_ast_code_block<W : ASTWalker>(walker : &mut W, code_block : &[SpanStatem
                 walker.visit_expression(expr, &local_context);
             }
             Statement::Block(code) => {
-                walk_ast_code_block(walker, &code, tokens, &local_context);
+                walk_ast_code_block(walker, &code, token_spans, file_text, &local_context);
             },
         }
     }
 }
 
-pub fn walk_ast<W : ASTWalker>(walker : &mut W, ast : &ASTRoot, tokens : &[Token], global_context : &VariableContext) {
+pub fn walk_ast<W : ASTWalker>(walker : &mut W, ast : &ASTRoot, token_spans : &[CharSpan], file_text : &str, global_context : &VariableContext) {
     for module in &ast.modules {
         walker.visit_module_name(module.name);
         let mut local_context = VariableContext::new_extend(global_context);
         for decl in &module.interface.inputs {
             walker.visit_declaration(decl, &local_context);
-            local_context.add_declaration(decl, tokens);
+            local_context.add_declaration(decl, token_spans, file_text);
         }
         for decl in &module.interface.outputs {
             walker.visit_declaration(decl, &local_context);
-            local_context.add_declaration(decl, tokens);
+            local_context.add_declaration(decl, token_spans, file_text);
         }
 
-        walk_ast_code_block(walker, &module.code, tokens, &local_context);
+        walk_ast_code_block(walker, &module.code, token_spans, file_text, &local_context);
     }
 }
 
