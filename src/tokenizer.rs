@@ -4,7 +4,9 @@ use crate::errors::*;
 
 pub type TokenTypeIdx = u8;
 
+use crate::ast::FilePos;
 use crate::ast::CharSpan;
+
 
 pub const ALL_KEYWORDS : [(&'static str, u8); 12] = [
     ("module", 0),
@@ -174,56 +176,99 @@ fn is_valid_identifier_char(c : char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
-fn iter_until_comment_end(mut file_char_iter : &mut CharIndices) -> Option<usize> {
-	while let Some((_, comment_char)) = file_char_iter.next() {
-        if comment_char == '*' {
-            // end of single line comment
-            for (comment_i_2, comment_char_2) in &mut file_char_iter {
-                if comment_char_2 == '/' {
-                    // End of comment
-                    return Some(comment_i_2);
-                } else if comment_char_2 == '*' {
-                    continue;
-                } else {
-                    break;
+struct FileIter<'iter> {
+    char_iter : CharIndices<'iter>,
+    row : usize,
+    col_starts_at : usize
+}
+
+impl<'iter> FileIter<'iter> {
+    fn new(text : &'iter str) -> Self {
+        Self{char_iter : text.char_indices(), row : 0, col_starts_at : 0}
+    }
+
+    // Returns number of parsed chars
+    fn iter_until_end_of_identifier(&mut self) -> (usize, Option<(FilePos, char)>) {
+        let mut parsed_chars = 0; // already include the first parsed character
+        for (word_i, word_char) in self {
+            if !is_valid_identifier_char(word_char) {
+                return (parsed_chars, Some((word_i, word_char)));
+            }
+            parsed_chars += 1;
+        }
+        (parsed_chars, None)
+    }
+
+    // Returns number of characters parsed
+    fn iter_until_end(&mut self, end : char) -> usize {
+        let mut parsed_chars = 0; // already include the first parsed character
+        for (_, word_char) in self {
+            parsed_chars += 1;
+            if word_char == end {
+                return parsed_chars;
+            }
+        }
+        parsed_chars
+    }
+
+    // Returns number of characters parsed
+    fn iter_until_comment_end(&mut self) -> usize {
+        let mut parsed_chars = 0;
+        while let Some((_, comment_char)) = self.next() {
+            parsed_chars += 1;
+            if comment_char == '*' {
+                // end of single line comment
+                while let Some((_, comment_char_2)) = self.next() {
+                    parsed_chars += 1;
+                    if comment_char_2 == '/' {
+                        // End of comment
+                        return parsed_chars;
+                    } else if comment_char_2 == '*' {
+                        continue;
+                    } else {
+                        break;
+                    }
                 }
             }
         }
+        return parsed_chars
     }
-    return None
 }
 
-fn find_end_of_identifier(mut file_char_iter : &mut CharIndices) -> Option<(usize, char)> {
-    for (word_i, word_char) in &mut file_char_iter {
-        if !is_valid_identifier_char(word_char) {
-            return Some((word_i, word_char));
+impl<'iter> Iterator for FileIter<'iter> {
+    type Item = (FilePos, char);
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((pos, ch)) = self.char_iter.next() {
+            let cur_pos = FilePos{char_idx : pos, row : self.row, col : pos - self.col_starts_at};
+            if ch == '\n' {
+                self.row += 1;
+                self.col_starts_at = pos+1;
+            }
+            Some((cur_pos, ch))
+        } else {
+            None
         }
     }
-    None // End of file
+
 }
 
 pub fn tokenize(file_data : &str) -> (Vec<TokenTypeIdx>, Vec<CharSpan>, Vec<ParsingError<CharSpan>>) {
     let mut token_spans : Vec<CharSpan> = Vec::new();
     let mut token_types : Vec<TokenTypeIdx> = Vec::new();
-    let mut file_char_iter = file_data.char_indices();
+    let mut file_char_iter = FileIter::new(file_data);
     let mut errors : Vec<ParsingError<CharSpan>> = Vec::new();
-    let file_length = file_data.len();
     
-    while let Some((mut char_i, mut cur_char)) = file_char_iter.next() {
+    while let Some((mut file_pos, cur_char)) = file_char_iter.next() {
+        if cur_char.is_whitespace() {
+            // Whitespace, ignore
+            continue;
+        }
         if is_valid_identifier_char(cur_char) {
             // Start of word
-            let end_of_identifier = find_end_of_identifier(&mut file_char_iter);
-            let was_end_of_file = end_of_identifier.is_none();
-            let word_span = if let Some((word_end, next_char)) = end_of_identifier {
-                // no looping back the iterator, just continue from non-alphanumeric character
-                let result = CharSpan(char_i,word_end);
-                char_i = word_end;
-                cur_char = next_char;
-                result
-            } else {
-                CharSpan(char_i,file_length)
-            };
-
+            let (num_chars_parsed, new_cur_char) = file_char_iter.iter_until_end_of_identifier();
+            let was_end_of_file = new_cur_char.is_none();
+            let word_span = CharSpan{file_pos, length: num_chars_parsed+1}; // Already parsed the first char beforehand
+            
             let word = file_data.get(word_span.as_range()).unwrap();
             let mut word_chars = word.chars();
 
@@ -246,49 +291,43 @@ pub fn tokenize(file_data : &str) -> (Vec<TokenTypeIdx>, Vec<CharSpan>, Vec<Pars
             if was_end_of_file {
                 break;
             }
-        } // no else! Continue next character
-        if cur_char.is_whitespace() {
-            // Whitespace, ignore
-            continue;
-        } else {
-            if let Some(symbol_idx) = ALL_SYMBOLS.iter().position(|&symb| Some(symb.0) == file_data.get(char_i..char_i+symb.0.len())) {
-                let symbol_tok_id = (symbol_idx + ALL_KEYWORDS.len()) as TokenTypeIdx;
-                if symbol_tok_id == kw("//") {
-                    // Open single line comment
-                    file_char_iter.next();
-                    let comment_text_span = if let Some((comment_i, _)) = file_char_iter.find(|&(_comment_i, comment_char)| comment_char == '\n') {
-                        CharSpan(char_i,comment_i)
-                    } else {
-                        CharSpan(char_i,file_length)
-                    };
-                    token_spans.push(comment_text_span);
-                    token_types.push(TOKEN_COMMENT);
 
-                } else if symbol_tok_id == kw("/*") {
-                    // Open single multi-line comment
-                    file_char_iter.next();
-                    let comment_text_span = if let Some(comment_i) = iter_until_comment_end(&mut file_char_iter) {
-                        CharSpan(char_i,comment_i+1)
-                    } else {
-                        CharSpan(char_i,file_length)
-                    };
-                    token_spans.push(comment_text_span);
-                    token_types.push(TOKEN_COMMENT);
-                } else if symbol_tok_id == kw("*/") {
-                    // Unexpected close comment
-                    errors.push(error_basic_str(CharSpan(char_i,char_i+2), "Unexpected close comment"));
-                    file_char_iter.next(); // symbol is 2 chars large, so one additional skip is needed
-                } else {
-                    let symbol_text_span = CharSpan(char_i, char_i+ALL_SYMBOLS[symbol_idx].0.len());
-                    if symbol_text_span.len() > 1 {
-                        file_char_iter.nth(symbol_text_span.len() - 2);
-                    }
-                    token_types.push(symbol_tok_id);
-                    token_spans.push(symbol_text_span);
+            if let Some((next_pos_i, next_char)) = new_cur_char {
+                if next_char.is_whitespace() {
+                    continue;
                 }
-            } else { // Symbol not found!
-                errors.push(error_basic_str(CharSpan(char_i,char_i+1), "Unexpected character"));
+                file_pos = next_pos_i;
             }
+        } // no else! Continue next character
+        
+        let char_file_pos = file_pos.char_idx;
+        if let Some(symbol_idx) = ALL_SYMBOLS.iter().position(|&symb| Some(symb.0) == file_data.get(char_file_pos..char_file_pos+symb.0.len())) {
+            if ALL_SYMBOLS[symbol_idx].0.len() > 1 {
+                file_char_iter.nth(ALL_SYMBOLS[symbol_idx].0.len() - 2); // Advance iterator properly
+            }
+            let symbol_tok_id = (symbol_idx + ALL_KEYWORDS.len()) as TokenTypeIdx;
+            if symbol_tok_id == kw("//") {
+                // Open single line comment
+                let comment_length = file_char_iter.iter_until_end('\n');
+                token_spans.push(CharSpan{file_pos, length: comment_length + 2}); // Add 2 because comment starts with "//"
+                token_types.push(TOKEN_COMMENT);
+
+            } else if symbol_tok_id == kw("/*") {
+                // Open single multi-line comment
+                let comment_length = file_char_iter.iter_until_comment_end();
+                token_spans.push(CharSpan{file_pos, length: comment_length+2}); // Add 2 because comment starts with "/*"
+                token_types.push(TOKEN_COMMENT);
+            } else if symbol_tok_id == kw("*/") {
+                // Unexpected close comment
+                errors.push(error_basic_str(CharSpan{file_pos, length: 2}, "Unexpected comment closer when not in comment"));
+            } else {
+                let symbol_text_span = CharSpan{file_pos, length: ALL_SYMBOLS[symbol_idx].0.len()};
+                
+                token_types.push(symbol_tok_id);
+                token_spans.push(symbol_text_span);
+            }
+        } else { // Symbol not found!
+            errors.push(error_basic_str(CharSpan{file_pos, length: 1}, "Unexpected character"));
         }
     }
 

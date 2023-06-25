@@ -409,3 +409,33 @@ pub fn parse<'a>(token_hierarchy : &Vec<TokenTreeNode>, num_tokens : usize) -> (
     
     (ast_root, context.errors)
 }
+
+
+
+pub struct FullParseResult {
+    pub token_types : Vec<TokenTypeIdx>,
+    pub token_spans : Vec<CharSpan>,
+    pub token_hierarchy : Vec<TokenTreeNode>,
+    pub ast : ASTRoot
+}
+
+pub fn perform_full_semantic_parse(file_text : &str) -> (FullParseResult, Vec<ParsingError<CharSpan>>) {
+    let (token_types, token_spans, mut errors) = tokenize(file_text);
+
+    let (token_hierarchy, hierarchy_errors) = to_token_hierarchy(&token_types);
+    for err in hierarchy_errors {
+        errors.push(cvt_token_error_to_str_error(err, &token_spans));
+    }
+
+    let (ast, parse_errors) = parse(&token_hierarchy, token_spans.len());
+    for err in parse_errors {
+        errors.push(cvt_token_error_to_str_error(err, &token_spans));
+    }
+
+    (FullParseResult{
+        token_types,
+        token_spans,
+        token_hierarchy,
+        ast,
+    }, errors)
+}

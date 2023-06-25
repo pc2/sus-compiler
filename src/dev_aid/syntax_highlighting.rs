@@ -4,14 +4,14 @@ use crate::{ast::*, tokenizer::*, parser::*};
 use console::Style;
 
 
-enum IDEIdentifierType {
+pub enum IDEIdentifierType {
     Value(IdentifierType),
     Type,
     Interface,
     Unknown
 }
 
-enum IDETokenType {
+pub enum IDETokenType {
     Comment,
     Keyword,
     Symbol,
@@ -23,12 +23,12 @@ enum IDETokenType {
     CloseBracket(usize) // Bracket depth
 }
 
-struct IDEToken {
-    typ : IDETokenType
+pub struct IDEToken {
+    pub typ : IDETokenType
 }
 
 fn pretty_print_chunk_with_whitespace(whitespace_start : usize, file_text : &str, text_span : CharSpan, st : Style) { 
-    let whitespace_text = file_text.get(whitespace_start..text_span.0).unwrap();
+    let whitespace_text = file_text.get(whitespace_start..text_span.file_pos.char_idx).unwrap();
 
     print!("{}{}", whitespace_text, st.apply_to(file_text.get(text_span.as_range()).unwrap()));
 }
@@ -40,7 +40,7 @@ fn print_tokens(file_text : &str, token_spans : &[CharSpan]) {
         let st = styles[tok_idx % styles.len()].clone().underlined();
         
         pretty_print_chunk_with_whitespace(whitespace_start, file_text, *tok_span, st);
-        whitespace_start = tok_span.1;
+        whitespace_start = tok_span.end_pos();
     }
 
     print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
@@ -71,7 +71,7 @@ fn pretty_print(file_text : &str, token_spans : &[CharSpan], ide_infos : &[IDETo
         
         let tok_span = token_spans[tok_idx];
         pretty_print_chunk_with_whitespace(whitespace_start, file_text, tok_span, st);
-        whitespace_start = tok_span.1;
+        whitespace_start = tok_span.end_pos();
     }
 
     print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
@@ -120,10 +120,11 @@ fn walk_name_color(ast : &ASTRoot, token_spans : &[CharSpan], file_text : &str, 
     walk_ast(&mut walker, ast, token_spans, file_text, &VariableContext::new_initial());
 }
 
-fn create_token_ide_info<'a>(token_types : &[TokenTypeIdx], token_spans : &[CharSpan], file_text : &str, ast : &ASTRoot, token_hierarchy : &[TokenTreeNode]) -> Vec<IDEToken> {
+pub fn create_token_ide_info<'a>(file_text : &str, parsed: &FullParseResult) -> Vec<IDEToken> {
     let mut result : Vec<IDEToken> = Vec::new();
+    result.reserve(parsed.token_types.len());
 
-    for &t in token_types {
+    for &t in &parsed.token_types {
         let initial_typ = if is_keyword(t) {
             IDETokenType::Keyword
         } else if is_bracket(t) != IsBracket::NotABracket {
@@ -143,45 +144,28 @@ fn create_token_ide_info<'a>(token_types : &[TokenTypeIdx], token_spans : &[Char
         result.push(IDEToken{typ : initial_typ})
     }
 
-    add_ide_bracket_depths_recursive(&mut result, 0, token_hierarchy);
+    add_ide_bracket_depths_recursive(&mut result, 0, &parsed.token_hierarchy);
 
-    walk_name_color(ast, &token_spans, file_text, &mut result);
+    walk_name_color(&parsed.ast, &parsed.token_spans, file_text, &mut result);
 
     result
 }
 
 pub fn syntax_highlight_file(file_path : &str) {
     let file_text = std::fs::read_to_string(file_path).expect("Could not open file!"); 
-    let (token_types, token_spans, token_errors) = tokenize(&file_text);
     
-    if !token_errors.is_empty() {
-        for err in token_errors {
-            err.pretty_print_error(file_path, &file_text);
-        }
-    }
+    let (full_parse, errors) = perform_full_semantic_parse(&file_text);
 
-    let (token_hierarchy, hierarchy_errors) = to_token_hierarchy(&token_types);
-    if !hierarchy_errors.is_empty() {
-        for err in hierarchy_errors {
-            err.pretty_print_error(file_path, &file_text, &token_spans);
-        }
-    }
-
-    let (ast, parse_errors) = parse(&token_hierarchy, token_spans.len());
-
-    if !parse_errors.is_empty() {
-        for err in parse_errors {
-            err.pretty_print_error(file_path, &file_text, &token_spans);
-        }
+    for err in errors {
+        err.pretty_print_error(&file_path, &file_text)
     }
     
-    print_tokens(&file_text, &token_spans);
+    print_tokens(&file_text, &full_parse.token_spans);
 
-    let ide_tokens = create_token_ide_info(&token_types, &token_spans, &file_text, &ast, &token_hierarchy);
+    let ide_tokens = create_token_ide_info(&file_text, &full_parse);
     
     
-    pretty_print(&file_text, &token_spans, &ide_tokens);
+    pretty_print(&file_text, &full_parse.token_spans, &ide_tokens);
     
-    println!("{:?}", ast);
+    println!("{:?}", full_parse.ast);
 }
-

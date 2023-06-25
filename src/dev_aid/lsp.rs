@@ -45,11 +45,13 @@ use std::error::Error;
 use std::fs::File;
 use lsp_types::{*, request::Request};
 
-use lsp_server::{Connection, Message, Response};
+use lsp_server::*;
 
 use std::path::Path;
 
-use crate::tokenizer::tokenize;
+use crate::{tokenizer::tokenize, parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, CharSpan}, errors::ParsingError};
+
+use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
 thread_local!(static OUT_FILE: File = File::create("/home/lennart/lsp_out.txt").expect("Replacement terminal /home/lennart/lsp_out.txt could not be created"));
 
@@ -99,11 +101,12 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
             },
             legend: SemanticTokensLegend{
                 token_types: vec![
-                    SemanticTokenType::COMMENT,
+                    SemanticTokenType::COMMENT, // When updating, see ['get_semantic_token_type_from_ide_token']
                     SemanticTokenType::KEYWORD,
                     SemanticTokenType::OPERATOR,
                     SemanticTokenType::VARIABLE,
                     SemanticTokenType::PARAMETER,
+                    SemanticTokenType::TYPE,
                     SemanticTokenType::NUMBER,
                     SemanticTokenType::FUNCTION
                 ],
@@ -128,18 +131,57 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
     Ok(())
 }
 
-fn do_syntax_highlight(params : SemanticTokensParams) -> SemanticTokensResult {
-    println!("got fullSemanticTokens request: {params:?}");
+fn get_semantic_token_type_from_ide_token(tok : &IDEToken) -> u32 {
+    match &tok.typ {
+        IDETokenType::Comment => 0,
+        IDETokenType::Keyword => 1,
+        IDETokenType::Symbol => 2,
+        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Input)) => 4,
+        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => 4,
+        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 3, // TODO
+        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Local)) => 3,
+        IDETokenType::Identifier(_) => 5, // All others are 'TYPE'
+        IDETokenType::Number => 6,
+        IDETokenType::Invalid => 2, // make it 'OPERATOR'?
+        IDETokenType::InvalidBracket => 2, // make it 'OPERATOR'?
+        IDETokenType::OpenBracket(_) => 2,
+        IDETokenType::CloseBracket(_) => 2,
+    }
+}
 
-    let path = params.text_document.uri.to_file_path().unwrap();
-    let file_text = std::fs::read_to_string(path).unwrap();
+fn do_syntax_highlight(file_text : &str, full_parse : &FullParseResult) -> SemanticTokensResult {
+    let ide_tokens = create_token_ide_info(&file_text, &full_parse);
 
-    let (token_vec, comments, errors) = tokenize(&file_text);
+    let mut semantic_tokens : Vec<SemanticToken> = Vec::new();
+    semantic_tokens.reserve(full_parse.token_spans.len());
 
-    let semantic_tokens : Vec<SemanticToken> = Vec::new();
+    let mut prev_line : usize = 0;
+    let mut prev_col : usize = 0;
+    for (idx, tok) in ide_tokens.iter().enumerate() {
+        let tok_file_pos = full_parse.token_spans[idx];
 
+        let delta_line = tok_file_pos.file_pos.row - prev_line;
 
+        if delta_line != 0 {
+            prev_col = 0;
+        }
 
+        let delta_col = tok_file_pos.file_pos.col - prev_col;
+        prev_col = tok_file_pos.file_pos.col;
+
+        prev_line = tok_file_pos.file_pos.row;
+
+        let typ = get_semantic_token_type_from_ide_token(tok);
+        semantic_tokens.push(SemanticToken{
+            delta_line: delta_line as u32,
+            delta_start: delta_col as u32,
+            length: tok_file_pos.length as u32,
+            token_type: typ,
+            token_modifiers_bitset: 0,
+        });
+
+        //println!("{}: typ={typ} {delta_line}:{delta_col}", file_text.get(tok_file_pos.as_range()).unwrap());
+    }
 
     SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
         result_id: None,
@@ -174,10 +216,21 @@ fn main_loop(
                     request::SemanticTokensFullRequest::METHOD => {
                         let params : SemanticTokensParams = serde_json::from_value(req.params).expect("JSON Encoding Error while parsing params");
                         
-                        let result = serde_json::to_value(&do_syntax_highlight(params)).unwrap();
+                        println!("got fullSemanticTokens request: {params:?}");
+
+                        let path = params.text_document.uri.to_file_path().unwrap();
+                        let file_text = std::fs::read_to_string(path).unwrap();
+
+                        let (full_parse, errors) = perform_full_semantic_parse(&file_text);
+                        
+                        let result = serde_json::to_value(&do_syntax_highlight(&file_text, &full_parse)).unwrap();
                         connection.sender.send(Message::Response(Response{
                             id: req.id, result: Some(result), error: None
                         }))?;
+
+                        /*connection.sender.send(Message::Notification(Notification{
+
+                        }))?;*/
                     },
                     // TODO ...
                     req => {

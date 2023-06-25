@@ -24,7 +24,7 @@ impl<'a> ParsingError<CharSpan> {
         let err_color = Color::Red;
         let info_color = Color::Blue;
 
-        let mut report = Report::build(ReportKind::Error, file_name, 12)
+        let mut report = Report::build(ReportKind::Error, file_name, self.error.position.file_pos.char_idx)
             .with_message(&self.error.reason)
             .with_label(
                 Label::new((file_name, self.error.position.as_range()))
@@ -46,12 +46,6 @@ impl<'a> ParsingError<CharSpan> {
         report.finish()
         .print((file_name, Source::from(file_text)))
         .unwrap();
-    }
-}
-
-impl ParsingError<Span> {
-    pub fn pretty_print_error(self, file_name : &str, file_text : &str, token_spans : &[CharSpan]) {
-        cvt_token_error_to_str_error(self, token_spans).pretty_print_error(file_name, file_text);
     }
 }
 

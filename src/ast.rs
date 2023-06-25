@@ -5,45 +5,53 @@ use core::ops::Range;
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub struct Span(pub usize, pub usize);
+impl Span {
+    pub fn as_range(&self) -> Range<usize> {
+        self.0..self.1+1
+    }
+    pub fn len(&self) -> usize {
+        self.1-self.0+1
+    }
+}
+
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
+pub struct FilePos {
+    pub char_idx : usize,
+    pub row : usize,
+    pub col : usize
+}
 
 // Char span, for chars in file. start is INCLUSIVE, end is EXCLUSIVE. It's a bit weird to make the distinction, but it works out
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
-pub struct CharSpan(pub usize, pub usize);
+pub struct CharSpan{
+    pub file_pos : FilePos,
+    pub length : usize
+}
 
 pub fn cvt_span_to_char_span(sp : Span, char_sp_buf : &[CharSpan]) -> CharSpan {
-    let begin = char_sp_buf[sp.0].0;
-    let end = char_sp_buf[sp.1].1;
+    let file_pos = char_sp_buf[sp.0].file_pos;
+    let length = char_sp_buf[sp.1].end_pos() - file_pos.char_idx;
 
-    CharSpan(begin, end)
+    CharSpan{file_pos, length}
 }
 
-impl Span {
-    pub fn as_range(&self) -> Range<usize> {
-        self.0..self.1
-    }
-    pub fn len(&self) -> usize {
-        self.1-self.0
-    }
-}
 impl CharSpan {
     pub fn as_range(&self) -> Range<usize> {
-        self.0..self.1
+        self.file_pos.char_idx..self.file_pos.char_idx+self.length
     }
-    pub fn len(&self) -> usize {
-        self.1-self.0
+    pub fn end_pos(&self) -> usize {
+        self.file_pos.char_idx + self.length
     }
 }
 
 impl From<Span> for Range<usize> {
     fn from(sp : Span) -> Self {
-        let Span(begin, end) = sp;
-        begin..end
+        sp.as_range()
     }
 }
 impl From<CharSpan> for Range<usize> {
     fn from(sp : CharSpan) -> Self {
-        let CharSpan(begin, end) = sp;
-        begin..end
+        sp.as_range()
     }
 }
 
@@ -211,8 +219,6 @@ pub fn walk_ast<W : ASTWalker>(walker : &mut W, ast : &ASTRoot, token_spans : &[
         walk_ast_code_block(walker, &module.code, token_spans, file_text, &local_context);
     }
 }
-
-
 
 
 
