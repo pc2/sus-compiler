@@ -43,9 +43,11 @@
 //! ```
 use std::error::Error;
 use std::fs::File;
-use lsp_types::{*, request::Request};
+use lsp_types::{*, request::Request, notification::*};
 
-use lsp_server::*;
+use lsp_server::{Response, Message, Connection, };
+
+use lsp_types::notification::Notification;
 
 use std::path::Path;
 
@@ -189,6 +191,51 @@ fn do_syntax_highlight(file_text : &str, full_parse : &FullParseResult) -> Seman
     })
 }
 
+use lsp_types::Diagnostic;
+
+fn cvt_char_span_to_lsp_range(ch_sp : CharSpan, file_text : &str) -> lsp_types::Range {
+    let mut last_char_line = ch_sp.file_pos.row;
+    let mut last_newline_idx = ch_sp.file_pos.char_idx - ch_sp.file_pos.col;
+    let last_char_idx = ch_sp.file_pos.char_idx+ch_sp.length;
+    for (i, c) in file_text.get(ch_sp.file_pos.char_idx..last_char_idx).unwrap().char_indices() {
+        if c == '\n' {
+            last_char_line += 1;
+            last_newline_idx = i;
+        }
+    }
+    let last_char_col = last_char_idx - last_newline_idx;
+    Range{
+        start : Position{
+            line : ch_sp.file_pos.row as u32,
+            character : ch_sp.file_pos.col as u32
+        }, end : Position{
+            line : last_char_line as u32,
+            character : last_char_col as u32
+        }
+    }
+}
+
+fn send_errors_warnings(connection: &Connection, errs : Vec<ParsingError<CharSpan>>, file_uri: Url, file_text : &str) -> Result<(), Box<dyn Error + Sync + Send>> {
+    let mut diag_vec : Vec<Diagnostic> = Vec::new();
+    for err in errs {
+        diag_vec.push(Diagnostic::new_simple(cvt_char_span_to_lsp_range(err.error.position, file_text), err.error.reason));
+    }
+    
+    let params = &PublishDiagnosticsParams{
+        uri: file_uri,
+        diagnostics: diag_vec,
+        version: None // TODO 
+    };
+    let params_json = serde_json::to_value(params)?;
+
+    connection.sender.send(Message::Notification(lsp_server::Notification{
+        method: PublishDiagnostics::METHOD.to_owned(),
+        params: params_json
+    }))?;
+
+    Ok(())
+}
+
 fn main_loop(
     connection: Connection,
     params: serde_json::Value,
@@ -228,9 +275,7 @@ fn main_loop(
                             id: req.id, result: Some(result), error: None
                         }))?;
 
-                        /*connection.sender.send(Message::Notification(Notification{
-
-                        }))?;*/
+                        send_errors_warnings(&connection, errors, params.text_document.uri, &file_text)?;
                     },
                     // TODO ...
                     req => {

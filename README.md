@@ -30,7 +30,7 @@ The main goals of the language are roughly listed below:
 ### Parsing
 - [x] Basic Tokenizer
 - [x] Basic Syntax Error Reporting
-- [ ] Syntax error reporting with infos
+- [x] Syntax error reporting with infos
 - [x] Basic Token Highlighting in Terminal
 - [x] Local Variable and Type Name highlighting
 - [ ] Can Parse Multiply-Add pipeline
@@ -44,7 +44,7 @@ The main goals of the language are roughly listed below:
 ### LSP
 - [x] Basic LSP for VSCode integration
 - [x] Syntax Highlighting
-- [ ] Error and Warning Reporting
+- [x] Error and Warning Reporting
 - [ ] Per-Line Resource Utilization Reporting
 
 ### Code Generation

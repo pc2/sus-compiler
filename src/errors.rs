@@ -9,13 +9,13 @@ use crate::tokenizer::{TokenTypeIdx, get_token_type_name};
 use crate::parser::TokenTreeNode;
 
 pub struct ErrorInfo<T> {
-    position : T,
-    reason : String
+    pub position : T,
+    pub reason : String
 }
 
 pub struct ParsingError<T> {
-    error : ErrorInfo<T>,
-    infos : Vec<ErrorInfo<T>>
+    pub error : ErrorInfo<T>,
+    pub infos : Vec<ErrorInfo<T>>
 }
 
 impl<'a> ParsingError<CharSpan> {
