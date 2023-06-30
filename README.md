@@ -32,7 +32,7 @@ The main goals of the language are roughly listed below:
 - [x] Basic Syntax Error Reporting
 - [ ] Syntax error reporting with infos
 - [x] Basic Token Highlighting in Terminal
-- [ ] Local Variable and Type Name highlighting
+- [x] Local Variable and Type Name highlighting
 - [ ] Can Parse Multiply-Add pipeline
 - [ ] Can Parse Blur2 filter
 - [ ] Multi-Interface Syntax
@@ -42,8 +42,8 @@ The main goals of the language are roughly listed below:
 - [ ] Rythm Syntax
 
 ### LSP
-- [ ] Basic LSP for VSCode integration
-- [ ] Syntax Highlighting
+- [x] Basic LSP for VSCode integration
+- [x] Syntax Highlighting
 - [ ] Error and Warning Reporting
 - [ ] Per-Line Resource Utilization Reporting
 

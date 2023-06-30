@@ -28,9 +28,11 @@ pub struct CharSpan{
     pub length : usize
 }
 
+
+
 pub fn cvt_span_to_char_span(sp : Span, char_sp_buf : &[CharSpan]) -> CharSpan {
-    let file_pos = char_sp_buf[sp.0].file_pos;
-    let length = char_sp_buf[sp.1].end_pos() - file_pos.char_idx;
+    let file_pos = char_sp_buf[if sp.0 < char_sp_buf.len() {sp.0} else {char_sp_buf.len()-1}].file_pos;
+    let length = char_sp_buf[if sp.1 < char_sp_buf.len() {sp.1} else {char_sp_buf.len()-1}].end_pos() - file_pos.char_idx;
 
     CharSpan{file_pos, length}
 }

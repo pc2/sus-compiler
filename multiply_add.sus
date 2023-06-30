@@ -5,15 +5,59 @@ module MultiplyAdd : i32 a, i32 b, i32 c -> i32 result {
 	// temporary variable
 	i32 tmp = a * b;
 	result = tmp + cooo * 30 + 5;
-
+	array_subscript[5] = tmp;
+  @
+	int[5] myVar = {1,2,3,4,5};
+  @
 	{
 		//[
 		beep boop;
 	}
-
-	int values[5];
-
-	int (&values) [5]
-
-	int[5]& values;*/
 }
+
+module beep : i32 a {
+	state i32 beep;
+}
+
+
+module multiply_add : i32 a, i32 b, i32 c -> i32 result, double double_result {
+  i32 tmp = a * b;
+  @
+  result = @(tmp + c);
+  @
+  double_result = cvt_to_double(result);
+}
+
+/*module blur : i32'0 a -> i32'1 result : timeline (a -> /) .. (a -> r)* {
+  state prev = a;
+  #
+  loop {
+    result = @@@@@@(a + prev) / 2; // pipeline stage
+    prev = a;
+    #   // timeline step
+  }
+}*/
+
+ /*module my_complex_operation : i32'0 a -> i32'9 result : timeline (a -> /) .. (a -> r)* {
+  state prev'0 = a;
+  state tmp2'6;
+  #
+  loop {
+    tmp2 = @@@@@@(a + prev) / 2; // pipeline stage
+	result = @@@(prev + tmp2);
+    prev = a;
+    #   // timeline step
+  }
+}
+
+module seq_adder : i32'0 a -> i32'9 result : timeline (a -> /)* .. (/ -> r) {
+  state sum = a;
+  #
+  loop {
+    sum = @@(sum + a);
+	#
+  }
+  result = sum;
+}*/
+
+
