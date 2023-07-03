@@ -298,18 +298,53 @@ impl ASTParserContext {
     }
 
     fn parse_statement(&mut self, token_stream : &mut TokenStream) -> Option<SpanStatement> {
+        let mut state_decl : Option<usize> = None;
+        let start_at = if let Some(peek) = token_stream.peek() {
+            peek.get_span().0
+        } else {
+            return None
+        };
+        match token_stream.peek() {
+            None => {
+                return None
+            }
+            Some(TokenTreeNode::PlainToken(typ, pos)) if *typ == kw("@") => {
+                // Assignment
+                token_stream.next();
+                return Some((Statement::PipelineStage(*pos), Span::from(*pos)))
+            }
+            Some(TokenTreeNode::PlainToken(typ, pos)) if *typ == kw("#") => {
+                // Assignment
+                token_stream.next();
+                return Some((Statement::TimelineStage(*pos), Span::from(*pos)))
+            }
+            Some(TokenTreeNode::PlainToken(typ, pos)) if *typ == kw("state") => {
+                // Assignment
+                token_stream.next();
+                state_decl = Some(*pos);
+            }
+            _other => {}
+        }
         let expr_first = self.parse_expression(token_stream)?; // Error case
-        let start_at = expr_first.1.0;
         let resulting_statement = match token_stream.peek() {
             // Regular assignment
             None => {
+                if let Some(kw_pos) = state_decl {
+                    self.errors.push(error_basic_str(Span::from(kw_pos), "Cannot attach 'state' keyword in mention"))
+                }
                 Statement::Mention(expr_first)
             },
             Some(TokenTreeNode::PlainToken(typ, _)) if *typ == kw(";") => {
                 token_stream.next();
+                if let Some(kw_pos) = state_decl {
+                    self.errors.push(error_basic_str(Span::from(kw_pos), "Cannot attach 'state' keyword in mention"))
+                }
                 Statement::Mention(expr_first)
             },
             Some(TokenTreeNode::PlainToken(typ, _)) if *typ == kw("=") => {
+                if let Some(kw_pos) = state_decl {
+                    self.errors.push(error_basic_str(Span::from(kw_pos), "Cannot attach 'state' keyword in assignment"))
+                }
                 // Assignment
                 token_stream.next();
                 let value = self.parse_expression(token_stream)?;
@@ -317,16 +352,21 @@ impl ASTParserContext {
                 Statement::Assign(expr_first, value)
             },
             Some(_other) => {
+                let declaration_type = if state_decl.is_some() {
+                    IdentifierType::State
+                } else {
+                    IdentifierType::Local
+                };
                 // This is a declaration!
                 let name = self.eat_plain(token_stream, TOKEN_IDENTIFIER, "declaration")?;
                 match token_stream.next() {
                     Some(TokenTreeNode::PlainToken(typ, _)) if *typ == kw("=") => {
                         let value = self.parse_expression(token_stream)?;
                         self.eat_plain(token_stream, kw(";"), "declaration");
-                        Statement::DeclareAssign(self.to_signal_declaration(expr_first, name, IdentifierType::Local)?, value)
+                        Statement::DeclareAssign(self.to_signal_declaration(expr_first, name, declaration_type)?, value)
                     },
                     Some(TokenTreeNode::PlainToken(typ, _)) if *typ == kw(";") => {
-                        Statement::Declare(self.to_signal_declaration(expr_first, name, IdentifierType::Local)?)
+                        Statement::Declare(self.to_signal_declaration(expr_first, name, declaration_type)?)
                     },
                     other => {
                         self.errors.push(error_unexpected_tree_node(&[kw(";"), kw("=")], other, token_stream.last_idx, "declaration")); // easy way to throw the End Of Scope error

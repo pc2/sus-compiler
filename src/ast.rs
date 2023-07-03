@@ -108,7 +108,9 @@ pub enum Statement {
     DeclareAssign(SignalDeclaration, SpanExpression), // type v = expr;
     Assign(SpanExpression, SpanExpression), // v = expr;
     Mention(SpanExpression),
-    Block(Vec<SpanStatement>)
+    Block(Vec<SpanStatement>),
+    PipelineStage(usize),
+    TimelineStage(usize)
 }
 
 #[derive(Debug)]
@@ -180,7 +182,7 @@ fn walk_ast_code_block<W : ASTWalker>(walker : &mut W, code_block : &[SpanStatem
             Statement::Declare(decl) => {
                 local_context.add_declaration(decl, token_spans, file_text);
                 walker.visit_declaration(&decl, &local_context);
-            },
+            }
             Statement::DeclareAssign(decl, expr) => {
                 local_context.add_declaration(decl, token_spans, file_text);
                 walker.visit_declaration(decl, &local_context);
@@ -189,18 +191,24 @@ fn walk_ast_code_block<W : ASTWalker>(walker : &mut W, code_block : &[SpanStatem
                 walker.visit_assignment(expr, &tmp_local_expr, &local_context);
                 walker.visit_expression(expr, &local_context);
                 walker.visit_expression(&tmp_local_expr, &local_context);
-            },
+            }
             Statement::Assign(to, expr) => {
                 walker.visit_expression(to, &local_context);
                 walker.visit_expression(expr, &local_context);
                 walker.visit_assignment(to, expr, &local_context);
-            },
+            }
             Statement::Mention(expr) => {
                 walker.visit_expression(expr, &local_context);
             }
             Statement::Block(code) => {
                 walk_ast_code_block(walker, &code, token_spans, file_text, &local_context);
-            },
+            }
+            Statement::PipelineStage(_pos) => {
+                
+            }
+            Statement::TimelineStage(_pos) => {
+                
+            }
         }
     }
 }

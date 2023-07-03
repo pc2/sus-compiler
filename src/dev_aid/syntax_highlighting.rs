@@ -14,7 +14,9 @@ pub enum IDEIdentifierType {
 pub enum IDETokenType {
     Comment,
     Keyword,
-    Symbol,
+    Operator,
+    PipelineStage,
+    TimelineStage,
     Identifier(IDEIdentifierType),
     Number,
     Invalid,
@@ -54,7 +56,9 @@ fn pretty_print(file_text : &str, token_spans : &[CharSpan], ide_infos : &[IDETo
         let st = match token.typ {
             IDETokenType::Comment => Style::new().green().dim(),
             IDETokenType::Keyword => Style::new().blue(),
-            IDETokenType::Symbol => Style::new().white().bright(),
+            IDETokenType::Operator => Style::new().white().bright(),
+            IDETokenType::PipelineStage => Style::new().red().bold(),
+            IDETokenType::TimelineStage => Style::new().red().bold(),
             IDETokenType::Identifier(IDEIdentifierType::Unknown) => Style::new().red().underlined(),
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Local)) => Style::new().blue().bright(),
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => Style::new().blue().bright().underlined(),
@@ -130,7 +134,13 @@ pub fn create_token_ide_info<'a>(file_text : &str, parsed: &FullParseResult) -> 
         } else if is_bracket(t) != IsBracket::NotABracket {
             IDETokenType::InvalidBracket // Brackets are initially invalid. They should be overwritten by the token_hierarchy step. The ones that don't get overwritten are invalid
         } else if is_symbol(t) {
-            IDETokenType::Symbol
+            if t == kw("@") {
+                IDETokenType::PipelineStage
+            } else if t == kw("#") {
+                IDETokenType::TimelineStage
+            } else {
+                IDETokenType::Operator
+            }
         } else if is_identifier(t) {
             IDETokenType::Identifier(IDEIdentifierType::Unknown)
         } else if is_number(t) {

@@ -25,30 +25,31 @@ pub const ALL_KEYWORDS : [(&'static str, u8); 12] = [
 
 // Extra data is opreator prescedence. Lower number is higher prescedence of operators
 // ordered by which to prefer when parsing
-pub const ALL_SYMBOLS : [(&'static str, u8); 33] = [
+pub const ALL_SYMBOLS : [(&'static str, u8); 34] = [
     // 'Meta symbols', for comments. Not actually used in further parsing
     ("/*", 0),
     ("//", 0),
     ("*/", 0),
     // Big symbols
     ("->", 0),
-    ("<=", 1), // Start of operators (see is_operator())
-    (">=", 1),
-    ("==", 1),
-    ("!=", 1),
-    ("<<", 3),
-    (">>", 3),
+    ("<=", 2), // Start of operators (see is_operator())
+    (">=", 2),
+    ("==", 2),
+    ("!=", 2),
+    ("<<", 4),
+    (">>", 4),
+    ("..", 1),
     // small Symbols
-    ("+", 5),
-    ("-", 5),
-    ("*", 4),
-    ("/", 4),
-    ("%", 4),
-    ("&", 2),
-    ("|", 2),
-    ("^", 2),
-    ("<", 1),
-    (">", 1),
+    ("+", 6),
+    ("-", 6),
+    ("*", 5),
+    ("/", 5),
+    ("%", 5),
+    ("&", 3),
+    ("|", 3),
+    ("^", 3),
+    ("<", 2),
+    (">", 2),
     ("!", 0),
     ("@", 0), // End of operators (see is_operator())
     ("#", 0),

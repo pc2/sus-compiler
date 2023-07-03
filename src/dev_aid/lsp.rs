@@ -110,9 +110,11 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
                     SemanticTokenType::PARAMETER,
                     SemanticTokenType::TYPE,
                     SemanticTokenType::NUMBER,
-                    SemanticTokenType::FUNCTION
+                    SemanticTokenType::FUNCTION,
+                    SemanticTokenType::EVENT
                 ],
                 token_modifiers: vec![
+                    SemanticTokenModifier::ASYNC, // repurpose ASYNC for "State"
                     SemanticTokenModifier::DECLARATION,
                     SemanticTokenModifier::DEFINITION,
                     SemanticTokenModifier::READONLY
@@ -137,10 +139,12 @@ fn get_semantic_token_type_from_ide_token(tok : &IDEToken) -> u32 {
     match &tok.typ {
         IDETokenType::Comment => 0,
         IDETokenType::Keyword => 1,
-        IDETokenType::Symbol => 2,
+        IDETokenType::Operator => 2,
+        IDETokenType::PipelineStage => 7, // EVENT seems to get a good colour
+        IDETokenType::TimelineStage => 7,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Input)) => 4,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => 4,
-        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 3, // TODO
+        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 3,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Local)) => 3,
         IDETokenType::Identifier(_) => 5, // All others are 'TYPE'
         IDETokenType::Number => 6,
@@ -148,6 +152,13 @@ fn get_semantic_token_type_from_ide_token(tok : &IDEToken) -> u32 {
         IDETokenType::InvalidBracket => 2, // make it 'OPERATOR'?
         IDETokenType::OpenBracket(_) => 2,
         IDETokenType::CloseBracket(_) => 2,
+    }
+}
+
+fn get_modifiers_for_token(tok : &IDEToken) -> u32 {
+    match &tok.typ {
+        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 15, // repurpose ASYNC for "State"
+        _other => 0
     }
 }
 
@@ -174,12 +185,13 @@ fn do_syntax_highlight(file_text : &str, full_parse : &FullParseResult) -> Seman
         prev_line = tok_file_pos.file_pos.row;
 
         let typ = get_semantic_token_type_from_ide_token(tok);
+        let mod_bits = get_modifiers_for_token(tok);
         semantic_tokens.push(SemanticToken{
             delta_line: delta_line as u32,
             delta_start: delta_col as u32,
             length: tok_file_pos.length as u32,
             token_type: typ,
-            token_modifiers_bitset: 0,
+            token_modifiers_bitset: mod_bits,
         });
 
         //println!("{}: typ={typ} {delta_line}:{delta_col}", file_text.get(tok_file_pos.as_range()).unwrap());
