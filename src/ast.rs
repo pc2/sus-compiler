@@ -57,7 +57,7 @@ impl From<CharSpan> for Range<usize> {
     }
 }
 
-#[derive(Debug,Clone,Copy)]
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum IdentifierType {
     Input,
     Output,

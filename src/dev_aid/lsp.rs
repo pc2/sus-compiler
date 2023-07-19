@@ -51,7 +51,7 @@ use lsp_types::notification::Notification;
 
 use std::path::Path;
 
-use crate::{tokenizer::tokenize, parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, CharSpan}, errors::ParsingError};
+use crate::{tokenizer::{tokenize, TOKEN_COMMENT}, parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, CharSpan}, errors::ParsingError};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -155,6 +155,7 @@ fn get_semantic_token_type_from_ide_token(tok : &IDEToken) -> u32 {
     }
 }
 
+
 fn get_modifiers_for_token(tok : &IDEToken) -> u32 {
     match &tok.typ {
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 15, // repurpose ASYNC for "State"
@@ -162,44 +163,72 @@ fn get_modifiers_for_token(tok : &IDEToken) -> u32 {
     }
 }
 
-fn do_syntax_highlight(file_text : &str, full_parse : &FullParseResult) -> SemanticTokensResult {
-    let ide_tokens = create_token_ide_info(&file_text, &full_parse);
+struct SemanticTokensDeltaAccumulator {
+    prev_line : usize,
+    prev_col : usize,
+    semantic_tokens : Vec<SemanticToken>
+}
 
-    let mut semantic_tokens : Vec<SemanticToken> = Vec::new();
-    semantic_tokens.reserve(full_parse.token_spans.len());
-
-    let mut prev_line : usize = 0;
-    let mut prev_col : usize = 0;
-    for (idx, tok) in ide_tokens.iter().enumerate() {
-        let tok_file_pos = full_parse.token_spans[idx];
-
-        let delta_line = tok_file_pos.file_pos.row - prev_line;
+impl SemanticTokensDeltaAccumulator {
+    fn push(&mut self, line : usize, col : usize, length : usize, typ : u32, mod_bits : u32) {
+        let delta_line = line - self.prev_line;
 
         if delta_line != 0 {
-            prev_col = 0;
+            self.prev_col = 0;
         }
 
-        let delta_col = tok_file_pos.file_pos.col - prev_col;
-        prev_col = tok_file_pos.file_pos.col;
+        let delta_col = col - self.prev_col;
+        self.prev_col = col;
+        self.prev_line = line;
 
-        prev_line = tok_file_pos.file_pos.row;
-
-        let typ = get_semantic_token_type_from_ide_token(tok);
-        let mod_bits = get_modifiers_for_token(tok);
-        semantic_tokens.push(SemanticToken{
+        self.semantic_tokens.push(SemanticToken{
             delta_line: delta_line as u32,
             delta_start: delta_col as u32,
-            length: tok_file_pos.length as u32,
+            length: length as u32,
             token_type: typ,
             token_modifiers_bitset: mod_bits,
         });
+    }
+}
+
+fn do_syntax_highlight(file_text : &str, full_parse : &FullParseResult) -> SemanticTokensResult {
+    let ide_tokens = create_token_ide_info(&file_text, &full_parse);
+
+    let mut semantic_tokens_acc = SemanticTokensDeltaAccumulator{prev_line : 0, prev_col : 0, semantic_tokens : Vec::new()};
+    semantic_tokens_acc.semantic_tokens.reserve(full_parse.token_spans.len());
+
+    for (idx, tok) in ide_tokens.iter().enumerate() {
+        let tok_file_pos = full_parse.token_spans[idx];
+
+        let typ = get_semantic_token_type_from_ide_token(tok);
+        let mod_bits = get_modifiers_for_token(tok);
+        if tok.typ == IDETokenType::Comment {
+            // Comments can be multiline, editor doesn't support this. Have to split them up myself. Eurgh
+            let mut comment_piece_start = tok_file_pos.file_pos.char_idx;
+            let mut char_iter = file_text.char_indices();
+            let mut line = tok_file_pos.file_pos.row;
+            let mut col = tok_file_pos.file_pos.col;
+            char_iter.nth(tok_file_pos.file_pos.char_idx);
+            for pos in 0..tok_file_pos.length {
+                let (idx, c) = char_iter.next().unwrap();
+                if c == '\n' {
+                    semantic_tokens_acc.push(line, col, idx - comment_piece_start, typ, mod_bits);
+
+                    comment_piece_start = idx + 1;
+                    line += 1;
+                    col = 0;
+                }
+            }
+        } else {
+            semantic_tokens_acc.push(tok_file_pos.file_pos.row, tok_file_pos.file_pos.col, tok_file_pos.length, typ, mod_bits);
+        }
 
         //println!("{}: typ={typ} {delta_line}:{delta_col}", file_text.get(tok_file_pos.as_range()).unwrap());
     }
 
     SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
         result_id: None,
-        data: semantic_tokens
+        data: semantic_tokens_acc.semantic_tokens
     })
 }
 

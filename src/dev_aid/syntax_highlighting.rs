@@ -4,6 +4,7 @@ use crate::{ast::*, tokenizer::*, parser::*};
 use console::Style;
 
 
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum IDEIdentifierType {
     Value(IdentifierType),
     Type,
@@ -11,6 +12,7 @@ pub enum IDEIdentifierType {
     Unknown
 }
 
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum IDETokenType {
     Comment,
     Keyword,
@@ -25,6 +27,7 @@ pub enum IDETokenType {
     CloseBracket(usize) // Bracket depth
 }
 
+#[derive(Debug,Clone,Copy)]
 pub struct IDEToken {
     pub typ : IDETokenType
 }
