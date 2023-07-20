@@ -215,14 +215,21 @@ fn do_syntax_highlight(file_data : &LoadedFile, full_parse : &FullParseResult) -
             let mut col = tok_file_pos.file_pos.col;
             char_iter.nth(tok_file_pos.file_pos.char_idx);
             for _pos in 0..tok_file_pos.length {
-                let (idx, c) = char_iter.next().unwrap();
-                if c == '\n' {
-                    semantic_tokens_acc.push(line, col, idx - comment_piece_start, typ, mod_bits);
+                if let Some((idx, c)) = char_iter.next() {
+                    if c == '\n' {
+                        semantic_tokens_acc.push(line, col, idx - comment_piece_start, typ, mod_bits);
 
-                    comment_piece_start = idx + 1;
-                    line += 1;
-                    col = 0;
+                        comment_piece_start = idx + 1;
+                        line += 1;
+                        col = 0;
+                    }
+                } else {
+                    break;
                 }
+            }
+            let leftover_length = tok_file_pos.file_pos.char_idx + tok_file_pos.length - comment_piece_start;
+            if leftover_length > 0 {
+                semantic_tokens_acc.push(line, col, leftover_length, typ, mod_bits);
             }
         } else {
             semantic_tokens_acc.push(tok_file_pos.file_pos.row, tok_file_pos.file_pos.col, tok_file_pos.length, typ, mod_bits);
