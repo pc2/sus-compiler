@@ -1,57 +1,16 @@
-//! A minimal example LSP server that can only respond to the `gotoDefinition` request. To use
-//! this example, execute it and then send an `initialize` request.
-//!
-//! ```no_run
-//! Content-Length: 85
-//!
-//! {"jsonrpc": "2.0", "method": "initialize", "id": 1, "params": {"capabilities": {}}}
-//! ```
-//!
-//! This will respond with a server response. Then send it a `initialized` notification which will
-//! have no response.
-//!
-//! ```no_run
-//! Content-Length: 59
-//!
-//! {"jsonrpc": "2.0", "method": "initialized", "params": {}}
-//! ```
-//!
-//! Once these two are sent, then we enter the main loop of the server. The only request this
-//! example can handle is `gotoDefinition`:
-//!
-//! ```no_run
-//! Content-Length: 159
-//!
-//! {"jsonrpc": "2.0", "method": "textDocument/definition", "id": 2, "params": {"textDocument": {"uri": "file://temp"}, "position": {"line": 1, "character": 1}}}
-//! ```
-//!
-//! To finish up without errors, send a shutdown request:
-//!
-//! ```no_run
-//! Content-Length: 67
-//!
-//! {"jsonrpc": "2.0", "method": "shutdown", "id": 3, "params": null}
-//! ```
-//!
-//! The server will exit the main loop and finally we send a `shutdown` notification to stop
-//! the server.
-//!
-//! ```
-//! Content-Length: 54
-//!
-//! {"jsonrpc": "2.0", "method": "exit", "params": null}
-//! ```
+
 use std::error::Error;
 use std::fs::File;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::rc::Rc;
 use lsp_types::{*, request::Request, notification::*};
 
-use lsp_server::{Response, Message, Connection, };
+use lsp_server::{Response, Message, Connection};
 
 use lsp_types::notification::Notification;
 
-use std::path::Path;
-
-use crate::{tokenizer::{tokenize, TOKEN_COMMENT}, parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, CharSpan}, errors::ParsingError};
+use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, CharSpan}, errors::ParsingError};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -74,6 +33,42 @@ macro_rules! println {
         })
     }};
 }
+
+
+struct LoadedFile {
+    file_text : String
+}
+struct LoadedFileCache {
+    loaded_files : HashMap<PathBuf, Rc<LoadedFile>>
+}
+
+impl LoadedFileCache {
+    fn new() -> LoadedFileCache {
+        LoadedFileCache{loaded_files : HashMap::new()}
+    }
+    fn get(&mut self, path : &PathBuf) -> Rc<LoadedFile> {
+        if let Some(found) = self.loaded_files.get(path) {
+            found.clone()
+        } else {
+            self.update_from_disk(path.clone())
+        }
+    }
+    fn update_text(&mut self, path : PathBuf, new_text : String) -> Rc<LoadedFile> {
+        let result = Rc::new(LoadedFile{
+            file_text: new_text
+        });
+        self.update(path, result.clone());
+        result
+    }
+    fn update_from_disk(&mut self, path : PathBuf) -> Rc<LoadedFile> {
+        let file_text = std::fs::read_to_string(&path).expect("Could not load file");
+        self.update_text(path, file_text)
+    }
+    fn update(&mut self, path : PathBuf, new_val : Rc<LoadedFile>) {
+        self.loaded_files.insert(path, new_val);
+    }
+}
+
 
 pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
     // Note that  we must have our logging only write out to stderr.
@@ -123,6 +118,15 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
             range: Some(false), // Don't support ranges yet
             full: Some(SemanticTokensFullOptions::Bool(true)), // TODO: Support delta updating for faster syntax highlighting, just do whole file for now
         })),
+        /*workspace: Some(WorkspaceClientCapabilities{
+            did_change_watched_files : Some(DidChangeWatchedFilesClientCapabilities{
+
+            }),
+            ..Default::default()
+        }),*/
+        text_document_sync : Some(TextDocumentSyncCapability::Kind(
+            TextDocumentSyncKind::FULL
+        )),
         ..Default::default()
     })
     .unwrap();
@@ -191,8 +195,9 @@ impl SemanticTokensDeltaAccumulator {
     }
 }
 
-fn do_syntax_highlight(file_text : &str, full_parse : &FullParseResult) -> SemanticTokensResult {
-    let ide_tokens = create_token_ide_info(&file_text, &full_parse);
+fn do_syntax_highlight(file_data : &LoadedFile, full_parse : &FullParseResult) -> SemanticTokensResult {
+    let file_text = &file_data.file_text;
+    let ide_tokens = create_token_ide_info(file_text, &full_parse);
 
     let mut semantic_tokens_acc = SemanticTokensDeltaAccumulator{prev_line : 0, prev_col : 0, semantic_tokens : Vec::new()};
     semantic_tokens_acc.semantic_tokens.reserve(full_parse.token_spans.len());
@@ -209,7 +214,7 @@ fn do_syntax_highlight(file_text : &str, full_parse : &FullParseResult) -> Seman
             let mut line = tok_file_pos.file_pos.row;
             let mut col = tok_file_pos.file_pos.col;
             char_iter.nth(tok_file_pos.file_pos.char_idx);
-            for pos in 0..tok_file_pos.length {
+            for _pos in 0..tok_file_pos.length {
                 let (idx, c) = char_iter.next().unwrap();
                 if c == '\n' {
                     semantic_tokens_acc.push(line, col, idx - comment_piece_start, typ, mod_bits);
@@ -281,6 +286,9 @@ fn main_loop(
     connection: Connection,
     params: serde_json::Value,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
+
+    let mut file_cache = LoadedFileCache::new();
+
     let _params: InitializeParams = serde_json::from_value(params).unwrap();
     println!("starting example main loop");
     for msg in &connection.receiver {
@@ -306,17 +314,17 @@ fn main_loop(
                         
                         println!("got fullSemanticTokens request: {params:?}");
 
-                        let path = params.text_document.uri.to_file_path().unwrap();
-                        let file_text = std::fs::read_to_string(path).unwrap();
+                        let path : PathBuf = params.text_document.uri.to_file_path().unwrap();
+                        let file_data : Rc<LoadedFile> = file_cache.get(&path);
 
-                        let (full_parse, errors) = perform_full_semantic_parse(&file_text);
+                        let (full_parse, errors) = perform_full_semantic_parse(&file_data.file_text);
                         
-                        let result = serde_json::to_value(&do_syntax_highlight(&file_text, &full_parse)).unwrap();
+                        let result = serde_json::to_value(&do_syntax_highlight(&file_data, &full_parse)).unwrap();
                         connection.sender.send(Message::Response(Response{
                             id: req.id, result: Some(result), error: None
                         }))?;
 
-                        send_errors_warnings(&connection, errors, params.text_document.uri, &file_text)?;
+                        send_errors_warnings(&connection, errors, params.text_document.uri, &file_data.file_text)?;
                     },
                     // TODO ...
                     req => {
@@ -328,7 +336,18 @@ fn main_loop(
                 println!("got response: {resp:?}");
             }
             Message::Notification(not) => {
-                println!("got notification: {not:?}");
+                match not.method.as_str() {
+                    notification::DidChangeTextDocument::METHOD => {
+                        let params : DidChangeTextDocumentParams = serde_json::from_value(not.params).expect("JSON Encoding Error while parsing params");
+                        let path_to_update = params.text_document.uri.to_file_path().unwrap();
+                        //let original_file_text = file_cache.get(&path_to_update).file_text;
+                        let new_file_text = params.content_changes[0].text.clone();
+                        file_cache.update_text(path_to_update, new_file_text);
+                    },
+                    other => {
+                        println!("got notification: {other:?}");
+                    }
+                }
             }
         }
     }

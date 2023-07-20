@@ -104,7 +104,7 @@ impl<'a> ASTWalker for NameColoringWalker<'a> {
     fn visit_module_name(&mut self, module_name : usize) {
         self.ide_token_info[module_name].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
     }
-    fn visit_declaration(&mut self, decl : &SignalDeclaration, context : &VariableContext) {
+    fn visit_declaration(&mut self, decl : &SignalDeclaration, _context : &VariableContext) {
         for_each_identifier_in_expression(&decl.typ.0, &mut |tok_idx| {
             self.ide_token_info[tok_idx].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
         });
@@ -118,7 +118,6 @@ impl<'a> ASTWalker for NameColoringWalker<'a> {
         });
         //self.ide_token_info[decl.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
     }
-    fn visit_assignment(&mut self, to : &SpanExpression, expr : &SpanExpression, context : &VariableContext) {}
 }
 
 fn walk_name_color(ast : &ASTRoot, token_spans : &[CharSpan], file_text : &str, result : &mut [IDEToken]) {
