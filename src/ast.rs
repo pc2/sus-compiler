@@ -89,8 +89,12 @@ pub struct Interface {
 #[derive(Debug)]
 pub enum Expression {
     Named(usize),
+    BoolConstant(bool, usize),
     Constant(usize),
-    BinOp(Box<(SpanExpression, TokenTypeIdx, usize/*Operator token */, SpanExpression)>)
+    UnaryOp(Box<(TokenTypeIdx, usize/*Operator token */, SpanExpression)>),
+    BinOp(Box<(SpanExpression, TokenTypeIdx, usize/*Operator token */, SpanExpression)>),
+    Array(Vec<SpanExpression>), // first[second, third, ...]
+    FuncCall(Vec<SpanExpression>) // first(second, third, ...)
 }
 
 impl Expression {
@@ -158,12 +162,22 @@ impl<'prev, 'ast> VariableContext<'prev, 'ast> {
 pub fn for_each_identifier_in_expression<F>(expr : &Expression, func : &mut F) where F: FnMut(usize) -> () {
     match expr {
         Expression::Named(token) => func(*token),
+        Expression::BoolConstant(_, _) => {},
         Expression::Constant(_) => {},
+        Expression::UnaryOp(b) => {
+            let (_operator, _operator_pos, right) = &**b;
+            for_each_identifier_in_expression(&right.0, func);
+        }
         Expression::BinOp(b) => {
             let (left, _operator, _operator_pos, right) = &**b;
             for_each_identifier_in_expression(&left.0, func);
             for_each_identifier_in_expression(&right.0, func);
         },
+        Expression::Array(args) | Expression::FuncCall(args) => {
+            for (a_expr, _a_span) in args {
+                for_each_identifier_in_expression(a_expr, func);
+            }
+        }
     }
 }
 

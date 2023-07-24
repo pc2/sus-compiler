@@ -33,13 +33,19 @@ The main goals of the language are roughly listed below:
 - [x] Syntax error reporting with infos
 - [x] Basic Token Highlighting in Terminal
 - [x] Local Variable and Type Name highlighting
-- [ ] Can Parse Multiply-Add pipeline
+- [x] Array Syntax
+- [x] Function Call Syntax
+- [x] Unary and Binary Operators
+- [x] Can Parse Multiply-Add pipeline
 - [ ] Can Parse Blur2 filter
+- [ ] If Statements
+- [ ] For Loops
 - [ ] Multi-Interface Syntax
 - [ ] Native Module integration syntax
 - [ ] Can Parse FIFO implementation
 - [ ] Clock Domain Crossings
 - [ ] Rythm Syntax
+- [ ] Generator Syntax
 
 ### LSP
 - [x] Basic LSP for VSCode integration

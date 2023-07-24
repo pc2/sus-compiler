@@ -191,13 +191,24 @@ impl ASTParserContext {
     }
 
     // For expression 
-    fn parse_unit_expression(&mut self ,token_stream : &mut TokenStream) -> Option<SpanExpression> {
-        match token_stream.next() {
+    fn parse_unit_expression(&mut self, token_stream : &mut TokenStream) -> Option<SpanExpression> {
+        let mut base_expr : (Expression, Span) = match token_stream.next() {
+            Some(TokenTreeNode::PlainToken(typ, pos)) if is_unary_operator(*typ) => {
+                let found_expr = self.parse_unit_expression(token_stream)?;
+                let new_span = Span(*pos, found_expr.1.1);
+                return Some((Expression::UnaryOp(Box::new((*typ, *pos, found_expr))), new_span));
+            },
             Some(TokenTreeNode::PlainToken(typ, pos)) if *typ == TOKEN_IDENTIFIER => {
-                Some((Expression::Named(*pos), Span(*pos, *pos)))
+                (Expression::Named(*pos), Span(*pos, *pos))
             },
             Some(TokenTreeNode::PlainToken(typ, pos)) if *typ == TOKEN_NUMBER => {
-                Some((Expression::Constant(*pos), Span(*pos, *pos)))
+                (Expression::Constant(*pos), Span(*pos, *pos))
+            },
+            Some(TokenTreeNode::PlainToken(typ, pos)) if *typ == kw("true") => {
+                (Expression::BoolConstant(true, *pos), Span(*pos, *pos))
+            },
+            Some(TokenTreeNode::PlainToken(typ, pos)) if *typ == kw("false") => {
+                (Expression::BoolConstant(false, *pos), Span(*pos, *pos))
             },
             Some(TokenTreeNode::Block(typ, contents, span)) if *typ == kw("(") => {
                 let mut content_token_stream = TokenStream::new(contents, span.0, span.1);
@@ -209,20 +220,45 @@ impl ASTParserContext {
                             error_info_str(result.1, "But actually only stretches this far"),
                         ];
                         self.errors.push(error_with_info(erroneous_found_token.get_span(), "The expression should have ended at the end of the () brackets. But instead it ended here.".to_owned(), infos));
-                        None
+                        return None
                     } else {
-                        Some(result)
+                        result
                     }
                 } else {
-                    None
+                    return None
                 }
             }
             other => {
                 self.errors.push(error_unexpected_tree_node(&[TOKEN_IDENTIFIER, TOKEN_NUMBER, kw("(")], other, token_stream.unexpected_eof_token, "unit expression"));
-                None
+                return None;
             }
-        }
+        };
+        while let Some(TokenTreeNode::Block(typ, content, bracket_span)) = token_stream.peek() {
+            if *typ == kw("[") || *typ == kw("(") {
+                let start_at = base_expr.1.0;
+                let mut args : Vec<SpanExpression> = Vec::new();
+                args.push(base_expr);
+                let mut content_tokens_iter = TokenStream::new(content, bracket_span.0, bracket_span.1);
+                while content_tokens_iter.peek().is_some() {
+                    if let Some(expr) = self.parse_expression(&mut content_tokens_iter) {
+                        args.push(expr);
+                        if content_tokens_iter.peek().is_some() {
+                            self.eat_plain(&mut content_tokens_iter, kw(","), if *typ == kw("[") {"array index arguments"} else {"function call arguments"});
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                let total_span = Span(start_at, bracket_span.1);
+                base_expr = (if *typ == kw("[") {Expression::Array(args)} else {Expression::FuncCall(args)}, total_span)
+            } else {
+                break;
+            }
+            token_stream.next();
+        };
+        Some(base_expr)
     }
+
     fn parse_expression(&mut self, token_stream : &mut TokenStream) -> Option<SpanExpression> {
         // Shunting-yard algorithm with single stack
         let mut stack : Vec<(SpanExpression, TokenTypeIdx, usize)> = Vec::new();
@@ -266,7 +302,7 @@ impl ASTParserContext {
                 result.push(decl);
             } else {
                 // Error during parsing signal decl. Skip till "," or end of scope
-                token_stream.skip_until(kw(","));
+                token_stream.skip_until_one_of(&[kw(","), kw("->"), kw("{"), kw(";")]);
             }
             
             if !token_stream.peek_is_plain(kw(",")) {

@@ -8,7 +8,8 @@ use crate::ast::FilePos;
 use crate::ast::CharSpan;
 
 
-pub const ALL_KEYWORDS : [(&'static str, u8); 12] = [
+pub const ALL_KEYWORDS : [(&'static str, u8); 16] = [
+    ("template", 0),
     ("module", 0),
     ("pipeline", 0),
     ("interface", 0),
@@ -17,6 +18,9 @@ pub const ALL_KEYWORDS : [(&'static str, u8); 12] = [
     ("assume", 0),
     ("state", 0),
     ("if", 0),
+    ("else", 0),
+    ("true", 0),
+    ("false", 0),
     ("while", 0),
     ("for", 0),
     ("struct", 0),
@@ -126,6 +130,9 @@ pub fn is_symbol(typ : TokenTypeIdx) -> bool {
 }
 pub fn is_operator(typ : TokenTypeIdx) -> bool {
     typ >= kw("<=") && typ <= kw("@")
+}
+pub fn is_unary_operator(typ : TokenTypeIdx) -> bool {
+    typ == kw("|") || typ == kw("&") || typ == kw("^") || typ == kw("+") || typ == kw("*") || typ == kw("!")
 }
 pub fn is_identifier(typ : TokenTypeIdx) -> bool {
     typ == TOKEN_IDENTIFIER
