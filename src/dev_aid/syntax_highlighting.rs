@@ -101,19 +101,19 @@ struct NameColoringWalker<'a> {
 }
 
 impl<'a> ASTWalker for NameColoringWalker<'a> {
-    fn visit_module_name(&mut self, module_name : usize) {
-        self.ide_token_info[module_name].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
+    fn visit_module_name(&mut self, module_name : IdentifierToken) {
+        self.ide_token_info[module_name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
     }
     fn visit_declaration(&mut self, decl : &SignalDeclaration, _context : &VariableContext) {
-        for_each_identifier_in_expression(&decl.typ.0, &mut |tok_idx| {
-            self.ide_token_info[tok_idx].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
+        for_each_identifier_in_expression(&decl.typ, &mut |name| {
+            self.ide_token_info[name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
         });
-        self.ide_token_info[decl.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
+        self.ide_token_info[decl.name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
     }
     fn visit_expression(&mut self, expr : &SpanExpression, context : &VariableContext) {
-        for_each_identifier_in_expression(&expr.0, &mut |tok_idx| {
-            if let Some(tok_decl) = context.get_declaration_for(tok_idx, self.token_spans, self.file_text) {
-                self.ide_token_info[tok_idx].typ = IDETokenType::Identifier(IDEIdentifierType::Value(tok_decl.identifier_type));
+        for_each_identifier_in_expression(&expr, &mut |name| {
+            if let Some(tok_decl) = context.get_declaration_for(name.name_idx) {
+                self.ide_token_info[name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Value(tok_decl.identifier_type));
             }
         });
         //self.ide_token_info[decl.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
@@ -123,31 +123,32 @@ impl<'a> ASTWalker for NameColoringWalker<'a> {
 fn walk_name_color(ast : &ASTRoot, token_spans : &[CharSpan], file_text : &str, result : &mut [IDEToken]) {
     let mut walker = NameColoringWalker{ide_token_info : result, token_spans : token_spans, file_text : file_text};
 
-    walk_ast(&mut walker, ast, token_spans, file_text, &VariableContext::new_initial());
+    walk_ast(&mut walker, ast, &VariableContext::new_initial());
 }
 
 pub fn create_token_ide_info<'a>(file_text : &str, parsed: &FullParseResult) -> Vec<IDEToken> {
     let mut result : Vec<IDEToken> = Vec::new();
-    result.reserve(parsed.token_types.len());
+    result.reserve(parsed.tokens.len());
 
-    for &t in &parsed.token_types {
-        let initial_typ = if is_keyword(t) {
+    for t in &parsed.tokens.tokens {
+        let tok_typ = t.get_type();
+        let initial_typ = if is_keyword(tok_typ) {
             IDETokenType::Keyword
-        } else if is_bracket(t) != IsBracket::NotABracket {
+        } else if is_bracket(tok_typ) != IsBracket::NotABracket {
             IDETokenType::InvalidBracket // Brackets are initially invalid. They should be overwritten by the token_hierarchy step. The ones that don't get overwritten are invalid
-        } else if is_symbol(t) {
-            if t == kw("@") {
+        } else if is_symbol(tok_typ) {
+            if tok_typ == kw("@") {
                 IDETokenType::PipelineStage
-            } else if t == kw("#") {
+            } else if tok_typ == kw("#") {
                 IDETokenType::TimelineStage
             } else {
                 IDETokenType::Operator
             }
-        } else if is_identifier(t) {
+        } else if is_identifier(tok_typ) {
             IDETokenType::Identifier(IDEIdentifierType::Unknown)
-        } else if is_number(t) {
+        } else if is_number(tok_typ) {
             IDETokenType::Number
-        } else if is_comment(t) {
+        } else if is_comment(tok_typ) {
             IDETokenType::Comment
         } else {
             IDETokenType::Invalid
@@ -158,7 +159,7 @@ pub fn create_token_ide_info<'a>(file_text : &str, parsed: &FullParseResult) -> 
 
     add_ide_bracket_depths_recursive(&mut result, 0, &parsed.token_hierarchy);
 
-    walk_name_color(&parsed.ast, &parsed.token_spans, file_text, &mut result);
+    walk_name_color(&parsed.ast, &parsed.tokens.token_spans, file_text, &mut result);
 
     result
 }
@@ -172,12 +173,12 @@ pub fn syntax_highlight_file(file_path : &str) {
         err.pretty_print_error(&file_path, &file_text)
     }
     
-    print_tokens(&file_text, &full_parse.token_spans);
+    print_tokens(&file_text, &full_parse.tokens.token_spans);
 
     let ide_tokens = create_token_ide_info(&file_text, &full_parse);
     
     
-    pretty_print(&file_text, &full_parse.token_spans, &ide_tokens);
+    pretty_print(&file_text, &full_parse.tokens.token_spans, &ide_tokens);
     
     println!("{:?}", full_parse.ast);
 }

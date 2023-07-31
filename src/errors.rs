@@ -117,8 +117,8 @@ pub fn error_unexpected_tree_node(expected : &[TokenTypeIdx], found : Option<&To
         None => {
             error_basic(Span::from(unexpected_eof_idx), format!("Unexpected End of Scope while parsing {context}. Expected {expected_list_str}"))
         },
-        Some(TokenTreeNode::PlainToken(typ, pos)) => {
-            let tok_typ_name = get_token_type_name(*typ);
+        Some(TokenTreeNode::PlainToken(tok, pos)) => {
+            let tok_typ_name = get_token_type_name(tok.get_type());
             error_basic(Span::from(*pos), format!("Unexpected Token '{tok_typ_name}' while parsing {context}. Expected {expected_list_str}"))
         },
         Some(TokenTreeNode::Block(typ, _, span)) => {

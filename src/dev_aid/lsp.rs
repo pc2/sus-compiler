@@ -200,10 +200,10 @@ fn do_syntax_highlight(file_data : &LoadedFile, full_parse : &FullParseResult) -
     let ide_tokens = create_token_ide_info(file_text, &full_parse);
 
     let mut semantic_tokens_acc = SemanticTokensDeltaAccumulator{prev_line : 0, prev_col : 0, semantic_tokens : Vec::new()};
-    semantic_tokens_acc.semantic_tokens.reserve(full_parse.token_spans.len());
+    semantic_tokens_acc.semantic_tokens.reserve(full_parse.tokens.token_spans.len());
 
     for (idx, tok) in ide_tokens.iter().enumerate() {
-        let tok_file_pos = full_parse.token_spans[idx];
+        let tok_file_pos = full_parse.tokens.token_spans[idx];
 
         let typ = get_semantic_token_type_from_ide_token(tok);
         let mod_bits = get_modifiers_for_token(tok);

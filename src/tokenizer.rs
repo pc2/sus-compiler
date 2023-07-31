@@ -1,8 +1,35 @@
 use std::str::CharIndices;
+use std::str::FromStr;
+use std::collections::HashMap;
+use std::collections::hash_map::*;
+use std::borrow::Cow;
 
 use crate::errors::*;
 
+use num_bigint::*;
+
+use core::convert::TryFrom;
+
 pub type TokenTypeIdx = u8;
+pub type TokenExtraInfo = u64;
+const NO_TOKEN_INFO : TokenExtraInfo = 0;
+
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct Token {
+    typ : TokenTypeIdx,
+    info : TokenExtraInfo
+}
+
+impl Token {
+    pub fn get_type(&self) -> TokenTypeIdx {
+        self.typ
+    }
+    pub fn get_info(&self) -> TokenExtraInfo {
+        self.info
+    }
+}
+
 
 use crate::ast::FilePos;
 use crate::ast::CharSpan;
@@ -257,14 +284,91 @@ impl<'iter> Iterator for FileIter<'iter> {
             None
         }
     }
-
 }
 
-pub fn tokenize(file_data : &str) -> (Vec<TokenTypeIdx>, Vec<CharSpan>, Vec<ParsingError<CharSpan>>) {
-    let mut token_spans : Vec<CharSpan> = Vec::new();
-    let mut token_types : Vec<TokenTypeIdx> = Vec::new();
+#[derive(Debug, Default)]
+pub struct TokenizerResult<'a> {
+    pub tokens : Vec<Token>,
+    pub token_spans : Vec<CharSpan>,
+    pub unique_identifiers : Vec<&'a str>,
+    pub numbers : Vec<BigUint>
+}
+
+const SMALL_NUMBER_CUTOFF : TokenExtraInfo = TokenExtraInfo::MAX >> 1;
+const KEYWORD_CUTOFF : TokenExtraInfo = TokenExtraInfo::MAX - ALL_KEYWORDS.len() as TokenExtraInfo;
+
+impl<'a> TokenizerResult<'a> {
+    pub fn get_number<'s>(&'s self, info : TokenExtraInfo) -> Cow<'s, BigUint> {
+        if info < SMALL_NUMBER_CUTOFF {
+            Cow::Owned(info.to_biguint().unwrap())
+        } else {
+            Cow::Borrowed(&self.numbers[(info - SMALL_NUMBER_CUTOFF) as usize])
+        }
+    }
+}
+
+impl<'a> TokenizerResult<'a> {
+    pub fn push(&mut self, typ : TokenTypeIdx, span : CharSpan) {
+        self.tokens.push(Token{typ, info : NO_TOKEN_INFO});
+        self.token_spans.push(span);
+    }
+    pub fn push_word(&mut self, id : &'a str, span : CharSpan, map : &mut HashMap<&'a str, TokenExtraInfo>) {
+        let entry = map.entry(id);
+        match entry {
+            Entry::Occupied(occ) => {
+                let info = *occ.get();
+                if info >= KEYWORD_CUTOFF {
+                    self.tokens.push(Token{typ : (info - KEYWORD_CUTOFF) as TokenTypeIdx, info : NO_TOKEN_INFO});
+                } else {
+                    self.tokens.push(Token{typ : TOKEN_IDENTIFIER, info});
+                }
+            },
+            Entry::Vacant(vacant) => {
+                let info = self.unique_identifiers.len() as TokenExtraInfo;
+                vacant.insert(info);
+                self.unique_identifiers.push(id);
+                self.tokens.push(Token{typ : TOKEN_IDENTIFIER, info});
+            }
+        }
+        self.token_spans.push(span);
+    }
+    pub fn push_number(&mut self, num_text : &str, span : CharSpan) {
+        let num_bigint = BigUint::from_str(num_text).unwrap();
+        let info = if let Ok(as_small_int) = TokenExtraInfo::try_from(&num_bigint) {
+            if as_small_int < SMALL_NUMBER_CUTOFF {
+                as_small_int
+            } else {
+                let num_idx = self.numbers.len();
+                self.numbers.push(num_bigint);
+                num_idx as TokenExtraInfo
+            }
+        } else {
+            let num_idx = self.numbers.len();
+            self.numbers.push(num_bigint);
+            num_idx as TokenExtraInfo
+        };
+        self.tokens.push(Token{typ : TOKEN_NUMBER, info : info as TokenExtraInfo});
+        self.token_spans.push(span);
+    }
+    pub fn len(&self) -> usize {
+        self.tokens.len()
+    }
+    fn init_unique_id_map(&self) -> HashMap<&'a str, TokenExtraInfo> {
+        let mut map : HashMap<&'a str, TokenExtraInfo> = HashMap::new();
+
+        for (idx, id) in ALL_KEYWORDS.iter().enumerate() {
+            map.insert(id.0, idx as TokenExtraInfo + KEYWORD_CUTOFF);
+        }
+
+        map
+    }
+}
+
+pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult<'txt>, Vec<ParsingError<CharSpan>>) {
+    let mut result : TokenizerResult<'txt> = Default::default();
     let mut file_char_iter = FileIter::new(file_data);
     let mut errors : Vec<ParsingError<CharSpan>> = Vec::new();
+    let mut unique_id_map : HashMap<&'txt str, TokenExtraInfo> = result.init_unique_id_map();
     
     while let Some((mut file_pos, cur_char)) = file_char_iter.next() {
         if cur_char.is_whitespace() {
@@ -280,21 +384,17 @@ pub fn tokenize(file_data : &str) -> (Vec<TokenTypeIdx>, Vec<CharSpan>, Vec<Pars
             let word = file_data.get(word_span.as_range()).unwrap();
             let mut word_chars = word.chars();
 
-            let sym_type = if word_chars.next().unwrap().is_digit(10) {
+            if word_chars.next().unwrap().is_digit(10) {
                 // It's a number
                 if word_chars.find(|v| !v.is_digit(10)).is_some() {
                     errors.push(error_basic_str(word_span, "Unexpected letter within number"));
-                    TOKEN_INVALID
+                    result.push(TOKEN_INVALID, word_span);
                 } else {
-                    TOKEN_NUMBER
+                    result.push_number(word, word_span);
                 }
-            } else if let Some(keyword_id) = const_str_position(word, &ALL_KEYWORDS) {
-                keyword_id as TokenTypeIdx
             } else {
-                TOKEN_IDENTIFIER
+                result.push_word(word, word_span, &mut unique_id_map);
             };
-            token_types.push(sym_type);
-            token_spans.push(word_span);
 
             if was_end_of_file {
                 break;
@@ -317,27 +417,25 @@ pub fn tokenize(file_data : &str) -> (Vec<TokenTypeIdx>, Vec<CharSpan>, Vec<Pars
             if symbol_tok_id == kw("//") {
                 // Open single line comment
                 let comment_length = file_char_iter.iter_until_end('\n');
-                token_spans.push(CharSpan{file_pos, length: comment_length + 2}); // Add 2 because comment starts with "//"
-                token_types.push(TOKEN_COMMENT);
+                result.push(TOKEN_COMMENT, CharSpan{file_pos, length: comment_length + 2});// Add 2 because comment starts with "//"
 
             } else if symbol_tok_id == kw("/*") {
                 // Open single multi-line comment
                 let comment_length = file_char_iter.iter_until_comment_end();
-                token_spans.push(CharSpan{file_pos, length: comment_length+2}); // Add 2 because comment starts with "/*"
-                token_types.push(TOKEN_COMMENT);
+                result.push(TOKEN_COMMENT, CharSpan{file_pos, length: comment_length+2}); // Add 2 because comment starts with "/*"
+                
             } else if symbol_tok_id == kw("*/") {
                 // Unexpected close comment
                 errors.push(error_basic_str(CharSpan{file_pos, length: 2}, "Unexpected comment closer when not in comment"));
             } else {
                 let symbol_text_span = CharSpan{file_pos, length: ALL_SYMBOLS[symbol_idx].0.len()};
                 
-                token_types.push(symbol_tok_id);
-                token_spans.push(symbol_text_span);
+                result.push(symbol_tok_id, symbol_text_span);
             }
         } else { // Symbol not found!
             errors.push(error_basic_str(CharSpan{file_pos, length: 1}, "Unexpected character"));
         }
     }
 
-    return (token_types, token_spans, errors);
+    (result, errors)
 }

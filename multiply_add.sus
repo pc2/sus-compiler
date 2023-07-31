@@ -11,7 +11,7 @@ module ExactlyOne : bool[Size] inputs -> bool exactlyOne {
 		bool[Size] atLeastTwos;
 		atLeastOnes[0] = inputs[0];
 		atLeastTwos[0] = false;
-		for i : 1..Size {
+		for i in 1:Size {
 			atLeastOnes[i] = atLeastOnes[i-1] | inputs[i];
 			atLeastTwos[i] = atLeastTwos[i-1] | atLeastOnes[i-1] & inputs[i];
 		}
@@ -34,7 +34,12 @@ module MultiplyAdd : i32 a, i32 b, i32 c -> i32 result {
 	result = tmp + cooo * 30 + 5;
 	array_subscript = tmp;
 	@
-	int[5] myVar = {1,2,3,4,5};
+	int[5] myVar;
+	myVar[0] = 0;
+	myVar[1] = 1;
+	myVar[2] = 2;
+	myVar[3] = 3;
+	myVar[4] = 4;
 	@
 	{
 		//[
@@ -60,7 +65,8 @@ module multiply_add : i32 a, i32 b, i32 c -> i32 result, double double_result {
 	double_result = cvt_to_double(result);
 }
 
-module blur : i32'0 a -> i32'1 result : timeline (a -> /) .. (a -> r)* {
+timeline (a -> /) .. (a -> r)*
+module blur : i32'0 a -> i32'1 result {
 	state prev = a;
 	#
 	loop {
@@ -70,7 +76,8 @@ module blur : i32'0 a -> i32'1 result : timeline (a -> /) .. (a -> r)* {
 	}
 }
 
-module my_complex_operation : i32'0 a -> i32'9 result : timeline (a -> /) .. (a -> r)* {
+timeline (a -> /) .. (a -> r)*
+module my_complex_operation : i32'0 a -> i32'9 result {
 	state prev'0 = a;
 	state tmp2'6;
 	#
@@ -82,11 +89,20 @@ module my_complex_operation : i32'0 a -> i32'9 result : timeline (a -> /) .. (a 
 	}
 }
 
-module seq_adder : i32'0 a -> i32'9 result : timeline (a -> /)* .. (/ -> r) {
-	state sum = a;
+timeline (a -> r) .. (/ -> r)
+module dwiogo : bool[512] data -> bool[256] out {
+    state bool[256] save = data[256:511];
+	out = data[0:255];
+	#
+	out = save;
+}
+
+timeline (a -> /)* .. (/ -> r)
+module seq_adder : i32 a -> i32 result {
+	state int sum = a;
 	#
 	loop {
-		sum = @@(sum + a);
+		sum = sum + a;
 		#
 	}
 	result = sum;
