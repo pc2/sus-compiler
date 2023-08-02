@@ -94,39 +94,28 @@ fn add_ide_bracket_depths_recursive<'a>(result : &mut [IDEToken], current_depth 
     }
 }
 
-struct NameColoringWalker<'a> {
-    ide_token_info : &'a mut [IDEToken],
-    token_spans : &'a [CharSpan],
-    file_text : &'a str
-}
+fn walk_name_color(ast : &ASTRoot, result : &mut [IDEToken]) {
+    for module in &ast.modules {
+        for decl in &module.declarations {
+            for_each_identifier_in_expression(&decl.typ, &mut |_name, position| {
+                result[position].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
+            });
+            //result[decl.name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
+        }
 
-impl<'a> ASTWalker for NameColoringWalker<'a> {
-    fn visit_module_name(&mut self, module_name : IdentifierToken) {
-        self.ide_token_info[module_name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
-    }
-    fn visit_declaration(&mut self, decl : &SignalDeclaration, _context : &VariableContext) {
-        for_each_identifier_in_expression(&decl.typ, &mut |name| {
-            self.ide_token_info[name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
+        for_each_expression_in_module(&module, &mut |expr| {
+            for_each_identifier_in_expression(expr, &mut |name, position| {
+                result[position].typ = IDETokenType::Identifier(if let Some(l) = name.get_local() {
+                    IDEIdentifierType::Value(module.declarations[l].identifier_type)
+                } else {
+                    IDEIdentifierType::Unknown
+                });
+            });
         });
-        self.ide_token_info[decl.name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
-    }
-    fn visit_expression(&mut self, expr : &SpanExpression, context : &VariableContext) {
-        for_each_identifier_in_expression(&expr, &mut |name| {
-            if let Some(tok_decl) = context.get_declaration_for(name.name_idx) {
-                self.ide_token_info[name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Value(tok_decl.identifier_type));
-            }
-        });
-        //self.ide_token_info[decl.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
     }
 }
 
-fn walk_name_color(ast : &ASTRoot, token_spans : &[CharSpan], file_text : &str, result : &mut [IDEToken]) {
-    let mut walker = NameColoringWalker{ide_token_info : result, token_spans : token_spans, file_text : file_text};
-
-    walk_ast(&mut walker, ast, &VariableContext::new_initial());
-}
-
-pub fn create_token_ide_info<'a>(file_text : &str, parsed: &FullParseResult) -> Vec<IDEToken> {
+pub fn create_token_ide_info<'a>(parsed: &FullParseResult) -> Vec<IDEToken> {
     let mut result : Vec<IDEToken> = Vec::new();
     result.reserve(parsed.tokens.len());
 
@@ -159,7 +148,7 @@ pub fn create_token_ide_info<'a>(file_text : &str, parsed: &FullParseResult) -> 
 
     add_ide_bracket_depths_recursive(&mut result, 0, &parsed.token_hierarchy);
 
-    walk_name_color(&parsed.ast, &parsed.tokens.token_spans, file_text, &mut result);
+    walk_name_color(&parsed.ast, &mut result);
 
     result
 }
@@ -175,7 +164,7 @@ pub fn syntax_highlight_file(file_path : &str) {
     
     print_tokens(&file_text, &full_parse.tokens.token_spans);
 
-    let ide_tokens = create_token_ide_info(&file_text, &full_parse);
+    let ide_tokens = create_token_ide_info(&full_parse);
     
     
     pretty_print(&file_text, &full_parse.tokens.token_spans, &ide_tokens);

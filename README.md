@@ -25,6 +25,7 @@ The main goals of the language are roughly listed below:
 - Handle control signals with streams
 - Clocks are handled with dedicated syntax
 - Syntactic sugar for Resets
+- Lambda Modules
 
 ## Tasks
 ### Parsing

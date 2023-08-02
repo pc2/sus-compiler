@@ -150,6 +150,7 @@ fn get_semantic_token_type_from_ide_token(tok : &IDEToken) -> u32 {
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => 4,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 3,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Local)) => 3,
+        IDETokenType::Identifier(IDEIdentifierType::Unknown) => 2, // make it 'OPERATOR'?
         IDETokenType::Identifier(_) => 5, // All others are 'TYPE'
         IDETokenType::Number => 6,
         IDETokenType::Invalid => 2, // make it 'OPERATOR'?
@@ -197,7 +198,7 @@ impl SemanticTokensDeltaAccumulator {
 
 fn do_syntax_highlight(file_data : &LoadedFile, full_parse : &FullParseResult) -> SemanticTokensResult {
     let file_text = &file_data.file_text;
-    let ide_tokens = create_token_ide_info(file_text, &full_parse);
+    let ide_tokens = create_token_ide_info(&full_parse);
 
     let mut semantic_tokens_acc = SemanticTokensDeltaAccumulator{prev_line : 0, prev_col : 0, semantic_tokens : Vec::new()};
     semantic_tokens_acc.semantic_tokens.reserve(full_parse.tokens.token_spans.len());

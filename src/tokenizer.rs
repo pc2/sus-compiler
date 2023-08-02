@@ -14,7 +14,6 @@ pub type TokenTypeIdx = u8;
 pub type TokenExtraInfo = u64;
 const NO_TOKEN_INFO : TokenExtraInfo = 0;
 
-
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Token {
     typ : TokenTypeIdx,
@@ -294,7 +293,7 @@ pub struct TokenizerResult<'a> {
     pub numbers : Vec<BigUint>
 }
 
-const SMALL_NUMBER_CUTOFF : TokenExtraInfo = TokenExtraInfo::MAX >> 1;
+const SMALL_NUMBER_CUTOFF : TokenExtraInfo = 1 << (TokenExtraInfo::BITS - 1);
 const KEYWORD_CUTOFF : TokenExtraInfo = TokenExtraInfo::MAX - ALL_KEYWORDS.len() as TokenExtraInfo;
 
 impl<'a> TokenizerResult<'a> {

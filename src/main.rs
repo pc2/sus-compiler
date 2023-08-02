@@ -3,12 +3,14 @@ mod tokenizer;
 mod parser;
 mod errors;
 mod ast;
+mod code_generation;
 
 mod dev_aid;
 
 use std::env;
 use std::error::Error;
 use dev_aid::syntax_highlighting::*;
+
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut args = env::args();

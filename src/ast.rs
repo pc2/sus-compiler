@@ -71,6 +71,28 @@ impl From<usize> for Span {
     }
 }
 
+const GLOBAL_IDENTIFIER_OFFSET : TokenExtraInfo = 1 << (TokenExtraInfo::BITS - 1);
+#[derive(Debug, Clone, Copy)]
+pub struct IdentifierIdx {
+    name_idx : TokenExtraInfo
+}
+
+impl IdentifierIdx {
+    pub fn new_local(local_idx : usize) -> IdentifierIdx {
+        IdentifierIdx{name_idx : local_idx as TokenExtraInfo}
+    }
+    pub fn new_global(global_idx : TokenExtraInfo) -> IdentifierIdx {
+        IdentifierIdx{name_idx : global_idx + GLOBAL_IDENTIFIER_OFFSET}
+    }
+    pub fn get_local(&self) -> Option<usize> {
+        if self.name_idx < GLOBAL_IDENTIFIER_OFFSET {
+            Some(self.name_idx as usize)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct IdentifierToken {
     pub position : usize,
@@ -81,30 +103,28 @@ pub struct IdentifierToken {
 pub struct SignalDeclaration {
     pub span : Span,
     pub typ : SpanExpression,
-    pub name : IdentifierToken,
+    pub name_idx : TokenExtraInfo,
     pub identifier_type : IdentifierType
 }
 
-#[derive(Debug)]
-pub struct Interface {
-    pub span : Span,
-    pub inputs : Vec<SignalDeclaration>,
-    pub outputs : Vec<SignalDeclaration>
+#[derive(Debug,Clone,Copy)]
+pub struct Operator {
+    pub op_typ : TokenTypeIdx
 }
 
 #[derive(Debug)]
 pub enum Expression {
-    Named(TokenExtraInfo),
+    Named(IdentifierIdx),
     Constant(TokenExtraInfo),
     BoolConstant(bool),
-    UnaryOp(Box<(TokenTypeIdx, usize/*Operator token */, SpanExpression)>),
-    BinOp(Box<(SpanExpression, TokenTypeIdx, usize/*Operator token */, SpanExpression)>),
+    UnaryOp(Box<(Operator, usize/*Operator token */, SpanExpression)>),
+    BinOp(Box<(SpanExpression, Operator, usize/*Operator token */, SpanExpression)>),
     Array(Vec<SpanExpression>), // first[second, third, ...]
     FuncCall(Vec<SpanExpression>) // first(second, third, ...)
 }
 
 impl Expression {
-    pub fn new_binop(left : SpanExpression, op : TokenTypeIdx, op_pos : usize/*Operator token */, right : SpanExpression) -> SpanExpression {
+    pub fn new_binop(left : SpanExpression, op : Operator, op_pos : usize/*Operator token */, right : SpanExpression) -> SpanExpression {
         let span = Span(left.1.0, right.1.1);
         (Expression::BinOp(Box::new((left, op, op_pos, right))), span)
     }
@@ -114,8 +134,6 @@ pub type SpanStatement = (Statement, Span);
 
 #[derive(Debug)]
 pub enum Statement {
-    Declare(SignalDeclaration), // type v;
-    DeclareAssign(SignalDeclaration, SpanExpression), // type v = expr;
     Assign(SpanExpression, SpanExpression), // v = expr;
     Mention(SpanExpression),
     Block(Vec<SpanStatement>),
@@ -127,7 +145,7 @@ pub enum Statement {
 pub struct Module {
     pub span : Span,
     pub name : IdentifierToken,
-    pub interface : Interface,
+    pub declarations : Vec<SignalDeclaration>,
     pub code : Vec<SpanStatement>
 }
 
@@ -136,36 +154,11 @@ pub struct ASTRoot {
     pub modules : Vec<Module>
 }
 
-pub struct VariableContext<'prev, 'ast> where 'prev : 'ast {
-    locals : Vec<&'ast SignalDeclaration>,
-    prev : Option<&'prev VariableContext<'prev, 'ast>>
-}
-
-impl<'prev, 'ast> VariableContext<'prev, 'ast> {
-    pub fn get_declaration_for(&self, name : TokenExtraInfo) -> Option<&'ast SignalDeclaration> {
-        for decl in &self.locals {
-            if decl.name.name_idx == name {
-                return Some(decl);
-            }
-        }
-        self.prev?.get_declaration_for(name)
-    }
-    pub fn add_declaration(&mut self, new_local : &'ast SignalDeclaration) {
-        self.locals.push(new_local);
-    }
-    pub fn new_initial() -> Self {
-        Self{locals : Vec::new(), prev : None}
-    }
-    pub fn new_extend(prev : &'prev Self) -> Self {
-        Self{locals : Vec::new(), prev : Some(prev)}
-    }
-}
-
-pub fn for_each_identifier_in_expression<F>((expr, span) : &SpanExpression, func : &mut F) where F: FnMut(IdentifierToken) -> () {
+pub fn for_each_identifier_in_expression<F>((expr, span) : &SpanExpression, func : &mut F) where F: FnMut(IdentifierIdx, usize) -> () {
     match expr {
         Expression::Named(id) => {
             assert!(span.0 == span.1);
-            func(IdentifierToken{name_idx : *id, position : span.0})
+            func(*id, span.0)
         },
         Expression::BoolConstant(_v) => {},
         Expression::Constant(_v) => {},
@@ -186,122 +179,31 @@ pub fn for_each_identifier_in_expression<F>((expr, span) : &SpanExpression, func
     }
 }
 
-#[allow(unused_variables)]
-pub trait ASTWalker {
-    fn visit_module_name(&mut self, module_name : IdentifierToken) {}
-    fn visit_declaration(&mut self, decl : &SignalDeclaration, context : &VariableContext) {}
-    fn visit_expression(&mut self, expr : &SpanExpression, context : &VariableContext) {}
-    fn visit_assignment(&mut self, to : &SpanExpression, expr : &SpanExpression, context : &VariableContext) {}
-}
-
-fn walk_ast_code_block<W : ASTWalker>(walker : &mut W, code_block : &[SpanStatement], outer_context : &VariableContext) {
-    let mut local_context = VariableContext::new_extend(outer_context);
-    for statement in code_block {
-        match &statement.0 {
-            Statement::Declare(decl) => {
-                local_context.add_declaration(decl);
-                walker.visit_declaration(&decl, &local_context);
-            }
-            Statement::DeclareAssign(decl, expr) => {
-                local_context.add_declaration(decl);
-                walker.visit_declaration(decl, &local_context);
-                let tmp_local_expr = (Expression::Named(decl.name.name_idx), Span::from(decl.name.position));
-                walker.visit_assignment(expr, &tmp_local_expr, &local_context);
-                walker.visit_expression(expr, &local_context);
-                walker.visit_expression(&tmp_local_expr, &local_context);
-            }
-            Statement::Assign(to, expr) => {
-                walker.visit_expression(to, &local_context);
-                walker.visit_expression(expr, &local_context);
-                walker.visit_assignment(to, expr, &local_context);
-            }
-            Statement::Mention(expr) => {
-                walker.visit_expression(expr, &local_context);
-            }
-            Statement::Block(code) => {
-                walk_ast_code_block(walker, &code, &local_context);
-            }
-            Statement::PipelineStage(_pos) => {
-                
-            }
-            Statement::TimelineStage(_pos) => {
-                
-            }
+pub fn for_each_expression_in_block<F>(block : &Vec<SpanStatement>, func : &mut F) where F: FnMut(&SpanExpression) {
+    for (stmt, _span) in block {
+        match stmt {
+            Statement::Assign(to, v) => {
+                func(to);
+                func(v);
+            },
+            Statement::Mention(m) => {
+                func(m);
+            },
+            Statement::Block(b) => {
+                for_each_expression_in_block(b, func);
+            },
+            _other => {}
         }
     }
 }
 
-pub fn walk_ast<W : ASTWalker>(walker : &mut W, ast : &ASTRoot, global_context : &VariableContext) {
-    for module in &ast.modules {
-        walker.visit_module_name(module.name);
-        let mut local_context = VariableContext::new_extend(global_context);
-        for decl in &module.interface.inputs {
-            walker.visit_declaration(decl, &local_context);
-            local_context.add_declaration(decl);
-        }
-        for decl in &module.interface.outputs {
-            walker.visit_declaration(decl, &local_context);
-            local_context.add_declaration(decl);
-        }
-
-        walk_ast_code_block(walker, &module.code, &local_context);
+pub fn for_each_expression_in_module<F>(m : &Module, func : &mut F) where F : FnMut(&SpanExpression) {
+    for (idx, d) in m.declarations.iter().enumerate() {
+        /*if d.identifier_type != IdentifierType::Input && d.identifier_type != IdentifierType::Output {
+            break;
+        }*/ // Allow potential duplicates for locals
+        let local_expr = (Expression::Named(IdentifierIdx::new_local(idx)), Span::from(d.span.1));
+        func(&local_expr);
     }
+    for_each_expression_in_block(&m.code, func);
 }
-
-
-
-/*
-General AST Code, not used, but may be useful to convert to
-
-#[derive(Debug,Clone,Copy)]
-pub enum ValueIdentifierType {
-    Input,
-    Output,
-    Local,
-    State
-}
-
-#[derive(Debug,Clone,Copy)]
-pub enum TypeIdentifierType {
-    Type,
-    Module,
-    Interface
-}
-
-#[derive(Debug,Clone,Copy)]
-pub enum StatementType {
-    Declare, // (Declaration)
-    DeclareAssign, // (Declaration, 
-    Assign,
-    Mention,
-    Block
-}
-
-#[derive(Debug,Clone,Copy)]
-pub enum ExpressionType {
-    Named, // No Contents
-    BinOp(TokenTypeIdx), // (Expression, Expression)
-    UniOp(TokenTypeIdx) // (Expression)
-}
-
-#[derive(Debug,Clone,Copy)]
-pub enum NodeType {
-    Error, // Parsing error type. Always return as much info as possible. Can contain anything
-    Module, // (TypeIdentifier, ArgList (input), ArgList (output), Statement(Block))
-
-    Statement(StatementType), // Enum Statement
-    Expression(ExpressionType), // Enum Expression
-    TypeExpr,
-
-    ArgList, // Declaration[]
-    Declaration, // (TypeExpr, Expression(Named))
-}
-
-#[derive(Debug)]
-pub struct Node {
-    pub typ : NodeType,
-    pub subnodes : Box<[Node]>,
-    pub token_span : Span
-}
-
- */
