@@ -1,4 +1,6 @@
 
+use num_bigint::BigUint;
+
 use crate::{tokenizer::*, errors::*, ast::*};
 
 use std::iter::Peekable;
@@ -190,11 +192,12 @@ impl<'it> TokenStream<'it> {
     }
 }
 
-struct ASTParserContext {
-    errors : Vec<ParsingError<Span>>
+struct ASTParserContext<'a> {
+    errors : Vec<ParsingError<Span>>,
+    numbers : &'a [BigUint]
 }
 
-impl ASTParserContext {
+impl<'a> ASTParserContext<'a> {
     fn eat_plain_internal(&mut self, token_stream : &mut TokenStream, expected : TokenTypeIdx, context : &str) -> Option<(usize, TokenExtraInfo)> {
         assert!(is_bracket(expected) == IsBracket::NotABracket);
         
@@ -257,14 +260,19 @@ impl ASTParserContext {
             Some(TokenTreeNode::PlainToken(tok, pos)) if is_identifier(tok.get_type()) => {
                 (Expression::Named(scope.get_declaration_for(tok.get_info())), Span(*pos, *pos))
             },
-            Some(TokenTreeNode::PlainToken(tok, pos)) if is_number(tok.get_type()) => {
-                (Expression::Constant(tok.get_info()), Span(*pos, *pos))
+            Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == TOKEN_NUMBER => {
+                let value = tok.get_info();
+                (Expression::Constant(Value::Integer(BigUint::from(value))), Span(*pos, *pos))
+            },
+            Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == TOKEN_BIG_INTEGER => {
+                let idx = tok.get_info();
+                (Expression::Constant(Value::Integer(self.numbers[idx as usize])), Span(*pos, *pos))
             },
             Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == kw("true") => {
-                (Expression::BoolConstant(true), Span(*pos, *pos))
+                (Expression::Constant(Value::Bool(true)), Span(*pos, *pos))
             },
             Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == kw("false") => {
-                (Expression::BoolConstant(false), Span(*pos, *pos))
+                (Expression::Constant(Value::Bool(false)), Span(*pos, *pos))
             },
             Some(TokenTreeNode::Block(typ, contents, span)) if *typ == kw("(") => {
                 let mut content_token_stream = TokenStream::new(contents, span.0, span.1);
@@ -511,13 +519,13 @@ impl ASTParserContext {
     }
 
     fn parse_ast(&mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {
-        let mut found_modules : Vec<Module> = Vec::new();
+        let mut modules : Vec<Module> = Vec::new();
 
         while let Some(t) = outer_token_iter.next() {
             match t {
                 TokenTreeNode::PlainToken(tok, module_kw_pos) if tok.get_type() == kw("module") => {
                     if let Some(module) = self.parse_module(outer_token_iter, *module_kw_pos) {
-                        found_modules.push(module);
+                        modules.push(module);
                     }
                 },
                 other => {
@@ -526,12 +534,12 @@ impl ASTParserContext {
             }
         }
 
-        ASTRoot{modules : found_modules}
+        ASTRoot{modules}
     }
 }
 
-pub fn parse<'a>(token_hierarchy : &Vec<TokenTreeNode>, num_tokens : usize) -> (ASTRoot, Vec<ParsingError<Span>>) {
-    let mut context = ASTParserContext{errors : Vec::new()};
+pub fn parse<'a>(token_hierarchy : &Vec<TokenTreeNode>, num_tokens : usize, numbers : &Vec<BigUint>) -> (ASTRoot, Vec<ParsingError<Span>>) {
+    let mut context = ASTParserContext{errors : Vec::new(), numbers};
     let mut token_stream = TokenStream::new(&token_hierarchy, 0, num_tokens);
     let ast_root = context.parse_ast(&mut token_stream);
     
@@ -554,7 +562,7 @@ pub fn perform_full_semantic_parse<'txt>(file_text : &'txt str) -> (FullParseRes
         errors.push(cvt_token_error_to_str_error(err, &tokens.token_spans));
     }
 
-    let (ast, parse_errors) = parse(&token_hierarchy, tokens.token_spans.len());
+    let (ast, parse_errors) = parse(&token_hierarchy, tokens.token_spans.len(), &tokens.numbers);
     for err in parse_errors {
         errors.push(cvt_token_error_to_str_error(err, &tokens.token_spans));
     }

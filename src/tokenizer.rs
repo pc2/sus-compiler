@@ -2,7 +2,6 @@ use std::str::CharIndices;
 use std::str::FromStr;
 use std::collections::HashMap;
 use std::collections::hash_map::*;
-use std::borrow::Cow;
 
 use crate::errors::*;
 
@@ -95,17 +94,19 @@ pub const ALL_SYMBOLS : [(&'static str, u8); 34] = [
     (":", 0)
 ];
 
-pub const MISC_TOKENS : [&'static str; 4] = [
+pub const MISC_TOKENS : [&'static str; 5] = [
     "IDENTIFIER",
     "NUMBER",
+    "BIG_INTEGER",
     "COMMENT",
     "INVALID"
 ];
 
 pub const TOKEN_IDENTIFIER : TokenTypeIdx = (ALL_KEYWORDS.len() + ALL_SYMBOLS.len()) as TokenTypeIdx;
 pub const TOKEN_NUMBER : TokenTypeIdx = TOKEN_IDENTIFIER + 1;
-pub const TOKEN_COMMENT : TokenTypeIdx = TOKEN_IDENTIFIER + 2;
-pub const TOKEN_INVALID : TokenTypeIdx = TOKEN_IDENTIFIER + 3;
+pub const TOKEN_BIG_INTEGER : TokenTypeIdx = TOKEN_IDENTIFIER + 2;
+pub const TOKEN_COMMENT : TokenTypeIdx = TOKEN_IDENTIFIER + 3;
+pub const TOKEN_INVALID : TokenTypeIdx = TOKEN_IDENTIFIER + 4;
 
 const fn const_eq_str(a: &str, b: &str) -> bool {
     let a_bytes = a.as_bytes();
@@ -164,7 +165,7 @@ pub fn is_identifier(typ : TokenTypeIdx) -> bool {
     typ == TOKEN_IDENTIFIER
 }
 pub fn is_number(typ : TokenTypeIdx) -> bool {
-    typ == TOKEN_NUMBER
+    typ == TOKEN_NUMBER || typ == TOKEN_BIG_INTEGER
 }
 pub fn is_comment(typ : TokenTypeIdx) -> bool {
     typ == TOKEN_COMMENT
@@ -293,17 +294,10 @@ pub struct TokenizerResult<'a> {
     pub numbers : Vec<BigUint>
 }
 
-const SMALL_NUMBER_CUTOFF : TokenExtraInfo = 1 << (TokenExtraInfo::BITS - 1);
 const KEYWORD_CUTOFF : TokenExtraInfo = TokenExtraInfo::MAX - ALL_KEYWORDS.len() as TokenExtraInfo;
 
 impl<'a> TokenizerResult<'a> {
-    pub fn get_number<'s>(&'s self, info : TokenExtraInfo) -> Cow<'s, BigUint> {
-        if info < SMALL_NUMBER_CUTOFF {
-            Cow::Owned(info.to_biguint().unwrap())
-        } else {
-            Cow::Borrowed(&self.numbers[(info - SMALL_NUMBER_CUTOFF) as usize])
-        }
-    }
+    
 }
 
 impl<'a> TokenizerResult<'a> {
@@ -333,20 +327,13 @@ impl<'a> TokenizerResult<'a> {
     }
     pub fn push_number(&mut self, num_text : &str, span : CharSpan) {
         let num_bigint = BigUint::from_str(num_text).unwrap();
-        let info = if let Ok(as_small_int) = TokenExtraInfo::try_from(&num_bigint) {
-            if as_small_int < SMALL_NUMBER_CUTOFF {
-                as_small_int
-            } else {
-                let num_idx = self.numbers.len();
-                self.numbers.push(num_bigint);
-                num_idx as TokenExtraInfo
-            }
+        if let Ok(as_small_int) = TokenExtraInfo::try_from(&num_bigint) {
+            self.tokens.push(Token{typ : TOKEN_NUMBER, info : as_small_int});
         } else {
             let num_idx = self.numbers.len();
             self.numbers.push(num_bigint);
-            num_idx as TokenExtraInfo
+            self.tokens.push(Token{typ : TOKEN_NUMBER, info : num_idx as TokenExtraInfo});
         };
-        self.tokens.push(Token{typ : TOKEN_NUMBER, info : info as TokenExtraInfo});
         self.token_spans.push(span);
     }
     pub fn len(&self) -> usize {

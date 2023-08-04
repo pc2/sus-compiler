@@ -1,4 +1,6 @@
 
+use num_bigint::BigUint;
+
 use crate::tokenizer::{TokenTypeIdx, TokenExtraInfo};
 use core::ops::Range;
 
@@ -113,10 +115,15 @@ pub struct Operator {
 }
 
 #[derive(Debug)]
+pub enum Value {
+    Bool(bool),
+    Integer(BigUint)
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Named(IdentifierIdx),
-    Constant(TokenExtraInfo),
-    BoolConstant(bool),
+    Constant(Value),
     UnaryOp(Box<(Operator, usize/*Operator token */, SpanExpression)>),
     BinOp(Box<(SpanExpression, Operator, usize/*Operator token */, SpanExpression)>),
     Array(Vec<SpanExpression>), // first[second, third, ...]
@@ -160,7 +167,6 @@ pub fn for_each_identifier_in_expression<F>((expr, span) : &SpanExpression, func
             assert!(span.0 == span.1);
             func(*id, span.0)
         },
-        Expression::BoolConstant(_v) => {},
         Expression::Constant(_v) => {},
         Expression::UnaryOp(b) => {
             let (_operator, _operator_pos, right) = &**b;
