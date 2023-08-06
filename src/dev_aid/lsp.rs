@@ -14,12 +14,20 @@ use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syn
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
-thread_local!(static OUT_FILE: File = File::create("/home/lennart/lsp_out.txt").expect("Replacement terminal /home/lennart/lsp_out.txt could not be created"));
+use std::env;
+
+static LSP_LOG_PATH : &str = if crate::tokenizer::const_eq_str(std::env::consts::OS, "windows") {
+    "C:\\Users\\lenna\\lsp_out.txt"
+} else {
+    "/home/lennart/lsp_out.txt"
+};
+
+thread_local!(static LSP_LOG: File = File::create(LSP_LOG_PATH).expect("Replacement terminal /home/lennart/lsp_out.txt could not be created"));
 
 macro_rules! print {
     ($($arg:tt)*) => {{
         use std::io::Write;
-        OUT_FILE.with(|mut file| {
+        LSP_LOG.with(|mut file| {
             write!(file, $($arg)*).unwrap();
         })
     }};
@@ -27,7 +35,7 @@ macro_rules! print {
 macro_rules! println {
     ($($arg:tt)*) => {{
         use std::io::Write;
-        OUT_FILE.with(|mut file| {
+        LSP_LOG.with(|mut file| {
             write!(file, $($arg)*).unwrap();
             write!(file, "\n").unwrap();
         })

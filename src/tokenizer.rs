@@ -107,7 +107,7 @@ pub const TOKEN_NUMBER : TokenTypeIdx = TOKEN_IDENTIFIER + 1;
 pub const TOKEN_COMMENT : TokenTypeIdx = TOKEN_IDENTIFIER + 2;
 pub const TOKEN_INVALID : TokenTypeIdx = TOKEN_IDENTIFIER + 3;
 
-const fn const_eq_str(a: &str, b: &str) -> bool {
+pub const fn const_eq_str(a: &str, b: &str) -> bool {
     let a_bytes = a.as_bytes();
     let b_bytes = b.as_bytes();
 
