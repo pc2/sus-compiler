@@ -33,7 +33,7 @@ use crate::ast::FilePos;
 use crate::ast::CharSpan;
 
 
-pub const ALL_KEYWORDS : [(&'static str, u8); 16] = [
+pub const ALL_KEYWORDS : [(&'static str, u8); 17] = [
     ("template", 0),
     ("module", 0),
     ("pipeline", 0),
@@ -49,7 +49,8 @@ pub const ALL_KEYWORDS : [(&'static str, u8); 16] = [
     ("while", 0),
     ("for", 0),
     ("struct", 0),
-    ("enum", 0)
+    ("enum", 0),
+    ("reg", 0)
 ];
 
 // Extra data is opreator prescedence. Lower number is higher prescedence of operators

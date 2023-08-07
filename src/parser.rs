@@ -266,7 +266,7 @@ impl<'a> ASTParserContext<'a> {
             },
             Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == TOKEN_BIG_INTEGER => {
                 let idx = tok.get_info();
-                (Expression::Constant(Value::Integer(self.numbers[idx as usize])), Span(*pos, *pos))
+                (Expression::Constant(Value::Integer(self.numbers[idx as usize].clone())), Span(*pos, *pos))
             },
             Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == kw("true") => {
                 (Expression::Constant(Value::Bool(true)), Span(*pos, *pos))
@@ -431,7 +431,7 @@ impl<'a> ASTParserContext<'a> {
                 }
                 Statement::Mention(expr_first)
             },
-            Some(TokenTreeNode::PlainToken(tok, _)) if tok.get_type() == kw("=") => {
+            Some(TokenTreeNode::PlainToken(tok, eq_sign_pos)) if tok.get_type() == kw("=") => {
                 if let Some(kw_pos) = state_decl {
                     self.errors.push(error_basic_str(Span::from(kw_pos), "Cannot attach 'state' keyword in assignment"))
                 }
@@ -439,7 +439,7 @@ impl<'a> ASTParserContext<'a> {
                 token_stream.next();
                 let value = self.parse_expression(token_stream, scope)?;
                 self.eat_plain(token_stream, kw(";"), "assignment");
-                Statement::Assign(expr_first, value)
+                Statement::Assign(expr_first, value, *eq_sign_pos)
             },
             Some(_other) => {
                 let declaration_type = if state_decl.is_some() {
@@ -450,11 +450,12 @@ impl<'a> ASTParserContext<'a> {
                 // This is a declaration!
                 let name = self.eat_identifier(token_stream, "declaration")?;
                 match token_stream.next() {
-                    Some(TokenTreeNode::PlainToken(tok, _)) if tok.get_type() == kw("=") => {
+                    Some(TokenTreeNode::PlainToken(tok, eq_sign_pos)) if tok.get_type() == kw("=") => {
+                        // Parse set value expression before adding declaration. The variable name should not yet be in scope
                         let value = self.parse_expression(token_stream, scope)?;
                         self.eat_plain(token_stream, kw(";"), "declaration");
                         let id = self.add_declaration(expr_first, name, declaration_type, declarations, scope);
-                        Statement::Assign((Expression::Named(IdentifierIdx::new_local(id)), Span::from(name.position)), value)
+                        Statement::Assign((Expression::Named(IdentifierIdx::new_local(id)), Span::from(name.position)), value, *eq_sign_pos)
                     },
                     Some(TokenTreeNode::PlainToken(tok, _)) if tok.get_type() == kw(";") => {
                         self.add_declaration(expr_first, name, declaration_type, declarations, scope);

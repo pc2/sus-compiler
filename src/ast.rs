@@ -101,7 +101,7 @@ pub struct IdentifierToken {
     pub name_idx : TokenExtraInfo
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct SignalDeclaration {
     pub span : Span,
     pub typ : SpanExpression,
@@ -114,13 +114,13 @@ pub struct Operator {
     pub op_typ : TokenTypeIdx
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub enum Value {
     Bool(bool),
     Integer(BigUint)
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub enum Expression {
     Named(IdentifierIdx),
     Constant(Value),
@@ -141,7 +141,7 @@ pub type SpanStatement = (Statement, Span);
 
 #[derive(Debug)]
 pub enum Statement {
-    Assign(SpanExpression, SpanExpression), // v = expr;
+    Assign(SpanExpression, SpanExpression, usize/* Eq sign token */), // v = expr;
     Mention(SpanExpression),
     Block(Vec<SpanStatement>),
     PipelineStage(usize),
@@ -188,7 +188,7 @@ pub fn for_each_identifier_in_expression<F>((expr, span) : &SpanExpression, func
 pub fn for_each_expression_in_block<F>(block : &Vec<SpanStatement>, func : &mut F) where F: FnMut(&SpanExpression) {
     for (stmt, _span) in block {
         match stmt {
-            Statement::Assign(to, v) => {
+            Statement::Assign(to, v, _eq_sign_pos) => {
                 func(to);
                 func(v);
             },
