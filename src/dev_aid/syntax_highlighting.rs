@@ -154,7 +154,10 @@ pub fn create_token_ide_info<'a>(parsed: &FullParseResult) -> Vec<IDEToken> {
 }
 
 pub fn syntax_highlight_file(file_path : &str) {
-    let file_text = std::fs::read_to_string(file_path).expect("Could not open file!"); 
+    let file_text = match std::fs::read_to_string(file_path) {
+        Ok(file_text) => file_text,
+        Err(reason) => panic!("Could not open file '{file_path}' for syntax highlighting because {reason}")
+    };
     
     let (full_parse, errors) = perform_full_semantic_parse(&file_text);
 
