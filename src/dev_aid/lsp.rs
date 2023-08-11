@@ -14,8 +14,6 @@ use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syn
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
-use std::env;
-
 static LSP_LOG_PATH : &str = if crate::tokenizer::const_eq_str(std::env::consts::OS, "windows") {
     "C:\\Users\\lenna\\lsp_out.txt"
 } else {
@@ -24,14 +22,6 @@ static LSP_LOG_PATH : &str = if crate::tokenizer::const_eq_str(std::env::consts:
 
 thread_local!(static LSP_LOG: File = File::create(LSP_LOG_PATH).expect("Replacement terminal /home/lennart/lsp_out.txt could not be created"));
 
-macro_rules! print {
-    ($($arg:tt)*) => {{
-        use std::io::Write;
-        LSP_LOG.with(|mut file| {
-            write!(file, $($arg)*).unwrap();
-        })
-    }};
-}
 macro_rules! println {
     ($($arg:tt)*) => {{
         use std::io::Write;
@@ -152,8 +142,7 @@ fn get_semantic_token_type_from_ide_token(tok : &IDEToken) -> u32 {
         IDETokenType::Comment => 0,
         IDETokenType::Keyword => 1,
         IDETokenType::Operator => 2,
-        IDETokenType::PipelineStage => 7, // EVENT seems to get a good colour
-        IDETokenType::TimelineStage => 7,
+        IDETokenType::TimelineStage => 7,// EVENT seems to get a good colour
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Input)) => 4,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => 4,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 3,

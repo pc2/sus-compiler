@@ -17,7 +17,6 @@ pub enum IDETokenType {
     Comment,
     Keyword,
     Operator,
-    PipelineStage,
     TimelineStage,
     Identifier(IDEIdentifierType),
     Number,
@@ -60,7 +59,6 @@ fn pretty_print(file_text : &str, token_spans : &[CharSpan], ide_infos : &[IDETo
             IDETokenType::Comment => Style::new().green().dim(),
             IDETokenType::Keyword => Style::new().blue(),
             IDETokenType::Operator => Style::new().white().bright(),
-            IDETokenType::PipelineStage => Style::new().red().bold(),
             IDETokenType::TimelineStage => Style::new().red().bold(),
             IDETokenType::Identifier(IDEIdentifierType::Unknown) => Style::new().red().underlined(),
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Local)) => Style::new().blue().bright(),
@@ -97,14 +95,14 @@ fn add_ide_bracket_depths_recursive<'a>(result : &mut [IDEToken], current_depth 
 fn walk_name_color(ast : &ASTRoot, result : &mut [IDEToken]) {
     for module in &ast.modules {
         for decl in &module.declarations {
-            for_each_identifier_in_expression(&decl.typ, &mut |_name, position| {
+            decl.typ.for_each_value(&mut |_name, position| {
                 result[position].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
             });
             //result[decl.name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
         }
 
         for_each_expression_in_module(&module, &mut |expr| {
-            for_each_identifier_in_expression(expr, &mut |name, position| {
+            expr.for_each_value(&mut |name, position| {
                 result[position].typ = IDETokenType::Identifier(if let Some(l) = name.get_local() {
                     IDEIdentifierType::Value(module.declarations[l].identifier_type)
                 } else {
@@ -126,9 +124,7 @@ pub fn create_token_ide_info<'a>(parsed: &FullParseResult) -> Vec<IDEToken> {
         } else if is_bracket(tok_typ) != IsBracket::NotABracket {
             IDETokenType::InvalidBracket // Brackets are initially invalid. They should be overwritten by the token_hierarchy step. The ones that don't get overwritten are invalid
         } else if is_symbol(tok_typ) {
-            if tok_typ == kw("@") {
-                IDETokenType::PipelineStage
-            } else if tok_typ == kw("#") {
+            if tok_typ == kw("#") {
                 IDETokenType::TimelineStage
             } else {
                 IDETokenType::Operator

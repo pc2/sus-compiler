@@ -119,17 +119,16 @@ impl<'prev> LocalVariableContext<'prev> {
     }
 }
 
+#[derive(Clone)]
 struct TokenStream<'it> {
     iter : Peekable<Iter<'it, TokenTreeNode>>,
     unexpected_eof_token : usize,
     pub last_idx : usize
 }
 
-impl<'it> TokenStream<'it> {
-    // The given start idx should point to the first element in this block. unexpected_eof_token should point one past the last element
-    fn new(list : &'it [TokenTreeNode], start_idx : usize, unexpected_eof_token : usize) -> TokenStream<'it> {
-        TokenStream{iter : list.iter().peekable(), unexpected_eof_token : unexpected_eof_token, last_idx : start_idx}
-    }
+impl<'it> Iterator for TokenStream<'it> {
+    type Item = &'it TokenTreeNode;
+
     fn next(&mut self) -> Option<&'it TokenTreeNode> {
         if let Some(found) = self.iter.next() {
             self.last_idx = found.get_span().1;
@@ -137,6 +136,13 @@ impl<'it> TokenStream<'it> {
         } else {
             None
         }
+    }
+}
+
+impl<'it> TokenStream<'it> {
+    // The given start idx should point to the first element in this block. unexpected_eof_token should point one past the last element
+    fn new(list : &'it [TokenTreeNode], start_idx : usize, unexpected_eof_token : usize) -> TokenStream<'it> {
+        TokenStream{iter : list.iter().peekable(), unexpected_eof_token : unexpected_eof_token, last_idx : start_idx}
     }
     fn peek(&mut self) -> Option<&'it TokenTreeNode> {
         if let Some(&found) = self.iter.peek() {
@@ -153,31 +159,23 @@ impl<'it> TokenStream<'it> {
         }
         false
     }
-    fn peek_is_plain_one_of(&mut self, expecteds : &[TokenTypeIdx]) -> bool {
-        if let Some(TokenTreeNode::PlainToken(tok, _place)) = self.iter.peek() {
-            for ex in expecteds {
-                if tok.get_type() == *ex {
-                    return true;
-                }
+    fn eat_is_plain(&mut self, expected : TokenTypeIdx) -> Option<(TokenExtraInfo, usize)> {
+        if let Some(TokenTreeNode::PlainToken(tok, pos)) = self.peek() {
+            if tok.get_type() == expected {
+                self.next();
+                return Some((tok.get_info(), *pos));
             }
         }
-        false
+        None
     }
-    fn peek_is_block(&mut self, expected : TokenTypeIdx) -> bool {
-        if let Some(TokenTreeNode::Block(typ, _content, _span)) = self.iter.peek() {
+    fn eat_is_block(&mut self, expected : TokenTypeIdx) -> Option<(&Vec<TokenTreeNode>, Span)> {
+        if let Some(TokenTreeNode::Block(typ, content, span)) = self.peek() {
             if *typ == expected {
-                return true;
+                self.next();
+                return Some((content, *span));
             }
         }
-        false
-    }
-    fn skip_until(&mut self, end_type : TokenTypeIdx) {
-        while let Some(found) = self.peek() {
-            if found.get_token_type() == end_type {
-                return;
-            }
-            self.next();
-        }
+        None
     }
     fn skip_until_one_of(&mut self, end_types : &[TokenTypeIdx]) {
         while let Some(found) = self.peek() {
@@ -236,7 +234,19 @@ impl<'a> ASTParserContext<'a> {
         }
     }
 
-    fn add_declaration(&mut self, type_expr : SpanExpression, name : IdentifierToken, identifier_type : IdentifierType, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext) -> usize {
+    fn token_stream_should_be_finished(&mut self, mut token_stream : TokenStream, context : &str) {
+        if let Some(bad_token) = token_stream.next() {
+            let mut bad_tokens_span = bad_token.get_span();
+
+            for tok in token_stream {
+                bad_tokens_span.1 = tok.get_span().1;
+            }
+
+            self.errors.push(error_basic(bad_tokens_span, format!("More tokens found than expected while parsing {context}")))
+        }
+    }
+
+    fn add_declaration(&mut self, type_expr : SpanTypeExpression, name : IdentifierToken, identifier_type : IdentifierType, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext) -> usize {
         let span = Span(type_expr.1.0, name.position);
         let decl = SignalDeclaration{typ : type_expr, span, name_idx : name.name_idx, identifier_type};
         let decl_id = declarations.len();
@@ -298,8 +308,9 @@ impl<'a> ASTParserContext<'a> {
             }
         };
         while let Some(TokenTreeNode::Block(typ, content, bracket_span)) = token_stream.peek() {
-            if *typ == kw("[") || *typ == kw("(") {
-                let start_at = base_expr.1.0;
+            let start_at = base_expr.1.0;
+            let total_span = Span(start_at, bracket_span.1);
+            if *typ == kw("(") {
                 let mut args : Vec<SpanExpression> = Vec::new();
                 args.push(base_expr);
                 let mut content_tokens_iter = TokenStream::new(content, bracket_span.0, bracket_span.1);
@@ -313,8 +324,11 @@ impl<'a> ASTParserContext<'a> {
                         }
                     }
                 }
-                let total_span = Span(start_at, bracket_span.1);
-                base_expr = (if *typ == kw("[") {Expression::Array(args)} else {Expression::FuncCall(args)}, total_span)
+                base_expr = (Expression::FuncCall(args), total_span)
+            } else if *typ == kw("[") {
+                let mut arg_token_stream = TokenStream::new(content, bracket_span.0, bracket_span.1);
+                let arg = self.parse_expression(&mut arg_token_stream, scope)?;
+                base_expr = (Expression::Array(Box::new((base_expr, arg))), total_span)
             } else {
                 break;
             }
@@ -354,125 +368,156 @@ impl<'a> ASTParserContext<'a> {
     }
 
     fn parse_signal_declaration(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext) -> Option<()> {
-        let sig_type = self.parse_expression(token_stream, scope)?;
+        let sig_type = self.try_parse_type(token_stream, scope)?;
         let name = self.eat_identifier(token_stream, "signal declaration")?;
         self.add_declaration(sig_type, name, identifier_type, declarations, scope);
         Some(())
     }
     
+    fn try_parse_type(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext) -> Option<SpanTypeExpression> {
+        let (name_id, first_pos) = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
+        let mut cur_type = (TypeExpression::Named(name_id as usize), Span::from(first_pos));
+        while let Some((content, block_span)) = token_stream.eat_is_block(kw("[")) {
+            let mut array_index_token_stream = TokenStream::new(content, block_span.0, block_span.1);
+            let expr = self.parse_expression(&mut array_index_token_stream, scope)?;
+            self.token_stream_should_be_finished(array_index_token_stream, "type array index");
+            cur_type = (TypeExpression::Array(Box::new((cur_type, expr))), Span(first_pos, block_span.1));
+        }
+        Some(cur_type)
+    }
+
+    fn try_parse_declaration(&mut self, token_stream : &mut TokenStream, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext) -> Option<SpanAssignableExpression> {
+        let identifier_type = if let Some((_info, _pos)) = token_stream.eat_is_plain(kw("state")) {
+            IdentifierType::State
+        } else {
+            IdentifierType::Local
+        };
+        
+        let typ = self.try_parse_type(token_stream, scope)?;
+        let (name_idx, position) = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
+        let local_id = self.add_declaration(typ, IdentifierToken{name_idx, position}, identifier_type, declarations, scope);
+        Some((Expression::Named(IdentifierIdx::new_local(local_id)), Span::from(position)))
+    }
+
     fn parse_bundle(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext) {
         while token_stream.peek_is_plain(TOKEN_IDENTIFIER) {
-            if let Some(()) = self.parse_signal_declaration(token_stream, identifier_type, declarations, scope) {
+            if let Some(_) = self.parse_signal_declaration(token_stream, identifier_type, declarations, scope) {
 
             } else {
                 // Error during parsing signal decl. Skip till "," or end of scope
                 token_stream.skip_until_one_of(&[kw(","), kw("->"), kw("{"), kw(";")]);
             }
             
-            if !token_stream.peek_is_plain(kw(",")) {
+            if !token_stream.eat_is_plain(kw(",")).is_some() {
                 break;
             }
-            token_stream.next();
         }
     }
 
     fn parse_interface(&mut self, token_stream : &mut TokenStream, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext) {
         self.parse_bundle(token_stream, IdentifierType::Input, declarations, scope);
     
-        if token_stream.peek_is_plain(kw("->")) {
-            token_stream.next();
+        if token_stream.eat_is_plain(kw("->")).is_some() {
             self.parse_bundle(token_stream, IdentifierType::Output, declarations, scope);
         }
     }
 
     fn parse_statement(&mut self, token_stream : &mut TokenStream, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext, statements : &mut Vec<SpanStatement>) -> Option<()> {
-        let mut state_decl : Option<usize> = None;
         let start_at = if let Some(peek) = token_stream.peek() {
             peek.get_span().0
         } else {
             return None;
         };
-        match token_stream.peek() {
-            None => {
+        if let Some((_info, pos)) = token_stream.eat_is_plain(kw("#")) {
+            statements.push((Statement::TimelineStage(pos), Span::from(pos)));
+            return Some(());
+        }
+        
+        let mut left_expressions : Vec<(SpanExpression, usize)> = Vec::new();
+        let mut all_decls = true;
+        loop { // Loop over a number of declarations possibly
+            let mut reg_count : usize = 0;
+            while let Some((_info, _pos)) = token_stream.eat_is_plain(kw("reg")) {
+                reg_count += 1;
+            }
+
+            let mut tok_stream_copy = token_stream.clone();
+            
+            if let Some(name) = self.try_parse_declaration(&mut tok_stream_copy, declarations, scope) {
+                // Maybe it's a declaration?
+                *token_stream = tok_stream_copy;
+                left_expressions.push((name, reg_count));
+
+            } else if let Some(sp_expr) = self.parse_expression(token_stream, scope) {
+                // It's an expression instead!
+                left_expressions.push((sp_expr, reg_count));
+                all_decls = false;
+            } else {
+                // Also not, error then
+                token_stream.skip_until_one_of(&[kw(","), kw("="), kw(";")]);
+            }
+            match token_stream.next() {
+                Some(TokenTreeNode::PlainToken(tok, _pos)) if tok.get_type() == kw(",") => {
+                    continue; // parse next declaration
+                }
+                Some(TokenTreeNode::PlainToken(tok, assign_pos)) if tok.get_type() == kw("=") => {
+                    // Ends the loop
+                    // T a, T b = x(y);
+                    return self.parse_statement_handle_equals(left_expressions, assign_pos, token_stream, scope, statements, start_at);
+                }
+                Some(TokenTreeNode::PlainToken(tok, _pos)) if tok.get_type() == kw(";") => {
+                    // Ends the loop
+                    return self.parse_statement_handle_end(left_expressions, all_decls, statements);
+                }
+                None => {
+                    // Ends the loop
+                    return self.parse_statement_handle_end(left_expressions, all_decls, statements);
+                }
+                other => {
+                    self.errors.push(error_unexpected_tree_node(&[kw(";"), kw("="), kw(",")], other, token_stream.unexpected_eof_token, "statement"));
+                    return None
+                }
+            }
+        }
+    }
+
+    fn parse_statement_handle_equals(&mut self, left_expressions: Vec<(SpanExpression, usize)>, assign_pos: &usize, token_stream: &mut TokenStream<'_>, scope: &mut LocalVariableContext<'_>, statements: &mut Vec<(Statement, Span)>, start_at: usize) -> Option<()> {
+        if left_expressions.len() == 0 {
+            self.errors.push(error_unexpected_token(&[TOKEN_IDENTIFIER], kw("="), *assign_pos, "statement"));
+            None
+        } else if let Some(value) = self.parse_expression(token_stream, scope) {
+            let converted_left : Vec<SpanExpression> = left_expressions.into_iter().map(|(expr, reg_count)| expr).collect();
+            let end_at = value.1.1;
+            statements.push((Statement::Assign(converted_left, value), Span(start_at, end_at)));
+            self.eat_plain(token_stream, kw(";"), "right-hand side of expression")?;
+            Some(())
+        } else {
+            None
+            // errors reported by self.parse_expression
+        }
+    }
+
+    fn parse_statement_handle_end(&mut self, left_expressions: Vec<(SpanExpression, usize)>, all_decls: bool, statements: &mut Vec<(Statement, Span)>) -> Option<()> {
+        // Declarations or single expression only
+        // T a;
+        // myFunc(x, y);
+        if left_expressions.len() == 0 {
+            return None
+        } else if left_expressions.len() == 1 {
+            // Is a single big expression, or a single declaration
+            let (expr, _reg_count) = left_expressions.into_iter().next().unwrap();
+            if all_decls {
+                // decls have been taken care of during try_parse_declaration step
+                return Some(());
+            } else {
+                let expr_span = expr.1;
+                statements.push((Statement::Assign(Vec::new(), expr), expr_span));
                 return None;
             }
-            Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == kw("@") => {
-                // Assignment
-                token_stream.next();
-                statements.push((Statement::PipelineStage(*pos), Span::from(*pos)));
-                return Some(())
-            }
-            Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == kw("#") => {
-                // Assignment
-                token_stream.next();
-                statements.push((Statement::TimelineStage(*pos), Span::from(*pos)));
-                return Some(())
-            }
-            Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == kw("state") => {
-                // Assignment
-                token_stream.next();
-                state_decl = Some(*pos);
-            }
-            _other => {}
+        } else {
+            self.errors.push(error_basic_str(Span(left_expressions[1].0.1.0, left_expressions[left_expressions.len()-1].0.1.1), "Multiple declarations are only allowed in function call syntax: int a, int b = f(x);"));
+            return None;
         }
-        let expr_first = self.parse_expression(token_stream, scope)?; // Error case
-        let resulting_statement = match token_stream.peek() {
-            // Regular assignment
-            None => {
-                if let Some(kw_pos) = state_decl {
-                    self.errors.push(error_basic_str(Span::from(kw_pos), "Cannot attach 'state' keyword in mention"))
-                }
-                Statement::Mention(expr_first)
-            },
-            Some(TokenTreeNode::PlainToken(tok, _)) if tok.get_type() == kw(";") => {
-                token_stream.next();
-                if let Some(kw_pos) = state_decl {
-                    self.errors.push(error_basic_str(Span::from(kw_pos), "Cannot attach 'state' keyword in mention"))
-                }
-                Statement::Mention(expr_first)
-            },
-            Some(TokenTreeNode::PlainToken(tok, eq_sign_pos)) if tok.get_type() == kw("=") => {
-                if let Some(kw_pos) = state_decl {
-                    self.errors.push(error_basic_str(Span::from(kw_pos), "Cannot attach 'state' keyword in assignment"))
-                }
-                // Assignment
-                token_stream.next();
-                let value = self.parse_expression(token_stream, scope)?;
-                self.eat_plain(token_stream, kw(";"), "assignment");
-                Statement::Assign(expr_first, value, *eq_sign_pos)
-            },
-            Some(_other) => {
-                let declaration_type = if state_decl.is_some() {
-                    IdentifierType::State
-                } else {
-                    IdentifierType::Local
-                };
-                // This is a declaration!
-                let name = self.eat_identifier(token_stream, "declaration")?;
-                match token_stream.next() {
-                    Some(TokenTreeNode::PlainToken(tok, eq_sign_pos)) if tok.get_type() == kw("=") => {
-                        // Parse set value expression before adding declaration. The variable name should not yet be in scope
-                        let value = self.parse_expression(token_stream, scope)?;
-                        self.eat_plain(token_stream, kw(";"), "declaration");
-                        let id = self.add_declaration(expr_first, name, declaration_type, declarations, scope);
-                        Statement::Assign((Expression::Named(IdentifierIdx::new_local(id)), Span::from(name.position)), value, *eq_sign_pos)
-                    },
-                    Some(TokenTreeNode::PlainToken(tok, _)) if tok.get_type() == kw(";") => {
-                        self.add_declaration(expr_first, name, declaration_type, declarations, scope);
-                        //Statement::Declare(self.to_signal_declaration(expr_first, name, declaration_type)?)
-                        return Some(());
-                    },
-                    other => {
-                        self.errors.push(error_unexpected_tree_node(&[kw(";"), kw("=")], other, token_stream.last_idx, "declaration")); // easy way to throw the End Of Scope error
-                        return None;
-                        // Statement::Declare(self.to_signal_declaration(expr_first, name)?)
-                    }
-                }
-            }
-        };
-
-        statements.push((resulting_statement, Span(start_at, token_stream.last_idx)));
-        return Some(())
     }
     fn parse_code_block(&mut self, block_tokens : &[TokenTreeNode], span : Span, declarations : &mut Vec<SignalDeclaration>, outer_scope : &LocalVariableContext) -> Vec<SpanStatement> {
         let mut token_stream = TokenStream::new(block_tokens, span.0, span.1);
@@ -481,9 +526,10 @@ impl<'a> ASTParserContext<'a> {
         
         let mut inner_scope = LocalVariableContext::new_extend(outer_scope);
 
+
         while token_stream.peek().is_some() {
-            if token_stream.peek_is_plain(kw(";")) {
-                token_stream.next();
+            // Allow empty statements
+            if token_stream.eat_is_plain(kw(";")).is_some() {
                 continue;
             }
             if let Some(TokenTreeNode::Block(typ, contents, block_span)) = token_stream.peek() {
@@ -493,6 +539,7 @@ impl<'a> ASTParserContext<'a> {
                     continue; // Can't add condition to if let, so have to do some weird control flow here
                 }
             }
+            
             if self.parse_statement(&mut token_stream, declarations, &mut inner_scope, &mut statements).is_none() {
                 // Error recovery. Find end of statement
                 token_stream.skip_until_one_of(&[kw(";"), kw("{")]);

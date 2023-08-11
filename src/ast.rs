@@ -1,8 +1,10 @@
 
 use num_bigint::BigUint;
 
-use crate::tokenizer::{TokenTypeIdx, TokenExtraInfo};
+use crate::{tokenizer::{TokenTypeIdx, TokenExtraInfo}, errors::{ParsingError, error_basic_str}};
 use core::ops::Range;
+
+use std::collections::HashMap;
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
@@ -93,6 +95,13 @@ impl IdentifierIdx {
             None
         }
     }
+    pub fn get_global(&self) -> Option<TokenExtraInfo> {
+        if self.name_idx >= GLOBAL_IDENTIFIER_OFFSET {
+            Some((self.name_idx - GLOBAL_IDENTIFIER_OFFSET) as TokenExtraInfo)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -101,10 +110,19 @@ pub struct IdentifierToken {
     pub name_idx : TokenExtraInfo
 }
 
+
+#[derive(Debug, Clone)]
+pub enum TypeExpression {
+    Named(usize),
+    Array(Box<(SpanTypeExpression, SpanExpression)>)
+}
+
+pub type SpanTypeExpression = (TypeExpression, Span);
+
 #[derive(Debug,Clone)]
 pub struct SignalDeclaration {
     pub span : Span,
-    pub typ : SpanExpression,
+    pub typ : SpanTypeExpression,
     pub name_idx : TokenExtraInfo,
     pub identifier_type : IdentifierType
 }
@@ -126,7 +144,7 @@ pub enum Expression {
     Constant(Value),
     UnaryOp(Box<(Operator, usize/*Operator token */, SpanExpression)>),
     BinOp(Box<(SpanExpression, Operator, usize/*Operator token */, SpanExpression)>),
-    Array(Vec<SpanExpression>), // first[second, third, ...]
+    Array(Box<(SpanExpression, SpanExpression)>), // first[second]
     FuncCall(Vec<SpanExpression>) // first(second, third, ...)
 }
 
@@ -139,12 +157,12 @@ impl Expression {
 pub type SpanExpression = (Expression, Span);
 pub type SpanStatement = (Statement, Span);
 
+pub type SpanAssignableExpression = SpanExpression;
+
 #[derive(Debug)]
 pub enum Statement {
-    Assign(SpanExpression, SpanExpression, usize/* Eq sign token */), // v = expr;
-    Mention(SpanExpression),
+    Assign(Vec<SpanAssignableExpression>, SpanExpression), // v = expr;
     Block(Vec<SpanStatement>),
-    PipelineStage(usize),
     TimelineStage(usize)
 }
 
@@ -161,25 +179,53 @@ pub struct ASTRoot {
     pub modules : Vec<Module>
 }
 
-pub fn for_each_identifier_in_expression<F>((expr, span) : &SpanExpression, func : &mut F) where F: FnMut(IdentifierIdx, usize) -> () {
-    match expr {
-        Expression::Named(id) => {
-            assert!(span.0 == span.1);
-            func(*id, span.0)
-        },
-        Expression::Constant(_v) => {},
-        Expression::UnaryOp(b) => {
-            let (_operator, _operator_pos, right) = &**b;
-            for_each_identifier_in_expression(&right, func);
+pub trait IterIdentifiers {
+    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(IdentifierIdx, usize) -> ();
+}
+
+impl IterIdentifiers for SpanExpression {
+    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(IdentifierIdx, usize) -> () {
+        let (expr, span) = self;
+        match expr {
+            Expression::Named(id) => {
+                assert!(span.0 == span.1);
+                func(*id, span.0)
+            }
+            Expression::Constant(_v) => {}
+            Expression::UnaryOp(b) => {
+                let (_operator, _operator_pos, right) = &**b;
+                right.for_each_value(func);
+            }
+            Expression::BinOp(b) => {
+                let (left, _operator, _operator_pos, right) = &**b;
+                left.for_each_value(func);
+                right.for_each_value(func);
+            }
+            Expression::FuncCall(args) => {
+                for arg in args {
+                    arg.for_each_value(func);
+                }
+            }
+            Expression::Array(b) => {
+                let (array, idx) = &**b;
+                array.for_each_value(func);
+                idx.for_each_value(func);
+            }
         }
-        Expression::BinOp(b) => {
-            let (left, _operator, _operator_pos, right) = &**b;
-            for_each_identifier_in_expression(&left, func);
-            for_each_identifier_in_expression(&right, func);
-        },
-        Expression::Array(args) | Expression::FuncCall(args) => {
-            for arg in args {
-                for_each_identifier_in_expression(arg, func);
+    }
+}
+
+impl IterIdentifiers for SpanTypeExpression {
+    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(IdentifierIdx, usize) -> () {
+        let (typ, _span) = self;
+        match typ {
+            TypeExpression::Named(_n) => {
+                // is type
+            }
+            TypeExpression::Array(b) => {
+                let (arr_typ, arr_size) = &**b;
+                arr_typ.for_each_value(func);
+                arr_size.for_each_value(func);
             }
         }
     }
@@ -188,12 +234,11 @@ pub fn for_each_identifier_in_expression<F>((expr, span) : &SpanExpression, func
 pub fn for_each_expression_in_block<F>(block : &Vec<SpanStatement>, func : &mut F) where F: FnMut(&SpanExpression) {
     for (stmt, _span) in block {
         match stmt {
-            Statement::Assign(to, v, _eq_sign_pos) => {
-                func(to);
+            Statement::Assign(to, v) => {
+                for t in to {
+                    func(t);
+                }
                 func(v);
-            },
-            Statement::Mention(m) => {
-                func(m);
             },
             Statement::Block(b) => {
                 for_each_expression_in_block(b, func);
@@ -213,3 +258,22 @@ pub fn for_each_expression_in_module<F>(m : &Module, func : &mut F) where F : Fn
     }
     for_each_expression_in_block(&m.code, func);
 }
+
+pub struct GlobalContext {
+    real_types : HashMap<usize, TypeExpression>,
+    // aliases : todo!()
+}
+
+impl GlobalContext {
+    pub fn parse_to_type((expr, span) : &SpanExpression, errors : &mut Vec<ParsingError<Span>>) -> Option<TypeExpression> {
+        match expr {
+            Expression::Named(idx) => {todo!();},
+            Expression::Array(args) => {todo!();},
+            other => {
+                errors.push(error_basic_str(*span, "Unexpected part"));
+                return None
+            }
+        }
+    }
+}
+

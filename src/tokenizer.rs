@@ -55,7 +55,7 @@ pub const ALL_KEYWORDS : [(&'static str, u8); 17] = [
 
 // Extra data is opreator prescedence. Lower number is higher prescedence of operators
 // ordered by which to prefer when parsing
-pub const ALL_SYMBOLS : [(&'static str, u8); 34] = [
+pub const ALL_SYMBOLS : [(&'static str, u8); 33] = [
     // 'Meta symbols', for comments. Not actually used in further parsing
     ("/*", 0),
     ("//", 0),
@@ -80,8 +80,7 @@ pub const ALL_SYMBOLS : [(&'static str, u8); 34] = [
     ("^", 3),
     ("<", 2),
     (">", 2),
-    ("!", 0),
-    ("@", 0), // End of operators (see is_operator())
+    ("!", 0),// End of operators (see is_operator())
     ("#", 0),
     ("=", 0),
     ("(", 0), // Close parens are always 1 larger than their open variant, (see closes())
@@ -157,7 +156,7 @@ pub fn is_symbol(typ : TokenTypeIdx) -> bool {
     typ < TOKEN_IDENTIFIER
 }
 pub fn is_operator(typ : TokenTypeIdx) -> bool {
-    typ >= kw("<=") && typ <= kw("@")
+    typ >= kw("<=") && typ <= kw("!")
 }
 pub fn is_unary_operator(typ : TokenTypeIdx) -> bool {
     typ == kw("|") || typ == kw("&") || typ == kw("^") || typ == kw("+") || typ == kw("*") || typ == kw("!")

@@ -1,10 +1,6 @@
 use crate::{ast::*, errors::{ParsingError, error_basic_str}};
 
 
-pub struct GlobalContext {
-
-}
-
 type ToAssignable = usize;
 
 #[derive(Debug)]
@@ -20,7 +16,7 @@ pub enum Operation {
 #[derive(Debug)]
 pub struct LocalVar {
     span : Span,
-    typ : Option<SpanExpression>,
+    typ : Option<SpanTypeExpression>,
     identifier_type : IdentifierType
 }
 
@@ -99,28 +95,32 @@ impl Flattened {
             }
         })
     }
-}
 
-pub fn synthesize(module : &Module, errors : &mut Vec<ParsingError<Span>>) -> Flattened {
-    let mut result = Flattened{variables : Vec::new(), operations : Vec::new()};
-
-    for decl in &module.declarations {
-        result.variables.push(LocalVar{span : decl.span, typ : Some(decl.typ.clone()), identifier_type : decl.identifier_type})
-    }
-
-    for (stmt, stmt_span) in &module.code {
-        match stmt {
-            Statement::Assign(to, value_expr, eq_sign_pos) => {
-                if let Some(to_idx) = result.synthesize_assign_to_expr(to, errors) {
-                    let value_idx = result.synthesize_expression(value_expr);
-                    result.operations.push((Operation::Copy { out: to_idx, input: value_idx }, *eq_sign_pos))
+    pub fn synthesize(module : &Module, errors : &mut Vec<ParsingError<Span>>) -> Flattened {
+        let mut result = Flattened{variables : Vec::new(), operations : Vec::new()};
+    
+        for decl in &module.declarations {
+            result.variables.push(LocalVar{span : decl.span, typ : Some(decl.typ.clone()), identifier_type : decl.identifier_type})
+        }
+    
+        for (stmt, stmt_span) in &module.code {
+            match stmt {
+                Statement::Assign(to, value_expr) => {
+                    /*if let Some(to_idx) = result.synthesize_assign_to_expr(to, errors) {
+                        let value_idx = result.synthesize_expression(value_expr);
+                        result.operations.push((Operation::Copy { out: to_idx, input: value_idx }, *eq_sign_pos))
+                    }*/
+                },
+                other => {
+                    todo!();
                 }
-            },
-            other => {
-                todo!();
             }
         }
+    
+        result
     }
 
-    result
+    pub fn typecheck(&mut self, errors : &mut Vec<ParsingError<Span>>) {
+
+    }
 }

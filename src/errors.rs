@@ -111,16 +111,29 @@ pub fn error_unopened_bracket(close_pos : usize, close_typ : TokenTypeIdx, open_
     error_with_info(Span::from(close_pos), reason, vec![error_info_str(Span(open_after_pos, open_after_pos), "must be opened in scope after this")])
 }
 
+pub fn error_unexpected_token(expected : &[TokenTypeIdx], found : TokenTypeIdx, pos : usize, context : &str) -> ParsingError<Span> {
+    let expected_list_str = join_expected_list(expected);
+    error_unexpected_token_str(&expected_list_str, found, pos, context)
+}
+
+pub fn error_unexpected_token_str(expected_list_str : &str, found : TokenTypeIdx, pos : usize, context : &str) -> ParsingError<Span> {
+    let tok_typ_name = get_token_type_name(found);
+    error_basic(Span::from(pos), format!("Unexpected Token '{tok_typ_name}' while parsing {context}. Expected {expected_list_str}"))
+}
+
 pub fn error_unexpected_tree_node(expected : &[TokenTypeIdx], found : Option<&TokenTreeNode>, unexpected_eof_idx : usize, context : &str) -> ParsingError<Span> {
     let expected_list_str = join_expected_list(expected);
+    error_unexpected_tree_node_str(&expected_list_str, found, unexpected_eof_idx, context)
+}
+
+pub fn error_unexpected_tree_node_str(expected_list_str : &str, found : Option<&TokenTreeNode>, unexpected_eof_idx : usize, context : &str) -> ParsingError<Span> {
     match found {
         None => {
             error_basic(Span::from(unexpected_eof_idx), format!("Unexpected End of Scope while parsing {context}. Expected {expected_list_str}"))
-        },
+        }
         Some(TokenTreeNode::PlainToken(tok, pos)) => {
-            let tok_typ_name = get_token_type_name(tok.get_type());
-            error_basic(Span::from(*pos), format!("Unexpected Token '{tok_typ_name}' while parsing {context}. Expected {expected_list_str}"))
-        },
+            error_unexpected_token_str(expected_list_str, tok.get_type(), *pos, context)
+        }
         Some(TokenTreeNode::Block(typ, _, span)) => {
             let tok_typ_name = get_token_type_name(*typ);
             error_basic(*span, format!("Unexpected Block '{tok_typ_name}' while parsing {context}. Expected {expected_list_str}"))
