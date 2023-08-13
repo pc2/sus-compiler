@@ -32,9 +32,9 @@ pub struct IDEToken {
 }
 
 fn pretty_print_chunk_with_whitespace(whitespace_start : usize, file_text : &str, text_span : CharSpan, st : Style) { 
-    let whitespace_text = file_text.get(whitespace_start..text_span.file_pos.char_idx).unwrap();
+    let whitespace_text = &file_text[whitespace_start..text_span.file_pos.char_idx];
 
-    print!("{}{}", whitespace_text, st.apply_to(file_text.get(text_span.as_range()).unwrap()));
+    print!("{}{}", whitespace_text, st.apply_to(&file_text[text_span.as_range()]));
 }
 
 fn print_tokens(file_text : &str, token_spans : &[CharSpan]) {
@@ -47,7 +47,7 @@ fn print_tokens(file_text : &str, token_spans : &[CharSpan]) {
         whitespace_start = tok_span.end_pos();
     }
 
-    print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
+    print!("{}\n", &file_text[whitespace_start..file_text.len()]);
 }
 
 fn pretty_print(file_text : &str, token_spans : &[CharSpan], ide_infos : &[IDEToken]) {
@@ -66,7 +66,7 @@ fn pretty_print(file_text : &str, token_spans : &[CharSpan], ide_infos : &[IDETo
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Input)) => Style::new().blue().bright(),
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => Style::new().blue().dim(),
             IDETokenType::Identifier(IDEIdentifierType::Type) => Style::new().magenta().bright(),
-            IDETokenType::Identifier(IDEIdentifierType::Interface) => Style::new().magenta().dim(),
+            IDETokenType::Identifier(IDEIdentifierType::Interface) => Style::new().yellow(),
             IDETokenType::Number => Style::new().green().bright(),
             IDETokenType::Invalid | IDETokenType::InvalidBracket => Style::new().red().underlined(),
             IDETokenType::OpenBracket(depth) | IDETokenType::CloseBracket(depth) => {
@@ -79,7 +79,7 @@ fn pretty_print(file_text : &str, token_spans : &[CharSpan], ide_infos : &[IDETo
         whitespace_start = tok_span.end_pos();
     }
 
-    print!("{}\n", file_text.get(whitespace_start..file_text.len()).unwrap());
+    print!("{}\n", &file_text[whitespace_start..file_text.len()]);
 }
 
 fn add_ide_bracket_depths_recursive<'a>(result : &mut [IDEToken], current_depth : usize, token_hierarchy : &[TokenTreeNode]) {
@@ -94,22 +94,17 @@ fn add_ide_bracket_depths_recursive<'a>(result : &mut [IDEToken], current_depth 
 
 fn walk_name_color(ast : &ASTRoot, result : &mut [IDEToken]) {
     for module in &ast.modules {
-        for decl in &module.declarations {
-            decl.typ.for_each_value(&mut |_name, position| {
-                result[position].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
-            });
-            //result[decl.name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
-        }
-
-        for_each_expression_in_module(&module, &mut |expr| {
-            expr.for_each_value(&mut |name, position| {
-                result[position].typ = IDETokenType::Identifier(if let Some(l) = name.get_local() {
-                    IDEIdentifierType::Value(module.declarations[l].identifier_type)
-                } else {
-                    IDEIdentifierType::Unknown
-                });
+        module.for_each_type(&mut |_name, position| {
+            result[position].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
+        });
+        module.for_each_value(&mut |name, position| {
+            result[position].typ = IDETokenType::Identifier(if let Some(l) = name.get_local() {
+                IDEIdentifierType::Value(module.declarations[l].identifier_type)
+            } else {
+                IDEIdentifierType::Unknown
             });
         });
+        result[module.name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
     }
 }
 

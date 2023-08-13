@@ -214,24 +214,22 @@ fn is_valid_identifier_char(c : char) -> bool {
 struct FileIter<'iter> {
     char_iter : CharIndices<'iter>,
     row : usize,
-    col_starts_at : usize
+    col : usize
 }
 
 impl<'iter> FileIter<'iter> {
     fn new(text : &'iter str) -> Self {
-        Self{char_iter : text.char_indices(), row : 0, col_starts_at : 0}
+        Self{char_iter : text.char_indices(), row : 0, col : 0}
     }
 
-    // Returns number of parsed chars
-    fn iter_until_end_of_identifier(&mut self) -> (usize, Option<(FilePos, char)>) {
-        let mut parsed_chars = 0; // already include the first parsed character
+    // Returns index of last char
+    fn iter_until_end_of_identifier<'a>(&mut self, start_char_idx : usize, file_text : &'a str) -> (&'a str, Option<(FilePos, char)>) {
         for (word_i, word_char) in self {
             if !is_valid_identifier_char(word_char) {
-                return (parsed_chars, Some((word_i, word_char)));
+                return (&file_text[start_char_idx..word_i.char_idx], Some((word_i, word_char)));
             }
-            parsed_chars += 1;
         }
-        (parsed_chars, None)
+        (&file_text[start_char_idx..], None)
     }
 
     // Returns number of characters parsed
@@ -274,10 +272,12 @@ impl<'iter> Iterator for FileIter<'iter> {
     type Item = (FilePos, char);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((pos, ch)) = self.char_iter.next() {
-            let cur_pos = FilePos{char_idx : pos, row : self.row, col : pos - self.col_starts_at};
+            let cur_pos = FilePos{char_idx : pos, row : self.row, col : self.col};
             if ch == '\n' {
                 self.row += 1;
-                self.col_starts_at = pos+1;
+                self.col = 0;
+            } else {
+                self.col += 1;
             }
             Some((cur_pos, ch))
         } else {
@@ -363,11 +363,10 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult<'txt>, Vec<Pars
         }
         if is_valid_identifier_char(cur_char) {
             // Start of word
-            let (num_chars_parsed, new_cur_char) = file_char_iter.iter_until_end_of_identifier();
-            let was_end_of_file = new_cur_char.is_none();
-            let word_span = CharSpan{file_pos, length: num_chars_parsed+1}; // Already parsed the first char beforehand
+            let (word, new_cur_char) = file_char_iter.iter_until_end_of_identifier(file_pos.char_idx, file_data);
             
-            let word = file_data.get(word_span.as_range()).unwrap();
+            let word_span = CharSpan{file_pos, length: word.len()};
+            
             let mut word_chars = word.chars();
 
             if word_chars.next().unwrap().is_digit(10) {
@@ -382,20 +381,18 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult<'txt>, Vec<Pars
                 result.push_word(word, word_span, &mut unique_id_map);
             };
 
-            if was_end_of_file {
-                break;
-            }
-
             if let Some((next_pos_i, next_char)) = new_cur_char {
                 if next_char.is_whitespace() {
                     continue;
                 }
                 file_pos = next_pos_i;
+            } else {
+                break;
             }
         } // no else! Continue next character
         
         let char_file_pos = file_pos.char_idx;
-        if let Some(symbol_idx) = ALL_SYMBOLS.iter().position(|&symb| Some(symb.0) == file_data.get(char_file_pos..char_file_pos+symb.0.len())) {
+        if let Some(symbol_idx) = ALL_SYMBOLS.iter().position(|&symb| *symb.0.as_bytes() == file_data.as_bytes()[char_file_pos..char_file_pos+symb.0.len()]) {
             if ALL_SYMBOLS[symbol_idx].0.len() > 1 {
                 file_char_iter.nth(ALL_SYMBOLS[symbol_idx].0.len() - 2); // Advance iterator properly
             }

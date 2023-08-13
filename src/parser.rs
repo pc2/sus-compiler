@@ -78,7 +78,7 @@ pub fn to_token_hierarchy(tokens : &[Token]) -> (Vec<TokenTreeNode>, Vec<Parsing
     }
 
     while let Some(unclosed) = stack.pop() {
-        errors.push(error_basic_str(Span::from(unclosed.open_bracket_pos), "Bracket was not closed before EOF!"))
+        errors.push(error_basic_str(Span::from(unclosed.open_bracket_pos), "Bracket was not closed before EOF"))
     }
 
     (cur_token_slab, errors)
@@ -376,7 +376,7 @@ impl<'a> ASTParserContext<'a> {
     
     fn try_parse_type(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext) -> Option<SpanTypeExpression> {
         let (name_id, first_pos) = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
-        let mut cur_type = (TypeExpression::Named(name_id as usize), Span::from(first_pos));
+        let mut cur_type = (TypeExpression::Named(name_id), Span::from(first_pos));
         while let Some((content, block_span)) = token_stream.eat_is_block(kw("[")) {
             let mut array_index_token_stream = TokenStream::new(content, block_span.0, block_span.1);
             let expr = self.parse_expression(&mut array_index_token_stream, scope)?;
@@ -386,7 +386,7 @@ impl<'a> ASTParserContext<'a> {
         Some(cur_type)
     }
 
-    fn try_parse_declaration(&mut self, token_stream : &mut TokenStream, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext) -> Option<SpanAssignableExpression> {
+    fn try_parse_declaration(&mut self, token_stream : &mut TokenStream, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext) -> Option<(usize, Span)> {
         let identifier_type = if let Some((_info, _pos)) = token_stream.eat_is_plain(kw("state")) {
             IdentifierType::State
         } else {
@@ -395,8 +395,8 @@ impl<'a> ASTParserContext<'a> {
         
         let typ = self.try_parse_type(token_stream, scope)?;
         let (name_idx, position) = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
-        let local_id = self.add_declaration(typ, IdentifierToken{name_idx, position}, identifier_type, declarations, scope);
-        Some((Expression::Named(IdentifierIdx::new_local(local_id)), Span::from(position)))
+        let local_idx = self.add_declaration(typ, IdentifierToken{name_idx, position}, identifier_type, declarations, scope);
+        Some((local_idx, Span::from(position)))
     }
 
     fn parse_bundle(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext) {
@@ -443,10 +443,10 @@ impl<'a> ASTParserContext<'a> {
 
             let mut tok_stream_copy = token_stream.clone();
             
-            if let Some(name) = self.try_parse_declaration(&mut tok_stream_copy, declarations, scope) {
+            if let Some((name, span)) = self.try_parse_declaration(&mut tok_stream_copy, declarations, scope) {
                 // Maybe it's a declaration?
                 *token_stream = tok_stream_copy;
-                left_expressions.push((name, reg_count));
+                left_expressions.push(((Expression::Named(IdentifierIdx::new_local(name)), span), reg_count));
 
             } else if let Some(sp_expr) = self.parse_expression(token_stream, scope) {
                 // It's an expression instead!
@@ -481,12 +481,34 @@ impl<'a> ASTParserContext<'a> {
         }
     }
 
+    fn convert_expression_to_assignable_expression(&mut self, (expr, span) : SpanExpression, num_regs : usize) -> Option<SpanAssignableExpression> {
+        match expr {
+            Expression::Named(n) => {
+                if let Some(local_idx) = n.get_local() {
+                    Some((AssignableExpression::Named{local_idx, num_regs}, span))
+                } else {
+                    self.errors.push(error_basic_str(span, "Can only assign to local variables"));
+                    None
+                }
+            },
+            Expression::Array(b) => {
+                let (arr, idx) = *b;
+                let assignable_arr = self.convert_expression_to_assignable_expression(arr, num_regs)?;
+                Some((AssignableExpression::ArrayIndex(Box::new((assignable_arr, idx))), span))
+            },
+            Expression::Constant(_) => {self.errors.push(error_basic_str(span, "Cannot assign to constant")); None},
+            Expression::UnaryOp(_) => {self.errors.push(error_basic_str(span, "Cannot assign to the result of an operator")); None},
+            Expression::BinOp(_) => {self.errors.push(error_basic_str(span, "Cannot assign to the result of an operator")); None},
+            Expression::FuncCall(_) => {self.errors.push(error_basic_str(span, "Cannot assign to function call")); None},
+        }
+    }
+
     fn parse_statement_handle_equals(&mut self, left_expressions: Vec<(SpanExpression, usize)>, assign_pos: &usize, token_stream: &mut TokenStream<'_>, scope: &mut LocalVariableContext<'_>, statements: &mut Vec<(Statement, Span)>, start_at: usize) -> Option<()> {
         if left_expressions.len() == 0 {
             self.errors.push(error_unexpected_token(&[TOKEN_IDENTIFIER], kw("="), *assign_pos, "statement"));
             None
         } else if let Some(value) = self.parse_expression(token_stream, scope) {
-            let converted_left : Vec<SpanExpression> = left_expressions.into_iter().map(|(expr, reg_count)| expr).collect();
+            let converted_left : Vec<SpanAssignableExpression> = left_expressions.into_iter().filter_map(&mut |(expr, reg_count)| self.convert_expression_to_assignable_expression(expr, reg_count)).collect();
             let end_at = value.1.1;
             statements.push((Statement::Assign(converted_left, value), Span(start_at, end_at)));
             self.eat_plain(token_stream, kw(";"), "right-hand side of expression")?;

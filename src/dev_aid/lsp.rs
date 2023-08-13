@@ -142,12 +142,13 @@ fn get_semantic_token_type_from_ide_token(tok : &IDEToken) -> u32 {
         IDETokenType::Comment => 0,
         IDETokenType::Keyword => 1,
         IDETokenType::Operator => 2,
-        IDETokenType::TimelineStage => 7,// EVENT seems to get a good colour
+        IDETokenType::TimelineStage => 8,// EVENT seems to get a good colour
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Input)) => 4,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => 4,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 3,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Local)) => 3,
         IDETokenType::Identifier(IDEIdentifierType::Unknown) => 2, // make it 'OPERATOR'?
+        IDETokenType::Identifier(IDEIdentifierType::Interface) => 7, // FUNCTION
         IDETokenType::Identifier(_) => 5, // All others are 'TYPE'
         IDETokenType::Number => 6,
         IDETokenType::Invalid => 2, // make it 'OPERATOR'?
@@ -202,38 +203,36 @@ fn do_syntax_highlight(file_data : &LoadedFile, full_parse : &FullParseResult) -
 
     for (idx, tok) in ide_tokens.iter().enumerate() {
         let tok_file_pos = full_parse.tokens.token_spans[idx];
+        let token_text = &file_text[tok_file_pos.as_range()];
+        let char_iter = token_text.chars();
 
         let typ = get_semantic_token_type_from_ide_token(tok);
         let mod_bits = get_modifiers_for_token(tok);
         if tok.typ == IDETokenType::Comment {
             // Comments can be multiline, editor doesn't support this. Have to split them up myself. Eurgh
-            let mut comment_piece_start = tok_file_pos.file_pos.char_idx;
-            let mut char_iter = file_text.char_indices();
+            let mut line_char_offset = 0;
             let mut line = tok_file_pos.file_pos.row;
             let mut col = tok_file_pos.file_pos.col;
-            char_iter.nth(tok_file_pos.file_pos.char_idx);
-            for _pos in 0..tok_file_pos.length {
-                if let Some((idx, c)) = char_iter.next() {
-                    if c == '\n' {
-                        semantic_tokens_acc.push(line, col, idx - comment_piece_start, typ, mod_bits);
+            let mut length_in_chars : usize = 0;
+            for (idx, c) in char_iter.enumerate() {
+                length_in_chars += 1;
+                if c == '\n' {
+                    semantic_tokens_acc.push(line, col, idx - line_char_offset, typ, mod_bits);
 
-                        comment_piece_start = idx + 1;
-                        line += 1;
-                        col = 0;
-                    }
-                } else {
-                    break;
+                    line_char_offset = idx + 1;
+                    line += 1;
+                    col = 0;
                 }
             }
-            let leftover_length = tok_file_pos.file_pos.char_idx + tok_file_pos.length - comment_piece_start;
+            let leftover_length = length_in_chars - line_char_offset;
             if leftover_length > 0 {
                 semantic_tokens_acc.push(line, col, leftover_length, typ, mod_bits);
             }
         } else {
-            semantic_tokens_acc.push(tok_file_pos.file_pos.row, tok_file_pos.file_pos.col, tok_file_pos.length, typ, mod_bits);
+            semantic_tokens_acc.push(tok_file_pos.file_pos.row, tok_file_pos.file_pos.col, char_iter.count(), typ, mod_bits);
         }
 
-        //println!("{}: typ={typ} {delta_line}:{delta_col}", file_text.get(tok_file_pos.as_range()).unwrap());
+        //println!("{}: typ={typ} {delta_line}:{delta_col}", file_text[tok_file_pos.as_range()]);
     }
 
     SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
@@ -246,15 +245,15 @@ use lsp_types::Diagnostic;
 
 fn cvt_char_span_to_lsp_range(ch_sp : CharSpan, file_text : &str) -> lsp_types::Range {
     let mut last_char_line = ch_sp.file_pos.row;
-    let mut last_newline_idx = ch_sp.file_pos.char_idx - ch_sp.file_pos.col;
-    let last_char_idx = ch_sp.file_pos.char_idx+ch_sp.length;
-    for (i, c) in file_text.get(ch_sp.file_pos.char_idx..last_char_idx).unwrap().char_indices() {
+    let mut last_char_col = ch_sp.file_pos.col;
+    for c in file_text[ch_sp.file_pos.char_idx..ch_sp.file_pos.char_idx + ch_sp.length].chars() {
         if c == '\n' {
             last_char_line += 1;
-            last_newline_idx = i;
+            last_char_col = 0;
+        } else {
+            last_char_col += 1;
         }
     }
-    let last_char_col = last_char_idx - last_newline_idx;
     Range{
         start : Position{
             line : ch_sp.file_pos.row as u32,

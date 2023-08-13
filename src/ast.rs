@@ -1,7 +1,7 @@
 
 use num_bigint::BigUint;
 
-use crate::{tokenizer::{TokenTypeIdx, TokenExtraInfo}, errors::{ParsingError, error_basic_str}};
+use crate::tokenizer::{TokenTypeIdx, TokenExtraInfo};
 use core::ops::Range;
 
 use std::collections::HashMap;
@@ -20,16 +20,16 @@ impl Span {
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub struct FilePos {
-    pub char_idx : usize,
+    pub char_idx : usize, // Byte index
     pub row : usize,
-    pub col : usize
+    pub col : usize // Char index
 }
 
 // Char span, for chars in file. start is INCLUSIVE, end is EXCLUSIVE. It's a bit weird to make the distinction, but it works out
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub struct CharSpan{
     pub file_pos : FilePos,
-    pub length : usize
+    pub length : usize // in bytes. Can just do file_text[file_pos.char_idx .. file_pos.char_idx = length]
 }
 
 
@@ -113,7 +113,7 @@ pub struct IdentifierToken {
 
 #[derive(Debug, Clone)]
 pub enum TypeExpression {
-    Named(usize),
+    Named(u64),
     Array(Box<(SpanTypeExpression, SpanExpression)>)
 }
 
@@ -155,9 +155,14 @@ impl Expression {
     }
 }
 pub type SpanExpression = (Expression, Span);
+pub type SpanAssignableExpression = (AssignableExpression, Span);
 pub type SpanStatement = (Statement, Span);
 
-pub type SpanAssignableExpression = SpanExpression;
+#[derive(Debug)]
+pub enum AssignableExpression {
+    Named{local_idx : usize, num_regs : usize},
+    ArrayIndex(Box<(SpanAssignableExpression, SpanExpression)>)
+}
 
 #[derive(Debug)]
 pub enum Statement {
@@ -181,6 +186,7 @@ pub struct ASTRoot {
 
 pub trait IterIdentifiers {
     fn for_each_value<F>(&self, func : &mut F) where F : FnMut(IdentifierIdx, usize) -> ();
+    fn for_each_type<F>(&self, func : &mut F) where F : FnMut(TokenExtraInfo, usize) -> ();
 }
 
 impl IterIdentifiers for SpanExpression {
@@ -213,6 +219,25 @@ impl IterIdentifiers for SpanExpression {
             }
         }
     }
+    fn for_each_type<F>(&self, _func : &mut F) where F : FnMut(TokenExtraInfo, usize) -> () {}
+}
+
+impl IterIdentifiers for SpanAssignableExpression {
+    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(IdentifierIdx, usize) -> () {
+        let (expr, span) = self;
+        match expr {
+            AssignableExpression::Named{local_idx: id, num_regs : _} => {
+                assert!(span.0 == span.1);
+                func(IdentifierIdx::new_local(*id), span.0)
+            }
+            AssignableExpression::ArrayIndex(b) => {
+                let (array, idx) = &**b;
+                array.for_each_value(func);
+                idx.for_each_value(func);
+            }
+        }
+    }
+    fn for_each_type<F>(&self, _func : &mut F) where F : FnMut(TokenExtraInfo, usize) -> () {}
 }
 
 impl IterIdentifiers for SpanTypeExpression {
@@ -229,34 +254,52 @@ impl IterIdentifiers for SpanTypeExpression {
             }
         }
     }
+    fn for_each_type<F>(&self, func : &mut F) where F : FnMut(TokenExtraInfo, usize) -> () {
+        let (typ, span) = self;
+        match typ {
+            TypeExpression::Named(n) => {
+                func(*n, span.1)
+            }
+            TypeExpression::Array(b) => {
+                let (arr_typ, arr_size) = &**b;
+                arr_typ.for_each_type(func);
+                arr_size.for_each_type(func);
+            }
+        }
+    }
 }
 
-pub fn for_each_expression_in_block<F>(block : &Vec<SpanStatement>, func : &mut F) where F: FnMut(&SpanExpression) {
+pub fn for_each_assign_in_block<F>(block : &Vec<SpanStatement>, func : &mut F) where F: FnMut(&Vec<SpanAssignableExpression>, &SpanExpression) {
     for (stmt, _span) in block {
         match stmt {
             Statement::Assign(to, v) => {
-                for t in to {
-                    func(t);
-                }
-                func(v);
+                func(to, v);
             },
             Statement::Block(b) => {
-                for_each_expression_in_block(b, func);
+                for_each_assign_in_block(b, func);
             },
             _other => {}
         }
     }
 }
 
-pub fn for_each_expression_in_module<F>(m : &Module, func : &mut F) where F : FnMut(&SpanExpression) {
-    for (idx, d) in m.declarations.iter().enumerate() {
-        /*if d.identifier_type != IdentifierType::Input && d.identifier_type != IdentifierType::Output {
-            break;
-        }*/ // Allow potential duplicates for locals
-        let local_expr = (Expression::Named(IdentifierIdx::new_local(idx)), Span::from(d.span.1));
-        func(&local_expr);
+impl IterIdentifiers for Module {
+    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(IdentifierIdx, usize) -> () {
+        for (pos, decl) in self.declarations.iter().enumerate() {
+            func(IdentifierIdx::new_local(pos), decl.span.1);
+        }
+        for_each_assign_in_block(&self.code, &mut |to, v| {
+            for assign_to in to {
+                assign_to.for_each_value(func);
+            }
+            v.for_each_value(func);
+        });
     }
-    for_each_expression_in_block(&m.code, func);
+    fn for_each_type<F>(&self, func : &mut F) where F : FnMut(TokenExtraInfo, usize) -> () {
+        for decl in &self.declarations {
+            decl.typ.for_each_type(func);
+        }
+    }
 }
 
 pub struct GlobalContext {
@@ -265,15 +308,6 @@ pub struct GlobalContext {
 }
 
 impl GlobalContext {
-    pub fn parse_to_type((expr, span) : &SpanExpression, errors : &mut Vec<ParsingError<Span>>) -> Option<TypeExpression> {
-        match expr {
-            Expression::Named(idx) => {todo!();},
-            Expression::Array(args) => {todo!();},
-            other => {
-                errors.push(error_basic_str(*span, "Unexpected part"));
-                return None
-            }
-        }
-    }
+    
 }
 
