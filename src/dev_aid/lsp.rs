@@ -31,7 +31,11 @@ macro_rules! println {
         })
     }};
 }
-
+/*macro_rules! println {
+    ($($arg:tt)*) => {{
+        eprintln!($($arg)*);
+    }};
+}*/
 
 struct LoadedFile {
     file_text : String
@@ -246,7 +250,7 @@ use lsp_types::Diagnostic;
 fn cvt_char_span_to_lsp_range(ch_sp : CharSpan, file_text : &str) -> lsp_types::Range {
     let mut last_char_line = ch_sp.file_pos.row;
     let mut last_char_col = ch_sp.file_pos.col;
-    for c in file_text[ch_sp.file_pos.char_idx..ch_sp.file_pos.char_idx + ch_sp.length].chars() {
+    for c in file_text[ch_sp.as_range()].chars() {
         if c == '\n' {
             last_char_line += 1;
             last_char_col = 0;

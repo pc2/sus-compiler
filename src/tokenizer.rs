@@ -233,29 +233,24 @@ impl<'iter> FileIter<'iter> {
     }
 
     // Returns number of characters parsed
-    fn iter_until_end(&mut self, end : char) -> usize {
-        let mut parsed_chars = 0; // already include the first parsed character
-        for (_, word_char) in self {
-            parsed_chars += 1;
-            if word_char == end {
-                return parsed_chars;
+    fn iter_until_end(&mut self, end : char) -> Option<usize> {
+        for (newline_pos, newline_char) in self {
+            if newline_char == end {
+                return Some(newline_pos.char_idx);
             }
         }
-        parsed_chars
+        None
     }
 
     // Returns number of characters parsed
-    fn iter_until_comment_end(&mut self) -> usize {
-        let mut parsed_chars = 0;
+    fn iter_until_comment_end(&mut self) -> Option<usize> {
         while let Some((_, comment_char)) = self.next() {
-            parsed_chars += 1;
             if comment_char == '*' {
                 // end of single line comment
-                while let Some((_, comment_char_2)) = self.next() {
-                    parsed_chars += 1;
+                while let Some((end_pos, comment_char_2)) = self.next() {
                     if comment_char_2 == '/' {
                         // End of comment
-                        return parsed_chars;
+                        return Some(end_pos.char_idx + '/'.len_utf8());
                     } else if comment_char_2 == '*' {
                         continue;
                     } else {
@@ -264,7 +259,7 @@ impl<'iter> FileIter<'iter> {
                 }
             }
         }
-        return parsed_chars
+        None
     }
 }
 
@@ -392,31 +387,43 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult<'txt>, Vec<Pars
         } // no else! Continue next character
         
         let char_file_pos = file_pos.char_idx;
-        if let Some(symbol_idx) = ALL_SYMBOLS.iter().position(|&symb| *symb.0.as_bytes() == file_data.as_bytes()[char_file_pos..char_file_pos+symb.0.len()]) {
-            if ALL_SYMBOLS[symbol_idx].0.len() > 1 {
-                file_char_iter.nth(ALL_SYMBOLS[symbol_idx].0.len() - 2); // Advance iterator properly
+        if let Some(symbol_idx) = ALL_SYMBOLS.iter().position(
+            // Have to do .as_bytes here so we don't get the exception that we're cutting a character in half
+            |&symb| *symb.0.as_bytes() == file_data.as_bytes()[char_file_pos..char_file_pos+symb.0.len()]
+        ) {
+            let symbol_text : &'static str = ALL_SYMBOLS[symbol_idx].0;
+            if symbol_text.len() > 1 {
+                file_char_iter.nth(symbol_text.len() - 2); // Advance iterator properly
             }
             let symbol_tok_id = (symbol_idx + ALL_KEYWORDS.len()) as TokenTypeIdx;
             if symbol_tok_id == kw("//") {
                 // Open single line comment
-                let comment_length = file_char_iter.iter_until_end('\n');
-                result.push(TOKEN_COMMENT, CharSpan{file_pos, length: comment_length + 2});// Add 2 because comment starts with "//"
+                let comment_str = if let Some(comment_end_idx) = file_char_iter.iter_until_end('\n') {
+                    &file_data[file_pos.char_idx..comment_end_idx]
+                } else {
+                    &file_data[file_pos.char_idx..]
+                };
+                result.push(TOKEN_COMMENT, CharSpan{file_pos, length: comment_str.len()});
 
             } else if symbol_tok_id == kw("/*") {
                 // Open single multi-line comment
-                let comment_length = file_char_iter.iter_until_comment_end();
-                result.push(TOKEN_COMMENT, CharSpan{file_pos, length: comment_length+2}); // Add 2 because comment starts with "/*"
+                let comment_str = if let Some(comment_end_idx) = file_char_iter.iter_until_comment_end() {
+                    &file_data[file_pos.char_idx..comment_end_idx]
+                } else {
+                    &file_data[file_pos.char_idx..]
+                };
+                result.push(TOKEN_COMMENT, CharSpan{file_pos, length: comment_str.len()});
                 
             } else if symbol_tok_id == kw("*/") {
                 // Unexpected close comment
                 errors.push(error_basic_str(CharSpan{file_pos, length: 2}, "Unexpected comment closer when not in comment"));
             } else {
-                let symbol_text_span = CharSpan{file_pos, length: ALL_SYMBOLS[symbol_idx].0.len()};
+                let symbol_text_span = CharSpan{file_pos, length: symbol_text.len()};
                 
                 result.push(symbol_tok_id, symbol_text_span);
             }
         } else { // Symbol not found!
-            errors.push(error_basic_str(CharSpan{file_pos, length: 1}, "Unexpected character"));
+            errors.push(error_basic_str(CharSpan{file_pos, length: cur_char.len_utf8()}, "Unexpected character"));
         }
     }
 

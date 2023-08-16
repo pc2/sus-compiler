@@ -36,6 +36,7 @@ module parallel_mul_add_att : int a, int b -> int p, int q {
 	q = b3 + b;
 	@ //?
 }
+
 module parallel_mul_add_reg : int a, int b -> int p, int q {
     reg int a2 = a * a;
 	reg int a3 = a * a2 + 3;
@@ -45,16 +46,20 @@ module parallel_mul_add_reg : int a, int b -> int p, int q {
 	reg int b3 = b + b2;
 	reg q = b + b3;
 
-
+	// UTF-8 Characters support
+	Lööwe 老虎;
 }
 
 /* a module to test the syntax */
 module MultiplyAdd : i32 a, i32 b, i32 c -> i32 result {
-	//module beelqzd 
 	// temporary variable
 	i32 tmp = a * b;
 	result = tmp + cooo * 30 + 5;
 	array_subscript = tmp;
+	{
+		//[
+		beep boop;
+	}
 	@
 	int[5] myVar;
 	myVar[0] = 0;
@@ -63,12 +68,6 @@ module MultiplyAdd : i32 a, i32 b, i32 c -> i32 result {
 	myVar[3] = 3;
 	myVar[4] = 4;
 	@
-	{
-		//[
-		beep boop;
-	}
-
-	Lööwe 老虎  Léopard;
 }
 
 module beep : i32 a {
