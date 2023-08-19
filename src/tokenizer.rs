@@ -292,10 +292,6 @@ pub struct TokenizerResult<'a> {
 const KEYWORD_CUTOFF : TokenExtraInfo = TokenExtraInfo::MAX - ALL_KEYWORDS.len() as TokenExtraInfo;
 
 impl<'a> TokenizerResult<'a> {
-    
-}
-
-impl<'a> TokenizerResult<'a> {
     pub fn push(&mut self, typ : TokenTypeIdx, span : CharSpan) {
         self.tokens.push(Token{typ, info : NO_TOKEN_INFO});
         self.token_spans.push(span);
@@ -367,7 +363,7 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult<'txt>, Vec<Pars
             if word_chars.next().unwrap().is_digit(10) {
                 // It's a number
                 if word_chars.find(|v| !v.is_digit(10)).is_some() {
-                    errors.push(error_basic_str(word_span, "Unexpected letter within number"));
+                    errors.push(error_basic(word_span, "Unexpected letter within number"));
                     result.push(TOKEN_INVALID, word_span);
                 } else {
                     result.push_number(word, word_span);
@@ -416,14 +412,14 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult<'txt>, Vec<Pars
                 
             } else if symbol_tok_id == kw("*/") {
                 // Unexpected close comment
-                errors.push(error_basic_str(CharSpan{file_pos, length: 2}, "Unexpected comment closer when not in comment"));
+                errors.push(error_basic(CharSpan{file_pos, length: 2}, "Unexpected comment closer when not in comment"));
             } else {
                 let symbol_text_span = CharSpan{file_pos, length: symbol_text.len()};
                 
                 result.push(symbol_tok_id, symbol_text_span);
             }
         } else { // Symbol not found!
-            errors.push(error_basic_str(CharSpan{file_pos, length: cur_char.len_utf8()}, "Unexpected character"));
+            errors.push(error_basic(CharSpan{file_pos, length: cur_char.len_utf8()}, "Unexpected character"));
         }
     }
 

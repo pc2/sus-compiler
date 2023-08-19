@@ -1,7 +1,7 @@
 
 use num_bigint::BigUint;
 
-use crate::{tokenizer::*, errors::*, ast::*};
+use crate::{tokenizer::*, errors::*, ast::*, global_context::GlobalContext};
 
 use std::iter::Peekable;
 use core::slice::Iter;
@@ -26,16 +26,26 @@ impl TokenTreeNode {
     }
 }
 
+
+fn error_unclosed_bracket(open_pos : usize, open_typ : TokenTypeIdx, close_before_pos : usize) -> ParsingError<Span> {
+    let open_name = get_token_type_name(open_typ);
+    let reason = format!("Unclosed bracket {open_name}");
+    error_with_info(Span::from(open_pos), reason, vec![error_info(Span(close_before_pos, close_before_pos), "must be closed before this")])
+}
+fn error_unopened_bracket(close_pos : usize, close_typ : TokenTypeIdx, open_after_pos : usize) -> ParsingError<Span> {
+    let close_name = get_token_type_name(close_typ);
+    let reason = format!("Unopened bracket. Closing bracket {close_name} found but was not opened.");
+    error_with_info(Span::from(close_pos), reason, vec![error_info(Span(open_after_pos, open_after_pos), "must be opened in scope after this")])
+}
 struct TokenHierarchyStackElem {
     open_bracket : TokenTypeIdx, 
     open_bracket_pos : usize,
     parent : Vec<TokenTreeNode>
 }
 
-pub fn to_token_hierarchy(tokens : &[Token]) -> (Vec<TokenTreeNode>, Vec<ParsingError<Span>>) {
+pub fn to_token_hierarchy(tokens : &[Token], global : &mut GlobalContext) -> Vec<TokenTreeNode> {
     let mut cur_token_slab : Vec<TokenTreeNode> = Vec::new();
     let mut stack : Vec<TokenHierarchyStackElem> = Vec::new(); // Type of opening bracket, token position, Token Subtree
-    let mut errors : Vec<ParsingError<Span>> = Vec::new();
 
     for (idx, &tok) in tokens.iter().enumerate() {
         let tok_typ = tok.get_type();
@@ -57,16 +67,16 @@ pub fn to_token_hierarchy(tokens : &[Token]) -> (Vec<TokenTreeNode>, Vec<Parsing
                             break;
                         } else {
                             if !stack.iter().any(|prev_bracket| closes(prev_bracket.open_bracket, tok_typ)) { // Any bracket in the stack closes this?
-                                errors.push(error_unopened_bracket(idx, tok_typ, cur_block.open_bracket_pos));
+                                global.error(error_unopened_bracket(idx, tok_typ, cur_block.open_bracket_pos));
                                 stack.push(cur_block); // Push the previous bracket back onto bracket stack, as we disregarded erroneous closing bracket
                                 break;
                             } else {
-                                errors.push(error_unclosed_bracket(cur_block.open_bracket_pos, tokens[cur_block.open_bracket_pos].get_type(), idx));
+                                global.error(error_unclosed_bracket(cur_block.open_bracket_pos, tokens[cur_block.open_bracket_pos].get_type(), idx));
                             }
                         }
                     } else {
                         // Too many close brackets
-                        errors.push(error_basic_str(Span::from(idx), "A close bracket had no corresponding opening bracket."));
+                        global.error_basic(Span::from(idx), "A close bracket had no corresponding opening bracket.");
                         break;
                     }
                 }
@@ -78,10 +88,10 @@ pub fn to_token_hierarchy(tokens : &[Token]) -> (Vec<TokenTreeNode>, Vec<Parsing
     }
 
     while let Some(unclosed) = stack.pop() {
-        errors.push(error_basic_str(Span::from(unclosed.open_bracket_pos), "Bracket was not closed before EOF"))
+        global.error_basic(Span::from(unclosed.open_bracket_pos), "Bracket was not closed before EOF")
     }
 
-    (cur_token_slab, errors)
+    cur_token_slab
 }
 
 struct LocalVariableContext<'prev> {
@@ -190,12 +200,43 @@ impl<'it> TokenStream<'it> {
     }
 }
 
-struct ASTParserContext<'a> {
-    errors : Vec<ParsingError<Span>>,
-    numbers : &'a [BigUint]
+struct ASTParserContext<'nums, 'g, 'g2> {
+    global : &'g mut GlobalContext<'g2>,
+    numbers : &'nums [BigUint]
 }
 
-impl<'a> ASTParserContext<'a> {
+impl<'nums, 'g, 'g2> ASTParserContext<'nums, 'g, 'g2> {
+    fn error_unexpected_token(&mut self, expected : &[TokenTypeIdx], found : TokenTypeIdx, pos : usize, context : &str) {
+        let expected_list_str = join_expected_list(expected);
+        self.error_unexpected_token_str(&expected_list_str, found, pos, context);
+    }
+    
+    fn error_unexpected_token_str(&mut self, expected_list_str : &str, found : TokenTypeIdx, pos : usize, context : &str) {
+        let tok_typ_name = get_token_type_name(found);
+        self.global.error_basic(Span::from(pos), format!("Unexpected Token '{tok_typ_name}' while parsing {context}. Expected {expected_list_str}"));
+    }
+    
+    fn error_unexpected_tree_node(&mut self, expected : &[TokenTypeIdx], found : Option<&TokenTreeNode>, unexpected_eof_idx : usize, context : &str) {
+        let expected_list_str = join_expected_list(expected);
+        self.error_unexpected_tree_node_str(&expected_list_str, found, unexpected_eof_idx, context);
+    }
+    
+    fn error_unexpected_tree_node_str(&mut self, expected_list_str : &str, found : Option<&TokenTreeNode>, unexpected_eof_idx : usize, context : &str) {
+        match found {
+            None => {
+                self.global.error_basic(Span::from(unexpected_eof_idx), format!("Unexpected End of Scope while parsing {context}. Expected {expected_list_str}"))
+            }
+            Some(TokenTreeNode::PlainToken(tok, pos)) => {
+                self.error_unexpected_token_str(expected_list_str, tok.get_type(), *pos, context);
+            }
+            Some(TokenTreeNode::Block(typ, _, span)) => {
+                let tok_typ_name = get_token_type_name(*typ);
+                self.global.error_basic(*span, format!("Unexpected Block '{tok_typ_name}' while parsing {context}. Expected {expected_list_str}"))
+            }
+        }
+    }
+
+
     fn eat_plain_internal(&mut self, token_stream : &mut TokenStream, expected : TokenTypeIdx, context : &str) -> Option<(usize, TokenExtraInfo)> {
         assert!(is_bracket(expected) == IsBracket::NotABracket);
         
@@ -206,7 +247,7 @@ impl<'a> ASTParserContext<'a> {
                 Some((*idx, tok.get_info()))
             },
             other => {
-                self.errors.push(error_unexpected_tree_node(&[expected], other, token_stream.unexpected_eof_token, context));
+                self.error_unexpected_tree_node(&[expected], other, token_stream.unexpected_eof_token, context);
                 None
             }
         }
@@ -228,7 +269,7 @@ impl<'a> ASTParserContext<'a> {
                 Some((contents, *span))
             },
             other => {
-                self.errors.push(error_unexpected_tree_node(&[expected_block_opener], other, token_stream.unexpected_eof_token, context));
+                self.error_unexpected_tree_node(&[expected_block_opener], other, token_stream.unexpected_eof_token, context);
                 None
             }
         }
@@ -242,7 +283,7 @@ impl<'a> ASTParserContext<'a> {
                 bad_tokens_span.1 = tok.get_span().1;
             }
 
-            self.errors.push(error_basic(bad_tokens_span, format!("More tokens found than expected while parsing {context}")))
+            self.global.error_basic(bad_tokens_span, format!("More tokens found than expected while parsing {context}"))
         }
     }
 
@@ -252,9 +293,9 @@ impl<'a> ASTParserContext<'a> {
         let decl_id = declarations.len();
         declarations.push(decl);
         if let Err(conflict) = scope.add_declaration(name.name_idx, decl_id) {
-            self.errors.push(error_with_info(span, format!("This name was already declared previously"), vec![
-                error_info_str(declarations[conflict].span, "Previous declaration")
-            ]));
+            self.global.error_with_info(span, format!("This name was already declared previously"), [
+                error_info(declarations[conflict].span, "Previous declaration")
+            ]);
         }
         decl_id
     }
@@ -289,11 +330,11 @@ impl<'a> ASTParserContext<'a> {
                 if let Some(result) = self.parse_expression(&mut content_token_stream, scope) {
                     if let Some(erroneous_found_token) = content_token_stream.peek() {
                         // The expression should cover the whole brackets! 
-                        let infos = vec![
-                            error_info_str(*span, "Expression should have ended with this scope"),
-                            error_info_str(result.1, "But actually only stretches this far"),
+                        let infos = [
+                            error_info(*span, "Expression should have ended with this scope"),
+                            error_info(result.1, "But actually only stretches this far"),
                         ];
-                        self.errors.push(error_with_info(erroneous_found_token.get_span(), "The expression should have ended at the end of the () brackets. But instead it ended here.".to_owned(), infos));
+                        self.global.error_with_info(erroneous_found_token.get_span(), "The expression should have ended at the end of the () brackets. But instead it ended here.".to_owned(), infos);
                         return None
                     } else {
                         result
@@ -303,7 +344,7 @@ impl<'a> ASTParserContext<'a> {
                 }
             }
             other => {
-                self.errors.push(error_unexpected_tree_node(&[TOKEN_IDENTIFIER, TOKEN_NUMBER, kw("(")], other, token_stream.unexpected_eof_token, "unit expression"));
+                self.error_unexpected_tree_node(&[TOKEN_IDENTIFIER, TOKEN_NUMBER, kw("(")], other, token_stream.unexpected_eof_token, "unit expression");
                 return None;
             }
         };
@@ -474,7 +515,7 @@ impl<'a> ASTParserContext<'a> {
                     return self.parse_statement_handle_end(left_expressions, all_decls, statements);
                 }
                 other => {
-                    self.errors.push(error_unexpected_tree_node(&[kw(";"), kw("="), kw(",")], other, token_stream.unexpected_eof_token, "statement"));
+                    self.error_unexpected_tree_node(&[kw(";"), kw("="), kw(",")], other, token_stream.unexpected_eof_token, "statement");
                     return None
                 }
             }
@@ -487,7 +528,7 @@ impl<'a> ASTParserContext<'a> {
                 if let Some(local_idx) = n.get_local() {
                     Some((AssignableExpression::Named{local_idx, num_regs}, span))
                 } else {
-                    self.errors.push(error_basic_str(span, "Can only assign to local variables"));
+                    self.global.error_basic(span, "Can only assign to local variables");
                     None
                 }
             },
@@ -496,16 +537,16 @@ impl<'a> ASTParserContext<'a> {
                 let assignable_arr = self.convert_expression_to_assignable_expression(arr, num_regs)?;
                 Some((AssignableExpression::ArrayIndex(Box::new((assignable_arr, idx))), span))
             },
-            Expression::Constant(_) => {self.errors.push(error_basic_str(span, "Cannot assign to constant")); None},
-            Expression::UnaryOp(_) => {self.errors.push(error_basic_str(span, "Cannot assign to the result of an operator")); None},
-            Expression::BinOp(_) => {self.errors.push(error_basic_str(span, "Cannot assign to the result of an operator")); None},
-            Expression::FuncCall(_) => {self.errors.push(error_basic_str(span, "Cannot assign to function call")); None},
+            Expression::Constant(_) => {self.global.error_basic(span, "Cannot assign to constant"); None},
+            Expression::UnaryOp(_) => {self.global.error_basic(span, "Cannot assign to the result of an operator"); None},
+            Expression::BinOp(_) => {self.global.error_basic(span, "Cannot assign to the result of an operator"); None},
+            Expression::FuncCall(_) => {self.global.error_basic(span, "Cannot assign to function call"); None},
         }
     }
 
     fn parse_statement_handle_equals(&mut self, left_expressions: Vec<(SpanExpression, usize)>, assign_pos: &usize, token_stream: &mut TokenStream<'_>, scope: &mut LocalVariableContext<'_>, statements: &mut Vec<(Statement, Span)>, start_at: usize) -> Option<()> {
         if left_expressions.len() == 0 {
-            self.errors.push(error_unexpected_token(&[TOKEN_IDENTIFIER], kw("="), *assign_pos, "statement"));
+            self.error_unexpected_token(&[TOKEN_IDENTIFIER], kw("="), *assign_pos, "statement");
             None
         } else if let Some(value) = self.parse_expression(token_stream, scope) {
             let converted_left : Vec<SpanAssignableExpression> = left_expressions.into_iter().filter_map(&mut |(expr, reg_count)| self.convert_expression_to_assignable_expression(expr, reg_count)).collect();
@@ -537,7 +578,7 @@ impl<'a> ASTParserContext<'a> {
                 return None;
             }
         } else {
-            self.errors.push(error_basic_str(Span(left_expressions[1].0.1.0, left_expressions[left_expressions.len()-1].0.1.1), "Multiple declarations are only allowed in function call syntax: int a, int b = f(x);"));
+            self.global.error_basic(Span(left_expressions[1].0.1.0, left_expressions[left_expressions.len()-1].0.1.1), "Multiple declarations are only allowed in function call syntax: int a, int b = f(x);");
             return None;
         }
     }
@@ -599,7 +640,7 @@ impl<'a> ASTParserContext<'a> {
                     }
                 },
                 other => {
-                    self.errors.push(error_unexpected_tree_node(&[kw("module")], Some(other), outer_token_iter.unexpected_eof_token, "file scope"))
+                    self.error_unexpected_tree_node(&[kw("module")], Some(other), outer_token_iter.unexpected_eof_token, "file scope");
                 }
             }
         }
@@ -608,12 +649,10 @@ impl<'a> ASTParserContext<'a> {
     }
 }
 
-pub fn parse<'a>(token_hierarchy : &Vec<TokenTreeNode>, num_tokens : usize, numbers : &Vec<BigUint>) -> (ASTRoot, Vec<ParsingError<Span>>) {
-    let mut context = ASTParserContext{errors : Vec::new(), numbers};
+pub fn parse<'nums, 'g, 'g2>(token_hierarchy : &Vec<TokenTreeNode>, num_tokens : usize, numbers : &'nums Vec<BigUint>, global : &'g mut GlobalContext<'g2>) -> ASTRoot {
+    let mut context = ASTParserContext{global, numbers};
     let mut token_stream = TokenStream::new(&token_hierarchy, 0, num_tokens);
-    let ast_root = context.parse_ast(&mut token_stream);
-    
-    (ast_root, context.errors)
+    context.parse_ast(&mut token_stream)
 }
 
 
@@ -625,21 +664,18 @@ pub struct FullParseResult<'txt> {
 }
 
 pub fn perform_full_semantic_parse<'txt>(file_text : &'txt str) -> (FullParseResult<'txt>, Vec<ParsingError<CharSpan>>) {
-    let (tokens, mut errors) = tokenize(file_text);
+    let (tokens, errors) = tokenize(file_text);
 
-    let (token_hierarchy, hierarchy_errors) = to_token_hierarchy(&tokens.tokens);
-    for err in hierarchy_errors {
-        errors.push(cvt_token_error_to_str_error(err, &tokens.token_spans));
-    }
+    let mut global = GlobalContext{errors, token_spans : &tokens.token_spans};
 
-    let (ast, parse_errors) = parse(&token_hierarchy, tokens.token_spans.len(), &tokens.numbers);
-    for err in parse_errors {
-        errors.push(cvt_token_error_to_str_error(err, &tokens.token_spans));
-    }
+    let token_hierarchy = to_token_hierarchy(&tokens.tokens, &mut global);
 
+    let ast = parse(&token_hierarchy, tokens.tokens.len(), &tokens.numbers, &mut global);
+
+    let errs = global.errors;
     (FullParseResult{
         tokens,
         token_hierarchy,
         ast,
-    }, errors)
+    }, errs)
 }

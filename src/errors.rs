@@ -6,7 +6,6 @@ use crate::ast::cvt_span_to_char_span;
 use ariadne::*;
 
 use crate::tokenizer::{TokenTypeIdx, get_token_type_name};
-use crate::parser::TokenTreeNode;
 
 pub struct ErrorInfo<T> {
     pub position : T,
@@ -64,23 +63,16 @@ pub fn cvt_token_error_to_str_error(err : ParsingError<Span>, token_spans : &[Ch
     ParsingError{error : cvt_token_err_info_to_str(err.error, token_spans), infos : info_vec}
 }
 
-pub fn error_info<T>(position : T, reason : String) -> ErrorInfo<T> {
-    ErrorInfo{position : position, reason : reason}
-}
-pub fn error_info_str<T>(position : T, reason : &str) -> ErrorInfo<T> {
-    ErrorInfo{position : position, reason : reason.to_owned()}
+pub fn error_info<T, S : Into<String>>(position : T, reason : S) -> ErrorInfo<T> {
+    ErrorInfo{position : position, reason : reason.into()}
 }
 
-pub fn error_basic<T>(position : T, reason : String) -> ParsingError<T> {
+pub fn error_basic<T, S : Into<String>>(position : T, reason : S) -> ParsingError<T> {
     ParsingError{error : error_info(position, reason), infos : Vec::new()}
 }
 
-pub fn error_basic_str<T>(position : T, reason : &str) -> ParsingError<T> {
-    ParsingError{error : error_info(position, reason.to_owned()), infos : Vec::new()}
-}
-
-pub fn error_with_info<T>(position : T, reason : String, infos : Vec<ErrorInfo<T>>) -> ParsingError<T> {
-    ParsingError{error : error_info(position, reason), infos : infos}
+pub fn error_with_info<T, S : Into<String>, V : Into<Vec<ErrorInfo<T>>>>(position : T, reason : S, infos : V) -> ParsingError<T> {
+    ParsingError{error : error_info(position, reason), infos : infos.into()}
 }
 
 pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
@@ -100,43 +92,3 @@ pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
     result
 }
 
-pub fn error_unclosed_bracket(open_pos : usize, open_typ : TokenTypeIdx, close_before_pos : usize) -> ParsingError<Span> {
-    let open_name = get_token_type_name(open_typ);
-    let reason = format!("Unclosed bracket {open_name}");
-    error_with_info(Span::from(open_pos), reason, vec![error_info_str(Span(close_before_pos, close_before_pos), "must be closed before this")])
-}
-pub fn error_unopened_bracket(close_pos : usize, close_typ : TokenTypeIdx, open_after_pos : usize) -> ParsingError<Span> {
-    let close_name = get_token_type_name(close_typ);
-    let reason = format!("Unopened bracket. Closing bracket {close_name} found but was not opened.");
-    error_with_info(Span::from(close_pos), reason, vec![error_info_str(Span(open_after_pos, open_after_pos), "must be opened in scope after this")])
-}
-
-pub fn error_unexpected_token(expected : &[TokenTypeIdx], found : TokenTypeIdx, pos : usize, context : &str) -> ParsingError<Span> {
-    let expected_list_str = join_expected_list(expected);
-    error_unexpected_token_str(&expected_list_str, found, pos, context)
-}
-
-pub fn error_unexpected_token_str(expected_list_str : &str, found : TokenTypeIdx, pos : usize, context : &str) -> ParsingError<Span> {
-    let tok_typ_name = get_token_type_name(found);
-    error_basic(Span::from(pos), format!("Unexpected Token '{tok_typ_name}' while parsing {context}. Expected {expected_list_str}"))
-}
-
-pub fn error_unexpected_tree_node(expected : &[TokenTypeIdx], found : Option<&TokenTreeNode>, unexpected_eof_idx : usize, context : &str) -> ParsingError<Span> {
-    let expected_list_str = join_expected_list(expected);
-    error_unexpected_tree_node_str(&expected_list_str, found, unexpected_eof_idx, context)
-}
-
-pub fn error_unexpected_tree_node_str(expected_list_str : &str, found : Option<&TokenTreeNode>, unexpected_eof_idx : usize, context : &str) -> ParsingError<Span> {
-    match found {
-        None => {
-            error_basic(Span::from(unexpected_eof_idx), format!("Unexpected End of Scope while parsing {context}. Expected {expected_list_str}"))
-        }
-        Some(TokenTreeNode::PlainToken(tok, pos)) => {
-            error_unexpected_token_str(expected_list_str, tok.get_type(), *pos, context)
-        }
-        Some(TokenTreeNode::Block(typ, _, span)) => {
-            let tok_typ_name = get_token_type_name(*typ);
-            error_basic(*span, format!("Unexpected Block '{tok_typ_name}' while parsing {context}. Expected {expected_list_str}"))
-        }
-    }
-}
