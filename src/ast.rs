@@ -1,7 +1,7 @@
 
 use num_bigint::BigUint;
 
-use crate::tokenizer::{TokenTypeIdx, TokenExtraInfo};
+use crate::{tokenizer::{TokenTypeIdx, TokenExtraInfo}, errors::{ParsingError, error_basic, error_basic_str}};
 use core::ops::Range;
 
 use std::collections::HashMap;
@@ -302,12 +302,36 @@ impl IterIdentifiers for Module {
     }
 }
 
-pub struct GlobalContext {
-    real_types : HashMap<usize, TypeExpression>,
+/*#[derive(Debug)]
+pub enum NamespaceElement {
+    Type(TypeExpression),
+    Module(Module),
+    SubNamespace(Box<Namespace>)
+}
+
+#[derive(Debug)]
+pub struct Namespace {
+    declarations : HashMap<TokenExtraInfo, NamespaceElement>,
     // aliases : todo!()
 }
 
-impl GlobalContext {
-    
-}
+impl Namespace {
+    pub fn register(&mut self, name : IdentifierToken, nse : NamespaceElement, errors : &mut Vec<ParsingError<Span>>) {
+        self.declarations.insert(name.name_idx, nse);
+    }
+
+    pub fn get<'s>(&'s self, name_path : &[IdentifierToken]) -> Result<&'s NamespaceElement, usize/* Which IdentifierToken went wrong */> {
+        assert!(name_path.len() >= 1);
+        
+        let mut cur_namespace = self;
+        for i in 0..name_path.len() - 1 {
+            match cur_namespace.declarations.get(name_path[i]) {
+                Some(NamespaceElement::SubNamespace()) => todo!(),
+                None => todo!(),
+            }
+        };
+
+        None
+    }
+}*/
 

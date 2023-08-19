@@ -12,6 +12,7 @@ use std::error::Error;
 use dev_aid::syntax_highlighting::*;
 
 
+
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut args = env::args();
 

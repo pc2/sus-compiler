@@ -25,18 +25,6 @@ module multiply_add2 : int a, int b, int c -> int r {
 }
 
 
-module parallel_mul_add_att : int a, int b -> int p, int q {
-    int a2 = a * a;
-	int b2 = b + b;
-	@
-	int a3 = a * a2;
-	int b3 = b + b2;
-	@
-	p = a3 * a;
-	q = b3 + b;
-	@ //?
-}
-
 module parallel_mul_add_reg : int a, int b -> int p, int q {
     reg int a2 = a * a;
 	reg int a3 = a * a2 + 3;
@@ -82,10 +70,8 @@ module beep : i32 a {
 
 module multiply_add : i32 a, i32 b, i32 c -> i32 result, double double_result {
 	i32 tmp = a * b;
-	@
-	result = tmp + c;
-	@
-	double_result = cvt_to_double(result);
+	reg result = tmp + c;
+	reg double_result = cvt_to_double(result);
 }
 
 timeline (a -> /) .. (a -> r)*

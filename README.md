@@ -85,12 +85,12 @@ I consider 'static pipelining' to be a solved problem. The one thing we can stil
 An example of such static pipeline can be shown as follows: 
 ```
 pipeline multiply_add i32 a, i32 b, i32 c -> i32 result {
-  i32 tmp = a * b;
-  @
-  result = @(tmp + c);
+  reg i32 tmp = a * b;
+  i32 tmp2 = tmp + c;
+  reg result = tmp + a;
 }
 ```
-Pipeline stages are separated by '@' symbols. Either at the statement level, or to add registers within expressions. This example would then compile to the following Verilog code:
+Pipeline stages are denoted by adding the 'reg' keyword to statements. Either at the statement level, or to add registers within expressions. This example would then compile to the following Verilog code:
 ```Verilog
 module multiply_add(
   input[31:0] a,
@@ -99,13 +99,20 @@ module multiply_add(
   output reg[31:0] result_DD // Note 'DD' means twice delayed signal
 ) {
   reg[31:0] tmp_D;
-  reg[31:0] c_D; // Also need to delay c, to be in sync with tmp_D
+  wire[31:0] tmp2_D;
+  reg[31:0] a_D; // Also need to delay a and c, to be in sync with tmp_D
+  reg[31:0] c_D;
 
   always @(posedge clk) begin 
     tmp_D <= a * b;
     c_D <= c;
-    
-    result_DD <= tmp_D + c_D;
+    a_D <= a;
+  end
+  
+  assign tmp2_D = tmp_D + c_D;
+
+  always @(posedge clk) begin 
+    result_DD <= tmp_D + a_D;
   end
 }
 ```
@@ -119,13 +126,13 @@ Making this distinction allows us to express timeline-bound operations, such as 
 
 For fixed-length timelines, this was already explored in Filament. We extend that to full timeline length. 
 
-Below is an example of a 2-wide blur filter. Its interface is described in the first part, and its run timeline shown on the timeline section. It takes a stream of indeterminate length. The first element is eaten without producing a result, and for all subsequent elements it outputs a result. (Note the difference between the '#' "timeline step" operator and the '@' "pipeline step" operator. This module takes a stream of length N, and outputs the first element of a stream of length (N-1) 2 clock cycles later. 
+Below is an example of a 2-wide blur filter. Its interface is described in the first part, and its run timeline shown on the timeline section. It takes a stream of indeterminate length. The first element is eaten without producing a result, and for all subsequent elements it outputs a result. (Note the difference between the '#' "timeline step" operator and the 'reg' "pipeline step" operator. This module takes a stream of length N, and outputs the first element of a stream of length (N-1) 2 clock cycles later. 
 ```
 pipeline blur : i32 a -> i32 result : timeline (a -> /) .. (a -> r)* {
   state prev = a;
   #
   loop {
-    result = @(a + prev) / 2;
+    reg result = (a + prev) / 2;
     prev = a;
     #
   }
@@ -238,7 +245,7 @@ rythmGenerator(clk*5, clk*3) :
 
 These either use compile-time information from the tool that implements the clocks, or it generates a module that tests the clock domain crossing for the proper rythm at initialization time. 
 
-Delayed rythms follow a modular arithmetic. For example a rythm between clocks with a ratio of `rythm(clk*3,clk*5)`, will repeat every 5 clock cycles of the first clock, and 3 clock cycles of the second clock. `@@@@@rythm(clk*3,clk*5)[0] = rythm(clk*3,clk*5)[0]`, `@@@rythm(clk*3,clk*5)[1] = rythm(clk*3,clk*5)[1]`
+Delayed rythms follow a modular arithmetic. For example a rythm between clocks with a ratio of `rythm(clk*3,clk*5)`, will repeat every 5 clock cycles of the first clock, and 3 clock cycles of the second clock. `reg reg reg reg reg rythm(clk*3,clk*5)[0] = rythm(clk*3,clk*5)[0]`, `reg reg reg rythm(clk*3,clk*5)[1] = rythm(clk*3,clk*5)[1]`
 
 ### Integrate Timing Constraints into language text itself
 - False Paths
