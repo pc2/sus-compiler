@@ -3,6 +3,7 @@ use num_bigint::BigUint;
 
 use crate::tokenizer::{TokenTypeIdx, TokenExtraInfo};
 use core::ops::Range;
+use std::ops::{Sub, Add};
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
@@ -13,6 +14,27 @@ impl Span {
     }
     pub fn len(&self) -> usize {
         self.1-self.0+1
+    }
+}
+
+// This type describes a subrange within a larger range. 
+// It is meant to be used to save spans within the ast, so only their outer span needs to be moved
+#[derive(Clone,Debug,PartialEq,Eq,Hash)]
+pub struct RelativeRange<T : PartialOrd + Sub + Add + Copy>(Range<T>);
+impl<T : PartialOrd + Sub<Output = T> + Add<Output = T> + Copy> RelativeRange<T> {
+    pub fn new_subrange(outer : Range<T>, inner : Range<T>) -> Self {
+        assert!(outer.start <= inner.start);
+        assert!(outer.end >= inner.end);
+        RelativeRange(inner.start - outer.start .. inner.end - outer.end)
+    }
+    pub fn as_range(&self, outer : Range<T>) -> Range<T> {
+        // This range falls within the bounds of the outer range
+        let real_range = outer.start + self.0.start .. outer.start + self.0.end;
+
+        assert!(real_range.start <= outer.end);
+        assert!(real_range.end <= outer.end);
+
+        real_range
     }
 }
 
@@ -27,9 +49,8 @@ pub struct FilePos {
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub struct CharSpan{
     pub file_pos : FilePos,
-    pub length : usize // in bytes. Can just do file_text[file_pos.char_idx .. file_pos.char_idx = length]
+    pub length : usize // in bytes. Can just do file_text[file_pos.char_idx .. file_pos.char_idx + length]
 }
-
 
 
 pub fn cvt_span_to_char_span(sp : Span, char_sp_buf : &[CharSpan]) -> CharSpan {
@@ -73,34 +94,12 @@ impl From<usize> for Span {
     }
 }
 
-const GLOBAL_IDENTIFIER_OFFSET : TokenExtraInfo = 1 << (TokenExtraInfo::BITS - 1);
 #[derive(Debug, Clone, Copy)]
-pub struct IdentifierIdx {
-    name_idx : TokenExtraInfo
+pub enum LocalOrGlobal {
+    Local(usize),
+    Global(usize)
 }
 
-impl IdentifierIdx {
-    pub fn new_local(local_idx : usize) -> IdentifierIdx {
-        IdentifierIdx{name_idx : local_idx as TokenExtraInfo}
-    }
-    pub fn new_global(global_idx : TokenExtraInfo) -> IdentifierIdx {
-        IdentifierIdx{name_idx : global_idx + GLOBAL_IDENTIFIER_OFFSET}
-    }
-    pub fn get_local(&self) -> Option<usize> {
-        if self.name_idx < GLOBAL_IDENTIFIER_OFFSET {
-            Some(self.name_idx as usize)
-        } else {
-            None
-        }
-    }
-    pub fn get_global(&self) -> Option<TokenExtraInfo> {
-        if self.name_idx >= GLOBAL_IDENTIFIER_OFFSET {
-            Some((self.name_idx - GLOBAL_IDENTIFIER_OFFSET) as TokenExtraInfo)
-        } else {
-            None
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy)]
 pub struct IdentifierToken {
@@ -111,7 +110,7 @@ pub struct IdentifierToken {
 
 #[derive(Debug, Clone)]
 pub enum TypeExpression {
-    Named(u64),
+    Named(GlobalPart),
     Array(Box<(SpanTypeExpression, SpanExpression)>)
 }
 
@@ -138,7 +137,7 @@ pub enum Value {
 
 #[derive(Debug,Clone)]
 pub enum Expression {
-    Named(IdentifierIdx),
+    Named(LocalOrGlobal),
     Constant(Value),
     UnaryOp(Box<(Operator, usize/*Operator token */, SpanExpression)>),
     BinOp(Box<(SpanExpression, Operator, usize/*Operator token */, SpanExpression)>),
@@ -177,18 +176,22 @@ pub struct Module {
     pub code : Vec<SpanStatement>
 }
 
+pub type GlobalPart = usize;
+
 #[derive(Debug)]
 pub struct ASTRoot {
-    pub modules : Vec<Module>
+    pub modules : Vec<Module>,
+    pub global_references : Vec<GlobalPart>,
+    pub type_references : Vec<GlobalPart>
 }
 
 pub trait IterIdentifiers {
-    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(IdentifierIdx, usize) -> ();
-    fn for_each_type<F>(&self, func : &mut F) where F : FnMut(TokenExtraInfo, usize) -> ();
+    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> ();
+    fn for_each_type<F>(&self, func : &mut F) where F : FnMut(GlobalPart, usize) -> ();
 }
 
 impl IterIdentifiers for SpanExpression {
-    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(IdentifierIdx, usize) -> () {
+    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
         let (expr, span) = self;
         match expr {
             Expression::Named(id) => {
@@ -217,16 +220,16 @@ impl IterIdentifiers for SpanExpression {
             }
         }
     }
-    fn for_each_type<F>(&self, _func : &mut F) where F : FnMut(TokenExtraInfo, usize) -> () {}
+    fn for_each_type<F>(&self, _func : &mut F) where F : FnMut(GlobalPart, usize) -> () {}
 }
 
 impl IterIdentifiers for SpanAssignableExpression {
-    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(IdentifierIdx, usize) -> () {
+    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
         let (expr, span) = self;
         match expr {
             AssignableExpression::Named{local_idx: id, num_regs : _} => {
                 assert!(span.0 == span.1);
-                func(IdentifierIdx::new_local(*id), span.0)
+                func(LocalOrGlobal::Local(*id), span.0)
             }
             AssignableExpression::ArrayIndex(b) => {
                 let (array, idx) = &**b;
@@ -235,11 +238,11 @@ impl IterIdentifiers for SpanAssignableExpression {
             }
         }
     }
-    fn for_each_type<F>(&self, _func : &mut F) where F : FnMut(TokenExtraInfo, usize) -> () {}
+    fn for_each_type<F>(&self, _func : &mut F) where F : FnMut(GlobalPart, usize) -> () {}
 }
 
 impl IterIdentifiers for SpanTypeExpression {
-    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(IdentifierIdx, usize) -> () {
+    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
         let (typ, _span) = self;
         match typ {
             TypeExpression::Named(_n) => {
@@ -252,7 +255,7 @@ impl IterIdentifiers for SpanTypeExpression {
             }
         }
     }
-    fn for_each_type<F>(&self, func : &mut F) where F : FnMut(TokenExtraInfo, usize) -> () {
+    fn for_each_type<F>(&self, func : &mut F) where F : FnMut(GlobalPart, usize) -> () {
         let (typ, span) = self;
         match typ {
             TypeExpression::Named(n) => {
@@ -282,9 +285,9 @@ pub fn for_each_assign_in_block<F>(block : &Vec<SpanStatement>, func : &mut F) w
 }
 
 impl IterIdentifiers for Module {
-    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(IdentifierIdx, usize) -> () {
+    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
         for (pos, decl) in self.declarations.iter().enumerate() {
-            func(IdentifierIdx::new_local(pos), decl.span.1);
+            func(LocalOrGlobal::Local(pos), decl.span.1);
         }
         for_each_assign_in_block(&self.code, &mut |to, v| {
             for assign_to in to {
@@ -293,7 +296,7 @@ impl IterIdentifiers for Module {
             v.for_each_value(func);
         });
     }
-    fn for_each_type<F>(&self, func : &mut F) where F : FnMut(TokenExtraInfo, usize) -> () {
+    fn for_each_type<F>(&self, func : &mut F) where F : FnMut(GlobalPart, usize) -> () {
         for decl in &self.declarations {
             decl.typ.for_each_type(func);
         }

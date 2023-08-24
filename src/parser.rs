@@ -100,16 +100,16 @@ struct LocalVariableContext<'prev> {
 }
 
 impl<'prev> LocalVariableContext<'prev> {
-    pub fn get_declaration_for(&self, name : TokenExtraInfo) -> IdentifierIdx {
+    pub fn get_declaration_for(&self, name : TokenExtraInfo) -> Option<usize> {
         for (decl_name, unique_id) in &self.locals {
             if *decl_name == name {
-                return IdentifierIdx::new_local(*unique_id);
+                return Some(*unique_id);
             }
         }
         if let Some(p) = self.prev {
             p.get_declaration_for(name)
         } else {
-            IdentifierIdx::new_global(name)
+            None
         }
     }
     pub fn add_declaration(&mut self, new_local_name : TokenExtraInfo, new_local_unique_id : usize) -> Result<(), usize> { // Returns conflicting signal declaration
@@ -202,10 +202,24 @@ impl<'it> TokenStream<'it> {
 
 struct ASTParserContext<'nums, 'g, 'g2> {
     global : &'g mut GlobalContext<'g2>,
-    numbers : &'nums [BigUint]
+    numbers : &'nums [BigUint],
+
+    global_references : Vec<GlobalPart>,
+    type_references : Vec<GlobalPart>
 }
 
 impl<'nums, 'g, 'g2> ASTParserContext<'nums, 'g, 'g2> {
+    fn add_global_reference(&mut self, g : GlobalPart) -> usize {
+        let idx = self.global_references.len();
+        self.global_references.push(g);
+        idx
+    }
+    fn add_type_reference(&mut self, t : GlobalPart) -> usize {
+        let idx = self.type_references.len();
+        self.type_references.push(t);
+        idx
+    }
+    
     fn error_unexpected_token(&mut self, expected : &[TokenTypeIdx], found : TokenTypeIdx, pos : usize, context : &str) {
         let expected_list_str = join_expected_list(expected);
         self.error_unexpected_token_str(&expected_list_str, found, pos, context);
@@ -309,21 +323,26 @@ impl<'nums, 'g, 'g2> ASTParserContext<'nums, 'g, 'g2> {
                 return Some((Expression::UnaryOp(Box::new((Operator{op_typ : tok.get_type()}, *pos, found_expr))), new_span));
             },
             Some(TokenTreeNode::PlainToken(tok, pos)) if is_identifier(tok.get_type()) => {
-                (Expression::Named(scope.get_declaration_for(tok.get_info())), Span(*pos, *pos))
+                let ident_ref = if let Some(local_idx) = scope.get_declaration_for(tok.get_info()) {
+                    LocalOrGlobal::Local(local_idx)
+                } else {
+                    LocalOrGlobal::Global(self.add_global_reference(tok.get_info() as GlobalPart))
+                };
+                (Expression::Named(ident_ref), Span::from(*pos))
             },
             Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == TOKEN_NUMBER => {
                 let value = tok.get_info();
-                (Expression::Constant(Value::Integer(BigUint::from(value))), Span(*pos, *pos))
+                (Expression::Constant(Value::Integer(BigUint::from(value))), Span::from(*pos))
             },
             Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == TOKEN_BIG_INTEGER => {
                 let idx = tok.get_info();
-                (Expression::Constant(Value::Integer(self.numbers[idx as usize].clone())), Span(*pos, *pos))
+                (Expression::Constant(Value::Integer(self.numbers[idx as usize].clone())), Span::from(*pos))
             },
             Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == kw("true") => {
-                (Expression::Constant(Value::Bool(true)), Span(*pos, *pos))
+                (Expression::Constant(Value::Bool(true)), Span::from(*pos))
             },
             Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == kw("false") => {
-                (Expression::Constant(Value::Bool(false)), Span(*pos, *pos))
+                (Expression::Constant(Value::Bool(false)), Span::from(*pos))
             },
             Some(TokenTreeNode::Block(typ, contents, span)) if *typ == kw("(") => {
                 let mut content_token_stream = TokenStream::new(contents, span.0, span.1);
@@ -417,7 +436,7 @@ impl<'nums, 'g, 'g2> ASTParserContext<'nums, 'g, 'g2> {
     
     fn try_parse_type(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext) -> Option<SpanTypeExpression> {
         let (name_id, first_pos) = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
-        let mut cur_type = (TypeExpression::Named(name_id), Span::from(first_pos));
+        let mut cur_type = (TypeExpression::Named(self.add_type_reference(name_id as GlobalPart)), Span::from(first_pos)); // TODO add more type info
         while let Some((content, block_span)) = token_stream.eat_is_block(kw("[")) {
             let mut array_index_token_stream = TokenStream::new(content, block_span.0, block_span.1);
             let expr = self.parse_expression(&mut array_index_token_stream, scope)?;
@@ -487,7 +506,7 @@ impl<'nums, 'g, 'g2> ASTParserContext<'nums, 'g, 'g2> {
             if let Some((name, span)) = self.try_parse_declaration(&mut tok_stream_copy, declarations, scope) {
                 // Maybe it's a declaration?
                 *token_stream = tok_stream_copy;
-                left_expressions.push(((Expression::Named(IdentifierIdx::new_local(name)), span), reg_count));
+                left_expressions.push(((Expression::Named(LocalOrGlobal::Local(name)), span), reg_count));
 
             } else if let Some(sp_expr) = self.parse_expression(token_stream, scope) {
                 // It's an expression instead!
@@ -525,7 +544,7 @@ impl<'nums, 'g, 'g2> ASTParserContext<'nums, 'g, 'g2> {
     fn convert_expression_to_assignable_expression(&mut self, (expr, span) : SpanExpression, num_regs : usize) -> Option<SpanAssignableExpression> {
         match expr {
             Expression::Named(n) => {
-                if let Some(local_idx) = n.get_local() {
+                if let LocalOrGlobal::Local(local_idx) = n {
                     Some((AssignableExpression::Named{local_idx, num_regs}, span))
                 } else {
                     self.global.error_basic(span, "Can only assign to local variables");
@@ -605,7 +624,8 @@ impl<'nums, 'g, 'g2> ASTParserContext<'nums, 'g, 'g2> {
             
             if self.parse_statement(&mut token_stream, declarations, &mut inner_scope, &mut statements).is_none() {
                 // Error recovery. Find end of statement
-                token_stream.skip_until_one_of(&[kw(";"), kw("{")]);
+                token_stream.next();
+                //token_stream.skip_until_one_of(&[kw(";"), kw("{")]);
             }
         }
 
@@ -629,7 +649,7 @@ impl<'nums, 'g, 'g2> ASTParserContext<'nums, 'g, 'g2> {
         Some(Module{span : Span(declaration_start_idx, token_stream.last_idx), name, declarations, code})
     }
 
-    fn parse_ast(&mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {
+    fn parse_ast(mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {
         let mut modules : Vec<Module> = Vec::new();
 
         while let Some(t) = outer_token_iter.next() {
@@ -645,12 +665,12 @@ impl<'nums, 'g, 'g2> ASTParserContext<'nums, 'g, 'g2> {
             }
         }
 
-        ASTRoot{modules}
+        ASTRoot{modules, global_references : self.global_references, type_references : self.type_references}
     }
 }
 
 pub fn parse<'nums, 'g, 'g2>(token_hierarchy : &Vec<TokenTreeNode>, num_tokens : usize, numbers : &'nums Vec<BigUint>, global : &'g mut GlobalContext<'g2>) -> ASTRoot {
-    let mut context = ASTParserContext{global, numbers};
+    let context = ASTParserContext{global, numbers, global_references : Vec::new(), type_references : Vec::new()};
     let mut token_stream = TokenStream::new(&token_hierarchy, 0, num_tokens);
     context.parse_ast(&mut token_stream)
 }

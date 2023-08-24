@@ -38,6 +38,24 @@ module parallel_mul_add_reg : int a, int b -> int p, int q {
 	Lööwe 老虎;
 }
 
+
+/*
+    a
+	b
+	c
+	    tmp
+	    result
+*/
+
+timeline (v v _ -> _) .. (_ _ v -> v)
+module mul_add : int a, int b, int c -> int result {
+	reg int tmp = a * b;
+	result = tmp + c;
+}
+
+
+
+
 /* a module to test the syntax */
 module MultiplyAdd : i32 a, i32 b, i32 c -> i32 result {
 	// temporary variable
@@ -65,6 +83,14 @@ module beep : i32 a {
 	# 
 	beep = a;
 	
+}
+
+timeline (a -> r) .. (/ -> r)
+module dwiogo : bool[512] data -> bool[256] out {
+    state bool[256] save = data[256:511];
+	out = data[0:255];
+	#
+	out = save;
 }
 
 
@@ -96,14 +122,6 @@ module my_complex_operation : i32'0 a -> i32'9 result {
 		prev = a;
 		#   // timeline step
 	}
-}
-
-timeline (a -> r) .. (/ -> r)
-module dwiogo : bool[512] data -> bool[256] out {
-    state bool[256] save = data[256:511];
-	out = data[0:255];
-	#
-	out = save;
 }
 
 timeline (a -> /)* .. (/ -> r)

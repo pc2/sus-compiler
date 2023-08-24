@@ -5,17 +5,17 @@ use crate::{ast::*, errors::ParsingError};
 #[derive(Debug)]
 pub enum Assignable {
     Named{local_idx : usize, num_regs : usize},
-    Array{to : Box<Assignable>, value : IdentifierIdx}
+    Array{to : Box<Assignable>, value : LocalOrGlobal}
 }
 
 #[derive(Debug)]
 pub enum Operation {
-    BinaryOp{out : Assignable, left : IdentifierIdx, op : Operator, right : IdentifierIdx},
-    UnaryOp{out : Assignable, op : Operator, right : IdentifierIdx},
-    Copy{out : Assignable, input : IdentifierIdx},
+    BinaryOp{out : Assignable, left : LocalOrGlobal, op : Operator, right : LocalOrGlobal},
+    UnaryOp{out : Assignable, op : Operator, right : LocalOrGlobal},
+    Copy{out : Assignable, input : LocalOrGlobal},
     Constant{out : Assignable, val : Value},
-    FunctionCall{results : Vec<Assignable>, func_name : IdentifierIdx, args : Vec<IdentifierIdx>},
-    ArrayAccess{result : Assignable, array : IdentifierIdx, args : Vec<IdentifierIdx>}
+    FunctionCall{results : Vec<Assignable>, func_name : LocalOrGlobal, args : Vec<LocalOrGlobal>},
+    ArrayAccess{result : Assignable, array : LocalOrGlobal, args : Vec<LocalOrGlobal>}
 }
 
 #[derive(Debug)]
@@ -38,7 +38,7 @@ impl Flattened {
         self.variables.push(LocalVar{span, typ : None, identifier_type : IdentifierType::Local});
         new_tmp_id
     }
-    fn flatten_expression(&mut self, (expr, span) : &SpanExpression) -> IdentifierIdx {
+    fn flatten_expression(&mut self, (expr, span) : &SpanExpression) -> LocalOrGlobal {
         match expr {
             Expression::Named(n) => {
                *n
@@ -52,7 +52,7 @@ impl Flattened {
 
                 self.operations.push((Operation::BinaryOp { out: Assignable::Named{local_idx : new_idx, num_regs : 0}, left: left_id, op: *op, right: right_id }, Span::from(*op_pos)));
 
-                IdentifierIdx::new_local(new_idx)
+                LocalOrGlobal::Local(new_idx)
             },
             Expression::UnaryOp(b) => {
                 let (op, op_pos, right) = &**b;
@@ -62,12 +62,12 @@ impl Flattened {
 
                 self.operations.push((Operation::UnaryOp { out: Assignable::Named{local_idx : new_idx, num_regs : 0}, op: *op, right: right_id }, Span::from(*op_pos)));
 
-                IdentifierIdx::new_local(new_idx)
+                LocalOrGlobal::Local(new_idx)
             },
             Expression::Constant(cst) => {
                 let tmp_local = self.new_local(*span);
                 self.operations.push((Operation::Constant { out: Assignable::Named{local_idx : tmp_local, num_regs : 0}, val: cst.clone() }, *span));
-                IdentifierIdx::new_local(tmp_local)
+                LocalOrGlobal::Local(tmp_local)
             },
             Expression::FuncCall(args) => {
                 /*let mut arg_iter = args.iter();

@@ -98,7 +98,7 @@ fn walk_name_color(ast : &ASTRoot, result : &mut [IDEToken]) {
             result[position].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
         });
         module.for_each_value(&mut |name, position| {
-            result[position].typ = IDETokenType::Identifier(if let Some(l) = name.get_local() {
+            result[position].typ = IDETokenType::Identifier(if let LocalOrGlobal::Local(l) = name {
                 IDEIdentifierType::Value(module.declarations[l].identifier_type)
             } else {
                 IDEIdentifierType::Unknown
