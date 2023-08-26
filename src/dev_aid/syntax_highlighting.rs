@@ -150,6 +150,28 @@ pub fn create_token_ide_info<'a>(parsed: &FullParseResult) -> Vec<IDEToken> {
     result
 }
 
+fn generate_character_offsets(file_text : &str, tokens : &[Token]) -> Vec<Range<usize>> {
+    let mut character_offsets : Vec<Range<usize>> = Vec::new();
+    character_offsets.reserve(tokens.len());
+    
+    let mut cur_char = 0;
+    let mut whitespace_start = 0;
+    for tok in tokens {
+        let tok_range = tok.get_range();
+
+        // whitespace
+        cur_char += file_text[whitespace_start..tok_range.start].chars().count();
+        let token_start_char = cur_char;
+        
+        // actual text
+        cur_char += file_text[tok_range.clone()].chars().count();
+        character_offsets.push(token_start_char..cur_char);
+        whitespace_start = tok_range.end;
+    }
+
+    character_offsets
+}
+
 pub fn syntax_highlight_file(file_path : &str) {
     let file_text = match std::fs::read_to_string(file_path) {
         Ok(file_text) => file_text,
@@ -158,8 +180,10 @@ pub fn syntax_highlight_file(file_path : &str) {
     
     let (full_parse, errors) = perform_full_semantic_parse(&file_text);
 
+    let token_offsets = generate_character_offsets(&file_text, &full_parse.tokens);
+
     for err in errors {
-        err.pretty_print_error(&file_path, &file_text, &full_parse.tokens);
+        err.pretty_print_error(&file_path, &file_text, &token_offsets);
     }
     
     print_tokens(&file_text, &full_parse.tokens);

@@ -8,6 +8,14 @@ use core::ops::Range;
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub struct Span(pub usize, pub usize);
 
+impl Span {
+    pub fn to_range<T : Clone>(&self, tokens : &[Range<T>]) -> Range<T> {
+        let min = tokens[self.0].start.clone();
+        let max = tokens[self.1].end.clone();
+        min..max
+    }
+}
+
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum IdentifierType {
     Input,

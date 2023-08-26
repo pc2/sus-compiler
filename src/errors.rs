@@ -3,7 +3,6 @@
 use std::ops::Range;
 
 use crate::ast::Span;
-use crate::tokenizer::Token;
 use ariadne::*;
 
 use crate::tokenizer::{TokenTypeIdx, get_token_type_name};
@@ -18,19 +17,13 @@ pub struct ParsingError<T> {
     pub infos : Vec<ErrorInfo<T>>
 }
 
-fn cvt_span_to_char_range(span : Span, tokens : &[Token]) -> Range<usize> {
-    let min = tokens[span.0].get_range().start;
-    let max = tokens[span.1].get_range().end;
-    min..max
-}
-
 impl<'a> ParsingError<Span> {
-    pub fn pretty_print_error(&self, file_name : &str, file_text : &str, tokens : &[Token]) {
+    pub fn pretty_print_error(&self, file_name : &str, file_text : &str, character_ranges : &[Range<usize>]) {
         // Generate & choose some colours for each of our elements
         let err_color = Color::Red;
         let info_color = Color::Blue;
 
-        let error_span = cvt_span_to_char_range(self.error.position, tokens);
+        let error_span = self.error.position.to_range(character_ranges);
         let mut report = Report::build(ReportKind::Error, file_name, error_span.start)
             .with_message(&self.error.reason)
             .with_label(
@@ -40,7 +33,7 @@ impl<'a> ParsingError<Span> {
             );
 
         for info in &self.infos {
-            let info_span = cvt_span_to_char_range(info.position, tokens);
+            let info_span = info.position.to_range(character_ranges);
             report = report.with_label(
                 Label::new((file_name, info_span))
                     .with_message(&info.reason)
