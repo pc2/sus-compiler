@@ -7,17 +7,17 @@ use ariadne::*;
 
 use crate::tokenizer::{TokenTypeIdx, get_token_type_name};
 
-pub struct ErrorInfo<T> {
-    pub position : T,
+pub struct ErrorInfo {
+    pub position : Span,
     pub reason : String
 }
 
-pub struct ParsingError<T> {
-    pub error : ErrorInfo<T>,
-    pub infos : Vec<ErrorInfo<T>>
+pub struct ParsingError {
+    pub error : ErrorInfo,
+    pub infos : Vec<ErrorInfo>
 }
 
-impl<'a> ParsingError<Span> {
+impl ParsingError {
     pub fn pretty_print_error(&self, file_name : &str, file_text : &str, character_ranges : &[Range<usize>]) {
         // Generate & choose some colours for each of our elements
         let err_color = Color::Red;
@@ -50,7 +50,7 @@ impl<'a> ParsingError<Span> {
     }
 }
 
-pub fn error_info<T, S : Into<String>>(position : T, reason : S) -> ErrorInfo<T> {
+pub fn error_info<S : Into<String>>(position : Span, reason : S) -> ErrorInfo {
     ErrorInfo{position : position, reason : reason.into()}
 }
 
@@ -73,7 +73,7 @@ pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
 
 // Class that collects and manages errors and warnings
 pub struct ErrorCollector {
-    pub errors : Vec<ParsingError<Span>>
+    pub errors : Vec<ParsingError>
 }
 
 impl<'a> ErrorCollector {
@@ -85,7 +85,7 @@ impl<'a> ErrorCollector {
         self.errors.push(ParsingError{error : error_info(position, reason), infos : Vec::new()});
     }
     
-    pub fn error_with_info<S : Into<String>>(&mut self, position : Span, reason : S, infos : Vec<ErrorInfo<Span>>) {
+    pub fn error_with_info<S : Into<String>>(&mut self, position : Span, reason : S, infos : Vec<ErrorInfo>) {
         self.errors.push(ParsingError{error : error_info(position, reason), infos : infos});
     }
 }

@@ -182,7 +182,7 @@ pub fn syntax_highlight_file(file_path : &str) {
 
     let token_offsets = generate_character_offsets(&file_text, &full_parse.tokens);
 
-    for err in errors {
+    for err in errors.errors {
         err.pretty_print_error(&file_path, &file_text, &token_offsets);
     }
     

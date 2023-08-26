@@ -10,7 +10,7 @@ use lsp_server::{Response, Message, Connection};
 
 use lsp_types::notification::Notification;
 
-use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::ParsingError};
+use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::ErrorCollector};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -258,9 +258,9 @@ fn cvt_span_to_lsp_range(ch_sp : Span, token_positions : &[std::ops::Range<Posit
     }
 }
 
-fn send_errors_warnings(connection: &Connection, errs : Vec<ParsingError<Span>>, file_uri: Url, token_positions : &[std::ops::Range<Position>]) -> Result<(), Box<dyn Error + Sync + Send>> {
+fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, file_uri: Url, token_positions : &[std::ops::Range<Position>]) -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut diag_vec : Vec<Diagnostic> = Vec::new();
-    for err in errs {
+    for err in errors.errors {
         diag_vec.push(Diagnostic::new_simple(cvt_span_to_lsp_range(err.error.position, token_positions), err.error.reason));
     }
     

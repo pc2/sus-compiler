@@ -1,5 +1,5 @@
 
-use crate::{ast::*, errors::ParsingError};
+use crate::{ast::*, errors::ErrorCollector};
 
 
 #[derive(Debug)]
@@ -138,7 +138,7 @@ impl Flattened {
         result
     }
 
-    pub fn typecheck(&mut self, errors : &mut Vec<ParsingError<Span>>) {
+    pub fn typecheck(&mut self, errors : &mut ErrorCollector) {
 
     }
 }

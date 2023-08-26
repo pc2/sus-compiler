@@ -683,7 +683,7 @@ pub struct FullParseResult {
     pub ast : ASTRoot
 }
 
-pub fn perform_full_semantic_parse<'txt>(file_text : &'txt str) -> (FullParseResult, Vec<ParsingError<Span>>) {
+pub fn perform_full_semantic_parse<'txt>(file_text : &'txt str) -> (FullParseResult, ErrorCollector) {
     let mut errors = ErrorCollector::new();
 
     let tokens = tokenize(file_text, &mut errors);
@@ -692,10 +692,9 @@ pub fn perform_full_semantic_parse<'txt>(file_text : &'txt str) -> (FullParseRes
 
     let ast = parse(&token_hierarchy, file_text, tokens.len(), &mut errors);
 
-    let errs = errors.errors;
     (FullParseResult{
         tokens,
         token_hierarchy,
         ast,
-    }, errs)
+    }, errors)
 }
