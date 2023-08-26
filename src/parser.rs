@@ -678,7 +678,7 @@ pub fn parse<'nums, 'g, 'file>(token_hierarchy : &Vec<TokenTreeNode>, file_text 
 
 
 pub struct FullParseResult {
-    pub tokens : TokenizerResult,
+    pub tokens : Vec<Token>,
     pub token_hierarchy : Vec<TokenTreeNode>,
     pub ast : ASTRoot
 }
@@ -688,9 +688,9 @@ pub fn perform_full_semantic_parse<'txt>(file_text : &'txt str) -> (FullParseRes
 
     let mut global = GlobalContext{errors};
 
-    let token_hierarchy = to_token_hierarchy(&tokens.tokens, &mut global);
+    let token_hierarchy = to_token_hierarchy(&tokens, &mut global);
 
-    let ast = parse(&token_hierarchy, file_text, tokens.tokens.len(), &mut global);
+    let ast = parse(&token_hierarchy, file_text, tokens.len(), &mut global);
 
     let errs = global.errors;
     (FullParseResult{

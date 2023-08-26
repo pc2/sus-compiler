@@ -10,7 +10,7 @@ use lsp_server::{Response, Message, Connection};
 
 use lsp_types::notification::Notification;
 
-use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, RowCol, Span}, errors::ParsingError, tokenizer::Token};
+use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::ParsingError};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -56,6 +56,7 @@ impl LoadedFileCache {
         }
     }
     fn update_text(&mut self, path : PathBuf, new_text : String) -> Rc<LoadedFile> {
+        //let tokens = tokenize(file_data)
         let result = Rc::new(LoadedFile{
             file_text: new_text
         });
@@ -171,102 +172,96 @@ fn get_modifiers_for_token(tok : &IDEToken) -> u32 {
 }
 
 struct SemanticTokensDeltaAccumulator {
-    prev_line : usize,
-    prev_col : usize,
+    prev : Position,
     semantic_tokens : Vec<SemanticToken>
 }
 
 impl SemanticTokensDeltaAccumulator {
-    fn push(&mut self, row_col : RowCol, length : usize, typ : u32, mod_bits : u32) {
-        let delta_line = row_col.row - self.prev_line;
+    fn push(&mut self, position : Position, length : u32, typ : u32, mod_bits : u32) {
+        let delta_line = position.line - self.prev.line;
 
         if delta_line != 0 {
-            self.prev_col = 0;
+            self.prev.character = 0;
         }
 
-        let delta_col = row_col.col - self.prev_col;
-        self.prev_col = row_col.col;
-        self.prev_line = row_col.row;
+        let delta_col = position.character - self.prev.character;
+        self.prev.character = position.character;
+        self.prev.line = position.line;
 
         self.semantic_tokens.push(SemanticToken{
-            delta_line: delta_line as u32,
-            delta_start: delta_col as u32,
-            length: length as u32,
+            delta_line: delta_line,
+            delta_start: delta_col,
+            length: length,
             token_type: typ,
             token_modifiers_bitset: mod_bits,
         });
     }
 }
 
-fn do_syntax_highlight(file_data : &LoadedFile, full_parse : &FullParseResult) -> SemanticTokensResult {
+fn do_syntax_highlight(file_data : &LoadedFile, full_parse : &FullParseResult) -> (SemanticTokensResult, Vec<std::ops::Range<Position>>) {
     let file_text = &file_data.file_text;
     let ide_tokens = create_token_ide_info(&full_parse);
 
-    let mut semantic_tokens_acc = SemanticTokensDeltaAccumulator{prev_line : 0, prev_col : 0, semantic_tokens : Vec::new()};
-    semantic_tokens_acc.semantic_tokens.reserve(full_parse.tokens.tokens.len());
+    let mut semantic_tokens_acc = SemanticTokensDeltaAccumulator{prev : Position {line : 0, character : 0}, semantic_tokens : Vec::new()};
+    semantic_tokens_acc.semantic_tokens.reserve(full_parse.tokens.len());
+    let mut positions : Vec<std::ops::Range<Position>> = Vec::new();
+    positions.reserve(full_parse.tokens.len());
 
-    for (idx, tok) in ide_tokens.iter().enumerate() {
-        let token_text = &file_text[full_parse.tokens.tokens[idx].get_range()];
-        let char_iter = token_text.chars();
-        let mut row_col = full_parse.tokens.token_row_cols[idx];
+    let mut cur_whitespace_start = 0;
+    let mut cur_position = Position{line : 0, character : 0};
+    for (tok_idx, ide_tok) in ide_tokens.iter().enumerate() {
+        let typ = get_semantic_token_type_from_ide_token(ide_tok);
+        let mod_bits = get_modifiers_for_token(ide_tok);
 
-        let typ = get_semantic_token_type_from_ide_token(tok);
-        let mod_bits = get_modifiers_for_token(tok);
-        if tok.typ == IDETokenType::Comment {
-            // Comments can be multiline, editor doesn't support this. Have to split them up myself. Eurgh
-            let mut line_char_offset = 0;
-            let mut length_in_chars : usize = 0;
-            for (idx, c) in char_iter.enumerate() {
-                length_in_chars += 1;
-                if c == '\n' {
-                    semantic_tokens_acc.push(row_col, idx - line_char_offset, typ, mod_bits);
+        let tok_range = full_parse.tokens[tok_idx].get_range();
+        let whitespace_text = &file_text[cur_whitespace_start..tok_range.start];
+        cur_whitespace_start = tok_range.end;
+        let token_text = &file_text[tok_range];
 
-                    line_char_offset = idx + 1;
-                    row_col.row += 1;
-                    row_col.col = 0;
-                }
+        // skip through whitespace
+        for c in whitespace_text.chars() {
+            if c == '\n' {
+                cur_position.line += 1;
+                cur_position.character = 0;
+            } else {
+                cur_position.character += 1;
             }
-            let leftover_length = length_in_chars - line_char_offset;
-            if leftover_length > 0 {
-                semantic_tokens_acc.push(row_col, leftover_length, typ, mod_bits);
-            }
-        } else {
-            semantic_tokens_acc.push(row_col, char_iter.count(), typ, mod_bits);
         }
-
-        //println!("{}: typ={typ} {delta_line}:{delta_col}", file_text[tok_file_pos.as_range()]);
+        let real_token_start_position = cur_position;
+        let mut part_start_position = cur_position;
+        for c in token_text.chars() {
+            if c == '\n' {
+                semantic_tokens_acc.push(part_start_position, cur_position.character - part_start_position.character, typ, mod_bits);
+                cur_position.line += 1;
+                cur_position.character = 0;
+                part_start_position = cur_position;
+            } else {
+                cur_position.character += 1;
+            }
+        }
+        semantic_tokens_acc.push(part_start_position, cur_position.character - part_start_position.character, typ, mod_bits);
+        positions.push(real_token_start_position..cur_position);
     }
 
-    SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
+    (SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
         result_id: None,
         data: semantic_tokens_acc.semantic_tokens
-    })
+    }), positions)
 }
 
 use lsp_types::Diagnostic;
 
-fn cvt_span_to_lsp_range(ch_sp : Span, file_text : &str, tokens : &[Token], row_cols : &[RowCol]) -> lsp_types::Range {
-    let start_row_col = row_cols[ch_sp.0];
-
-    let mut last_row_col = row_cols[ch_sp.1];
-    for c in file_text[tokens[ch_sp.1].get_range()].chars() {
-        last_row_col.advance_char(c);
-    }
-    Range{
-        start : Position{
-            line : start_row_col.row as u32,
-            character : start_row_col.col as u32
-        }, end : Position{
-            line : last_row_col.row as u32,
-            character : last_row_col.col as u32
-        }
+fn cvt_span_to_lsp_range(ch_sp : Span, token_positions : &[std::ops::Range<Position>]) -> lsp_types::Range {
+    Range {
+        start: token_positions[ch_sp.0].start,
+        end: token_positions[ch_sp.1].end
     }
 }
 
-fn send_errors_warnings(connection: &Connection, errs : Vec<ParsingError<Span>>, file_uri: Url, file_text : &str, tokens : &[Token], token_row_cols : &[RowCol]) -> Result<(), Box<dyn Error + Sync + Send>> {
+fn send_errors_warnings(connection: &Connection, errs : Vec<ParsingError<Span>>, file_uri: Url, token_positions : &[std::ops::Range<Position>]) -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut diag_vec : Vec<Diagnostic> = Vec::new();
     for err in errs {
-        diag_vec.push(Diagnostic::new_simple(cvt_span_to_lsp_range(err.error.position, file_text,tokens, token_row_cols), err.error.reason));
+        diag_vec.push(Diagnostic::new_simple(cvt_span_to_lsp_range(err.error.position, token_positions), err.error.reason));
     }
     
     let params = &PublishDiagnosticsParams{
@@ -321,12 +316,14 @@ fn main_loop(
 
                         let (full_parse, errors) = perform_full_semantic_parse(&file_data.file_text);
                         
-                        let result = serde_json::to_value(&do_syntax_highlight(&file_data, &full_parse)).unwrap();
+                        let (syntax_highlight, token_positions) = do_syntax_highlight(&file_data, &full_parse);
+
+                        let result = serde_json::to_value(&syntax_highlight).unwrap();
                         connection.sender.send(Message::Response(Response{
                             id: req.id, result: Some(result), error: None
                         }))?;
 
-                        send_errors_warnings(&connection, errors, params.text_document.uri, &file_data.file_text, &full_parse.tokens.tokens, &full_parse.tokens.token_row_cols)?;
+                        send_errors_warnings(&connection, errors, params.text_document.uri, &token_positions)?;
                     },
                     // TODO ...
                     req => {

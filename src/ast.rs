@@ -7,64 +7,6 @@ use core::ops::Range;
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub struct Span(pub usize, pub usize);
-impl Span {
-    pub fn as_range(&self) -> Range<usize> {
-        self.0..self.1+1
-    }
-    pub fn len(&self) -> usize {
-        self.1-self.0+1
-    }
-}
-
-#[derive(Clone,Copy,Debug,PartialEq,Eq)]
-pub struct RowCol {
-    pub row : usize,
-    pub col : usize // deals with character indices
-}
-
-impl RowCol {
-    pub fn advance_char(&mut self, ch : char) {
-        if ch == '\n' {
-            self.row += 1;
-            self.col = 0;
-        } else {
-            self.col += 1;
-        }
-    }
-}
-
-#[derive(Debug,Clone,Copy,PartialEq,Eq)]
-pub struct FilePos {
-    pub char_idx : usize, // Byte index
-    pub row_col : RowCol,
-}
-
-// Char span, for chars in file. start is INCLUSIVE, end is EXCLUSIVE. It's a bit weird to make the distinction, but it works out
-#[derive(Clone,Copy,Debug,PartialEq,Eq)]
-pub struct CharSpan{
-    pub file_pos : FilePos,
-    pub length : usize // in bytes. Can just do file_text[file_pos.char_idx .. file_pos.char_idx + length]
-}
-
-impl CharSpan {
-    pub fn as_range(&self) -> Range<usize> {
-        self.file_pos.char_idx..self.file_pos.char_idx+self.length
-    }
-    pub fn end_pos(&self) -> usize {
-        self.file_pos.char_idx + self.length
-    }
-}
-
-impl From<Span> for Range<usize> {
-    fn from(sp : Span) -> Self {
-        sp.as_range()
-    }
-}
-impl From<CharSpan> for Range<usize> {
-    fn from(sp : CharSpan) -> Self {
-        sp.as_range()
-    }
-}
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum IdentifierType {

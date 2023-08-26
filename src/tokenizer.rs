@@ -1,7 +1,7 @@
 use std::ops::Range;
 use std::str::CharIndices;
 
-use crate::ast::{RowCol, Span};
+use crate::ast::Span;
 use crate::errors::*;
 
 pub type TokenTypeIdx = u8;
@@ -14,6 +14,9 @@ pub struct Token {
 }
 
 impl Token {
+    pub fn new(typ : TokenTypeIdx, range : Range<usize>) -> Self {
+        Self{typ, from : range.start, to : range.end}
+    }
     pub fn get_type(&self) -> TokenTypeIdx {
         self.typ
     }
@@ -21,10 +24,6 @@ impl Token {
         self.from..self.to
     }
 }
-
-
-use crate::ast::FilePos;
-
 
 pub const ALL_KEYWORDS : [(&'static str, u8); 17] = [
     ("template", 0),
@@ -204,20 +203,19 @@ fn is_valid_identifier_char(c : char) -> bool {
 }
 
 struct FileIter<'iter> {
-    char_iter : CharIndices<'iter>,
-    row_col : RowCol
+    char_iter : CharIndices<'iter>
 }
 
 impl<'iter> FileIter<'iter> {
     fn new(text : &'iter str) -> Self {
-        Self{char_iter : text.char_indices(), row_col : RowCol{row : 0, col : 0}}
+        Self{char_iter : text.char_indices()}
     }
 
     // Returns index of last char
-    fn iter_until_end_of_identifier<'a>(&mut self, start_char_idx : usize, file_text : &'a str) -> (Range<usize>, Option<(FilePos, char)>) {
+    fn iter_until_end_of_identifier<'a>(&mut self, start_char_idx : usize, file_text : &'a str) -> (Range<usize>, Option<(usize, char)>) {
         for (word_i, word_char) in self {
             if !is_valid_identifier_char(word_char) {
-                return (start_char_idx..word_i.char_idx, Some((word_i, word_char)));
+                return (start_char_idx..word_i, Some((word_i, word_char)));
             }
         }
         (start_char_idx..file_text.len(), None)
@@ -227,7 +225,7 @@ impl<'iter> FileIter<'iter> {
     fn iter_until_end(&mut self, end : char) -> Option<usize> {
         for (newline_pos, newline_char) in self {
             if newline_char == end {
-                return Some(newline_pos.char_idx);
+                return Some(newline_pos);
             }
         }
         None
@@ -241,7 +239,7 @@ impl<'iter> FileIter<'iter> {
                 while let Some((end_pos, comment_char_2)) = self.next() {
                     if comment_char_2 == '/' {
                         // End of comment
-                        return Some(end_pos.char_idx + '/'.len_utf8());
+                        return Some(end_pos + '/'.len_utf8());
                     } else if comment_char_2 == '*' {
                         continue;
                     } else {
@@ -255,36 +253,14 @@ impl<'iter> FileIter<'iter> {
 }
 
 impl<'iter> Iterator for FileIter<'iter> {
-    type Item = (FilePos, char);
+    type Item = (usize, char);
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some((pos, ch)) = self.char_iter.next() {
-            let cur_pos = FilePos{char_idx : pos, row_col : self.row_col};
-            self.row_col.advance_char(ch);
-            Some((cur_pos, ch))
-        } else {
-            None
-        }
+        self.char_iter.next()
     }
 }
 
-#[derive(Debug, Default)]
-pub struct TokenizerResult {
-    pub tokens : Vec<Token>,
-    pub token_row_cols : Vec<RowCol>
-}
-
-impl TokenizerResult {
-    pub fn push(&mut self, typ : TokenTypeIdx, span : Range<usize>, row_col : RowCol) {
-        self.tokens.push(Token{typ, from : span.start, to : span.end});
-        self.token_row_cols.push(row_col);
-    }
-    pub fn len(&self) -> usize {
-        self.tokens.len()
-    }
-}
-
-pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult, Vec<ParsingError<Span>>) {
-    let mut result : TokenizerResult = Default::default();
+pub fn tokenize<'txt>(file_data : &'txt str) -> (Vec<Token>, Vec<ParsingError<Span>>) {
+    let mut result : Vec<Token> = Vec::new();
     let mut file_char_iter = FileIter::new(file_data);
     let mut errors : Vec<ParsingError<Span>> = Vec::new();
     
@@ -295,7 +271,7 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult, Vec<ParsingErr
         }
         if is_valid_identifier_char(cur_char) {
             // Start of word
-            let (word, new_cur_char) = file_char_iter.iter_until_end_of_identifier(file_pos.char_idx, file_data);
+            let (word, new_cur_char) = file_char_iter.iter_until_end_of_identifier(file_pos, file_data);
             
             let word_str = &file_data[word.clone()];
             let mut word_chars = word_str.chars();
@@ -314,7 +290,7 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult, Vec<ParsingErr
                     TOKEN_IDENTIFIER
                 }
             };
-            result.push(tok_typ, word, file_pos.row_col);
+            result.push(Token::new(tok_typ, word));
 
             if let Some((next_pos_i, next_char)) = new_cur_char {
                 if next_char.is_whitespace() {
@@ -326,7 +302,7 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult, Vec<ParsingErr
             }
         } // no else! Continue next character
         
-        let char_file_pos = file_pos.char_idx;
+        let char_file_pos = file_pos;
         if let Some(symbol_idx) = ALL_SYMBOLS.iter().position(
             // Have to do .as_bytes here so we don't get the exception that we're cutting a character in half
             |&symb| *symb.0.as_bytes() == file_data.as_bytes()[char_file_pos..char_file_pos+symb.0.len()]
@@ -343,8 +319,8 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult, Vec<ParsingErr
                 } else {
                     file_data.len()
                 };
-                let comment_span = file_pos.char_idx..end_pos;
-                result.push(TOKEN_COMMENT, comment_span, file_pos.row_col);
+                let comment_span = file_pos..end_pos;
+                result.push(Token::new(TOKEN_COMMENT, comment_span));
 
             } else if symbol_tok_id == kw("/*") {
                 // Open single multi-line comment
@@ -353,19 +329,19 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult, Vec<ParsingErr
                 } else {
                     file_data.len()
                 };
-                let comment_span = file_pos.char_idx..end_pos;
-                result.push(TOKEN_COMMENT, comment_span, file_pos.row_col);
+                let comment_span = file_pos..end_pos;
+                result.push(Token::new(TOKEN_COMMENT, comment_span));
                 
             } else if symbol_tok_id == kw("*/") {
                 // Unexpected close comment
                 errors.push(error_basic(Span::from(result.len()), "Unexpected comment closer when not in comment"));
-                result.push(TOKEN_INVALID, file_pos.char_idx..file_pos.char_idx + 2, file_pos.row_col);
+                result.push(Token::new(TOKEN_INVALID, file_pos..file_pos + 2));
             } else {
-                result.push(symbol_tok_id, file_pos.char_idx..file_pos.char_idx + 2, file_pos.row_col);
+                result.push(Token::new(symbol_tok_id, file_pos..file_pos + symbol_text.len()));
             }
         } else { // Symbol not found!
             errors.push(error_basic(Span::from(result.len()), "Unexpected character"));
-            result.push(TOKEN_INVALID, file_pos.char_idx..file_pos.char_idx + cur_char.len_utf8(), file_pos.row_col);
+            result.push(Token::new(TOKEN_INVALID, file_pos..file_pos + cur_char.len_utf8()));
         }
     }
 

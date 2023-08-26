@@ -45,8 +45,9 @@ fn print_tokens(file_text : &str, tokens : &[Token]) {
         let styles = [Style::new().magenta(), Style::new().yellow(), Style::new().blue()];
         let st = styles[tok_idx % styles.len()].clone().underlined();
         
-        pretty_print_chunk_with_whitespace(whitespace_start, file_text, token.get_range(), st);
-        whitespace_start = token.get_range().end;
+        let token_range = token.get_range();
+        pretty_print_chunk_with_whitespace(whitespace_start, file_text, token_range.clone(), st);
+        whitespace_start = token_range.end;
     }
 
     print!("{}\n", &file_text[whitespace_start..file_text.len()]);
@@ -117,7 +118,7 @@ pub fn create_token_ide_info<'a>(parsed: &FullParseResult) -> Vec<IDEToken> {
     let mut result : Vec<IDEToken> = Vec::new();
     result.reserve(parsed.tokens.len());
 
-    for t in &parsed.tokens.tokens {
+    for t in &parsed.tokens {
         let tok_typ = t.get_type();
         let initial_typ = if is_keyword(tok_typ) {
             IDETokenType::Keyword
@@ -158,15 +159,15 @@ pub fn syntax_highlight_file(file_path : &str) {
     let (full_parse, errors) = perform_full_semantic_parse(&file_text);
 
     for err in errors {
-        err.pretty_print_error(&file_path, &file_text, &full_parse.tokens.tokens);
+        err.pretty_print_error(&file_path, &file_text, &full_parse.tokens);
     }
     
-    print_tokens(&file_text, &full_parse.tokens.tokens);
+    print_tokens(&file_text, &full_parse.tokens);
 
     let ide_tokens = create_token_ide_info(&full_parse);
     
     
-    pretty_print(&file_text, &full_parse.tokens.tokens, &ide_tokens);
+    pretty_print(&file_text, &full_parse.tokens, &ide_tokens);
     
     println!("{:?}", full_parse.ast);
 }
