@@ -10,7 +10,7 @@ use lsp_server::{Response, Message, Connection};
 
 use lsp_types::notification::Notification;
 
-use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::ErrorCollector};
+use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::{ErrorCollector, ParsingError}};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -258,16 +258,28 @@ fn cvt_span_to_lsp_range(ch_sp : Span, token_positions : &[std::ops::Range<Posit
     }
 }
 
+fn convert_diagnostic(err : ParsingError, severity : DiagnosticSeverity, uri : &Url, token_positions : &[std::ops::Range<Position>]) -> Diagnostic {
+    let error_pos = cvt_span_to_lsp_range(err.error.position, token_positions);
+
+    let mut related_info = Vec::new();
+    for info in err.infos {
+        let info_pos = cvt_span_to_lsp_range(info.position, token_positions);
+        let location = Location{uri : uri.clone(), range : info_pos};
+        related_info.push(DiagnosticRelatedInformation { location, message: info.reason });
+    }
+    Diagnostic::new(error_pos, Some(severity), None, None, err.error.reason, Some(related_info), None)
+}
+
 fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, file_uri: Url, token_positions : &[std::ops::Range<Position>]) -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut diag_vec : Vec<Diagnostic> = Vec::new();
     for err in errors.errors {
-        diag_vec.push(Diagnostic::new_simple(cvt_span_to_lsp_range(err.error.position, token_positions), err.error.reason));
+        diag_vec.push(convert_diagnostic(err, DiagnosticSeverity::ERROR, &file_uri, token_positions));
     }
     
     let params = &PublishDiagnosticsParams{
         uri: file_uri,
         diagnostics: diag_vec,
-        version: None // TODO 
+        version: None
     };
     let params_json = serde_json::to_value(params)?;
 
