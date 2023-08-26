@@ -1,9 +1,8 @@
 
 use num_bigint::BigUint;
 
-use crate::tokenizer::{TokenTypeIdx, TokenExtraInfo};
+use crate::tokenizer::TokenTypeIdx;
 use core::ops::Range;
-use std::ops::{Sub, Add};
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
@@ -14,27 +13,6 @@ impl Span {
     }
     pub fn len(&self) -> usize {
         self.1-self.0+1
-    }
-}
-
-// This type describes a subrange within a larger range. 
-// It is meant to be used to save spans within the ast, so only their outer span needs to be moved
-#[derive(Clone,Debug,PartialEq,Eq,Hash)]
-pub struct RelativeRange<T : PartialOrd + Sub + Add + Copy>(Range<T>);
-impl<T : PartialOrd + Sub<Output = T> + Add<Output = T> + Copy> RelativeRange<T> {
-    pub fn new_subrange(outer : Range<T>, inner : Range<T>) -> Self {
-        assert!(outer.start <= inner.start);
-        assert!(outer.end >= inner.end);
-        RelativeRange(inner.start - outer.start .. inner.end - outer.end)
-    }
-    pub fn as_range(&self, outer : Range<T>) -> Range<T> {
-        // This range falls within the bounds of the outer range
-        let real_range = outer.start + self.0.start .. outer.start + self.0.end;
-
-        assert!(real_range.start <= outer.end);
-        assert!(real_range.end <= outer.end);
-
-        real_range
     }
 }
 
@@ -101,16 +79,16 @@ pub enum LocalOrGlobal {
 }
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct IdentifierToken {
     pub position : usize,
-    pub name_idx : TokenExtraInfo
+    pub name : Range<usize> // File position
 }
 
 
 #[derive(Debug, Clone)]
 pub enum TypeExpression {
-    Named(GlobalPart),
+    Named(usize), // position in referenced globals list
     Array(Box<(SpanTypeExpression, SpanExpression)>)
 }
 
@@ -120,7 +98,7 @@ pub type SpanTypeExpression = (TypeExpression, Span);
 pub struct SignalDeclaration {
     pub span : Span,
     pub typ : SpanTypeExpression,
-    pub name_idx : TokenExtraInfo,
+    pub name : Range<usize>, // File position
     pub identifier_type : IdentifierType
 }
 
@@ -176,18 +154,17 @@ pub struct Module {
     pub code : Vec<SpanStatement>
 }
 
-pub type GlobalPart = usize;
+pub type GlobalIdentifier = Vec<(usize, Range<usize>)>; // token index, and name span
 
 #[derive(Debug)]
 pub struct ASTRoot {
     pub modules : Vec<Module>,
-    pub global_references : Vec<GlobalPart>,
-    pub type_references : Vec<GlobalPart>
+    pub global_references : Vec<GlobalIdentifier>,
+    pub type_references : Vec<GlobalIdentifier>
 }
 
 pub trait IterIdentifiers {
     fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> ();
-    fn for_each_type<F>(&self, func : &mut F) where F : FnMut(GlobalPart, usize) -> ();
 }
 
 impl IterIdentifiers for SpanExpression {
@@ -220,7 +197,6 @@ impl IterIdentifiers for SpanExpression {
             }
         }
     }
-    fn for_each_type<F>(&self, _func : &mut F) where F : FnMut(GlobalPart, usize) -> () {}
 }
 
 impl IterIdentifiers for SpanAssignableExpression {
@@ -238,7 +214,6 @@ impl IterIdentifiers for SpanAssignableExpression {
             }
         }
     }
-    fn for_each_type<F>(&self, _func : &mut F) where F : FnMut(GlobalPart, usize) -> () {}
 }
 
 impl IterIdentifiers for SpanTypeExpression {
@@ -252,19 +227,6 @@ impl IterIdentifiers for SpanTypeExpression {
                 let (arr_typ, arr_size) = &**b;
                 arr_typ.for_each_value(func);
                 arr_size.for_each_value(func);
-            }
-        }
-    }
-    fn for_each_type<F>(&self, func : &mut F) where F : FnMut(GlobalPart, usize) -> () {
-        let (typ, span) = self;
-        match typ {
-            TypeExpression::Named(n) => {
-                func(*n, span.1)
-            }
-            TypeExpression::Array(b) => {
-                let (arr_typ, arr_size) = &**b;
-                arr_typ.for_each_type(func);
-                arr_size.for_each_type(func);
             }
         }
     }
@@ -295,11 +257,6 @@ impl IterIdentifiers for Module {
             }
             v.for_each_value(func);
         });
-    }
-    fn for_each_type<F>(&self, func : &mut F) where F : FnMut(GlobalPart, usize) -> () {
-        for decl in &self.declarations {
-            decl.typ.for_each_type(func);
-        }
     }
 }
 

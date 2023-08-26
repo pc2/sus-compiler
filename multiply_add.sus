@@ -1,5 +1,10 @@
 
 
+module multiply_add2 : int a, int b, int c -> int r {
+    int tmp = a * b;
+	reg r = tmp + c;
+}
+
 template<int Size>
 module ExactlyOne : bool[Size] inputs -> bool exactlyOne {
 	if Size == 0 {
@@ -17,11 +22,6 @@ module ExactlyOne : bool[Size] inputs -> bool exactlyOne {
 		}
 		exactlyOne = atLeastOnes & !atLeastTwos;
 	}
-}
-
-module multiply_add2 : int a, int b, int c -> int r {
-    int tmp = a * b;
-	reg r = tmp + c;
 }
 
 
@@ -87,6 +87,16 @@ module beep : i32 a {
 
 timeline (a -> r) .. (/ -> r)
 module dwiogo : bool[512] data -> bool[256] out {
+    state bool[256] save = data[256:511];
+	out = data[0:255];
+	#
+	out = save;
+}
+
+
+
+timeline (v -> v) .. (/ -> v) .. (/ -> v) .. (/ -> v)
+module packer : T[256] data /* v _ _ _ */ -> T[64] out { /* v v v v */
     state bool[256] save = data[256:511];
 	out = data[0:255];
 	#

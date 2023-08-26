@@ -94,9 +94,6 @@ fn add_ide_bracket_depths_recursive<'a>(result : &mut [IDEToken], current_depth 
 
 fn walk_name_color(ast : &ASTRoot, result : &mut [IDEToken]) {
     for module in &ast.modules {
-        module.for_each_type(&mut |_name, position| {
-            result[position].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
-        });
         module.for_each_value(&mut |name, position| {
             result[position].typ = IDETokenType::Identifier(if let LocalOrGlobal::Local(l) = name {
                 IDEIdentifierType::Value(module.declarations[l].identifier_type)
@@ -105,6 +102,12 @@ fn walk_name_color(ast : &ASTRoot, result : &mut [IDEToken]) {
             });
         });
         result[module.name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
+    }
+
+    for part_vec in &ast.type_references {
+        for (pos, _name_span) in part_vec {
+            result[*pos].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
+        }
     }
 }
 
