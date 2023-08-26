@@ -259,10 +259,9 @@ impl<'iter> Iterator for FileIter<'iter> {
     }
 }
 
-pub fn tokenize<'txt>(file_data : &'txt str) -> (Vec<Token>, Vec<ParsingError<Span>>) {
+pub fn tokenize<'txt>(file_text : &'txt str, errors : &mut ErrorCollector) -> Vec<Token> {
     let mut result : Vec<Token> = Vec::new();
-    let mut file_char_iter = FileIter::new(file_data);
-    let mut errors : Vec<ParsingError<Span>> = Vec::new();
+    let mut file_char_iter = FileIter::new(file_text);
     
     while let Some((mut file_pos, cur_char)) = file_char_iter.next() {
         if cur_char.is_whitespace() {
@@ -271,14 +270,14 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (Vec<Token>, Vec<ParsingError<Sp
         }
         if is_valid_identifier_char(cur_char) {
             // Start of word
-            let (word, new_cur_char) = file_char_iter.iter_until_end_of_identifier(file_pos, file_data);
+            let (word, new_cur_char) = file_char_iter.iter_until_end_of_identifier(file_pos, file_text);
             
-            let word_str = &file_data[word.clone()];
+            let word_str = &file_text[word.clone()];
             let mut word_chars = word_str.chars();
             let tok_typ = if word_chars.next().unwrap().is_digit(10) {
                 // It's a number
                 if word_chars.find(|v| !v.is_digit(10)).is_some() {
-                    errors.push(error_basic(Span::from(result.len()), "Unexpected letter within number"));
+                    errors.error_basic(Span::from(result.len()), "Unexpected letter within number");
                     TOKEN_INVALID
                 } else {
                     TOKEN_NUMBER
@@ -305,7 +304,7 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (Vec<Token>, Vec<ParsingError<Sp
         let char_file_pos = file_pos;
         if let Some(symbol_idx) = ALL_SYMBOLS.iter().position(
             // Have to do .as_bytes here so we don't get the exception that we're cutting a character in half
-            |&symb| *symb.0.as_bytes() == file_data.as_bytes()[char_file_pos..char_file_pos+symb.0.len()]
+            |&symb| *symb.0.as_bytes() == file_text.as_bytes()[char_file_pos..char_file_pos+symb.0.len()]
         ) {
             let symbol_text : &'static str = ALL_SYMBOLS[symbol_idx].0;
             if symbol_text.len() > 1 {
@@ -317,7 +316,7 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (Vec<Token>, Vec<ParsingError<Sp
                 let end_pos = if let Some(comment_end_idx) = file_char_iter.iter_until_end('\n') {
                     comment_end_idx
                 } else {
-                    file_data.len()
+                    file_text.len()
                 };
                 let comment_span = file_pos..end_pos;
                 result.push(Token::new(TOKEN_COMMENT, comment_span));
@@ -327,23 +326,23 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (Vec<Token>, Vec<ParsingError<Sp
                 let end_pos = if let Some(comment_end_idx) = file_char_iter.iter_until_comment_end() {
                     comment_end_idx
                 } else {
-                    file_data.len()
+                    file_text.len()
                 };
                 let comment_span = file_pos..end_pos;
                 result.push(Token::new(TOKEN_COMMENT, comment_span));
                 
             } else if symbol_tok_id == kw("*/") {
                 // Unexpected close comment
-                errors.push(error_basic(Span::from(result.len()), "Unexpected comment closer when not in comment"));
+                errors.error_basic(Span::from(result.len()), "Unexpected comment closer when not in comment");
                 result.push(Token::new(TOKEN_INVALID, file_pos..file_pos + 2));
             } else {
                 result.push(Token::new(symbol_tok_id, file_pos..file_pos + symbol_text.len()));
             }
         } else { // Symbol not found!
-            errors.push(error_basic(Span::from(result.len()), "Unexpected character"));
+            errors.error_basic(Span::from(result.len()), "Unexpected character");
             result.push(Token::new(TOKEN_INVALID, file_pos..file_pos + cur_char.len_utf8()));
         }
     }
 
-    (result, errors)
+    result
 }

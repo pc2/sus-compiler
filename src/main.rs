@@ -4,7 +4,6 @@ mod parser;
 mod errors;
 mod ast;
 mod code_generation;
-mod global_context;
 
 mod dev_aid;
 

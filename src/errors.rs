@@ -54,14 +54,6 @@ pub fn error_info<T, S : Into<String>>(position : T, reason : S) -> ErrorInfo<T>
     ErrorInfo{position : position, reason : reason.into()}
 }
 
-pub fn error_basic<T, S : Into<String>>(position : T, reason : S) -> ParsingError<T> {
-    ParsingError{error : error_info(position, reason), infos : Vec::new()}
-}
-
-pub fn error_with_info<T, S : Into<String>, V : Into<Vec<ErrorInfo<T>>>>(position : T, reason : S, infos : V) -> ParsingError<T> {
-    ParsingError{error : error_info(position, reason), infos : infos.into()}
-}
-
 pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
     assert!(!expected.is_empty());
     let mut result = String::new();
@@ -79,3 +71,21 @@ pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
     result
 }
 
+// Class that collects and manages errors and warnings
+pub struct ErrorCollector {
+    pub errors : Vec<ParsingError<Span>>
+}
+
+impl<'a> ErrorCollector {
+    pub fn new() -> Self {
+        Self{errors : Vec::new()}
+    }
+    
+    pub fn error_basic<S : Into<String>>(&mut self, position : Span, reason : S) {
+        self.errors.push(ParsingError{error : error_info(position, reason), infos : Vec::new()});
+    }
+    
+    pub fn error_with_info<S : Into<String>>(&mut self, position : Span, reason : S, infos : Vec<ErrorInfo<Span>>) {
+        self.errors.push(ParsingError{error : error_info(position, reason), infos : infos});
+    }
+}
