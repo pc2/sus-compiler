@@ -16,11 +16,27 @@ impl Span {
     }
 }
 
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+pub struct RowCol {
+    pub row : usize,
+    pub col : usize // deals with character indices
+}
+
+impl RowCol {
+    pub fn advance_char(&mut self, ch : char) {
+        if ch == '\n' {
+            self.row += 1;
+            self.col = 0;
+        } else {
+            self.col += 1;
+        }
+    }
+}
+
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub struct FilePos {
     pub char_idx : usize, // Byte index
-    pub row : usize,
-    pub col : usize // Char index
+    pub row_col : RowCol,
 }
 
 // Char span, for chars in file. start is INCLUSIVE, end is EXCLUSIVE. It's a bit weird to make the distinction, but it works out
@@ -28,14 +44,6 @@ pub struct FilePos {
 pub struct CharSpan{
     pub file_pos : FilePos,
     pub length : usize // in bytes. Can just do file_text[file_pos.char_idx .. file_pos.char_idx + length]
-}
-
-
-pub fn cvt_span_to_char_span(sp : Span, char_sp_buf : &[CharSpan]) -> CharSpan {
-    let file_pos = char_sp_buf[if sp.0 < char_sp_buf.len() {sp.0} else {char_sp_buf.len()-1}].file_pos;
-    let length = char_sp_buf[if sp.1 < char_sp_buf.len() {sp.1} else {char_sp_buf.len()-1}].end_pos() - file_pos.char_idx;
-
-    CharSpan{file_pos, length}
 }
 
 impl CharSpan {

@@ -200,15 +200,15 @@ impl<'it> TokenStream<'it> {
     }
 }
 
-struct ASTParserContext<'g, 'g2, 'file> {
-    global : &'g mut GlobalContext<'g2>,
+struct ASTParserContext<'g, 'file> {
+    global : &'g mut GlobalContext,
     file_text : &'file str,
 
     global_references : Vec<GlobalIdentifier>,
     type_references : Vec<GlobalIdentifier>
 }
 
-impl<'g, 'g2, 'file> ASTParserContext<'g, 'g2, 'file> {
+impl<'g, 'file> ASTParserContext<'g, 'file> {
     fn add_global_reference(&mut self, name_span : GlobalIdentifier) -> usize {
         let idx = self.global_references.len();
         self.global_references.push(name_span);
@@ -307,7 +307,7 @@ impl<'g, 'g2, 'file> ASTParserContext<'g, 'g2, 'file> {
         let decl_id = declarations.len();
         declarations.push(decl);
         if let Err(conflict) = scope.add_declaration(&self.file_text[name.name.clone()], decl_id) {
-            self.global.error_with_info(span, format!("This name was already declared previously"), [
+            self.global.error_with_info(span, format!("This name was already declared previously"), vec![
                 error_info(declarations[conflict].span, "Previous declaration")
             ]);
         }
@@ -347,7 +347,7 @@ impl<'g, 'g2, 'file> ASTParserContext<'g, 'g2, 'file> {
                 if let Some(result) = self.parse_expression(&mut content_token_stream, scope) {
                     if let Some(erroneous_found_token) = content_token_stream.peek() {
                         // The expression should cover the whole brackets! 
-                        let infos = [
+                        let infos = vec![
                             error_info(*span, "Expression should have ended with this scope"),
                             error_info(result.1, "But actually only stretches this far"),
                         ];
@@ -669,7 +669,7 @@ impl<'g, 'g2, 'file> ASTParserContext<'g, 'g2, 'file> {
     }
 }
 
-pub fn parse<'nums, 'g, 'g2, 'file>(token_hierarchy : &Vec<TokenTreeNode>, file_text : &'file str, num_tokens : usize, global : &'g mut GlobalContext<'g2>) -> ASTRoot {
+pub fn parse<'nums, 'g, 'file>(token_hierarchy : &Vec<TokenTreeNode>, file_text : &'file str, num_tokens : usize, global : &'g mut GlobalContext) -> ASTRoot {
     let context = ASTParserContext{global, file_text, global_references : Vec::new(), type_references : Vec::new()};
     let mut token_stream = TokenStream::new(&token_hierarchy, 0, num_tokens);
     context.parse_ast(&mut token_stream)
@@ -683,10 +683,10 @@ pub struct FullParseResult {
     pub ast : ASTRoot
 }
 
-pub fn perform_full_semantic_parse<'txt>(file_text : &'txt str) -> (FullParseResult, Vec<ParsingError<CharSpan>>) {
+pub fn perform_full_semantic_parse<'txt>(file_text : &'txt str) -> (FullParseResult, Vec<ParsingError<Span>>) {
     let (tokens, errors) = tokenize(file_text);
 
-    let mut global = GlobalContext{errors, token_spans : &tokens.token_spans};
+    let mut global = GlobalContext{errors};
 
     let token_hierarchy = to_token_hierarchy(&tokens.tokens, &mut global);
 

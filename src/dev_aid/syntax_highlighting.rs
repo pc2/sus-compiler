@@ -1,4 +1,6 @@
 
+use std::ops::Range;
+
 use crate::{ast::*, tokenizer::*, parser::*};
 
 use console::Style;
@@ -31,26 +33,26 @@ pub struct IDEToken {
     pub typ : IDETokenType
 }
 
-fn pretty_print_chunk_with_whitespace(whitespace_start : usize, file_text : &str, text_span : CharSpan, st : Style) { 
-    let whitespace_text = &file_text[whitespace_start..text_span.file_pos.char_idx];
+fn pretty_print_chunk_with_whitespace(whitespace_start : usize, file_text : &str, text_span : Range<usize>, st : Style) { 
+    let whitespace_text = &file_text[whitespace_start..text_span.start];
 
-    print!("{}{}", whitespace_text, st.apply_to(&file_text[text_span.as_range()]));
+    print!("{}{}", whitespace_text, st.apply_to(&file_text[text_span]));
 }
 
-fn print_tokens(file_text : &str, token_spans : &[CharSpan]) {
+fn print_tokens(file_text : &str, tokens : &[Token]) {
     let mut whitespace_start : usize = 0;
-    for (tok_idx, tok_span) in token_spans.iter().enumerate() {
+    for (tok_idx, token) in tokens.iter().enumerate() {
         let styles = [Style::new().magenta(), Style::new().yellow(), Style::new().blue()];
         let st = styles[tok_idx % styles.len()].clone().underlined();
         
-        pretty_print_chunk_with_whitespace(whitespace_start, file_text, *tok_span, st);
-        whitespace_start = tok_span.end_pos();
+        pretty_print_chunk_with_whitespace(whitespace_start, file_text, token.get_range(), st);
+        whitespace_start = token.get_range().end;
     }
 
     print!("{}\n", &file_text[whitespace_start..file_text.len()]);
 }
 
-fn pretty_print(file_text : &str, token_spans : &[CharSpan], ide_infos : &[IDEToken]) {
+fn pretty_print(file_text : &str, tokens : &[Token], ide_infos : &[IDEToken]) {
     let mut whitespace_start : usize = 0;
 
     for (tok_idx, token) in ide_infos.iter().enumerate() {
@@ -74,9 +76,9 @@ fn pretty_print(file_text : &str, token_spans : &[CharSpan], ide_infos : &[IDETo
             }
         };
         
-        let tok_span = token_spans[tok_idx];
-        pretty_print_chunk_with_whitespace(whitespace_start, file_text, tok_span, st);
-        whitespace_start = tok_span.end_pos();
+        let tok_span = tokens[tok_idx].get_range();
+        pretty_print_chunk_with_whitespace(whitespace_start, file_text, tok_span.clone(), st);
+        whitespace_start = tok_span.end;
     }
 
     print!("{}\n", &file_text[whitespace_start..file_text.len()]);
@@ -156,15 +158,15 @@ pub fn syntax_highlight_file(file_path : &str) {
     let (full_parse, errors) = perform_full_semantic_parse(&file_text);
 
     for err in errors {
-        err.pretty_print_error(&file_path, &file_text)
+        err.pretty_print_error(&file_path, &file_text, &full_parse.tokens.tokens);
     }
     
-    print_tokens(&file_text, &full_parse.tokens.token_spans);
+    print_tokens(&file_text, &full_parse.tokens.tokens);
 
     let ide_tokens = create_token_ide_info(&full_parse);
     
     
-    pretty_print(&file_text, &full_parse.tokens.token_spans, &ide_tokens);
+    pretty_print(&file_text, &full_parse.tokens.tokens, &ide_tokens);
     
     println!("{:?}", full_parse.ast);
 }

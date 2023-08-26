@@ -1,8 +1,9 @@
 
 
+use std::ops::Range;
+
 use crate::ast::Span;
-use crate::ast::CharSpan;
-use crate::ast::cvt_span_to_char_span;
+use crate::tokenizer::Token;
 use ariadne::*;
 
 use crate::tokenizer::{TokenTypeIdx, get_token_type_name};
@@ -17,23 +18,31 @@ pub struct ParsingError<T> {
     pub infos : Vec<ErrorInfo<T>>
 }
 
-impl<'a> ParsingError<CharSpan> {
-    pub fn pretty_print_error(&self, file_name : &str, file_text : &str) {
+fn cvt_span_to_char_range(span : Span, tokens : &[Token]) -> Range<usize> {
+    let min = tokens[span.0].get_range().start;
+    let max = tokens[span.1].get_range().end;
+    min..max
+}
+
+impl<'a> ParsingError<Span> {
+    pub fn pretty_print_error(&self, file_name : &str, file_text : &str, tokens : &[Token]) {
         // Generate & choose some colours for each of our elements
         let err_color = Color::Red;
         let info_color = Color::Blue;
 
-        let mut report = Report::build(ReportKind::Error, file_name, self.error.position.file_pos.char_idx)
+        let error_span = cvt_span_to_char_range(self.error.position, tokens);
+        let mut report = Report::build(ReportKind::Error, file_name, error_span.start)
             .with_message(&self.error.reason)
             .with_label(
-                Label::new((file_name, self.error.position.as_range()))
+                Label::new((file_name, error_span))
                     .with_message(&self.error.reason)
                     .with_color(err_color)
             );
 
         for info in &self.infos {
+            let info_span = cvt_span_to_char_range(info.position, tokens);
             report = report.with_label(
-                Label::new((file_name, info.position.as_range()))
+                Label::new((file_name, info_span))
                     .with_message(&info.reason)
                     .with_color(info_color)
             )
@@ -46,21 +55,6 @@ impl<'a> ParsingError<CharSpan> {
         .print((file_name, Source::from(file_text)))
         .unwrap();
     }
-}
-
-pub fn cvt_token_err_info_to_str(err : ErrorInfo<Span>, token_spans : &[CharSpan]) -> ErrorInfo<CharSpan> {
-    ErrorInfo{position : cvt_span_to_char_span(err.position, token_spans), reason : err.reason}
-}
-
-pub fn cvt_token_error_to_str_error(err : ParsingError<Span>, token_spans : &[CharSpan]) -> ParsingError<CharSpan> {
-    let mut info_vec : Vec<ErrorInfo<CharSpan>> = Vec::new();
-    info_vec.reserve(err.infos.len());
-
-    for i in err.infos {
-        info_vec.push(cvt_token_err_info_to_str(i, token_spans));
-    }
-
-    ParsingError{error : cvt_token_err_info_to_str(err.error, token_spans), infos : info_vec}
 }
 
 pub fn error_info<T, S : Into<String>>(position : T, reason : S) -> ErrorInfo<T> {

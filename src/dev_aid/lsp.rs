@@ -10,7 +10,7 @@ use lsp_server::{Response, Message, Connection};
 
 use lsp_types::notification::Notification;
 
-use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, CharSpan}, errors::ParsingError};
+use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, RowCol, Span}, errors::ParsingError, tokenizer::Token};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -177,16 +177,16 @@ struct SemanticTokensDeltaAccumulator {
 }
 
 impl SemanticTokensDeltaAccumulator {
-    fn push(&mut self, line : usize, col : usize, length : usize, typ : u32, mod_bits : u32) {
-        let delta_line = line - self.prev_line;
+    fn push(&mut self, row_col : RowCol, length : usize, typ : u32, mod_bits : u32) {
+        let delta_line = row_col.row - self.prev_line;
 
         if delta_line != 0 {
             self.prev_col = 0;
         }
 
-        let delta_col = col - self.prev_col;
-        self.prev_col = col;
-        self.prev_line = line;
+        let delta_col = row_col.col - self.prev_col;
+        self.prev_col = row_col.col;
+        self.prev_line = row_col.row;
 
         self.semantic_tokens.push(SemanticToken{
             delta_line: delta_line as u32,
@@ -203,37 +203,35 @@ fn do_syntax_highlight(file_data : &LoadedFile, full_parse : &FullParseResult) -
     let ide_tokens = create_token_ide_info(&full_parse);
 
     let mut semantic_tokens_acc = SemanticTokensDeltaAccumulator{prev_line : 0, prev_col : 0, semantic_tokens : Vec::new()};
-    semantic_tokens_acc.semantic_tokens.reserve(full_parse.tokens.token_spans.len());
+    semantic_tokens_acc.semantic_tokens.reserve(full_parse.tokens.tokens.len());
 
     for (idx, tok) in ide_tokens.iter().enumerate() {
-        let tok_file_pos = full_parse.tokens.token_spans[idx];
-        let token_text = &file_text[tok_file_pos.as_range()];
+        let token_text = &file_text[full_parse.tokens.tokens[idx].get_range()];
         let char_iter = token_text.chars();
+        let mut row_col = full_parse.tokens.token_row_cols[idx];
 
         let typ = get_semantic_token_type_from_ide_token(tok);
         let mod_bits = get_modifiers_for_token(tok);
         if tok.typ == IDETokenType::Comment {
             // Comments can be multiline, editor doesn't support this. Have to split them up myself. Eurgh
             let mut line_char_offset = 0;
-            let mut line = tok_file_pos.file_pos.row;
-            let mut col = tok_file_pos.file_pos.col;
             let mut length_in_chars : usize = 0;
             for (idx, c) in char_iter.enumerate() {
                 length_in_chars += 1;
                 if c == '\n' {
-                    semantic_tokens_acc.push(line, col, idx - line_char_offset, typ, mod_bits);
+                    semantic_tokens_acc.push(row_col, idx - line_char_offset, typ, mod_bits);
 
                     line_char_offset = idx + 1;
-                    line += 1;
-                    col = 0;
+                    row_col.row += 1;
+                    row_col.col = 0;
                 }
             }
             let leftover_length = length_in_chars - line_char_offset;
             if leftover_length > 0 {
-                semantic_tokens_acc.push(line, col, leftover_length, typ, mod_bits);
+                semantic_tokens_acc.push(row_col, leftover_length, typ, mod_bits);
             }
         } else {
-            semantic_tokens_acc.push(tok_file_pos.file_pos.row, tok_file_pos.file_pos.col, char_iter.count(), typ, mod_bits);
+            semantic_tokens_acc.push(row_col, char_iter.count(), typ, mod_bits);
         }
 
         //println!("{}: typ={typ} {delta_line}:{delta_col}", file_text[tok_file_pos.as_range()]);
@@ -247,32 +245,28 @@ fn do_syntax_highlight(file_data : &LoadedFile, full_parse : &FullParseResult) -
 
 use lsp_types::Diagnostic;
 
-fn cvt_char_span_to_lsp_range(ch_sp : CharSpan, file_text : &str) -> lsp_types::Range {
-    let mut last_char_line = ch_sp.file_pos.row;
-    let mut last_char_col = ch_sp.file_pos.col;
-    for c in file_text[ch_sp.as_range()].chars() {
-        if c == '\n' {
-            last_char_line += 1;
-            last_char_col = 0;
-        } else {
-            last_char_col += 1;
-        }
+fn cvt_span_to_lsp_range(ch_sp : Span, file_text : &str, tokens : &[Token], row_cols : &[RowCol]) -> lsp_types::Range {
+    let start_row_col = row_cols[ch_sp.0];
+
+    let mut last_row_col = row_cols[ch_sp.1];
+    for c in file_text[tokens[ch_sp.1].get_range()].chars() {
+        last_row_col.advance_char(c);
     }
     Range{
         start : Position{
-            line : ch_sp.file_pos.row as u32,
-            character : ch_sp.file_pos.col as u32
+            line : start_row_col.row as u32,
+            character : start_row_col.col as u32
         }, end : Position{
-            line : last_char_line as u32,
-            character : last_char_col as u32
+            line : last_row_col.row as u32,
+            character : last_row_col.col as u32
         }
     }
 }
 
-fn send_errors_warnings(connection: &Connection, errs : Vec<ParsingError<CharSpan>>, file_uri: Url, file_text : &str) -> Result<(), Box<dyn Error + Sync + Send>> {
+fn send_errors_warnings(connection: &Connection, errs : Vec<ParsingError<Span>>, file_uri: Url, file_text : &str, tokens : &[Token], token_row_cols : &[RowCol]) -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut diag_vec : Vec<Diagnostic> = Vec::new();
     for err in errs {
-        diag_vec.push(Diagnostic::new_simple(cvt_char_span_to_lsp_range(err.error.position, file_text), err.error.reason));
+        diag_vec.push(Diagnostic::new_simple(cvt_span_to_lsp_range(err.error.position, file_text,tokens, token_row_cols), err.error.reason));
     }
     
     let params = &PublishDiagnosticsParams{
@@ -332,7 +326,7 @@ fn main_loop(
                             id: req.id, result: Some(result), error: None
                         }))?;
 
-                        send_errors_warnings(&connection, errors, params.text_document.uri, &file_data.file_text)?;
+                        send_errors_warnings(&connection, errors, params.text_document.uri, &file_data.file_text, &full_parse.tokens.tokens, &full_parse.tokens.token_row_cols)?;
                     },
                     // TODO ...
                     req => {

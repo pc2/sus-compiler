@@ -1,6 +1,7 @@
 use std::ops::Range;
 use std::str::CharIndices;
 
+use crate::ast::{RowCol, Span};
 use crate::errors::*;
 
 pub type TokenTypeIdx = u8;
@@ -23,7 +24,6 @@ impl Token {
 
 
 use crate::ast::FilePos;
-use crate::ast::CharSpan;
 
 
 pub const ALL_KEYWORDS : [(&'static str, u8); 17] = [
@@ -205,13 +205,12 @@ fn is_valid_identifier_char(c : char) -> bool {
 
 struct FileIter<'iter> {
     char_iter : CharIndices<'iter>,
-    row : usize,
-    col : usize
+    row_col : RowCol
 }
 
 impl<'iter> FileIter<'iter> {
     fn new(text : &'iter str) -> Self {
-        Self{char_iter : text.char_indices(), row : 0, col : 0}
+        Self{char_iter : text.char_indices(), row_col : RowCol{row : 0, col : 0}}
     }
 
     // Returns index of last char
@@ -259,13 +258,8 @@ impl<'iter> Iterator for FileIter<'iter> {
     type Item = (FilePos, char);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((pos, ch)) = self.char_iter.next() {
-            let cur_pos = FilePos{char_idx : pos, row : self.row, col : self.col};
-            if ch == '\n' {
-                self.row += 1;
-                self.col = 0;
-            } else {
-                self.col += 1;
-            }
+            let cur_pos = FilePos{char_idx : pos, row_col : self.row_col};
+            self.row_col.advance_char(ch);
             Some((cur_pos, ch))
         } else {
             None
@@ -276,23 +270,23 @@ impl<'iter> Iterator for FileIter<'iter> {
 #[derive(Debug, Default)]
 pub struct TokenizerResult {
     pub tokens : Vec<Token>,
-    pub token_spans : Vec<CharSpan>
+    pub token_row_cols : Vec<RowCol>
 }
 
 impl TokenizerResult {
-    pub fn push(&mut self, typ : TokenTypeIdx, span : CharSpan) {
-        self.tokens.push(Token{typ, from : span.file_pos.char_idx, to : span.file_pos.char_idx + span.length});
-        self.token_spans.push(span);
+    pub fn push(&mut self, typ : TokenTypeIdx, span : Range<usize>, row_col : RowCol) {
+        self.tokens.push(Token{typ, from : span.start, to : span.end});
+        self.token_row_cols.push(row_col);
     }
     pub fn len(&self) -> usize {
         self.tokens.len()
     }
 }
 
-pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult, Vec<ParsingError<CharSpan>>) {
+pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult, Vec<ParsingError<Span>>) {
     let mut result : TokenizerResult = Default::default();
     let mut file_char_iter = FileIter::new(file_data);
-    let mut errors : Vec<ParsingError<CharSpan>> = Vec::new();
+    let mut errors : Vec<ParsingError<Span>> = Vec::new();
     
     while let Some((mut file_pos, cur_char)) = file_char_iter.next() {
         if cur_char.is_whitespace() {
@@ -303,25 +297,24 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult, Vec<ParsingErr
             // Start of word
             let (word, new_cur_char) = file_char_iter.iter_until_end_of_identifier(file_pos.char_idx, file_data);
             
-            let word_span = CharSpan{file_pos, length: word.len()};
-            
-            let word_str = &file_data[word];
+            let word_str = &file_data[word.clone()];
             let mut word_chars = word_str.chars();
-            if word_chars.next().unwrap().is_digit(10) {
+            let tok_typ = if word_chars.next().unwrap().is_digit(10) {
                 // It's a number
                 if word_chars.find(|v| !v.is_digit(10)).is_some() {
-                    errors.push(error_basic(word_span, "Unexpected letter within number"));
-                    result.push(TOKEN_INVALID, word_span);
+                    errors.push(error_basic(Span::from(result.len()), "Unexpected letter within number"));
+                    TOKEN_INVALID
                 } else {
-                    result.push(TOKEN_NUMBER, word_span);
+                    TOKEN_NUMBER
                 }
             } else {
                 if let Some(found) = const_str_position(word_str, &ALL_KEYWORDS) {
-                    result.push(found as TokenTypeIdx, word_span);
+                    found as TokenTypeIdx
                 } else {
-                    result.push(TOKEN_IDENTIFIER, word_span);
+                    TOKEN_IDENTIFIER
                 }
             };
+            result.push(tok_typ, word, file_pos.row_col);
 
             if let Some((next_pos_i, next_char)) = new_cur_char {
                 if next_char.is_whitespace() {
@@ -345,32 +338,34 @@ pub fn tokenize<'txt>(file_data : &'txt str) -> (TokenizerResult, Vec<ParsingErr
             let symbol_tok_id = (symbol_idx + ALL_KEYWORDS.len()) as TokenTypeIdx;
             if symbol_tok_id == kw("//") {
                 // Open single line comment
-                let comment_str = if let Some(comment_end_idx) = file_char_iter.iter_until_end('\n') {
-                    &file_data[file_pos.char_idx..comment_end_idx]
+                let end_pos = if let Some(comment_end_idx) = file_char_iter.iter_until_end('\n') {
+                    comment_end_idx
                 } else {
-                    &file_data[file_pos.char_idx..]
+                    file_data.len()
                 };
-                result.push(TOKEN_COMMENT, CharSpan{file_pos, length: comment_str.len()});
+                let comment_span = file_pos.char_idx..end_pos;
+                result.push(TOKEN_COMMENT, comment_span, file_pos.row_col);
 
             } else if symbol_tok_id == kw("/*") {
                 // Open single multi-line comment
-                let comment_str = if let Some(comment_end_idx) = file_char_iter.iter_until_comment_end() {
-                    &file_data[file_pos.char_idx..comment_end_idx]
+                let end_pos = if let Some(comment_end_idx) = file_char_iter.iter_until_comment_end() {
+                    comment_end_idx
                 } else {
-                    &file_data[file_pos.char_idx..]
+                    file_data.len()
                 };
-                result.push(TOKEN_COMMENT, CharSpan{file_pos, length: comment_str.len()});
+                let comment_span = file_pos.char_idx..end_pos;
+                result.push(TOKEN_COMMENT, comment_span, file_pos.row_col);
                 
             } else if symbol_tok_id == kw("*/") {
                 // Unexpected close comment
-                errors.push(error_basic(CharSpan{file_pos, length: 2}, "Unexpected comment closer when not in comment"));
+                errors.push(error_basic(Span::from(result.len()), "Unexpected comment closer when not in comment"));
+                result.push(TOKEN_INVALID, file_pos.char_idx..file_pos.char_idx + 2, file_pos.row_col);
             } else {
-                let symbol_text_span = CharSpan{file_pos, length: symbol_text.len()};
-                
-                result.push(symbol_tok_id, symbol_text_span);
+                result.push(symbol_tok_id, file_pos.char_idx..file_pos.char_idx + 2, file_pos.row_col);
             }
         } else { // Symbol not found!
-            errors.push(error_basic(CharSpan{file_pos, length: cur_char.len_utf8()}, "Unexpected character"));
+            errors.push(error_basic(Span::from(result.len()), "Unexpected character"));
+            result.push(TOKEN_INVALID, file_pos.char_idx..file_pos.char_idx + cur_char.len_utf8(), file_pos.row_col);
         }
     }
 
