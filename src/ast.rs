@@ -163,7 +163,7 @@ impl IterIdentifiers for SpanAssignableExpression {
         match expr {
             AssignableExpression::Named{local_idx: id, num_regs : _} => {
                 assert!(span.0 == span.1);
-                func(LocalOrGlobal::Local(*id), span.0)
+                func(LocalOrGlobal::Local(*id), span.0);
             }
             AssignableExpression::ArrayIndex(b) => {
                 let (array, idx) = &**b;

@@ -208,6 +208,11 @@ struct ASTParserContext<'g, 'file> {
     type_references : Vec<GlobalIdentifier>
 }
 
+struct ASTParserRollbackable {
+    original_global_references_size : usize,
+    original_type_references_size : usize
+}
+
 impl<'g, 'file> ASTParserContext<'g, 'file> {
     fn add_global_reference(&mut self, name_span : GlobalIdentifier) -> usize {
         let idx = self.global_references.len();
@@ -218,6 +223,15 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         let idx = self.type_references.len();
         self.type_references.push(name_span);
         idx
+    }
+
+    fn prepare_rollback(&self) -> ASTParserRollbackable {
+        ASTParserRollbackable{original_global_references_size : self.global_references.len(), original_type_references_size : self.type_references.len()}
+    }
+
+    fn rollback(&mut self, rollback_store : ASTParserRollbackable) {
+        self.global_references.truncate(rollback_store.original_global_references_size);
+        self.type_references.truncate(rollback_store.original_type_references_size);
     }
     
     fn error_unexpected_token(&mut self, expected : &[TokenTypeIdx], found : TokenTypeIdx, pos : usize, context : &str) {
@@ -503,18 +517,22 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
 
             let mut tok_stream_copy = token_stream.clone();
             
+            let rollback_ctx = self.prepare_rollback();
             if let Some((name, span)) = self.try_parse_declaration(&mut tok_stream_copy, declarations, scope) {
                 // Maybe it's a declaration?
                 *token_stream = tok_stream_copy;
                 left_expressions.push(((Expression::Named(LocalOrGlobal::Local(name)), span), reg_count));
 
-            } else if let Some(sp_expr) = self.parse_expression(token_stream, scope) {
-                // It's an expression instead!
-                left_expressions.push((sp_expr, reg_count));
-                all_decls = false;
             } else {
-                // Also not, error then
-                token_stream.skip_until_one_of(&[kw(","), kw("="), kw(";")]);
+                self.rollback(rollback_ctx);
+                if let Some(sp_expr) = self.parse_expression(token_stream, scope) {
+                    // It's an expression instead!
+                    left_expressions.push((sp_expr, reg_count));
+                    all_decls = false;
+                } else {
+                    // Also not, error then
+                    token_stream.skip_until_one_of(&[kw(","), kw("="), kw(";")]);
+                }
             }
             match token_stream.next() {
                 Some(TokenTreeNode::PlainToken(tok, _pos)) if tok.get_type() == kw(",") => {
