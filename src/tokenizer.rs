@@ -304,7 +304,7 @@ pub fn tokenize<'txt>(file_text : &'txt str, errors : &mut ErrorCollector) -> Ve
         let char_file_pos = file_pos;
         if let Some(symbol_idx) = ALL_SYMBOLS.iter().position(
             // Have to do .as_bytes here so we don't get the exception that we're cutting a character in half
-            |&symb| *symb.0.as_bytes() == file_text.as_bytes()[char_file_pos..char_file_pos+symb.0.len()]
+            |&symb| file_text[char_file_pos..].starts_with(symb.0)
         ) {
             let symbol_text : &'static str = ALL_SYMBOLS[symbol_idx].0;
             if symbol_text.len() > 1 {
