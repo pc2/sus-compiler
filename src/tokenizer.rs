@@ -86,18 +86,17 @@ pub const ALL_SYMBOLS : [(&'static str, u8); 33] = [
     (":", 0)
 ];
 
-pub const MISC_TOKENS : [&'static str; 5] = [
-    "IDENTIFIER",
-    "NUMBER",
-    "BIG_INTEGER",
-    "COMMENT",
-    "INVALID"
-];
-
 pub const TOKEN_IDENTIFIER : TokenTypeIdx = (ALL_KEYWORDS.len() + ALL_SYMBOLS.len()) as TokenTypeIdx;
 pub const TOKEN_NUMBER : TokenTypeIdx = TOKEN_IDENTIFIER + 1;
 pub const TOKEN_COMMENT : TokenTypeIdx = TOKEN_IDENTIFIER + 2;
 pub const TOKEN_INVALID : TokenTypeIdx = TOKEN_IDENTIFIER + 3;
+
+pub const MISC_TOKENS : [&'static str; (TOKEN_INVALID - TOKEN_IDENTIFIER + 1) as usize] = [
+    "IDENTIFIER",
+    "NUMBER",
+    "COMMENT",
+    "INVALID"
+];
 
 pub const fn const_eq_str(a: &str, b: &str) -> bool {
     let a_bytes = a.as_bytes();
@@ -151,15 +150,6 @@ pub fn is_operator(typ : TokenTypeIdx) -> bool {
 }
 pub fn is_unary_operator(typ : TokenTypeIdx) -> bool {
     typ == kw("|") || typ == kw("&") || typ == kw("^") || typ == kw("+") || typ == kw("*") || typ == kw("!")
-}
-pub fn is_identifier(typ : TokenTypeIdx) -> bool {
-    typ == TOKEN_IDENTIFIER
-}
-pub fn is_number(typ : TokenTypeIdx) -> bool {
-    typ == TOKEN_NUMBER
-}
-pub fn is_comment(typ : TokenTypeIdx) -> bool {
-    typ == TOKEN_COMMENT
 }
 pub fn get_token_type_name(typ : TokenTypeIdx) -> &'static str {
     if is_keyword(typ) {

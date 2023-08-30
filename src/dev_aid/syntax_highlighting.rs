@@ -130,13 +130,14 @@ pub fn create_token_ide_info<'a>(parsed: &FullParseResult) -> Vec<IDEToken> {
             } else {
                 IDETokenType::Operator
             }
-        } else if is_identifier(tok_typ) {
+        } else if tok_typ == TOKEN_IDENTIFIER {
             IDETokenType::Identifier(IDEIdentifierType::Unknown)
-        } else if is_number(tok_typ) {
+        } else if tok_typ == TOKEN_NUMBER {
             IDETokenType::Number
-        } else if is_comment(tok_typ) {
+        } else if tok_typ == TOKEN_COMMENT {
             IDETokenType::Comment
         } else {
+            assert!(tok_typ == TOKEN_INVALID);
             IDETokenType::Invalid
         };
 

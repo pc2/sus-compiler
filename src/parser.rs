@@ -49,7 +49,7 @@ pub fn to_token_hierarchy(tokens : &[Token], errors : &mut ErrorCollector) -> Ve
 
     for (idx, &tok) in tokens.iter().enumerate() {
         let tok_typ = tok.get_type();
-        if is_comment(tok_typ) { // At this stage the comments are filtered out
+        if tok_typ == TOKEN_COMMENT || tok_typ == TOKEN_INVALID { // At this stage the comments are filtered out
             continue;
         }
         match is_bracket(tok_typ) {
@@ -336,7 +336,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
                 let new_span = Span(*pos, found_expr.1.1);
                 return Some((Expression::UnaryOp(Box::new((Operator{op_typ : tok.get_type()}, *pos, found_expr))), new_span));
             },
-            Some(TokenTreeNode::PlainToken(tok, pos)) if is_identifier(tok.get_type()) => {
+            Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == TOKEN_IDENTIFIER => {
                 let ident_ref = if let Some(local_idx) = scope.get_declaration_for(&self.file_text[tok.get_range()]) {
                     LocalOrGlobal::Local(local_idx)
                 } else {
@@ -531,7 +531,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
                     all_decls = false;
                 } else {
                     // Also not, error then
-                    token_stream.skip_until_one_of(&[kw(","), kw("="), kw(";")]);
+                    //token_stream.skip_until_one_of(&[kw(","), kw("="), kw(";")]);
                 }
             }
             match token_stream.next() {
