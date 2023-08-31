@@ -105,11 +105,11 @@ fn walk_name_color(ast : &ASTRoot, result : &mut [IDEToken]) {
             });
         });
         result[module.name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
-    }
 
-    for part_vec in &ast.type_references {
-        for (pos, _name_span) in part_vec {
-            result[*pos].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
+        for part_vec in &module.type_references {
+            for part_tok in part_vec {
+                result[part_tok.position].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
+            }
         }
     }
 }

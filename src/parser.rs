@@ -3,8 +3,10 @@ use num_bigint::BigUint;
 
 use crate::{tokenizer::*, errors::*, ast::*};
 
-use std::{iter::Peekable, ops::Range, str::FromStr};
+use std::{iter::Peekable, str::FromStr};
 use core::slice::Iter;
+
+use std::mem::replace;
 
 pub enum TokenTreeNode {
     PlainToken(Token, usize), // Has the index of the given token to the global Token array
@@ -169,11 +171,11 @@ impl<'it> TokenStream<'it> {
         }
         false
     }
-    fn eat_is_plain(&mut self, expected : TokenTypeIdx) -> Option<(Range<usize>, usize)> {
+    fn eat_is_plain(&mut self, expected : TokenTypeIdx) -> Option<TokenContent> {
         if let Some(TokenTreeNode::PlainToken(tok, pos)) = self.peek() {
             if tok.get_type() == expected {
                 self.next();
-                return Some((tok.get_range(), *pos));
+                return Some(TokenContent{position : *pos, text : tok.get_range()});
             }
         }
         None
@@ -265,14 +267,12 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
     }
 
 
-    fn eat_plain_internal(&mut self, token_stream : &mut TokenStream, expected : TokenTypeIdx, context : &str) -> Option<(usize, Range<usize>)> {
+    fn eat_plain_internal(&mut self, token_stream : &mut TokenStream, expected : TokenTypeIdx, context : &str) -> Option<TokenContent> {
         assert!(is_bracket(expected) == IsBracket::NotABracket);
         
-        let tok_elem = token_stream.next();
-        
-        match tok_elem {
+        match token_stream.next() {
             Some(TokenTreeNode::PlainToken(tok, idx)) if tok.get_type() == expected => {
-                Some((*idx, tok.get_range()))
+                Some(TokenContent{position : *idx, text : tok.get_range()})
             },
             other => {
                 self.error_unexpected_tree_node(&[expected], other, token_stream.unexpected_eof_token, context);
@@ -281,11 +281,10 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
     fn eat_plain(&mut self, token_stream : &mut TokenStream, expected : TokenTypeIdx, context : &str) -> Option<usize> {
-        Some(self.eat_plain_internal(token_stream, expected, context)?.0)
+        Some(self.eat_plain_internal(token_stream, expected, context)?.position)
     }
-    fn eat_identifier(&mut self, token_stream : &mut TokenStream, context : &str) -> Option<IdentifierToken> {
-        let (position, name) = self.eat_plain_internal(token_stream, TOKEN_IDENTIFIER, context)?;
-        Some(IdentifierToken{name, position})
+    fn eat_identifier(&mut self, token_stream : &mut TokenStream, context : &str) -> Option<TokenContent> {
+        self.eat_plain_internal(token_stream, TOKEN_IDENTIFIER, context)
     }
     fn eat_block<'it>(&mut self, token_stream : &mut TokenStream<'it>, expected_block_opener : TokenTypeIdx, context : &str) -> Option<(&'it [TokenTreeNode], Span)> {
         assert!(is_bracket(expected_block_opener) != IsBracket::NotABracket);
@@ -315,12 +314,12 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn add_declaration(&mut self, type_expr : SpanTypeExpression, name : IdentifierToken, identifier_type : IdentifierType, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>) -> usize {
+    fn add_declaration(&mut self, type_expr : SpanTypeExpression, name : TokenContent, identifier_type : IdentifierType, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>) -> usize {
         let span = Span(type_expr.1.0, name.position);
-        let decl = SignalDeclaration{typ : type_expr, span, name : name.name.clone(), identifier_type};
+        let decl = SignalDeclaration{typ : type_expr, span, name : name.text.clone(), identifier_type};
         let decl_id = declarations.len();
         declarations.push(decl);
-        if let Err(conflict) = scope.add_declaration(&self.file_text[name.name.clone()], decl_id) {
+        if let Err(conflict) = scope.add_declaration(&self.file_text[name.text.clone()], decl_id) {
             self.errors.error_with_info(span, format!("This name was already declared previously"), vec![
                 error_info(declarations[conflict].span, "Previous declaration")
             ]);
@@ -341,7 +340,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
                     LocalOrGlobal::Local(local_idx)
                 } else {
                     // todo namespacing and shit
-                    let global_ident = vec![(*pos, tok.get_range())];
+                    let global_ident = vec![TokenContent{position : *pos, text : tok.get_range()}];
                     LocalOrGlobal::Global(self.add_global_reference(global_ident))
                 };
                 (Expression::Named(ident_ref), Span::from(*pos))
@@ -447,30 +446,30 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
     }
     
     fn try_parse_type(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext) -> Option<SpanTypeExpression> {
-        let (name_id, first_pos) = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
+        let first_token = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
         // todo namespacing and shit
-        let global_ident = vec![(first_pos, name_id)];
-        let mut cur_type = (TypeExpression::Named(self.add_type_reference(global_ident)), Span::from(first_pos)); // TODO add more type info
+        let global_ident = vec![first_token.clone()];
+        let mut cur_type = (TypeExpression::Named(self.add_type_reference(global_ident)), Span::from(first_token.position)); // TODO add more type info
         while let Some((content, block_span)) = token_stream.eat_is_block(kw("[")) {
             let mut array_index_token_stream = TokenStream::new(content, block_span.0, block_span.1);
             let expr = self.parse_expression(&mut array_index_token_stream, scope)?;
             self.token_stream_should_be_finished(array_index_token_stream, "type array index");
-            cur_type = (TypeExpression::Array(Box::new((cur_type, expr))), Span(first_pos, block_span.1));
+            cur_type = (TypeExpression::Array(Box::new((cur_type, expr))), Span(first_token.position, block_span.1));
         }
         Some(cur_type)
     }
 
     fn try_parse_declaration(&mut self, token_stream : &mut TokenStream, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>) -> Option<(usize, Span)> {
-        let identifier_type = if let Some((_info, _pos)) = token_stream.eat_is_plain(kw("state")) {
+        let identifier_type = if token_stream.peek_is_plain(kw("state")) {
             IdentifierType::State
         } else {
             IdentifierType::Local
         };
         
         let typ = self.try_parse_type(token_stream, scope)?;
-        let (name_span, position) = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
-        let local_idx = self.add_declaration(typ, IdentifierToken{name : name_span, position}, identifier_type, declarations, scope);
-        Some((local_idx, Span::from(position)))
+        let name_token = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
+        let local_idx = self.add_declaration(typ, name_token.clone(), identifier_type, declarations, scope);
+        Some((local_idx, Span::from(name_token.position)))
     }
 
     fn parse_bundle(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>) {
@@ -502,8 +501,8 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         } else {
             return None;
         };
-        if let Some((_info, pos)) = token_stream.eat_is_plain(kw("#")) {
-            statements.push((Statement::TimelineStage(pos), Span::from(pos)));
+        if let Some(token) = token_stream.eat_is_plain(kw("#")) {
+            statements.push((Statement::TimelineStage(token.position), Span::from(token.position)));
             return Some(());
         }
         
@@ -511,7 +510,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         let mut all_decls = true;
         loop { // Loop over a number of declarations possibly
             let mut reg_count : usize = 0;
-            while let Some((_info, _pos)) = token_stream.eat_is_plain(kw("reg")) {
+            while let Some(_tok) = token_stream.eat_is_plain(kw("reg")) {
                 reg_count += 1;
             }
 
@@ -664,7 +663,11 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
 
         let code = self.parse_code_block(block_tokens, block_span, &mut declarations, &scope);
 
-        Some(Module{span : Span(declaration_start_idx, token_stream.last_idx), name, declarations, code})
+        let span = Span(declaration_start_idx, token_stream.last_idx);
+        Some(Module{span, name, declarations, code,
+            global_references : replace(&mut self.global_references, Vec::new()),
+            type_references : replace(&mut self.type_references, Vec::new())
+        })
     }
 
     fn parse_ast(mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {
@@ -683,9 +686,11 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             }
         }
 
-        ASTRoot{modules, global_references : self.global_references, type_references : self.type_references}
+        ASTRoot{modules}
     }
 }
+
+
 
 pub fn parse<'nums, 'g, 'file>(token_hierarchy : &Vec<TokenTreeNode>, file_text : &'file str, num_tokens : usize, errors : &'g mut ErrorCollector) -> ASTRoot {
     let context = ASTParserContext{errors, file_text, global_references : Vec::new(), type_references : Vec::new()};

@@ -114,7 +114,7 @@ module multiply_add : i32 a, i32 b, i32 c -> i32 result, double double_result {
 
 timeline (a -> /) .. (a -> r)*
 module blur : i32'0 a -> i32'1 result {
-	state prev = a;
+	state int prev = a;
 	#
 	loop {
 		result = @@@@@@(a + prev) / 2; // pipeline stage

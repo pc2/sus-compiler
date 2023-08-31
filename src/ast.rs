@@ -38,9 +38,9 @@ pub enum LocalOrGlobal {
 
 
 #[derive(Debug, Clone)]
-pub struct IdentifierToken {
+pub struct TokenContent {
     pub position : usize,
-    pub name : Range<usize> // File position
+    pub text : Range<usize> // File position
 }
 
 
@@ -107,18 +107,19 @@ pub enum Statement {
 #[derive(Debug)]
 pub struct Module {
     pub span : Span,
-    pub name : IdentifierToken,
+    pub name : TokenContent,
     pub declarations : Vec<SignalDeclaration>,
-    pub code : Vec<SpanStatement>
+    pub code : Vec<SpanStatement>,
+
+    pub global_references : Vec<GlobalIdentifier>,
+    pub type_references : Vec<GlobalIdentifier>
 }
 
-pub type GlobalIdentifier = Vec<(usize, Range<usize>)>; // token index, and name span
+pub type GlobalIdentifier = Vec<TokenContent>; // token index, and name span
 
 #[derive(Debug)]
 pub struct ASTRoot {
-    pub modules : Vec<Module>,
-    pub global_references : Vec<GlobalIdentifier>,
-    pub type_references : Vec<GlobalIdentifier>
+    pub modules : Vec<Module>
 }
 
 pub trait IterIdentifiers {
@@ -221,36 +222,4 @@ impl IterIdentifiers for Module {
 
 
 
-/*#[derive(Debug)]
-pub enum NamespaceElement {
-    Type(TypeExpression),
-    Module(Module),
-    SubNamespace(Box<Namespace>)
-}
-
-#[derive(Debug)]
-pub struct Namespace {
-    declarations : HashMap<TokenExtraInfo, NamespaceElement>,
-    // aliases : todo!()
-}
-
-impl Namespace {
-    pub fn register(&mut self, name : IdentifierToken, nse : NamespaceElement, errors : &mut Vec<ParsingError<Span>>) {
-        self.declarations.insert(name.name_idx, nse);
-    }
-
-    pub fn get<'s>(&'s self, name_path : &[IdentifierToken]) -> Result<&'s NamespaceElement, usize/* Which IdentifierToken went wrong */> {
-        assert!(name_path.len() >= 1);
-        
-        let mut cur_namespace = self;
-        for i in 0..name_path.len() - 1 {
-            match cur_namespace.declarations.get(name_path[i]) {
-                Some(NamespaceElement::SubNamespace()) => todo!(),
-                None => todo!(),
-            }
-        };
-
-        None
-    }
-}*/
 
