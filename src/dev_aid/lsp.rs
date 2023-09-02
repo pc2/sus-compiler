@@ -258,26 +258,26 @@ fn cvt_span_to_lsp_range(ch_sp : Span, token_positions : &[std::ops::Range<Posit
     }
 }
 
-fn convert_diagnostic(err : ParsingError, severity : DiagnosticSeverity, uri : &Url, token_positions : &[std::ops::Range<Position>]) -> Diagnostic {
-    let error_pos = cvt_span_to_lsp_range(err.error.position, token_positions);
+fn convert_diagnostic(err : ParsingError, severity : DiagnosticSeverity, token_positions : &[std::ops::Range<Position>]) -> Diagnostic {
+    let error_pos = cvt_span_to_lsp_range(err.position, token_positions);
 
     let mut related_info = Vec::new();
     for info in err.infos {
         let info_pos = cvt_span_to_lsp_range(info.position, token_positions);
-        let location = Location{uri : uri.clone(), range : info_pos};
-        related_info.push(DiagnosticRelatedInformation { location, message: info.reason });
+        let location = Location{uri : Url::parse(&info.file_name).unwrap(), range : info_pos};
+        related_info.push(DiagnosticRelatedInformation { location, message: info.info });
     }
-    Diagnostic::new(error_pos, Some(severity), None, None, err.error.reason, Some(related_info), None)
+    Diagnostic::new(error_pos, Some(severity), None, None, err.reason, Some(related_info), None)
 }
 
-fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, file_uri: Url, token_positions : &[std::ops::Range<Position>]) -> Result<(), Box<dyn Error + Sync + Send>> {
+fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, uri : Url, token_positions : &[std::ops::Range<Position>]) -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut diag_vec : Vec<Diagnostic> = Vec::new();
     for err in errors.errors {
-        diag_vec.push(convert_diagnostic(err, DiagnosticSeverity::ERROR, &file_uri, token_positions));
+        diag_vec.push(convert_diagnostic(err, DiagnosticSeverity::ERROR, token_positions));
     }
     
     let params = &PublishDiagnosticsParams{
-        uri: file_uri,
+        uri: uri,
         diagnostics: diag_vec,
         version: None
     };
@@ -325,8 +325,9 @@ fn main_loop(
 
                         let path : PathBuf = params.text_document.uri.to_file_path().unwrap();
                         let file_data : Rc<LoadedFile> = file_cache.get(&path);
-
-                        let (full_parse, errors) = perform_full_semantic_parse(&file_data.file_text);
+                        
+                        let file_uri_text = params.text_document.uri.to_string();
+                        let (full_parse, errors) = perform_full_semantic_parse(&file_data.file_text, Rc::from(file_uri_text));
                         
                         let (syntax_highlight, token_positions) = do_syntax_highlight(&file_data, &full_parse);
 

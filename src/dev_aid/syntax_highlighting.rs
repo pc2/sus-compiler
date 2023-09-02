@@ -1,5 +1,5 @@
 
-use std::ops::Range;
+use std::{ops::Range, rc::Rc};
 
 use crate::{ast::*, tokenizer::*, parser::*};
 
@@ -179,12 +179,12 @@ pub fn syntax_highlight_file(file_path : &str) {
         Err(reason) => panic!("Could not open file '{file_path}' for syntax highlighting because {reason}")
     };
     
-    let (full_parse, errors) = perform_full_semantic_parse(&file_text);
+    let (full_parse, errors) = perform_full_semantic_parse(&file_text, Rc::from(file_path.to_owned()));
 
     let token_offsets = generate_character_offsets(&file_text, &full_parse.tokens);
 
     for err in errors.errors {
-        err.pretty_print_error(&file_path, &file_text, &token_offsets);
+        err.pretty_print_error(file_path, &file_text, &token_offsets);
     }
     
     print_tokens(&file_text, &full_parse.tokens);

@@ -32,12 +32,14 @@ impl TokenTreeNode {
 fn error_unclosed_bracket(open_pos : usize, open_typ : TokenTypeIdx, close_before_pos : usize, errors : &mut ErrorCollector) {
     let open_name = get_token_type_name(open_typ);
     let reason = format!("Unclosed bracket {open_name}");
-    errors.error_with_info(Span::from(open_pos), reason, vec![error_info(Span(close_before_pos, close_before_pos), "must be closed before this")])
+    let file_name = errors.main_file.clone();
+    errors.error_with_info(Span::from(open_pos), reason, vec![error_info(Span(close_before_pos, close_before_pos), file_name, "must be closed before this")])
 }
 fn error_unopened_bracket(close_pos : usize, close_typ : TokenTypeIdx, open_after_pos : usize, errors : &mut ErrorCollector) {
     let close_name = get_token_type_name(close_typ);
     let reason = format!("Unopened bracket. Closing bracket {close_name} found but was not opened.");
-    errors.error_with_info(Span::from(close_pos), reason, vec![error_info(Span(open_after_pos, open_after_pos), "must be opened in scope after this")])
+    let file_name = errors.main_file.clone();
+    errors.error_with_info(Span::from(close_pos), reason, vec![error_info(Span(open_after_pos, open_after_pos), file_name, "must be opened in scope after this")])
 }
 struct TokenHierarchyStackElem {
     open_bracket : TokenTypeIdx, 
@@ -206,8 +208,8 @@ struct ASTParserContext<'g, 'file> {
     errors : &'g mut ErrorCollector,
     file_text : &'file str,
 
-    global_references : Vec<GlobalIdentifier>,
-    type_references : Vec<GlobalIdentifier>
+    global_references : Vec<GlobalReference>,
+    type_references : Vec<GlobalReference>
 }
 
 struct ASTParserRollbackable {
@@ -216,12 +218,12 @@ struct ASTParserRollbackable {
 }
 
 impl<'g, 'file> ASTParserContext<'g, 'file> {
-    fn add_global_reference(&mut self, name_span : GlobalIdentifier) -> usize {
+    fn add_global_reference(&mut self, name_span : GlobalReference) -> usize {
         let idx = self.global_references.len();
         self.global_references.push(name_span);
         idx
     }
-    fn add_type_reference(&mut self, name_span : GlobalIdentifier) -> usize {
+    fn add_type_reference(&mut self, name_span : GlobalReference) -> usize {
         let idx = self.type_references.len();
         self.type_references.push(name_span);
         idx
@@ -321,7 +323,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         declarations.push(decl);
         if let Err(conflict) = scope.add_declaration(&self.file_text[name.text.clone()], decl_id) {
             self.errors.error_with_info(span, format!("This name was already declared previously"), vec![
-                error_info(declarations[conflict].span, "Previous declaration")
+                error_info(declarations[conflict].span, self.errors.main_file.clone(), "Previous declaration")
             ]);
         }
         decl_id
@@ -361,8 +363,8 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
                     if let Some(erroneous_found_token) = content_token_stream.peek() {
                         // The expression should cover the whole brackets! 
                         let infos = vec![
-                            error_info(*span, "Expression should have ended with this scope"),
-                            error_info(result.1, "But actually only stretches this far"),
+                            error_info(*span, self.errors.main_file.clone(), "Expression should have ended with this scope"),
+                            error_info(result.1, self.errors.main_file.clone(), "But actually only stretches this far"),
                         ];
                         self.errors.error_with_info(erroneous_found_token.get_span(), "The expression should have ended at the end of the () brackets. But instead it ended here.".to_owned(), infos);
                         return None
@@ -664,6 +666,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         let code = self.parse_code_block(block_tokens, block_span, &mut declarations, &scope);
 
         let span = Span(declaration_start_idx, token_stream.last_idx);
+
         Some(Module{span, name, declarations, code,
             global_references : replace(&mut self.global_references, Vec::new()),
             type_references : replace(&mut self.type_references, Vec::new())
@@ -706,8 +709,8 @@ pub struct FullParseResult {
     pub ast : ASTRoot
 }
 
-pub fn perform_full_semantic_parse<'txt>(file_text : &'txt str) -> (FullParseResult, ErrorCollector) {
-    let mut errors = ErrorCollector::new();
+pub fn perform_full_semantic_parse<'txt>(file_text : &'txt str, file_name : FileName) -> (FullParseResult, ErrorCollector) {
+    let mut errors = ErrorCollector::new(file_name);
 
     let tokens = tokenize(file_text, &mut errors);
 

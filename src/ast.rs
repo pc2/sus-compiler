@@ -111,11 +111,11 @@ pub struct Module {
     pub declarations : Vec<SignalDeclaration>,
     pub code : Vec<SpanStatement>,
 
-    pub global_references : Vec<GlobalIdentifier>,
-    pub type_references : Vec<GlobalIdentifier>
+    pub global_references : Vec<GlobalReference>,
+    pub type_references : Vec<GlobalReference>
 }
 
-pub type GlobalIdentifier = Vec<TokenContent>; // token index, and name span
+pub type GlobalReference = Vec<TokenContent>; // token index, and name span
 
 #[derive(Debug)]
 pub struct ASTRoot {
@@ -132,7 +132,7 @@ impl IterIdentifiers for SpanExpression {
         match expr {
             Expression::Named(id) => {
                 assert!(span.0 == span.1);
-                func(*id, span.0)
+                func(*id, span.0);
             }
             Expression::Constant(_v) => {}
             Expression::UnaryOp(b) => {
