@@ -1,7 +1,7 @@
 
 use std::{ops::Range, rc::Rc};
 
-use crate::{ast::*, tokenizer::*, parser::*};
+use crate::{ast::*, tokenizer::*, parser::*, linker::Linker};
 
 use console::Style;
 
@@ -106,7 +106,7 @@ fn walk_name_color(ast : &ASTRoot, result : &mut [IDEToken]) {
         });
         result[module.name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
 
-        for part_vec in &module.type_references {
+        for part_vec in &module.dependencies.type_references {
             for part_tok in part_vec {
                 result[part_tok.position].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
             }
@@ -173,26 +173,36 @@ fn generate_character_offsets(file_text : &str, tokens : &[Token]) -> Vec<Range<
     character_offsets
 }
 
-pub fn syntax_highlight_file(file_path : &str) {
-    let file_text = match std::fs::read_to_string(file_path) {
-        Ok(file_text) => file_text,
-        Err(reason) => panic!("Could not open file '{file_path}' for syntax highlighting because {reason}")
-    };
-    
-    let (full_parse, errors) = perform_full_semantic_parse(&file_text, Rc::from(file_path.to_owned()));
+pub fn syntax_highlight_file(file_paths : &[String]) {
+    let mut linker : Linker = Linker::new();
+    let mut file_list = Vec::new();
+    for file_path in file_paths {
+        let file_text = match std::fs::read_to_string(file_path) {
+            Ok(file_text) => file_text,
+            Err(reason) => panic!("Could not open file '{file_path}' for syntax highlighting because {reason}")
+        };
+        
+        let (full_parse, errors) = perform_full_semantic_parse(&file_text, Rc::from(file_path.to_owned()));
 
-    let token_offsets = generate_character_offsets(&file_text, &full_parse.tokens);
+        print_tokens(&file_text, &full_parse.tokens);
 
-    for err in errors.errors {
-        err.pretty_print_error(file_path, &file_text, &token_offsets);
+        let ide_tokens = create_token_ide_info(&full_parse);
+        
+        
+        pretty_print(&file_text, &full_parse.tokens, &ide_tokens);
+        
+        println!("{:?}", full_parse.ast);
+
+        file_list.push(linker.add_file(file_text, full_parse.ast, errors, (full_parse.tokens, ide_tokens)));
     }
-    
-    print_tokens(&file_text, &full_parse.tokens);
 
-    let ide_tokens = create_token_ide_info(&full_parse);
-    
-    
-    pretty_print(&file_text, &full_parse.tokens, &ide_tokens);
-    
-    println!("{:?}", full_parse.ast);
+    let linked = linker.link_all(file_list);
+
+    for f in &linked.files {
+        let token_offsets = generate_character_offsets(&f.file_text, &f.extra_data.0);
+
+        for err in &f.errors.errors {
+            err.pretty_print_error(&f.errors.main_file, &f.file_text, &token_offsets);
+        }
+    }
 }

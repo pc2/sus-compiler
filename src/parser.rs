@@ -667,10 +667,13 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
 
         let span = Span(declaration_start_idx, token_stream.last_idx);
 
-        Some(Module{span, name, declarations, code,
+        let dependencies = Dependencies{
             global_references : replace(&mut self.global_references, Vec::new()),
-            type_references : replace(&mut self.type_references, Vec::new())
-        })
+            type_references : replace(&mut self.type_references, Vec::new()),
+            ..Default::default()
+        };
+        let full_name : String = [self.errors.main_file.as_ref(), &self.file_text[name.text.clone()]].join("::");
+        Some(Module{name, declarations, code, full_name, location : Location{span, file_name : self.errors.main_file.clone()}, dependencies})
     }
 
     fn parse_ast(mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {

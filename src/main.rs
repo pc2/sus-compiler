@@ -6,11 +6,11 @@ mod ast;
 mod code_generation;
 
 mod dev_aid;
+mod linker;
 
 use std::env;
 use std::error::Error;
 use dev_aid::syntax_highlighting::*;
-
 
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
@@ -18,20 +18,24 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     let _executable_path = args.next();
 
-    match args.next() {
-        None => {
-            // Quick debug path
-            let file_path = "multiply_add.sus";
-            syntax_highlight_file(file_path);
-        },
-        #[cfg(feature = "lsp")]
-        Some(cmd) if cmd == "--lsp" => {
-            return dev_aid::lsp::lsp_main();
-        },
-        Some(file_path) => {
-            syntax_highlight_file(&file_path);
+    let mut file_paths : Vec<String> = Vec::new();
+    let mut is_lsp : bool = false;
+    for arg in args {
+        if arg == "--lsp" {
+            is_lsp = true;
+        } else {
+            file_paths.push(arg);
         }
     }
+    #[cfg(feature = "lsp")]
+    if is_lsp {
+        return dev_aid::lsp::lsp_main();
+    }
+    if file_paths.len() == 0 {
+        // Quick debug file
+        file_paths.push("multiply_add.sus".to_owned());
+    }
+    syntax_highlight_file(&file_paths);
 
     Ok(())
 }

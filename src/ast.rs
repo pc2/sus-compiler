@@ -1,8 +1,9 @@
 
 use num_bigint::BigUint;
 
-use crate::tokenizer::TokenTypeIdx;
+use crate::{tokenizer::TokenTypeIdx, linker::GlobalValueUUID, linker::GlobalTypeUUID};
 use core::ops::Range;
+use std::rc::Rc;
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
@@ -104,15 +105,32 @@ pub enum Statement {
     TimelineStage(usize)
 }
 
+pub type FileName = Rc<String>;
+
+#[derive(Debug)]
+pub struct Location {
+    pub file_name : FileName,
+    pub span : Span
+}
+
+#[derive(Debug, Default)]
+pub struct Dependencies {
+    pub global_references : Vec<GlobalReference>,
+    pub type_references : Vec<GlobalReference>,
+
+    pub resolved_globals : Vec<GlobalValueUUID>,
+    pub resolved_types : Vec<GlobalTypeUUID>
+}
+
 #[derive(Debug)]
 pub struct Module {
-    pub span : Span,
     pub name : TokenContent,
     pub declarations : Vec<SignalDeclaration>,
     pub code : Vec<SpanStatement>,
 
-    pub global_references : Vec<GlobalReference>,
-    pub type_references : Vec<GlobalReference>
+    pub full_name : String,
+    pub location : Location,
+    pub dependencies : Dependencies
 }
 
 pub type GlobalReference = Vec<TokenContent>; // token index, and name span

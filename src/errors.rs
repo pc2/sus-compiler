@@ -1,13 +1,11 @@
 
 
-use std::{ops::Range, rc::Rc};
+use std::ops::Range;
 
-use crate::ast::Span;
+use crate::ast::{Span, FileName};
 use ariadne::*;
 
 use crate::tokenizer::{TokenTypeIdx, get_token_type_name};
-
-pub type FileName = Rc<String>;
 
 pub struct ErrorInfo {
     pub position : Span,

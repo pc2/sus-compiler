@@ -1,11 +1,17 @@
 
+use std::ops::Range;
+
 use crate::{ast::*, errors::ErrorCollector};
 
+pub struct Instantiation {
+
+}
 
 #[derive(Debug)]
 pub enum Assignable {
     Named{local_idx : usize, num_regs : usize},
-    Array{to : Box<Assignable>, value : LocalOrGlobal}
+    Array{to : Box<Assignable>, value : LocalOrGlobal},
+    Field{to : Box<Assignable>, value : Range<usize>}
 }
 
 #[derive(Debug)]

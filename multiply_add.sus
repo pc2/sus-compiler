@@ -146,3 +146,13 @@ module seq_adder : i32 a -> i32 result {
 	}
 	result = sum;
 }
+
+
+module exists : hello a -> int result {
+
+}
+
+module test_exists : -> int result {
+	int x = exists(5);
+	int b = doesnt_exist(3);
+}
