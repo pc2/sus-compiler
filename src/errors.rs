@@ -20,6 +20,7 @@ pub struct ParsingError {
 }
 
 impl ParsingError {
+    // Requires that character_ranges.len() == tokens.len() + 1 to include EOF token
     pub fn pretty_print_error(&self, main_file_name : &str, file_text : &str, character_ranges : &[Range<usize>]) {
         // Generate & choose some colours for each of our elements
         let err_color = Color::Red;

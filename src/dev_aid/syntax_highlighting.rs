@@ -151,6 +151,7 @@ pub fn create_token_ide_info<'a>(parsed: &FullParseResult) -> Vec<IDEToken> {
     result
 }
 
+// Outputs character_offsets.len() == tokens.len() + 1 to include EOF token
 fn generate_character_offsets(file_text : &str, tokens : &[Token]) -> Vec<Range<usize>> {
     let mut character_offsets : Vec<Range<usize>> = Vec::new();
     character_offsets.reserve(tokens.len());
@@ -169,6 +170,10 @@ fn generate_character_offsets(file_text : &str, tokens : &[Token]) -> Vec<Range<
         character_offsets.push(token_start_char..cur_char);
         whitespace_start = tok_range.end;
     }
+
+    // Final char offset for EOF
+    let num_chars_in_file = cur_char + file_text[whitespace_start..].chars().count();
+    character_offsets.push(cur_char..num_chars_in_file);
 
     character_offsets
 }

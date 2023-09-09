@@ -243,6 +243,17 @@ fn do_syntax_highlight(file_data : &LoadedFile, full_parse : &FullParseResult) -
         positions.push(real_token_start_position..cur_position);
     }
 
+    let eof_start = cur_position.clone();
+    for c in file_text[cur_whitespace_start..].chars() {
+        if c == '\n' {
+            cur_position.line += 1;
+            cur_position.character = 0;
+        } else {
+            cur_position.character += 1;
+        }
+    }
+    positions.push(eof_start..cur_position);
+
     (SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
         result_id: None,
         data: semantic_tokens_acc.semantic_tokens
@@ -258,6 +269,7 @@ fn cvt_span_to_lsp_range(ch_sp : Span, token_positions : &[std::ops::Range<Posit
     }
 }
 
+// Requires that token_positions.len() == tokens.len() + 1 to include EOF token
 fn convert_diagnostic(err : ParsingError, severity : DiagnosticSeverity, token_positions : &[std::ops::Range<Position>]) -> Diagnostic {
     let error_pos = cvt_span_to_lsp_range(err.position, token_positions);
 
@@ -270,6 +282,7 @@ fn convert_diagnostic(err : ParsingError, severity : DiagnosticSeverity, token_p
     Diagnostic::new(error_pos, Some(severity), None, None, err.reason, Some(related_info), None)
 }
 
+// Requires that token_positions.len() == tokens.len() + 1 to include EOF token
 fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, uri : Url, token_positions : &[std::ops::Range<Position>]) -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut diag_vec : Vec<Diagnostic> = Vec::new();
     for err in errors.errors {
