@@ -672,7 +672,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             type_references : replace(&mut self.type_references, Vec::new()),
             ..Default::default()
         };
-        let full_name : String = [self.errors.main_file.as_ref(), &self.file_text[name.text.clone()]].join("::");
+        let full_name : String = [&self.errors.main_file.as_ref().to_string_lossy(), &self.file_text[name.text.clone()]].join("::");
         Some(Module{name, declarations, code, full_name, location : Location{span, file_name : self.errors.main_file.clone()}, dependencies})
     }
 

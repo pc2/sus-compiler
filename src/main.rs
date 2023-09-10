@@ -10,6 +10,9 @@ mod linker;
 
 use std::env;
 use std::error::Error;
+use std::path::PathBuf;
+use std::rc::Rc;
+use ast::FileName;
 use dev_aid::syntax_highlighting::*;
 
 
@@ -18,13 +21,13 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     let _executable_path = args.next();
 
-    let mut file_paths : Vec<String> = Vec::new();
+    let mut file_paths : Vec<FileName> = Vec::new();
     let mut is_lsp : bool = false;
     for arg in args {
         if arg == "--lsp" {
             is_lsp = true;
         } else {
-            file_paths.push(arg);
+            file_paths.push(Rc::from(PathBuf::from(arg)));
         }
     }
     #[cfg(feature = "lsp")]
@@ -33,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     }
     if file_paths.len() == 0 {
         // Quick debug file
-        file_paths.push("multiply_add.sus".to_owned());
+        file_paths.push(Rc::from(PathBuf::from("multiply_add.sus")));
     }
     syntax_highlight_file(&file_paths);
 

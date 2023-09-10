@@ -1,9 +1,9 @@
 
 use num_bigint::BigUint;
 
-use crate::{tokenizer::TokenTypeIdx, linker::GlobalValueUUID, linker::GlobalTypeUUID};
+use crate::{tokenizer::TokenTypeIdx, linker::ValueUUID, linker::TypeUUID};
 use core::ops::Range;
-use std::rc::Rc;
+use std::{rc::Rc, path::Path};
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
@@ -105,7 +105,7 @@ pub enum Statement {
     TimelineStage(usize)
 }
 
-pub type FileName = Rc<String>;
+pub type FileName = Rc<Path>;
 
 #[derive(Debug)]
 pub struct Location {
@@ -118,8 +118,8 @@ pub struct Dependencies {
     pub global_references : Vec<GlobalReference>,
     pub type_references : Vec<GlobalReference>,
 
-    pub resolved_globals : Vec<GlobalValueUUID>,
-    pub resolved_types : Vec<GlobalTypeUUID>
+    pub resolved_globals : Vec<ValueUUID>,
+    pub resolved_types : Vec<TypeUUID>
 }
 
 #[derive(Debug)]

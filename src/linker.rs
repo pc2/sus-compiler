@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use crate::{ast::{Module, ASTRoot, Span, Location, Dependencies}, errors::{ErrorCollector, error_info}};
+use crate::{ast::{Module, ASTRoot, Span, Location, Dependencies, FileName}, errors::{ErrorCollector, error_info}};
 
 
-#[derive(Debug, Clone, Copy)]
-pub struct GlobalValueUUID(usize);
-#[derive(Debug, Clone, Copy)]
-pub struct GlobalTypeUUID(usize);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ValueUUID(usize);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TypeUUID(usize);
 
 const INVALID_UUID : usize = usize::MAX;
 
@@ -91,16 +91,16 @@ impl Linkable for NamedType {
 
 #[derive(Debug, Clone, Copy)]
 pub enum GlobalNamespaceNode {
-    Value(GlobalValueUUID),
-    Type(GlobalTypeUUID),
+    Value(ValueUUID),
+    Type(TypeUUID),
 }
 
 pub struct FileData<T> {
     pub file_text : String,
     pub extra_data : T,
     pub errors : ErrorCollector,
-    associated_values : Vec<GlobalValueUUID>,
-    associated_types : Vec<GlobalTypeUUID>
+    associated_values : Vec<ValueUUID>,
+    associated_types : Vec<TypeUUID>
 }
 
 // All modules in the workspace
@@ -113,17 +113,17 @@ pub struct Linker {
 // All modules in the workspace
 pub struct FullyLinked<T> {
     pub data : Linker,
-    pub files : Vec<FileData<T>>
+    pub files : HashMap<FileName, FileData<T>>
 }
 
 impl Linker {
     // Returns None for builtins
     fn get_location(&self, node : GlobalNamespaceNode) -> Option<&Location> {
         match node {
-            GlobalNamespaceNode::Value(GlobalValueUUID(pos)) => {
+            GlobalNamespaceNode::Value(ValueUUID(pos)) => {
                 self.values[pos].get_location()
             },
-            GlobalNamespaceNode::Type(GlobalTypeUUID(pos)) => {
+            GlobalNamespaceNode::Type(TypeUUID(pos)) => {
                 self.types[pos].get_location()
             },
         }
@@ -136,7 +136,7 @@ impl Linker {
         let mut global_namespace = HashMap::new();
         
         for name in BUILTIN_TYPES {
-            let success = global_namespace.insert(name.to_owned(), GlobalNamespaceNode::Type(GlobalTypeUUID(named_types.len()))).is_none();
+            let success = global_namespace.insert(name.to_owned(), GlobalNamespaceNode::Type(TypeUUID(named_types.len()))).is_none();
             assert!(success);
             named_types.push(NamedType::Builtin(name));
         } 
@@ -159,8 +159,8 @@ impl Linker {
                     }
                 }
                 std::collections::hash_map::Entry::Vacant(vac) => {
-                    vac.insert(GlobalNamespaceNode::Value(GlobalValueUUID(self.values.len())));
-                    associated_values.push(GlobalValueUUID(self.values.len()));
+                    vac.insert(GlobalNamespaceNode::Value(ValueUUID(self.values.len())));
+                    associated_values.push(ValueUUID(self.values.len()));
                     self.values.push(NamedValue::Module(md));
                 }
             }
@@ -168,15 +168,15 @@ impl Linker {
         FileData{file_text, errors, associated_values, associated_types: Vec::new(), extra_data}
     }
 
-    fn link_dependencies(&self, file_text : &str, deps : &Dependencies, errors : &mut ErrorCollector) -> (Vec<GlobalValueUUID>, Vec<GlobalTypeUUID>) {
-        let value_references : Vec<GlobalValueUUID> = deps.global_references.iter().map(|reference| {
+    fn link_dependencies(&self, file_text : &str, deps : &Dependencies, errors : &mut ErrorCollector) -> (Vec<ValueUUID>, Vec<TypeUUID>) {
+        let value_references : Vec<ValueUUID> = deps.global_references.iter().map(|reference| {
             let reference_span = Span(reference.last().unwrap().position, reference[0].position);
             let reference_name_str = &file_text[reference[0].text.clone()];
             match self.global_namespace.get(reference_name_str) {
                 Some(GlobalNamespaceNode::Value(v)) => {
                     *v
                 }
-                Some(GlobalNamespaceNode::Type(GlobalTypeUUID(t))) => {
+                Some(GlobalNamespaceNode::Type(TypeUUID(t))) => {
                     let found_instead = &self.types[*t];
                     let found_full_name = found_instead.get_full_name();
                     let infos = if let Some(loc) = found_instead.get_location() {
@@ -185,23 +185,23 @@ impl Linker {
                         vec![]
                     };
                     errors.error_with_info(reference_span, format!("No Module or Constant of the name '{reference_name_str}' was found. Found type '{found_full_name}'"), infos);
-                    GlobalValueUUID(INVALID_UUID)
+                    ValueUUID(INVALID_UUID)
                 }
                 None => {
                     errors.error_basic(reference_span, format!("No Module or Constant of the name '{reference_name_str}' was found. Did you forget to import it?"));
-                    GlobalValueUUID(INVALID_UUID)
+                    ValueUUID(INVALID_UUID)
                 }
             }
         }).collect();
 
-        let type_references : Vec<GlobalTypeUUID> = deps.type_references.iter().map(|reference| {
+        let type_references : Vec<TypeUUID> = deps.type_references.iter().map(|reference| {
             let reference_span = Span(reference.last().unwrap().position, reference[0].position);
             let reference_name_str = &file_text[reference[0].text.clone()];
             match self.global_namespace.get(reference_name_str) {
                 Some(GlobalNamespaceNode::Type(v)) => {
                     *v
                 }
-                Some(GlobalNamespaceNode::Value(GlobalValueUUID(idx))) => {
+                Some(GlobalNamespaceNode::Value(ValueUUID(idx))) => {
                     let found_instead = &self.values[*idx];
                     let found_full_name = found_instead.get_full_name();
                     let infos = if let Some(loc) = found_instead.get_location() {
@@ -210,11 +210,11 @@ impl Linker {
                         vec![]
                     };
                     errors.error_with_info(reference_span, format!("No Type of the name '{reference_name_str}' was found. Found type '{found_full_name}'"), infos);
-                    GlobalTypeUUID(INVALID_UUID)
+                    TypeUUID(INVALID_UUID)
                 }
                 None => {
                     errors.error_basic(reference_span, format!("No Type of the name '{reference_name_str}' was found. Did you forget to import it?"));
-                    GlobalTypeUUID(INVALID_UUID)
+                    TypeUUID(INVALID_UUID)
                 }
             }
         }).collect();
@@ -223,16 +223,16 @@ impl Linker {
     }
 
     // This should be called once all modules have been added. Adds errors for globals it couldn't match
-    pub fn link_all<T>(mut self, mut files : Vec<FileData<T>>) -> FullyLinked<T> {
-        for file in &mut files {
-            for GlobalValueUUID(idx) in &file.associated_values {
+    pub fn link_all<T>(mut self, mut files : HashMap<FileName, FileData<T>>) -> FullyLinked<T> {
+        for (_file_name, file) in &mut files {
+            for ValueUUID(idx) in &file.associated_values {
                 let deps = self.values[*idx].get_dependencies();
                 let (vals_this_refers_to, types_this_refers_to) = self.link_dependencies(&file.file_text, deps, &mut file.errors);
                 let deps_mut = self.values[*idx].get_dependencies_mut();
                 deps_mut.resolved_globals = vals_this_refers_to;
                 deps_mut.resolved_types = types_this_refers_to;
             }
-            for GlobalTypeUUID(idx) in &file.associated_types {
+            for TypeUUID(idx) in &file.associated_types {
                 let deps = self.types[*idx].get_dependencies();
                 let (vals_this_refers_to, types_this_refers_to) = self.link_dependencies(&file.file_text, deps, &mut file.errors);
                 let deps_mut = self.types[*idx].get_dependencies_mut();

@@ -156,3 +156,7 @@ module test_exists : -> int result {
 	int x = exists(5);
 	int b = doesnt_exist(3);
 }
+
+module exists : duplicate a {
+	// Should be a duplicate of previous exists
+}

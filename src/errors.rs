@@ -1,6 +1,6 @@
 
 
-use std::ops::Range;
+use std::{ops::Range, path::Path};
 
 use crate::ast::{Span, FileName};
 use ariadne::*;
@@ -19,27 +19,40 @@ pub struct ParsingError {
     pub infos : Vec<ErrorInfo>
 }
 
+struct CustomSpan<'a> {
+    file : &'a Path,
+    span : Range<usize>
+}
+impl<'a> ariadne::Span for CustomSpan<'a> {
+    type SourceId = Path;
+
+    fn source(&self) -> &Self::SourceId { &self.file }
+    fn start(&self) -> usize { self.span.start }
+    fn end(&self) -> usize { self.span.end }
+}
+
 impl ParsingError {
     // Requires that character_ranges.len() == tokens.len() + 1 to include EOF token
-    pub fn pretty_print_error(&self, main_file_name : &str, file_text : &str, character_ranges : &[Range<usize>]) {
+    pub fn pretty_print_error(&self, main_file : &Path, character_ranges : &[Range<usize>], file_cache : &mut FileCache) {
         // Generate & choose some colours for each of our elements
         let err_color = Color::Red;
         let info_color = Color::Blue;
 
         let error_span = self.position.to_range(character_ranges);
-        let mut report = Report::build(ReportKind::Error, main_file_name, error_span.start)
+
+        let mut report: ReportBuilder<'_, CustomSpan> = Report::build(ReportKind::Error, main_file, error_span.start);
+        report = report
             .with_message(&self.reason)
             .with_label(
-                Label::new((main_file_name, error_span))
+                Label::new(CustomSpan{file : main_file, span : error_span})
                     .with_message(&self.reason)
                     .with_color(err_color)
             );
 
         for info in &self.infos {
             let info_span = info.position.to_range(character_ranges);
-            let info_file : &str = &info.file_name;
             report = report.with_label(
-                Label::new((info_file, info_span))
+                Label::new(CustomSpan{file : &info.file_name, span : info_span})
                     .with_message(&info.info)
                     .with_color(info_color)
             )
@@ -49,7 +62,7 @@ impl ParsingError {
                 "match".fg(out)
             ))*/
         report.finish()
-        .print((main_file_name, Source::from(file_text)))
+        .eprint(file_cache)
         .unwrap();
     }
 }
