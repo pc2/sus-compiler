@@ -462,7 +462,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
     }
 
     fn try_parse_declaration(&mut self, token_stream : &mut TokenStream, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>) -> Option<(usize, Span)> {
-        let identifier_type = if token_stream.peek_is_plain(kw("state")) {
+        let identifier_type = if token_stream.eat_is_plain(kw("state")).is_some() {
             IdentifierType::State
         } else {
             IdentifierType::Local
