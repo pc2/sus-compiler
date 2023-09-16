@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry};
 
 use crate::{ast::{Module, ASTRoot, Span, Location, Dependencies, FileName}, errors::{ErrorCollector, error_info}};
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ValueUUID(usize);
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TypeUUID(usize);
 
 const INVALID_UUID : usize = usize::MAX;
@@ -14,6 +14,9 @@ const BUILTIN_TYPES : [&'static str; 2] = [
     "bool",
     "int"
 ];
+
+const VALUE_NAMES : &'static str = "Module Or Constant";
+const TYPE_NAMES : &'static str = "Type";
 
 pub trait Linkable {
     fn get_full_name(&self) -> &str;
@@ -104,19 +107,19 @@ pub struct FileData<T> {
 }
 
 // All modules in the workspace
-pub struct Linker {
+pub struct Links {
     values : Vec<NamedValue>,
     types : Vec<NamedType>,
     global_namespace : HashMap<String, GlobalNamespaceNode>
 }
 
 // All modules in the workspace
-pub struct FullyLinked<T> {
-    pub data : Linker,
+pub struct FileLinker<T> {
+    links : Links,
     pub files : HashMap<FileName, FileData<T>>
 }
 
-impl Linker {
+impl Links {
     // Returns None for builtins
     fn get_location(&self, node : GlobalNamespaceNode) -> Option<&Location> {
         match node {
@@ -129,7 +132,7 @@ impl Linker {
         }
     }
 
-    pub fn new() -> Linker {
+    pub fn new() -> Links {
         // Add builtins
         let named_values = Vec::new();
         let mut named_types = Vec::new();
@@ -141,7 +144,7 @@ impl Linker {
             named_types.push(NamedType::Builtin(name));
         } 
 
-        Linker{values: named_values, types: named_types, global_namespace}
+        Links{values: named_values, types: named_types, global_namespace}
     }
     pub fn add_file<T>(&mut self, file_text : String, ast : ASTRoot, mut errors : ErrorCollector, extra_data : T) -> FileData<T> {
         let mut associated_values = Vec::new();
@@ -184,11 +187,11 @@ impl Linker {
                     } else {
                         vec![]
                     };
-                    errors.error_with_info(reference_span, format!("No Module or Constant of the name '{reference_name_str}' was found. Found type '{found_full_name}'"), infos);
+                    errors.error_with_info(reference_span, format!("No {VALUE_NAMES} of the name '{reference_name_str}' was found. Found Type '{found_full_name}'"), infos);
                     ValueUUID(INVALID_UUID)
                 }
                 None => {
-                    errors.error_basic(reference_span, format!("No Module or Constant of the name '{reference_name_str}' was found. Did you forget to import it?"));
+                    errors.error_basic(reference_span, format!("No {VALUE_NAMES} of the name '{reference_name_str}' was found. Did you forget to import it?"));
                     ValueUUID(INVALID_UUID)
                 }
             }
@@ -209,11 +212,11 @@ impl Linker {
                     } else {
                         vec![]
                     };
-                    errors.error_with_info(reference_span, format!("No Type of the name '{reference_name_str}' was found. Found type '{found_full_name}'"), infos);
+                    errors.error_with_info(reference_span, format!("No {TYPE_NAMES} of the name '{reference_name_str}' was found. Found Type '{found_full_name}'"), infos);
                     TypeUUID(INVALID_UUID)
                 }
                 None => {
-                    errors.error_basic(reference_span, format!("No Type of the name '{reference_name_str}' was found. Did you forget to import it?"));
+                    errors.error_basic(reference_span, format!("No {TYPE_NAMES} of the name '{reference_name_str}' was found. Did you forget to import it?"));
                     TypeUUID(INVALID_UUID)
                 }
             }
@@ -223,7 +226,7 @@ impl Linker {
     }
 
     // This should be called once all modules have been added. Adds errors for globals it couldn't match
-    pub fn link_all<T>(mut self, mut files : HashMap<FileName, FileData<T>>) -> FullyLinked<T> {
+    pub fn link_all<T>(mut self, mut files : HashMap<FileName, FileData<T>>) -> FileLinker<T> {
         for (_file_name, file) in &mut files {
             for ValueUUID(idx) in &file.associated_values {
                 let deps = self.values[*idx].get_dependencies();
@@ -240,6 +243,26 @@ impl Linker {
                 deps_mut.resolved_types = types_this_refers_to;
             }
         }
-        FullyLinked{data: self, files}
+        FileLinker{links: self, files}
+    }
+}
+
+impl<ExtraData> FileLinker<ExtraData> {
+    pub fn remove(&mut self, file_name : FileName) {
+
+    }
+    pub fn relink(&mut self, file_name : FileName, file_text : String, ast : ASTRoot, mut errors : ErrorCollector) {
+        match self.files.entry(file_name) {
+            Entry::Occupied(mut exists) => {
+                let existing_entry = exists.get_mut();
+
+                for ValueUUID(v) in &mut existing_entry.associated_values {
+
+                }
+            },
+            Entry::Vacant(new_entry) => {
+
+            },
+        }
     }
 }

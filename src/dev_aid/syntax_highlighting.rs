@@ -1,7 +1,7 @@
 
 use std::{ops::Range, rc::Rc, collections::HashMap};
 
-use crate::{ast::*, tokenizer::*, parser::*, linker::Linker};
+use crate::{ast::*, tokenizer::*, parser::*, linker::Links};
 
 use ariadne::FileCache;
 use console::Style;
@@ -180,7 +180,7 @@ fn generate_character_offsets(file_text : &str, tokens : &[Token]) -> Vec<Range<
 }
 
 pub fn syntax_highlight_file(file_paths : &[FileName]) {
-    let mut linker : Linker = Linker::new();
+    let mut linker : Links = Links::new();
     let mut file_list = HashMap::new();
     for file_path in file_paths {
         let file_text = match std::fs::read_to_string(file_path) {
