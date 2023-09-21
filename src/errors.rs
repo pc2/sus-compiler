@@ -2,14 +2,15 @@
 
 use std::{ops::Range, path::Path};
 
-use crate::ast::{Span, FileName};
+use crate::{ast::Span, linker::{FileUUID, Linker}};
 use ariadne::*;
+
 
 use crate::tokenizer::{TokenTypeIdx, get_token_type_name};
 
 pub struct ErrorInfo {
     pub position : Span,
-    pub file_name : FileName,
+    pub file : FileUUID,
     pub info : String
 }
 
@@ -33,18 +34,20 @@ impl<'a> ariadne::Span for CustomSpan<'a> {
 
 impl ParsingError {
     // Requires that character_ranges.len() == tokens.len() + 1 to include EOF token
-    pub fn pretty_print_error(&self, main_file : &Path, character_ranges : &[Range<usize>], file_cache : &mut FileCache) {
+    pub fn pretty_print_error(&self, file : FileUUID, character_ranges : &[Range<usize>], linker : &Linker, file_cache : &mut FileCache) {
         // Generate & choose some colours for each of our elements
         let err_color = Color::Red;
         let info_color = Color::Blue;
 
         let error_span = self.position.to_range(character_ranges);
 
-        let mut report: ReportBuilder<'_, CustomSpan> = Report::build(ReportKind::Error, main_file, error_span.start);
+        let file_path = &linker.files[file].file_path;
+
+        let mut report: ReportBuilder<'_, CustomSpan> = Report::build(ReportKind::Error, file_path, error_span.start);
         report = report
             .with_message(&self.reason)
             .with_label(
-                Label::new(CustomSpan{file : main_file, span : error_span})
+                Label::new(CustomSpan{file : file_path, span : error_span})
                     .with_message(&self.reason)
                     .with_color(err_color)
             );
@@ -52,7 +55,7 @@ impl ParsingError {
         for info in &self.infos {
             let info_span = info.position.to_range(character_ranges);
             report = report.with_label(
-                Label::new(CustomSpan{file : &info.file_name, span : info_span})
+                Label::new(CustomSpan{file : &linker.files[info.file].file_path, span : info_span})
                     .with_message(&info.info)
                     .with_color(info_color)
             )
@@ -67,8 +70,8 @@ impl ParsingError {
     }
 }
 
-pub fn error_info<S : Into<String>>(position : Span, file_name : FileName, reason : S) -> ErrorInfo {
-    ErrorInfo{position, file_name, info : reason.into()}
+pub fn error_info<S : Into<String>>(position : Span, file : FileUUID, reason : S) -> ErrorInfo {
+    ErrorInfo{position, file, info : reason.into()}
 }
 
 pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
@@ -91,12 +94,12 @@ pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
 // Class that collects and manages errors and warnings
 pub struct ErrorCollector {
     pub errors : Vec<ParsingError>,
-    pub main_file : FileName
+    pub file : FileUUID
 }
 
 impl ErrorCollector {
-    pub fn new(main_file : FileName) -> Self {
-        Self{errors : Vec::new(), main_file}
+    pub fn new(file : FileUUID) -> Self {
+        Self{errors : Vec::new(), file}
     }
     
     pub fn error_basic<S : Into<String>>(&mut self, position : Span, reason : S) {

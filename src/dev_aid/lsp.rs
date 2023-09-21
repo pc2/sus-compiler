@@ -10,7 +10,7 @@ use lsp_server::{Response, Message, Connection};
 
 use lsp_types::notification::Notification;
 
-use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::{ErrorCollector, ParsingError}};
+use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::{ErrorCollector, ParsingError}, linker::{Linker, PreLinker}};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -270,23 +270,23 @@ fn cvt_span_to_lsp_range(ch_sp : Span, token_positions : &[std::ops::Range<Posit
 }
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn convert_diagnostic(err : ParsingError, severity : DiagnosticSeverity, token_positions : &[std::ops::Range<Position>]) -> Diagnostic {
+fn convert_diagnostic(err : ParsingError, severity : DiagnosticSeverity, token_positions : &[std::ops::Range<Position>], linker : &Linker) -> Diagnostic {
     let error_pos = cvt_span_to_lsp_range(err.position, token_positions);
 
     let mut related_info = Vec::new();
     for info in err.infos {
         let info_pos = cvt_span_to_lsp_range(info.position, token_positions);
-        let location = Location{uri : Url::from_file_path(info.file_name).unwrap(), range : info_pos};
+        let location = Location{uri : Url::from_file_path(&linker.files[info.file].file_path).unwrap(), range : info_pos};
         related_info.push(DiagnosticRelatedInformation { location, message: info.info });
     }
     Diagnostic::new(error_pos, Some(severity), None, None, err.reason, Some(related_info), None)
 }
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, uri : Url, token_positions : &[std::ops::Range<Position>]) -> Result<(), Box<dyn Error + Sync + Send>> {
+fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, uri : Url, token_positions : &[std::ops::Range<Position>], linker : &Linker) -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut diag_vec : Vec<Diagnostic> = Vec::new();
     for err in errors.errors {
-        diag_vec.push(convert_diagnostic(err, DiagnosticSeverity::ERROR, token_positions));
+        diag_vec.push(convert_diagnostic(err, DiagnosticSeverity::ERROR, token_positions, linker));
     }
     
     let params = &PublishDiagnosticsParams{
@@ -339,7 +339,11 @@ fn main_loop(
                         let path : PathBuf = params.text_document.uri.to_file_path().unwrap();
                         let file_data : Rc<LoadedFile> = file_cache.get(&path);
                         
-                        let (full_parse, errors) = perform_full_semantic_parse(&file_data.file_text, Rc::from(path));
+
+                        let mut prelink = PreLinker::new();
+                        let uuid = prelink.reserve_file();
+
+                        let (full_parse, errors) = perform_full_semantic_parse(&file_data.file_text, uuid);
                         
                         let (syntax_highlight, token_positions) = do_syntax_highlight(&file_data, &full_parse);
 
@@ -348,7 +352,9 @@ fn main_loop(
                             id: req.id, result: Some(result), error: None
                         }))?;
 
-                        send_errors_warnings(&connection, errors, params.text_document.uri, &token_positions)?;
+                        let linker = prelink.link();
+
+                        send_errors_warnings(&connection, errors, params.text_document.uri, &token_positions, &linker)?;
                     },
                     // TODO ...
                     req => {

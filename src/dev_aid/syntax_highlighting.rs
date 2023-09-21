@@ -1,7 +1,7 @@
 
-use std::{ops::Range, rc::Rc, collections::HashMap};
+use std::{ops::Range, path::PathBuf};
 
-use crate::{ast::*, tokenizer::*, parser::*, linker::Links};
+use crate::{ast::*, tokenizer::*, parser::*, linker::PreLinker};
 
 use ariadne::FileCache;
 use console::Style;
@@ -107,7 +107,8 @@ fn walk_name_color(ast : &ASTRoot, result : &mut [IDEToken]) {
         });
         result[module.name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
 
-        for part_vec in &module.dependencies.type_references {
+        
+        for part_vec in &module.dependencies.global_references {
             for part_tok in part_vec {
                 result[part_tok.position].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
             }
@@ -179,11 +180,11 @@ fn generate_character_offsets(file_text : &str, tokens : &[Token]) -> Vec<Range<
     character_offsets
 }
 
-pub fn syntax_highlight_file(file_paths : &[FileName]) {
-    let mut linker : Links = Links::new();
-    let mut file_list = HashMap::new();
+pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
+    let mut prelinker : PreLinker = PreLinker::new();
     for file_path in file_paths {
-        let file_text = match std::fs::read_to_string(file_path) {
+        let uuid = prelinker.reserve_file();
+        let file_text = match std::fs::read_to_string(&file_path) {
             Ok(file_text) => file_text,
             Err(reason) => {
                 let file_path_disp = file_path.display();
@@ -191,7 +192,7 @@ pub fn syntax_highlight_file(file_paths : &[FileName]) {
             }
         };
         
-        let (full_parse, errors) = perform_full_semantic_parse(&file_text, Rc::from(file_path.to_owned()));
+        let (full_parse, errors) = perform_full_semantic_parse(&file_text, uuid);
 
         print_tokens(&file_text, &full_parse.tokens);
 
@@ -202,19 +203,18 @@ pub fn syntax_highlight_file(file_paths : &[FileName]) {
         
         println!("{:?}", full_parse.ast);
 
-        let file_data = linker.add_file(file_text, full_parse.ast, errors, (full_parse.tokens, ide_tokens));
-        file_list.insert(file_path.clone(), file_data);
+        prelinker.add_reserved_file(uuid, file_path, file_text, full_parse, errors);
     }
 
-    let linked = linker.link_all(file_list);
+    let linker = prelinker.link();
 
     let mut file_cache : FileCache = Default::default();
     
-    for (_file_name, f) in &linked.files {
-        let token_offsets = generate_character_offsets(&f.file_text, &f.extra_data.0);
+    for (_file_name, f) in &linker.files {
+        let token_offsets = generate_character_offsets(&f.file_text, &f.tokens);
 
-        for err in &f.errors.errors {
-            err.pretty_print_error(&f.errors.main_file, &token_offsets, &mut file_cache);
+        for err in &f.parsing_errors.errors {
+            err.pretty_print_error(f.parsing_errors.file, &token_offsets, &linker, &mut file_cache);
         }
     }
 }
