@@ -343,7 +343,7 @@ fn main_loop(
                         let mut prelink = PreLinker::new();
                         let uuid = prelink.reserve_file();
 
-                        let (full_parse, errors) = perform_full_semantic_parse(&file_data.file_text, uuid);
+                        let (full_parse, parsing_errors) = perform_full_semantic_parse(&file_data.file_text, uuid);
                         
                         let (syntax_highlight, token_positions) = do_syntax_highlight(&file_data, &full_parse);
 
@@ -352,7 +352,12 @@ fn main_loop(
                             id: req.id, result: Some(result), error: None
                         }))?;
 
+                        prelink.add_reserved_file(uuid, path, file_data.file_text.clone(), full_parse, parsing_errors);
+
                         let linker = prelink.link();
+
+                        let mut errors = linker.files[uuid].parsing_errors.clone();
+                        linker.get_linking_errors(uuid, &mut errors);
 
                         send_errors_warnings(&connection, errors, params.text_document.uri, &token_positions, &linker)?;
                     },

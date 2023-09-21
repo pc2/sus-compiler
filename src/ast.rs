@@ -38,13 +38,6 @@ pub enum LocalOrGlobal {
 
 
 #[derive(Debug, Clone)]
-pub struct TokenContent {
-    pub position : usize,
-    pub text : Range<usize> // File position
-}
-
-
-#[derive(Debug, Clone)]
 pub enum TypeExpression {
     Named(usize), // position in referenced globals list
     Array(Box<(SpanTypeExpression, SpanExpression)>)
@@ -107,6 +100,7 @@ pub enum Statement {
 #[derive(Debug)]
 pub struct Location {
     pub file : FileUUID,
+    pub name_token : usize,
     pub span : Span
 }
 
@@ -119,7 +113,6 @@ pub struct Dependencies {
 
 #[derive(Debug)]
 pub struct Module {
-    pub name : TokenContent,
     pub declarations : Vec<SignalDeclaration>,
     pub code : Vec<SpanStatement>,
 
@@ -127,7 +120,7 @@ pub struct Module {
     pub dependencies : Dependencies
 }
 
-pub type GlobalReference = Vec<TokenContent>; // token index, and name span
+pub type GlobalReference = Vec<usize>; // token index, and name span
 
 #[derive(Debug)]
 pub struct ASTRoot {

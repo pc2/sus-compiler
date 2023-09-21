@@ -25,7 +25,7 @@ impl Token {
     }
 }
 
-pub const ALL_KEYWORDS : [(&'static str, u8); 17] = [
+pub const ALL_KEYWORDS : [(&'static str, u8); 15] = [
     ("template", 0),
     ("module", 0),
     ("pipeline", 0),
@@ -36,8 +36,6 @@ pub const ALL_KEYWORDS : [(&'static str, u8); 17] = [
     ("state", 0),
     ("if", 0),
     ("else", 0),
-    ("true", 0),
-    ("false", 0),
     ("while", 0),
     ("for", 0),
     ("struct", 0),

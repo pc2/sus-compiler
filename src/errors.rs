@@ -8,12 +8,14 @@ use ariadne::*;
 
 use crate::tokenizer::{TokenTypeIdx, get_token_type_name};
 
+#[derive(Debug,Clone)]
 pub struct ErrorInfo {
     pub position : Span,
     pub file : FileUUID,
     pub info : String
 }
 
+#[derive(Debug,Clone)]
 pub struct ParsingError {
     pub position : Span,
     pub reason : String,
@@ -92,6 +94,7 @@ pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
 }
 
 // Class that collects and manages errors and warnings
+#[derive(Clone)]
 pub struct ErrorCollector {
     pub errors : Vec<ParsingError>,
     pub file : FileUUID

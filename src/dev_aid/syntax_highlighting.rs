@@ -105,12 +105,12 @@ fn walk_name_color(ast : &ASTRoot, result : &mut [IDEToken]) {
                 IDEIdentifierType::Unknown
             });
         });
-        result[module.name.position].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
+        result[module.location.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
 
         
         for part_vec in &module.dependencies.global_references {
             for part_tok in part_vec {
-                result[part_tok.position].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
+                result[*part_tok].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
             }
         }
     }
@@ -210,10 +210,12 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
 
     let mut file_cache : FileCache = Default::default();
     
-    for (_file_name, f) in &linker.files {
+    for (file_uuid, f) in &linker.files {
         let token_offsets = generate_character_offsets(&f.file_text, &f.tokens);
 
-        for err in &f.parsing_errors.errors {
+        let mut errors = f.parsing_errors.clone();
+        linker.get_linking_errors(file_uuid, &mut errors);
+        for err in errors.errors {
             err.pretty_print_error(f.parsing_errors.file, &token_offsets, &linker, &mut file_cache);
         }
     }

@@ -3,10 +3,16 @@ use num_bigint::BigUint;
 
 use crate::{tokenizer::*, errors::*, ast::*, linker::FileUUID};
 
-use std::{iter::Peekable, str::FromStr};
+use std::{iter::Peekable, str::FromStr, ops::Range};
 use core::slice::Iter;
 
 use std::mem::replace;
+
+#[derive(Clone)]
+struct TokenContent {
+    position : usize,
+    text : Range<usize> // File position
+}
 
 pub enum TokenTreeNode {
     PlainToken(Token, usize), // Has the index of the given token to the global Token array
@@ -334,7 +340,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
                     LocalOrGlobal::Local(local_idx)
                 } else {
                     // todo namespacing and shit
-                    let global_ident = vec![TokenContent{position : *pos, text : tok.get_range()}];
+                    let global_ident = vec![*pos];
                     LocalOrGlobal::Global(self.add_global_reference(global_ident))
                 };
                 (Expression::Named(ident_ref), Span::from(*pos))
@@ -342,12 +348,6 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == TOKEN_NUMBER => {
                 let value = &self.file_text[tok.get_range()];
                 (Expression::Constant(Value::Integer(BigUint::from_str(value).unwrap())), Span::from(*pos))
-            },
-            Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == kw("true") => {
-                (Expression::Constant(Value::Bool(true)), Span::from(*pos))
-            },
-            Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == kw("false") => {
-                (Expression::Constant(Value::Bool(false)), Span::from(*pos))
             },
             Some(TokenTreeNode::Block(typ, contents, span)) if *typ == kw("(") => {
                 let mut content_token_stream = TokenStream::new(contents, span.0, span.1);
@@ -442,7 +442,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
     fn try_parse_type(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext) -> Option<SpanTypeExpression> {
         let first_token = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
         // todo namespacing and shit
-        let global_ident = vec![first_token.clone()];
+        let global_ident = vec![first_token.position];
         let mut cur_type = (TypeExpression::Named(self.add_global_reference(global_ident)), Span::from(first_token.position)); // TODO add more type info
         while let Some((content, block_span)) = token_stream.eat_is_block(kw("[")) {
             let mut array_index_token_stream = TokenStream::new(content, block_span.0, block_span.1);
@@ -663,7 +663,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             global_references : replace(&mut self.global_references, Vec::new()),
             ..Default::default()
         };
-        Some(Module{name, declarations, code, location : Location{span, file : self.errors.file}, dependencies})
+        Some(Module{declarations, code, location : Location{file : self.errors.file, name_token : name.position, span}, dependencies})
     }
 
     fn parse_ast(mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {
