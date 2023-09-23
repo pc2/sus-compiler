@@ -1,12 +1,12 @@
-use std::{collections::HashMap, ops::{IndexMut, Index}, path::PathBuf};
+use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}, path::PathBuf};
 
-use crate::{ast::{Module, Location, Dependencies, GlobalReference, Span}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}};
+use crate::{ast::{Module, LinkInfo, GlobalReference, Span}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NamedUUIDMarker;
 pub type ValueUUID = UUID<NamedUUIDMarker>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FileUUIDMarker;
 pub type FileUUID = UUID<FileUUIDMarker>;
 
@@ -22,25 +22,8 @@ const BUILTIN_VALUES : [&'static str; 2] = [
 
 pub trait Linkable {
     fn get_name<'a>(&self, linker : &'a Linker) -> &'a str;
-    fn get_full_name(&self, linker : &Linker) -> String {
-        let mut full_name = match self.get_file() {
-            FileUUID::INVALID => "<builtin>".to_owned(),
-            f => linker.files[f].file_path.to_string_lossy().into_owned()
-        };
-        full_name += "::";
-        full_name += self.get_name(linker);
-        full_name
-    }
-    fn get_location(&self) -> Option<&Location>;
-    fn get_dependencies(&self) -> &Dependencies;
-    fn get_dependencies_mut(&mut self) -> &mut Dependencies;
-    fn get_file(&self) -> FileUUID {
-        if let Some(loc) = self.get_location() {
-            loc.file
-        } else {
-            FileUUID::INVALID
-        }
-    }
+    fn get_link_info(&self) -> Option<&LinkInfo>;
+    fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo>;
 }
 
 #[derive(Debug)]
@@ -65,32 +48,24 @@ impl Linkable for NamedValue {
         match self {
             NamedValue::Builtin(name) => name,
             NamedValue::Module(md) => {
-                let file = &linker.files[md.location.file];
-                file.get_token_text(md.location.name_token)
+                let file = &linker.files[md.link_info.file];
+                file.get_token_text(md.link_info.name_token)
             },
         }
     }
-    fn get_dependencies(&self) -> &Dependencies {
-        match self {
-            NamedValue::Builtin(_) => unreachable!(),
-            NamedValue::Module(md) => {
-                &md.dependencies
-            }
-        }
-    }
-    fn get_dependencies_mut(&mut self) -> &mut Dependencies {
-        match self {
-            NamedValue::Builtin(_) => unreachable!(),
-            NamedValue::Module(md) => {
-                &mut md.dependencies
-            }
-        }
-    }
-    fn get_location(&self) -> Option<&Location> {
+    fn get_link_info(&self) -> Option<&LinkInfo> {
         match self {
             NamedValue::Builtin(_) => None,
             NamedValue::Module(md) => {
-                Some(&md.location)
+                Some(&md.link_info)
+            }
+        }
+    }
+    fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo> {
+        match self {
+            NamedValue::Builtin(_) => None,
+            NamedValue::Module(md) => {
+                Some(&mut md.link_info)
             }
         }
     }
@@ -102,19 +77,14 @@ impl Linkable for NamedType {
             NamedType::Builtin(name) => name,
         }
     }
-    fn get_dependencies(&self) -> &Dependencies {
+    fn get_link_info(&self) -> Option<&LinkInfo> {
         match self {
-            NamedType::Builtin(_) => unreachable!(),
+            NamedType::Builtin(_) => None,
         }
     }
-    fn get_dependencies_mut(&mut self) -> &mut Dependencies {
+    fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo> {
         match self {
-            NamedType::Builtin(_) => unreachable!(),
-        }
-    }
-    fn get_location(&self) -> Option<&Location> {
-        match self {
-            NamedType::Builtin(_name) => None
+            NamedType::Builtin(_) => None,
         }
     }
 }
@@ -126,22 +96,16 @@ impl Linkable for Named {
             Named::Type(t) => t.get_name(linker),
         }
     }
-    fn get_dependencies(&self) -> &Dependencies {
+    fn get_link_info(&self) -> Option<&LinkInfo> {
         match self {
-            Named::Value(v) => v.get_dependencies(),
-            Named::Type(t) => t.get_dependencies()
+            Named::Value(v) => v.get_link_info(),
+            Named::Type(t) => t.get_link_info()
         }
     }
-    fn get_dependencies_mut(&mut self) -> &mut Dependencies {
+    fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo> {
         match self {
-            Named::Value(v) => v.get_dependencies_mut(),
-            Named::Type(t) => t.get_dependencies_mut()
-        }
-    }
-    fn get_location(&self) -> Option<&Location> {
-        match self {
-            Named::Value(v) => v.get_location(),
-            Named::Type(t) => t.get_location()
+            Named::Value(v) => v.get_link_info_mut(),
+            Named::Type(t) => t.get_link_info_mut()
         }
     }
 }
@@ -240,7 +204,7 @@ impl PreLinker {
     pub fn add_reserved_file(&mut self, file : FileUUID, file_path : PathBuf, file_text : String, parse_result : FullParseResult, parsing_errors : ErrorCollector) {
         let mut associated_values = Vec::new();
         for md in parse_result.ast.modules {
-            let module_name = &file_text[parse_result.tokens[md.location.name_token].get_range()];
+            let module_name = &file_text[parse_result.tokens[md.link_info.name_token].get_range()];
             let new_module_uuid = self.links.globals.alloc(Named::Value(NamedValue::Module(md)));
             associated_values.push(new_module_uuid);
             match self.links.global_namespace.entry(module_name.to_owned()) {
@@ -257,12 +221,12 @@ impl PreLinker {
 
     // This should be called once all modules have been added. Adds errors for globals it couldn't match
     pub fn link(mut self) -> Linker {
-        for (_file_uuid, file) in &mut self.files {
-            for idx in &file.associated_values {
-                let deps = self.links.globals[*idx].get_dependencies();
-                let vals_this_refers_to = self.links.resolve_dependencies(&file, &deps.global_references);
-                let deps_mut = self.links.globals[*idx].get_dependencies_mut();
-                deps_mut.resolved_globals = vals_this_refers_to;
+        for (_file_uuid, file) in &self.files {
+            for val_in_file in &file.associated_values {
+                let link_info = self.links.globals[*val_in_file].get_link_info().unwrap();
+                let vals_this_refers_to = self.links.resolve_dependencies(&file, &link_info.global_references);
+                let link_info_mut = self.links.globals[*val_in_file].get_link_info_mut().unwrap();
+                link_info_mut.resolved_globals = vals_this_refers_to;
             }
         }
         Linker{links: self.links, files : self.files}
@@ -275,35 +239,39 @@ impl Linker {
 
         // Conflicting Declarations
         for colission in &self.links.name_colissions {
-            let file_0 = self.links.globals[colission.0].get_file();
-            let file_1 = self.links.globals[colission.1].get_file();
-            
-            let (main_object, other_object) = if file_0 == file_uuid {
-                (colission.0, colission.1)
-            } else if file_1 == file_uuid {
-                (colission.1, colission.0)
+            let info_0 = self.links.globals[colission.0].get_link_info().unwrap(); // Is always valid because colission.0 is 'the thing that conflicts with'
+            let info_1_opt = self.links.globals[colission.1].get_link_info();
+
+            let (info_a, info_b) = if info_0.file == file_uuid {
+                if let Some(info_1) = info_1_opt {
+                    (info_0, info_1)
+                } else {
+                    let this_object_name = file.get_token_text(info_0.name_token);
+                    errors.error_basic(Span::from(info_0.name_token), format!("Cannot redeclare the builtin '{this_object_name}'"));
+                    continue;
+                }
+            } else if let Some(info_1) = info_1_opt {
+                if info_1.file == file_uuid {
+                    (info_1, info_0)
+                } else {
+                    continue;
+                }
             } else {
                 continue;
             };
-            let main_location = self.links.globals[main_object].get_location().unwrap(); // This is always valid, because we're getting the location of an object in the current file
-            let this_object_name = file.get_token_text(main_location.name_token);
-            if let Some(other_location) = self.links.globals[other_object].get_location() {
-                errors.error_with_info(Span::from(main_location.name_token), format!("Conflicting Declaration for the name '{this_object_name}'"), vec![
-                    error_info(Span::from(other_location.name_token), other_location.file, "Conflicting Declaration")
-                ]);
-            } else {
-                errors.error_basic(Span::from(main_location.name_token), format!("Cannot redeclare the builtin '{this_object_name}'"));
-            }
+            let this_object_name = file.get_token_text(info_a.name_token);
+            errors.error_with_info(Span::from(info_a.name_token), format!("Conflicting Declaration for the name '{this_object_name}'"), vec![
+                error_info(Span::from(info_b.name_token), info_b.file, "Conflicting Declaration")
+            ]);
         }
         
         // References not found
-
         for val_uuid in &self.files[file_uuid].associated_values {
             let object = &self.links.globals[*val_uuid];
-            let object_dependencies = object.get_dependencies();
-            for (pos, ref_uuid) in object_dependencies.resolved_globals.iter().enumerate() {
+            let object_link_info = object.get_link_info().unwrap(); // Always valid because it's part of file
+            for (pos, ref_uuid) in object_link_info.resolved_globals.iter().enumerate() {
                 if *ref_uuid == ValueUUID::INVALID {
-                    let unresolved_reference = &object_dependencies.global_references[pos];
+                    let unresolved_reference = &object_link_info.global_references[pos];
                     let reference_span = Span(unresolved_reference[0], *unresolved_reference.last().unwrap());
                     let reference_text = file.get_span_text(reference_span);
                     errors.error_basic(reference_span, format!("No Value or Type of the name '{reference_text}' was found. Did you forget to import it?"));
@@ -311,10 +279,68 @@ impl Linker {
             }
         }
     }
-    /*pub fn remove(&mut self, file : FileUUID) {
 
+    pub fn remove_files(&mut self, files : &[FileUUID]) {
+        // For quick lookup if a reference disappears
+        let mut back_reference_set = HashSet::new();
+
+        // Remove the files and their referenced values
+        for file in files {
+            for v in self.files.free(*file).associated_values {
+                back_reference_set.insert(v);
+                self.links.globals.free(v);
+            }
+        }
+
+        // Remove resolved globals
+        for (_uuid, v) in &mut self.links.globals {
+            if let Some(info) = v.get_link_info_mut() { // Builtins can't refer to other things
+                for v in &mut info.resolved_globals {
+                    if back_reference_set.contains(v) {
+                        *v = ValueUUID::INVALID;
+                    }
+                }
+            }
+        }
+
+        // Remove possible conflicts
+        let mut conflict_replacements = HashMap::new();
+        let nc = &mut self.links.name_colissions;
+        let mut i = 0;
+        while i < nc.len() {
+            let (c_0, c_1) = nc[i];
+            if back_reference_set.contains(&c_1) {
+                let last = *nc.last().unwrap();
+                nc[i] = last;
+                nc.pop();
+            } else {
+                // does not contain c_1, but does contain c_0. Have to recreate conflicts containing c_0 to instead refer to c_1
+                let last = *nc.last().unwrap();
+                nc[i] = last;
+                nc.pop();
+                conflict_replacements.insert(c_0, c_1);
+            }
+            i += 1;
+        }
+        if !conflict_replacements.is_empty() {
+            for conflict in nc {
+                if let Some(replacement) = conflict_replacements.get(&conflict.0) {
+                    conflict.0 = *replacement;
+                }
+            }
+        }
+
+        // Remove names from the global namespace
+        self.links.global_namespace.retain(|_k, v| -> bool {
+            if let Some(found_replacement) = conflict_replacements.get(v) {
+                *v = *found_replacement;
+                return true;
+            }
+            !back_reference_set.contains(v)
+        });
     }
-    pub fn relink(&mut self, file : FileUUID, file_text : String, ast : ASTRoot, mut errors : ErrorCollector) {
+
+    /*pub fn relink(&mut self, file : FileUUID, file_text : String, ast : ASTRoot, mut errors : ErrorCollector) {
         match self.files.entry(file_name) {
             Entry::Occupied(mut exists) => {
                 let existing_entry = exists.get_mut();

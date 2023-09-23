@@ -659,11 +659,14 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
 
         let span = Span(declaration_start_idx, token_stream.last_idx);
 
-        let dependencies = Dependencies{
+        let link_info = LinkInfo{
+            file : self.errors.file,
+            name_token : name.position,
+            span,
             global_references : replace(&mut self.global_references, Vec::new()),
-            ..Default::default()
+            resolved_globals : Vec::new()
         };
-        Some(Module{declarations, code, location : Location{file : self.errors.file, name_token : name.position, span}, dependencies})
+        Some(Module{declarations, code, link_info})
     }
 
     fn parse_ast(mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {

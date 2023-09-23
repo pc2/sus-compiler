@@ -98,26 +98,20 @@ pub enum Statement {
 }
 
 #[derive(Debug)]
-pub struct Location {
+pub struct LinkInfo {
     pub file : FileUUID,
     pub name_token : usize,
-    pub span : Span
-}
-
-#[derive(Debug, Default)]
-pub struct Dependencies {
+    pub span : Span,
     pub global_references : Vec<GlobalReference>,
-
     pub resolved_globals : Vec<ValueUUID>
 }
 
 #[derive(Debug)]
 pub struct Module {
-    pub declarations : Vec<SignalDeclaration>,
-    pub code : Vec<SpanStatement>,
+    pub link_info : LinkInfo,
 
-    pub location : Location,
-    pub dependencies : Dependencies
+    pub declarations : Vec<SignalDeclaration>,
+    pub code : Vec<SpanStatement>
 }
 
 pub type GlobalReference = Vec<usize>; // token index, and name span

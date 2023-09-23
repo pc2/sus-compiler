@@ -105,10 +105,10 @@ fn walk_name_color(ast : &ASTRoot, result : &mut [IDEToken]) {
                 IDEIdentifierType::Unknown
             });
         });
-        result[module.location.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
+        result[module.link_info.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
 
         
-        for part_vec in &module.dependencies.global_references {
+        for part_vec in &module.link_info.global_references {
             for part_tok in part_vec {
                 result[*part_tok].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
             }
