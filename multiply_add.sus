@@ -152,6 +152,8 @@ module exists : hello a -> int result {
 
 }
 
+module hello : int a -> int b {}
+
 module test_exists : -> int result {
 	int x = exists(5);
 	int b = doesnt_exist(3);
@@ -159,4 +161,8 @@ module test_exists : -> int result {
 
 module exists : duplicate a {
 	// Should be a duplicate of previous exists
+}
+
+module use_other_file : int a -> int r {
+	r = hello_from_the_other_side(a);
 }

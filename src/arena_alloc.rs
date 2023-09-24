@@ -46,6 +46,10 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
             l
         }, PhantomData)
     }
+    pub fn revert_to_reservation(&mut self, UUID(uuid, _) : UUID<IndexMarker>) {
+        assert!(self.data[uuid].is_some());
+        self.data[uuid] = None;
+    }
     pub fn alloc_reservation(&mut self, UUID(uuid, _) : UUID<IndexMarker>, v : T) {
         assert!(self.data[uuid].is_none());
         self.data[uuid] = Some(v);
@@ -53,6 +57,12 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
     pub fn free(&mut self, UUID(uuid, _) : UUID<IndexMarker>) -> T {
         self.free_slots.push(uuid);
         std::mem::replace(&mut self.data[uuid], None).unwrap()
+    }
+    pub fn iter<'a>(&'a self) -> ArenaIterator<'a, T, IndexMarker> {
+        self.into_iter()
+    }
+    pub fn iter_mut<'a>(&'a mut self) -> ArenaIteratorMut<'a, T, IndexMarker> {
+        self.into_iter()
     }
 }
 
@@ -138,33 +148,63 @@ impl<'a, T, IndexMarker> IntoIterator for &'a mut ArenaAllocator<T, IndexMarker>
     }
 }
 
-pub struct ArenaVector<T : Default, IndexMarker> {
-    data : Vec<T>,
+pub struct ArenaVector<T, IndexMarker> {
+    data : Vec<Option<T>>,
     _ph : PhantomData<IndexMarker>
 }
 
-impl<T : Default, IndexMarker> ArenaVector<T, IndexMarker> {
+impl<T, IndexMarker> ArenaVector<T, IndexMarker> {
+    pub fn new() -> Self {
+        Self{data : Vec::new(), _ph : PhantomData}
+    }
     pub fn insert(&mut self, UUID(uuid, _) : UUID<IndexMarker>, value : T) {
         if uuid >= self.data.len() {
-            self.data.resize_with(uuid+1, Default::default);
+            self.data.resize_with(uuid+1, || None);
         }
-        self.data[uuid] = value;
+        assert!(self.data[uuid].is_none());
+        self.data[uuid] = Some(value);
     }
     pub fn remove(&mut self, UUID(uuid, _) : UUID<IndexMarker>) {
-        self.data[uuid] = Default::default();
+        self.data[uuid] = None;
+    }
+    pub fn iter<'a>(&'a self) -> ArenaIterator<'a, T, IndexMarker> {
+        self.into_iter()
+    }
+    pub fn iter_mut<'a>(&'a mut self) -> ArenaIteratorMut<'a, T, IndexMarker> {
+        self.into_iter()
     }
 }
 
-impl<T : Default, IndexMarker> Index<UUID<IndexMarker>> for ArenaVector<T, IndexMarker> {
+impl<T, IndexMarker> Index<UUID<IndexMarker>> for ArenaVector<T, IndexMarker> {
     type Output = T;
 
     fn index(&self, UUID(uuid, _): UUID<IndexMarker>) -> &Self::Output {
-        &self.data[uuid]
+        self.data[uuid].as_ref().unwrap()
     }
 }
 
-impl<T : Default, IndexMarker> IndexMut<UUID<IndexMarker>> for ArenaVector<T, IndexMarker> {
+impl<T, IndexMarker> IndexMut<UUID<IndexMarker>> for ArenaVector<T, IndexMarker> {
     fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
-        &mut self.data[uuid]
+        self.data[uuid].as_mut().unwrap()
+    }
+}
+
+impl<'a, T, IndexMarker> IntoIterator for &'a ArenaVector<T, IndexMarker> {
+    type Item = (UUID<IndexMarker>, &'a T);
+
+    type IntoIter = ArenaIterator<'a, T, IndexMarker>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ArenaIterator{it : self.data.iter().enumerate(), _ph : PhantomData}
+    }
+}
+
+impl<'a, T, IndexMarker> IntoIterator for &'a mut ArenaVector<T, IndexMarker> {
+    type Item = (UUID<IndexMarker>, &'a mut T);
+
+    type IntoIter = ArenaIteratorMut<'a, T, IndexMarker>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ArenaIteratorMut{it : self.data.iter_mut().enumerate(), _ph : PhantomData}
     }
 }

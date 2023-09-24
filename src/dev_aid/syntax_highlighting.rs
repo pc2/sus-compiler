@@ -1,7 +1,7 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{ast::*, tokenizer::*, parser::*, linker::PreLinker};
+use crate::{ast::*, tokenizer::*, parser::*, linker::{PreLinker, FileData, Links, ValueUUID, NamedValue, Named, Linkable}, arena_alloc::ArenaVector};
 
 use ariadne::FileCache;
 use console::Style;
@@ -12,6 +12,7 @@ pub enum IDEIdentifierType {
     Value(IdentifierType),
     Type,
     Interface,
+    Constant,
     Unknown
 }
 
@@ -69,6 +70,7 @@ fn pretty_print(file_text : &str, tokens : &[Token], ide_infos : &[IDEToken]) {
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => Style::new().blue().bright().underlined(),
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Input)) => Style::new().blue().bright(),
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => Style::new().blue().dim(),
+            IDETokenType::Identifier(IDEIdentifierType::Constant) => Style::new().blue().bold(),
             IDETokenType::Identifier(IDEIdentifierType::Type) => Style::new().magenta().bright(),
             IDETokenType::Identifier(IDEIdentifierType::Interface) => Style::new().yellow(),
             IDETokenType::Number => Style::new().green().bright(),
@@ -96,27 +98,48 @@ fn add_ide_bracket_depths_recursive<'a>(result : &mut [IDEToken], current_depth 
     }
 }
 
-fn walk_name_color(ast : &ASTRoot, result : &mut [IDEToken]) {
-    for module in &ast.modules {
-        module.for_each_value(&mut |name, position| {
-            result[position].typ = IDETokenType::Identifier(if let LocalOrGlobal::Local(l) = name {
-                IDEIdentifierType::Value(module.declarations[l].identifier_type)
-            } else {
-                IDEIdentifierType::Unknown
-            });
-        });
-        result[module.link_info.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Interface);
+impl Named {
+    fn get_ide_type(&self) -> IDEIdentifierType{
+        match self {
+            Named::Value(NamedValue::Module(_)) => IDEIdentifierType::Interface,
+            Named::Value(NamedValue::Builtin(_)) => IDEIdentifierType::Constant,
+            Named::Type(_) => IDEIdentifierType::Type,
+        }
+    }
+}
 
+fn walk_name_color(all_objects : &[ValueUUID], links : &Links, result : &mut [IDEToken]) {
+    for obj_uuid in all_objects {
+        let object = &links.globals[*obj_uuid];
+        match object {
+            Named::Value(NamedValue::Module(module)) => {
+                module.for_each_value(&mut |name, position| {
+                    result[position].typ = IDETokenType::Identifier(if let LocalOrGlobal::Local(l) = name {
+                        IDEIdentifierType::Value(module.declarations[l].identifier_type)
+                    } else {
+                        IDEIdentifierType::Unknown
+                    });
+                });       
+            }
+            _other => {}
+        }
         
-        for part_vec in &module.link_info.global_references {
-            for part_tok in part_vec {
-                result[*part_tok].typ = IDETokenType::Identifier(IDEIdentifierType::Type);
+        let link_info = object.get_link_info().unwrap();
+        result[link_info.name_token].typ = IDETokenType::Identifier(object.get_ide_type());
+        for (reference_parts, ref_uuid) in &link_info.global_references {
+            let typ = if *ref_uuid != ValueUUID::INVALID {
+                IDETokenType::Identifier(links.globals[*ref_uuid].get_ide_type())
+            } else {
+                IDETokenType::Invalid
+            };
+            for part_tok in reference_parts {
+                result[*part_tok].typ = typ;
             }
         }
     }
 }
 
-pub fn create_token_ide_info<'a>(parsed: &FullParseResult) -> Vec<IDEToken> {
+pub fn create_token_ide_info<'a>(parsed: &FileData, links : &Links) -> Vec<IDEToken> {
     let mut result : Vec<IDEToken> = Vec::new();
     result.reserve(parsed.tokens.len());
 
@@ -148,7 +171,7 @@ pub fn create_token_ide_info<'a>(parsed: &FullParseResult) -> Vec<IDEToken> {
 
     add_ide_bracket_depths_recursive(&mut result, 0, &parsed.token_hierarchy);
 
-    walk_name_color(&parsed.ast, &mut result);
+    walk_name_color(&parsed.associated_values, links, &mut result);
 
     result
 }
@@ -182,6 +205,7 @@ fn generate_character_offsets(file_text : &str, tokens : &[Token]) -> Vec<Range<
 
 pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
     let mut prelinker : PreLinker = PreLinker::new();
+    let mut paths_arena = ArenaVector::new();
     for file_path in file_paths {
         let uuid = prelinker.reserve_file();
         let file_text = match std::fs::read_to_string(&file_path) {
@@ -193,17 +217,11 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
         };
         
         let (full_parse, errors) = perform_full_semantic_parse(&file_text, uuid);
-
-        print_tokens(&file_text, &full_parse.tokens);
-
-        let ide_tokens = create_token_ide_info(&full_parse);
-        
-        
-        pretty_print(&file_text, &full_parse.tokens, &ide_tokens);
         
         println!("{:?}", full_parse.ast);
 
-        prelinker.add_reserved_file(uuid, file_path, file_text, full_parse, errors);
+        prelinker.add_reserved_file(uuid, file_text, full_parse, errors);
+        paths_arena.insert(uuid, file_path);
     }
 
     let linker = prelinker.link();
@@ -211,12 +229,17 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
     let mut file_cache : FileCache = Default::default();
     
     for (file_uuid, f) in &linker.files {
+        print_tokens(&f.file_text, &f.tokens);
+
+        let ide_tokens = create_token_ide_info(f, &linker.links);
+        pretty_print(&f.file_text, &f.tokens, &ide_tokens);
+
         let token_offsets = generate_character_offsets(&f.file_text, &f.tokens);
 
         let mut errors = f.parsing_errors.clone();
         linker.get_linking_errors(file_uuid, &mut errors);
         for err in errors.errors {
-            err.pretty_print_error(f.parsing_errors.file, &token_offsets, &linker, &mut file_cache);
+            err.pretty_print_error(f.parsing_errors.file, &token_offsets, &paths_arena, &mut file_cache);
         }
     }
 }

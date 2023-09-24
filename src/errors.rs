@@ -1,8 +1,8 @@
 
 
-use std::{ops::Range, path::Path};
+use std::{ops::Range, path::{Path, PathBuf}};
 
-use crate::{ast::Span, linker::{FileUUID, Linker}};
+use crate::{ast::Span, linker::{FileUUID, FileUUIDMarker}, arena_alloc::ArenaVector};
 use ariadne::*;
 
 
@@ -36,14 +36,14 @@ impl<'a> ariadne::Span for CustomSpan<'a> {
 
 impl ParsingError {
     // Requires that character_ranges.len() == tokens.len() + 1 to include EOF token
-    pub fn pretty_print_error(&self, file : FileUUID, character_ranges : &[Range<usize>], linker : &Linker, file_cache : &mut FileCache) {
+    pub fn pretty_print_error(&self, file : FileUUID, character_ranges : &[Range<usize>], paths : &ArenaVector<PathBuf, FileUUIDMarker>, file_cache : &mut FileCache) {
         // Generate & choose some colours for each of our elements
         let err_color = Color::Red;
         let info_color = Color::Blue;
 
         let error_span = self.position.to_range(character_ranges);
 
-        let file_path = &linker.files[file].file_path;
+        let file_path = &paths[file];
 
         let mut report: ReportBuilder<'_, CustomSpan> = Report::build(ReportKind::Error, file_path, error_span.start);
         report = report
@@ -57,7 +57,7 @@ impl ParsingError {
         for info in &self.infos {
             let info_span = info.position.to_range(character_ranges);
             report = report.with_label(
-                Label::new(CustomSpan{file : &linker.files[info.file].file_path, span : info_span})
+                Label::new(CustomSpan{file : &paths[info.file], span : info_span})
                     .with_message(&info.info)
                     .with_color(info_color)
             )

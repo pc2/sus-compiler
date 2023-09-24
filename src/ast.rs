@@ -102,8 +102,7 @@ pub struct LinkInfo {
     pub file : FileUUID,
     pub name_token : usize,
     pub span : Span,
-    pub global_references : Vec<GlobalReference>,
-    pub resolved_globals : Vec<ValueUUID>
+    pub global_references : Vec<(GlobalReference, ValueUUID)>
 }
 
 #[derive(Debug)]

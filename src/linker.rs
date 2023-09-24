@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}, path::PathBuf};
+use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}};
 
 use crate::{ast::{Module, LinkInfo, GlobalReference, Span}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}};
 
@@ -112,7 +112,6 @@ impl Linkable for Named {
 
 pub struct FileData {
     pub file_text : String,
-    pub file_path : PathBuf,
     pub tokens : Vec<Token>,
     pub token_hierarchy : Vec<TokenTreeNode>,
     pub parsing_errors : ErrorCollector,
@@ -130,14 +129,14 @@ impl FileData {
 
 // All modules in the workspace
 pub struct Links {
-    globals : ArenaAllocator<Named, NamedUUIDMarker>,
+    pub globals : ArenaAllocator<Named, NamedUUIDMarker>,
     global_namespace : HashMap<String, ValueUUID>,
     name_colissions : Vec<(ValueUUID, ValueUUID)>
 }
 
 // Represents the fully linked set of all files. Incremental operations such as adding and removing files can be performed
 pub struct Linker {
-    links : Links,
+    pub links : Links,
     pub files : ArenaAllocator<FileData, FileUUIDMarker>
 }
 
@@ -161,16 +160,29 @@ impl Links {
         Links{globals, name_colissions : Vec::new(), global_namespace}
     }
 
-    fn resolve_dependencies(&self, file : &FileData, deps : &[GlobalReference]) -> Vec<ValueUUID> {
-        deps.iter().map(|reference| {
-            let reference_name_str = file.get_token_text(reference[0]);
+    fn resolve_dependencies(namespace : &HashMap<String, ValueUUID>, file : &FileData, deps : &mut [(GlobalReference, ValueUUID)]) {
+        for (reference_name, uuid) in deps {
+            if *uuid == ValueUUID::INVALID {
+                let reference_name_str = file.get_token_text(reference_name[0]);
 
-            if let Some(found) = self.global_namespace.get(reference_name_str) {
-                *found
-            } else {
-                UUID::INVALID
+                *uuid = if let Some(found) = namespace.get(reference_name_str) {
+                    *found
+                } else {
+                    UUID::INVALID
+                }
             }
-        }).collect()
+        }
+    }
+
+    fn add_name(&mut self, module_name: &str, new_module_uuid: UUID<NamedUUIDMarker>) {
+        match self.global_namespace.entry(module_name.to_owned()) {
+            std::collections::hash_map::Entry::Occupied(occ) => {
+                self.name_colissions.push((new_module_uuid, *occ.get()));
+            },
+            std::collections::hash_map::Entry::Vacant(vac) => {
+                vac.insert(new_module_uuid);
+            },
+        }
     }
 }
 
@@ -201,32 +213,23 @@ impl PreLinker {
     pub fn reserve_file(&mut self) -> FileUUID {
         self.files.reserve()
     }
-    pub fn add_reserved_file(&mut self, file : FileUUID, file_path : PathBuf, file_text : String, parse_result : FullParseResult, parsing_errors : ErrorCollector) {
+    pub fn add_reserved_file(&mut self, file : FileUUID, file_text : String, parse_result : FullParseResult, parsing_errors : ErrorCollector) {
         let mut associated_values = Vec::new();
         for md in parse_result.ast.modules {
             let module_name = &file_text[parse_result.tokens[md.link_info.name_token].get_range()];
             let new_module_uuid = self.links.globals.alloc(Named::Value(NamedValue::Module(md)));
             associated_values.push(new_module_uuid);
-            match self.links.global_namespace.entry(module_name.to_owned()) {
-                std::collections::hash_map::Entry::Occupied(occ) => {
-                    self.links.name_colissions.push((new_module_uuid, *occ.get()));
-                },
-                std::collections::hash_map::Entry::Vacant(vac) => {
-                    vac.insert(new_module_uuid);
-                },
-            }
+            self.links.add_name(module_name, new_module_uuid);
         }
-        self.files.alloc_reservation(file, FileData { file_text, file_path, tokens: parse_result.tokens, token_hierarchy: parse_result.token_hierarchy, parsing_errors, associated_values});
+        self.files.alloc_reservation(file, FileData { file_text, tokens: parse_result.tokens, token_hierarchy: parse_result.token_hierarchy, parsing_errors, associated_values});
     }
 
     // This should be called once all modules have been added. Adds errors for globals it couldn't match
     pub fn link(mut self) -> Linker {
         for (_file_uuid, file) in &self.files {
             for val_in_file in &file.associated_values {
-                let link_info = self.links.globals[*val_in_file].get_link_info().unwrap();
-                let vals_this_refers_to = self.links.resolve_dependencies(&file, &link_info.global_references);
-                let link_info_mut = self.links.globals[*val_in_file].get_link_info_mut().unwrap();
-                link_info_mut.resolved_globals = vals_this_refers_to;
+                let link_info = self.links.globals[*val_in_file].get_link_info_mut().unwrap();
+                Links::resolve_dependencies(&self.links.global_namespace, &file, &mut link_info.global_references);
             }
         }
         Linker{links: self.links, files : self.files}
@@ -269,10 +272,9 @@ impl Linker {
         for val_uuid in &self.files[file_uuid].associated_values {
             let object = &self.links.globals[*val_uuid];
             let object_link_info = object.get_link_info().unwrap(); // Always valid because it's part of file
-            for (pos, ref_uuid) in object_link_info.resolved_globals.iter().enumerate() {
+            for (name, ref_uuid) in &object_link_info.global_references {
                 if *ref_uuid == ValueUUID::INVALID {
-                    let unresolved_reference = &object_link_info.global_references[pos];
-                    let reference_span = Span(unresolved_reference[0], *unresolved_reference.last().unwrap());
+                    let reference_span = Span(name[0], *name.last().unwrap());
                     let reference_text = file.get_span_text(reference_span);
                     errors.error_basic(reference_span, format!("No Value or Type of the name '{reference_text}' was found. Did you forget to import it?"));
                 }
@@ -280,22 +282,22 @@ impl Linker {
         }
     }
 
-    pub fn remove_files(&mut self, files : &[FileUUID]) {
+    pub fn remove_file_datas(&mut self, files : &[FileUUID]) {
         // For quick lookup if a reference disappears
         let mut back_reference_set = HashSet::new();
 
         // Remove the files and their referenced values
         for file in files {
-            for v in self.files.free(*file).associated_values {
+            for v in &self.files[*file].associated_values {
                 back_reference_set.insert(v);
-                self.links.globals.free(v);
+                self.links.globals.free(*v);
             }
         }
 
         // Remove resolved globals
         for (_uuid, v) in &mut self.links.globals {
             if let Some(info) = v.get_link_info_mut() { // Builtins can't refer to other things
-                for v in &mut info.resolved_globals {
+                for (_name, v) in &mut info.global_references {
                     if back_reference_set.contains(v) {
                         *v = ValueUUID::INVALID;
                     }
@@ -328,30 +330,54 @@ impl Linker {
                     conflict.0 = *replacement;
                 }
             }
-        }
 
-        // Remove names from the global namespace
-        self.links.global_namespace.retain(|_k, v| -> bool {
-            if let Some(found_replacement) = conflict_replacements.get(v) {
-                *v = *found_replacement;
-                return true;
-            }
-            !back_reference_set.contains(v)
-        });
+            // Remove names from the global namespace
+            self.links.global_namespace.retain(|_k, v| -> bool {
+                !back_reference_set.contains(v)
+            });
+        } else {
+            // Remove names from the global namespace, also have to rename renamed things
+            self.links.global_namespace.retain(|_k, v| -> bool {
+                if let Some(found_replacement) = conflict_replacements.get(v) {
+                    *v = *found_replacement;
+                    return true;
+                }
+                !back_reference_set.contains(v)
+            });
+        }
     }
 
-    /*pub fn relink(&mut self, file : FileUUID, file_text : String, ast : ASTRoot, mut errors : ErrorCollector) {
-        match self.files.entry(file_name) {
-            Entry::Occupied(mut exists) => {
-                let existing_entry = exists.get_mut();
-
-                for ValueUUID(v) in &mut existing_entry.associated_values {
-
-                }
-            },
-            Entry::Vacant(new_entry) => {
-
-            },
+    pub fn remove_files(&mut self, files : &[FileUUID]) {
+        self.remove_file_datas(files);
+        for uuid in files {
+            self.files.free(*uuid);
         }
-    }*/
+    }
+
+    pub fn reserve_file(&mut self) -> FileUUID {
+        self.files.reserve()
+    }
+    
+    pub fn add_reserved_file(&mut self, file : FileUUID, file_text : String, parse_result : FullParseResult, parsing_errors : ErrorCollector) {
+        let mut associated_values = Vec::new();
+        for md in parse_result.ast.modules {
+            let module_name = &file_text[parse_result.tokens[md.link_info.name_token].get_range()];
+            let new_module_uuid = self.links.globals.alloc(Named::Value(NamedValue::Module(md)));
+            associated_values.push(new_module_uuid);
+            self.links.add_name(module_name, new_module_uuid);
+        }
+        self.files.alloc_reservation(file, FileData { file_text, tokens: parse_result.tokens, token_hierarchy: parse_result.token_hierarchy, parsing_errors, associated_values});
+
+        for (_uuid, val_in_file) in &mut self.links.globals {
+            if let Some(link_info) = val_in_file.get_link_info_mut() {
+                Links::resolve_dependencies(&self.links.global_namespace, &self.files[link_info.file], &mut link_info.global_references);
+            }
+        }
+    }
+
+    pub fn relink(&mut self, file : FileUUID, file_text : String, parse_result : FullParseResult, parsing_errors : ErrorCollector) {
+        self.remove_file_datas(&[file]);
+        self.files.revert_to_reservation(file);
+        self.add_reserved_file(file, file_text, parse_result, parsing_errors);
+    }
 }

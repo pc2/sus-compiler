@@ -1,7 +1,7 @@
 
 use num_bigint::BigUint;
 
-use crate::{tokenizer::*, errors::*, ast::*, linker::FileUUID};
+use crate::{tokenizer::*, errors::*, ast::*, linker::{FileUUID, ValueUUID}};
 
 use std::{iter::Peekable, str::FromStr, ops::Range};
 use core::slice::Iter;
@@ -214,7 +214,7 @@ struct ASTParserContext<'g, 'file> {
     errors : &'g mut ErrorCollector,
     file_text : &'file str,
 
-    global_references : Vec<GlobalReference>
+    global_references : Vec<(GlobalReference, ValueUUID)>
 }
 
 struct ASTParserRollbackable {
@@ -224,7 +224,7 @@ struct ASTParserRollbackable {
 impl<'g, 'file> ASTParserContext<'g, 'file> {
     fn add_global_reference(&mut self, name_span : GlobalReference) -> usize {
         let idx = self.global_references.len();
-        self.global_references.push(name_span);
+        self.global_references.push((name_span, ValueUUID::INVALID));
         idx
     }
 
@@ -663,8 +663,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             file : self.errors.file,
             name_token : name.position,
             span,
-            global_references : replace(&mut self.global_references, Vec::new()),
-            resolved_globals : Vec::new()
+            global_references : replace(&mut self.global_references, Vec::new())
         };
         Some(Module{declarations, code, link_info})
     }

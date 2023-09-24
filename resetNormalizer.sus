@@ -1,4 +1,4 @@
-
+/*
 clocked module resetNormalizer : 
 	bool resetn -> bool reg rst, bool reg isInitialized;
 
@@ -15,3 +15,8 @@ if(!resetn) {
 }
 
 endmodule
+*/
+
+module hello_from_the_other_side : int a -> int result {
+	result = a;
+}

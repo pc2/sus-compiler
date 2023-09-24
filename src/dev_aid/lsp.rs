@@ -1,16 +1,13 @@
 
 use std::error::Error;
 use std::fs::File;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::rc::Rc;
 use lsp_types::{*, request::Request, notification::*};
 
 use lsp_server::{Response, Message, Connection};
 
 use lsp_types::notification::Notification;
 
-use crate::{parser::{perform_full_semantic_parse, FullParseResult}, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::{ErrorCollector, ParsingError}, linker::{Linker, PreLinker}};
+use crate::{parser::perform_full_semantic_parse, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::{ErrorCollector, ParsingError}, linker::{PreLinker, FileUUIDMarker, Linker, FileUUID, FileData, Links}, arena_alloc::ArenaVector};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -37,41 +34,38 @@ macro_rules! println {
     }};
 }*/
 
-struct LoadedFile {
-    file_text : String
-}
 struct LoadedFileCache {
-    loaded_files : HashMap<PathBuf, Rc<LoadedFile>>
+    linker : Linker,
+    uris : ArenaVector<Url, FileUUIDMarker>
 }
 
 impl LoadedFileCache {
-    fn new() -> LoadedFileCache {
-        LoadedFileCache{loaded_files : HashMap::new()}
+    fn new(linker : Linker, uris : ArenaVector<Url, FileUUIDMarker>) -> Self {
+        Self{linker, uris}
     }
-    fn get(&mut self, path : &PathBuf) -> Rc<LoadedFile> {
-        if let Some(found) = self.loaded_files.get(path) {
-            found.clone()
+    fn find_uri(&self, uri : &Url) -> Option<FileUUID> {
+        self.uris.iter()
+            .find(|(_uuid, uri_found)| **uri_found == *uri)
+            .map(|(uuid, _uri_found)| uuid)
+    }
+    fn update_text(&mut self, uri : Url, new_file_text : String) {
+        let file_uuid = self.find_uri(&uri).unwrap();
+        let (full_parse, parsing_errors) = perform_full_semantic_parse(&new_file_text, file_uuid);
+        self.linker.relink(file_uuid, new_file_text, full_parse, parsing_errors);
+    }
+    fn ensure_contains_file(&mut self, uri : &Url) -> FileUUID {
+        if let Some(found) = self.find_uri(uri) {
+            found
         } else {
-            self.update_from_disk(path.clone())
+            let file_uuid = self.linker.reserve_file();
+            let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
+            let (full_parse, parsing_errors) = perform_full_semantic_parse(&file_text, file_uuid);
+            self.linker.add_reserved_file(file_uuid, file_text, full_parse, parsing_errors);
+            self.uris.insert(file_uuid, uri.clone());
+            file_uuid
         }
     }
-    fn update_text(&mut self, path : PathBuf, new_text : String) -> Rc<LoadedFile> {
-        //let tokens = tokenize(file_data)
-        let result = Rc::new(LoadedFile{
-            file_text: new_text
-        });
-        self.update(path, result.clone());
-        result
-    }
-    fn update_from_disk(&mut self, path : PathBuf) -> Rc<LoadedFile> {
-        let file_text = std::fs::read_to_string(&path).expect("Could not load file");
-        self.update_text(path, file_text)
-    }
-    fn update(&mut self, path : PathBuf, new_val : Rc<LoadedFile>) {
-        self.loaded_files.insert(path, new_val);
-    }
 }
-
 
 pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
     // Note that  we must have our logging only write out to stderr.
@@ -109,7 +103,8 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
                     SemanticTokenType::TYPE,
                     SemanticTokenType::NUMBER,
                     SemanticTokenType::FUNCTION,
-                    SemanticTokenType::EVENT
+                    SemanticTokenType::EVENT,
+                    SemanticTokenType::ENUM_MEMBER,
                 ],
                 token_modifiers: vec![
                     SemanticTokenModifier::ASYNC, // repurpose ASYNC for "State"
@@ -152,9 +147,10 @@ fn get_semantic_token_type_from_ide_token(tok : &IDEToken) -> u32 {
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => 4,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 3,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Local)) => 3,
+        IDETokenType::Identifier(IDEIdentifierType::Constant) => 9, // make it 'OPERATOR'?
         IDETokenType::Identifier(IDEIdentifierType::Unknown) => 2, // make it 'OPERATOR'?
         IDETokenType::Identifier(IDEIdentifierType::Interface) => 7, // FUNCTION
-        IDETokenType::Identifier(_) => 5, // All others are 'TYPE'
+        IDETokenType::Identifier(IDEIdentifierType::Type) => 5, // All others are 'TYPE'
         IDETokenType::Number => 6,
         IDETokenType::Invalid => 2, // make it 'OPERATOR'?
         IDETokenType::InvalidBracket => 2, // make it 'OPERATOR'?
@@ -198,14 +194,14 @@ impl SemanticTokensDeltaAccumulator {
     }
 }
 
-fn do_syntax_highlight(file_data : &LoadedFile, full_parse : &FullParseResult) -> (SemanticTokensResult, Vec<std::ops::Range<Position>>) {
+fn do_syntax_highlight(file_data : &FileData, links : &Links) -> (SemanticTokensResult, Vec<std::ops::Range<Position>>) {
     let file_text = &file_data.file_text;
-    let ide_tokens = create_token_ide_info(&full_parse);
+    let ide_tokens = create_token_ide_info(&file_data, links);
 
     let mut semantic_tokens_acc = SemanticTokensDeltaAccumulator{prev : Position {line : 0, character : 0}, semantic_tokens : Vec::new()};
-    semantic_tokens_acc.semantic_tokens.reserve(full_parse.tokens.len());
+    semantic_tokens_acc.semantic_tokens.reserve(file_data.tokens.len());
     let mut positions : Vec<std::ops::Range<Position>> = Vec::new();
-    positions.reserve(full_parse.tokens.len());
+    positions.reserve(file_data.tokens.len());
 
     let mut cur_whitespace_start = 0;
     let mut cur_position = Position{line : 0, character : 0};
@@ -213,7 +209,7 @@ fn do_syntax_highlight(file_data : &LoadedFile, full_parse : &FullParseResult) -
         let typ = get_semantic_token_type_from_ide_token(ide_tok);
         let mod_bits = get_modifiers_for_token(ide_tok);
 
-        let tok_range = full_parse.tokens[tok_idx].get_range();
+        let tok_range = file_data.tokens[tok_idx].get_range();
         let whitespace_text = &file_text[cur_whitespace_start..tok_range.start];
         cur_whitespace_start = tok_range.end;
         let token_text = &file_text[tok_range];
@@ -270,27 +266,27 @@ fn cvt_span_to_lsp_range(ch_sp : Span, token_positions : &[std::ops::Range<Posit
 }
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn convert_diagnostic(err : ParsingError, severity : DiagnosticSeverity, token_positions : &[std::ops::Range<Position>], linker : &Linker) -> Diagnostic {
+fn convert_diagnostic(err : ParsingError, severity : DiagnosticSeverity, token_positions : &[std::ops::Range<Position>], uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
     let error_pos = cvt_span_to_lsp_range(err.position, token_positions);
 
     let mut related_info = Vec::new();
     for info in err.infos {
         let info_pos = cvt_span_to_lsp_range(info.position, token_positions);
-        let location = Location{uri : Url::from_file_path(&linker.files[info.file].file_path).unwrap(), range : info_pos};
+        let location = Location{uri : uris[info.file].clone(), range : info_pos};
         related_info.push(DiagnosticRelatedInformation { location, message: info.info });
     }
     Diagnostic::new(error_pos, Some(severity), None, None, err.reason, Some(related_info), None)
 }
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, uri : Url, token_positions : &[std::ops::Range<Position>], linker : &Linker) -> Result<(), Box<dyn Error + Sync + Send>> {
+fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, token_positions : &[std::ops::Range<Position>], uris : &ArenaVector<Url, FileUUIDMarker>) -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut diag_vec : Vec<Diagnostic> = Vec::new();
     for err in errors.errors {
-        diag_vec.push(convert_diagnostic(err, DiagnosticSeverity::ERROR, token_positions, linker));
+        diag_vec.push(convert_diagnostic(err, DiagnosticSeverity::ERROR, token_positions, uris));
     }
     
     let params = &PublishDiagnosticsParams{
-        uri: uri,
+        uri: uris[errors.file].clone(),
         diagnostics: diag_vec,
         version: None
     };
@@ -309,10 +305,11 @@ fn main_loop(
     params: serde_json::Value,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
 
-    let mut file_cache = LoadedFileCache::new();
+    let prelinker = PreLinker::new();
+    let mut file_cache = LoadedFileCache::new(prelinker.link(), ArenaVector::new());
 
     let _params: InitializeParams = serde_json::from_value(params).unwrap();
-    println!("starting example main loop");
+    println!("starting LSP main loop");
     for msg in &connection.receiver {
         println!("got msg: {msg:?}");
         match msg {
@@ -336,30 +333,21 @@ fn main_loop(
                         
                         println!("got fullSemanticTokens request: {params:?}");
 
-                        let path : PathBuf = params.text_document.uri.to_file_path().unwrap();
-                        let file_data : Rc<LoadedFile> = file_cache.get(&path);
+                        let uuid = file_cache.ensure_contains_file(&params.text_document.uri);
                         
+                        let file_data = &file_cache.linker.files[uuid];
 
-                        let mut prelink = PreLinker::new();
-                        let uuid = prelink.reserve_file();
-
-                        let (full_parse, parsing_errors) = perform_full_semantic_parse(&file_data.file_text, uuid);
-                        
-                        let (syntax_highlight, token_positions) = do_syntax_highlight(&file_data, &full_parse);
+                        let (syntax_highlight, token_positions) = do_syntax_highlight(file_data, &file_cache.linker.links);
 
                         let result = serde_json::to_value(&syntax_highlight).unwrap();
                         connection.sender.send(Message::Response(Response{
                             id: req.id, result: Some(result), error: None
                         }))?;
 
-                        prelink.add_reserved_file(uuid, path, file_data.file_text.clone(), full_parse, parsing_errors);
+                        let mut errors = file_cache.linker.files[uuid].parsing_errors.clone();
+                        file_cache.linker.get_linking_errors(uuid, &mut errors);
 
-                        let linker = prelink.link();
-
-                        let mut errors = linker.files[uuid].parsing_errors.clone();
-                        linker.get_linking_errors(uuid, &mut errors);
-
-                        send_errors_warnings(&connection, errors, params.text_document.uri, &token_positions, &linker)?;
+                        send_errors_warnings(&connection, errors, &token_positions, &file_cache.uris)?;
                     },
                     // TODO ...
                     req => {
@@ -374,10 +362,7 @@ fn main_loop(
                 match not.method.as_str() {
                     notification::DidChangeTextDocument::METHOD => {
                         let params : DidChangeTextDocumentParams = serde_json::from_value(not.params).expect("JSON Encoding Error while parsing params");
-                        let path_to_update = params.text_document.uri.to_file_path().unwrap();
-                        //let original_file_text = file_cache.get(&path_to_update).file_text;
-                        let new_file_text = params.content_changes[0].text.clone();
-                        file_cache.update_text(path_to_update, new_file_text);
+                        file_cache.update_text(params.text_document.uri, params.content_changes.into_iter().next().unwrap().text);
                     },
                     other => {
                         println!("got notification: {other:?}");
