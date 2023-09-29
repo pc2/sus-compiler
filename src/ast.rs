@@ -102,7 +102,8 @@ pub struct LinkInfo {
     pub file : FileUUID,
     pub name_token : usize,
     pub span : Span,
-    pub global_references : Vec<(GlobalReference, ValueUUID)>
+    pub global_references : Vec<(GlobalReference, ValueUUID)>,
+    pub is_fully_linked : bool // Caches if self.global_references contains any INVALID references. 
 }
 
 #[derive(Debug)]

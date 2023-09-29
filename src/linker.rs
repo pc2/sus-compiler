@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}};
 
-use crate::{ast::{Module, LinkInfo, GlobalReference, Span}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}};
+use crate::{ast::{Module, LinkInfo, Span}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NamedUUIDMarker;
@@ -160,18 +160,21 @@ impl Links {
         Links{globals, name_colissions : Vec::new(), global_namespace}
     }
 
-    fn resolve_dependencies(namespace : &HashMap<String, ValueUUID>, file : &FileData, deps : &mut [(GlobalReference, ValueUUID)]) {
-        for (reference_name, uuid) in deps {
+    fn resolve_dependencies(namespace : &HashMap<String, ValueUUID>, file : &FileData, link_info : &mut LinkInfo) {
+        let mut all_resolved = true;
+        for (reference_name, uuid) in &mut link_info.global_references {
             if *uuid == ValueUUID::INVALID {
                 let reference_name_str = file.get_token_text(reference_name[0]);
 
                 *uuid = if let Some(found) = namespace.get(reference_name_str) {
                     *found
                 } else {
+                    all_resolved = false;
                     UUID::INVALID
                 }
             }
         }
+        link_info.is_fully_linked = all_resolved;
     }
 
     fn add_name(&mut self, module_name: &str, new_module_uuid: UUID<NamedUUIDMarker>) {
@@ -229,11 +232,18 @@ impl PreLinker {
         for (_file_uuid, file) in &self.files {
             for val_in_file in &file.associated_values {
                 let link_info = self.links.globals[*val_in_file].get_link_info_mut().unwrap();
-                Links::resolve_dependencies(&self.links.global_namespace, &file, &mut link_info.global_references);
+                Links::resolve_dependencies(&self.links.global_namespace, &file, link_info);
             }
         }
         Linker{links: self.links, files : self.files}
     }
+}
+
+fn add_error(file: &FileData, info_a: &LinkInfo, info_b: &LinkInfo, errors: &mut ErrorCollector) {
+    let this_object_name = file.get_token_text(info_a.name_token);
+    errors.error_with_info(Span::from(info_a.name_token), format!("Conflicting Declaration for the name '{this_object_name}'"), vec![
+        error_info(Span::from(info_b.name_token), info_b.file, "Conflicting Declaration")
+    ]);
 }
 
 impl Linker {
@@ -245,33 +255,30 @@ impl Linker {
             let info_0 = self.links.globals[colission.0].get_link_info().unwrap(); // Is always valid because colission.0 is 'the thing that conflicts with'
             let info_1_opt = self.links.globals[colission.1].get_link_info();
 
-            let (info_a, info_b) = if info_0.file == file_uuid {
+            if info_0.file == file_uuid {
                 if let Some(info_1) = info_1_opt {
-                    (info_0, info_1)
+                    add_error(file, info_0, info_1, errors);
+                    if info_1.file == file_uuid {
+                        add_error(file, info_1, info_0, errors);
+                    }
                 } else {
                     let this_object_name = file.get_token_text(info_0.name_token);
                     errors.error_basic(Span::from(info_0.name_token), format!("Cannot redeclare the builtin '{this_object_name}'"));
-                    continue;
                 }
             } else if let Some(info_1) = info_1_opt {
                 if info_1.file == file_uuid {
-                    (info_1, info_0)
-                } else {
-                    continue;
+                    add_error(file, info_1, info_0, errors);
                 }
-            } else {
-                continue;
-            };
-            let this_object_name = file.get_token_text(info_a.name_token);
-            errors.error_with_info(Span::from(info_a.name_token), format!("Conflicting Declaration for the name '{this_object_name}'"), vec![
-                error_info(Span::from(info_b.name_token), info_b.file, "Conflicting Declaration")
-            ]);
+            }
         }
         
         // References not found
         for val_uuid in &self.files[file_uuid].associated_values {
             let object = &self.links.globals[*val_uuid];
             let object_link_info = object.get_link_info().unwrap(); // Always valid because it's part of file
+            if object_link_info.is_fully_linked {
+                continue; // Early exit because we know this object contains no linking errors
+            }
             for (name, ref_uuid) in &object_link_info.global_references {
                 if *ref_uuid == ValueUUID::INVALID {
                     let reference_span = Span(name[0], *name.last().unwrap());
@@ -300,6 +307,7 @@ impl Linker {
                 for (_name, v) in &mut info.global_references {
                     if back_reference_set.contains(v) {
                         *v = ValueUUID::INVALID;
+                        info.is_fully_linked = false;
                     }
                 }
             }
@@ -370,7 +378,10 @@ impl Linker {
 
         for (_uuid, val_in_file) in &mut self.links.globals {
             if let Some(link_info) = val_in_file.get_link_info_mut() {
-                Links::resolve_dependencies(&self.links.global_namespace, &self.files[link_info.file], &mut link_info.global_references);
+                if link_info.is_fully_linked {
+                    continue; // Early continue, because we know this object is already fully linked
+                }
+                Links::resolve_dependencies(&self.links.global_namespace, &self.files[link_info.file], link_info);
             }
         }
     }

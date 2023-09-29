@@ -663,7 +663,8 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             file : self.errors.file,
             name_token : name.position,
             span,
-            global_references : replace(&mut self.global_references, Vec::new())
+            global_references : replace(&mut self.global_references, Vec::new()),
+            is_fully_linked : false
         };
         Some(Module{declarations, code, link_info})
     }
