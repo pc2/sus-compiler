@@ -16,6 +16,16 @@ impl Span {
     }
 }
 
+impl IntoIterator for Span {
+    type Item = usize;
+
+    type IntoIter = <std::ops::Range<usize> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Range{start : self.0, end : self.1 + 1}.into_iter()
+    }
+}
+
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum IdentifierType {
     Input,
@@ -86,13 +96,19 @@ pub type SpanStatement = (Statement, Span);
 
 #[derive(Debug)]
 pub enum AssignableExpression {
-    Named{local_idx : usize, num_regs : usize},
+    Named{local_idx : usize},
     ArrayIndex(Box<(SpanAssignableExpression, SpanExpression)>)
 }
 
 #[derive(Debug)]
+pub struct AssignableExpressionWithModifiers {
+    pub expr : SpanAssignableExpression,
+    pub num_regs : u32
+}
+
+#[derive(Debug)]
 pub enum Statement {
-    Assign(Vec<SpanAssignableExpression>, SpanExpression), // v = expr;
+    Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : SpanExpression}, // num_regs v = expr;
     Block(Vec<SpanStatement>),
     TimelineStage(usize)
 }
@@ -102,7 +118,7 @@ pub struct LinkInfo {
     pub file : FileUUID,
     pub name_token : usize,
     pub span : Span,
-    pub global_references : Vec<(GlobalReference, ValueUUID)>,
+    pub global_references : Vec<GlobalReference>,
     pub is_fully_linked : bool // Caches if self.global_references contains any INVALID references. 
 }
 
@@ -114,7 +130,55 @@ pub struct Module {
     pub code : Vec<SpanStatement>
 }
 
-pub type GlobalReference = Vec<usize>; // token index, and name span
+impl Module {
+    pub fn get_function_sugar_inputs_outputs(&self) -> (Range<usize>, Range<usize>) {
+        let mut decl_iter = self.declarations.iter().enumerate();
+        let mut input_range : Range<usize> = 0..0;
+        let mut output_range : Range<usize> = 0..0;
+        let mut last = if let Some((_pos, decl)) = decl_iter.next() {
+            match decl.identifier_type {
+                IdentifierType::Input => IdentifierType::Input,
+                IdentifierType::Output => IdentifierType::Output,
+                IdentifierType::Local | IdentifierType::State => {return (0..0, 0..0)}
+            }
+        } else {
+            return (0..0, 0..0);
+        };
+        let mut last_valid_pos = 0;
+        for (pos, decl) in decl_iter {
+            if decl.identifier_type != last {
+                match decl.identifier_type {
+                    IdentifierType::Input => {
+                        input_range.start = pos;
+                        output_range.end = pos;
+                    }
+                    IdentifierType::Output => {
+                        output_range.start = pos;
+                        input_range.end = pos;
+                    }
+                    IdentifierType::Local | IdentifierType::State => {
+                        break;
+                    }
+                }
+                last = decl.identifier_type;
+                last_valid_pos = pos;
+            }
+        }
+        match last {
+            IdentifierType::Input => {
+                input_range.end = last_valid_pos + 1;
+            }
+            IdentifierType::Output => {
+                output_range.end = last_valid_pos + 1;
+            }
+            _other => unreachable!()
+        }
+        (input_range, output_range)
+    }
+}
+
+#[derive(Debug,Clone,Copy)]
+pub struct GlobalReference(pub Span, pub ValueUUID); // token index, and name span
 
 #[derive(Debug)]
 pub struct ASTRoot {
@@ -161,7 +225,7 @@ impl IterIdentifiers for SpanAssignableExpression {
     fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
         let (expr, span) = self;
         match expr {
-            AssignableExpression::Named{local_idx: id, num_regs : _} => {
+            AssignableExpression::Named{local_idx: id} => {
                 assert!(span.0 == span.1);
                 func(LocalOrGlobal::Local(*id), span.0);
             }
@@ -190,11 +254,11 @@ impl IterIdentifiers for SpanTypeExpression {
     }
 }
 
-pub fn for_each_assign_in_block<F>(block : &Vec<SpanStatement>, func : &mut F) where F: FnMut(&Vec<SpanAssignableExpression>, &SpanExpression) {
+pub fn for_each_assign_in_block<F>(block : &Vec<SpanStatement>, func : &mut F) where F: FnMut(&Vec<AssignableExpressionWithModifiers>, &SpanExpression) {
     for (stmt, _span) in block {
         match stmt {
-            Statement::Assign(to, v) => {
-                func(to, v);
+            Statement::Assign{to, eq_sign_position : _, expr} => {
+                func(to, expr);
             },
             Statement::Block(b) => {
                 for_each_assign_in_block(b, func);
@@ -211,7 +275,7 @@ impl IterIdentifiers for Module {
         }
         for_each_assign_in_block(&self.code, &mut |to, v| {
             for assign_to in to {
-                assign_to.for_each_value(func);
+                assign_to.expr.for_each_value(func);
             }
             v.for_each_value(func);
         });

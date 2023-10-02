@@ -52,13 +52,13 @@ pub const ALL_SYMBOLS : [(&'static str, u8); 33] = [
     ("*/", 0),
     // Big symbols
     ("->", 0),
+    ("..", 1),
     ("<=", 2), // Start of operators (see is_operator())
     (">=", 2),
     ("==", 2),
     ("!=", 2),
     ("<<", 4),
     (">>", 4),
-    ("..", 1),
     // small Symbols
     ("+", 6),
     ("-", 6),

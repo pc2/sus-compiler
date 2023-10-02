@@ -214,7 +214,7 @@ struct ASTParserContext<'g, 'file> {
     errors : &'g mut ErrorCollector,
     file_text : &'file str,
 
-    global_references : Vec<(GlobalReference, ValueUUID)>
+    global_references : Vec<GlobalReference>
 }
 
 struct ASTParserRollbackable {
@@ -222,9 +222,9 @@ struct ASTParserRollbackable {
 }
 
 impl<'g, 'file> ASTParserContext<'g, 'file> {
-    fn add_global_reference(&mut self, name_span : GlobalReference) -> usize {
+    fn add_global_reference(&mut self, name_span : Span) -> usize {
         let idx = self.global_references.len();
-        self.global_references.push((name_span, ValueUUID::INVALID));
+        self.global_references.push(GlobalReference(name_span, ValueUUID::INVALID));
         idx
     }
 
@@ -340,8 +340,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
                     LocalOrGlobal::Local(local_idx)
                 } else {
                     // todo namespacing and shit
-                    let global_ident = vec![*pos];
-                    LocalOrGlobal::Global(self.add_global_reference(global_ident))
+                    LocalOrGlobal::Global(self.add_global_reference(Span::from(*pos)))
                 };
                 (Expression::Named(ident_ref), Span::from(*pos))
             },
@@ -442,8 +441,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
     fn try_parse_type(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext) -> Option<SpanTypeExpression> {
         let first_token = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
         // todo namespacing and shit
-        let global_ident = vec![first_token.position];
-        let mut cur_type = (TypeExpression::Named(self.add_global_reference(global_ident)), Span::from(first_token.position)); // TODO add more type info
+        let mut cur_type = (TypeExpression::Named(self.add_global_reference(Span::from(first_token.position))), Span::from(first_token.position)); // TODO add more type info
         while let Some((content, block_span)) = token_stream.eat_is_block(kw("[")) {
             let mut array_index_token_stream = TokenStream::new(content, block_span.0, block_span.1);
             let expr = self.parse_expression(&mut array_index_token_stream, scope)?;
@@ -500,10 +498,10 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             return Some(());
         }
         
-        let mut left_expressions : Vec<(SpanExpression, usize)> = Vec::new();
+        let mut left_expressions : Vec<(SpanExpression, u32)> = Vec::new();
         let mut all_decls = true;
         loop { // Loop over a number of declarations possibly
-            let mut reg_count : usize = 0;
+            let mut reg_count = 0;
             while let Some(_tok) = token_stream.eat_is_plain(kw("reg")) {
                 reg_count += 1;
             }
@@ -534,7 +532,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
                 Some(TokenTreeNode::PlainToken(tok, assign_pos)) if tok.get_type() == kw("=") => {
                     // Ends the loop
                     // T a, T b = x(y);
-                    return self.parse_statement_handle_equals(left_expressions, assign_pos, token_stream, scope, statements, start_at);
+                    return self.parse_statement_handle_equals(left_expressions, *assign_pos, token_stream, scope, statements, start_at);
                 }
                 Some(TokenTreeNode::PlainToken(tok, _pos)) if tok.get_type() == kw(";") => {
                     // Ends the loop
@@ -552,11 +550,11 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn convert_expression_to_assignable_expression(&mut self, (expr, span) : SpanExpression, num_regs : usize) -> Option<SpanAssignableExpression> {
+    fn convert_expression_to_assignable_expression(&mut self, (expr, span) : SpanExpression) -> Option<SpanAssignableExpression> {
         match expr {
             Expression::Named(n) => {
                 if let LocalOrGlobal::Local(local_idx) = n {
-                    Some((AssignableExpression::Named{local_idx, num_regs}, span))
+                    Some((AssignableExpression::Named{local_idx}, span))
                 } else {
                     self.errors.error_basic(span, "Can only assign to local variables");
                     None
@@ -564,7 +562,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             },
             Expression::Array(b) => {
                 let (arr, idx) = *b;
-                let assignable_arr = self.convert_expression_to_assignable_expression(arr, num_regs)?;
+                let assignable_arr = self.convert_expression_to_assignable_expression(arr)?;
                 Some((AssignableExpression::ArrayIndex(Box::new((assignable_arr, idx))), span))
             },
             Expression::Constant(_) => {self.errors.error_basic(span, "Cannot assign to constant"); None},
@@ -574,14 +572,16 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn parse_statement_handle_equals(&mut self, left_expressions: Vec<(SpanExpression, usize)>, assign_pos: &usize, token_stream: &mut TokenStream<'_>, scope: &mut LocalVariableContext<'_, 'file>, statements: &mut Vec<(Statement, Span)>, start_at: usize) -> Option<()> {
+    fn parse_statement_handle_equals(&mut self, left_expressions: Vec<(SpanExpression, u32)>, assign_pos: usize, token_stream: &mut TokenStream<'_>, scope: &mut LocalVariableContext<'_, 'file>, statements: &mut Vec<(Statement, Span)>, start_at: usize) -> Option<()> {
         if left_expressions.len() == 0 {
-            self.error_unexpected_token(&[TOKEN_IDENTIFIER], kw("="), *assign_pos, "statement");
+            self.error_unexpected_token(&[TOKEN_IDENTIFIER], kw("="), assign_pos, "statement");
             None
         } else if let Some(value) = self.parse_expression(token_stream, scope) {
-            let converted_left : Vec<SpanAssignableExpression> = left_expressions.into_iter().filter_map(&mut |(expr, reg_count)| self.convert_expression_to_assignable_expression(expr, reg_count)).collect();
+            let converted_left : Vec<AssignableExpressionWithModifiers> = left_expressions.into_iter().filter_map(&mut |(expr, num_regs)| {
+                Some(AssignableExpressionWithModifiers{expr : self.convert_expression_to_assignable_expression(expr)?, num_regs})
+            }).collect();
             let end_at = value.1.1;
-            statements.push((Statement::Assign(converted_left, value), Span(start_at, end_at)));
+            statements.push((Statement::Assign{to : converted_left, eq_sign_position : Some(assign_pos), expr : value}, Span(start_at, end_at)));
             self.eat_plain(token_stream, kw(";"), "right-hand side of expression")?;
             Some(())
         } else {
@@ -590,7 +590,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn parse_statement_handle_end(&mut self, left_expressions: Vec<(SpanExpression, usize)>, all_decls: bool, statements: &mut Vec<(Statement, Span)>) -> Option<()> {
+    fn parse_statement_handle_end(&mut self, left_expressions: Vec<(SpanExpression, u32)>, all_decls: bool, statements: &mut Vec<(Statement, Span)>) -> Option<()> {
         // Declarations or single expression only
         // T a;
         // myFunc(x, y);
@@ -604,7 +604,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
                 return Some(());
             } else {
                 let expr_span = expr.1;
-                statements.push((Statement::Assign(Vec::new(), expr), expr_span));
+                statements.push((Statement::Assign{to : Vec::new(), eq_sign_position : None, expr}, expr_span));
                 return None;
             }
         } else {

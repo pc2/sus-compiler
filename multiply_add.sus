@@ -1,7 +1,11 @@
 
 
+module multiply : int a, int b -> int r {
+	r = a * b;
+}
+
 module multiply_add2 : int a, int b, int c -> int r {
-    int tmp = a * b;
+    int tmp = multiply(a, b);
 	reg r = tmp + c;
 }
 

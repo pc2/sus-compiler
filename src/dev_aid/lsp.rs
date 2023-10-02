@@ -347,6 +347,8 @@ fn main_loop(
                         let mut errors = file_cache.linker.files[uuid].parsing_errors.clone();
                         file_cache.linker.get_linking_errors(uuid, &mut errors);
 
+                        file_cache.linker.flatten_all_modules_in_file(uuid, &mut errors);
+
                         send_errors_warnings(&connection, errors, &token_positions, &file_cache.uris)?;
                     },
                     // TODO ...

@@ -102,7 +102,7 @@ impl Named {
     fn get_ide_type(&self) -> IDEIdentifierType{
         match self {
             Named::Value(NamedValue::Module(_)) => IDEIdentifierType::Interface,
-            Named::Value(NamedValue::Builtin(_)) => IDEIdentifierType::Constant,
+            Named::Value(NamedValue::Constant(_)) => IDEIdentifierType::Constant,
             Named::Type(_) => IDEIdentifierType::Type,
         }
     }
@@ -126,14 +126,14 @@ fn walk_name_color(all_objects : &[ValueUUID], links : &Links, result : &mut [ID
         
         let link_info = object.get_link_info().unwrap();
         result[link_info.name_token].typ = IDETokenType::Identifier(object.get_ide_type());
-        for (reference_parts, ref_uuid) in &link_info.global_references {
+        for GlobalReference(reference_span, ref_uuid) in &link_info.global_references {
             let typ = if *ref_uuid != ValueUUID::INVALID {
                 IDETokenType::Identifier(links.globals[*ref_uuid].get_ide_type())
             } else {
                 IDETokenType::Invalid
             };
-            for part_tok in reference_parts {
-                result[*part_tok].typ = typ;
+            for part_tok in *reference_span {
+                result[part_tok].typ = typ;
             }
         }
     }
@@ -238,6 +238,9 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
 
         let mut errors = f.parsing_errors.clone();
         linker.get_linking_errors(file_uuid, &mut errors);
+
+        linker.flatten_all_modules_in_file(file_uuid, &mut errors);
+
         for err in errors.errors {
             err.pretty_print_error(f.parsing_errors.file, &token_offsets, &paths_arena, &mut file_cache);
         }

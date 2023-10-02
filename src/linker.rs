@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}};
 
-use crate::{ast::{Module, LinkInfo, Span}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}};
+use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, code_generation::flatten};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NamedUUIDMarker;
@@ -15,20 +15,32 @@ const BUILTIN_TYPES : [&'static str; 2] = [
     "int"
 ];
 
-const BUILTIN_VALUES : [&'static str; 2] = [
-    "true",
-    "false"
+const BUILTIN_CONSTANTS : [(&'static str, Value); 2] = [
+    ("true", Value::Bool(true)),
+    ("false", Value::Bool(false))
 ];
+
+pub struct LinkingErrorLocation<'a> {
+    pub named_type : &'static str,
+    pub name : &'a str,
+    pub location : Option<(FileUUID, usize)>
+}
 
 pub trait Linkable {
     fn get_name<'a>(&self, linker : &'a Linker) -> &'a str;
+    fn get_linking_error_location<'a>(&self, linker : &'a Linker) -> LinkingErrorLocation<'a>;
     fn get_link_info(&self) -> Option<&LinkInfo>;
     fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo>;
 }
 
 #[derive(Debug)]
+pub enum NamedConstant {
+    Builtin(&'static str, Value)
+}
+
+#[derive(Debug)]
 pub enum NamedValue {
-    Builtin(&'static str),
+    Constant(NamedConstant),
     Module(Module)
 }
 
@@ -43,19 +55,51 @@ pub enum Named {
     Type(NamedType)
 }
 
+impl Linkable for NamedConstant {
+    fn get_name<'a>(&self, _linker : &'a Linker) -> &'a str {
+        match self {
+            NamedConstant::Builtin(name, _) => name
+        }
+    }
+    fn get_linking_error_location<'a>(&self, _linker : &'a Linker) -> LinkingErrorLocation<'a> {
+        match self {
+            NamedConstant::Builtin(name, _) => LinkingErrorLocation { named_type: "Builtin Constant", name, location: None }
+        }
+    }
+    fn get_link_info(&self) -> Option<&LinkInfo> {
+        match self {
+            NamedConstant::Builtin(_, _) => None
+        }
+    }
+    fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo> {
+        match self {
+            NamedConstant::Builtin(_, _) => None
+        }
+    }
+}
+
 impl Linkable for NamedValue {
     fn get_name<'a>(&self, linker : &'a Linker) -> &'a str {
         match self {
-            NamedValue::Builtin(name) => name,
+            NamedValue::Constant(cst) => cst.get_name(linker),
             NamedValue::Module(md) => {
                 let file = &linker.files[md.link_info.file];
                 file.get_token_text(md.link_info.name_token)
             },
         }
     }
+    fn get_linking_error_location<'a>(&self, linker : &'a Linker) -> LinkingErrorLocation<'a> {
+        match self {
+            NamedValue::Constant(cst) => cst.get_linking_error_location(linker),
+            NamedValue::Module(md) => {
+                let file = &linker.files[md.link_info.file];
+                LinkingErrorLocation { named_type: "Module", name : file.get_token_text(md.link_info.name_token), location: Some((md.link_info.file, md.link_info.name_token)) }
+            }
+        }
+    }
     fn get_link_info(&self) -> Option<&LinkInfo> {
         match self {
-            NamedValue::Builtin(_) => None,
+            NamedValue::Constant(cst) => cst.get_link_info(),
             NamedValue::Module(md) => {
                 Some(&md.link_info)
             }
@@ -63,7 +107,7 @@ impl Linkable for NamedValue {
     }
     fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo> {
         match self {
-            NamedValue::Builtin(_) => None,
+            NamedValue::Constant(cst) => cst.get_link_info_mut(),
             NamedValue::Module(md) => {
                 Some(&mut md.link_info)
             }
@@ -75,6 +119,11 @@ impl Linkable for NamedType {
     fn get_name<'a>(&self, _linker : &'a Linker) -> &'a str {
         match self {
             NamedType::Builtin(name) => name,
+        }
+    }
+    fn get_linking_error_location<'a>(&self, _linker : &'a Linker) -> LinkingErrorLocation<'a> {
+        match self {
+            NamedType::Builtin(name) => LinkingErrorLocation { named_type: "Builtin Type", name, location: None },
         }
     }
     fn get_link_info(&self) -> Option<&LinkInfo> {
@@ -94,6 +143,12 @@ impl Linkable for Named {
         match self {
             Named::Value(v) => v.get_name(linker),
             Named::Type(t) => t.get_name(linker),
+        }
+    }
+    fn get_linking_error_location<'a>(&self, linker : &'a Linker) -> LinkingErrorLocation<'a> {
+        match self {
+            Named::Value(v) => v.get_linking_error_location(linker),
+            Named::Type(t) => t.get_linking_error_location(linker),
         }
     }
     fn get_link_info(&self) -> Option<&LinkInfo> {
@@ -151,8 +206,8 @@ impl Links {
             let already_exisits = global_namespace.insert(name.to_owned(), id);
             assert!(already_exisits.is_none());
         }
-        for name in BUILTIN_VALUES {
-            let id = globals.alloc(Named::Value(NamedValue::Builtin(name)));
+        for (name, val) in BUILTIN_CONSTANTS {
+            let id = globals.alloc(Named::Value(NamedValue::Constant(NamedConstant::Builtin(name, val))));
             let already_exisits = global_namespace.insert(name.to_owned(), id);
             assert!(already_exisits.is_none());
         }
@@ -162,9 +217,9 @@ impl Links {
 
     fn resolve_dependencies(namespace : &HashMap<String, ValueUUID>, file : &FileData, link_info : &mut LinkInfo) {
         let mut all_resolved = true;
-        for (reference_name, uuid) in &mut link_info.global_references {
+        for GlobalReference(reference_span, uuid) in &mut link_info.global_references {
             if *uuid == ValueUUID::INVALID {
-                let reference_name_str = file.get_token_text(reference_name[0]);
+                let reference_name_str = file.get_span_text(*reference_span);
 
                 *uuid = if let Some(found) = namespace.get(reference_name_str) {
                     *found
@@ -279,11 +334,10 @@ impl Linker {
             if object_link_info.is_fully_linked {
                 continue; // Early exit because we know this object contains no linking errors
             }
-            for (name, ref_uuid) in &object_link_info.global_references {
+            for GlobalReference(reference_span, ref_uuid) in &object_link_info.global_references {
                 if *ref_uuid == ValueUUID::INVALID {
-                    let reference_span = Span(name[0], *name.last().unwrap());
-                    let reference_text = file.get_span_text(reference_span);
-                    errors.error_basic(reference_span, format!("No Value or Type of the name '{reference_text}' was found. Did you forget to import it?"));
+                    let reference_text = file.get_span_text(*reference_span);
+                    errors.error_basic(*reference_span, format!("No Value or Type of the name '{reference_text}' was found. Did you forget to import it?"));
                 }
             }
         }
@@ -304,7 +358,7 @@ impl Linker {
         // Remove resolved globals
         for (_uuid, v) in &mut self.links.globals {
             if let Some(info) = v.get_link_info_mut() { // Builtins can't refer to other things
-                for (_name, v) in &mut info.global_references {
+                for GlobalReference(_name, v) in &mut info.global_references {
                     if back_reference_set.contains(v) {
                         *v = ValueUUID::INVALID;
                         info.is_fully_linked = false;
@@ -390,5 +444,58 @@ impl Linker {
         self.remove_file_datas(&[file]);
         self.files.revert_to_reservation(file);
         self.add_reserved_file(file, file_text, parse_result, parsing_errors);
+    }
+
+    pub fn get_constant(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &mut ErrorCollector) -> Option<Value> {
+        match &self.links.globals[uuid] {
+            Named::Value(NamedValue::Constant(NamedConstant::Builtin(_name, v))) => {
+                Some(v.clone())
+            },
+            other => {
+                let info = other.get_linking_error_location(self);
+                let infos = if let Some((file, position)) = info.location {
+                    vec![error_info(Span::from(position), file, "Defined here")]
+                } else {
+                    vec![]
+                };
+                let name = info.name;
+                let ident_type = info.named_type;
+                errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a Constant!"), infos);
+                None
+            }
+        }
+    }
+
+    pub fn get_module(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &mut ErrorCollector) -> Option<&Module> {
+        match &self.links.globals[uuid] {
+            Named::Value(NamedValue::Module(md)) => {
+                Some(md)
+            },
+            other => {
+                let info = other.get_linking_error_location(self);
+                let infos = if let Some((file, position)) = info.location {
+                    vec![error_info(Span::from(position), file, "Defined here")]
+                } else {
+                    vec![]
+                };
+                let name = info.name;
+                let ident_type = info.named_type;
+                errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a Module!"), infos);
+                None
+            }
+        }
+    }
+
+    pub fn flatten_all_modules_in_file(&self, file : FileUUID, errors : &mut ErrorCollector) {
+        for md_uuid in &self.files[file].associated_values {
+            let named = &self.links.globals[*md_uuid];
+            if let Named::Value(NamedValue::Module(md)) = named {
+                if !md.link_info.is_fully_linked {
+                    continue;
+                }
+                let _flt = flatten(md, &self, errors);
+                // TODO use
+            }
+        }
     }
 }
