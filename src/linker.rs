@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}};
 
-use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, code_generation::flatten};
+use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::flatten};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NamedUUIDMarker;
@@ -493,8 +493,8 @@ impl Linker {
                 if !md.link_info.is_fully_linked {
                     continue;
                 }
-                let _flt = flatten(md, &self, errors);
-                // TODO use
+                let flt = flatten(md, &self, errors);
+                println!("{:?}", flt);
             }
         }
     }

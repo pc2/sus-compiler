@@ -3,7 +3,7 @@ mod tokenizer;
 mod parser;
 mod errors;
 mod ast;
-mod code_generation;
+mod flattening;
 mod arena_alloc;
 
 mod dev_aid;

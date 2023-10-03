@@ -8,12 +8,14 @@ use crate::{
 
 
 
+#[derive(Debug)]
 struct LocalVariable {
     pub location : Span,
     pub typ : Option<SpanTypeExpression>
 }
 
 // These are assignable connections
+#[derive(Debug)]
 enum ConnectionRead {
     Local(usize),
     ArrayIdx{arr_local : usize, idx_local : usize},
@@ -21,6 +23,7 @@ enum ConnectionRead {
     FuncOutput{instantiation_idx : usize, field : usize},
     Constant(Value)
 }
+#[derive(Debug)]
 enum ConnectionWrite {
     Local(usize),
     ArrayIdx(Box<(ConnectionWrite, usize)>),
@@ -30,12 +33,14 @@ enum ConnectionWrite {
 
 type SpanConnectionRead = (ConnectionRead, Span);
 
+#[derive(Debug)]
 enum Instantiation {
     Named(ValueUUID),
     UnaryOp(Operator),
     BinaryOp(Operator)
 }
 
+#[derive(Debug)]
 struct Connection {
     num_regs : u32,
     from : SpanConnectionRead,
@@ -253,6 +258,7 @@ pub fn flatten(module : &Module, linker : &Linker, errors : &mut ErrorCollector)
     FlattenedModule { locals: result.locals, instantiations: result.instantiations, connections: result.connections }
 }
 
+#[derive(Debug)]
 pub struct FlattenedModule {
     locals : Vec<LocalVariable>,
     instantiations : Vec<Instantiation>,
