@@ -48,6 +48,13 @@ The main goals of the language are roughly listed below:
 - [ ] Rythm Syntax
 - [ ] Generator Syntax
 
+### Linking and Name Resolution
+- [x] Single File Name Resolution
+- [x] Multi File Name Resolution
+- [x] Incremental Linking
+- [ ] Incremental Compilation
+- [ ] Multi-Threaded Compilation
+
 ### LSP
 - [x] Basic LSP for VSCode integration
 - [x] Syntax Highlighting
@@ -55,6 +62,8 @@ The main goals of the language are roughly listed below:
 - [ ] Per-Line Resource Utilization Reporting
 
 ### Code Generation
+- [x] Expression Flattening
+- [ ] State Machine Generation
 - [ ] Can Generate Verilog for Multiply-Add pipeline
 - [ ] Can Generate Verilog for Blur2 filter
 - [ ] Can Generate Verilog for FIFO
