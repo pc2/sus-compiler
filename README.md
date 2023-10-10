@@ -28,6 +28,11 @@ The main goals of the language are roughly listed below:
 - Lambda Modules
 
 ## Tasks
+### Major Milestones
+- [ ] Arbitrary forward pipelines representable
+- [ ] Arbitrary FPGA hardware representable
+- [ ] Generative Code
+- [ ] Templates
 ### Parsing
 - [x] Basic Tokenizer
 - [x] Basic Syntax Error Reporting

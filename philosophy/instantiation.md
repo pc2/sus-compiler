@@ -6,4 +6,4 @@ Because we have a broader vocabulary describing our modules, it becomes possible
 
 Additional modifiers
 - Latency-free: All latency registers are removed
-- Set latency: between two 
+- Set latency: sets the latency between two connectors (ports, locals, fields etc), adding or removing latency registers as needed. Mustly used to override latency for tight feedback loops. 
