@@ -2,14 +2,14 @@
 
 So what does the Safety-First in Safety-First HDL mean? Like with our counterparts in Software Design such as Rust, it does not mean that the code you write is guaranteed to be correct. Rather it eliminates common classes of bugs that would otherwise have to be found through manual debugging. Counterintuitively however, is that the safety abstractions employed should never limit the programmer in the hardware they want to design. This means *any* hardware design one could possibly build in Verilog or VHDL, should also be representable in SUS. The difference should be that safe hardware should be easy to design, while unsafe should be comparatively difficult. Finally, as with Safe Software Languages, the goal is to enable fearless development and maintenance. The programmer should be able to rest easy that after implementing their change and fixing all compilation errors, the code again works properly. 
 
-## Common classes of HW bugs are: 
-### Cycle-wise timing errors through incorrectly pipelined HW. 
+## Common classes of HW bugs
+### Cycle-wise timing errors through incorrectly pipelined HW
 Manually keeping their pipeline in sync is taken out of the programmer's hands. The language makes a distinction between registers used for *latency* and those used for *state*. Latency registers are handled by latency counting and adding registers the other paths to keep them in sync. 
 
-### Misunderstood module documentation leading to incorrect use. 
+### Misunderstood module documentation leading to incorrect use
 The system of Flow Descriptors is there to prevent incorrect use of library modules. Flow descriptors are not optional, so they force the programmer to add the proper descriptors when they define a module containing state. 
 
-### Operation results being cast to a too small integer bitwidth. 
+### Operation results being cast to a too small integer bitwidth
 SUS disallows implicit casts that lose information. Instead, the programmer is required to specify either unsafe casts, where runtime checks can be inserted, or adding modular arithmetic to specify overflow behaviour.
 
 ### Data loss or duplication

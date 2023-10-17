@@ -209,7 +209,7 @@ impl<'a, T, IndexMarker> IntoIterator for &'a mut ArenaVector<T, IndexMarker> {
     }
 }
 
-
+#[derive(Debug)]
 pub struct ListAllocator<T, IndexMarker> {
     data : Vec<T>,
     _ph : PhantomData<IndexMarker>

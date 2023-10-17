@@ -1,34 +1,47 @@
 use std::ops::{Deref, Range};
 
 use crate::{
-    ast::{Span, Value, Module, SpanTypeExpression, Expression, SpanStatement, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression},
-    linker::{ValueUUID, Linker, NamedValue, Named},
-    errors::{ErrorCollector, error_info}
+    ast::{Span, Value, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, AssignableExpressionWithModifiers, TypeExpression},
+    linker::{ValueUUID, Linker, Named, Linkable},
+    errors::{ErrorCollector, error_info}, arena_alloc::{ListAllocator, UUID}
 };
 
+#[derive(Debug,Clone,Copy,PartialEq,Eq,PartialOrd,Ord,Hash)]
+struct WireIDMarker;
+type WireID = UUID<WireIDMarker>;
 
+#[derive(Debug,Clone,Copy,PartialEq,Eq,PartialOrd,Ord,Hash)]
+struct InstantiationIDMarker;
+type InstantiationID = UUID<InstantiationIDMarker>;
+
+#[derive(Debug)]
+enum WireOrInstantiation {
+    Wire(WireID),
+    Instantiation(InstantiationID),
+    Other(ValueUUID)
+}
 
 #[derive(Debug)]
 struct LocalVariable {
     pub location : Span,
-    pub typ : Option<SpanTypeExpression>
+    pub wire_or_instance : WireOrInstantiation
 }
 
 // These are assignable connections
 #[derive(Debug)]
 enum ConnectionRead {
-    Local(usize),
-    ArrayIdx{arr_local : usize, idx_local : usize},
+    Local(WireID),
+    ArrayIdx{arr_local : WireID, idx_local : WireID},
     //StructField{struct_local : usize, field : usize},
-    FuncOutput{instantiation_idx : usize, field : usize},
+    FuncOutput{instantiation_idx : InstantiationID, field : usize},
     Constant(Value)
 }
 #[derive(Debug)]
 enum ConnectionWrite {
-    Local(usize),
-    ArrayIdx(Box<(ConnectionWrite, usize)>),
+    Local(WireID),
+    ArrayIdx(Box<(ConnectionWrite, WireID)>),
     //StructField(Box<(ConnectionWrite, usize)>),
-    FuncInput{instantiation_idx : usize, field : usize}
+    FuncInput{instantiation_idx : InstantiationID, field : usize}
 }
 
 type SpanConnectionRead = (ConnectionRead, Span);
@@ -52,37 +65,78 @@ impl Connection {
     }
 }
 
+#[derive(Debug)]
+struct Wire {
+    typ : Option<TypeExpression>
+}
+
 struct FlatteningContext<'l, 'm, 'e> {
-    locals : Vec<LocalVariable>,
-    instantiations : Vec<Instantiation>,
+    named_locals_to_object_map : Vec<LocalVariable>,
+    wires : ListAllocator<Wire, WireIDMarker>,
+    instantiations : ListAllocator<Instantiation, InstantiationIDMarker>,
     connections : Vec<Connection>,
+
     linker : &'l Linker,
     module : &'m Module,
     errors : &'e mut ErrorCollector
 }
 
 impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
-    fn convert_to_local(&mut self, (read_connection, location) : SpanConnectionRead) -> usize {
+    fn new(module : &'m Module, linker : &'l Linker, errors : &'e mut ErrorCollector) -> Self {
+        let mut wires = ListAllocator::new();
+        let mut instantiations = ListAllocator::new();
+        
+        let named_locals_to_object_map = module.declarations.iter().map(|decl| {
+            let decl_typ_root_reference = module.link_info.global_references[decl.typ.0.get_root()];
+            let wire_or_instance = match &linker.links.globals[decl_typ_root_reference.1] {
+                Named::Constant(c) => {
+                    errors.error_basic(decl_typ_root_reference.0, format!("This should be the type of a declaration, but it refers to the constant '{}'", c.get_full_name(linker)));
+                    WireOrInstantiation::Other(decl_typ_root_reference.1)
+                }
+                Named::Module(_) => {
+                    match decl.typ.0 {
+                        TypeExpression::Named(name_ref_idx) => {
+                            let name_ref = module.link_info.global_references[name_ref_idx].1;
+                            WireOrInstantiation::Instantiation(instantiations.alloc(Instantiation::Named(name_ref)))
+                        }
+                        TypeExpression::Array(_) => todo!(),
+                    }
+                }
+                Named::Type(_) => {
+                    WireOrInstantiation::Wire(wires.alloc(Wire{typ : Some(decl.typ.0.clone())}))
+                }
+            };
+            LocalVariable{location : decl.span, wire_or_instance}
+        }).collect();
+        
+        Self {
+            named_locals_to_object_map,
+            wires,
+            instantiations,
+            connections : Vec::new(),
+            module,
+            linker,
+            errors
+        }
+    }
+    fn convert_to_local(&mut self, (read_connection, location) : SpanConnectionRead) -> WireID {
         if let ConnectionRead::Local(l) = read_connection {
             l
         } else {
-            let new_local_idx = self.locals.len();
-            self.locals.push(LocalVariable { location, typ: None });
+            let new_local_idx = self.wires.alloc(Wire{typ : None});
             self.connections.push(Connection::new(ConnectionWrite::Local(new_local_idx), (read_connection, location)));
             new_local_idx
         }
     }
-    fn desugar_func_call(&mut self, func_and_args : &[SpanExpression], closing_bracket_pos : usize) -> Option<(&Module, usize, Range<usize>)> {
+    fn desugar_func_call(&mut self, func_and_args : &[SpanExpression], closing_bracket_pos : usize) -> Option<(&Module, InstantiationID, Range<usize>)> {
         let (name_expr, name_expr_span) = &func_and_args[0]; // Function name is always there
         let func_instantiation = match name_expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {
                 todo!(); // TODO explicit interface instantiation
             }
             Expression::Named(LocalOrGlobal::Global(g)) => {
-                let instantiation_idx = self.instantiations.len();
                 let module_uuid = self.module.link_info.global_references[*g];
-                self.instantiations.push(Instantiation::Named(module_uuid.1));
-                instantiation_idx
+                self.instantiations.alloc(Instantiation::Named(module_uuid.1))
             }
             _other => {
                 self.errors.error_basic(*name_expr_span, "Function call cannot be an expression");
@@ -90,7 +144,7 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
             }
         };
         let Instantiation::Named(module_uuid) = self.instantiations[func_instantiation] else {panic!("Instantiation is not named!");};
-        let Named::Value(NamedValue::Module(md)) = &self.linker.links.globals[module_uuid] else {panic!("UUID Is not module!");};
+        let Named::Module(md) = &self.linker.links.globals[module_uuid] else {panic!("UUID Is not module!");};
         let (input_range, output_range) = md.get_function_sugar_inputs_outputs();
 
         let mut args = &func_and_args[1..];
@@ -120,10 +174,21 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
 
         Some((md, func_instantiation, output_range))
     }
+    fn cast_to_wire(&mut self, local_idx : usize) -> Option<WireID> {
+        match &self.named_locals_to_object_map[local_idx].wire_or_instance {
+            WireOrInstantiation::Wire(w) => Some(*w),
+            WireOrInstantiation::Instantiation(inst) => {
+                todo!();
+            }
+            WireOrInstantiation::Other(value_uuid) => {
+                todo!();
+            }
+        }
+    }
     fn flatten_single_expr(&mut self, (expr, expr_span) : &SpanExpression) -> Option<SpanConnectionRead> {
         let single_connection_side = match expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {
-                ConnectionRead::Local(*l)
+                ConnectionRead::Local(self.cast_to_wire(*l)?)
             }
             Expression::Named(LocalOrGlobal::Global(g)) => {
                 let r = self.module.link_info.global_references[*g];
@@ -136,8 +201,7 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
             Expression::UnaryOp(op_box) => {
                 let (op, _op_pos, operate_on) = op_box.deref();
                 let flat_operate_on = self.flatten_single_expr(operate_on)?;
-                let new_instantiation_idx = self.instantiations.len();
-                self.instantiations.push(Instantiation::UnaryOp(*op));
+                let new_instantiation_idx = self.instantiations.alloc(Instantiation::UnaryOp(*op));
                 let write = ConnectionWrite::FuncInput{instantiation_idx : new_instantiation_idx, field : 0};
                 self.connections.push(Connection::new(write, flat_operate_on));
                 ConnectionRead::FuncOutput{instantiation_idx : new_instantiation_idx, field : 1}
@@ -146,8 +210,7 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
                 let (left, op, _op_pos, right) = binop_box.deref();
                 let flat_left = self.flatten_single_expr(left)?;
                 let flat_right = self.flatten_single_expr(right)?;
-                let new_instantiation_idx = self.instantiations.len();
-                self.instantiations.push(Instantiation::BinaryOp(*op));
+                let new_instantiation_idx = self.instantiations.alloc(Instantiation::BinaryOp(*op));
                 let write_left = ConnectionWrite::FuncInput{instantiation_idx : new_instantiation_idx, field : 0};
                 let write_right = ConnectionWrite::FuncInput{instantiation_idx : new_instantiation_idx, field : 1};
                 self.connections.push(Connection::new(write_left, flat_left));
@@ -179,7 +242,7 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
     fn flatten_assignable_expr(&mut self, (expr, _span) : &SpanAssignableExpression) -> Option<ConnectionWrite> {
         match expr {
             AssignableExpression::Named{local_idx} => {
-                Some(ConnectionWrite::Local(*local_idx))
+                Some(ConnectionWrite::Local(self.cast_to_wire(*local_idx)?))
             }
             AssignableExpression::ArrayIndex(arr_box) => {
                 let (arr, idx) = arr_box.deref();
@@ -192,28 +255,31 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
             }
         }
     }
-    fn flatten_code(&mut self, code : &Vec<SpanStatement>) {
-        for (stmt, _stmt_span) in code {
+    fn flatten_code(&mut self, code : &CodeBlock) {
+        for (stmt, _stmt_span) in &code.statements {
             match stmt {
-                crate::ast::Statement::Assign{to, expr : (Expression::FuncCall(func_and_args), func_span), eq_sign_position} => {
+                Statement::Declaration{local_id} => {
+                    // TODO
+                }
+                Statement::Assign{to, expr : (Expression::FuncCall(func_and_args), func_span), eq_sign_position} => {
                     let Some((md, instantiation_idx, output_range)) = self.desugar_func_call(&func_and_args, func_span.1) else {return;};
 
                     let func_name_span = func_and_args[0].1;
                     let num_func_outputs = output_range.len();
                     let num_targets = to.len();
-                    let assign_list = if num_targets != num_func_outputs {
+                    let assign_list: &[AssignableExpressionWithModifiers] = if num_targets != num_func_outputs {
                         let info = vec![error_info(md.link_info.span, md.link_info.file, "Module Defined here")];
                         if num_targets > num_func_outputs {
                             let excess_results_span = Span(to[num_func_outputs].expr.1.0, to.last().unwrap().expr.1.1);
                             self.errors.error_with_info(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
-                            to
+                            &to
                         } else {
                             let too_few_targets_pos = if let Some(eq) = eq_sign_position {Span::from(*eq)} else {func_name_span};
                             self.errors.error_with_info(too_few_targets_pos, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
                             &to[..num_targets]
                         }
                     } else {
-                        to
+                        &to
                     };
 
                     for (i, to_i) in assign_list.iter().enumerate() {
@@ -223,44 +289,32 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
                         self.connections.push(Connection{num_regs : to_i.num_regs, from: (read_side, func_name_span), to: write_side});
                     }
                 },
-                crate::ast::Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
+                Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
                     assert!(to.len() == 1);
                     let Some(read_side) = self.flatten_single_expr(non_func_expr) else {return;};
                     let t = &to[0];
                     let Some(write_side) = self.flatten_assignable_expr(&t.expr) else {return;};
                     self.connections.push(Connection{num_regs : t.num_regs, from: read_side, to: write_side});
                 },
-                crate::ast::Statement::Block(inner_code) => {
+                Statement::Block(inner_code) => {
                     self.flatten_code(inner_code);
                 },
-                crate::ast::Statement::TimelineStage(_) => {/*TODO */}
+                Statement::TimelineStage(_) => {/*TODO */}
             }
         }
     }
 }
 
 pub fn flatten(module : &Module, linker : &Linker, errors : &mut ErrorCollector) -> FlattenedModule {
-    let locals = module.declarations.iter().map(|decl| {
-        LocalVariable{location : decl.span, typ : Some(decl.typ.clone())}
-    }).collect();
-    
-    let mut result = FlatteningContext{
-        locals,
-        instantiations : Vec::new(),
-        connections : Vec::new(),
-        module,
-        linker,
-        errors
-    };
-
+    let mut result = FlatteningContext::new(module, linker, errors);
     result.flatten_code(&module.code);
 
-    FlattenedModule { locals: result.locals, instantiations: result.instantiations, connections: result.connections }
+    FlattenedModule { wires : result.wires, instantiations: result.instantiations, connections: result.connections }
 }
 
 #[derive(Debug)]
 pub struct FlattenedModule {
-    locals : Vec<LocalVariable>,
-    instantiations : Vec<Instantiation>,
+    wires : ListAllocator<Wire, WireIDMarker>,
+    instantiations : ListAllocator<Instantiation, InstantiationIDMarker>,
     connections : Vec<Connection>
 }

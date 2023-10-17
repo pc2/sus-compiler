@@ -98,10 +98,10 @@ I consider 'static pipelining' to be a solved problem. The one thing we can stil
 
 An example of such static pipeline can be shown as follows: 
 ```
-pipeline multiply_add i32 a, i32 b, i32 c -> i32 result {
+pipeline multiply_add : i32 a, i32 b, i32 c -> i32 result {
   reg i32 tmp = a * b;
   i32 tmp2 = tmp + c;
-  reg result = tmp + a;
+  reg result = tmp2 + a;
 }
 ```
 Pipeline stages are denoted by adding the 'reg' keyword to statements. Either at the statement level, or to add registers within expressions. This example would then compile to the following Verilog code:
@@ -253,19 +253,19 @@ Of course, connecting a data stream to a clock domain crossing without the prope
 Rythms can be generated through built-in opaque modules.
 ```
 rythmGenerator(clk*5, clk*3) : 
-  [0]: () -> rythm v / v / v
-  [1]: () -> rythm v v v
+  left: () -> rythm v / v / v
+  right: () -> rythm v v v
 ```
 
 These either use compile-time information from the tool that implements the clocks, or it generates a module that tests the clock domain crossing for the proper rythm at initialization time. 
 
-Delayed rythms follow a modular arithmetic. For example a rythm between clocks with a ratio of `rythm(clk*3,clk*5)`, will repeat every 5 clock cycles of the first clock, and 3 clock cycles of the second clock. `reg reg reg reg reg rythm(clk*3,clk*5)[0] = rythm(clk*3,clk*5)[0]`, `reg reg reg rythm(clk*3,clk*5)[1] = rythm(clk*3,clk*5)[1]`
+Delayed rythms follow a modular arithmetic. For example a rythm between clocks with a ratio of `rythm(clk*3,clk*5)`, will repeat every 5 clock cycles of the first clock, and 3 clock cycles of the second clock. `reg reg reg reg reg rythm(clk*3,clk*5).left = rythm(clk*3,clk*5).left`, `reg reg reg rythm(clk*3,clk*5).right = rythm(clk*3,clk*5).right`
 
 ### Integrate Timing Constraints into language text itself
 - False Paths
 - Multicycle Paths
 
-Often, false paths are used to denote constants that should be disseminated throughout the FPGA, or bits of hardware that won't affect each other, because only one will be active. Adding false paths relaxes the placement problem, leading to more optimal hardware implementations. 
+Often, false paths are used to denote semi-constants that should be disseminated throughout the FPGA, or bits of hardware that won't affect each other, because only one will be active. Adding false paths relaxes the placement problem, leading to more optimal hardware implementations for the paths that matter. 
 
 Constants specifically require that the modules the constant affect aren't being used when the constant changes. This should be representible in some way. 
 
@@ -303,3 +303,6 @@ Constants specifically require that the modules the constant affect aren't being
 - FIFO
 - Ready/Acknowledge Clock domain Crossing
 - Ring pipeline
+
+## Long Term Strategy
+[https://www.youtube.com/watch?v=XZ3w_jec1v8]("The Economics of Programming Languages" by Evan Czaplicki (Strange Loop 2023))

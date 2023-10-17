@@ -1,7 +1,7 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{ast::*, tokenizer::*, parser::*, linker::{PreLinker, FileData, Links, ValueUUID, NamedValue, Named, Linkable}, arena_alloc::ArenaVector};
+use crate::{ast::*, tokenizer::*, parser::*, linker::{PreLinker, FileData, Links, ValueUUID, Named, Linkable}, arena_alloc::ArenaVector};
 
 use ariadne::FileCache;
 use console::Style;
@@ -101,8 +101,8 @@ fn add_ide_bracket_depths_recursive<'a>(result : &mut [IDEToken], current_depth 
 impl Named {
     fn get_ide_type(&self) -> IDEIdentifierType{
         match self {
-            Named::Value(NamedValue::Module(_)) => IDEIdentifierType::Interface,
-            Named::Value(NamedValue::Constant(_)) => IDEIdentifierType::Constant,
+            Named::Module(_) => IDEIdentifierType::Interface,
+            Named::Constant(_) => IDEIdentifierType::Constant,
             Named::Type(_) => IDEIdentifierType::Type,
         }
     }
@@ -112,7 +112,7 @@ fn walk_name_color(all_objects : &[ValueUUID], links : &Links, result : &mut [ID
     for obj_uuid in all_objects {
         let object = &links.globals[*obj_uuid];
         match object {
-            Named::Value(NamedValue::Module(module)) => {
+            Named::Module(module) => {
                 module.for_each_value(&mut |name, position| {
                     result[position].typ = IDETokenType::Identifier(if let LocalOrGlobal::Local(l) = name {
                         IDEIdentifierType::Value(module.declarations[l].identifier_type)

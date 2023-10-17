@@ -28,6 +28,9 @@ pub struct LinkingErrorLocation<'a> {
 
 pub trait Linkable {
     fn get_name<'a>(&self, linker : &'a Linker) -> &'a str;
+    fn get_full_name(&self, linker : &Linker) -> String {
+        format!("::{}", self.get_name(linker))
+    }
     fn get_linking_error_location<'a>(&self, linker : &'a Linker) -> LinkingErrorLocation<'a>;
     fn get_link_info(&self) -> Option<&LinkInfo>;
     fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo>;
@@ -39,19 +42,14 @@ pub enum NamedConstant {
 }
 
 #[derive(Debug)]
-pub enum NamedValue {
-    Constant(NamedConstant),
-    Module(Module)
-}
-
-#[derive(Debug)]
 pub enum NamedType {
     Builtin(&'static str)
 }
 
 #[derive(Debug)]
 pub enum Named {
-    Value(NamedValue),
+    Constant(NamedConstant),
+    Module(Module),
     Type(NamedType)
 }
 
@@ -74,43 +72,6 @@ impl Linkable for NamedConstant {
     fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo> {
         match self {
             NamedConstant::Builtin(_, _) => None
-        }
-    }
-}
-
-impl Linkable for NamedValue {
-    fn get_name<'a>(&self, linker : &'a Linker) -> &'a str {
-        match self {
-            NamedValue::Constant(cst) => cst.get_name(linker),
-            NamedValue::Module(md) => {
-                let file = &linker.files[md.link_info.file];
-                file.get_token_text(md.link_info.name_token)
-            },
-        }
-    }
-    fn get_linking_error_location<'a>(&self, linker : &'a Linker) -> LinkingErrorLocation<'a> {
-        match self {
-            NamedValue::Constant(cst) => cst.get_linking_error_location(linker),
-            NamedValue::Module(md) => {
-                let file = &linker.files[md.link_info.file];
-                LinkingErrorLocation { named_type: "Module", name : file.get_token_text(md.link_info.name_token), location: Some((md.link_info.file, md.link_info.name_token)) }
-            }
-        }
-    }
-    fn get_link_info(&self) -> Option<&LinkInfo> {
-        match self {
-            NamedValue::Constant(cst) => cst.get_link_info(),
-            NamedValue::Module(md) => {
-                Some(&md.link_info)
-            }
-        }
-    }
-    fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo> {
-        match self {
-            NamedValue::Constant(cst) => cst.get_link_info_mut(),
-            NamedValue::Module(md) => {
-                Some(&mut md.link_info)
-            }
         }
     }
 }
@@ -141,26 +102,40 @@ impl Linkable for NamedType {
 impl Linkable for Named {
     fn get_name<'a>(&self, linker : &'a Linker) -> &'a str {
         match self {
-            Named::Value(v) => v.get_name(linker),
+            Named::Constant(v) => v.get_name(linker),
             Named::Type(t) => t.get_name(linker),
+            Named::Module(md) => {
+                let file = &linker.files[md.link_info.file];
+                file.get_token_text(md.link_info.name_token)
+            },
         }
     }
     fn get_linking_error_location<'a>(&self, linker : &'a Linker) -> LinkingErrorLocation<'a> {
         match self {
-            Named::Value(v) => v.get_linking_error_location(linker),
+            Named::Constant(v) => v.get_linking_error_location(linker),
             Named::Type(t) => t.get_linking_error_location(linker),
+            Named::Module(md) => {
+                let file = &linker.files[md.link_info.file];
+                LinkingErrorLocation { named_type: "Module", name : file.get_token_text(md.link_info.name_token), location: Some((md.link_info.file, md.link_info.name_token)) }
+            }
         }
     }
     fn get_link_info(&self) -> Option<&LinkInfo> {
         match self {
-            Named::Value(v) => v.get_link_info(),
-            Named::Type(t) => t.get_link_info()
+            Named::Constant(v) => v.get_link_info(),
+            Named::Type(t) => t.get_link_info(),
+            Named::Module(md) => {
+                Some(&md.link_info)
+            }
         }
     }
     fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo> {
         match self {
-            Named::Value(v) => v.get_link_info_mut(),
-            Named::Type(t) => t.get_link_info_mut()
+            Named::Constant(v) => v.get_link_info_mut(),
+            Named::Type(t) => t.get_link_info_mut(),
+            Named::Module(md) => {
+                Some(&mut md.link_info)
+            }
         }
     }
 }
@@ -207,7 +182,7 @@ impl Links {
             assert!(already_exisits.is_none());
         }
         for (name, val) in BUILTIN_CONSTANTS {
-            let id = globals.alloc(Named::Value(NamedValue::Constant(NamedConstant::Builtin(name, val))));
+            let id = globals.alloc(Named::Constant(NamedConstant::Builtin(name, val)));
             let already_exisits = global_namespace.insert(name.to_owned(), id);
             assert!(already_exisits.is_none());
         }
@@ -275,7 +250,7 @@ impl PreLinker {
         let mut associated_values = Vec::new();
         for md in parse_result.ast.modules {
             let module_name = &file_text[parse_result.tokens[md.link_info.name_token].get_range()];
-            let new_module_uuid = self.links.globals.alloc(Named::Value(NamedValue::Module(md)));
+            let new_module_uuid = self.links.globals.alloc(Named::Module(md));
             associated_values.push(new_module_uuid);
             self.links.add_name(module_name, new_module_uuid);
         }
@@ -424,7 +399,7 @@ impl Linker {
         let mut associated_values = Vec::new();
         for md in parse_result.ast.modules {
             let module_name = &file_text[parse_result.tokens[md.link_info.name_token].get_range()];
-            let new_module_uuid = self.links.globals.alloc(Named::Value(NamedValue::Module(md)));
+            let new_module_uuid = self.links.globals.alloc(Named::Module(md));
             associated_values.push(new_module_uuid);
             self.links.add_name(module_name, new_module_uuid);
         }
@@ -448,7 +423,7 @@ impl Linker {
 
     pub fn get_constant(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &mut ErrorCollector) -> Option<Value> {
         match &self.links.globals[uuid] {
-            Named::Value(NamedValue::Constant(NamedConstant::Builtin(_name, v))) => {
+            Named::Constant(NamedConstant::Builtin(_name, v)) => {
                 Some(v.clone())
             },
             other => {
@@ -468,7 +443,7 @@ impl Linker {
 
     pub fn get_module(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &mut ErrorCollector) -> Option<&Module> {
         match &self.links.globals[uuid] {
-            Named::Value(NamedValue::Module(md)) => {
+            Named::Module(md) => {
                 Some(md)
             },
             other => {
@@ -489,7 +464,7 @@ impl Linker {
     pub fn flatten_all_modules_in_file(&self, file : FileUUID, errors : &mut ErrorCollector) {
         for md_uuid in &self.files[file].associated_values {
             let named = &self.links.globals[*md_uuid];
-            if let Named::Value(NamedValue::Module(md)) = named {
+            if let Named::Module(md) = named {
                 if !md.link_info.is_fully_linked {
                     continue;
                 }

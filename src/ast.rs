@@ -3,6 +3,7 @@ use num_bigint::BigUint;
 
 use crate::{tokenizer::TokenTypeIdx, linker::{ValueUUID, FileUUID}};
 use core::ops::Range;
+use std::ops::Deref;
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
@@ -51,6 +52,17 @@ pub enum LocalOrGlobal {
 pub enum TypeExpression {
     Named(usize), // position in referenced globals list
     Array(Box<(SpanTypeExpression, SpanExpression)>)
+}
+
+impl TypeExpression {
+    pub fn get_root(&self) -> usize {
+        match self {
+            Self::Named(s) => *s,
+            Self::Array(b) => {
+                b.deref().0.0.get_root()
+            }
+        }
+    }
 }
 
 pub type SpanTypeExpression = (TypeExpression, Span);
@@ -107,9 +119,15 @@ pub struct AssignableExpressionWithModifiers {
 }
 
 #[derive(Debug)]
+pub struct CodeBlock {
+    pub statements : Vec<SpanStatement>
+}
+
+#[derive(Debug)]
 pub enum Statement {
+    Declaration{local_id : usize},
     Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : SpanExpression}, // num_regs v = expr;
-    Block(Vec<SpanStatement>),
+    Block(CodeBlock),
     TimelineStage(usize)
 }
 
@@ -127,7 +145,7 @@ pub struct Module {
     pub link_info : LinkInfo,
 
     pub declarations : Vec<SignalDeclaration>,
-    pub code : Vec<SpanStatement>
+    pub code : CodeBlock
 }
 
 impl Module {
@@ -261,7 +279,7 @@ pub fn for_each_assign_in_block<F>(block : &Vec<SpanStatement>, func : &mut F) w
                 func(to, expr);
             },
             Statement::Block(b) => {
-                for_each_assign_in_block(b, func);
+                for_each_assign_in_block(&b.statements, func);
             },
             _other => {}
         }
@@ -273,7 +291,7 @@ impl IterIdentifiers for Module {
         for (pos, decl) in self.declarations.iter().enumerate() {
             func(LocalOrGlobal::Local(pos), decl.span.1);
         }
-        for_each_assign_in_block(&self.code, &mut |to, v| {
+        for_each_assign_in_block(&self.code.statements, &mut |to, v| {
             for assign_to in to {
                 assign_to.expr.for_each_value(func);
             }

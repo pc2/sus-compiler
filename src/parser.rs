@@ -487,14 +487,14 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn parse_statement(&mut self, token_stream : &mut TokenStream, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>, statements : &mut Vec<SpanStatement>) -> Option<()> {
+    fn parse_statement(&mut self, token_stream : &mut TokenStream, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>, code_block : &mut CodeBlock) -> Option<()> {
         let start_at = if let Some(peek) = token_stream.peek() {
             peek.get_span().0
         } else {
             return None;
         };
         if let Some(token) = token_stream.eat_is_plain(kw("#")) {
-            statements.push((Statement::TimelineStage(token.position), Span::from(token.position)));
+            code_block.statements.push((Statement::TimelineStage(token.position), Span::from(token.position)));
             return Some(());
         }
         
@@ -513,7 +513,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
                 // Maybe it's a declaration?
                 *token_stream = tok_stream_copy;
                 left_expressions.push(((Expression::Named(LocalOrGlobal::Local(name)), span), reg_count));
-
+                code_block.statements.push((Statement::Declaration{local_id: name}, span));
             } else {
                 self.rollback(rollback_ctx);
                 if let Some(sp_expr) = self.parse_expression(token_stream, scope) {
@@ -532,15 +532,15 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
                 Some(TokenTreeNode::PlainToken(tok, assign_pos)) if tok.get_type() == kw("=") => {
                     // Ends the loop
                     // T a, T b = x(y);
-                    return self.parse_statement_handle_equals(left_expressions, *assign_pos, token_stream, scope, statements, start_at);
+                    return self.parse_statement_handle_equals(left_expressions, *assign_pos, token_stream, scope, &mut code_block.statements, start_at);
                 }
                 Some(TokenTreeNode::PlainToken(tok, _pos)) if tok.get_type() == kw(";") => {
                     // Ends the loop
-                    return self.parse_statement_handle_end(left_expressions, all_decls, statements);
+                    return self.parse_statement_handle_end(left_expressions, all_decls, &mut code_block.statements);
                 }
                 None => {
                     // Ends the loop
-                    return self.parse_statement_handle_end(left_expressions, all_decls, statements);
+                    return self.parse_statement_handle_end(left_expressions, all_decls, &mut code_block.statements);
                 }
                 other => {
                     self.error_unexpected_tree_node(&[kw(";"), kw("="), kw(",")], other, token_stream.unexpected_eof_token, "statement");
@@ -612,10 +612,10 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             return None;
         }
     }
-    fn parse_code_block(&mut self, block_tokens : &[TokenTreeNode], span : Span, declarations : &mut Vec<SignalDeclaration>, outer_scope : &LocalVariableContext<'_, 'file>) -> Vec<SpanStatement> {
+    fn parse_code_block(&mut self, block_tokens : &[TokenTreeNode], span : Span, declarations : &mut Vec<SignalDeclaration>, outer_scope : &LocalVariableContext<'_, 'file>) -> CodeBlock {
         let mut token_stream = TokenStream::new(block_tokens, span.0, span.1);
 
-        let mut statements : Vec<SpanStatement> = Vec::new();
+        let mut code_block = CodeBlock{statements : Vec::new()};
         
         let mut inner_scope = LocalVariableContext::new_extend(outer_scope);
 
@@ -627,20 +627,20 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             }
             if let Some(TokenTreeNode::Block(typ, contents, block_span)) = token_stream.peek() {
                 if *typ == kw("{") {
-                    statements.push((Statement::Block(self.parse_code_block(contents, *block_span, declarations, &inner_scope)), *block_span));
+                    code_block.statements.push((Statement::Block(self.parse_code_block(contents, *block_span, declarations, &inner_scope)), *block_span));
                     token_stream.next();
                     continue; // Can't add condition to if let, so have to do some weird control flow here
                 }
             }
             
-            if self.parse_statement(&mut token_stream, declarations, &mut inner_scope, &mut statements).is_none() {
+            if self.parse_statement(&mut token_stream, declarations, &mut inner_scope, &mut code_block).is_none() {
                 // Error recovery. Find end of statement
                 token_stream.next();
                 //token_stream.skip_until_one_of(&[kw(";"), kw("{")]);
             }
         }
 
-        statements
+        code_block
     }
 
     fn parse_module(&mut self, token_stream : &mut TokenStream, declaration_start_idx : usize) -> Option<Module> {
