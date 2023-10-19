@@ -94,7 +94,7 @@ pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
 }
 
 // Class that collects and manages errors and warnings
-#[derive(Clone)]
+#[derive(Debug,Clone)]
 pub struct ErrorCollector {
     pub errors : Vec<ParsingError>,
     pub file : FileUUID

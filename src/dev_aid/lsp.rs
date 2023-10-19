@@ -50,8 +50,8 @@ impl LoadedFileCache {
     }
     fn update_text(&mut self, uri : Url, new_file_text : String) {
         let file_uuid = self.find_uri(&uri).unwrap();
-        let (full_parse, parsing_errors) = perform_full_semantic_parse(&new_file_text, file_uuid);
-        self.linker.relink(file_uuid, new_file_text, full_parse, parsing_errors);
+        let (full_parse, parsing_errors) = perform_full_semantic_parse(new_file_text, file_uuid);
+        self.linker.relink(file_uuid, full_parse, parsing_errors);
     }
     fn ensure_contains_file(&mut self, uri : &Url) -> FileUUID {
         if let Some(found) = self.find_uri(uri) {
@@ -59,8 +59,8 @@ impl LoadedFileCache {
         } else {
             let file_uuid = self.linker.reserve_file();
             let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
-            let (full_parse, parsing_errors) = perform_full_semantic_parse(&file_text, file_uuid);
-            self.linker.add_reserved_file(file_uuid, file_text, full_parse, parsing_errors);
+            let (full_parse, parsing_errors) = perform_full_semantic_parse(file_text, file_uuid);
+            self.linker.add_reserved_file(file_uuid, full_parse, parsing_errors);
             self.uris.insert(file_uuid, uri.clone());
             file_uuid
         }
@@ -347,8 +347,9 @@ fn main_loop(
                         let mut errors = file_cache.linker.files[uuid].parsing_errors.clone();
                         file_cache.linker.get_linking_errors(uuid, &mut errors);
 
-                        file_cache.linker.flatten_all_modules_in_file(uuid, &mut errors);
+                        //file_cache.linker.flatten_all_modules_in_file(uuid, &mut errors);
 
+                        println!("Errors: {:?}", &errors);
                         send_errors_warnings(&connection, errors, &token_positions, &file_cache.uris)?;
                     },
                     // TODO ...

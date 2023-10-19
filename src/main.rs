@@ -1,10 +1,11 @@
 
+mod arena_alloc;
 mod tokenizer;
 mod parser;
 mod errors;
 mod ast;
 mod flattening;
-mod arena_alloc;
+mod codegen;
 
 mod dev_aid;
 mod linker;

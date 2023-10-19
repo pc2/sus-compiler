@@ -1,7 +1,7 @@
 
 use num_bigint::BigUint;
 
-use crate::{tokenizer::TokenTypeIdx, linker::{ValueUUID, FileUUID}};
+use crate::{tokenizer::TokenTypeIdx, linker::{ValueUUID, FileUUID}, flattening::FlattenedModule};
 use core::ops::Range;
 use std::ops::Deref;
 
@@ -127,6 +127,7 @@ pub struct CodeBlock {
 pub enum Statement {
     Declaration{local_id : usize},
     Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : SpanExpression}, // num_regs v = expr;
+    If{condition : SpanExpression, then : CodeBlock, els : Option<CodeBlock>},
     Block(CodeBlock),
     TimelineStage(usize)
 }
@@ -145,7 +146,9 @@ pub struct Module {
     pub link_info : LinkInfo,
 
     pub declarations : Vec<SignalDeclaration>,
-    pub code : CodeBlock
+    pub code : CodeBlock,
+
+    pub flattened : Option<FlattenedModule>
 }
 
 impl Module {
@@ -272,16 +275,29 @@ impl IterIdentifiers for SpanTypeExpression {
     }
 }
 
-pub fn for_each_assign_in_block<F>(block : &Vec<SpanStatement>, func : &mut F) where F: FnMut(&Vec<AssignableExpressionWithModifiers>, &SpanExpression) {
-    for (stmt, _span) in block {
-        match stmt {
-            Statement::Assign{to, eq_sign_position : _, expr} => {
-                func(to, expr);
-            },
-            Statement::Block(b) => {
-                for_each_assign_in_block(&b.statements, func);
-            },
-            _other => {}
+impl IterIdentifiers for CodeBlock {
+    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
+        for (stmt, _span) in &self.statements {
+            match stmt {
+                Statement::Assign{to, eq_sign_position : _, expr} => {
+                    for assign_to in to {
+                        assign_to.expr.for_each_value(func);
+                    }
+                    expr.for_each_value(func);
+                },
+                Statement::Block(b) => {
+                    b.for_each_value(func);
+                },
+                Statement::Declaration { local_id : _ } => {}
+                Statement::If { condition, then, els } => {
+                    condition.for_each_value(func);
+                    then.for_each_value(func);
+                    if let Some(e) = &els {
+                        e.for_each_value(func);
+                    }
+                }
+                Statement::TimelineStage(_) => {}
+            }
         }
     }
 }
@@ -291,16 +307,6 @@ impl IterIdentifiers for Module {
         for (pos, decl) in self.declarations.iter().enumerate() {
             func(LocalOrGlobal::Local(pos), decl.span.1);
         }
-        for_each_assign_in_block(&self.code.statements, &mut |to, v| {
-            for assign_to in to {
-                assign_to.expr.for_each_value(func);
-            }
-            v.for_each_value(func);
-        });
+        self.code.for_each_value(func);
     }
 }
-
-
-
-
-

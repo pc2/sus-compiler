@@ -216,11 +216,11 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
             }
         };
         
-        let (full_parse, errors) = perform_full_semantic_parse(&file_text, uuid);
+        let (full_parse, errors) = perform_full_semantic_parse(file_text, uuid);
         
         println!("{:?}", full_parse.ast);
 
-        prelinker.add_reserved_file(uuid, file_text, full_parse, errors);
+        prelinker.add_reserved_file(uuid, full_parse, errors);
         paths_arena.insert(uuid, file_path);
     }
 

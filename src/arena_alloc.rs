@@ -1,7 +1,14 @@
-use std::{ops::{IndexMut, Index}, marker::PhantomData, iter::Enumerate};
+use std::{ops::{IndexMut, Index}, marker::PhantomData, iter::Enumerate, fmt};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UUID<IndexMarker>(usize, PhantomData<IndexMarker>);
+
+impl<IndexMarker> fmt::Debug for UUID<IndexMarker> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("id_")?;
+        self.0.fmt(f)
+    }
+}
 
 impl<IndexMarker> Default for UUID<IndexMarker> {
     fn default() -> Self {

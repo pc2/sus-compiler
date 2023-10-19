@@ -261,6 +261,9 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
                 Statement::Declaration{local_id} => {
                     // TODO
                 }
+                Statement::If { condition, then, els } => {
+                    //todo!()
+                }
                 Statement::Assign{to, expr : (Expression::FuncCall(func_and_args), func_span), eq_sign_position} => {
                     let Some((md, instantiation_idx, output_range)) = self.desugar_func_call(&func_and_args, func_span.1) else {return;};
 
@@ -318,3 +321,19 @@ pub struct FlattenedModule {
     instantiations : ListAllocator<Instantiation, InstantiationIDMarker>,
     connections : Vec<Connection>
 }
+
+
+
+#[derive(Debug)]
+struct InstantiatedWire {
+    typ : TypeExpression,
+    latency : i64
+}
+
+#[derive(Debug)]
+pub struct InstantiatedModule {
+    wires : ListAllocator<InstantiatedWire, WireIDMarker>,
+    instantiations : ListAllocator<Instantiation, InstantiationIDMarker>,
+    connections : Vec<Connection>
+}
+
