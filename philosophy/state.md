@@ -32,6 +32,17 @@ However, state registers should not count towards the latency count. So specifyi
 
 If this rule holds for all possible hardware designs is up for further research. 
 
+### Maximum Latency Requirements
+It's the intention of the language to hide fixed-size latency as much as possible, making it easy to create pipelined designs. 
+
+Often however, there are limits to how long latency is allowed to be. The most common case is a state to itself feedback loop. If a state register must be updated every cycle, and it depends on itself, the loopback computation path may not include any latency. 
+
+For example, a FIFO with an almost_full threshold of _N_, may have at most a `ready_out -> valid_in` latency of _N_. 
+
+For state to state paths, this could be relaxed in several ways:
+- If it is proven the register won't be read for some cycles, then the latency can be hidden in these cycles. (Requires complex validity checking)
+- Slow the rate of state updating to the maximum latency, possibly allow automatic C-Slowing
+
 ## On State
 State goes hand-in-hand with the flow descriptors on the ports of modules. Without state all a module could represent is a simple flow-through pipeline. 
 
