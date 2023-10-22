@@ -171,6 +171,27 @@ module use_other_file : int a -> int r {
 	r = hello_from_the_other_side(a);
 }
 
+
+module Tree_Multiply : int[4] values -> int total {
+    reg int a = values[0] * values[1];
+	reg int b = values[2] * values[3];
+	reg total = a * b;
+}
+
+//timeline (X, false -> /)* .. (X, true -> T)
+module Accumulator : int term, bool done -> int total {
+    state int tot = 0; // Initial value, not a real assignment
+
+    int new_tot = tot + term;
+    if done {
+        total = new_tot;
+        tot = 0;
+        finish; // packet is hereby finished. 
+    } else {
+        tot = new_tot;
+    }
+}
+
 //timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
 module Unpack4 : int[4] packed -> int out_stream {
     state int st = 0; // Initial value, not a real assignment

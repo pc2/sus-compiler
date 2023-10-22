@@ -1,5 +1,5 @@
 
-use std::error::Error;
+use std::{error::Error, net::SocketAddr};
 use std::fs::File;
 use lsp_types::{*, request::Request, notification::*};
 
@@ -67,7 +67,7 @@ impl LoadedFileCache {
     }
 }
 
-pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
+pub fn lsp_main(use_tcp : Option<u16>) -> Result<(), Box<dyn Error + Sync + Send>> {
     // Note that  we must have our logging only write out to stderr.
     //println!("starting generic LSP server");
 
@@ -76,7 +76,12 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
     // Create the transport. Includes the stdio (stdin and stdout) versions but this could
     // also be implemented to use sockets or HTTP.
     //let (connection, io_threads) = Connection::listen(SocketAddr::from(([127,0,0,1], 25000)))?;
-    let (connection, io_threads) = Connection::stdio();
+    let (connection, io_threads) = if let Some(port) = use_tcp {
+        println!("Listening for connections on port {}...", port);
+        Connection::connect(SocketAddr::from(([127,0,0,1], port)))?
+    } else {
+        Connection::stdio()
+    };
     println!("connection established");
 
     // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
@@ -347,7 +352,7 @@ fn main_loop(
                         let mut errors = file_cache.linker.files[uuid].parsing_errors.clone();
                         file_cache.linker.get_linking_errors(uuid, &mut errors);
 
-                        //file_cache.linker.flatten_all_modules_in_file(uuid, &mut errors);
+                        file_cache.linker.flatten_all_modules_in_file(uuid, &mut errors);
 
                         println!("Errors: {:?}", &errors);
                         send_errors_warnings(&connection, errors, &token_positions, &file_cache.uris)?;
