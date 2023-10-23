@@ -583,6 +583,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             }).collect();
             let end_at = value.1.1;
             statements.push((Statement::Assign{to : converted_left, eq_sign_position : Some(assign_pos), expr : value}, Span(start_at, end_at)));
+            
             self.eat_plain(token_stream, kw(";"), "right-hand side of expression")?;
             Some(())
         } else {

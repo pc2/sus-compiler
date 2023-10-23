@@ -242,7 +242,7 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
         linker.flatten_all_modules_in_file(file_uuid, &mut errors);
 
         for err in errors.errors {
-        //    err.pretty_print_error(f.parsing_errors.file, &token_offsets, &paths_arena, &mut file_cache);
+            err.pretty_print_error(f.parsing_errors.file, &token_offsets, &paths_arena, &mut file_cache);
         }
     }
 }

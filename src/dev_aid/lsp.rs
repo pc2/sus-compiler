@@ -1,6 +1,5 @@
 
 use std::{error::Error, net::SocketAddr};
-use std::fs::File;
 use lsp_types::{*, request::Request, notification::*};
 
 use lsp_server::{Response, Message, Connection};
@@ -10,29 +9,6 @@ use lsp_types::notification::Notification;
 use crate::{parser::perform_full_semantic_parse, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::{ErrorCollector, ParsingError}, linker::{PreLinker, FileUUIDMarker, Linker, FileUUID, FileData, Links}, arena_alloc::ArenaVector};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
-
-static LSP_LOG_PATH : &str = if crate::tokenizer::const_eq_str(std::env::consts::OS, "windows") {
-    "C:\\Users\\lenna\\lsp_out.txt"
-} else {
-    "/home/lennart/lsp_out.txt"
-};
-
-thread_local!(static LSP_LOG: File = File::create(LSP_LOG_PATH).expect("Replacement terminal /home/lennart/lsp_out.txt could not be created"));
-
-macro_rules! println {
-    ($($arg:tt)*) => {{
-        use std::io::Write;
-        LSP_LOG.with(|mut file| {
-            write!(file, $($arg)*).unwrap();
-            write!(file, "\n").unwrap();
-        })
-    }};
-}
-/*macro_rules! println {
-    ($($arg:tt)*) => {{
-        eprintln!($($arg)*);
-    }};
-}*/
 
 struct LoadedFileCache {
     linker : Linker,
@@ -49,9 +25,17 @@ impl LoadedFileCache {
             .map(|(uuid, _uri_found)| uuid)
     }
     fn update_text(&mut self, uri : Url, new_file_text : String) {
-        let file_uuid = self.find_uri(&uri).unwrap();
+        let found_opt = self.find_uri(&uri);
+        let found_opt_was_none = found_opt.is_none();
+        let file_uuid : FileUUID = found_opt.unwrap_or_else(|| self.linker.reserve_file());
         let (full_parse, parsing_errors) = perform_full_semantic_parse(new_file_text, file_uuid);
-        self.linker.relink(file_uuid, full_parse, parsing_errors);
+        
+        if found_opt_was_none {
+            self.linker.add_reserved_file(file_uuid, full_parse, parsing_errors);
+            self.uris.insert(file_uuid, uri.clone());
+        } else {
+            self.linker.relink(file_uuid, full_parse, parsing_errors);
+        }
     }
     fn ensure_contains_file(&mut self, uri : &Url) -> FileUUID {
         if let Some(found) = self.find_uri(uri) {
@@ -67,7 +51,7 @@ impl LoadedFileCache {
     }
 }
 
-pub fn lsp_main(use_tcp : Option<u16>) -> Result<(), Box<dyn Error + Sync + Send>> {
+pub fn lsp_main(port : u16) -> Result<(), Box<dyn Error + Sync + Send>> {
     // Note that  we must have our logging only write out to stderr.
     //println!("starting generic LSP server");
 
@@ -76,14 +60,10 @@ pub fn lsp_main(use_tcp : Option<u16>) -> Result<(), Box<dyn Error + Sync + Send
     // Create the transport. Includes the stdio (stdin and stdout) versions but this could
     // also be implemented to use sockets or HTTP.
     //let (connection, io_threads) = Connection::listen(SocketAddr::from(([127,0,0,1], 25000)))?;
-    let (connection, io_threads) = if let Some(port) = use_tcp {
-        println!("Listening for connections on port {}...", port);
-        Connection::connect(SocketAddr::from(([127,0,0,1], port)))?
-    } else {
-        Connection::stdio()
-    };
+    println!("Connecting on port {}...", port);
+    let (connection, io_threads) = Connection::connect(SocketAddr::from(([127,0,0,1], port)))?;
     println!("connection established");
-
+    
     // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
         definition_provider: Some(OneOf::Left(true)),
@@ -352,6 +332,7 @@ fn main_loop(
                         let mut errors = file_cache.linker.files[uuid].parsing_errors.clone();
                         file_cache.linker.get_linking_errors(uuid, &mut errors);
 
+                        println!("Flattening...");
                         file_cache.linker.flatten_all_modules_in_file(uuid, &mut errors);
 
                         println!("Errors: {:?}", &errors);

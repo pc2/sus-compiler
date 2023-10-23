@@ -304,7 +304,7 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
         }
     }
     fn flatten_code(&mut self, code : &CodeBlock, condition : WireID) {
-        for (stmt, _stmt_span) in &code.statements {
+        for (stmt, stmt_span) in &code.statements {
             match stmt {
                 Statement::Declaration{local_id} => {
                     // TODO
@@ -350,11 +350,14 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
                     }
                 },
                 Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
-                    assert!(to.len() == 1);
-                    let Some(read_side) = self.flatten_single_expr(non_func_expr, condition) else {return;};
-                    let t = &to[0];
-                    let Some(write_side) = self.flatten_assignable_expr(&t.expr, condition) else {return;};
-                    self.connections.push(Connection{num_regs : t.num_regs, from: read_side, to: write_side, condition});
+                    if to.len() == 1 {
+                        let Some(read_side) = self.flatten_single_expr(non_func_expr, condition) else {return;};
+                        let t = &to[0];
+                        let Some(write_side) = self.flatten_assignable_expr(&t.expr, condition) else {return;};
+                        self.connections.push(Connection{num_regs : t.num_regs, from: read_side, to: write_side, condition});
+                    } else {
+                        self.errors.error_basic(*stmt_span, format!("Non-function assignments must only output exactly 1 instead of {}", to.len()));
+                    }
                 },
                 Statement::Block(inner_code) => {
                     self.flatten_code(inner_code, condition);
