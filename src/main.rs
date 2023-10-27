@@ -5,6 +5,8 @@ mod parser;
 mod errors;
 mod ast;
 mod flattening;
+
+#[cfg(feature = "codegen")]
 mod codegen;
 
 mod dev_aid;

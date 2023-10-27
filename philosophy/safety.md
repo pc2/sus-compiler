@@ -20,6 +20,9 @@ Examples:
 
 Compiler warnings or errors on data that sits unused, ports that go unread, or ports that are written when no data is expected are all prevented by the flow descriptor system. Of course, it's not possible to prevent data from being lost within the module state itself. 
 
+#### Safe Clock Domain Crossing through rhythms
+
+
 ## Flow Descriptors
 On any module or interface we can specify flow descriptors. These describe how and in which patterns data are allowed to flow through a module. Much like rust's borrow checker, this provides an additional layer of code flow analysis that must be verified for correctness. They are written in a kind of regex-like syntax, ideally with the full descriptive power of Linear Temporal Logic (LTL). Like with typing and borrow checking, the additional information describes the *what*, whereas the code describes the *how*. 
 

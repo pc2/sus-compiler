@@ -464,7 +464,7 @@ impl Linker {
     pub fn flatten_all_modules_in_file(&self, file : FileUUID, errors : &mut ErrorCollector) {
         for md_uuid in &self.files[file].associated_values {
             let named = &self.links.globals[*md_uuid];
-            eprintln!("Flattening {}", named.get_name(self));
+            println!("Flattening {}", named.get_name(self));
             if let Named::Module(md) = named {
                 if !md.link_info.is_fully_linked {
                     continue;

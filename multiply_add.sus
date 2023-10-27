@@ -116,7 +116,7 @@ module multiply_add : i32 a, i32 b, i32 c -> i32 result, double double_result {
 	reg double_result = cvt_to_double(result);
 }
 
-timeline (a -> /) .. (a -> r)*
+/*timeline (a -> /) .. (a -> r)*
 module blur : i32'0 a -> i32'1 result {
 	state int prev = a;
 	#
@@ -125,7 +125,7 @@ module blur : i32'0 a -> i32'1 result {
 		prev = a;
 		#   // timeline step
 	}
-}
+}*/
 
 timeline (a -> /) .. (a -> r)*
 module my_complex_operation : i32'0 a -> i32'9 result {
@@ -172,11 +172,47 @@ module use_other_file : int a -> int r {
 }
 
 
+interface maemory_read : int addr -> bool[16] data;
+
+//HandShake hs = hs_0;
+
+module test_hs {
+	state int st = 5;
+
+	gen if HA_HANDSHAKE {}
+	interface hs {
+
+		interface boop {
+
+		}
+	};
+	interface process : int[10] data -> int[9] data {
+	
+	}
+}
+
+module b: HandShake hs -> {	
+	if hs.event {
+	
+	}
+}
+
+
+
+
+
+
+
+
 module Tree_Multiply : int[4] values -> int total {
-    reg int a = values[0] * values[1];
-	reg int b = values[2] * values[3];
+    int a = values[0] * values[1];
+	int b = values[2] * values[3];
 	reg total = a * b;
 }
+
+
+
+
 
 //timeline (X, false -> /)* .. (X, true -> T)
 module Accumulator : int term, bool done -> int total {
@@ -186,11 +222,26 @@ module Accumulator : int term, bool done -> int total {
     if done {
         total = new_tot;
         tot = 0;
-        finish; // packet is hereby finished. 
+        //finish; // packet is hereby finished. 
     } else {
         tot = new_tot;
     }
 }
+
+
+//timeline (a, true -> /) | (a, false -> /) .. (a, false -> r)* .. (a, true -> r)
+module blur : int a, bool done -> int result {
+	state bool working = false; // Initial value, not a real assignment
+	state int prev;
+
+	if working {
+		reg result = prev + a; // Add a pipeline stage for shits and giggles
+	}
+	prev = a;
+	working = !done;
+}
+
+
 
 //timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
 module Unpack4 : int[4] packed -> int out_stream {
@@ -211,7 +262,7 @@ module Unpack4 : int[4] packed -> int out_stream {
         st = 3;
     } else if st == 3 {
         out_stream = stored_packed[2];
-        st = 0;
-        finish; // packet is hereby finished. 
+        st = 0; // Must restore initial conditions
+        //finish; // packet is hereby finished. 
     }
 }

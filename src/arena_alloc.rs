@@ -5,8 +5,12 @@ pub struct UUID<IndexMarker>(usize, PhantomData<IndexMarker>);
 
 impl<IndexMarker> fmt::Debug for UUID<IndexMarker> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("id_")?;
-        self.0.fmt(f)
+        if self.0 == Self::INVALID.0 {
+            f.write_str("id_INV")
+        } else {
+            f.write_str("id_")?;
+            self.0.fmt(f)
+        }
     }
 }
 
@@ -236,6 +240,10 @@ impl<T, IndexMarker> ListAllocator<T, IndexMarker> {
     }
     pub fn iter_mut<'a>(&'a mut self) -> ListAllocIteratorMut<'a, T, IndexMarker> {
         self.into_iter()
+    }
+    pub fn map<OutT, F : FnMut(UUID<IndexMarker>, &T) -> OutT>(&self, f : &mut F) -> ListAllocator<OutT, IndexMarker> {
+        let data = self.iter().map(|(a, v)| f(a, v)).collect();
+        ListAllocator{data, _ph : PhantomData}
     }
 }
 

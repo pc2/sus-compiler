@@ -7,22 +7,22 @@ use crate::{
 };
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq,PartialOrd,Ord,Hash)]
-struct WireIDMarker;
-type WireID = UUID<WireIDMarker>;
+pub struct WireIDMarker;
+pub type WireID = UUID<WireIDMarker>;
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq,PartialOrd,Ord,Hash)]
-struct InstantiationIDMarker;
-type InstantiationID = UUID<InstantiationIDMarker>;
+pub struct InstantiationIDMarker;
+pub type InstantiationID = UUID<InstantiationIDMarker>;
 
 #[derive(Debug)]
-enum WireOrInstantiation {
+pub enum WireOrInstantiation {
     Wire(WireID),
     Instantiation(InstantiationID),
     Other(ValueUUID)
 }
 
 #[derive(Debug)]
-struct LocalVariable {
+pub struct LocalVariable {
     pub location : Span,
     pub wire_or_instance : WireOrInstantiation
 }
@@ -47,18 +47,18 @@ enum ConnectionWrite {
 type SpanConnectionRead = (ConnectionRead, Span);
 
 #[derive(Debug)]
-enum Instantiation {
+pub enum Instantiation {
     Named(ValueUUID),
     UnaryOp(Operator),
     BinaryOp(Operator)
 }
 
 #[derive(Debug)]
-struct Connection {
-    num_regs : u32,
-    from : SpanConnectionRead,
-    to : ConnectionWrite,
-    condition : WireID
+pub struct Connection {
+    pub num_regs : u32,
+    pub from : SpanConnectionRead,
+    pub to : ConnectionWrite,
+    pub condition : WireID
 }
 impl Connection {
     fn new(to : ConnectionWrite, from : SpanConnectionRead, condition : WireID) -> Connection {
@@ -67,8 +67,8 @@ impl Connection {
 }
 
 #[derive(Debug)]
-struct Wire {
-    typ : Option<TypeExpression>
+pub struct Wire {
+    pub typ : Option<TypeExpression>
 }
 
 struct FlatteningContext<'l, 'm, 'e> {
@@ -372,14 +372,15 @@ pub fn flatten(module : &Module, linker : &Linker, errors : &mut ErrorCollector)
     let mut result = FlatteningContext::new(module, linker, errors);
     result.flatten_code(&module.code, WireID::INVALID);
 
-    FlattenedModule { wires : result.wires, instantiations: result.instantiations, connections: result.connections }
+    FlattenedModule { local_map : result.named_locals_to_object_map, wires : result.wires, instantiations: result.instantiations, connections: result.connections }
 }
 
 #[derive(Debug)]
 pub struct FlattenedModule {
-    wires : ListAllocator<Wire, WireIDMarker>,
-    instantiations : ListAllocator<Instantiation, InstantiationIDMarker>,
-    connections : Vec<Connection>
+    pub local_map : Vec<LocalVariable>,
+    pub wires : ListAllocator<Wire, WireIDMarker>,
+    pub instantiations : ListAllocator<Instantiation, InstantiationIDMarker>,
+    pub connections : Vec<Connection>
 }
 
 

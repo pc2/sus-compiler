@@ -29,8 +29,8 @@ The main goals of the language are roughly listed below:
 
 ## Tasks
 ### Major Milestones
-- [ ] Arbitrary forward pipelines representable
-- [ ] Arbitrary FPGA hardware representable
+- [ ] Arbitrary forward pipelines full flow
+- [ ] Arbitrary FPGA hardware full flow
 - [ ] Generative Code
 - [ ] Templates
 ### Parsing
@@ -43,8 +43,8 @@ The main goals of the language are roughly listed below:
 - [x] Function Call Syntax
 - [x] Unary and Binary Operators
 - [x] Can Parse Multiply-Add pipeline
-- [ ] Can Parse Blur2 filter
-- [ ] If Statements
+- [x] Can Parse Blur2 filter
+- [x] If Statements
 - [ ] For Loops
 - [ ] Multi-Interface Syntax
 - [ ] Native Module integration syntax
