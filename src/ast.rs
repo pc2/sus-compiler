@@ -1,5 +1,5 @@
 
-use num_bigint::BigUint;
+use num::bigint::BigUint;
 
 use crate::{tokenizer::TokenTypeIdx, linker::{ValueUUID, FileUUID}, flattening::FlattenedModule};
 use core::ops::Range;

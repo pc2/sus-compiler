@@ -12,20 +12,22 @@ license = "MIT"
 console = "0.15.7" # for terminal colors
 # chumsky = "0.9.2"
 ariadne = "0.3.0" # for nice errors
-num-bigint = "0.4.3"
+num = "*"
 
-calyx-ir = {version = "0.6.1", optional = true}
-calyx-opt = {version = "0.6.1", optional = true}
-calyx-backend = {version = "0.6.1", optional = true}
+# calyx-ir = {version = "0.6.1", optional = true}
+# calyx-opt = {version = "0.6.1", optional = true}
+# calyx-backend = {version = "0.6.1", optional = true}
+
+moore-circt = {version = "0.14.0", optional = true, path = "/home/lennart/Desktop/moore/src/circt"}
+moore-circt-sys = {version = "0.14.0", optional = true, path = "/home/lennart/Desktop/moore/src/circt-sys"}
 
 #lsp
 lsp-server = {version = "0.7.1", optional = true}
 lsp-types = {version = "0.94.0", optional = true}
 serde_json = {version = "1.0.97", optional = true}
 serde = {version = "1.0.156", optional = true}
-#tower-lsp = {version = "0.19.0", optional = true}
-#tokio = { version = "1.28.2", features = ["full"], optional = true }
 
 [features]
 lsp = ["lsp-server", "lsp-types", "serde_json", "serde"]
-codegen = ["calyx-ir", "calyx-opt", "calyx-backend"]
+# codegen = ["calyx-ir", "calyx-opt", "calyx-backend"]
+codegen = ["moore-circt-sys", "moore-circt"]

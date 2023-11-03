@@ -19,21 +19,35 @@ use dev_aid::syntax_highlighting::*;
 
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
+    let gen_ctx = codegen::GenerationContext::new();
+    gen_ctx.to_circt();
+    return Ok(());
+    
     let mut args = env::args();
 
     let _executable_path = args.next();
 
     let mut file_paths : Vec<PathBuf> = Vec::new();
     let mut is_lsp = false;
+    let mut codegen = true;
     for arg in args {
         match arg.as_str() {
             "--lsp" => {
                 is_lsp = true;
             },
+            "--codegen" => {
+                codegen = true;
+            }
             other => {
                 file_paths.push(PathBuf::from(other));
             }
         }
+    }
+    
+    #[cfg(feature = "codegen")]
+    if codegen {
+        let gen_ctx = codegen::GenerationContext::new();
+        gen_ctx.to_circt();
     }
     #[cfg(feature = "lsp")]
     if is_lsp {

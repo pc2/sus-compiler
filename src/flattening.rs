@@ -29,7 +29,7 @@ pub struct LocalVariable {
 
 // These are assignable connections
 #[derive(Debug)]
-enum ConnectionRead {
+pub enum ConnectionRead {
     Local(WireID),
     ArrayIdx{arr_local : WireID, idx_local : WireID},
     //StructField{struct_local : usize, field : usize},
@@ -37,7 +37,7 @@ enum ConnectionRead {
     Constant(Value)
 }
 #[derive(Debug)]
-enum ConnectionWrite {
+pub enum ConnectionWrite {
     Local(WireID),
     ArrayIdx(Box<(ConnectionWrite, WireID)>),
     //StructField(Box<(ConnectionWrite, usize)>),

@@ -138,18 +138,20 @@ If we have a proper description of the timeline of our outputs, we can match our
 
 Making this distinction allows us to express timeline-bound operations, such as accumulators and stream processors with sufficient safety features. 
 
-For fixed-length timelines, this was already explored in Filament. We extend that to full timeline length. 
+For fixed-length timelines, this was already explored in Filament. We extend that to dynamic runtime timeline length. 
 
-Below is an example of a 2-wide blur filter. Its interface is described in the first part, and its run timeline shown on the timeline section. It takes a stream of indeterminate length. The first element is eaten without producing a result, and for all subsequent elements it outputs a result. (Note the difference between the '#' "timeline step" operator and the 'reg' "pipeline step" operator. This module takes a stream of length N, and outputs the first element of a stream of length (N-1) 2 clock cycles later. 
+Below is an example of a 2-wide blur filter. Its interface is described in the first part, and its run timeline shown on the timeline section. It takes a stream of indeterminate length. The first element is eaten without producing a result, and for all subsequent elements it outputs a result. (Note the difference between the 'state' registers that deal with the persistent data across cycles, and the 'reg' "pipeline step" operator.) This module takes a stream of length N, and outputs the first element of a stream of length (N-1) 2 clock cycles later. 
 ```
-pipeline blur : i32 a -> i32 result : timeline (a -> /) .. (a -> r)* {
-  state prev = a;
-  #
-  loop {
-    reg result = (a + prev) / 2;
-    prev = a;
-    #
-  }
+timeline (a, true -> /) | (a, false -> /) .. (a, false -> r)* .. (a, true -> r)
+module blur : int a, bool done -> int result {
+	state bool working = false; // Initial value, not a real assignment
+	state int prev;
+
+	if working {
+		reg result = prev + a; // Add a pipeline stage for shits and giggles
+	}
+	prev = a;
+	working = !done;
 }
 ```
 
