@@ -23,15 +23,15 @@ const BUILTIN_CONSTANTS : [(&'static str, Value); 2] = [
 pub struct LinkingErrorLocation<'a> {
     pub named_type : &'static str,
     pub name : &'a str,
-    pub location : Option<(FileUUID, usize)>
+    pub location : Option<(FileUUID, Span)>
 }
 
 pub trait Linkable {
-    fn get_name<'a>(&self, linker : &'a Linker) -> &'a str;
-    fn get_full_name(&self, linker : &Linker) -> String {
-        format!("::{}", self.get_name(linker))
+    fn get_name(&self) -> &str;
+    fn get_full_name(&self) -> String {
+        format!("::{}", self.get_name())
     }
-    fn get_linking_error_location<'a>(&self, linker : &'a Linker) -> LinkingErrorLocation<'a>;
+    fn get_linking_error_location<'a>(&'a self) -> LinkingErrorLocation<'a>;
     fn get_link_info(&self) -> Option<&LinkInfo>;
     fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo>;
 }
@@ -54,12 +54,12 @@ pub enum Named {
 }
 
 impl Linkable for NamedConstant {
-    fn get_name<'a>(&self, _linker : &'a Linker) -> &'a str {
+    fn get_name(&self) -> &'static str {
         match self {
             NamedConstant::Builtin(name, _) => name
         }
     }
-    fn get_linking_error_location<'a>(&self, _linker : &'a Linker) -> LinkingErrorLocation<'a> {
+    fn get_linking_error_location<'a>(&'a self) -> LinkingErrorLocation<'a> {
         match self {
             NamedConstant::Builtin(name, _) => LinkingErrorLocation { named_type: "Builtin Constant", name, location: None }
         }
@@ -77,12 +77,12 @@ impl Linkable for NamedConstant {
 }
 
 impl Linkable for NamedType {
-    fn get_name<'a>(&self, _linker : &'a Linker) -> &'a str {
+    fn get_name(&self) -> &'static str {
         match self {
             NamedType::Builtin(name) => name,
         }
     }
-    fn get_linking_error_location<'a>(&self, _linker : &'a Linker) -> LinkingErrorLocation<'a> {
+    fn get_linking_error_location<'a>(&'a self) -> LinkingErrorLocation<'a> {
         match self {
             NamedType::Builtin(name) => LinkingErrorLocation { named_type: "Builtin Type", name, location: None },
         }
@@ -100,23 +100,21 @@ impl Linkable for NamedType {
 }
 
 impl Linkable for Named {
-    fn get_name<'a>(&self, linker : &'a Linker) -> &'a str {
+    fn get_name(&self) -> &str {
         match self {
-            Named::Constant(v) => v.get_name(linker),
-            Named::Type(t) => t.get_name(linker),
+            Named::Constant(v) => v.get_name(),
+            Named::Type(t) => t.get_name(),
             Named::Module(md) => {
-                let file = &linker.files[md.link_info.file];
-                file.get_token_text(md.link_info.name_token)
+                &md.link_info.name
             },
         }
     }
-    fn get_linking_error_location<'a>(&self, linker : &'a Linker) -> LinkingErrorLocation<'a> {
+    fn get_linking_error_location<'a>(&'a self) -> LinkingErrorLocation<'a> {
         match self {
-            Named::Constant(v) => v.get_linking_error_location(linker),
-            Named::Type(t) => t.get_linking_error_location(linker),
+            Named::Constant(v) => v.get_linking_error_location(),
+            Named::Type(t) => t.get_linking_error_location(),
             Named::Module(md) => {
-                let file = &linker.files[md.link_info.file];
-                LinkingErrorLocation { named_type: "Module", name : file.get_token_text(md.link_info.name_token), location: Some((md.link_info.file, md.link_info.name_token)) }
+                LinkingErrorLocation { named_type: "Module", name : &md.link_info.name, location: Some((md.link_info.file, md.link_info.name_span)) }
             }
         }
     }
@@ -160,7 +158,7 @@ impl FileData {
 // All modules in the workspace
 pub struct Links {
     pub globals : ArenaAllocator<Named, NamedUUIDMarker>,
-    global_namespace : HashMap<String, ValueUUID>,
+    global_namespace : HashMap<Box<str>, ValueUUID>,
     name_colissions : Vec<(ValueUUID, ValueUUID)>
 }
 
@@ -174,23 +172,23 @@ impl Links {
     pub fn new() -> Links {
         // Add builtins
         let mut globals = ArenaAllocator::new();
-        let mut global_namespace = HashMap::new();
+        let mut global_namespace: HashMap<Box<str>, UUID<NamedUUIDMarker>> = HashMap::new();
         
         for name in BUILTIN_TYPES {
             let id = globals.alloc(Named::Type(NamedType::Builtin(name)));
-            let already_exisits = global_namespace.insert(name.to_owned(), id);
+            let already_exisits = global_namespace.insert(name.into(), id);
             assert!(already_exisits.is_none());
         }
         for (name, val) in BUILTIN_CONSTANTS {
             let id = globals.alloc(Named::Constant(NamedConstant::Builtin(name, val)));
-            let already_exisits = global_namespace.insert(name.to_owned(), id);
+            let already_exisits = global_namespace.insert(name.into(), id);
             assert!(already_exisits.is_none());
         }
 
         Links{globals, name_colissions : Vec::new(), global_namespace}
     }
 
-    fn resolve_dependencies(namespace : &HashMap<String, ValueUUID>, file : &FileData, link_info : &mut LinkInfo) {
+    fn resolve_dependencies(namespace : &HashMap<Box<str>, ValueUUID>, file : &FileData, link_info : &mut LinkInfo) {
         let mut all_resolved = true;
         for GlobalReference(reference_span, uuid) in &mut link_info.global_references {
             if *uuid == ValueUUID::INVALID {
@@ -207,8 +205,8 @@ impl Links {
         link_info.is_fully_linked = all_resolved;
     }
 
-    fn add_name(&mut self, module_name: &str, new_module_uuid: UUID<NamedUUIDMarker>) {
-        match self.global_namespace.entry(module_name.to_owned()) {
+    fn add_name(&mut self, module_name: Box<str>, new_module_uuid: UUID<NamedUUIDMarker>) {
+        match self.global_namespace.entry(module_name) {
             std::collections::hash_map::Entry::Occupied(occ) => {
                 self.name_colissions.push((new_module_uuid, *occ.get()));
             },
@@ -249,7 +247,7 @@ impl PreLinker {
     pub fn add_reserved_file(&mut self, file : FileUUID, parse_result : FullParseResult, parsing_errors : ErrorCollector) {
         let mut associated_values = Vec::new();
         for md in parse_result.ast.modules {
-            let module_name = &parse_result.file_text[parse_result.tokens[md.link_info.name_token].get_range()];
+            let module_name = md.link_info.name.clone();
             let new_module_uuid = self.links.globals.alloc(Named::Module(md));
             associated_values.push(new_module_uuid);
             self.links.add_name(module_name, new_module_uuid);
@@ -269,10 +267,10 @@ impl PreLinker {
     }
 }
 
-fn add_error(file: &FileData, info_a: &LinkInfo, info_b: &LinkInfo, errors: &mut ErrorCollector) {
-    let this_object_name = file.get_token_text(info_a.name_token);
-    errors.error_with_info(Span::from(info_a.name_token), format!("Conflicting Declaration for the name '{this_object_name}'"), vec![
-        error_info(Span::from(info_b.name_token), info_b.file, "Conflicting Declaration")
+fn add_error(info_a: &LinkInfo, info_b: &LinkInfo, errors: &mut ErrorCollector) {
+    let this_object_name = &info_a.name;
+    errors.error_with_info(info_a.name_span, format!("Conflicting Declaration for the name '{this_object_name}'"), vec![
+        error_info(info_b.name_span, info_b.file, "Conflicting Declaration")
     ]);
 }
 
@@ -287,17 +285,17 @@ impl Linker {
 
             if info_0.file == file_uuid {
                 if let Some(info_1) = info_1_opt {
-                    add_error(file, info_0, info_1, errors);
+                    add_error(info_0, info_1, errors);
                     if info_1.file == file_uuid {
-                        add_error(file, info_1, info_0, errors);
+                        add_error(info_1, info_0, errors);
                     }
                 } else {
-                    let this_object_name = file.get_token_text(info_0.name_token);
-                    errors.error_basic(Span::from(info_0.name_token), format!("Cannot redeclare the builtin '{this_object_name}'"));
+                    let this_object_name = &info_0.name;
+                    errors.error_basic(info_0.name_span, format!("Cannot redeclare the builtin '{this_object_name}'"));
                 }
             } else if let Some(info_1) = info_1_opt {
                 if info_1.file == file_uuid {
-                    add_error(file, info_1, info_0, errors);
+                    add_error(info_1, info_0, errors);
                 }
             }
         }
@@ -398,7 +396,7 @@ impl Linker {
     pub fn add_reserved_file(&mut self, file : FileUUID, parse_result : FullParseResult, parsing_errors : ErrorCollector) {
         let mut associated_values = Vec::new();
         for md in parse_result.ast.modules {
-            let module_name = &parse_result.file_text[parse_result.tokens[md.link_info.name_token].get_range()];
+            let module_name = md.link_info.name.clone();
             let new_module_uuid = self.links.globals.alloc(Named::Module(md));
             associated_values.push(new_module_uuid);
             self.links.add_name(module_name, new_module_uuid);
@@ -427,9 +425,9 @@ impl Linker {
                 Some(v.clone())
             },
             other => {
-                let info = other.get_linking_error_location(self);
-                let infos = if let Some((file, position)) = info.location {
-                    vec![error_info(Span::from(position), file, "Defined here")]
+                let info = other.get_linking_error_location();
+                let infos = if let Some((file, span)) = info.location {
+                    vec![error_info(span, file, "Defined here")]
                 } else {
                     vec![]
                 };
@@ -447,9 +445,9 @@ impl Linker {
                 Some(md)
             },
             other => {
-                let info = other.get_linking_error_location(self);
-                let infos = if let Some((file, position)) = info.location {
-                    vec![error_info(Span::from(position), file, "Defined here")]
+                let info = other.get_linking_error_location();
+                let infos = if let Some((file, span)) = info.location {
+                    vec![error_info(span, file, "Defined here")]
                 } else {
                     vec![]
                 };
@@ -464,7 +462,7 @@ impl Linker {
     pub fn flatten_all_modules_in_file(&self, file : FileUUID, errors : &mut ErrorCollector) {
         for md_uuid in &self.files[file].associated_values {
             let named = &self.links.globals[*md_uuid];
-            println!("Flattening {}", named.get_name(self));
+            println!("Flattening {}", named.get_name());
             if let Named::Module(md) = named {
                 if !md.link_info.is_fully_linked {
                     continue;

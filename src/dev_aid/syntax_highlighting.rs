@@ -125,7 +125,10 @@ fn walk_name_color(all_objects : &[ValueUUID], links : &Links, result : &mut [ID
         }
         
         let link_info = object.get_link_info().unwrap();
-        result[link_info.name_token].typ = IDETokenType::Identifier(object.get_ide_type());
+        let ide_typ = object.get_ide_type();
+        for name_part in link_info.name_span {
+            result[name_part].typ = IDETokenType::Identifier(ide_typ);
+        }
         for GlobalReference(reference_span, ref_uuid) in &link_info.global_references {
             let typ = if *ref_uuid != ValueUUID::INVALID {
                 IDETokenType::Identifier(links.globals[*ref_uuid].get_ide_type())

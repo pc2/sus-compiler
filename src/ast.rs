@@ -71,7 +71,7 @@ pub type SpanTypeExpression = (TypeExpression, Span);
 pub struct SignalDeclaration {
     pub span : Span,
     pub typ : SpanTypeExpression,
-    pub name : Range<usize>, // File position
+    pub name : Box<str>, // File position
     pub identifier_type : IdentifierType
 }
 
@@ -135,7 +135,8 @@ pub enum Statement {
 #[derive(Debug)]
 pub struct LinkInfo {
     pub file : FileUUID,
-    pub name_token : usize,
+    pub name : Box<str>,
+    pub name_span : Span,
     pub span : Span,
     pub global_references : Vec<GlobalReference>,
     pub is_fully_linked : bool // Caches if self.global_references contains any INVALID references. 

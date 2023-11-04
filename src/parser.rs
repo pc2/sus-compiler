@@ -316,7 +316,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
 
     fn add_declaration(&mut self, type_expr : SpanTypeExpression, name : TokenContent, identifier_type : IdentifierType, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>) -> usize {
         let span = Span(type_expr.1.0, name.position);
-        let decl = SignalDeclaration{typ : type_expr, span, name : name.text.clone(), identifier_type};
+        let decl = SignalDeclaration{typ : type_expr, span, name : self.file_text[name.text.clone()].into(), identifier_type};
         let decl_id = declarations.len();
         declarations.push(decl);
         if let Err(conflict) = scope.add_declaration(&self.file_text[name.text.clone()], decl_id) {
@@ -693,7 +693,8 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         
         let link_info = LinkInfo{
             file : self.errors.file,
-            name_token : name.position,
+            name : self.file_text[name.text].into(),
+            name_span : Span::from(name.position),
             span,
             global_references : replace(&mut self.global_references, Vec::new()),
             is_fully_linked : false

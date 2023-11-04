@@ -91,7 +91,7 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
             let decl_typ_root_reference = module.link_info.global_references[decl.typ.0.get_root()];
             let wire_or_instance = match &linker.links.globals[decl_typ_root_reference.1] {
                 Named::Constant(c) => {
-                    errors.error_basic(decl_typ_root_reference.0, format!("This should be the type of a declaration, but it refers to the constant '{}'", c.get_full_name(linker)));
+                    errors.error_basic(decl_typ_root_reference.0, format!("This should be the type of a declaration, but it refers to the constant '{}'", c.get_full_name()));
                     WireOrInstantiation::Other(decl_typ_root_reference.1)
                 }
                 Named::Module(_) => {
@@ -153,7 +153,7 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
         let arg_count = args.len();
         let expected_arg_count = input_range.len();
         if arg_count != expected_arg_count {
-            let module_info = vec![error_info(Span::from(md.link_info.name_token), md.link_info.file, "Interface defined here")];
+            let module_info = vec![error_info(md.link_info.span, md.link_info.file, "Interface defined here")];
             if arg_count > expected_arg_count {
                 // Too many args, complain about excess args at the end
                 let excess_args_span = Span(args[expected_arg_count].1.0, closing_bracket_pos - 1);

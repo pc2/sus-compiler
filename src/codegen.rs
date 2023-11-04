@@ -33,7 +33,7 @@ impl GenerationContext {
         //mlir_builder.set_insertion_point_to_end(self.into_mlir.block());
 
         //builder.set_insertion_point_to_start(module.into());
-
+        
         let int32 = mlir::ty::get_integer_type(ctx, 32);
         //entity_builder.add_input("a", int32);
         //entity_builder.add_input("b", int32);
