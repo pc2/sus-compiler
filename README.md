@@ -50,7 +50,7 @@ The main goals of the language are roughly listed below:
 - [ ] Native Module integration syntax
 - [ ] Can Parse FIFO implementation
 - [ ] Clock Domain Crossings
-- [ ] Rythm Syntax
+- [ ] Rhythm Syntax
 - [ ] Generator Syntax
 
 ### Linking and Name Resolution
@@ -233,35 +233,6 @@ Timing information itself should not be part of the RTL. So the clocks' absolute
 As an added benefit, hardware modules can then alter their construction based on this information, so for example, a FIFO can use a standard synchronous implementation for a single clock, but then switch to different CDC approaches for (un-)synchronized clocks. 
 
 By including clocks in the language itself, we can then start making statements about data rates. For example a stream may be outputting on clock A, with full bandwidth, and then be transported onto clock A*2 at half its bandwidth. One neat way of expressing the signal throughput is done by [Aetherling](https://aetherling.org/). Signals are expressed as sequences of valid and invalid elements. This can then again filter out bad designs, where the bandwidth from one clock may not be carryable by another clock. 
-
-#### Rythm timelines
-Special timelines called 'rythm' timelines are used to make things like safe synchronous clock domain crossings possible. 
-
-let's take a 3-5 clock domain crossing:
-```
-Slow: !---------!---------!---------!---------!---------!---------!
-Fast:  !-----!-----!-----!-----!-----!-----!-----!-----!-----!-----!
-```
-To properly define the crossings, no two clocks may land at the exact same time. We offset the fast clock by a small amount to do this. 
-Data coming from the slow domain to the fast domain encounters no constraint on the sender. 
-A full stream of data will result in the following rythm:
-`v v v v v v v v v v v v v v v ...` -> `v _ v _ v v _ v _ v v _ v _ v ...`
-
-To send data from the fast to the slow clock, we must do the opposite. Our sender has to be careful to only send data when it will be picked up properly:
-`_ v _ v v _ v _ v v _ v _ v ...` -> `v v v v v v v v v v v v v v v ...`
-
-Of course, connecting a data stream to a clock domain crossing without the proper rythm is an error. 
-
-Rythms can be generated through built-in opaque modules.
-```
-rythmGenerator(clk*5, clk*3) : 
-  left: () -> rythm v / v / v
-  right: () -> rythm v v v
-```
-
-These either use compile-time information from the tool that implements the clocks, or it generates a module that tests the clock domain crossing for the proper rythm at initialization time. 
-
-Delayed rythms follow a modular arithmetic. For example a rythm between clocks with a ratio of `rythm(clk*3,clk*5)`, will repeat every 5 clock cycles of the first clock, and 3 clock cycles of the second clock. `reg reg reg reg reg rythm(clk*3,clk*5).left = rythm(clk*3,clk*5).left`, `reg reg reg rythm(clk*3,clk*5).right = rythm(clk*3,clk*5).right`
 
 ### Integrate Timing Constraints into language text itself
 - False Paths
