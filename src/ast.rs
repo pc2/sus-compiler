@@ -1,7 +1,7 @@
 
 use num::bigint::BigUint;
 
-use crate::{tokenizer::TokenTypeIdx, linker::{ValueUUID, FileUUID}, flattening::FlattenedModule};
+use crate::{tokenizer::TokenTypeIdx, linker::{NamedUUID, FileUUID}, flattening::FlattenedModule};
 use core::ops::Range;
 use std::ops::Deref;
 
@@ -51,7 +51,7 @@ pub enum LocalOrGlobal {
 #[derive(Debug, Clone)]
 pub enum TypeExpression {
     Named(usize), // position in referenced globals list
-    Array(Box<(SpanTypeExpression, SpanExpression)>)
+    Array(Box<(TypeExpression, SpanExpression)>)
 }
 
 impl TypeExpression {
@@ -59,13 +59,31 @@ impl TypeExpression {
         match self {
             Self::Named(s) => *s,
             Self::Array(b) => {
-                b.deref().0.0.get_root()
+                b.deref().0.get_root()
             }
+        }
+    }
+    pub fn map_to_type<F : Fn(usize) -> NamedUUID>(&self, f : F) -> Type {
+        match self {
+            TypeExpression::Named(n) => Type::Named(f(*n)),
+            TypeExpression::Array(b) => {
+                let (sub, idx) = b.deref();
+                Type::Array(Box::new(sub.map_to_type(f)))
+                // TODO gather bound constraints
+            },
         }
     }
 }
 
 pub type SpanTypeExpression = (TypeExpression, Span);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Type {
+    Named(NamedUUID),
+    Array(Box<Type>)
+}
+
+pub type SpanType = (Type, Span);
 
 #[derive(Debug,Clone)]
 pub struct SignalDeclaration {
@@ -124,8 +142,14 @@ pub struct CodeBlock {
 }
 
 #[derive(Debug)]
+pub struct Bound {
+    max : SpanExpression
+}
+
+#[derive(Debug)]
 pub enum Statement {
     Declaration{local_id : usize},
+    AssumeBound{to : SpanAssignableExpression, bound : Bound},
     Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : SpanExpression}, // num_regs v = expr;
     If{condition : SpanExpression, then : CodeBlock, els : Option<CodeBlock>},
     Block(CodeBlock),
@@ -200,7 +224,7 @@ impl Module {
 }
 
 #[derive(Debug,Clone,Copy)]
-pub struct GlobalReference(pub Span, pub ValueUUID); // token index, and name span
+pub struct GlobalReference(pub Span, pub NamedUUID); // token index, and name span
 
 #[derive(Debug)]
 pub struct ASTRoot {
@@ -260,26 +284,14 @@ impl IterIdentifiers for SpanAssignableExpression {
     }
 }
 
-impl IterIdentifiers for SpanTypeExpression {
-    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
-        let (typ, _span) = self;
-        match typ {
-            TypeExpression::Named(_n) => {
-                // is type
-            }
-            TypeExpression::Array(b) => {
-                let (arr_typ, arr_size) = &**b;
-                arr_typ.for_each_value(func);
-                arr_size.for_each_value(func);
-            }
-        }
-    }
-}
-
 impl IterIdentifiers for CodeBlock {
     fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
         for (stmt, _span) in &self.statements {
             match stmt {
+                Statement::AssumeBound{to, bound} => {
+                    to.for_each_value(func);
+                    bound.max.for_each_value(func);
+                }
                 Statement::Assign{to, eq_sign_position : _, expr} => {
                     for assign_to in to {
                         assign_to.expr.for_each_value(func);

@@ -1,4 +1,4 @@
-
+mod util;
 mod arena_alloc;
 mod tokenizer;
 mod parser;
@@ -19,10 +19,6 @@ use dev_aid::syntax_highlighting::*;
 
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
-    let gen_ctx = codegen::GenerationContext::new();
-    gen_ctx.to_circt();
-    return Ok(());
-    
     let mut args = env::args();
 
     let _executable_path = args.next();

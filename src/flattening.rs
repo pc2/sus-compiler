@@ -1,8 +1,8 @@
 use std::ops::{Deref, Range};
 
 use crate::{
-    ast::{Span, Value, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, AssignableExpressionWithModifiers, TypeExpression},
-    linker::{ValueUUID, Linker, Named, Linkable},
+    ast::{Span, Value, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, AssignableExpressionWithModifiers, TypeExpression, Type, SpanType},
+    linker::{NamedUUID, Linker, Named, Linkable},
     errors::{ErrorCollector, error_info}, arena_alloc::{ListAllocator, UUID}, tokenizer::kw
 };
 
@@ -18,7 +18,7 @@ pub type InstantiationID = UUID<InstantiationIDMarker>;
 pub enum WireOrInstantiation {
     Wire(WireID),
     Instantiation(InstantiationID),
-    Other(ValueUUID)
+    Other(NamedUUID)
 }
 
 #[derive(Debug)]
@@ -48,7 +48,7 @@ type SpanConnectionRead = (ConnectionRead, Span);
 
 #[derive(Debug)]
 pub enum Instantiation {
-    Named(ValueUUID),
+    Named(NamedUUID),
     UnaryOp(Operator),
     BinaryOp(Operator)
 }
@@ -68,7 +68,7 @@ impl Connection {
 
 #[derive(Debug)]
 pub struct Wire {
-    pub typ : Option<TypeExpression>
+    pub typ : Option<SpanType>
 }
 
 struct FlatteningContext<'l, 'm, 'e> {
@@ -104,7 +104,7 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
                     }
                 }
                 Named::Type(_) => {
-                    WireOrInstantiation::Wire(wires.alloc(Wire{typ : Some(decl.typ.0.clone())}))
+                    WireOrInstantiation::Wire(wires.alloc(Wire{typ : Some((decl.typ.0.map_to_type(|n| module.link_info.global_references[n].1), decl.typ.1))}))
                 }
             };
             LocalVariable{location : decl.span, wire_or_instance}
@@ -257,7 +257,7 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
         }
     }
     fn make_binary_operator_to_new_local(&mut self, op : Operator, left : WireID, left_span : Span, right : WireID, right_span : Span, condition : WireID, output_span : Span) -> WireID {
-        let instantiation_idx = self.instantiations.alloc(Instantiation::BinaryOp(Operator{op_typ: kw("&")}));
+        let instantiation_idx = self.instantiations.alloc(Instantiation::BinaryOp(op));
         self.connections.push(Connection{
             num_regs: 0,
             from: (ConnectionRead::Local(left), left_span),
@@ -280,7 +280,7 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
         new_output_wire
     }
     fn make_unary_operator_to_new_local(&mut self, op : Operator, right : WireID, right_span : Span, condition : WireID, output_span : Span) -> WireID {
-        let instantiation_idx = self.instantiations.alloc(Instantiation::BinaryOp(Operator{op_typ: kw("&")}));
+        let instantiation_idx = self.instantiations.alloc(Instantiation::BinaryOp(op));
         self.connections.push(Connection{
             num_regs: 0,
             from: (ConnectionRead::Local(right), right_span),
@@ -307,6 +307,9 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
         for (stmt, stmt_span) in &code.statements {
             match stmt {
                 Statement::Declaration{local_id} => {
+                    // TODO
+                }
+                Statement::AssumeBound{to, bound} => {
                     // TODO
                 }
                 Statement::If{condition : condition_expr, then, els} => {
@@ -366,6 +369,15 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
             }
         }
     }
+
+    pub fn get_type(&self, ) {
+        
+    }
+    pub fn type_check(&mut self) {
+        for c in &self.connections {
+            
+        }
+    }
 }
 
 pub fn flatten(module : &Module, linker : &Linker, errors : &mut ErrorCollector) -> FlattenedModule {
@@ -387,7 +399,7 @@ pub struct FlattenedModule {
 
 #[derive(Debug)]
 struct InstantiatedWire {
-    typ : TypeExpression,
+    typ : Type,
     latency : i64
 }
 

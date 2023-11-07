@@ -1,10 +1,10 @@
 use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}};
 
-use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::flatten};
+use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference, Operator, Type}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::{Token, kw}, errors::{ErrorCollector, error_info}, flattening::flatten, util::{const_str_position, const_str_position_in_tuples}};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NamedUUIDMarker;
-pub type ValueUUID = UUID<NamedUUIDMarker>;
+pub type NamedUUID = UUID<NamedUUIDMarker>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FileUUIDMarker;
@@ -19,6 +19,17 @@ const BUILTIN_CONSTANTS : [(&'static str, Value); 2] = [
     ("true", Value::Bool(true)),
     ("false", Value::Bool(false))
 ];
+
+// Goes together with Links::new
+pub const fn get_builtin_uuid(name : &'static str) -> NamedUUID {
+    if let Some(is_type) = const_str_position(name, &BUILTIN_TYPES) {
+        NamedUUID::from_hidden_value(is_type)
+    } else if let Some(is_constant) = const_str_position_in_tuples(name, &BUILTIN_CONSTANTS) {
+        NamedUUID::from_hidden_value(is_constant + BUILTIN_TYPES.len())
+    } else {
+        unreachable!()
+    }
+}
 
 pub struct LinkingErrorLocation<'a> {
     pub named_type : &'static str,
@@ -143,7 +154,7 @@ pub struct FileData {
     pub tokens : Vec<Token>,
     pub token_hierarchy : Vec<TokenTreeNode>,
     pub parsing_errors : ErrorCollector,
-    pub associated_values : Vec<ValueUUID>
+    pub associated_values : Vec<NamedUUID>
 }
 
 impl FileData {
@@ -158,21 +169,22 @@ impl FileData {
 // All modules in the workspace
 pub struct Links {
     pub globals : ArenaAllocator<Named, NamedUUIDMarker>,
-    global_namespace : HashMap<Box<str>, ValueUUID>,
-    name_colissions : Vec<(ValueUUID, ValueUUID)>
+    global_namespace : HashMap<Box<str>, NamedUUID>,
+    name_colissions : Vec<(NamedUUID, NamedUUID)>
 }
 
 // Represents the fully linked set of all files. Incremental operations such as adding and removing files can be performed
 pub struct Linker {
     pub links : Links,
-    pub files : ArenaAllocator<FileData, FileUUIDMarker>
+    pub files : ArenaAllocator<FileData, FileUUIDMarker>,
 }
 
 impl Links {
+    // Goes together with get_builtin_uuid
     pub fn new() -> Links {
         // Add builtins
         let mut globals = ArenaAllocator::new();
-        let mut global_namespace: HashMap<Box<str>, UUID<NamedUUIDMarker>> = HashMap::new();
+        let mut global_namespace = HashMap::new();
         
         for name in BUILTIN_TYPES {
             let id = globals.alloc(Named::Type(NamedType::Builtin(name)));
@@ -188,10 +200,10 @@ impl Links {
         Links{globals, name_colissions : Vec::new(), global_namespace}
     }
 
-    fn resolve_dependencies(namespace : &HashMap<Box<str>, ValueUUID>, file : &FileData, link_info : &mut LinkInfo) {
+    fn resolve_dependencies(namespace : &HashMap<Box<str>, NamedUUID>, file : &FileData, link_info : &mut LinkInfo) {
         let mut all_resolved = true;
         for GlobalReference(reference_span, uuid) in &mut link_info.global_references {
-            if *uuid == ValueUUID::INVALID {
+            if *uuid == NamedUUID::INVALID {
                 let reference_name_str = file.get_span_text(*reference_span);
 
                 *uuid = if let Some(found) = namespace.get(reference_name_str) {
@@ -217,15 +229,15 @@ impl Links {
     }
 }
 
-impl Index<ValueUUID> for Links {
+impl Index<NamedUUID> for Links {
     type Output = Named;
 
-    fn index(&self, index: ValueUUID) -> &Self::Output {
+    fn index(&self, index: NamedUUID) -> &Self::Output {
         &self.globals[index]
     }
 }
-impl IndexMut<ValueUUID> for Links {
-    fn index_mut(&mut self, index: ValueUUID) -> &mut Self::Output {
+impl IndexMut<NamedUUID> for Links {
+    fn index_mut(&mut self, index: NamedUUID) -> &mut Self::Output {
         &mut self.globals[index]
     }
 }
@@ -308,7 +320,7 @@ impl Linker {
                 continue; // Early exit because we know this object contains no linking errors
             }
             for GlobalReference(reference_span, ref_uuid) in &object_link_info.global_references {
-                if *ref_uuid == ValueUUID::INVALID {
+                if *ref_uuid == NamedUUID::INVALID {
                     let reference_text = file.get_span_text(*reference_span);
                     errors.error_basic(*reference_span, format!("No Value or Type of the name '{reference_text}' was found. Did you forget to import it?"));
                 }
@@ -333,7 +345,7 @@ impl Linker {
             if let Some(info) = v.get_link_info_mut() { // Builtins can't refer to other things
                 for GlobalReference(_name, v) in &mut info.global_references {
                     if back_reference_set.contains(v) {
-                        *v = ValueUUID::INVALID;
+                        *v = NamedUUID::INVALID;
                         info.is_fully_linked = false;
                     }
                 }
@@ -457,6 +469,44 @@ impl Linker {
                 None
             }
         }
+    }
+
+    pub fn get_unary_operator_types(&self, op : Operator) -> (Type, Type) {
+        let bool = Type::Named(get_builtin_uuid("bool"));
+        let int = Type::Named(get_builtin_uuid("int"));
+        
+        match op.op_typ {
+            x if x == kw("!") => (bool.clone(), bool),
+            x if x == kw("&") => (Type::Array(Box::new(bool.clone())), bool),
+            x if x == kw("|") => (Type::Array(Box::new(bool.clone())), bool),
+            x if x == kw("^") => (Type::Array(Box::new(bool.clone())), bool),
+            x if x == kw("+") => (Type::Array(Box::new(int.clone())), int),
+            x if x == kw("*") => (Type::Array(Box::new(int.clone())), int),
+            _ => unreachable!()
+        }
+    }
+    pub fn get_binary_operator_types(&self, op : Operator) -> ((Type, Type), Type) {
+        let bool = get_builtin_uuid("bool");
+        let int = get_builtin_uuid("int");
+        
+        let (a, b, o) = match op.op_typ {
+            x if x == kw("&") => (bool, bool, bool),
+            x if x == kw("|") => (bool, bool, bool),
+            x if x == kw("^") => (bool, bool, bool),
+            x if x == kw("+") => (int, int, int),
+            x if x == kw("-") => (int, int, int),
+            x if x == kw("*") => (int, int, int),
+            x if x == kw("/") => (int, int, int),
+            x if x == kw("%") => (int, int, int),
+            x if x == kw("==") => (int, int, bool),
+            x if x == kw("!=") => (int, int, bool),
+            x if x == kw(">=") => (int, int, bool),
+            x if x == kw("<=") => (int, int, bool),
+            x if x == kw(">") => (int, int, bool),
+            x if x == kw("<") => (int, int, bool),
+            _ => unreachable!()
+        };
+        ((Type::Named(a), Type::Named(b)), Type::Named(o))
     }
 
     pub fn flatten_all_modules_in_file(&self, file : FileUUID, errors : &mut ErrorCollector) {

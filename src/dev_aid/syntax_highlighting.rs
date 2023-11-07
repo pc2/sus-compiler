@@ -1,7 +1,7 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{ast::*, tokenizer::*, parser::*, linker::{PreLinker, FileData, Links, ValueUUID, Named, Linkable}, arena_alloc::ArenaVector};
+use crate::{ast::*, tokenizer::*, parser::*, linker::{PreLinker, FileData, Links, NamedUUID, Named, Linkable}, arena_alloc::ArenaVector};
 
 use ariadne::FileCache;
 use console::Style;
@@ -108,7 +108,7 @@ impl Named {
     }
 }
 
-fn walk_name_color(all_objects : &[ValueUUID], links : &Links, result : &mut [IDEToken]) {
+fn walk_name_color(all_objects : &[NamedUUID], links : &Links, result : &mut [IDEToken]) {
     for obj_uuid in all_objects {
         let object = &links.globals[*obj_uuid];
         match object {
@@ -130,7 +130,7 @@ fn walk_name_color(all_objects : &[ValueUUID], links : &Links, result : &mut [ID
             result[name_part].typ = IDETokenType::Identifier(ide_typ);
         }
         for GlobalReference(reference_span, ref_uuid) in &link_info.global_references {
-            let typ = if *ref_uuid != ValueUUID::INVALID {
+            let typ = if *ref_uuid != NamedUUID::INVALID {
                 IDETokenType::Identifier(links.globals[*ref_uuid].get_ide_type())
             } else {
                 IDETokenType::Invalid
@@ -245,7 +245,7 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
         linker.flatten_all_modules_in_file(file_uuid, &mut errors);
 
         for err in errors.errors {
-            err.pretty_print_error(f.parsing_errors.file, &token_offsets, &paths_arena, &mut file_cache);
+            //err.pretty_print_error(f.parsing_errors.file, &token_offsets, &paths_arena, &mut file_cache);
         }
     }
 }

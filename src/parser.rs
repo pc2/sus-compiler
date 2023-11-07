@@ -1,7 +1,7 @@
 
 use num::bigint::BigUint;
 
-use crate::{tokenizer::*, errors::*, ast::*, linker::{FileUUID, ValueUUID}};
+use crate::{tokenizer::*, errors::*, ast::*, linker::{FileUUID, NamedUUID}};
 
 use std::{iter::Peekable, str::FromStr, ops::Range};
 use core::slice::Iter;
@@ -224,7 +224,7 @@ struct ASTParserRollbackable {
 impl<'g, 'file> ASTParserContext<'g, 'file> {
     fn add_global_reference(&mut self, name_span : Span) -> usize {
         let idx = self.global_references.len();
-        self.global_references.push(GlobalReference(name_span, ValueUUID::INVALID));
+        self.global_references.push(GlobalReference(name_span, NamedUUID::INVALID));
         idx
     }
 
@@ -446,7 +446,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             let mut array_index_token_stream = TokenStream::new(content, block_span.0, block_span.1);
             let expr = self.parse_expression(&mut array_index_token_stream, scope)?;
             self.token_stream_should_be_finished(array_index_token_stream, "type array index");
-            cur_type = (TypeExpression::Array(Box::new((cur_type, expr))), Span(first_token.position, block_span.1));
+            cur_type = (TypeExpression::Array(Box::new((cur_type.0, expr))), Span(first_token.position, block_span.1));
         }
         Some(cur_type)
     }

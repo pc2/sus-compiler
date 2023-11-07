@@ -3,6 +3,7 @@ use std::str::CharIndices;
 
 use crate::ast::Span;
 use crate::errors::*;
+use crate::util::const_str_position_in_tuples;
 
 pub type TokenTypeIdx = u8;
 
@@ -97,41 +98,10 @@ pub const MISC_TOKENS : [&'static str; (TOKEN_INVALID - TOKEN_IDENTIFIER + 1) as
     "INVALID"
 ];
 
-pub const fn const_eq_str(a: &str, b: &str) -> bool {
-    let a_bytes = a.as_bytes();
-    let b_bytes = b.as_bytes();
-
-    if a_bytes.len() != b_bytes.len() {
-        return false;
-    }
-
-    let mut i: usize = 0;
-    while i < a_bytes.len() {
-        if a_bytes[i] != b_bytes[i] {
-            return false;
-        }
-        i += 1;
-    }
-
-    true
-}
-
-const fn const_str_position(v : &str, list : &[(&str, u8)]) -> Option<usize> {
-    let mut i : usize = 0;
-
-    while i < list.len() {
-        if const_eq_str(v, list[i].0) {
-            return Some(i);
-        }
-        i += 1;
-    }
-    None
-}
-
 pub const fn kw(name : &str) -> TokenTypeIdx {
-    if let Some(found) = const_str_position(name, &ALL_KEYWORDS) {
+    if let Some(found) = const_str_position_in_tuples(name, &ALL_KEYWORDS) {
         found as TokenTypeIdx
-    } else if let Some(found) = const_str_position(name, &ALL_SYMBOLS) {
+    } else if let Some(found) = const_str_position_in_tuples(name, &ALL_SYMBOLS) {
         (found + ALL_KEYWORDS.len()) as TokenTypeIdx
     } else {
         panic!();
@@ -272,7 +242,7 @@ pub fn tokenize<'txt>(file_text : &'txt str, errors : &mut ErrorCollector) -> Ve
                     TOKEN_NUMBER
                 }
             } else {
-                if let Some(found) = const_str_position(word_str, &ALL_KEYWORDS) {
+                if let Some(found) = const_str_position_in_tuples(word_str, &ALL_KEYWORDS) {
                     found as TokenTypeIdx
                 } else {
                     TOKEN_IDENTIFIER

@@ -22,6 +22,14 @@ impl<IndexMarker> Default for UUID<IndexMarker> {
 
 impl<IndexMarker> UUID<IndexMarker> {
     pub const INVALID : Self = UUID(usize::MAX, PhantomData);
+
+    pub const fn from_hidden_value(v : usize) -> Self {
+        UUID(v, PhantomData)
+    }
+
+    pub const fn get_hidden_value(&self) -> usize {
+        self.0
+    }
 }
 
 #[derive(Default)]
