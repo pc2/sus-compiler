@@ -1,7 +1,7 @@
 
 use num::bigint::BigUint;
 
-use crate::{tokenizer::TokenTypeIdx, linker::{NamedUUID, FileUUID}, flattening::FlattenedModule};
+use crate::{tokenizer::TokenTypeIdx, linker::{NamedUUID, FileUUID}, flattening::{FlattenedModule, WireIDMarker, WireID, OutsideWireID}, arena_alloc::ListAllocator};
 use core::ops::Range;
 use std::ops::Deref;
 
@@ -43,7 +43,7 @@ impl From<usize> for Span {
 
 #[derive(Debug, Clone, Copy)]
 pub enum LocalOrGlobal {
-    Local(usize),
+    Local(WireID),
     Global(usize)
 }
 
@@ -126,7 +126,7 @@ pub type SpanStatement = (Statement, Span);
 
 #[derive(Debug)]
 pub enum AssignableExpression {
-    Named{local_idx : usize},
+    Named{local_idx : WireID},
     ArrayIndex(Box<(SpanAssignableExpression, SpanExpression)>)
 }
 
@@ -148,7 +148,7 @@ pub struct Bound {
 
 #[derive(Debug)]
 pub enum Statement {
-    Declaration{local_id : usize},
+    Declaration(WireID),
     AssumeBound{to : SpanAssignableExpression, bound : Bound},
     Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : SpanExpression}, // num_regs v = expr;
     If{condition : SpanExpression, then : CodeBlock, els : Option<CodeBlock>},
@@ -170,56 +170,42 @@ pub struct LinkInfo {
 pub struct Module {
     pub link_info : LinkInfo,
 
-    pub declarations : Vec<SignalDeclaration>,
+    pub declarations : ListAllocator<SignalDeclaration, WireIDMarker>,
     pub code : CodeBlock,
 
     pub flattened : Option<FlattenedModule>
 }
 
 impl Module {
-    pub fn get_function_sugar_inputs_outputs(&self) -> (Range<usize>, Range<usize>) {
-        let mut decl_iter = self.declarations.iter().enumerate();
-        let mut input_range : Range<usize> = 0..0;
-        let mut output_range : Range<usize> = 0..0;
+    pub fn get_function_sugar_inputs_outputs(&self) -> (Vec<OutsideWireID>, Vec<OutsideWireID>) {
+        let mut decl_iter = self.declarations.iter();
+        let mut inputs = Vec::new();
+        let mut outputs = Vec::new();
         let mut last = if let Some((_pos, decl)) = decl_iter.next() {
             match decl.identifier_type {
                 IdentifierType::Input => IdentifierType::Input,
                 IdentifierType::Output => IdentifierType::Output,
-                IdentifierType::Local | IdentifierType::State => {return (0..0, 0..0)}
+                IdentifierType::Local | IdentifierType::State => {return (inputs, outputs)}
             }
         } else {
-            return (0..0, 0..0);
+            return (inputs, outputs);
         };
-        let mut last_valid_pos = 0;
-        for (pos, decl) in decl_iter {
+        for (id, decl) in decl_iter {
             if decl.identifier_type != last {
                 match decl.identifier_type {
                     IdentifierType::Input => {
-                        input_range.start = pos;
-                        output_range.end = pos;
+                        inputs.push(OutsideWireID(id));
                     }
                     IdentifierType::Output => {
-                        output_range.start = pos;
-                        input_range.end = pos;
+                        outputs.push(OutsideWireID(id));
                     }
                     IdentifierType::Local | IdentifierType::State => {
                         break;
                     }
                 }
-                last = decl.identifier_type;
-                last_valid_pos = pos;
             }
         }
-        match last {
-            IdentifierType::Input => {
-                input_range.end = last_valid_pos + 1;
-            }
-            IdentifierType::Output => {
-                output_range.end = last_valid_pos + 1;
-            }
-            _other => unreachable!()
-        }
-        (input_range, output_range)
+        (inputs, outputs)
     }
 }
 
@@ -301,7 +287,7 @@ impl IterIdentifiers for CodeBlock {
                 Statement::Block(b) => {
                     b.for_each_value(func);
                 },
-                Statement::Declaration { local_id : _ } => {}
+                Statement::Declaration(_) => {}
                 Statement::If { condition, then, els } => {
                     condition.for_each_value(func);
                     then.for_each_value(func);
@@ -317,7 +303,7 @@ impl IterIdentifiers for CodeBlock {
 
 impl IterIdentifiers for Module {
     fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
-        for (pos, decl) in self.declarations.iter().enumerate() {
+        for (pos, decl) in &self.declarations {
             func(LocalOrGlobal::Local(pos), decl.span.1);
         }
         self.code.for_each_value(func);

@@ -1,7 +1,7 @@
 
 use num::bigint::BigUint;
 
-use crate::{tokenizer::*, errors::*, ast::*, linker::{FileUUID, NamedUUID}};
+use crate::{tokenizer::*, errors::*, ast::*, linker::{FileUUID, NamedUUID}, flattening::{WireID, WireIDMarker}, arena_alloc::ListAllocator};
 
 use std::{iter::Peekable, str::FromStr, ops::Range};
 use core::slice::Iter;
@@ -105,12 +105,12 @@ pub fn to_token_hierarchy(tokens : &[Token], errors : &mut ErrorCollector) -> Ve
 }
 
 struct LocalVariableContext<'prev, 'file> {
-    locals : Vec<(&'file str, usize)>,
+    locals : Vec<(&'file str, WireID)>,
     prev : Option<&'prev LocalVariableContext<'prev, 'file>>
 }
 
 impl<'prev, 'file> LocalVariableContext<'prev, 'file> {
-    pub fn get_declaration_for(&self, name : &'file str) -> Option<usize> {
+    pub fn get_declaration_for(&self, name : &'file str) -> Option<WireID> {
         for (decl_name, unique_id) in &self.locals {
             if *decl_name == name {
                 return Some(*unique_id);
@@ -122,7 +122,7 @@ impl<'prev, 'file> LocalVariableContext<'prev, 'file> {
             None
         }
     }
-    pub fn add_declaration(&mut self, new_local_name : &'file str, new_local_unique_id : usize) -> Result<(), usize> { // Returns conflicting signal declaration
+    pub fn add_declaration(&mut self, new_local_name : &'file str, new_local_unique_id : WireID) -> Result<(), WireID> { // Returns conflicting signal declaration
         for (existing_local_name, existing_local_id) in &self.locals {
             if new_local_name == *existing_local_name {
                 return Err(*existing_local_id)
@@ -314,11 +314,10 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn add_declaration(&mut self, type_expr : SpanTypeExpression, name : TokenContent, identifier_type : IdentifierType, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>) -> usize {
+    fn add_declaration(&mut self, type_expr : SpanTypeExpression, name : TokenContent, identifier_type : IdentifierType, declarations : &mut ListAllocator<SignalDeclaration, WireIDMarker>, scope : &mut LocalVariableContext<'_, 'file>) -> WireID {
         let span = Span(type_expr.1.0, name.position);
         let decl = SignalDeclaration{typ : type_expr, span, name : self.file_text[name.text.clone()].into(), identifier_type};
-        let decl_id = declarations.len();
-        declarations.push(decl);
+        let decl_id = declarations.alloc(decl);
         if let Err(conflict) = scope.add_declaration(&self.file_text[name.text.clone()], decl_id) {
             self.errors.error_with_info(span, format!("This name was already declared previously"), vec![
                 error_info(declarations[conflict].span, self.errors.file.clone(), "Previous declaration")
@@ -431,7 +430,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn parse_signal_declaration(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>) -> Option<()> {
+    fn parse_signal_declaration(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType, declarations : &mut ListAllocator<SignalDeclaration, WireIDMarker>, scope : &mut LocalVariableContext<'_, 'file>) -> Option<()> {
         let sig_type = self.try_parse_type(token_stream, scope)?;
         let name = self.eat_identifier(token_stream, "signal declaration")?;
         self.add_declaration(sig_type, name, identifier_type, declarations, scope);
@@ -451,7 +450,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         Some(cur_type)
     }
 
-    fn try_parse_declaration(&mut self, token_stream : &mut TokenStream, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>) -> Option<(usize, Span)> {
+    fn try_parse_declaration(&mut self, token_stream : &mut TokenStream, declarations : &mut ListAllocator<SignalDeclaration, WireIDMarker>, scope : &mut LocalVariableContext<'_, 'file>) -> Option<(WireID, Span)> {
         let identifier_type = if token_stream.eat_is_plain(kw("state")).is_some() {
             IdentifierType::State
         } else {
@@ -464,7 +463,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         Some((local_idx, Span::from(name_token.position)))
     }
 
-    fn parse_bundle(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>) {
+    fn parse_bundle(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType, declarations : &mut ListAllocator<SignalDeclaration, WireIDMarker>, scope : &mut LocalVariableContext<'_, 'file>) {
         while token_stream.peek_is_plain(TOKEN_IDENTIFIER) {
             if let Some(_) = self.parse_signal_declaration(token_stream, identifier_type, declarations, scope) {
 
@@ -479,7 +478,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn parse_interface(&mut self, token_stream : &mut TokenStream, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>) {
+    fn parse_interface(&mut self, token_stream : &mut TokenStream, declarations : &mut ListAllocator<SignalDeclaration, WireIDMarker>, scope : &mut LocalVariableContext<'_, 'file>) {
         self.parse_bundle(token_stream, IdentifierType::Input, declarations, scope);
     
         if token_stream.eat_is_plain(kw("->")).is_some() {
@@ -487,7 +486,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn parse_statement(&mut self, token_stream : &mut TokenStream, declarations : &mut Vec<SignalDeclaration>, scope : &mut LocalVariableContext<'_, 'file>, code_block : &mut CodeBlock) -> Option<()> {
+    fn parse_statement(&mut self, token_stream : &mut TokenStream, declarations : &mut ListAllocator<SignalDeclaration, WireIDMarker>, scope : &mut LocalVariableContext<'_, 'file>, code_block : &mut CodeBlock) -> Option<()> {
         let start_at = if let Some(peek) = token_stream.peek() {
             peek.get_span().0
         } else {
@@ -514,7 +513,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
                 // Maybe it's a declaration?
                 *token_stream = tok_stream_copy;
                 left_expressions.push(((Expression::Named(LocalOrGlobal::Local(name)), span), reg_count));
-                code_block.statements.push((Statement::Declaration{local_id: name}, span));
+                code_block.statements.push((Statement::Declaration(name), span));
             } else {
                 self.rollback(rollback_ctx);
                 if let Some(sp_expr) = self.parse_expression(token_stream, scope) {
@@ -614,7 +613,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             return None;
         }
     }
-    fn parse_if_statement(&mut self, token_stream : &mut TokenStream, if_token : &TokenContent, declarations : &mut Vec<SignalDeclaration>, scope : &LocalVariableContext<'_, 'file>) -> Option<(Statement, Span)> {
+    fn parse_if_statement(&mut self, token_stream : &mut TokenStream, if_token : &TokenContent, declarations : &mut ListAllocator<SignalDeclaration, WireIDMarker>, scope : &LocalVariableContext<'_, 'file>) -> Option<(Statement, Span)> {
         let condition = self.parse_expression(token_stream, &scope)?;
 
         let (then_block, then_block_span) = self.eat_block(token_stream, kw("{"), "Then block of if statement")?;
@@ -638,7 +637,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
 
         Some((Statement::If{condition, then: then_content, els: else_content }, Span(if_token.position, span_end)))
     }
-    fn parse_code_block(&mut self, block_tokens : &[TokenTreeNode], span : Span, declarations : &mut Vec<SignalDeclaration>, outer_scope : &LocalVariableContext<'_, 'file>) -> CodeBlock {
+    fn parse_code_block(&mut self, block_tokens : &[TokenTreeNode], span : Span, declarations : &mut ListAllocator<SignalDeclaration, WireIDMarker>, outer_scope : &LocalVariableContext<'_, 'file>) -> CodeBlock {
         let mut token_stream = TokenStream::new(block_tokens, span.0, span.1);
 
         let mut code_block = CodeBlock{statements : Vec::new()};
@@ -681,7 +680,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         let name = self.eat_identifier(token_stream, "module")?;
         self.eat_plain(token_stream, kw(":"), "module")?;
 
-        let mut declarations : Vec<SignalDeclaration> = Vec::new();
+        let mut declarations = ListAllocator::new();
         let mut scope = LocalVariableContext::new_initial();
         self.parse_interface(token_stream, &mut declarations, &mut scope);
 
