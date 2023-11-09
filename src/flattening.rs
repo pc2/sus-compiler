@@ -1,7 +1,7 @@
 use std::{ops::Deref, iter::zip};
 
 use crate::{
-    ast::{Span, Value, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, AssignableExpressionWithModifiers, TypeExpression},
+    ast::{Span, Value, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, AssignableExpressionWithModifiers, IdentifierType},
     linker::{Linker, Named, Linkable, get_builtin_uuid},
     errors::{ErrorCollector, error_info}, arena_alloc::{ListAllocator, UUID}, tokenizer::kw, typing::{Type, get_unary_operator_types, get_binary_operator_types}
 };
@@ -105,15 +105,24 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
                 Some(arr_content_type.clone())
             },
             ConnectionWrite::StructField(struct_field_box) => {
-                let (struct_or_instance, OutsideWireID(outside_field)) = struct_field_box.deref();
+                let ((struct_or_instance, struct_or_instance_span), OutsideWireID(outside_field)) = struct_field_box.deref();
 
-                let ConnectionWrite::Local(id) = struct_or_instance.0 else {todo!()};
+                let ConnectionWrite::Local(id) = struct_or_instance else {todo!()};
 
-                let Instantiation::Instantiation{typ : Type::Named(instantiation), typ_span} = &self.instantiations[id] else {todo!()};
+                let Instantiation::Instantiation{typ : Type::Named(instantiation), typ_span} = &self.instantiations[*id] else {todo!()};
 
                 let Named::Module(found) = &self.linker.links[*instantiation] else {panic!("Instantiation must be module!")};
 
-                let found_type = found.declarations[*outside_field].typ.0.map_to_type(&found.link_info.global_references);
+                let field_decl = &found.declarations[*outside_field];
+
+                if field_decl.identifier_type != IdentifierType::Input {
+                    assert!(field_decl.identifier_type == IdentifierType::Output);
+                    let field_decl_info = error_info(field_decl.span, found.link_info.file, "Output Defined Here");
+                    self.errors.error_with_info(*struct_or_instance_span, "Cannot write to output of submodule!", vec![field_decl_info]);
+                    return None;
+                }
+
+                let found_type = field_decl.typ.0.map_to_type(&found.link_info.global_references);
 
                 Some(found_type)
             },

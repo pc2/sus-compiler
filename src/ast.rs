@@ -3,7 +3,7 @@ use num::bigint::BigUint;
 
 use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::{FlattenedModule, WireIDMarker, WireID, OutsideWireID}, arena_alloc::ListAllocator, typing::Type};
 use core::ops::Range;
-use std::{ops::Deref, fmt::Display};
+use std::fmt::Display;
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
