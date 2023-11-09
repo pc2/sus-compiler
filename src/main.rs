@@ -9,6 +9,8 @@ mod flattening;
 #[cfg(feature = "codegen")]
 mod codegen;
 
+mod typing;
+
 mod dev_aid;
 mod linker;
 

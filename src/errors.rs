@@ -1,6 +1,6 @@
 
 
-use std::{ops::Range, path::{Path, PathBuf}};
+use std::{ops::Range, path::{Path, PathBuf}, cell::RefCell};
 
 use crate::{ast::Span, linker::{FileUUID, FileUUIDMarker}, arena_alloc::ArenaVector};
 use ariadne::*;
@@ -94,22 +94,27 @@ pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
 }
 
 // Class that collects and manages errors and warnings
+// Implemented such that it can be shared immutably. This makes many operations to do with parsing easier
 #[derive(Debug,Clone)]
 pub struct ErrorCollector {
-    pub errors : Vec<ParsingError>,
+    errors : RefCell<Vec<ParsingError>>,
     pub file : FileUUID
 }
 
 impl ErrorCollector {
     pub fn new(file : FileUUID) -> Self {
-        Self{errors : Vec::new(), file}
+        Self{errors : RefCell::new(Vec::new()), file}
     }
     
-    pub fn error_basic<S : Into<String>>(&mut self, position : Span, reason : S) {
-        self.errors.push(ParsingError{position, reason : reason.into(), infos : Vec::new()});
+    pub fn error_basic<S : Into<String>>(&self, position : Span, reason : S) {
+        self.errors.borrow_mut().push(ParsingError{position, reason : reason.into(), infos : Vec::new()});
     }
     
-    pub fn error_with_info<S : Into<String>>(&mut self, position : Span, reason : S, infos : Vec<ErrorInfo>) {
-        self.errors.push(ParsingError{position, reason : reason.into(), infos : infos});
+    pub fn error_with_info<S : Into<String>>(&self, position : Span, reason : S, infos : Vec<ErrorInfo>) {
+        self.errors.borrow_mut().push(ParsingError{position, reason : reason.into(), infos : infos});
+    }
+
+    pub fn get(self) -> (Vec<ParsingError>, FileUUID) {
+        (self.errors.into_inner(), self.file)
     }
 }

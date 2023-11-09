@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}};
 
-use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference, Operator, Type}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::{Token, kw}, errors::{ErrorCollector, error_info}, flattening::flatten, util::{const_str_position, const_str_position_in_tuples}};
+use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::flatten, util::{const_str_position, const_str_position_in_tuples}};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NamedUUIDMarker;
@@ -279,7 +279,7 @@ impl PreLinker {
     }
 }
 
-fn add_error(info_a: &LinkInfo, info_b: &LinkInfo, errors: &mut ErrorCollector) {
+fn add_error(info_a: &LinkInfo, info_b: &LinkInfo, errors: &ErrorCollector) {
     let this_object_name = &info_a.name;
     errors.error_with_info(info_a.name_span, format!("Conflicting Declaration for the name '{this_object_name}'"), vec![
         error_info(info_b.name_span, info_b.file, "Conflicting Declaration")
@@ -287,7 +287,7 @@ fn add_error(info_a: &LinkInfo, info_b: &LinkInfo, errors: &mut ErrorCollector) 
 }
 
 impl Linker {
-    pub fn get_linking_errors(&self, file_uuid : FileUUID, errors : &mut ErrorCollector) {
+    pub fn get_linking_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
         let file = &self.files[file_uuid];
 
         // Conflicting Declarations
@@ -431,7 +431,7 @@ impl Linker {
         self.add_reserved_file(file, parse_result, parsing_errors);
     }
 
-    pub fn get_constant(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &mut ErrorCollector) -> Option<Value> {
+    pub fn get_constant(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &ErrorCollector) -> Option<Value> {
         match &self.links.globals[uuid] {
             Named::Constant(NamedConstant::Builtin(_name, v)) => {
                 Some(v.clone())
@@ -451,7 +451,7 @@ impl Linker {
         }
     }
 
-    pub fn get_module(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &mut ErrorCollector) -> Option<&Module> {
+    pub fn get_module(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &ErrorCollector) -> Option<&Module> {
         match &self.links.globals[uuid] {
             Named::Module(md) => {
                 Some(md)
@@ -471,45 +471,7 @@ impl Linker {
         }
     }
 
-    pub fn get_unary_operator_types(&self, op : Operator) -> (Type, Type) {
-        let bool = Type::Named(get_builtin_uuid("bool"));
-        let int = Type::Named(get_builtin_uuid("int"));
-        
-        match op.op_typ {
-            x if x == kw("!") => (bool.clone(), bool),
-            x if x == kw("&") => (Type::Array(Box::new(bool.clone())), bool),
-            x if x == kw("|") => (Type::Array(Box::new(bool.clone())), bool),
-            x if x == kw("^") => (Type::Array(Box::new(bool.clone())), bool),
-            x if x == kw("+") => (Type::Array(Box::new(int.clone())), int),
-            x if x == kw("*") => (Type::Array(Box::new(int.clone())), int),
-            _ => unreachable!()
-        }
-    }
-    pub fn get_binary_operator_types(&self, op : Operator) -> ((Type, Type), Type) {
-        let bool = get_builtin_uuid("bool");
-        let int = get_builtin_uuid("int");
-        
-        let (a, b, o) = match op.op_typ {
-            x if x == kw("&") => (bool, bool, bool),
-            x if x == kw("|") => (bool, bool, bool),
-            x if x == kw("^") => (bool, bool, bool),
-            x if x == kw("+") => (int, int, int),
-            x if x == kw("-") => (int, int, int),
-            x if x == kw("*") => (int, int, int),
-            x if x == kw("/") => (int, int, int),
-            x if x == kw("%") => (int, int, int),
-            x if x == kw("==") => (int, int, bool),
-            x if x == kw("!=") => (int, int, bool),
-            x if x == kw(">=") => (int, int, bool),
-            x if x == kw("<=") => (int, int, bool),
-            x if x == kw(">") => (int, int, bool),
-            x if x == kw("<") => (int, int, bool),
-            _ => unreachable!()
-        };
-        ((Type::Named(a), Type::Named(b)), Type::Named(o))
-    }
-
-    pub fn flatten_all_modules_in_file(&self, file : FileUUID, errors : &mut ErrorCollector) {
+    pub fn flatten_all_modules_in_file(&self, file : FileUUID, errors : &ErrorCollector) {
         for md_uuid in &self.files[file].associated_values {
             let named = &self.links.globals[*md_uuid];
             println!("Flattening {}", named.get_name());

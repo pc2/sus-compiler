@@ -1,9 +1,9 @@
 
 use num::bigint::BigUint;
 
-use crate::{tokenizer::TokenTypeIdx, linker::{NamedUUID, FileUUID}, flattening::{FlattenedModule, WireIDMarker, WireID, OutsideWireID}, arena_alloc::ListAllocator};
+use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::{FlattenedModule, WireIDMarker, WireID, OutsideWireID}, arena_alloc::ListAllocator, typing::Type};
 use core::ops::Range;
-use std::ops::Deref;
+use std::{ops::Deref, fmt::Display};
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
@@ -54,36 +54,7 @@ pub enum TypeExpression {
     Array(Box<(TypeExpression, SpanExpression)>)
 }
 
-impl TypeExpression {
-    pub fn get_root(&self) -> usize {
-        match self {
-            Self::Named(s) => *s,
-            Self::Array(b) => {
-                b.deref().0.get_root()
-            }
-        }
-    }
-    pub fn map_to_type<F : Fn(usize) -> NamedUUID>(&self, f : F) -> Type {
-        match self {
-            TypeExpression::Named(n) => Type::Named(f(*n)),
-            TypeExpression::Array(b) => {
-                let (sub, idx) = b.deref();
-                Type::Array(Box::new(sub.map_to_type(f)))
-                // TODO gather bound constraints
-            },
-        }
-    }
-}
-
 pub type SpanTypeExpression = (TypeExpression, Span);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Type {
-    Named(NamedUUID),
-    Array(Box<Type>)
-}
-
-pub type SpanType = (Type, Span);
 
 #[derive(Debug,Clone)]
 pub struct SignalDeclaration {
@@ -96,6 +67,12 @@ pub struct SignalDeclaration {
 #[derive(Debug,Clone,Copy)]
 pub struct Operator {
     pub op_typ : TokenTypeIdx
+}
+
+impl Display for Operator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(get_token_type_name(self.op_typ))
+    }
 }
 
 #[derive(Debug,Clone)]
@@ -177,31 +154,27 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn get_function_sugar_inputs_outputs(&self) -> (Vec<OutsideWireID>, Vec<OutsideWireID>) {
-        let mut decl_iter = self.declarations.iter();
+    pub fn get_function_sugar_inputs_outputs(&self) -> (Vec<(OutsideWireID, Type)>, Vec<(OutsideWireID, Type)>) {
         let mut inputs = Vec::new();
         let mut outputs = Vec::new();
-        let mut last = if let Some((_pos, decl)) = decl_iter.next() {
+        let mut last_was_output = true;
+        for (id, decl) in &self.declarations {
+            let typ = decl.typ.0.map_to_type(&self.link_info.global_references);
             match decl.identifier_type {
-                IdentifierType::Input => IdentifierType::Input,
-                IdentifierType::Output => IdentifierType::Output,
-                IdentifierType::Local | IdentifierType::State => {return (inputs, outputs)}
-            }
-        } else {
-            return (inputs, outputs);
-        };
-        for (id, decl) in decl_iter {
-            if decl.identifier_type != last {
-                match decl.identifier_type {
-                    IdentifierType::Input => {
-                        inputs.push(OutsideWireID(id));
+                IdentifierType::Input => {
+                    if last_was_output {
+                        inputs.clear();
                     }
-                    IdentifierType::Output => {
-                        outputs.push(OutsideWireID(id));
-                    }
-                    IdentifierType::Local | IdentifierType::State => {
-                        break;
-                    }
+                    inputs.push((OutsideWireID(id), typ));
+                    outputs.clear();
+                    last_was_output = false;
+                }
+                IdentifierType::Output => {
+                    outputs.push((OutsideWireID(id), typ));
+                    last_was_output = true;
+                }
+                IdentifierType::Local | IdentifierType::State => {
+                    break;
                 }
             }
         }

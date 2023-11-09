@@ -45,6 +45,7 @@ The main goals of the language are roughly listed below:
 - [x] Can Parse Multiply-Add pipeline
 - [x] Can Parse Blur2 filter
 - [x] If Statements
+- [ ] Structs
 - [ ] For Loops
 - [ ] Multi-Interface Syntax
 - [ ] Native Module integration syntax
@@ -59,6 +60,12 @@ The main goals of the language are roughly listed below:
 - [x] Incremental Linking
 - [ ] Incremental Compilation
 - [ ] Multi-Threaded Compilation
+
+### Type and Bound Checking
+- [x] Basic Type Checking (bools, ints, arrays, etc)
+- [ ] Types for Interfaces
+- [ ] Integer and Array Bounds Checking
+- [ ] Latency Checking
 
 ### LSP
 - [x] Basic LSP for VSCode integration

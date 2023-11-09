@@ -266,12 +266,13 @@ fn convert_diagnostic(err : ParsingError, severity : DiagnosticSeverity, token_p
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
 fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, token_positions : &[std::ops::Range<Position>], uris : &ArenaVector<Url, FileUUIDMarker>) -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut diag_vec : Vec<Diagnostic> = Vec::new();
-    for err in errors.errors {
+    let (err_vec, file) = errors.get();
+    for err in err_vec {
         diag_vec.push(convert_diagnostic(err, DiagnosticSeverity::ERROR, token_positions, uris));
     }
     
     let params = &PublishDiagnosticsParams{
-        uri: uris[errors.file].clone(),
+        uri: uris[file].clone(),
         diagnostics: diag_vec,
         version: None
     };
