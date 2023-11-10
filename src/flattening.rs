@@ -27,7 +27,7 @@ pub type SpanConnectionWrite = (ConnectionWrite, Span);
 
 #[derive(Debug)]
 pub enum Instantiation {
-    Instantiation{typ : Type, typ_span : Span},
+    SubModule{typ : Type, typ_span : Span},
     PlainWire{typ : Type, typ_span : Span},
     ExtractWire{typ : Type, extract_from : WireID, field : OutsideWireID},
     UnaryOp{typ : Type, op : Operator, right : SpanWireID},
@@ -40,7 +40,7 @@ pub enum Instantiation {
 impl Instantiation {
     pub fn get_type(&self) -> &Type {
         match self {
-            Instantiation::Instantiation{ typ, typ_span : _} => typ,
+            Instantiation::SubModule{ typ, typ_span : _} => typ,
             Instantiation::PlainWire { typ, typ_span : _} => typ,
             Instantiation::ExtractWire { typ, extract_from : _, field : _} => typ,
             Instantiation::UnaryOp { typ, op : _, right : _} => typ,
@@ -109,7 +109,7 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
 
                 let ConnectionWrite::Local(id) = struct_or_instance else {todo!()};
 
-                let Instantiation::Instantiation{typ : Type::Named(instantiation), typ_span} = &self.instantiations[*id] else {todo!()};
+                let Instantiation::SubModule{typ : Type::Named(instantiation), typ_span} = &self.instantiations[*id] else {todo!()};
 
                 let Named::Module(found) = &self.linker.links[*instantiation] else {panic!("Instantiation must be module!")};
 
@@ -138,7 +138,7 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
         Some(())
     }
     fn new(module : &'m Module, linker : &'l Linker, errors : &'e ErrorCollector) -> Self {
-        let instantiations: ListAllocator<Instantiation, WireIDMarker> = module.declarations.map(&mut |_id, decl| {
+        let instantiations: ListAllocator<Instantiation, WireIDMarker> = module.declarations.map(|_id, decl| {
             let typ = decl.typ.0.map_to_type(&module.link_info.global_references);
             let typ_span = decl.typ.1;
 
@@ -149,7 +149,7 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
                     Instantiation::Error
                 }
                 Named::Module(_) => {
-                    Instantiation::Instantiation{typ, typ_span}
+                    Instantiation::SubModule{typ, typ_span}
                 }
                 Named::Type(_) => {
                     Instantiation::PlainWire{typ, typ_span}
@@ -173,14 +173,14 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
             }
             Expression::Named(LocalOrGlobal::Global(g)) => {
                 let module_uuid = self.module.link_info.global_references[*g];
-                self.instantiations.alloc(Instantiation::Instantiation{typ : Type::Named(module_uuid.1), typ_span : *name_expr_span})
+                self.instantiations.alloc(Instantiation::SubModule{typ : Type::Named(module_uuid.1), typ_span : *name_expr_span})
             }
             _other => {
                 self.errors.error_basic(*name_expr_span, "Function call cannot be an expression");
                 return None;
             }
         };
-        let Instantiation::Instantiation{typ : module_type, typ_span} = &self.instantiations[func_instantiation] else {panic!("Instantiation is not named!");};
+        let Instantiation::SubModule{typ : module_type, typ_span} = &self.instantiations[func_instantiation] else {panic!("Instantiation is not named!");};
         let Type::Named(module_id) = module_type else {todo!();};
         let Named::Module(md) = &self.linker.links.globals[*module_id] else {panic!("UUID Is not module!");};
         let (inputs, output_range) = md.get_function_sugar_inputs_outputs();
@@ -364,6 +364,12 @@ impl<'l, 'm, 'e> FlatteningContext<'l, 'm, 'e> {
     }
 }
 
+/*
+This method flattens all given code into a simple set of assignments, operators and submodules. 
+It already does basic type checking and assigns a type to every wire. 
+The Generating Structure of the code is not yet executed. 
+It is template-preserving
+*/
 pub fn flatten(module : &Module, linker : &Linker, errors : &ErrorCollector) -> FlattenedModule {
     let mut result = FlatteningContext::new(module, linker, errors);
     result.flatten_code(&module.code, WireID::INVALID);
@@ -377,3 +383,8 @@ pub struct FlattenedModule {
     pub connections : Vec<Connection>
 }
 
+#[derive(Debug)]
+pub struct InstantiatedModule {
+    pub instantiations : ListAllocator<Instantiation, WireIDMarker>,
+    pub connections : Vec<Connection>
+}

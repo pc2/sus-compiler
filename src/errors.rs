@@ -8,6 +8,12 @@ use ariadne::*;
 
 use crate::tokenizer::{TokenTypeIdx, get_token_type_name};
 
+#[derive(Debug,Clone,PartialEq,Eq)]
+pub enum ErrorLevel {
+    Error,
+    Warning
+}
+
 #[derive(Debug,Clone)]
 pub struct ErrorInfo {
     pub position : Span,
@@ -16,10 +22,11 @@ pub struct ErrorInfo {
 }
 
 #[derive(Debug,Clone)]
-pub struct ParsingError {
+pub struct CompileError {
     pub position : Span,
     pub reason : String,
-    pub infos : Vec<ErrorInfo>
+    pub infos : Vec<ErrorInfo>,
+    pub level : ErrorLevel
 }
 
 struct CustomSpan<'a> {
@@ -34,18 +41,21 @@ impl<'a> ariadne::Span for CustomSpan<'a> {
     fn end(&self) -> usize { self.span.end }
 }
 
-impl ParsingError {
+impl CompileError {
     // Requires that character_ranges.len() == tokens.len() + 1 to include EOF token
     pub fn pretty_print_error(&self, file : FileUUID, character_ranges : &[Range<usize>], paths : &ArenaVector<PathBuf, FileUUIDMarker>, file_cache : &mut FileCache) {
         // Generate & choose some colours for each of our elements
-        let err_color = Color::Red;
+        let (err_color, report_kind) = match self.level {
+            ErrorLevel::Error => (Color::Red, ReportKind::Error),
+            ErrorLevel::Warning => (Color::Yellow, ReportKind::Warning),
+        };
         let info_color = Color::Blue;
 
         let error_span = self.position.to_range(character_ranges);
 
         let file_path = &paths[file];
 
-        let mut report: ReportBuilder<'_, CustomSpan> = Report::build(ReportKind::Error, file_path, error_span.start);
+        let mut report: ReportBuilder<'_, CustomSpan> = Report::build(report_kind, file_path, error_span.start);
         report = report
             .with_message(&self.reason)
             .with_label(
@@ -97,7 +107,7 @@ pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
 // Implemented such that it can be shared immutably. This makes many operations to do with parsing easier
 #[derive(Debug,Clone)]
 pub struct ErrorCollector {
-    errors : RefCell<Vec<ParsingError>>,
+    errors : RefCell<Vec<CompileError>>,
     pub file : FileUUID
 }
 
@@ -105,16 +115,24 @@ impl ErrorCollector {
     pub fn new(file : FileUUID) -> Self {
         Self{errors : RefCell::new(Vec::new()), file}
     }
-    
+
     pub fn error_basic<S : Into<String>>(&self, position : Span, reason : S) {
-        self.errors.borrow_mut().push(ParsingError{position, reason : reason.into(), infos : Vec::new()});
+        self.errors.borrow_mut().push(CompileError{position, reason : reason.into(), infos : Vec::new(), level : ErrorLevel::Error});
     }
     
     pub fn error_with_info<S : Into<String>>(&self, position : Span, reason : S, infos : Vec<ErrorInfo>) {
-        self.errors.borrow_mut().push(ParsingError{position, reason : reason.into(), infos : infos});
+        self.errors.borrow_mut().push(CompileError{position, reason : reason.into(), infos : infos, level : ErrorLevel::Error});
+    }
+    
+    pub fn warn_basic<S : Into<String>>(&self, position : Span, reason : S) {
+        self.errors.borrow_mut().push(CompileError{position, reason : reason.into(), infos : Vec::new(), level : ErrorLevel::Warning});
+    }
+    
+    pub fn warn_with_info<S : Into<String>>(&self, position : Span, reason : S, infos : Vec<ErrorInfo>) {
+        self.errors.borrow_mut().push(CompileError{position, reason : reason.into(), infos : infos, level : ErrorLevel::Warning});
     }
 
-    pub fn get(self) -> (Vec<ParsingError>, FileUUID) {
+    pub fn get(self) -> (Vec<CompileError>, FileUUID) {
         (self.errors.into_inner(), self.file)
     }
 }

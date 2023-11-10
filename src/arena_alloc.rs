@@ -249,7 +249,7 @@ impl<T, IndexMarker> ListAllocator<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> ListAllocIteratorMut<'a, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn map<OutT, F : FnMut(UUID<IndexMarker>, &T) -> OutT>(&self, f : &mut F) -> ListAllocator<OutT, IndexMarker> {
+    pub fn map<OutT, F : FnMut(UUID<IndexMarker>, &T) -> OutT>(&self, mut f : F) -> ListAllocator<OutT, IndexMarker> {
         let data = self.iter().map(|(a, v)| f(a, v)).collect();
         ListAllocator{data, _ph : PhantomData}
     }

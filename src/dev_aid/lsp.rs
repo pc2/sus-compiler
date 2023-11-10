@@ -6,7 +6,7 @@ use lsp_server::{Response, Message, Connection};
 
 use lsp_types::notification::Notification;
 
-use crate::{parser::perform_full_semantic_parse, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::{ErrorCollector, ParsingError}, linker::{PreLinker, FileUUIDMarker, Linker, FileUUID, FileData, Links}, arena_alloc::ArenaVector};
+use crate::{parser::perform_full_semantic_parse, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::{ErrorCollector, CompileError, ErrorLevel}, linker::{PreLinker, FileUUIDMarker, Linker, FileUUID, FileData, Links}, arena_alloc::ArenaVector};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -251,9 +251,13 @@ fn cvt_span_to_lsp_range(ch_sp : Span, token_positions : &[std::ops::Range<Posit
 }
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn convert_diagnostic(err : ParsingError, severity : DiagnosticSeverity, token_positions : &[std::ops::Range<Position>], uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
+fn convert_diagnostic(err : CompileError, token_positions : &[std::ops::Range<Position>], uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
     let error_pos = cvt_span_to_lsp_range(err.position, token_positions);
 
+    let severity = match err.level {
+        ErrorLevel::Error => DiagnosticSeverity::ERROR,
+        ErrorLevel::Warning => DiagnosticSeverity::WARNING,
+    };
     let mut related_info = Vec::new();
     for info in err.infos {
         let info_pos = cvt_span_to_lsp_range(info.position, token_positions);
@@ -268,7 +272,7 @@ fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, token_
     let mut diag_vec : Vec<Diagnostic> = Vec::new();
     let (err_vec, file) = errors.get();
     for err in err_vec {
-        diag_vec.push(convert_diagnostic(err, DiagnosticSeverity::ERROR, token_positions, uris));
+        diag_vec.push(convert_diagnostic(err, token_positions, uris));
     }
     
     let params = &PublishDiagnosticsParams{
@@ -333,10 +337,10 @@ fn main_loop(
                         let mut errors = file_cache.linker.files[uuid].parsing_errors.clone();
                         file_cache.linker.get_linking_errors(uuid, &mut errors);
 
-                        println!("Flattening...");
+                        // println!("Flattening...");
                         file_cache.linker.flatten_all_modules_in_file(uuid, &mut errors);
 
-                        println!("Errors: {:?}", &errors);
+                        // println!("Errors: {:?}", &errors);
                         send_errors_warnings(&connection, errors, &token_positions, &file_cache.uris)?;
                     },
                     // TODO ...
