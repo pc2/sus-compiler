@@ -1,13 +1,15 @@
 use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}};
 
-use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference}, arena_alloc::{ArenaAllocator, UUID}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::flatten, util::{const_str_position, const_str_position_in_tuples}};
+use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference}, arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::{flatten, make_initial_flattened, FlattenedInterface, FlattenedModule}, util::{const_str_position, const_str_position_in_tuples}};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NamedUUIDMarker;
+impl UUIDMarker for NamedUUIDMarker {const DISPLAY_NAME : &'static str = "global_";}
 pub type NamedUUID = UUID<NamedUUIDMarker>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FileUUIDMarker;
+impl UUIDMarker for FileUUIDMarker {const DISPLAY_NAME : &'static str = "file_";}
 pub type FileUUID = UUID<FileUUIDMarker>;
 
 const BUILTIN_TYPES : [&'static str; 2] = [
@@ -287,7 +289,7 @@ fn add_error(info_a: &LinkInfo, info_b: &LinkInfo, errors: &ErrorCollector) {
 }
 
 impl Linker {
-    pub fn get_linking_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
+    fn get_linking_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
         let file = &self.files[file_uuid];
 
         // Conflicting Declarations
@@ -326,6 +328,19 @@ impl Linker {
                 }
             }
         }
+    }
+
+    fn get_flattening_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
+        for v in &self.files[file_uuid].associated_values {
+            if let Named::Module(md) = &self.links.globals[*v] {
+                errors.ingest(&md.flattened.errors);
+            }
+        }
+    }
+
+    pub fn get_all_errors_in_file(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
+        self.get_linking_errors(file_uuid, errors);
+        self.get_flattening_errors(file_uuid, errors);
     }
 
     pub fn remove_file_datas(&mut self, files : &[FileUUID]) {
@@ -471,17 +486,45 @@ impl Linker {
         }
     }
 
-    pub fn flatten_all_modules_in_file(&self, file : FileUUID, errors : &ErrorCollector) {
-        for md_uuid in &self.files[file].associated_values {
-            let named = &self.links.globals[*md_uuid];
-            println!("Flattening {}", named.get_name());
-            if let Named::Module(md) = named {
+    pub fn flatten_all_modules(&mut self) {
+        // First create initial flattening for everything, to produce the necessary interfaces
+
+        let mut flattened_vec : Vec<(NamedUUID, FlattenedModule)> = Vec::new();
+        let mut interface_vec : Vec<(NamedUUID, FlattenedInterface)> = Vec::new();
+        for (id, named_object) in &self.links.globals {
+            println!("Initializing Flattening for {}", named_object.get_name());
+            if let Named::Module(md) = named_object {
                 if !md.link_info.is_fully_linked {
                     continue;
                 }
-                let flt = flatten(md, &self, errors);
-                println!("{:?}", flt);
+                
+                let (flt, interface) = make_initial_flattened(md, &self);
+                flattened_vec.push((id, flt));
+                interface_vec.push((id, interface));
             }
+        }
+
+        for (id, interface) in interface_vec {
+            let Named::Module(md) = &mut self.links.globals[id] else {unreachable!()};
+            md.interface = interface;
+        }
+
+        // Then do proper flattening on every module
+        for (id, flattened) in flattened_vec {
+            // println!("Flattening {}", named_object.get_name());
+            let Named::Module(md) = &self.links.globals[id] else {unreachable!()};
+            let new_flattened = flatten(flattened, md, &self);
+            let Named::Module(md) = &mut self.links.globals[id] else {unreachable!()};
+            println!("[[{}]]:", md.link_info.name);
+            println!("\tInstantiations:");
+            for (id, inst) in &new_flattened.instantiations {
+                println!("\t\t{:?}: {:?}", id, inst);
+            }
+            println!("\tConnections:");
+            for conn in &new_flattened.connections {
+                println!("\t\t{:?}", conn);
+            }
+            md.flattened = new_flattened;
         }
     }
 }

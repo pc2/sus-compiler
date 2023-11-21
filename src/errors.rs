@@ -135,4 +135,9 @@ impl ErrorCollector {
     pub fn get(self) -> (Vec<CompileError>, FileUUID) {
         (self.errors.into_inner(), self.file)
     }
+
+    pub fn ingest(&self, source : &Self) {
+        assert!(self.file == source.file);
+        self.errors.borrow_mut().extend_from_slice(&source.errors.borrow());
+    }
 }

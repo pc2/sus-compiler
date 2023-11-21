@@ -227,9 +227,11 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
         paths_arena.insert(uuid, file_path);
     }
 
-    let linker = prelinker.link();
+    let mut linker = prelinker.link();
 
     let mut file_cache : FileCache = Default::default();
+
+    linker.flatten_all_modules();
     
     for (file_uuid, f) in &linker.files {
         print_tokens(&f.file_text, &f.tokens);
@@ -240,9 +242,7 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
         let token_offsets = generate_character_offsets(&f.file_text, &f.tokens);
 
         let mut errors = f.parsing_errors.clone();
-        linker.get_linking_errors(file_uuid, &mut errors);
-
-        linker.flatten_all_modules_in_file(file_uuid, &mut errors);
+        linker.get_all_errors_in_file(file_uuid, &mut errors);
 
         for err in errors.get().0 {
             err.pretty_print_error(f.parsing_errors.file, &token_offsets, &paths_arena, &mut file_cache);

@@ -1,7 +1,7 @@
 
 use num::bigint::BigUint;
 
-use crate::{tokenizer::*, errors::*, ast::*, linker::{FileUUID, NamedUUID}, flattening::{WireID, WireIDMarker}, arena_alloc::ListAllocator};
+use crate::{tokenizer::*, errors::*, ast::*, linker::{FileUUID, NamedUUID}, flattening::{WireID, WireIDMarker, FlattenedModule, FlattenedInterface}, arena_alloc::ListAllocator};
 
 use std::{iter::Peekable, str::FromStr, ops::Range};
 use core::slice::Iter;
@@ -698,7 +698,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             global_references : replace(&mut self.global_references, Vec::new()),
             is_fully_linked : false
         };
-        Some(Module{declarations, code, link_info, flattened : None})
+        Some(Module{declarations, code, link_info, flattened : FlattenedModule::empty(self.errors.file), interface : FlattenedInterface::default()})
     }
 
     fn parse_ast(mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {

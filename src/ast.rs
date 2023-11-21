@@ -1,7 +1,7 @@
 
 use num::bigint::BigUint;
 
-use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::{FlattenedModule, WireIDMarker, WireID, OutsideWireID}, arena_alloc::ListAllocator, typing::Type};
+use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::{FlattenedModule, WireIDMarker, WireID, FlattenedInterface}, arena_alloc::ListAllocator};
 use core::ops::Range;
 use std::fmt::Display;
 
@@ -119,14 +119,8 @@ pub struct CodeBlock {
 }
 
 #[derive(Debug)]
-pub struct Bound {
-    max : SpanExpression
-}
-
-#[derive(Debug)]
 pub enum Statement {
     Declaration(WireID),
-    AssumeBound{to : SpanAssignableExpression, bound : Bound},
     Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : SpanExpression}, // num_regs v = expr;
     If{condition : SpanExpression, then : CodeBlock, els : Option<CodeBlock>},
     Block(CodeBlock),
@@ -150,36 +144,8 @@ pub struct Module {
     pub declarations : ListAllocator<SignalDeclaration, WireIDMarker>,
     pub code : CodeBlock,
 
-    pub flattened : Option<FlattenedModule>
-}
-
-impl Module {
-    pub fn get_function_sugar_inputs_outputs(&self) -> (Vec<(OutsideWireID, Type)>, Vec<(OutsideWireID, Type)>) {
-        let mut inputs = Vec::new();
-        let mut outputs = Vec::new();
-        let mut last_was_output = true;
-        for (id, decl) in &self.declarations {
-            let typ = decl.typ.0.map_to_type(&self.link_info.global_references);
-            match decl.identifier_type {
-                IdentifierType::Input => {
-                    if last_was_output {
-                        inputs.clear();
-                    }
-                    inputs.push((OutsideWireID(id), typ));
-                    outputs.clear();
-                    last_was_output = false;
-                }
-                IdentifierType::Output => {
-                    outputs.push((OutsideWireID(id), typ));
-                    last_was_output = true;
-                }
-                IdentifierType::Local | IdentifierType::State => {
-                    break;
-                }
-            }
-        }
-        (inputs, outputs)
-    }
+    pub interface : FlattenedInterface,
+    pub flattened : FlattenedModule
 }
 
 #[derive(Debug,Clone,Copy)]
@@ -247,10 +213,6 @@ impl IterIdentifiers for CodeBlock {
     fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
         for (stmt, _span) in &self.statements {
             match stmt {
-                Statement::AssumeBound{to, bound} => {
-                    to.for_each_value(func);
-                    bound.max.for_each_value(func);
-                }
                 Statement::Assign{to, eq_sign_position : _, expr} => {
                     for assign_to in to {
                         assign_to.expr.for_each_value(func);

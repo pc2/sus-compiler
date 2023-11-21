@@ -36,6 +36,7 @@ impl LoadedFileCache {
         } else {
             self.linker.relink(file_uuid, full_parse, parsing_errors);
         }
+        self.linker.flatten_all_modules();
     }
     fn ensure_contains_file(&mut self, uri : &Url) -> FileUUID {
         if let Some(found) = self.find_uri(uri) {
@@ -46,6 +47,7 @@ impl LoadedFileCache {
             let (full_parse, parsing_errors) = perform_full_semantic_parse(file_text, file_uuid);
             self.linker.add_reserved_file(file_uuid, full_parse, parsing_errors);
             self.uris.insert(file_uuid, uri.clone());
+            self.linker.flatten_all_modules();
             file_uuid
         }
     }
@@ -334,11 +336,11 @@ fn main_loop(
                             id: req.id, result: Some(result), error: None
                         }))?;
 
-                        let mut errors = file_cache.linker.files[uuid].parsing_errors.clone();
-                        file_cache.linker.get_linking_errors(uuid, &mut errors);
-
                         // println!("Flattening...");
-                        file_cache.linker.flatten_all_modules_in_file(uuid, &mut errors);
+                        file_cache.linker.flatten_all_modules();
+
+                        let mut errors = file_cache.linker.files[uuid].parsing_errors.clone();
+                        file_cache.linker.get_all_errors_in_file(uuid, &mut errors);
 
                         // println!("Errors: {:?}", &errors);
                         send_errors_warnings(&connection, errors, &token_positions, &file_cache.uris)?;
