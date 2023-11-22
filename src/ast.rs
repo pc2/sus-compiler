@@ -1,7 +1,7 @@
 
 use num::bigint::BigUint;
 
-use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::{FlattenedModule, WireIDMarker, WireID, FlattenedInterface}, arena_alloc::ListAllocator};
+use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::{FlattenedModule, FlatIDMarker, FlatID, FlattenedInterface}, arena_alloc::ListAllocator};
 use core::ops::Range;
 use std::fmt::Display;
 
@@ -43,7 +43,7 @@ impl From<usize> for Span {
 
 #[derive(Debug, Clone, Copy)]
 pub enum LocalOrGlobal {
-    Local(WireID),
+    Local(FlatID),
     Global(usize)
 }
 
@@ -103,7 +103,7 @@ pub type SpanStatement = (Statement, Span);
 
 #[derive(Debug)]
 pub enum AssignableExpression {
-    Named{local_idx : WireID},
+    Named{local_idx : FlatID},
     ArrayIndex(Box<(SpanAssignableExpression, SpanExpression)>)
 }
 
@@ -120,7 +120,7 @@ pub struct CodeBlock {
 
 #[derive(Debug)]
 pub enum Statement {
-    Declaration(WireID),
+    Declaration(FlatID),
     Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : SpanExpression}, // num_regs v = expr;
     If{condition : SpanExpression, then : CodeBlock, els : Option<CodeBlock>},
     Block(CodeBlock),
@@ -141,7 +141,7 @@ pub struct LinkInfo {
 pub struct Module {
     pub link_info : LinkInfo,
 
-    pub declarations : ListAllocator<SignalDeclaration, WireIDMarker>,
+    pub declarations : ListAllocator<SignalDeclaration, FlatIDMarker>,
     pub code : CodeBlock,
 
     pub interface : FlattenedInterface,

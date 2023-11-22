@@ -1,6 +1,6 @@
 use std::{ops::Deref, io};
 
-use crate::{linker::Linker, flattening::{FlattenedModule, WireID}, ast::{Module, Span}, arena_alloc::ListAllocator};
+use crate::{linker::Linker, flattening::{FlattenedModule, FlatID}, ast::{Module, Span}, arena_alloc::ListAllocator};
 
 
 use moore_circt::{hw, comb, mlir::{self, Owned, builder, OperationExt, SingleBlockOp}, mlir::{Context, OwnedContext, DialectHandle, Builder, Value, Type}};

@@ -7,19 +7,19 @@ use crate::{
 };
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
-pub struct WireIDMarker;
-impl UUIDMarker for WireIDMarker {const DISPLAY_NAME : &'static str = "wire_";}
-pub type WireID = UUID<WireIDMarker>;
+pub struct FlatIDMarker;
+impl UUIDMarker for FlatIDMarker {const DISPLAY_NAME : &'static str = "obj_";}
+pub type FlatID = UUID<FlatIDMarker>;
 
-pub type SpanWireID = (WireID, Span);
+pub type SpanFlatID = (FlatID, Span);
 
 pub type FieldID = usize;
 
 // These are assignable connections
 #[derive(Debug)]
 pub enum ConnectionWrite {
-    Local(WireID),
-    ArrayIdx(Box<(SpanConnectionWrite, SpanWireID)>),
+    Local(FlatID),
+    ArrayIdx(Box<(SpanConnectionWrite, SpanFlatID)>),
     StructField(Box<(SpanConnectionWrite, FieldID)>)
 }
 
@@ -29,10 +29,10 @@ pub type SpanConnectionWrite = (ConnectionWrite, Span);
 pub enum Instantiation {
     SubModule{typ : Type, typ_span : Span},
     PlainWire{typ : Type, typ_span : Span},
-    ExtractWire{typ : Type, extract_from : WireID, field : FieldID},
-    UnaryOp{typ : Type, op : Operator, right : SpanWireID},
-    BinaryOp{typ : Type, op : Operator, left : SpanWireID, right : SpanWireID},
-    ArrayAccess{typ : Type, arr : SpanWireID, arr_idx : SpanWireID},
+    ExtractWire{typ : Type, extract_from : FlatID, field : FieldID},
+    UnaryOp{typ : Type, op : Operator, right : SpanFlatID},
+    BinaryOp{typ : Type, op : Operator, left : SpanFlatID, right : SpanFlatID},
+    ArrayAccess{typ : Type, arr : SpanFlatID, arr_idx : SpanFlatID},
     Constant{typ : Type, value : Value},
     Error
 }
@@ -55,13 +55,13 @@ impl Instantiation {
 #[derive(Debug)]
 pub struct Connection {
     pub num_regs : u32,
-    pub from : SpanWireID,
+    pub from : SpanFlatID,
     pub to : SpanConnectionWrite,
-    pub condition : WireID
+    pub condition : FlatID
 }
 
 struct FlatteningContext<'l, 'm> {
-    instantiations : ListAllocator<Instantiation, WireIDMarker>,
+    instantiations : ListAllocator<Instantiation, FlatIDMarker>,
     connections : Vec<Connection>,
     errors : ErrorCollector,
 
@@ -70,7 +70,7 @@ struct FlatteningContext<'l, 'm> {
 }
 
 impl<'l, 'm> FlatteningContext<'l, 'm> {
-    fn typecheck(&self, wire : SpanWireID, expected : &Type, context : &str) -> Option<()> {
+    fn typecheck(&self, wire : SpanFlatID, expected : &Type, context : &str) -> Option<()> {
         let found = self.instantiations[wire.0].get_type();
         typecheck(found, wire.1, expected, context, self.linker, &self.errors)
     }
@@ -83,7 +83,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
             TypeExpression::Array(b) => {
                 let (array_type_expr, array_size_expr) = b.deref();
                 let array_element_type = self.map_to_type(array_type_expr, global_references)?;
-                let array_size_wire = self.flatten_single_expr(array_size_expr, WireID::INVALID)?;
+                let array_size_wire = self.flatten_single_expr(array_size_expr, FlatID::INVALID)?;
                 Some(Type::Array(Box::new((array_element_type, array_size_wire.0))))
             },
         }
@@ -133,7 +133,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
 
         Some(())
     }
-    fn desugar_func_call(&mut self, func_and_args : &[SpanExpression], closing_bracket_pos : usize, condition : WireID) -> Option<(&'l Module, WireID, Range<FieldID>)> {
+    fn desugar_func_call(&mut self, func_and_args : &[SpanExpression], closing_bracket_pos : usize, condition : FlatID) -> Option<(&'l Module, FlatID, Range<FieldID>)> {
         let (name_expr, name_expr_span) = &func_and_args[0]; // Function name is always there
         let func_instantiation = match name_expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {
@@ -184,7 +184,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
 
         Some((md, func_instantiation, output_range))
     }
-    fn flatten_single_expr(&mut self, (expr, expr_span) : &SpanExpression, condition : WireID) -> Option<SpanWireID> {
+    fn flatten_single_expr(&mut self, (expr, expr_span) : &SpanExpression, condition : FlatID) -> Option<SpanFlatID> {
         let single_connection_side = match expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {
                 *l
@@ -238,7 +238,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
         };
         Some((single_connection_side, *expr_span))
     }
-    fn flatten_assignable_expr(&mut self, (expr, span) : &SpanAssignableExpression, condition : WireID) -> Option<SpanConnectionWrite> {
+    fn flatten_assignable_expr(&mut self, (expr, span) : &SpanAssignableExpression, condition : FlatID) -> Option<SpanConnectionWrite> {
         Some((match expr {
             AssignableExpression::Named{local_idx} => {
                 ConnectionWrite::Local(*local_idx)
@@ -253,8 +253,8 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
             }
         }, *span))
     }
-    fn extend_condition(&mut self, condition : WireID, additional_condition : SpanWireID) -> WireID {
-        if condition == WireID::INVALID {
+    fn extend_condition(&mut self, condition : FlatID, additional_condition : SpanFlatID) -> FlatID {
+        if condition == FlatID::INVALID {
             additional_condition.0
         } else {
             let bool_typ = Type::Named(get_builtin_uuid("bool"));
@@ -262,7 +262,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
             self.instantiations.alloc(Instantiation::BinaryOp{typ : bool_typ, op: Operator{op_typ : kw("&")}, left : (condition, additional_condition.1), right : additional_condition})
         }
     }
-    fn flatten_code(&mut self, code : &CodeBlock, condition : WireID) {
+    fn flatten_code(&mut self, code : &CodeBlock, condition : FlatID) {
         for (stmt, stmt_span) in &code.statements {
             match stmt {
                 Statement::Declaration(local_id) => {
@@ -388,14 +388,14 @@ pub fn flatten(flattened : FlattenedModule, module : &Module, linker : &Linker) 
         module,
         linker,
     };
-    context.flatten_code(&module.code, WireID::INVALID);
+    context.flatten_code(&module.code, FlatID::INVALID);
 
     FlattenedModule{instantiations: context.instantiations, connections: context.connections, errors : context.errors}
 }
 
 #[derive(Debug)]
 pub struct FlattenedInterfacePort {
-    wire_id : WireID,
+    wire_id : FlatID,
     is_input : bool,
     typ : Type,
     port_name : Box<str>,
@@ -434,7 +434,7 @@ impl FlattenedInterface {
 
 #[derive(Debug)]
 pub struct FlattenedModule {
-    pub instantiations : ListAllocator<Instantiation, WireIDMarker>,
+    pub instantiations : ListAllocator<Instantiation, FlatIDMarker>,
     pub connections : Vec<Connection>,
     pub errors : ErrorCollector
 }

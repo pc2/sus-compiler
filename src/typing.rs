@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{ast::{Value, Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::WireID, errors::ErrorCollector};
+use crate::{ast::{Value, Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector};
 
 // Types contain everything that cannot be expressed at runtime
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -10,7 +10,7 @@ pub enum Type {
     but doesn't actually take size into account for type checking as that would
     make type checking too difficult. Instead delay until proper instantiation
     to check array sizes, as then we have concrete numbers*/
-    Array(Box<(Type, WireID)>)
+    Array(Box<(Type, FlatID)>)
 }
 
 impl Type {
