@@ -5,7 +5,6 @@ use std::{ops::Range, path::{Path, PathBuf}, cell::RefCell};
 use crate::{ast::Span, linker::{FileUUID, FileUUIDMarker}, arena_alloc::ArenaVector};
 use ariadne::*;
 
-
 use crate::tokenizer::{TokenTypeIdx, get_token_type_name};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
@@ -105,6 +104,7 @@ pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
 
 // Class that collects and manages errors and warnings
 // Implemented such that it can be shared immutably. This makes many operations to do with parsing easier
+// It doesn't allow indexing, so no immutable references to contents can exist
 #[derive(Debug,Clone)]
 pub struct ErrorCollector {
     errors : RefCell<Vec<CompileError>>,

@@ -2,7 +2,15 @@ use std::{cell::{UnsafeCell, Cell}, mem::MaybeUninit, ops::{DerefMut, Deref, Ind
 
 
 
-/* Has the property that appends don't move other elements. References are always preserved, therefore append is const */
+/* 
+    Has the property that appends don't move other elements. References are always preserved, therefore append is const 
+
+    Critically, alloc takes a CONST self, because using this will not invalidate any references derived from this
+    However, IndexMut still requires a mutable reference, since we can edit any arbitrary element, and the compiler can't check for overlap there
+
+    The const iterator exists, though it is not recommended to append elements while iterating over it. The const iterator would continue even onto newer elements
+    Existence of the mutable iterator disallows updating the container of course
+*/
 #[derive(Debug,Default)]
 pub struct BlockVec<T, const BLOCK_SIZE : usize = 64> {
     blocks : UnsafeCell<Vec<Box<[MaybeUninit<T>; BLOCK_SIZE]>>>,
@@ -14,11 +22,6 @@ impl<T, const BLOCK_SIZE : usize> BlockVec<T, BLOCK_SIZE> {
         Self{blocks : UnsafeCell::new(Vec::new()), length : Cell::new(0)}
     }
 
-    /*
-        Critically, takes a CONST self, because using this will not invalidate any references derived from this
-        However, IndexMut still requires a mutable reference, since we can edit any arbitrary element. 
-        Because it would conflict with this function, this class does not provide an immutable iterator. 
-    */ 
     pub fn alloc(&self, obj : T) -> usize {
         let b = self.blocks.get();
 
@@ -45,6 +48,14 @@ impl<T, const BLOCK_SIZE : usize> BlockVec<T, BLOCK_SIZE> {
         self.length.set(allocated_id + 1);
 
         allocated_id
+    }
+
+    pub fn iter<'s>(&'s self) -> BlockVecIter<'s, T, BLOCK_SIZE> {
+        self.into_iter()
+    }
+
+    pub fn iter_mut<'s>(&'s mut self) -> BlockVecIterMut<'s, T, BLOCK_SIZE> {
+        self.into_iter()
     }
 }
 
@@ -98,7 +109,41 @@ impl<T, const BLOCK_SIZE : usize> IndexMut<usize> for BlockVec<T, BLOCK_SIZE> {
     }
 }
 
-pub struct BlockVecIterMut<'bv, T, const BLOCK_SIZE : usize> {
+
+pub struct BlockVecIter<'bv, T, const BLOCK_SIZE : usize = 64> {
+    block_vec : &'bv BlockVec<T, BLOCK_SIZE>,
+    cur_idx : usize
+}
+
+impl<'bv, T, const BLOCK_SIZE : usize> Iterator for BlockVecIter<'bv, T, BLOCK_SIZE> {
+    type Item = &'bv T;
+
+    fn next(&mut self) -> Option<&'bv T> {
+        if self.cur_idx < self.block_vec.length.get() {
+            let selected_idx = self.cur_idx;
+            self.cur_idx += 1;
+            
+            Some(&self.block_vec[selected_idx])
+        } else {
+            return None;
+        }
+    }
+}
+
+impl<'bv, T, const BLOCK_SIZE : usize> IntoIterator for &'bv BlockVec<T, BLOCK_SIZE> {
+    type Item = &'bv T;
+
+    type IntoIter = BlockVecIter<'bv, T, BLOCK_SIZE>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        BlockVecIter{
+            block_vec : self,
+            cur_idx : 0
+        }
+    }
+}
+
+pub struct BlockVecIterMut<'bv, T, const BLOCK_SIZE : usize = 64> {
     block_vec_iter : <&'bv mut Vec<Box<[MaybeUninit<T>; BLOCK_SIZE]>> as IntoIterator>::IntoIter,
     current_block : std::slice::IterMut<'bv, MaybeUninit<T>>,
     remaining : usize
@@ -139,7 +184,7 @@ impl<'bv, T, const BLOCK_SIZE : usize> IntoIterator for &'bv mut BlockVec<T, BLO
     }
 }
 
-pub struct BlockVecConsumingIter<T, const BLOCK_SIZE : usize> {
+pub struct BlockVecConsumingIter<T, const BLOCK_SIZE : usize = 64> {
     block_vec_iter : <Vec<Box<[MaybeUninit<T>; BLOCK_SIZE]>> as IntoIterator>::IntoIter,
     current_block : Option<Box<[MaybeUninit<T>; BLOCK_SIZE]>>,
     current_idx : usize,
@@ -188,5 +233,15 @@ impl<T, const BLOCK_SIZE : usize> IntoIterator for BlockVec<T, BLOCK_SIZE> {
 impl<T, const BLOCK_SIZE : usize> Drop for BlockVecConsumingIter<T, BLOCK_SIZE> {
     fn drop(&mut self) {
         while let Some(_) = self.next() {} // Automatically drops all remaining elements of the iterator
+    }
+}
+
+impl<'bv, T, const BLOCK_SIZE : usize> FromIterator<T> for BlockVec<T, BLOCK_SIZE> {
+    fn from_iter<Iter: IntoIterator<Item = T>>(iter: Iter) -> Self {
+        let new_coll = BlockVec::new();
+        for v in iter {
+            new_coll.alloc(v);
+        }
+        new_coll
     }
 }

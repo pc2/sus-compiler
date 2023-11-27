@@ -1,6 +1,4 @@
 
-module hello_from_the_other_side : int a -> int result {
-	if true {
-		result = a;
-	}
+module hello_from_the_other_side : int[3] a -> int result {
+	result = a[2];
 }

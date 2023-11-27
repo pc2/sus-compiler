@@ -110,7 +110,7 @@ module packer : T[256] data /* v _ _ _ */ -> T[64] out { /* v v v v */
 }
 
 
-module multiply_add : i32 a, i32 b, i32 c -> i32 result, double double_result {
+module multiply_add_old : i32 a, i32 b, i32 c -> i32 result, double double_result {
 	i32 tmp = a * b;
 	reg result = tmp + c;
 	reg double_result = cvt_to_double(result);
@@ -200,14 +200,35 @@ module b: HandShake hs -> {
 
 
 
+module multiply_add : 
+	int a,
+	int b,
+	int c
+	-> int total {
 
+	reg int tmp = a * b;
+	total = tmp + c;
+}
 
+//timeline (v, true -> /) .. (v, false -> v)*
+module blur2 : 
+	int data,
+	bool first
+	-> int blurred {
+	
+	state int prev;
+
+	if !first {
+		blurred = data + prev;
+	}
+	prev = data;
+}
 
 
 module Tree_Multiply : int[4] values -> int total {
-    int a = values[0] * values[1];
+    reg int a = values[0] * values[1];
 	int b = values[2] * values[3];
-	reg total = a * b;
+	total = a * b;
 }
 
 
@@ -221,8 +242,7 @@ module Accumulator : int term, bool done -> int total {
     int new_tot = tot + term;
     if done {
         total = new_tot;
-        tot = 0;
-        //finish; // packet is hereby finished. 
+        tot = 0; // Must restore initial conditions
     } else {
         tot = new_tot;
     }
@@ -265,4 +285,64 @@ module Unpack4 : int[4] packed -> int out_stream {
         st = 0; // Must restore initial conditions
         //finish; // packet is hereby finished. 
     }
+}
+
+
+
+
+//timeline (bs -> /, true) | (bs -> v, false)
+module first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros {
+	if bits[0] {
+		first = 0;
+		all_zeros = false;
+	} else if bits[1] {
+		first = 1;
+		all_zeros = false;
+	} else if bits[2] {
+		first = 2;
+		all_zeros = false;
+	} else if bits[3] {
+		first = 3;
+		all_zeros = false;
+	} else if bits[4] {
+		first = 4;
+		all_zeros = false;
+	} else if bits[5] {
+		first = 5;
+		all_zeros = false;
+	} else {
+		all_zeros = true;
+	}
+}
+
+module first_bit_idx_24 : bool[24] bits -> int first {
+	int[4] offsets;
+	bool[4] was_nonzero;
+
+	for i in 0..4 {
+		offsets[i], was_nonzero[i] = first_bit_idx_6(bits[i*6+:6]);
+	}
+}
+
+module permute : bool[128] mbf, int selected_permutation -> bool[128] permuted_mbf {
+	// TODO
+}
+
+//timeline (X, [false;24], true -> /, false) | (X, vs, true -> X, true) .. (/, /, false -> X, true)*
+module permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid {
+	state bool[128] stored_mbf;
+	state bool[24] stored_valid_permutes = 000000000000000000000000;
+
+
+	bool[24] permutes_to_keep;
+	permutes_to_keep[0] = false;
+	for i in 1..24 {
+		permutes_to_keep[i] = permutes_to_keep[i-1] | stored_valid_permutes[i-1];
+	}
+
+	int current_permutation_idx = first_bit_idx_24(permutes_to_keep);
+	
+	stored_valid_permutes = stored_valid_permutes & permutes_to_keep;
+
+	permuted_out = permute(stored_mbf, current_permutation_idx);
 }

@@ -1,6 +1,6 @@
-use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}};
+use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}, rc::Rc};
 
-use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference}, arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::{flatten, make_initial_flattened, FlattenedInterface, FlattenedModule}, util::{const_str_position, const_str_position_in_tuples}};
+use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference}, arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::{flatten, make_initial_flattened, FlattenedInterface, FlattenedModule}, util::{const_str_position, const_str_position_in_tuples}, instantiation::InstantiatedModule};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NamedUUIDMarker;
@@ -334,6 +334,7 @@ impl Linker {
         for v in &self.files[file_uuid].associated_values {
             if let Named::Module(md) = &self.links.globals[*v] {
                 errors.ingest(&md.flattened.errors);
+                md.instantiations.collect_errors(errors);
             }
         }
     }
@@ -447,6 +448,9 @@ impl Linker {
     }
 
     pub fn get_constant(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &ErrorCollector) -> Option<Value> {
+        if uuid == UUID::INVALID {
+            return None; // Error reporting already handled by linking
+        }
         match &self.links.globals[uuid] {
             Named::Constant(NamedConstant::Builtin(_name, v)) => {
                 Some(v.clone())
@@ -467,6 +471,9 @@ impl Linker {
     }
 
     pub fn get_module(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &ErrorCollector) -> Option<&Module> {
+        if uuid == UUID::INVALID {
+            return None; // Error reporting already handled by linking
+        }
         match &self.links.globals[uuid] {
             Named::Module(md) => {
                 Some(md)
@@ -494,10 +501,8 @@ impl Linker {
         for (id, named_object) in &self.links.globals {
             println!("Initializing Flattening for {}", named_object.get_name());
             if let Named::Module(md) = named_object {
-                if !md.link_info.is_fully_linked {
-                    continue;
-                }
-                
+                // Do initial flattening for ALL modules, regardless of linking errors, to get proper interface
+                // if !md.link_info.is_fully_linked {continue;}
                 let (flt, interface) = make_initial_flattened(md, &self);
                 flattened_vec.push((id, flt));
                 interface_vec.push((id, interface));
@@ -509,11 +514,16 @@ impl Linker {
             md.interface = interface;
         }
 
+        let mut to_instantiate_vec : Vec<NamedUUID> = Vec::new();
+
         // Then do proper flattening on every module
         for (id, flattened) in flattened_vec {
             // println!("Flattening {}", named_object.get_name());
             let Named::Module(md) = &self.links.globals[id] else {unreachable!()};
+            // Do check for linking errors when generating code, as this could cause the compiler to error
+            if !md.link_info.is_fully_linked {continue;}
             let new_flattened = flatten(flattened, md, &self);
+
             let Named::Module(md) = &mut self.links.globals[id] else {unreachable!()};
             println!("[[{}]]:", md.link_info.name);
             println!("\tInstantiations:");
@@ -525,6 +535,18 @@ impl Linker {
                 println!("\t\t{:?}", conn);
             }
             md.flattened = new_flattened;
+            to_instantiate_vec.push(id);
         }
+
+        for id in to_instantiate_vec {
+            self.instantiate(id);
+        }
+    }
+
+    pub fn instantiate(&self, module_id : NamedUUID) -> Rc<InstantiatedModule> {
+        let Named::Module(md) = &self.links.globals[module_id] else {panic!("{module_id:?} is not a Module!")};
+        println!("Instantiating {}", md.link_info.name);
+
+        md.instantiations.instantiate(&md.flattened, self)
     }
 }

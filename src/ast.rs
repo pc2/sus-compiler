@@ -1,13 +1,20 @@
 
 use num::bigint::BigUint;
 
-use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::{FlattenedModule, FlatIDMarker, FlatID, FlattenedInterface}, arena_alloc::ListAllocator};
+use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::{FlattenedModule, FlattenedInterface}, arena_alloc::{ListAllocator, UUIDMarker, UUID}, instantiation::InstantiationList};
 use core::ops::Range;
 use std::fmt::Display;
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub struct Span(pub usize, pub usize);
+
+
+#[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
+pub struct DeclIDMarker;
+impl UUIDMarker for DeclIDMarker {const DISPLAY_NAME : &'static str = "obj_";}
+pub type DeclID = UUID<DeclIDMarker>;
+
 
 impl Span {
     pub fn to_range<T : Clone>(&self, tokens : &[Range<T>]) -> Range<T> {
@@ -43,7 +50,7 @@ impl From<usize> for Span {
 
 #[derive(Debug, Clone, Copy)]
 pub enum LocalOrGlobal {
-    Local(FlatID),
+    Local(DeclID),
     Global(usize)
 }
 
@@ -87,7 +94,7 @@ pub enum Expression {
     Constant(Value),
     UnaryOp(Box<(Operator, usize/*Operator token */, SpanExpression)>),
     BinOp(Box<(SpanExpression, Operator, usize/*Operator token */, SpanExpression)>),
-    Array(Box<(SpanExpression, SpanExpression)>), // first[second]
+    Array(Box<(SpanExpression, SpanExpression, Span/*Brackets */)>), // first[second]
     FuncCall(Vec<SpanExpression>) // first(second, third, ...)
 }
 
@@ -103,8 +110,8 @@ pub type SpanStatement = (Statement, Span);
 
 #[derive(Debug)]
 pub enum AssignableExpression {
-    Named{local_idx : FlatID},
-    ArrayIndex(Box<(SpanAssignableExpression, SpanExpression)>)
+    Named{local_idx : DeclID},
+    ArrayIndex(Box<(SpanAssignableExpression, SpanExpression, Span/* Brackets */)>)
 }
 
 #[derive(Debug)]
@@ -120,7 +127,7 @@ pub struct CodeBlock {
 
 #[derive(Debug)]
 pub enum Statement {
-    Declaration(FlatID),
+    Declaration(DeclID),
     Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : SpanExpression}, // num_regs v = expr;
     If{condition : SpanExpression, then : CodeBlock, els : Option<CodeBlock>},
     Block(CodeBlock),
@@ -141,11 +148,13 @@ pub struct LinkInfo {
 pub struct Module {
     pub link_info : LinkInfo,
 
-    pub declarations : ListAllocator<SignalDeclaration, FlatIDMarker>,
+    pub declarations : ListAllocator<SignalDeclaration, DeclIDMarker>,
     pub code : CodeBlock,
 
     pub interface : FlattenedInterface,
-    pub flattened : FlattenedModule
+    pub flattened : FlattenedModule,
+
+    pub instantiations : InstantiationList
 }
 
 #[derive(Debug,Clone,Copy)]
@@ -184,7 +193,7 @@ impl IterIdentifiers for SpanExpression {
                 }
             }
             Expression::Array(b) => {
-                let (array, idx) = &**b;
+                let (array, idx, bracket_span) = &**b;
                 array.for_each_value(func);
                 idx.for_each_value(func);
             }
@@ -201,7 +210,7 @@ impl IterIdentifiers for SpanAssignableExpression {
                 func(LocalOrGlobal::Local(*id), span.0);
             }
             AssignableExpression::ArrayIndex(b) => {
-                let (array, idx) = &**b;
+                let (array, idx, bracket_span) = &**b;
                 array.for_each_value(func);
                 idx.for_each_value(func);
             }

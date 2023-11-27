@@ -6,6 +6,7 @@ mod parser;
 mod errors;
 mod ast;
 mod flattening;
+mod instantiation;
 
 #[cfg(feature = "codegen")]
 mod codegen;

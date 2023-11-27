@@ -1,9 +1,9 @@
 use std::{ops::{Deref, Range}, iter::zip};
 
 use crate::{
-    ast::{Span, Value, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, IdentifierType, GlobalReference, TypeExpression},
-    linker::{Linker, Named, Linkable, get_builtin_uuid, FileUUID},
-    errors::{ErrorCollector, error_info}, arena_alloc::{ListAllocator, UUID, UUIDMarker}, tokenizer::kw, typing::{Type, typecheck_unary_operator, get_binary_operator_types, typecheck, typecheck_is_array_indexer}
+    ast::{Span, Value, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, IdentifierType, GlobalReference, TypeExpression, DeclIDMarker},
+    linker::{Linker, Named, Linkable, get_builtin_uuid, FileUUID, NamedUUID},
+    errors::{ErrorCollector, error_info}, arena_alloc::{ListAllocator, UUID, UUIDMarker}, tokenizer::kw, typing::{Type, typecheck_unary_operator, get_binary_operator_types, typecheck, typecheck_is_array_indexer}, block_vector::BlockVec
 };
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
@@ -15,21 +15,30 @@ pub type SpanFlatID = (FlatID, Span);
 
 pub type FieldID = usize;
 
-// These are assignable connections
 #[derive(Debug)]
-pub enum ConnectionWrite {
-    Local(FlatID),
-    ArrayIdx(Box<(SpanConnectionWrite, SpanFlatID)>),
-    StructField(Box<(SpanConnectionWrite, FieldID)>)
+pub enum ConnectionWritePathElement {
+    ArrayIdx(SpanFlatID),
+    //StructField(FieldID)
 }
 
-pub type SpanConnectionWrite = (ConnectionWrite, Span);
+// These are assignable connections
+#[derive(Debug)]
+pub struct ConnectionWrite {
+    pub root : FlatID,
+    pub path : Vec<ConnectionWritePathElement>,
+    pub span : Span
+}
+
+impl ConnectionWrite {
+    pub fn simple(root : FlatID, span : Span) -> ConnectionWrite {
+        ConnectionWrite { root, path: Vec::new(), span }
+    }
+}
 
 #[derive(Debug)]
 pub enum Instantiation {
-    SubModule{typ : Type, typ_span : Span},
+    SubModule{module_uuid : NamedUUID, typ_span : Span, interface_wires : Vec<FlatID>},
     PlainWire{typ : Type, typ_span : Span},
-    ExtractWire{typ : Type, extract_from : FlatID, field : FieldID},
     UnaryOp{typ : Type, op : Operator, right : SpanFlatID},
     BinaryOp{typ : Type, op : Operator, left : SpanFlatID, right : SpanFlatID},
     ArrayAccess{typ : Type, arr : SpanFlatID, arr_idx : SpanFlatID},
@@ -40,9 +49,8 @@ pub enum Instantiation {
 impl Instantiation {
     pub fn get_type(&self) -> &Type {
         match self {
-            Instantiation::SubModule{typ, typ_span : _} => typ,
+            Instantiation::SubModule{module_uuid : _, typ_span : _, interface_wires : _} => panic!("This is not a struct!"),
             Instantiation::PlainWire{typ, typ_span : _} => typ,
-            Instantiation::ExtractWire{typ, extract_from : _, field : _} => typ,
             Instantiation::UnaryOp{typ, op : _, right : _} => typ,
             Instantiation::BinaryOp{typ, op : _, left : _, right : _} => typ,
             Instantiation::ArrayAccess{typ, arr : _, arr_idx : _} => typ,
@@ -56,13 +64,14 @@ impl Instantiation {
 pub struct Connection {
     pub num_regs : u32,
     pub from : SpanFlatID,
-    pub to : SpanConnectionWrite,
+    pub to : ConnectionWrite,
     pub condition : FlatID
 }
 
 struct FlatteningContext<'l, 'm> {
     instantiations : ListAllocator<Instantiation, FlatIDMarker>,
-    connections : Vec<Connection>,
+    connections : BlockVec<Connection>,
+    decl_to_flat_map : ListAllocator<FlatID, DeclIDMarker>,
     errors : ErrorCollector,
 
     linker : &'l Linker,
@@ -74,10 +83,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
         let found = self.instantiations[wire.0].get_type();
         typecheck(found, wire.1, expected, context, self.linker, &self.errors)
     }
-    fn typecheck_is_array_indexer<'a>(&self, arr_type : &'a Type, span : Span) -> Option<&'a Type> {
-        typecheck_is_array_indexer(arr_type, span, self.linker, &self.errors)
-    }
-    pub fn map_to_type(&mut self, type_expr : &TypeExpression, global_references : &[GlobalReference]) -> Option<Type> {
+    pub fn map_to_type(&self, type_expr : &TypeExpression, global_references : &[GlobalReference]) -> Option<Type> {
         match type_expr {
             TypeExpression::Named(n) => Some(Type::Named(global_references[*n].1)),
             TypeExpression::Array(b) => {
@@ -90,67 +96,55 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
     }
     // May also error, for example when array accesses happen on non-array types
     fn get_connectionwrite_type(&self, cw : &ConnectionWrite) -> Option<&Type> {
-        match cw {
-            ConnectionWrite::Local(id) => Some(self.instantiations[*id].get_type()),
-            ConnectionWrite::ArrayIdx(arr_box) => {
-                let (arr, arr_idx) = arr_box.deref();
-
-                let index_was_int = self.typecheck(*arr_idx, &Type::Named(get_builtin_uuid("int")), "array index");
-
-                let arr_type = self.get_connectionwrite_type(&arr.0)?;
-                let arr_content_type = self.typecheck_is_array_indexer(&arr_type, arr.1)?;
-
-                index_was_int?; // Do both for better typechecking diagnostics
-                Some(arr_content_type)
-            },
-            ConnectionWrite::StructField(struct_field_box) => {
-                let ((struct_or_instance, struct_or_instance_span), outside_field) = struct_field_box.deref();
-
-                let ConnectionWrite::Local(id) = struct_or_instance else {todo!()};
-
-                let Instantiation::SubModule{typ : Type::Named(instantiation), typ_span} = &self.instantiations[*id] else {todo!()};
-
-                let Named::Module(found) = &self.linker.links[*instantiation] else {panic!("Instantiation must be module!")};
-
-                let port_decl = &found.interface.interface_wires[*outside_field];
-
-                if !port_decl.is_input {
-                    let field_decl_info = error_info(port_decl.span, found.link_info.file, "Output Defined Here");
-                    self.errors.error_with_info(*struct_or_instance_span, "Cannot write to output of submodule!", vec![field_decl_info]);
-                    return None;
+        let mut current_type = self.instantiations[cw.root].get_type();
+        for p in &cw.path {
+            match p {
+                ConnectionWritePathElement::ArrayIdx(idx) => {
+                    let index_was_int = self.typecheck(*idx, &Type::Named(get_builtin_uuid("int")), "array index");
+                    current_type = typecheck_is_array_indexer(current_type, idx.1, self.linker, &self.errors)?;
+                    index_was_int?;
                 }
-
-                Some(&port_decl.typ)
-            },
+            }
         }
+        Some(current_type)
     }
-    fn create_connection(&mut self, connection : Connection) -> Option<()> {
-        let expected_type = self.get_connectionwrite_type(&connection.to.0)?;
+    fn create_connection(&self, connection : Connection) -> Option<()> {
+        let expected_type = self.get_connectionwrite_type(&connection.to)?;
 
         self.typecheck(connection.from, &expected_type, "connection")?;
 
-        self.connections.push(connection);
+        self.connections.alloc(connection);
 
         Some(())
     }
-    fn desugar_func_call(&mut self, func_and_args : &[SpanExpression], closing_bracket_pos : usize, condition : FlatID) -> Option<(&'l Module, FlatID, Range<FieldID>)> {
+    fn alloc_module_interface(&self, module : &Module, module_uuid : NamedUUID, typ_span : Span) -> Instantiation {
+        let interface_wires = module.interface.interface_wires.iter().map(|port| {
+            self.instantiations.alloc(Instantiation::PlainWire { typ: port.typ.clone(), typ_span })
+        }).collect();
+
+        Instantiation::SubModule{module_uuid, typ_span, interface_wires}
+    }
+    fn desugar_func_call(&self, func_and_args : &[SpanExpression], closing_bracket_pos : usize, condition : FlatID) -> Option<(&Module, &[FlatID])> {
         let (name_expr, name_expr_span) = &func_and_args[0]; // Function name is always there
-        let func_instantiation = match name_expr {
+        let func_instantiation_id = match name_expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {
-                *l
+                self.decl_to_flat_map[*l]
             }
             Expression::Named(LocalOrGlobal::Global(g)) => {
-                let module_uuid = self.module.link_info.global_references[*g];
-                self.instantiations.alloc(Instantiation::SubModule{typ : Type::Named(module_uuid.1), typ_span : *name_expr_span})
+                let module_ref = self.module.link_info.global_references[*g];
+
+                let dependency = self.linker.get_module(module_ref, &self.errors)?;
+                let new_module_interface = self.alloc_module_interface(dependency, module_ref.1, *name_expr_span);
+                self.instantiations.alloc(new_module_interface)
             }
             _other => {
-                self.errors.error_basic(*name_expr_span, "Function call cannot be an expression");
+                self.errors.error_basic(*name_expr_span, "Function call name cannot be an expression");
                 return None;
             }
         };
-        let Instantiation::SubModule{typ : module_type, typ_span} = &self.instantiations[func_instantiation] else {panic!("Instantiation is not named!");};
-        let Type::Named(module_id) = module_type else {todo!();};
-        let Named::Module(md) = &self.linker.links.globals[*module_id] else {panic!("UUID Is not module!");};
+        let func_instantiation = &self.instantiations[func_instantiation_id];
+        let Instantiation::SubModule{module_uuid, typ_span, interface_wires} = func_instantiation else {unreachable!("It should be proven {func_instantiation:?} was a Module!");};
+        let Named::Module(md) = &self.linker.links.globals[*module_uuid] else {unreachable!("UUID Should be a module!");};
         let (inputs, output_range) = md.interface.get_function_sugar_inputs_outputs();
 
         let mut args = &func_and_args[1..];
@@ -176,18 +170,17 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
                 if self.typecheck(arg_read_side, &md.interface.interface_wires[field].typ, "submodule output") == None {
                     continue;
                 }
-                let func_instance_connectionwrite = (ConnectionWrite::Local(func_instantiation), *name_expr_span);
-                let to = (ConnectionWrite::StructField(Box::new((func_instance_connectionwrite, field))), *name_expr_span);
-                self.create_connection(Connection{num_regs: 0, to, from : arg_read_side, condition});
+                let func_input_wire = interface_wires[field];
+                self.create_connection(Connection { num_regs: 0, from: arg_read_side, to: ConnectionWrite::simple(func_input_wire, *name_expr_span), condition });
             }
         }
 
-        Some((md, func_instantiation, output_range))
+        Some((md, &interface_wires[output_range]))
     }
-    fn flatten_single_expr(&mut self, (expr, expr_span) : &SpanExpression, condition : FlatID) -> Option<SpanFlatID> {
+    fn flatten_single_expr(&self, (expr, expr_span) : &SpanExpression, condition : FlatID) -> Option<SpanFlatID> {
         let single_connection_side = match expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {
-                *l
+                self.decl_to_flat_map[*l]
             }
             Expression::Named(LocalOrGlobal::Global(g)) => {
                 let r = self.module.link_info.global_references[*g];
@@ -214,18 +207,18 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
                 self.instantiations.alloc(Instantiation::BinaryOp{typ : output_type, op : *op, left, right})
             }
             Expression::Array(arr_box) => {
-                let (left, right) = arr_box.deref();
+                let (left, right, bracket_span) = arr_box.deref();
                 let arr = self.flatten_single_expr(left, condition)?;
                 let arr_idx = self.flatten_single_expr(right, condition)?;
                 
                 let index_was_int = self.typecheck(arr_idx, &Type::Named(get_builtin_uuid("int")), "array index");
                 let array_type = self.instantiations[arr.0].get_type();
-                let typ = self.typecheck_is_array_indexer(array_type, arr.1)?.clone();
+                let typ = typecheck_is_array_indexer(array_type, arr.1, self.linker, &self.errors)?.clone();
                 index_was_int?; // Do both for better typechecking diagnostics
                 self.instantiations.alloc(Instantiation::ArrayAccess{typ, arr, arr_idx})
             }
             Expression::FuncCall(func_and_args) => {
-                let (md, func_instance, outputs) = self.desugar_func_call(func_and_args, expr_span.1, condition)?;
+                let (md, outputs) = self.desugar_func_call(func_and_args, expr_span.1, condition)?;
 
                 if outputs.len() != 1 {
                     let info = error_info(md.link_info.span, md.link_info.file, "Module Defined here");
@@ -233,27 +226,31 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
                     return None;
                 }
 
-                self.instantiations.alloc(Instantiation::ExtractWire{typ: md.interface.interface_wires[outputs.start].typ.clone(), extract_from: func_instance, field: outputs.start})
+                outputs[0]
             }
         };
         Some((single_connection_side, *expr_span))
     }
-    fn flatten_assignable_expr(&mut self, (expr, span) : &SpanAssignableExpression, condition : FlatID) -> Option<SpanConnectionWrite> {
-        Some((match expr {
+    fn flatten_assignable_expr(&self, (expr, span) : &SpanAssignableExpression, condition : FlatID) -> Option<ConnectionWrite> {
+        Some(match expr {
             AssignableExpression::Named{local_idx} => {
-                ConnectionWrite::Local(*local_idx)
+                ConnectionWrite{root: self.decl_to_flat_map[*local_idx], path : Vec::new(), span : *span}
             }
             AssignableExpression::ArrayIndex(arr_box) => {
-                let (arr, idx) = arr_box.deref();
+                let (arr, idx, bracket_span) = arr_box.deref();
+                let flattened_arr_expr_opt = self.flatten_assignable_expr(arr, condition);
+                
                 let idx_local = self.flatten_single_expr(idx, condition)?;
 
-                let flattened_arr_expr = self.flatten_assignable_expr(arr, condition)?;
+                let mut flattened_arr_expr = flattened_arr_expr_opt?; // only unpack the subexpr after flattening the idx, so we catch all errors
 
-                ConnectionWrite::ArrayIdx(Box::new((flattened_arr_expr, idx_local)))
+                flattened_arr_expr.path.push(ConnectionWritePathElement::ArrayIdx(idx_local));
+
+                flattened_arr_expr
             }
-        }, *span))
+        })
     }
-    fn extend_condition(&mut self, condition : FlatID, additional_condition : SpanFlatID) -> FlatID {
+    fn extend_condition(&self, condition : FlatID, additional_condition : SpanFlatID) -> FlatID {
         if condition == FlatID::INVALID {
             additional_condition.0
         } else {
@@ -262,7 +259,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
             self.instantiations.alloc(Instantiation::BinaryOp{typ : bool_typ, op: Operator{op_typ : kw("&")}, left : (condition, additional_condition.1), right : additional_condition})
         }
     }
-    fn flatten_code(&mut self, code : &CodeBlock, condition : FlatID) {
+    fn flatten_code(&self, code : &CodeBlock, condition : FlatID) {
         for (stmt, stmt_span) in &code.statements {
             match stmt {
                 Statement::Declaration(local_id) => {
@@ -281,7 +278,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
                     }
                 }
                 Statement::Assign{to, expr : (Expression::FuncCall(func_and_args), func_span), eq_sign_position} => {
-                    let Some((md, instantiation_idx, outputs)) = self.desugar_func_call(&func_and_args, func_span.1, condition) else {return;};
+                    let Some((md, outputs)) = self.desugar_func_call(&func_and_args, func_span.1, condition) else {return;};
 
                     let func_name_span = func_and_args[0].1;
                     let num_func_outputs = outputs.len();
@@ -299,8 +296,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
 
                     for (field, to_i) in zip(outputs, to) {
                         let Some(write_side) = self.flatten_assignable_expr(&to_i.expr, condition) else {return;};
-                        let w = self.instantiations.alloc(Instantiation::ExtractWire{typ: md.interface.interface_wires[field].typ.clone(), extract_from: instantiation_idx, field});
-                        self.create_connection(Connection{num_regs : to_i.num_regs, from: (w, func_name_span), to: write_side, condition});
+                        self.create_connection(Connection{num_regs : to_i.num_regs, from: (*field, func_name_span), to: write_side, condition});
                     }
                 },
                 Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
@@ -329,33 +325,44 @@ Must be further processed by flatten, but this requires all modules to have been
 pub fn make_initial_flattened(module : &Module, linker : &Linker) -> (FlattenedModule, FlattenedInterface) {
     let mut interface = FlattenedInterface{interface_wires : Vec::new()};
     let mut context = FlatteningContext {
-        instantiations : module.declarations.map(|_,_| Instantiation::Error),
-        connections : Vec::new(),
+        instantiations : ListAllocator::new(),
+        connections : BlockVec::new(),
+        decl_to_flat_map : module.declarations.iter().map(|_| UUID::INVALID).collect(),
         errors : ErrorCollector::new(module.link_info.file),
         module,
         linker,
     };
     
-    for (wire_id, decl) in &module.declarations {
+    for (decl_id, decl) in &module.declarations {
         let Some(typ) = context.map_to_type(&decl.typ.0, &module.link_info.global_references) else {continue;};
         let typ_copy = typ.clone();
         let typ_span = decl.typ.1;
 
         let decl_typ_root_reference = typ.get_root();
-        let inst = match &linker.links.globals[decl_typ_root_reference] {
-            Named::Constant(c) => {
-                context.errors.error_basic(typ_span, format!("This should be the type of a declaration, but it refers to the constant '{}'", c.get_full_name()));
-                Instantiation::Error
-            }
-            Named::Module(_) => {
-                Instantiation::SubModule{typ, typ_span}
-            }
-            Named::Type(_) => {
-                Instantiation::PlainWire{typ, typ_span}
+        let inst = if decl_typ_root_reference == UUID::INVALID {
+            Instantiation::Error // Error's covered by linker
+        } else {
+            match &linker.links.globals[decl_typ_root_reference] {
+                Named::Constant(c) => {
+                    context.errors.error_basic(typ_span, format!("This should be the type of a declaration, but it refers to the constant '{}'", c.get_full_name()));
+                    Instantiation::Error
+                }
+                Named::Module(md) => {
+                    if let Type::Named(name) = typ {
+                        context.alloc_module_interface(md, name, typ_span)
+                    } else {
+                        todo!("Implement submodule arrays");
+                        //Instantiation::Error
+                    }
+                }
+                Named::Type(_) => {
+                    Instantiation::PlainWire{typ, typ_span}
+                }
             }
         };
-        context.instantiations[wire_id] = inst;
-
+        
+        let wire_id = context.instantiations.alloc(inst);
+        context.decl_to_flat_map[decl_id] = wire_id;
 
         match decl.identifier_type {
             IdentifierType::Input | IdentifierType::Output => {
@@ -371,7 +378,7 @@ pub fn make_initial_flattened(module : &Module, linker : &Linker) -> (FlattenedM
         }
     };
 
-    (FlattenedModule{instantiations: context.instantiations, connections: context.connections, errors : context.errors}, interface)
+    (FlattenedModule{instantiations: context.instantiations, connections: context.connections, decl_to_flat_map : context.decl_to_flat_map, errors : context.errors}, interface)
 }
 
 /*
@@ -384,13 +391,14 @@ pub fn flatten(flattened : FlattenedModule, module : &Module, linker : &Linker) 
     let mut context = FlatteningContext {
         instantiations : flattened.instantiations,
         connections : flattened.connections,
+        decl_to_flat_map : flattened.decl_to_flat_map,
         errors : flattened.errors,
         module,
         linker,
     };
     context.flatten_code(&module.code, FlatID::INVALID);
 
-    FlattenedModule{instantiations: context.instantiations, connections: context.connections, errors : context.errors}
+    FlattenedModule{instantiations: context.instantiations, connections: context.connections, decl_to_flat_map : context.decl_to_flat_map, errors : context.errors}
 }
 
 #[derive(Debug)]
@@ -435,7 +443,8 @@ impl FlattenedInterface {
 #[derive(Debug)]
 pub struct FlattenedModule {
     pub instantiations : ListAllocator<Instantiation, FlatIDMarker>,
-    pub connections : Vec<Connection>,
+    pub connections : BlockVec<Connection>,
+    pub decl_to_flat_map : ListAllocator<FlatID, DeclIDMarker>,
     pub errors : ErrorCollector
 }
 
@@ -443,7 +452,8 @@ impl FlattenedModule {
     pub fn empty(file : FileUUID) -> FlattenedModule {
         FlattenedModule {
             instantiations : ListAllocator::new(),
-            connections : Vec::new(),
+            connections : BlockVec::new(),
+            decl_to_flat_map : ListAllocator::new(),
             errors : ErrorCollector::new(file)
         }
     }

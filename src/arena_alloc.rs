@@ -1,5 +1,7 @@
 use std::{ops::{IndexMut, Index}, marker::PhantomData, iter::Enumerate, fmt};
 
+use crate::block_vector::{BlockVec, BlockVecIterMut, BlockVecIter};
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UUID<IndexMarker : UUIDMarker>(usize, PhantomData<IndexMarker>);
 
@@ -24,8 +26,10 @@ impl<IndexMarker : UUIDMarker> Default for UUID<IndexMarker> {
     }
 }
 
+const INVALID_UUID_VALUE : usize = usize::MAX;
+
 impl<IndexMarker : UUIDMarker> UUID<IndexMarker> {
-    pub const INVALID : Self = UUID(usize::MAX, PhantomData);
+    pub const INVALID : Self = UUID(INVALID_UUID_VALUE, PhantomData);
 
     pub const fn from_hidden_value(v : usize) -> Self {
         UUID(v, PhantomData)
@@ -93,6 +97,7 @@ impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ArenaAllocator<T,
     type Output = T;
 
     fn index(&self, UUID(uuid, _): UUID<IndexMarker>) -> &Self::Output {
+        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index");
         assert!(self.data[uuid].is_some());
         self.data[uuid].as_ref().unwrap()
     }
@@ -100,6 +105,7 @@ impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ArenaAllocator<T,
 
 impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for ArenaAllocator<T, IndexMarker> {
     fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
+        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index_mut");
         assert!(self.data[uuid].is_some());
         self.data[uuid].as_mut().unwrap()
     }
@@ -202,12 +208,14 @@ impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ArenaVector<T, In
     type Output = T;
 
     fn index(&self, UUID(uuid, _): UUID<IndexMarker>) -> &Self::Output {
+        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index");
         self.data[uuid].as_ref().unwrap()
     }
 }
 
 impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for ArenaVector<T, IndexMarker> {
     fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
+        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index_mut");
         self.data[uuid].as_mut().unwrap()
     }
 }
@@ -234,18 +242,17 @@ impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a mut ArenaVector<T, In
 
 #[derive(Debug)]
 pub struct ListAllocator<T, IndexMarker : UUIDMarker> {
-    data : Vec<T>,
+    data : BlockVec<T>,
     _ph : PhantomData<IndexMarker>
 }
 
 impl<T, IndexMarker : UUIDMarker> ListAllocator<T, IndexMarker> {
     pub fn new() -> Self {
-        Self{data : Vec::new(), _ph : PhantomData}
+        Self{data : BlockVec::new(), _ph : PhantomData}
     }
-    pub fn alloc(&mut self, v : T) -> UUID<IndexMarker> {
-        let uuid = UUID(self.data.len(), PhantomData);
-        self.data.push(v);
-        uuid
+    // Allocation is const because it doesn't invalidate existing references
+    pub fn alloc(&self, v : T) -> UUID<IndexMarker> {
+        UUID(self.data.alloc(v), PhantomData)
     }
     pub fn iter<'a>(&'a self) -> ListAllocIterator<'a, T, IndexMarker> {
         self.into_iter()
@@ -253,28 +260,32 @@ impl<T, IndexMarker : UUIDMarker> ListAllocator<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> ListAllocIteratorMut<'a, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn map<OutT, F : FnMut(UUID<IndexMarker>, &T) -> OutT>(&self, mut f : F) -> ListAllocator<OutT, IndexMarker> {
-        let data = self.iter().map(|(a, v)| f(a, v)).collect();
-        ListAllocator{data, _ph : PhantomData}
-    }
 }
 
 impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ListAllocator<T, IndexMarker> {
     type Output = T;
 
     fn index(&self, UUID(uuid, _): UUID<IndexMarker>) -> &Self::Output {
+        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index");
         &self.data[uuid]
     }
 }
 
 impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for ListAllocator<T, IndexMarker> {
     fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
+        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index_mut");
         &mut self.data[uuid]
     }
 }
 
+impl<T, IndexMarker : UUIDMarker> FromIterator<T> for ListAllocator<T, IndexMarker> {
+    fn from_iter<Iter: IntoIterator<Item = T>>(iter: Iter) -> Self {
+        Self { data: BlockVec::from_iter(iter), _ph: PhantomData }
+    }
+}
+
 pub struct ListAllocIterator<'a, T, IndexMarker> {
-    it: Enumerate<std::slice::Iter<'a, T>>,
+    it: Enumerate<BlockVecIter<'a, T>>,
     _ph : PhantomData<IndexMarker>
 }
 
@@ -294,7 +305,7 @@ impl<'a, T, IndexMarker : UUIDMarker> Iterator for ListAllocIterator<'a, T, Inde
 }
 
 pub struct ListAllocIteratorMut<'a, T, IndexMarker> {
-    it: Enumerate<std::slice::IterMut<'a, T>>,
+    it: Enumerate<BlockVecIterMut<'a, T>>,
     _ph : PhantomData<IndexMarker>
 }
 
