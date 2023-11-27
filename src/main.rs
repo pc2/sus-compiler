@@ -1,4 +1,5 @@
 mod util;
+mod block_vector;
 mod arena_alloc;
 mod tokenizer;
 mod parser;
