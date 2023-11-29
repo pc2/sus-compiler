@@ -343,3 +343,100 @@ impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a mut ListAllocator<T, 
         ListAllocIteratorMut{it : self.data.iter_mut().enumerate(), _ph : PhantomData}
     }
 }
+
+
+
+#[derive(Debug)]
+pub struct FlatAlloc<T, IndexMarker> {
+    data : Vec<T>,
+    _ph : PhantomData<IndexMarker>
+}
+
+impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
+    pub fn new() -> Self {
+        Self{data : Vec::new(), _ph : PhantomData}
+    }
+    pub fn alloc(&mut self, UUID(uuid, _) : UUID<IndexMarker>, value : T) {
+        self.data[uuid] = value;
+    }
+    pub fn iter<'a>(&'a self) -> FlatAllocIter<'a, T, IndexMarker> {
+        self.into_iter()
+    }
+    pub fn iter_mut<'a>(&'a mut self) -> FlatAllocIterMut<'a, T, IndexMarker> {
+        self.into_iter()
+    }
+}
+
+impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for FlatAlloc<T, IndexMarker> {
+    type Output = T;
+
+    fn index(&self, UUID(uuid, _): UUID<IndexMarker>) -> &Self::Output {
+        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index");
+        &self.data[uuid]
+    }
+}
+
+impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for FlatAlloc<T, IndexMarker> {
+    fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
+        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index_mut");
+        &mut self.data[uuid]
+    }
+}
+
+fn map_uuid_to_id<IndexMarker : UUIDMarker, T>(tup : (usize, T)) -> (UUID<IndexMarker>, T) {
+    (UUID(tup.0, PhantomData), tup.1)
+}
+
+#[derive(Debug)]
+pub struct FlatAllocIter<'a, T, IndexMarker : UUIDMarker> {
+    iter : Enumerate<std::slice::Iter<'a, T>>,
+    _ph : PhantomData<IndexMarker>
+}
+
+impl<'a, T, IndexMarker : UUIDMarker> Iterator for FlatAllocIter<'a, T, IndexMarker> {
+    type Item = (UUID<IndexMarker>, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|(id, v)| (UUID(id, PhantomData), v))
+    }
+}
+
+impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a FlatAlloc<T, IndexMarker> {
+    type Item = (UUID<IndexMarker>, &'a T);
+
+    type IntoIter = FlatAllocIter<'a, T, IndexMarker>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        FlatAllocIter{iter : self.data.iter().enumerate(), _ph : PhantomData}
+    }
+}
+
+#[derive(Debug)]
+pub struct FlatAllocIterMut<'a, T, IndexMarker : UUIDMarker> {
+    iter : Enumerate<std::slice::IterMut<'a, T>>,
+    _ph : PhantomData<IndexMarker>
+}
+
+impl<'a, T, IndexMarker : UUIDMarker> Iterator for FlatAllocIterMut<'a, T, IndexMarker> {
+    type Item = (UUID<IndexMarker>, &'a mut T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|(id, v)| (UUID(id, PhantomData), v))
+    }
+}
+
+impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a mut FlatAlloc<T, IndexMarker> {
+    type Item = (UUID<IndexMarker>, &'a mut T);
+
+    type IntoIter = FlatAllocIterMut<'a, T, IndexMarker>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        FlatAllocIterMut{iter : self.data.iter_mut().enumerate(), _ph : PhantomData}
+    }
+}
+
+impl<'a, T, IndexMarker : UUIDMarker> FromIterator<T> for FlatAlloc<T, IndexMarker> {
+    fn from_iter<Iter: IntoIterator<Item = T>>(iter: Iter) -> Self {
+        Self { data: Vec::from_iter(iter), _ph: PhantomData }
+    }
+}

@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}, rc::Rc};
 
-use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference}, arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::{flatten, make_initial_flattened, FlattenedInterface, FlattenedModule}, util::{const_str_position, const_str_position_in_tuples}, instantiation::InstantiatedModule};
+use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference, DeclIDMarker}, arena_alloc::{ArenaAllocator, UUID, UUIDMarker, FlatAlloc}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::{FlattenedInterface, FlattenedModule, FlatID}, util::{const_str_position, const_str_position_in_tuples}, instantiation::InstantiatedModule};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NamedUUIDMarker;
@@ -496,49 +496,43 @@ impl Linker {
     pub fn flatten_all_modules(&mut self) {
         // First create initial flattening for everything, to produce the necessary interfaces
 
-        let mut flattened_vec : Vec<(NamedUUID, FlattenedModule)> = Vec::new();
         let mut interface_vec : Vec<(NamedUUID, FlattenedInterface)> = Vec::new();
+        let mut flattened_vec : Vec<(NamedUUID, FlatAlloc<FlatID, DeclIDMarker>)> = Vec::new();
         for (id, named_object) in &self.links.globals {
             println!("Initializing Flattening for {}", named_object.get_name());
             if let Named::Module(md) = named_object {
                 // Do initial flattening for ALL modules, regardless of linking errors, to get proper interface
                 // if !md.link_info.is_fully_linked {continue;}
-                let (flt, interface) = make_initial_flattened(md, &self);
-                flattened_vec.push((id, flt));
+                let (interface, decl_to_flat_map) = md.flattened.initialize_interfaces(&self, md);
                 interface_vec.push((id, interface));
+                flattened_vec.push((id, decl_to_flat_map));
             }
         }
 
         for (id, interface) in interface_vec {
             let Named::Module(md) = &mut self.links.globals[id] else {unreachable!()};
+
             md.interface = interface;
         }
 
-        let mut to_instantiate_vec : Vec<NamedUUID> = Vec::new();
-
         // Then do proper flattening on every module
-        for (id, flattened) in flattened_vec {
-            // println!("Flattening {}", named_object.get_name());
+        for (id, decl_to_flat_map) in flattened_vec {
             let Named::Module(md) = &self.links.globals[id] else {unreachable!()};
+
+            println!("Flattening {}", &md.link_info.name);
             // Do check for linking errors when generating code, as this could cause the compiler to error
             if !md.link_info.is_fully_linked {continue;}
-            let new_flattened = flatten(flattened, md, &self);
+            md.flattened.flatten(md, &self, decl_to_flat_map);
 
-            let Named::Module(md) = &mut self.links.globals[id] else {unreachable!()};
             println!("[[{}]]:", md.link_info.name);
             println!("\tInstantiations:");
-            for (id, inst) in &new_flattened.instantiations {
+            for (id, inst) in &md.flattened.instantiations {
                 println!("\t\t{:?}: {:?}", id, inst);
             }
             println!("\tConnections:");
-            for conn in &new_flattened.connections {
+            for conn in &md.flattened.connections {
                 println!("\t\t{:?}", conn);
             }
-            md.flattened = new_flattened;
-            to_instantiate_vec.push(id);
-        }
-
-        for id in to_instantiate_vec {
             self.instantiate(id);
         }
     }

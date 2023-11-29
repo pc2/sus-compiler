@@ -34,12 +34,38 @@ pub struct Connect {
 
 #[derive(Debug)]
 pub enum RealWireDataSource {
+    ReadOnly,
     Multiplexer{sources : Vec<Connect>},
-    ExtractWire{extract_from : SubModuleID, field : FieldID},
     UnaryOp{op : Operator, right : WireID},
     BinaryOp{op : Operator, left : WireID, right : WireID},
     ArrayAccess{arr : WireID, arr_idx : WireID},
     Constant{value : Value}
+}
+
+impl RealWireDataSource {
+    fn iter_sources<F : FnMut(WireID) -> ()>(&self, mut f : F) {
+        match self {
+            RealWireDataSource::ReadOnly => {}
+            RealWireDataSource::Multiplexer { sources } => {
+                for s in sources {
+                    f(s.from.from);
+                    f(s.from.condition);
+                }
+            }
+            RealWireDataSource::UnaryOp { op, right } => {
+                f(*right);
+            }
+            RealWireDataSource::BinaryOp { op, left, right } => {
+                f(*left);
+                f(*right);
+            }
+            RealWireDataSource::ArrayAccess { arr, arr_idx } => {
+                f(*arr);
+                f(*arr_idx);
+            }
+            RealWireDataSource::Constant { value } => {}
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -146,8 +172,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     let interface_real_wires = interface_wires.iter().map(|w| self.instance_map[*w].extract_wire()).collect();
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModuleInstance{instance : self.linker.instantiate(*name), interface_wires : interface_real_wires}))
                 },
-                Instantiation::PlainWire{typ, typ_span} => {
-                    SubModuleOrWire::Wire(self.wires.alloc(RealWire{ typ : self.concretize_type(typ), original_wire, source : RealWireDataSource::Multiplexer {sources : Vec::new()}}))
+                Instantiation::PlainWire{read_only, typ, typ_span} => {
+                    let source = if *read_only {
+                        RealWireDataSource::ReadOnly
+                    } else {
+                        RealWireDataSource::Multiplexer {sources : Vec::new()}
+                    };
+                    SubModuleOrWire::Wire(self.wires.alloc(RealWire{ typ : self.concretize_type(typ), original_wire, source}))
                 },
                 Instantiation::UnaryOp{typ, op, right} => {
                     SubModuleOrWire::Wire(self.wires.alloc(RealWire { typ : self.concretize_type(typ), original_wire, source : RealWireDataSource::UnaryOp{op: *op, right: self.instance_map[right.0].extract_wire() }}))

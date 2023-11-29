@@ -11,7 +11,7 @@ use std::{cell::{UnsafeCell, Cell}, mem::MaybeUninit, ops::{DerefMut, Deref, Ind
     The const iterator exists, though it is not recommended to append elements while iterating over it. The const iterator would continue even onto newer elements
     Existence of the mutable iterator disallows updating the container of course
 */
-#[derive(Debug,Default)]
+#[derive(Default)]
 pub struct BlockVec<T, const BLOCK_SIZE : usize = 64> {
     blocks : UnsafeCell<Vec<Box<[MaybeUninit<T>; BLOCK_SIZE]>>>,
     length : Cell<usize>,
@@ -77,6 +77,18 @@ impl<T, const BLOCK_SIZE : usize> Drop for BlockVec<T, BLOCK_SIZE> {
                 unsafe{last_block[i].assume_init_drop()};
             }
         }
+    }
+}
+
+impl<T : std::fmt::Debug, const BLOCK_SIZE : usize> std::fmt::Debug for BlockVec<T, BLOCK_SIZE> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let len = self.length.get();
+        f.write_fmt(format_args!("BlockVec(Size = {len})["))?;
+        for item in self {
+            item.fmt(f)?;
+            f.write_str(", ")?;
+        }
+        f.write_str("]")
     }
 }
 

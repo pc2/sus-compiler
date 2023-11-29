@@ -55,6 +55,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     }
     if file_paths.len() == 0 {
         // Quick debug file
+        //file_paths.push(PathBuf::from("resetNormalizer.sus"));
         file_paths.push(PathBuf::from("multiply_add.sus"));
     }
     syntax_highlight_file(file_paths);

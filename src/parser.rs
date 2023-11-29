@@ -698,7 +698,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             global_references : replace(&mut self.global_references, Vec::new()),
             is_fully_linked : false
         };
-        Some(Module{declarations, code, link_info, flattened : FlattenedModule::empty(self.errors.file), interface : FlattenedInterface::default(), instantiations : InstantiationList::new()})
+        Some(Module{declarations, code, link_info, interface : FlattenedInterface::new(), flattened : FlattenedModule::empty(self.errors.file), instantiations : InstantiationList::new()})
     }
 
     fn parse_ast(mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {

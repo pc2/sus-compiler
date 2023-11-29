@@ -234,7 +234,7 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
     linker.flatten_all_modules();
     
     for (file_uuid, f) in &linker.files {
-        print_tokens(&f.file_text, &f.tokens);
+        //print_tokens(&f.file_text, &f.tokens);
 
         let ide_tokens = create_token_ide_info(f, &linker.links);
         pretty_print(&f.file_text, &f.tokens, &ide_tokens);
