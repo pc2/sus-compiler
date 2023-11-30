@@ -356,8 +356,10 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
     pub fn new() -> Self {
         Self{data : Vec::new(), _ph : PhantomData}
     }
-    pub fn alloc(&mut self, UUID(uuid, _) : UUID<IndexMarker>, value : T) {
-        self.data[uuid] = value;
+    pub fn alloc(&mut self, value : T) -> UUID<IndexMarker> {
+        let uuid = self.data.len();
+        self.data.push(value);
+        UUID(uuid, PhantomData)
     }
     pub fn iter<'a>(&'a self) -> FlatAllocIter<'a, T, IndexMarker> {
         self.into_iter()
@@ -381,10 +383,6 @@ impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for FlatAlloc<T, I
         assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index_mut");
         &mut self.data[uuid]
     }
-}
-
-fn map_uuid_to_id<IndexMarker : UUIDMarker, T>(tup : (usize, T)) -> (UUID<IndexMarker>, T) {
-    (UUID(tup.0, PhantomData), tup.1)
 }
 
 #[derive(Debug)]

@@ -447,7 +447,12 @@ impl Linker {
         self.add_reserved_file(file, parse_result, parsing_errors);
     }
 
-    pub fn get_constant(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &ErrorCollector) -> Option<Value> {
+    pub fn get_module(&self, uuid : NamedUUID) -> &Module {
+        let Named::Module(md) = &self.links.globals[uuid] else {unreachable!()};
+        md
+    }
+
+    pub fn try_get_constant(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &ErrorCollector) -> Option<Value> {
         if uuid == UUID::INVALID {
             return None; // Error reporting already handled by linking
         }
@@ -470,7 +475,7 @@ impl Linker {
         }
     }
 
-    pub fn get_module(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &ErrorCollector) -> Option<&Module> {
+    pub fn try_get_module(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &ErrorCollector) -> Option<&Module> {
         if uuid == UUID::INVALID {
             return None; // Error reporting already handled by linking
         }
@@ -523,6 +528,7 @@ impl Linker {
             // Do check for linking errors when generating code, as this could cause the compiler to error
             if !md.link_info.is_fully_linked {continue;}
             md.flattened.flatten(md, &self, decl_to_flat_map);
+            md.flattened.find_unused_variables(md);
 
             println!("[[{}]]:", md.link_info.name);
             println!("\tInstantiations:");
@@ -541,6 +547,6 @@ impl Linker {
         let Named::Module(md) = &self.links.globals[module_id] else {panic!("{module_id:?} is not a Module!")};
         println!("Instantiating {}", md.link_info.name);
 
-        md.instantiations.instantiate(&md.flattened, self)
+        md.instantiations.instantiate(&md, self)
     }
 }

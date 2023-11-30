@@ -1,7 +1,7 @@
 
 use num::bigint::BigUint;
 
-use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::{FlattenedModule, FlattenedInterface}, arena_alloc::{ListAllocator, UUIDMarker, UUID}, instantiation::InstantiationList};
+use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::{FlattenedModule, FlattenedInterface}, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList};
 use core::ops::Range;
 use std::fmt::Display;
 
@@ -66,6 +66,7 @@ pub type SpanTypeExpression = (TypeExpression, Span);
 #[derive(Debug,Clone)]
 pub struct SignalDeclaration {
     pub span : Span,
+    pub name_token : usize,
     pub typ : SpanTypeExpression,
     pub name : Box<str>, // File position
     pub identifier_type : IdentifierType
@@ -148,7 +149,7 @@ pub struct LinkInfo {
 pub struct Module {
     pub link_info : LinkInfo,
 
-    pub declarations : ListAllocator<SignalDeclaration, DeclIDMarker>,
+    pub declarations : FlatAlloc<SignalDeclaration, DeclIDMarker>,
     pub code : CodeBlock,
 
     pub interface : FlattenedInterface,
@@ -193,7 +194,7 @@ impl IterIdentifiers for SpanExpression {
                 }
             }
             Expression::Array(b) => {
-                let (array, idx, bracket_span) = &**b;
+                let (array, idx, _bracket_span) = &**b;
                 array.for_each_value(func);
                 idx.for_each_value(func);
             }
@@ -210,7 +211,7 @@ impl IterIdentifiers for SpanAssignableExpression {
                 func(LocalOrGlobal::Local(*id), span.0);
             }
             AssignableExpression::ArrayIndex(b) => {
-                let (array, idx, bracket_span) = &**b;
+                let (array, idx, _bracket_span) = &**b;
                 array.for_each_value(func);
                 idx.for_each_value(func);
             }

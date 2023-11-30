@@ -35,6 +35,10 @@ pub struct IDEToken {
     pub typ : IDETokenType
 }
 
+pub struct SyntaxHighlightSettings {
+    pub show_tokens : bool
+}
+
 fn pretty_print_chunk_with_whitespace(whitespace_start : usize, file_text : &str, text_span : Range<usize>, st : Style) { 
     let whitespace_text = &file_text[whitespace_start..text_span.start];
 
@@ -206,7 +210,7 @@ fn generate_character_offsets(file_text : &str, tokens : &[Token]) -> Vec<Range<
     character_offsets
 }
 
-pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
+pub fn syntax_highlight_file(file_paths : Vec<PathBuf>, settings : &SyntaxHighlightSettings) {
     let mut prelinker : PreLinker = PreLinker::new();
     let mut paths_arena = ArenaVector::new();
     for file_path in file_paths {
@@ -234,7 +238,9 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>) {
     linker.flatten_all_modules();
     
     for (file_uuid, f) in &linker.files {
-        //print_tokens(&f.file_text, &f.tokens);
+        if settings.show_tokens {
+            print_tokens(&f.file_text, &f.tokens);
+        }
 
         let ide_tokens = create_token_ide_info(f, &linker.links);
         pretty_print(&f.file_text, &f.tokens, &ide_tokens);

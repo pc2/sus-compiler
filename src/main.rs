@@ -30,13 +30,20 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut file_paths : Vec<PathBuf> = Vec::new();
     let mut is_lsp = false;
     let mut codegen = true;
+    let mut settings = SyntaxHighlightSettings{
+        show_tokens : false
+    };
+    
     for arg in args {
         match arg.as_str() {
             "--lsp" => {
                 is_lsp = true;
-            },
+            }
             "--codegen" => {
                 codegen = true;
+            }
+            "--tokens" => {
+                settings.show_tokens = true;
             }
             other => {
                 file_paths.push(PathBuf::from(other));
@@ -58,8 +65,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         //file_paths.push(PathBuf::from("resetNormalizer.sus"));
         file_paths.push(PathBuf::from("multiply_add.sus"));
     }
-    syntax_highlight_file(file_paths);
+    syntax_highlight_file(file_paths, &settings);
 
     Ok(())
 }
-

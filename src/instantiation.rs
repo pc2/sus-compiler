@@ -1,6 +1,6 @@
-use std::{rc::Rc, ops::Deref, cell::RefCell};
+use std::{rc::Rc, ops::Deref, cell::RefCell, iter::zip};
 
-use crate::{arena_alloc::{UUID, ListAllocator, UUIDMarker}, ast::{Value, Operator}, typing::{ConcreteType, Type}, flattening::{FlatID, FieldID, Instantiation, FlattenedModule, FlatIDMarker, ConnectionWrite, ConnectionWritePathElement}, errors::{ErrorCollector, error_info}, linker::{Linker, get_builtin_uuid}};
+use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Value, Operator, Module}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWrite, ConnectionWritePathElement, InterfacePort}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid, NamedUUID}};
 
 
 
@@ -77,18 +77,20 @@ pub struct RealWire {
 
 #[derive(Debug)]
 pub struct SubModuleInstance {
+    module_uuid : NamedUUID,
     instance : Rc<InstantiatedModule>,
-    interface_wires : Vec<WireID>
+    interface_wires : Vec<InterfacePort<WireID>>
 }
 
 #[derive(Debug)]
 pub struct InstantiatedModule {
     pub interface : Vec<WireID>,
-    pub wires : ListAllocator<RealWire, WireIDMarker>,
-    pub submodules : ListAllocator<SubModuleInstance, SubModuleIDMarker>,
+    pub wires : FlatAlloc<RealWire, WireIDMarker>,
+    pub submodules : FlatAlloc<SubModuleInstance, SubModuleIDMarker>,
     pub errors : ErrorCollector
 }
 
+#[derive(Clone,Copy)]
 enum SubModuleOrWire {
     SubModule(SubModuleID),
     Wire(WireID),
@@ -107,19 +109,19 @@ impl SubModuleOrWire {
 }
 
 struct InstantiationContext<'fl, 'l> {
-    instance_map : ListAllocator<SubModuleOrWire, FlatIDMarker>,
-    wires : ListAllocator<RealWire, WireIDMarker>,
-    submodules : ListAllocator<SubModuleInstance, SubModuleIDMarker>,
+    instance_map : FlatAlloc<SubModuleOrWire, FlatIDMarker>,
+    wires : FlatAlloc<RealWire, WireIDMarker>,
+    submodules : FlatAlloc<SubModuleInstance, SubModuleIDMarker>,
     interface : Vec<WireID>,
     errors : ErrorCollector,
 
-    flattened : &'fl FlattenedModule,
+    module : &'fl Module,
     linker : &'l Linker,
 }
 
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn compute_constant(&self, wire : FlatID) -> Value {
-        let Instantiation::Constant { typ, value } = &self.flattened.instantiations[wire] else {todo!()};
+        let Instantiation::Constant { typ, value } = &self.module.flattened.instantiations[wire] else {todo!()};
         value.clone()
     }
     fn concretize_type(&self, typ : &Type) -> ConcreteType {
@@ -166,13 +168,15 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         sources.push(Connect{from, path : new_path})
     }
     fn instantiate_flattened_module(&mut self) {
-        for (original_wire, inst) in &self.flattened.instantiations {
+        for (original_wire, inst) in &self.module.flattened.instantiations {
             let instance_to_add : SubModuleOrWire = match inst {
-                Instantiation::SubModule{module_uuid: name, typ_span, interface_wires} => {
-                    let interface_real_wires = interface_wires.iter().map(|w| self.instance_map[*w].extract_wire()).collect();
-                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModuleInstance{instance : self.linker.instantiate(*name), interface_wires : interface_real_wires}))
+                Instantiation::SubModule{module_uuid, typ_span, interface_wires} => {
+                    let interface_real_wires = interface_wires.iter().map(|port| {
+                        InterfacePort { is_input: port.is_input, id: self.instance_map[port.id].extract_wire()}
+                    }).collect();
+                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModuleInstance{module_uuid : *module_uuid, instance : self.linker.instantiate(*module_uuid), interface_wires : interface_real_wires}))
                 },
-                Instantiation::PlainWire{read_only, typ, typ_span} => {
+                Instantiation::PlainWire{read_only, typ, decl_id} => {
                     let source = if *read_only {
                         RealWireDataSource::ReadOnly
                     } else {
@@ -196,7 +200,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             };
             self.instance_map[original_wire] = instance_to_add;
         }
-        for conn in &self.flattened.connections {
+        for conn in &self.module.flattened.connections {
             let condition = if conn.condition != UUID::INVALID {
                 self.instance_map[conn.condition].extract_wire()
             } else {
@@ -225,19 +229,19 @@ impl InstantiationList {
         Self{cache : RefCell::new(Vec::new())}
     }
 
-    pub fn instantiate(&self, flattened : &FlattenedModule, linker : &Linker) -> Rc<InstantiatedModule> {
+    pub fn instantiate(&self, module : &Module, linker : &Linker) -> Rc<InstantiatedModule> {
         let mut cache_borrow = self.cache.borrow_mut();
         
         // Temporary, no template arguments yet
         if cache_borrow.is_empty() {
             let mut context = InstantiationContext{
-                instance_map : flattened.instantiations.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect(),
-                wires : ListAllocator::new(),
-                submodules : ListAllocator::new(),
+                instance_map : module.flattened.instantiations.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect(),
+                wires : FlatAlloc::new(),
+                submodules : FlatAlloc::new(),
                 interface : Vec::new(),
-                flattened : flattened,
+                module : module,
                 linker : linker,
-                errors : ErrorCollector::new(flattened.errors.file)
+                errors : ErrorCollector::new(module.flattened.errors.file)
             };
         
             context.instantiate_flattened_module();
@@ -256,3 +260,5 @@ impl InstantiationList {
         }
     }
 }
+
+
