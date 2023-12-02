@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{ast::{Value, Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector};
+use crate::{ast::{Value, Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector, arena_alloc::UUID};
 
 // Types contain everything that cannot be expressed at runtime
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,7 +16,13 @@ pub enum Type {
 impl Type {
     pub fn to_string(&self, linker : &Linker) -> String {
         match self {
-            Type::Named(n) => linker.links[*n].get_full_name(),
+            Type::Named(n) => {
+                if *n == UUID::INVALID {
+                    "{unknown}".to_owned()
+                } else {
+                    linker.links[*n].get_full_name()
+                }
+            }
             Type::Array(sub) => sub.deref().0.to_string(linker) + "[]",
         }
     }

@@ -498,30 +498,32 @@ impl Linker {
         }
     }
 
-    pub fn flatten_all_modules(&mut self) {
+    pub fn recompile_all(&mut self) {
         // First create initial flattening for everything, to produce the necessary interfaces
 
-        let mut interface_vec : Vec<(NamedUUID, FlattenedInterface)> = Vec::new();
-        let mut flattened_vec : Vec<(NamedUUID, FlatAlloc<FlatID, DeclIDMarker>)> = Vec::new();
+        let mut interface_vec : Vec<(NamedUUID, FlattenedInterface, FlattenedModule)> = Vec::new();
+        let mut initial_flat_vec : Vec<(NamedUUID, FlatAlloc<FlatID, DeclIDMarker>)> = Vec::new();
         for (id, named_object) in &self.links.globals {
-            println!("Initializing Flattening for {}", named_object.get_name());
+            println!("Initializing Interface for {}", named_object.get_name());
             if let Named::Module(md) = named_object {
                 // Do initial flattening for ALL modules, regardless of linking errors, to get proper interface
                 // if !md.link_info.is_fully_linked {continue;}
-                let (interface, decl_to_flat_map) = md.flattened.initialize_interfaces(&self, md);
-                interface_vec.push((id, interface));
-                flattened_vec.push((id, decl_to_flat_map));
+                let (interface, flattened, decl_to_flat_map) = FlattenedModule::initialize_interfaces(&self, md);
+                interface_vec.push((id, interface, flattened));
+                initial_flat_vec.push((id, decl_to_flat_map));
             }
         }
 
-        for (id, interface) in interface_vec {
+        for (id, interface, flattened) in interface_vec {
             let Named::Module(md) = &mut self.links.globals[id] else {unreachable!()};
 
             md.interface = interface;
+            md.flattened = flattened;
+            md.instantiations.clear_instances();
         }
 
         // Then do proper flattening on every module
-        for (id, decl_to_flat_map) in flattened_vec {
+        for (id, decl_to_flat_map) in initial_flat_vec {
             let Named::Module(md) = &self.links.globals[id] else {unreachable!()};
 
             println!("Flattening {}", &md.link_info.name);
@@ -529,17 +531,15 @@ impl Linker {
             if !md.link_info.is_fully_linked {continue;}
             md.flattened.flatten(md, &self, decl_to_flat_map);
             md.flattened.find_unused_variables(md);
+        }
 
-            println!("[[{}]]:", md.link_info.name);
-            println!("\tInstantiations:");
-            for (id, inst) in &md.flattened.instantiations {
-                println!("\t\t{:?}: {:?}", id, inst);
+        // Can't merge these loops
+        for (id, named_object) in &self.links.globals {
+            if let Named::Module(md) = named_object {
+                println!("[[{}]]:", md.link_info.name);
+                md.print_flattened_module(self);
+                let inst = self.instantiate(id);    
             }
-            println!("\tConnections:");
-            for conn in &md.flattened.connections {
-                println!("\t\t{:?}", conn);
-            }
-            self.instantiate(id);
         }
     }
 

@@ -1,6 +1,6 @@
 
 
-use std::{ops::Range, path::{Path, PathBuf}, cell::RefCell};
+use std::{ops::Range, path::{Path, PathBuf}, cell::{RefCell, Cell}};
 
 use crate::{ast::Span, linker::{FileUUID, FileUUIDMarker}, arena_alloc::ArenaVector};
 use ariadne::*;
@@ -108,20 +108,23 @@ pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
 #[derive(Debug,Clone)]
 pub struct ErrorCollector {
     errors : RefCell<Vec<CompileError>>,
-    pub file : FileUUID
+    did_error : Cell<bool>,
+    pub file : FileUUID,
 }
 
 impl ErrorCollector {
     pub fn new(file : FileUUID) -> Self {
-        Self{errors : RefCell::new(Vec::new()), file}
+        Self{errors : RefCell::new(Vec::new()), file, did_error : Cell::new(false)}
     }
 
     pub fn error_basic<S : Into<String>>(&self, position : Span, reason : S) {
         self.errors.borrow_mut().push(CompileError{position, reason : reason.into(), infos : Vec::new(), level : ErrorLevel::Error});
+        self.did_error.set(true);
     }
     
     pub fn error_with_info<S : Into<String>>(&self, position : Span, reason : S, infos : Vec<ErrorInfo>) {
         self.errors.borrow_mut().push(CompileError{position, reason : reason.into(), infos : infos, level : ErrorLevel::Error});
+        self.did_error.set(true);
     }
     
     pub fn warn_basic<S : Into<String>>(&self, position : Span, reason : S) {
@@ -139,5 +142,9 @@ impl ErrorCollector {
     pub fn ingest(&self, source : &Self) {
         assert!(self.file == source.file);
         self.errors.borrow_mut().extend_from_slice(&source.errors.borrow());
+    }
+
+    pub fn did_error(&self) -> bool {
+        self.did_error.get()
     }
 }

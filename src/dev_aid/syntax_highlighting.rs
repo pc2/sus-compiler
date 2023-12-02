@@ -235,7 +235,7 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>, settings : &SyntaxHighli
 
     let mut file_cache : FileCache = Default::default();
 
-    linker.flatten_all_modules();
+    linker.recompile_all();
     
     for (file_uuid, f) in &linker.files {
         if settings.show_tokens {

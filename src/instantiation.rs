@@ -1,4 +1,4 @@
-use std::{rc::Rc, ops::Deref, cell::RefCell, iter::zip};
+use std::{rc::Rc, ops::Deref, cell::RefCell};
 
 use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Value, Operator, Module}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWrite, ConnectionWritePathElement, InterfacePort}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid, NamedUUID}};
 
@@ -258,6 +258,10 @@ impl InstantiationList {
         for inst in cache_borrow.deref() {
             errors.ingest(&inst.errors);
         }
+    }
+
+    pub fn clear_instances(&mut self) {
+        self.cache.borrow_mut().clear()
     }
 }
 

@@ -67,18 +67,18 @@ impl Instantiation {
 
     pub fn iter_sources<F : FnMut(FlatID) -> ()>(&self, mut f : F) {
         match self {
-            Instantiation::SubModule { module_uuid, typ_span, interface_wires } => {
+            Instantiation::SubModule { module_uuid : _, typ_span : _, interface_wires } => {
                 for port in interface_wires {
                     if port.is_input {
                         f(port.id);
                     }
                 }
             }
-            Instantiation::PlainWire { read_only, typ, decl_id } => {}
-            Instantiation::UnaryOp { typ, op, right } => {f(right.0);}
-            Instantiation::BinaryOp { typ, op, left, right } => {f(left.0); f(right.0);}
-            Instantiation::ArrayAccess { typ, arr, arr_idx } => {f(arr.0); f(arr_idx.0)}
-            Instantiation::Constant { typ, value } => {}
+            Instantiation::PlainWire { read_only : _, typ : _, decl_id : _ } => {}
+            Instantiation::UnaryOp { typ : _, op : _, right } => {f(right.0);}
+            Instantiation::BinaryOp { typ : _, op : _, left, right } => {f(left.0); f(right.0);}
+            Instantiation::ArrayAccess { typ : _, arr, arr_idx } => {f(arr.0); f(arr_idx.0)}
+            Instantiation::Constant { typ : _, value : _ } => {}
             Instantiation::Error => {}
         }
     }
@@ -441,14 +441,20 @@ impl FlattenedModule {
     Produces an initial FlattenedModule, in which the interface types have already been resolved. 
     Must be further processed by flatten, but this requires all modules to have been Initial Flattened for dependency resolution
     */
-    pub fn initialize_interfaces(&self, linker : &Linker, module : &Module) -> (FlattenedInterface, FlatAlloc<FlatID, DeclIDMarker>) {
+    pub fn initialize_interfaces(linker : &Linker, module : &Module) -> (FlattenedInterface, FlattenedModule, FlatAlloc<FlatID, DeclIDMarker>) {
         let mut interface = FlattenedInterface::new();
         
+        let flat_mod = FlattenedModule {
+            instantiations: ListAllocator::new(),
+            connections: BlockVec::new(),
+            errors: ErrorCollector::new(module.link_info.file)
+        };
+
         let mut context = FlatteningContext{
             decl_to_flat_map: module.declarations.iter().map(|_| UUID::INVALID).collect(),
-            instantiations: &self.instantiations,
-            connections: &self.connections,
-            errors: &self.errors,
+            instantiations: &flat_mod.instantiations,
+            connections: &flat_mod.connections,
+            errors: &flat_mod.errors,
             linker,
             module,
         };
@@ -461,7 +467,7 @@ impl FlattenedModule {
             };
             
             let (wire_id, typ) = if let Some(typ) = context.map_to_type(&decl.typ.0, &module.link_info.global_references) {
-                let wire_id = self.instantiations.alloc(Instantiation::PlainWire { read_only: is_input, typ : typ.clone(), decl_id : Some(decl_id)});
+                let wire_id = context.instantiations.alloc(Instantiation::PlainWire { read_only: is_input, typ : typ.clone(), decl_id : Some(decl_id)});
                 (wire_id, typ)
             } else {
                 (UUID::INVALID, Type::Named(UUID::INVALID))
@@ -470,7 +476,8 @@ impl FlattenedModule {
             context.decl_to_flat_map[decl_id] = wire_id;
         }
 
-        (interface, context.decl_to_flat_map)
+        let decl_to_flat_map = context.decl_to_flat_map;
+        (interface, flat_mod, decl_to_flat_map)
     }
 
     /*
@@ -493,16 +500,13 @@ impl FlattenedModule {
 
     pub fn find_unused_variables(&self, md : &Module) {
         // Setup Wire Fanouts List for faster processing
-        let mut wire_fanouts : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.instantiations.iter().map(|_| Vec::new()).collect();
-
-        for (id, w) in &self.instantiations {
-            w.iter_sources(|s_id| {
-                wire_fanouts[s_id].push(id);
-            });
-        }
+        let mut connection_fanin : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.instantiations.iter().map(|_| Vec::new()).collect();
 
         for conn in &self.connections {
-            wire_fanouts[conn.from.0].push(conn.to.root);
+            connection_fanin[conn.to.root].push(conn.from.0);
+            if conn.condition != UUID::INVALID {
+                connection_fanin[conn.to.root].push(conn.condition);
+            }
         }
 
         let mut is_instance_used_map : FlatAlloc<bool, FlatIDMarker> = self.instantiations.iter().map(|_| false).collect();
@@ -516,20 +520,37 @@ impl FlattenedModule {
             }
         }
 
+        println!("Pre Explore");
+        println!("{:?}", connection_fanin);
+        println!("{:?}", is_instance_used_map);
+        println!("{:?}", wire_to_explore_queue);
+
         while let Some(item) = wire_to_explore_queue.pop() {
-            for to in &wire_fanouts[item] {
-                if !is_instance_used_map[*to] {
-                    is_instance_used_map[*to] = true;
-                    wire_to_explore_queue.push(*to);
+            let wire = &self.instantiations[item];
+            wire.iter_sources(|from| {
+                if !is_instance_used_map[from] {
+                    is_instance_used_map[from] = true;
+                    wire_to_explore_queue.push(from);
+                }
+            });
+            for from in &connection_fanin[item] {
+                if !is_instance_used_map[*from] {
+                    is_instance_used_map[*from] = true;
+                    wire_to_explore_queue.push(*from);
                 }
             }
         }
+
+        println!("Final");
+        println!("{:?}", connection_fanin);
+        println!("{:?}", is_instance_used_map);
+        println!("{:?}", wire_to_explore_queue);
 
         // Now produce warnings from the unused list
         for (id, inst) in &self.instantiations {
             if !is_instance_used_map[id] {
                 if let Instantiation::PlainWire { read_only : _, typ : _, decl_id : Some(decl_id) } = inst {
-                    self.errors.warn_basic(Span::from(md.declarations[*decl_id].name_token), "Unused variable");
+                    self.errors.warn_basic(Span::from(md.declarations[*decl_id].name_token), "Unused Variable: This variable does not affect the output ports of this module");
                 }
             }
         }

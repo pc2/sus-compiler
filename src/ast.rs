@@ -1,7 +1,7 @@
 
 use num::bigint::BigUint;
 
-use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::{FlattenedModule, FlattenedInterface}, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList};
+use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID, Linker}, flattening::{FlattenedModule, FlattenedInterface}, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList};
 use core::ops::Range;
 use std::fmt::Display;
 
@@ -12,7 +12,7 @@ pub struct Span(pub usize, pub usize);
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
 pub struct DeclIDMarker;
-impl UUIDMarker for DeclIDMarker {const DISPLAY_NAME : &'static str = "obj_";}
+impl UUIDMarker for DeclIDMarker {const DISPLAY_NAME : &'static str = "decl_";}
 pub type DeclID = UUID<DeclIDMarker>;
 
 
@@ -156,6 +156,26 @@ pub struct Module {
     pub flattened : FlattenedModule,
 
     pub instantiations : InstantiationList
+}
+
+impl Module {
+    pub fn print_flattened_module(&self, linker : &Linker) {
+        println!("Interface:");
+        for port in &self.interface.interface_wires {
+            let port_direction = if port.is_input {"input"} else {"output"};
+            let port_type = port.typ.to_string(linker);
+            let port_name = &port.port_name;
+            println!("    {port_direction} {port_type} {port_name} -> {:?}", port.wire_id);
+        }
+        println!("Instantiations:");
+        for (id, inst) in &self.flattened.instantiations {
+            println!("    {:?}: {:?}", id, inst);
+        }
+        println!("Connections:");
+        for conn in &self.flattened.connections {
+            println!("    {:?}", conn);
+        }
+    }
 }
 
 #[derive(Debug,Clone,Copy)]
