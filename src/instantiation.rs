@@ -27,7 +27,7 @@ pub enum ConnectToPathElem {
 }
 
 #[derive(Debug)]
-pub struct Connect {
+pub struct MultiplexerSource {
     pub path : Vec<ConnectToPathElem>,
     pub from : ConnectFrom
 }
@@ -35,7 +35,7 @@ pub struct Connect {
 #[derive(Debug)]
 pub enum RealWireDataSource {
     ReadOnly,
-    Multiplexer{sources : Vec<Connect>},
+    Multiplexer{sources : Vec<MultiplexerSource>},
     UnaryOp{op : Operator, right : WireID},
     BinaryOp{op : Operator, left : WireID, right : WireID},
     ArrayAccess{arr : WireID, arr_idx : WireID},
@@ -72,8 +72,11 @@ impl RealWireDataSource {
 pub struct RealWire {
     source : RealWireDataSource,
     original_wire : FlatID,
-    typ : ConcreteType
+    typ : ConcreteType,
+    absolute_latency : i64 // i64::MIN for invalid. Only temporary
 }
+
+const LAETNCY_NOT_SET_YET : i64 = i64::MIN;
 
 #[derive(Debug)]
 pub struct SubModuleInstance {
@@ -163,9 +166,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             todo!();
         }
 
-        let RealWire{typ : _, original_wire: _, source : RealWireDataSource::Multiplexer { sources }} = &mut self.wires[self.instance_map[to.root].extract_wire()] else {unreachable!("Should only be a writeable wire here")};
+        let RealWire{absolute_latency : _, typ : _, original_wire: _, source : RealWireDataSource::Multiplexer { sources }} = &mut self.wires[self.instance_map[to.root].extract_wire()] else {unreachable!("Should only be a writeable wire here")};
 
-        sources.push(Connect{from, path : new_path})
+        sources.push(MultiplexerSource{from, path : new_path})
+    }
+    fn add_wire(&mut self, typ : &Type, original_wire : FlatID, source : RealWireDataSource) -> SubModuleOrWire {
+        SubModuleOrWire::Wire(self.wires.alloc(RealWire{ absolute_latency : LAETNCY_NOT_SET_YET, typ : self.concretize_type(typ), original_wire, source}))
     }
     fn instantiate_flattened_module(&mut self) {
         for (original_wire, inst) in &self.module.flattened.instantiations {
@@ -182,19 +188,19 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     } else {
                         RealWireDataSource::Multiplexer {sources : Vec::new()}
                     };
-                    SubModuleOrWire::Wire(self.wires.alloc(RealWire{ typ : self.concretize_type(typ), original_wire, source}))
+                    self.add_wire(typ, original_wire, source)
                 },
                 Instantiation::UnaryOp{typ, op, right} => {
-                    SubModuleOrWire::Wire(self.wires.alloc(RealWire { typ : self.concretize_type(typ), original_wire, source : RealWireDataSource::UnaryOp{op: *op, right: self.instance_map[right.0].extract_wire() }}))
+                    self.add_wire(typ, original_wire, RealWireDataSource::UnaryOp{op: *op, right: self.instance_map[right.0].extract_wire() })
                 },
                 Instantiation::BinaryOp{typ, op, left, right} => {
-                    SubModuleOrWire::Wire(self.wires.alloc(RealWire { typ : self.concretize_type(typ), original_wire, source : RealWireDataSource::BinaryOp{op: *op, left: self.instance_map[left.0].extract_wire(), right: self.instance_map[right.0].extract_wire() }}))
+                    self.add_wire(typ, original_wire, RealWireDataSource::BinaryOp{op: *op, left: self.instance_map[left.0].extract_wire(), right: self.instance_map[right.0].extract_wire() })
                 },
                 Instantiation::ArrayAccess{typ, arr, arr_idx} => {
-                    SubModuleOrWire::Wire(self.wires.alloc(RealWire { typ : self.concretize_type(typ), original_wire, source : RealWireDataSource::ArrayAccess{arr: self.instance_map[arr.0].extract_wire(), arr_idx: self.instance_map[arr_idx.0].extract_wire() }}))
+                    self.add_wire(typ, original_wire, RealWireDataSource::ArrayAccess{arr: self.instance_map[arr.0].extract_wire(), arr_idx: self.instance_map[arr_idx.0].extract_wire() })
                 },
                 Instantiation::Constant{typ, value} => {
-                    SubModuleOrWire::Wire(self.wires.alloc(RealWire { typ : self.concretize_type(typ), original_wire, source : RealWireDataSource::Constant{value : value.clone() }}))
+                    self.add_wire(typ, original_wire, RealWireDataSource::Constant{value : value.clone() })
                 },
                 Instantiation::Error => {unreachable!()},
             };
