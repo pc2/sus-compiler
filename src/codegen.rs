@@ -1,6 +1,6 @@
 use std::{ops::Deref, io};
 
-use crate::{linker::Linker, flattening::{FlattenedModule, FlatID}, ast::{Module, Span}, arena_alloc::ListAllocator};
+use crate::{linker::Linker, flattening::{FlattenedModule, FlatID}, ast::{Module, Span}, arena_alloc::ListAllocator, instantiation::InstantiatedModule};
 
 
 use moore_circt::{hw, comb, mlir::{self, Owned, builder, OperationExt, SingleBlockOp}, mlir::{Context, OwnedContext, DialectHandle, Builder, Value, Type}};
@@ -19,7 +19,7 @@ impl GenerationContext {
         Self{global_ctx}
     }
 
-    pub fn to_circt(&self) {
+    pub fn to_circt(&self, instance : &InstantiatedModule) {
         let ctx = *self.global_ctx.deref();
         //moore_circt::hw::
         let module = moore_circt::ModuleOp::new(ctx);
@@ -28,6 +28,11 @@ impl GenerationContext {
 
         let mut builder = Builder::new(mod_ctx);
         builder.set_insertion_point_to_start(module.block());
+
+        //let mut wire_names = instance.wires.iter().map(|a| builder.)
+        for (id, w) in &instance.wires {
+
+        }
 
         //mlir_builder.set_loc(span_to_loc(mod_ctx, hir.span()));
         //mlir_builder.set_insertion_point_to_end(self.into_mlir.block());

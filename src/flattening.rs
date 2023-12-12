@@ -35,15 +35,15 @@ impl ConnectionWrite {
     }
 }
 
-#[derive(Debug)]
-pub struct InterfacePort<UID> {
+#[derive(Debug,Clone,Copy)]
+pub struct InterfacePort {
     pub is_input : bool,
-    pub id : UID
+    pub id : FlatID
 }
 
 #[derive(Debug)]
 pub enum Instantiation {
-    SubModule{module_uuid : NamedUUID, typ_span : Span, interface_wires : Vec<InterfacePort<FlatID>>},
+    SubModule{module_uuid : NamedUUID, typ_span : Span, interface_wires : Vec<InterfacePort>},
     PlainWire{read_only : bool, typ : Type, decl_id : Option<DeclID>},
     UnaryOp{typ : Type, op : Operator, right : SpanFlatID},
     BinaryOp{typ : Type, op : Operator, left : SpanFlatID, right : SpanFlatID},
@@ -86,7 +86,7 @@ impl Instantiation {
 
 #[derive(Debug)]
 pub struct Connection {
-    pub num_regs : u32,
+    pub num_regs : i64,
     pub from : SpanFlatID,
     pub to : ConnectionWrite,
     pub condition : FlatID
@@ -148,7 +148,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
 
         Instantiation::SubModule{module_uuid, typ_span, interface_wires}
     }
-    fn desugar_func_call(&self, func_and_args : &[SpanExpression], closing_bracket_pos : usize, condition : FlatID) -> Option<(&Module, &[InterfacePort<FlatID>])> {
+    fn desugar_func_call(&self, func_and_args : &[SpanExpression], closing_bracket_pos : usize, condition : FlatID) -> Option<(&Module, &[InterfacePort])> {
         let (name_expr, name_expr_span) = &func_and_args[0]; // Function name is always there
         let func_instantiation_id = match name_expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {

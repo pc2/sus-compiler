@@ -175,6 +175,12 @@ pub struct Links {
     name_colissions : Vec<(NamedUUID, NamedUUID)>
 }
 
+impl Links {
+    pub fn get_obj_by_name(&self, name : &str) -> Option<&Named> {
+        self.global_namespace.get(name).map(|id| &self.globals[*id])
+    }
+}
+
 // Represents the fully linked set of all files. Incremental operations such as adding and removing files can be performed
 pub struct Linker {
     pub links : Links,
@@ -538,7 +544,7 @@ impl Linker {
             if let Named::Module(md) = named_object {
                 println!("[[{}]]:", md.link_info.name);
                 md.print_flattened_module(self);
-                let inst = self.instantiate(id);    
+                let inst = self.instantiate(id);
             }
         }
     }

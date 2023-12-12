@@ -118,7 +118,7 @@ pub enum AssignableExpression {
 #[derive(Debug)]
 pub struct AssignableExpressionWithModifiers {
     pub expr : SpanAssignableExpression,
-    pub num_regs : u32
+    pub num_regs : i64
 }
 
 #[derive(Debug)]

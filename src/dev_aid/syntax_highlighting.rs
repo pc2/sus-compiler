@@ -1,7 +1,7 @@
 
-use std::{ops::Range, path::PathBuf};
+use std::{ops::Range, path::{PathBuf, Path}};
 
-use crate::{ast::*, tokenizer::*, parser::*, linker::{PreLinker, FileData, Links, NamedUUID, Named, Linkable}, arena_alloc::ArenaVector};
+use crate::{ast::*, tokenizer::*, parser::*, linker::{PreLinker, FileData, Links, NamedUUID, Named, Linkable, Linker, FileUUIDMarker, FileUUID}, arena_alloc::ArenaVector};
 
 use ariadne::FileCache;
 use console::Style;
@@ -210,7 +210,7 @@ fn generate_character_offsets(file_text : &str, tokens : &[Token]) -> Vec<Range<
     character_offsets
 }
 
-pub fn syntax_highlight_file(file_paths : Vec<PathBuf>, settings : &SyntaxHighlightSettings) {
+pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<PathBuf, FileUUIDMarker>) {
     let mut prelinker : PreLinker = PreLinker::new();
     let mut paths_arena = ArenaVector::new();
     for file_path in file_paths {
@@ -233,18 +233,15 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>, settings : &SyntaxHighli
 
     let mut linker = prelinker.link();
 
-    let mut file_cache : FileCache = Default::default();
-
     linker.recompile_all();
     
+    (linker, paths_arena)
+}
+
+pub fn print_all_errors(linker : &Linker, paths_arena : &ArenaVector<PathBuf, FileUUIDMarker>) {
+    let mut file_cache : FileCache = Default::default();
+    
     for (file_uuid, f) in &linker.files {
-        if settings.show_tokens {
-            print_tokens(&f.file_text, &f.tokens);
-        }
-
-        let ide_tokens = create_token_ide_info(f, &linker.links);
-        pretty_print(&f.file_text, &f.tokens, &ide_tokens);
-
         let token_offsets = generate_character_offsets(&f.file_text, &f.tokens);
 
         let mut errors = f.parsing_errors.clone();
@@ -254,4 +251,15 @@ pub fn syntax_highlight_file(file_paths : Vec<PathBuf>, settings : &SyntaxHighli
             err.pretty_print_error(f.parsing_errors.file, &token_offsets, &paths_arena, &mut file_cache);
         }
     }
+}
+
+pub fn syntax_highlight_file(linker : &Linker, file_uuid : FileUUID, settings : &SyntaxHighlightSettings) {
+    let f = &linker.files[file_uuid];
+
+    if settings.show_tokens {
+        print_tokens(&f.file_text, &f.tokens);
+    }
+
+    let ide_tokens = create_token_ide_info(f, &linker.links);
+    pretty_print(&f.file_text, &f.tokens, &ide_tokens);
 }

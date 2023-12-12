@@ -221,6 +221,11 @@ struct ASTParserRollbackable {
     original_global_references_size : usize
 }
 
+struct LeftExpression {
+    expr : SpanExpression,
+    num_regs : i64
+}
+
 impl<'g, 'file> ASTParserContext<'g, 'file> {
     fn add_global_reference(&mut self, name_span : Span) -> usize {
         let idx = self.global_references.len();
@@ -498,12 +503,12 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
 
 
-        let mut left_expressions : Vec<(SpanExpression, u32)> = Vec::new();
+        let mut left_expressions : Vec<LeftExpression> = Vec::new();
         let mut all_decls = true;
         loop { // Loop over a number of declarations possibly
-            let mut reg_count = 0;
+            let mut num_regs = 0;
             while let Some(_tok) = token_stream.eat_is_plain(kw("reg")) {
-                reg_count += 1;
+                num_regs += 1;
             }
 
             let mut tok_stream_copy = token_stream.clone();
@@ -512,13 +517,13 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             if let Some((name, span)) = self.try_parse_declaration(&mut tok_stream_copy, declarations, scope) {
                 // Maybe it's a declaration?
                 *token_stream = tok_stream_copy;
-                left_expressions.push(((Expression::Named(LocalOrGlobal::Local(name)), span), reg_count));
+                left_expressions.push(LeftExpression{expr : (Expression::Named(LocalOrGlobal::Local(name)), span), num_regs});
                 code_block.statements.push((Statement::Declaration(name), span));
             } else {
                 self.rollback(rollback_ctx);
-                if let Some(sp_expr) = self.parse_expression(token_stream, scope) {
+                if let Some(expr) = self.parse_expression(token_stream, scope) {
                     // It's an expression instead!
-                    left_expressions.push((sp_expr, reg_count));
+                    left_expressions.push(LeftExpression{expr, num_regs});
                     all_decls = false;
                 } else {
                     // Also not, error then
@@ -572,13 +577,13 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn parse_statement_handle_equals(&mut self, left_expressions: Vec<(SpanExpression, u32)>, assign_pos: usize, token_stream: &mut TokenStream<'_>, scope: &mut LocalVariableContext<'_, 'file>, statements: &mut Vec<(Statement, Span)>, start_at: usize) -> Option<()> {
+    fn parse_statement_handle_equals(&mut self, left_expressions: Vec<LeftExpression>, assign_pos: usize, token_stream: &mut TokenStream<'_>, scope: &mut LocalVariableContext<'_, 'file>, statements: &mut Vec<(Statement, Span)>, start_at: usize) -> Option<()> {
         if left_expressions.len() == 0 {
             self.error_unexpected_token(&[TOKEN_IDENTIFIER], kw("="), assign_pos, "statement");
             None
         } else if let Some(value) = self.parse_expression(token_stream, scope) {
-            let converted_left : Vec<AssignableExpressionWithModifiers> = left_expressions.into_iter().filter_map(&mut |(expr, num_regs)| {
-                Some(AssignableExpressionWithModifiers{expr : self.convert_expression_to_assignable_expression(expr)?, num_regs})
+            let converted_left : Vec<AssignableExpressionWithModifiers> = left_expressions.into_iter().filter_map(&mut |le: LeftExpression| {
+                Some(AssignableExpressionWithModifiers{expr : self.convert_expression_to_assignable_expression(le.expr)?, num_regs : le.num_regs})
             }).collect();
             let end_at = value.1.1;
             statements.push((Statement::Assign{to : converted_left, eq_sign_position : Some(assign_pos), expr : value}, Span(start_at, end_at)));
@@ -591,7 +596,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn parse_statement_handle_end(&mut self, left_expressions: Vec<(SpanExpression, u32)>, all_decls: bool, statements: &mut Vec<(Statement, Span)>) -> Option<()> {
+    fn parse_statement_handle_end(&mut self, left_expressions: Vec<LeftExpression>, all_decls: bool, statements: &mut Vec<(Statement, Span)>) -> Option<()> {
         // Declarations or single expression only
         // T a;
         // myFunc(x, y);
@@ -599,17 +604,17 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             return None
         } else if left_expressions.len() == 1 {
             // Is a single big expression, or a single declaration
-            let (expr, _reg_count) = left_expressions.into_iter().next().unwrap();
+            let le = left_expressions.into_iter().next().unwrap();
             if all_decls {
                 // decls have been taken care of during try_parse_declaration step
                 return Some(());
             } else {
-                let expr_span = expr.1;
-                statements.push((Statement::Assign{to : Vec::new(), eq_sign_position : None, expr}, expr_span));
+                let expr_span = le.expr.1;
+                statements.push((Statement::Assign{to : Vec::new(), eq_sign_position : None, expr : le.expr}, expr_span));
                 return None;
             }
         } else {
-            self.errors.error_basic(Span(left_expressions[1].0.1.0, left_expressions[left_expressions.len()-1].0.1.1), "Multiple declarations are only allowed in function call syntax: int a, int b = f(x);");
+            self.errors.error_basic(Span(left_expressions[1].expr.1.0, left_expressions[left_expressions.len()-1].expr.1.1), "Multiple declarations are only allowed in function call syntax: int a, int b = f(x);");
             return None;
         }
     }

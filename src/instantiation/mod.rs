@@ -2,7 +2,7 @@ use std::{rc::Rc, ops::Deref, cell::RefCell};
 
 use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Value, Operator, Module}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWrite, ConnectionWritePathElement, InterfacePort}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid, NamedUUID}};
 
-
+pub mod latency;
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
 pub struct WireIDMarker;
@@ -16,7 +16,7 @@ pub type SubModuleID = UUID<SubModuleIDMarker>;
 
 #[derive(Debug)]
 pub struct ConnectFrom {
-    num_regs : u32,
+    num_regs : i64,
     from : WireID,
     condition : WireID
 }
@@ -43,25 +43,25 @@ pub enum RealWireDataSource {
 }
 
 impl RealWireDataSource {
-    fn iter_sources<F : FnMut(WireID) -> ()>(&self, mut f : F) {
+    fn iter_sources_with_min_latency<F : FnMut(WireID, i64) -> ()>(&self, mut f : F) {
         match self {
             RealWireDataSource::ReadOnly => {}
             RealWireDataSource::Multiplexer { sources } => {
                 for s in sources {
-                    f(s.from.from);
-                    f(s.from.condition);
+                    f(s.from.from, s.from.num_regs);
+                    f(s.from.condition, 0);
                 }
             }
             RealWireDataSource::UnaryOp { op, right } => {
-                f(*right);
+                f(*right, 0);
             }
             RealWireDataSource::BinaryOp { op, left, right } => {
-                f(*left);
-                f(*right);
+                f(*left, 0);
+                f(*right, 0);
             }
             RealWireDataSource::ArrayAccess { arr, arr_idx } => {
-                f(*arr);
-                f(*arr_idx);
+                f(*arr, 0);
+                f(*arr_idx, 0);
             }
             RealWireDataSource::Constant { value } => {}
         }
@@ -73,24 +73,29 @@ pub struct RealWire {
     source : RealWireDataSource,
     original_wire : FlatID,
     typ : ConcreteType,
-    absolute_latency : i64 // i64::MIN for invalid. Only temporary
+    latency : i64
 }
 
-const LAETNCY_NOT_SET_YET : i64 = i64::MIN;
+#[derive(Debug,Clone,Copy)]
+pub struct InstantiatedInterfacePort {
+    pub id : WireID,
+    pub is_input : bool,
+    pub absolute_latency : i64
+}
 
 #[derive(Debug)]
-pub struct SubModuleInstance {
-    module_uuid : NamedUUID,
+pub struct SubModule {
+    original_flat : FlatID,
     instance : Rc<InstantiatedModule>,
-    interface_wires : Vec<InterfacePort<WireID>>
+    wires : Vec<WireID>
 }
 
 #[derive(Debug)]
 pub struct InstantiatedModule {
-    pub interface : Vec<WireID>,
+    pub interface : Vec<InstantiatedInterfacePort>,
     pub wires : FlatAlloc<RealWire, WireIDMarker>,
-    pub submodules : FlatAlloc<SubModuleInstance, SubModuleIDMarker>,
-    pub errors : ErrorCollector
+    pub submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
+    pub errors : ErrorCollector,
 }
 
 #[derive(Clone,Copy)]
@@ -114,8 +119,8 @@ impl SubModuleOrWire {
 struct InstantiationContext<'fl, 'l> {
     instance_map : FlatAlloc<SubModuleOrWire, FlatIDMarker>,
     wires : FlatAlloc<RealWire, WireIDMarker>,
-    submodules : FlatAlloc<SubModuleInstance, SubModuleIDMarker>,
-    interface : Vec<WireID>,
+    submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
+    interface : Vec<InstantiatedInterfacePort>,
     errors : ErrorCollector,
 
     module : &'fl Module,
@@ -124,7 +129,7 @@ struct InstantiationContext<'fl, 'l> {
 
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn compute_constant(&self, wire : FlatID) -> Value {
-        let Instantiation::Constant { typ, value } = &self.module.flattened.instantiations[wire] else {todo!()};
+        let Instantiation::Constant { typ : _, value } = &self.module.flattened.instantiations[wire] else {todo!()};
         value.clone()
     }
     fn concretize_type(&self, typ : &Type) -> ConcreteType {
@@ -166,21 +171,30 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             todo!();
         }
 
-        let RealWire{absolute_latency : _, typ : _, original_wire: _, source : RealWireDataSource::Multiplexer { sources }} = &mut self.wires[self.instance_map[to.root].extract_wire()] else {unreachable!("Should only be a writeable wire here")};
+        let RealWire{latency : _, typ : _, original_wire: _, source : RealWireDataSource::Multiplexer { sources }} = &mut self.wires[self.instance_map[to.root].extract_wire()] else {unreachable!("Should only be a writeable wire here")};
 
         sources.push(MultiplexerSource{from, path : new_path})
     }
     fn add_wire(&mut self, typ : &Type, original_wire : FlatID, source : RealWireDataSource) -> SubModuleOrWire {
-        SubModuleOrWire::Wire(self.wires.alloc(RealWire{ absolute_latency : LAETNCY_NOT_SET_YET, typ : self.concretize_type(typ), original_wire, source}))
+        SubModuleOrWire::Wire(self.wires.alloc(RealWire{ latency : i64::MIN /* Invalid */, typ : self.concretize_type(typ), original_wire, source}))
     }
+    fn compute_absolute_latencies(&mut self) {
+
+        
+
+        
+    }
+
+
     fn instantiate_flattened_module(&mut self) {
         for (original_wire, inst) in &self.module.flattened.instantiations {
             let instance_to_add : SubModuleOrWire = match inst {
                 Instantiation::SubModule{module_uuid, typ_span, interface_wires} => {
+                    let instance = self.linker.instantiate(*module_uuid);
                     let interface_real_wires = interface_wires.iter().map(|port| {
-                        InterfacePort { is_input: port.is_input, id: self.instance_map[port.id].extract_wire()}
+                        self.instance_map[port.id].extract_wire()
                     }).collect();
-                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModuleInstance{module_uuid : *module_uuid, instance : self.linker.instantiate(*module_uuid), interface_wires : interface_real_wires}))
+                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, wires : interface_real_wires}))
                 },
                 Instantiation::PlainWire{read_only, typ, decl_id} => {
                     let source = if *read_only {
@@ -252,7 +266,12 @@ impl InstantiationList {
         
             context.instantiate_flattened_module();
             
-            cache_borrow.push(Rc::new(InstantiatedModule{wires : context.wires, submodules : context.submodules, interface : context.interface, errors : context.errors}));
+            cache_borrow.push(Rc::new(InstantiatedModule{
+                wires : context.wires,
+                submodules : context.submodules,
+                interface : context.interface,
+                errors : context.errors
+            }));
         }
         
         let instance_id = 0; // Temporary, will always be 0 while not template arguments
@@ -270,5 +289,3 @@ impl InstantiationList {
         self.cache.borrow_mut().clear()
     }
 }
-
-

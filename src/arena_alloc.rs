@@ -361,6 +361,9 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
         self.data.push(value);
         UUID(uuid, PhantomData)
     }
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
     pub fn iter<'a>(&'a self) -> FlatAllocIter<'a, T, IndexMarker> {
         self.into_iter()
     }
@@ -397,6 +400,14 @@ impl<'a, T, IndexMarker : UUIDMarker> Iterator for FlatAllocIter<'a, T, IndexMar
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(|(id, v)| (UUID(id, PhantomData), v))
     }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+impl<'a, T, IndexMarker : UUIDMarker> ExactSizeIterator for FlatAllocIter<'a, T, IndexMarker> {
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
 }
 
 impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a FlatAlloc<T, IndexMarker> {
@@ -420,6 +431,14 @@ impl<'a, T, IndexMarker : UUIDMarker> Iterator for FlatAllocIterMut<'a, T, Index
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(|(id, v)| (UUID(id, PhantomData), v))
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+impl<'a, T, IndexMarker : UUIDMarker> ExactSizeIterator for FlatAllocIterMut<'a, T, IndexMarker> {
+    fn len(&self) -> usize {
+        self.iter.len()
     }
 }
 
