@@ -203,7 +203,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         self.instance_map[port.id].extract_wire()
                     }).collect();
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, wires : interface_real_wires, name : name.clone()}))
-                },
+                }
                 Instantiation::PlainWire{read_only, identifier_type, typ, decl_id} => {
                     let source = if *read_only {
                         RealWireDataSource::ReadOnly
@@ -213,36 +213,37 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         RealWireDataSource::Multiplexer {is_state, sources : Vec::new()}
                     };
                     self.add_wire(decl_id.map(|id| self.module.declarations[id].name.clone()), typ, original_wire, source)
-                },
+                }
                 Instantiation::UnaryOp{typ, op, right} => {
                     self.add_wire(None, typ, original_wire, RealWireDataSource::UnaryOp{op: *op, right: self.instance_map[right.0].extract_wire() })
-                },
+                }
                 Instantiation::BinaryOp{typ, op, left, right} => {
                     self.add_wire(None, typ, original_wire, RealWireDataSource::BinaryOp{op: *op, left: self.instance_map[left.0].extract_wire(), right: self.instance_map[right.0].extract_wire() })
-                },
+                }
                 Instantiation::ArrayAccess{typ, arr, arr_idx} => {
                     self.add_wire(None, typ, original_wire, RealWireDataSource::ArrayAccess{arr: self.instance_map[arr.0].extract_wire(), arr_idx: self.instance_map[arr_idx.0].extract_wire() })
-                },
+                }
                 Instantiation::Constant{typ, value} => {
                     self.add_wire(None, typ, original_wire, RealWireDataSource::Constant{value : value.clone() })
-                },
+                }
+                Instantiation::Connection(conn) => {
+                    let condition = if conn.condition != UUID::INVALID {
+                        self.instance_map[conn.condition].extract_wire()
+                    } else {
+                        UUID::INVALID
+                    };
+                    let conn_from = ConnectFrom {
+                        num_regs: conn.num_regs,
+                        from: self.instance_map[conn.from.0].extract_wire(), // TODO Span?
+                        condition,
+                    };
+                    
+                    self.process_connection(&conn.to, conn_from);
+                    continue;
+                }
                 Instantiation::Error => {unreachable!()},
             };
             self.instance_map[original_wire] = instance_to_add;
-        }
-        for conn in &self.module.flattened.connections {
-            let condition = if conn.condition != UUID::INVALID {
-                self.instance_map[conn.condition].extract_wire()
-            } else {
-                UUID::INVALID
-            };
-            let conn_from = ConnectFrom {
-                num_regs: conn.num_regs,
-                from: self.instance_map[conn.from.0].extract_wire(), // TODO Span?
-                condition,
-            };
-            
-            self.process_connection(&conn.to, conn_from);
         }
     }
 

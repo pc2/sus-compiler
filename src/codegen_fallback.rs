@@ -42,7 +42,7 @@ pub fn value_to_str(value : &Value) -> String {
     }
 }
 
-pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule, linker : &Linker) -> Option<String> {
+pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<String> {
     let mut program_text : String = format!("module {}(\n\tinput clk, \n", md.link_info.name);
     for (port, real_port) in zip(&md.interface.interface_wires, &instance.interface) {
         if real_port.id == UUID::INVALID {return None;}

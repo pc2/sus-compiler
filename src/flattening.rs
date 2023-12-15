@@ -49,6 +49,7 @@ pub enum Instantiation {
     BinaryOp{typ : Type, op : Operator, left : SpanFlatID, right : SpanFlatID},
     ArrayAccess{typ : Type, arr : SpanFlatID, arr_idx : SpanFlatID},
     Constant{typ : Type, value : Value},
+    Connection(Connection),
     Error
 }
 
@@ -61,6 +62,7 @@ impl Instantiation {
             Instantiation::BinaryOp{typ, op : _, left : _, right : _} => typ,
             Instantiation::ArrayAccess{typ, arr : _, arr_idx : _} => typ,
             Instantiation::Constant{typ, value : _} => typ,
+            Instantiation::Connection(_) => panic!("Calling get_type on Connection!"),
             Instantiation::Error => panic!("This was not properly resolved!")
         }
     }
@@ -79,6 +81,7 @@ impl Instantiation {
             Instantiation::BinaryOp { typ : _, op : _, left, right } => {f(left.0); f(right.0);}
             Instantiation::ArrayAccess { typ : _, arr, arr_idx } => {f(arr.0); f(arr_idx.0)}
             Instantiation::Constant { typ : _, value : _ } => {}
+            Instantiation::Connection(_) => panic!("Calling iter_sources on Connection!"),
             Instantiation::Error => {}
         }
     }
@@ -95,7 +98,6 @@ pub struct Connection {
 struct FlatteningContext<'l, 'm, 'fl> {
     decl_to_flat_map : FlatAlloc<FlatID, DeclIDMarker>,
     instantiations : &'fl ListAllocator<Instantiation, FlatIDMarker>,
-    connections : &'fl BlockVec<Connection>,
     errors : &'fl ErrorCollector,
 
     linker : &'l Linker,
@@ -137,7 +139,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
 
         self.typecheck(connection.from, &expected_type, "connection")?;
 
-        self.connections.alloc(connection);
+        self.instantiations.alloc(Instantiation::Connection(connection));
 
         Some(())
     }
@@ -462,7 +464,6 @@ impl FlattenedModule {
         let mut context = FlatteningContext{
             decl_to_flat_map: module.declarations.iter().map(|_| UUID::INVALID).collect(),
             instantiations: &flat_mod.instantiations,
-            connections: &flat_mod.connections,
             errors: &flat_mod.errors,
             linker,
             module,
@@ -499,7 +500,6 @@ impl FlattenedModule {
         let mut context = FlatteningContext {
             decl_to_flat_map : decl_to_flat_map,
             instantiations : &self.instantiations,
-            connections : &self.connections,
             errors : &self.errors,
             module,
             linker,

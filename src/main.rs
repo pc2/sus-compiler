@@ -34,7 +34,7 @@ fn codegen_to_file(linker : &Linker, id : NamedUUID, md : &Module) {
     let module_name = md.link_info.name.deref();
     println!("Generating Verilog for {module_name}:");
     // gen_ctx.to_circt();
-    let Some(code) = gen_verilog_code(md, &inst, &linker) else {println!("Error"); return;};
+    let Some(code) = gen_verilog_code(md, &inst) else {println!("Error"); return;};
 
     let mut out_file = File::create(format!("verilog_output/{module_name}.v")).unwrap();
     write!(out_file, "{}", code).unwrap()
