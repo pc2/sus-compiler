@@ -179,6 +179,9 @@ impl Links {
     pub fn get_obj_by_name(&self, name : &str) -> Option<&Named> {
         self.global_namespace.get(name).map(|id| &self.globals[*id])
     }
+    pub fn get_obj_id(&self, name : &str) -> Option<NamedUUID> {
+        self.global_namespace.get(name).map(|id| *id)
+    }
 }
 
 // Represents the fully linked set of all files. Incremental operations such as adding and removing files can be performed

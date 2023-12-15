@@ -50,6 +50,10 @@ impl<T, const BLOCK_SIZE : usize> BlockVec<T, BLOCK_SIZE> {
         allocated_id
     }
 
+    pub fn len(&self) -> usize {
+        self.length.get()
+    }
+
     pub fn iter<'s>(&'s self) -> BlockVecIter<'s, T, BLOCK_SIZE> {
         self.into_iter()
     }

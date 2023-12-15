@@ -19,7 +19,7 @@ impl GenerationContext {
         Self{global_ctx}
     }
 
-    pub fn to_circt(&self, instance : &InstantiatedModule) {
+    pub fn to_circt(&self) {
         let ctx = *self.global_ctx.deref();
         //moore_circt::hw::
         let module = moore_circt::ModuleOp::new(ctx);
@@ -28,11 +28,6 @@ impl GenerationContext {
 
         let mut builder = Builder::new(mod_ctx);
         builder.set_insertion_point_to_start(module.block());
-
-        //let mut wire_names = instance.wires.iter().map(|a| builder.)
-        for (id, w) in &instance.wires {
-
-        }
 
         //mlir_builder.set_loc(span_to_loc(mod_ctx, hir.span()));
         //mlir_builder.set_insertion_point_to_end(self.into_mlir.block());
@@ -80,53 +75,4 @@ pub fn to_calyx(md : &Module, flattened : &FlattenedModule, linker : &Linker) {
     let res : CalyxResult<()> = backend.emit(ctx: &ir::Context, file: &mut OutputFile)
 }
 
-pub fn gen_verilog_code(md : &Module, flattened : &FlattenedModule, linker : &Linker) {
-    let mut cur_wire_id : usize = 0;
-    let mut wire_names = flattened.wires.map(&mut |_id, _| {
-        let name = format!("w_{cur_wire_id}");
-        cur_wire_id += 1;
-        name
-    });
-
-    let mut cur_inst_id : usize = 0;
-    let mut instance_names = flattened.instantiations.map(&mut |_id, _| {
-        let name = format!("inst_{cur_inst_id}");
-        cur_inst_id += 1;
-        name
-    });
-
-    let file = &linker.files[md.link_info.file];
-    for (idx, v) in md.declarations.iter().enumerate() {
-        let name = file.file_text[v.name.clone()].to_owned();
-        match &flattened.local_map[idx].wire_or_instance {
-            crate::flattening::WireOrInstantiation::Wire(w_idx) => {
-                wire_names[*w_idx] = name;
-            },
-            crate::flattening::WireOrInstantiation::Instantiation(i_idx) => {
-                instance_names[*i_idx] = name;
-            },
-            crate::flattening::WireOrInstantiation::Other(_) => {},
-        }
-    }
-
-    println!("Module {} {{", &file.file_text[file.tokens[md.link_info.name_token].get_range()]);
-    for (id, w) in &flattened.wires {
-        println!("\twire {:?} {};", w.typ, &wire_names[id]);
-    }
-    println!();
-    for (id, i) in &flattened.instantiations {
-        println!("\tinstantiation {:?} {};", i, &instance_names[id]);
-    }
-    println!();
-    for conn in &flattened.connections {
-        let regs = "reg ".repeat(conn.num_regs as usize);
-
-
-        if conn.condition != WireID::INVALID {
-            
-        }
-        println!("\t·{regs}{:?} {};", i, &instance_names[id]);
-    }
-    println!("}}")
-}
 */

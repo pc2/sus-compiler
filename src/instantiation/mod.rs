@@ -1,6 +1,8 @@
 use std::{rc::Rc, ops::Deref, cell::RefCell};
 
-use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Value, Operator, Module}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWrite, ConnectionWritePathElement, InterfacePort}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid, NamedUUID}};
+use num::{BigUint, FromPrimitive};
+
+use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Value, Operator, Module, IdentifierType}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWrite, ConnectionWritePathElement}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid}};
 
 pub mod latency;
 
@@ -16,9 +18,9 @@ pub type SubModuleID = UUID<SubModuleIDMarker>;
 
 #[derive(Debug)]
 pub struct ConnectFrom {
-    num_regs : i64,
-    from : WireID,
-    condition : WireID
+    pub num_regs : i64,
+    pub from : WireID,
+    pub condition : WireID
 }
 
 #[derive(Debug)]
@@ -33,9 +35,15 @@ pub struct MultiplexerSource {
 }
 
 #[derive(Debug)]
+pub enum StateInitialValue {
+    NotState,
+    State{initial_value : Option<Value>}
+}
+
+#[derive(Debug)]
 pub enum RealWireDataSource {
     ReadOnly,
-    Multiplexer{sources : Vec<MultiplexerSource>},
+    Multiplexer{is_state : StateInitialValue, sources : Vec<MultiplexerSource>},
     UnaryOp{op : Operator, right : WireID},
     BinaryOp{op : Operator, left : WireID, right : WireID},
     ArrayAccess{arr : WireID, arr_idx : WireID},
@@ -46,7 +54,7 @@ impl RealWireDataSource {
     fn iter_sources_with_min_latency<F : FnMut(WireID, i64) -> ()>(&self, mut f : F) {
         match self {
             RealWireDataSource::ReadOnly => {}
-            RealWireDataSource::Multiplexer { sources } => {
+            RealWireDataSource::Multiplexer { is_state, sources } => {
                 for s in sources {
                     f(s.from.from, s.from.num_regs);
                     f(s.from.condition, 0);
@@ -70,10 +78,11 @@ impl RealWireDataSource {
 
 #[derive(Debug)]
 pub struct RealWire {
-    source : RealWireDataSource,
-    original_wire : FlatID,
-    typ : ConcreteType,
-    latency : i64
+    pub source : RealWireDataSource,
+    pub original_wire : FlatID,
+    pub typ : ConcreteType,
+    pub latency : i64,
+    pub name : Box<str>
 }
 
 #[derive(Debug,Clone,Copy)]
@@ -85,13 +94,15 @@ pub struct InstantiatedInterfacePort {
 
 #[derive(Debug)]
 pub struct SubModule {
-    original_flat : FlatID,
-    instance : Rc<InstantiatedModule>,
-    wires : Vec<WireID>
+    pub original_flat : FlatID,
+    pub instance : Rc<InstantiatedModule>,
+    pub wires : Vec<WireID>,
+    pub name : Box<str>
 }
 
 #[derive(Debug)]
 pub struct InstantiatedModule {
+    pub name : Box<str>, // Unique name involving all template arguments
     pub interface : Vec<InstantiatedInterfacePort>,
     pub wires : FlatAlloc<RealWire, WireIDMarker>,
     pub submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
@@ -120,7 +131,6 @@ struct InstantiationContext<'fl, 'l> {
     instance_map : FlatAlloc<SubModuleOrWire, FlatIDMarker>,
     wires : FlatAlloc<RealWire, WireIDMarker>,
     submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
-    interface : Vec<InstantiatedInterfacePort>,
     errors : ErrorCollector,
 
     module : &'fl Module,
@@ -129,8 +139,12 @@ struct InstantiationContext<'fl, 'l> {
 
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn compute_constant(&self, wire : FlatID) -> Value {
-        let Instantiation::Constant { typ : _, value } = &self.module.flattened.instantiations[wire] else {todo!()};
-        value.clone()
+        if let Instantiation::Constant { typ : _, value } = &self.module.flattened.instantiations[wire] {
+            value.clone()
+        } else {
+            println!("TODO HIT");
+            Value::Integer(BigUint::from_u64(3333333).unwrap())
+        }
     }
     fn concretize_type(&self, typ : &Type) -> ConcreteType {
         match typ {
@@ -171,50 +185,46 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             todo!();
         }
 
-        let RealWire{latency : _, typ : _, original_wire: _, source : RealWireDataSource::Multiplexer { sources }} = &mut self.wires[self.instance_map[to.root].extract_wire()] else {unreachable!("Should only be a writeable wire here")};
+        let RealWire{name : _, latency : _, typ : _, original_wire: _, source : RealWireDataSource::Multiplexer { is_state: initial_value, sources }} = &mut self.wires[self.instance_map[to.root].extract_wire()] else {unreachable!("Should only be a writeable wire here")};
 
         sources.push(MultiplexerSource{from, path : new_path})
     }
-    fn add_wire(&mut self, typ : &Type, original_wire : FlatID, source : RealWireDataSource) -> SubModuleOrWire {
-        SubModuleOrWire::Wire(self.wires.alloc(RealWire{ latency : i64::MIN /* Invalid */, typ : self.concretize_type(typ), original_wire, source}))
+    fn add_wire(&mut self, name : Option<Box<str>>, typ : &Type, original_wire : FlatID, source : RealWireDataSource) -> SubModuleOrWire {
+        let name = name.unwrap_or_else(|| {format!("_{}", self.wires.get_next_alloc_id().get_hidden_value()).into_boxed_str()});
+        SubModuleOrWire::Wire(self.wires.alloc(RealWire{ name, latency : i64::MIN /* Invalid */, typ : self.concretize_type(typ), original_wire, source}))
     }
-    fn compute_absolute_latencies(&mut self) {
-
-        
-
-        
-    }
-
 
     fn instantiate_flattened_module(&mut self) {
         for (original_wire, inst) in &self.module.flattened.instantiations {
             let instance_to_add : SubModuleOrWire = match inst {
-                Instantiation::SubModule{module_uuid, typ_span, interface_wires} => {
+                Instantiation::SubModule{module_uuid, name, typ_span, interface_wires} => {
                     let instance = self.linker.instantiate(*module_uuid);
                     let interface_real_wires = interface_wires.iter().map(|port| {
                         self.instance_map[port.id].extract_wire()
                     }).collect();
-                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, wires : interface_real_wires}))
+                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, wires : interface_real_wires, name : name.clone()}))
                 },
-                Instantiation::PlainWire{read_only, typ, decl_id} => {
+                Instantiation::PlainWire{read_only, identifier_type, typ, decl_id} => {
                     let source = if *read_only {
                         RealWireDataSource::ReadOnly
                     } else {
-                        RealWireDataSource::Multiplexer {sources : Vec::new()}
+                        // TODO initial value
+                        let is_state = if *identifier_type == IdentifierType::State {StateInitialValue::State { initial_value: None }} else {StateInitialValue::NotState};
+                        RealWireDataSource::Multiplexer {is_state, sources : Vec::new()}
                     };
-                    self.add_wire(typ, original_wire, source)
+                    self.add_wire(decl_id.map(|id| self.module.declarations[id].name.clone()), typ, original_wire, source)
                 },
                 Instantiation::UnaryOp{typ, op, right} => {
-                    self.add_wire(typ, original_wire, RealWireDataSource::UnaryOp{op: *op, right: self.instance_map[right.0].extract_wire() })
+                    self.add_wire(None, typ, original_wire, RealWireDataSource::UnaryOp{op: *op, right: self.instance_map[right.0].extract_wire() })
                 },
                 Instantiation::BinaryOp{typ, op, left, right} => {
-                    self.add_wire(typ, original_wire, RealWireDataSource::BinaryOp{op: *op, left: self.instance_map[left.0].extract_wire(), right: self.instance_map[right.0].extract_wire() })
+                    self.add_wire(None, typ, original_wire, RealWireDataSource::BinaryOp{op: *op, left: self.instance_map[left.0].extract_wire(), right: self.instance_map[right.0].extract_wire() })
                 },
                 Instantiation::ArrayAccess{typ, arr, arr_idx} => {
-                    self.add_wire(typ, original_wire, RealWireDataSource::ArrayAccess{arr: self.instance_map[arr.0].extract_wire(), arr_idx: self.instance_map[arr_idx.0].extract_wire() })
+                    self.add_wire(None, typ, original_wire, RealWireDataSource::ArrayAccess{arr: self.instance_map[arr.0].extract_wire(), arr_idx: self.instance_map[arr_idx.0].extract_wire() })
                 },
                 Instantiation::Constant{typ, value} => {
-                    self.add_wire(typ, original_wire, RealWireDataSource::Constant{value : value.clone() })
+                    self.add_wire(None, typ, original_wire, RealWireDataSource::Constant{value : value.clone() })
                 },
                 Instantiation::Error => {unreachable!()},
             };
@@ -234,6 +244,21 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             
             self.process_connection(&conn.to, conn_from);
         }
+    }
+
+    fn make_interface(&self) -> Vec<InstantiatedInterfacePort> {
+        self.module.interface.interface_wires.iter().map(|port|  {
+            let real_interface_wire = if port.wire_id != UUID::INVALID {
+                self.instance_map[port.wire_id].extract_wire()
+            } else {
+                UUID::INVALID
+            };
+            InstantiatedInterfacePort {
+                id: real_interface_wire,
+                is_input: port.is_input,
+                absolute_latency: i64::MIN, // INVALID
+            }
+        }).collect()
     }
 }
 
@@ -258,18 +283,19 @@ impl InstantiationList {
                 instance_map : module.flattened.instantiations.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect(),
                 wires : FlatAlloc::new(),
                 submodules : FlatAlloc::new(),
-                interface : Vec::new(),
                 module : module,
                 linker : linker,
                 errors : ErrorCollector::new(module.flattened.errors.file)
             };
         
             context.instantiate_flattened_module();
+            let interface = context.make_interface();
             
             cache_borrow.push(Rc::new(InstantiatedModule{
+                name : module.link_info.name.clone(),
                 wires : context.wires,
                 submodules : context.submodules,
-                interface : context.interface,
+                interface,
                 errors : context.errors
             }));
         }

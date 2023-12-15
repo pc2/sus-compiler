@@ -86,7 +86,8 @@ impl Display for Operator {
 #[derive(Debug,Clone)]
 pub enum Value {
     Bool(bool),
-    Integer(BigUint)
+    Integer(BigUint),
+    Invalid
 }
 
 #[derive(Debug,Clone)]

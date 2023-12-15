@@ -1,5 +1,5 @@
 
-use std::{ops::Range, path::{PathBuf, Path}};
+use std::{ops::Range, path::PathBuf};
 
 use crate::{ast::*, tokenizer::*, parser::*, linker::{PreLinker, FileData, Links, NamedUUID, Named, Linkable, Linker, FileUUIDMarker, FileUUID}, arena_alloc::ArenaVector};
 

@@ -254,6 +254,9 @@ impl<T, IndexMarker : UUIDMarker> ListAllocator<T, IndexMarker> {
     pub fn alloc(&self, v : T) -> UUID<IndexMarker> {
         UUID(self.data.alloc(v), PhantomData)
     }
+    pub fn get_next_alloc_id(&self) -> UUID<IndexMarker> {
+        UUID(self.data.len(), PhantomData)
+    }
     pub fn iter<'a>(&'a self) -> ListAllocIterator<'a, T, IndexMarker> {
         self.into_iter()
     }
@@ -355,6 +358,10 @@ pub struct FlatAlloc<T, IndexMarker> {
 impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
     pub fn new() -> Self {
         Self{data : Vec::new(), _ph : PhantomData}
+    }
+    pub fn get_next_alloc_id(&self) -> UUID<IndexMarker> {
+        let uuid = self.data.len();
+        UUID(uuid, PhantomData)
     }
     pub fn alloc(&mut self, value : T) -> UUID<IndexMarker> {
         let uuid = self.data.len();

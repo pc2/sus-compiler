@@ -39,6 +39,7 @@ impl Value {
         match self {
             Value::Bool(_) => Type::Named(get_builtin_uuid("bool")),
             Value::Integer(_) => Type::Named(get_builtin_uuid("int")),
+            Value::Invalid => Type::Named(UUID::INVALID),
         }
     }
 }
