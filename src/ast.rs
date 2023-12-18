@@ -172,10 +172,6 @@ impl Module {
         for (id, inst) in &self.flattened.instantiations {
             println!("    {:?}: {:?}", id, inst);
         }
-        println!("Connections:");
-        for conn in &self.flattened.connections {
-            println!("    {:?}", conn);
-        }
     }
 }
 

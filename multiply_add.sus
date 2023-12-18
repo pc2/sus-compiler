@@ -255,7 +255,7 @@ module blur : int a, bool done -> int result {
 	state int prev;
 
 	if working {
-		reg result = prev + a; // Add a pipeline stage for shits and giggles
+		reg reg reg result = prev + a; // Add a pipeline stage for shits and giggles
 	}
 	prev = a;
 	working = !done;
@@ -324,8 +324,10 @@ module first_bit_idx_24 : bool[24] bits -> int first {
 	}
 }
 
+
 module permute : bool[128] mbf, int selected_permutation -> bool[128] permuted_mbf {
-	// TODO
+	// cvt_to_double
+	permuted_mbf = mbf;
 }
 
 //timeline (X, [false;24], true -> /, false) | (X, vs, true -> X, true) .. (/, /, false -> X, true)*

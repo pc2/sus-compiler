@@ -3,7 +3,7 @@ use std::ops::Deref;
 use crate::{ast::{Value, Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector, arena_alloc::UUID};
 
 // Types contain everything that cannot be expressed at runtime
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum Type {
     Named(NamedUUID),
     /*Contains a wireID pointing to a constant expression for the array size, 
@@ -12,6 +12,17 @@ pub enum Type {
     to check array sizes, as then we have concrete numbers*/
     Array(Box<(Type, FlatID)>)
 }
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Named(l0), Self::Named(r0)) => l0 == r0,
+            (Self::Array(l0), Self::Array(r0)) => l0.deref().0 == r0.deref().0,
+            _ => false,
+        }
+    }
+}
+impl Eq for Type {}
 
 impl Type {
     pub fn to_string(&self, linker : &Linker) -> String {
@@ -96,6 +107,7 @@ pub fn typecheck(found : &Type, span : Span, expected : &Type, context : &str, l
         let expected_name = expected.to_string(linker);
         let found_name = found.to_string(linker);
         errors.error_basic(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
+        assert!(expected_name != found_name);
         None
     } else {
         Some(())
