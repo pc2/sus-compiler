@@ -1,6 +1,6 @@
 use std::{iter::zip, ops::Deref};
 
-use crate::{ast::{Module, Value, IdentifierType}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{Linker, NamedUUID, get_builtin_uuid}, arena_alloc::UUID, typing::ConcreteType, tokenizer::get_token_type_name, flattening::WireSource};
+use crate::{ast::{Module, Value, IdentifierType}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{NamedUUID, get_builtin_uuid}, arena_alloc::UUID, typing::ConcreteType, tokenizer::get_token_type_name, flattening::WireSource};
 
 fn get_type_name_size(id : NamedUUID) -> u64 {
     if id == get_builtin_uuid("int") {
@@ -55,7 +55,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<
     }
     program_text.push_str(");\n");
 
-    for (id, w) in &instance.wires {
+    for (_id, w) in &instance.wires {
         if let WireSource::NamedWire{read_only : _, identifier_type, decl_id : _} = &md.flattened.instantiations[w.original_wire].extract_wire().inst {
             // Don't print named inputs and outputs, already did that in interface
             match identifier_type {
@@ -63,7 +63,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<
                 IdentifierType::Local | IdentifierType::State => {}
             }
         }
-        let wire_or_reg = if let RealWireDataSource::Multiplexer{is_state: initial_value, sources} = &w.source {
+        let wire_or_reg = if let RealWireDataSource::Multiplexer{is_state: initial_value, sources: _} = &w.source {
             if let StateInitialValue::NotState = initial_value {
                 "/*mux_wire*/ reg"
             } else {
@@ -75,10 +75,27 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<
         program_text.push_str(&typ_to_verilog_array(&w.typ));
         program_text.push(' ');
         program_text.push_str(&w.name);
+
+        match &w.source {
+            RealWireDataSource::UnaryOp { op, right } => {
+                program_text.push_str(&format!(" = {}{}", get_token_type_name(op.op_typ), instance.wires[*right].name));
+            }
+            RealWireDataSource::BinaryOp { op, left, right } => {
+                program_text.push_str(&format!(" = {} {} {}", instance.wires[*left].name, get_token_type_name(op.op_typ), instance.wires[*right].name));
+            }
+            RealWireDataSource::ArrayAccess { arr, arr_idx } => {
+                program_text.push_str(&format!(" = {}[{}]", instance.wires[*arr].name, instance.wires[*arr_idx].name));
+            }
+            RealWireDataSource::Constant { value } => {
+                program_text.push_str(&format!(" = {}", value_to_str(value)));
+            }
+            RealWireDataSource::ReadOnly => {}
+            RealWireDataSource::Multiplexer{is_state : _, sources : _} => {}
+        }
         program_text.push_str(";\n");
     }
     
-    for (id, sm) in &instance.submodules {
+    for (_id, sm) in &instance.submodules {
         program_text.push_str(&sm.instance.name);
         program_text.push(' ');
         program_text.push_str(&sm.name);
@@ -93,7 +110,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<
         program_text.push_str("\n);\n");
     }
 
-    for (id, w) in &instance.wires {
+    for (_id, w) in &instance.wires {
         match &w.source {
             RealWireDataSource::ReadOnly => {}
             RealWireDataSource::Multiplexer { is_state, sources } => {
@@ -102,7 +119,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<
                     StateInitialValue::NotState => {
                         program_text.push_str(&format!("/*always_comb*/ always @(*) begin\n\t{output_name} <= 1'bX; // Not defined when not valid\n"));
                     }
-                    StateInitialValue::State { initial_value } => {
+                    StateInitialValue::State{initial_value : _} => {
                         program_text.push_str(&format!("/*always_ff*/ always @(posedge clk) begin\n"));
                     }
                 }
@@ -127,18 +144,10 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<
                 }
                 program_text.push_str("end\n");
             }
-            RealWireDataSource::UnaryOp { op, right } => {
-                program_text.push_str(&format!("assign {} = {}{};\n", w.name, get_token_type_name(op.op_typ), instance.wires[*right].name));
-            }
-            RealWireDataSource::BinaryOp { op, left, right } => {
-                program_text.push_str(&format!("assign {} = {} {} {};\n", w.name, instance.wires[*left].name, get_token_type_name(op.op_typ), instance.wires[*right].name));
-            }
-            RealWireDataSource::ArrayAccess { arr, arr_idx } => {
-                program_text.push_str(&format!("assign {} = {}[{}];\n", w.name, instance.wires[*arr].name, instance.wires[*arr_idx].name));
-            }
-            RealWireDataSource::Constant { value } => {
-                program_text.push_str(&format!("assign {} = {};\n", w.name, value_to_str(value)));
-            }
+            RealWireDataSource::UnaryOp{op : _, right : _} => {}
+            RealWireDataSource::BinaryOp{op : _, left : _, right : _} => {}
+            RealWireDataSource::ArrayAccess{arr : _, arr_idx : _} => {}
+            RealWireDataSource::Constant{value : _} => {}
         }
     }
 

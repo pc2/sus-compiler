@@ -3,7 +3,7 @@ use std::{ops::{Deref, Range}, iter::zip};
 use crate::{
     ast::{Span, Value, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, IdentifierType, GlobalReference, TypeExpression, DeclIDMarker, DeclID},
     linker::{Linker, Named, Linkable, get_builtin_uuid, FileUUID, NamedUUID},
-    errors::{ErrorCollector, error_info}, arena_alloc::{ListAllocator, UUID, UUIDMarker, FlatAlloc}, tokenizer::kw, typing::{Type, typecheck_unary_operator, get_binary_operator_types, typecheck, typecheck_is_array_indexer}, block_vector::BlockVec
+    errors::{ErrorCollector, error_info}, arena_alloc::{ListAllocator, UUID, UUIDMarker, FlatAlloc}, tokenizer::kw, typing::{Type, typecheck_unary_operator, get_binary_operator_types, typecheck, typecheck_is_array_indexer}
 };
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
@@ -158,7 +158,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
             }
         };
         let func_instantiation = &self.instantiations[func_instantiation_id];
-        let Instantiation::SubModule{module_uuid, name, typ_span, interface_wires} = func_instantiation else {unreachable!("It should be proven {func_instantiation:?} was a Module!");};
+        let Instantiation::SubModule{module_uuid, name : _, typ_span : _, interface_wires} = func_instantiation else {unreachable!("It should be proven {func_instantiation:?} was a Module!");};
         let Named::Module(md) = &self.linker.links.globals[*module_uuid] else {unreachable!("UUID Should be a module!");};
         let (inputs, output_range) = md.interface.get_function_sugar_inputs_outputs();
 
@@ -223,7 +223,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
                 self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : output_type, inst : WireSource::BinaryOp{op : *op, left, right}}))
             }
             Expression::Array(arr_box) => {
-                let (left, right, bracket_span) = arr_box.deref();
+                let (left, right, _bracket_span) = arr_box.deref();
                 let arr = self.flatten_single_expr(left, condition)?;
                 let arr_idx = self.flatten_single_expr(right, condition)?;
                 
@@ -251,7 +251,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
         Some(match expr {
             AssignableExpression::Named{local_idx} => {
                 let root = self.decl_to_flat_map[*local_idx];
-                let WireSource::NamedWire { read_only, identifier_type : _, decl_id } = &self.instantiations[root].extract_wire().inst else {
+                let WireSource::NamedWire { read_only, identifier_type : _, decl_id : _ } = &self.instantiations[root].extract_wire().inst else {
                     unreachable!("Attempting to assign to a Instantiation::PlainWire")
                 };
                 if *read_only {
@@ -262,7 +262,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
                 ConnectionWrite{root, path : Vec::new(), span : *span}
             }
             AssignableExpression::ArrayIndex(arr_box) => {
-                let (arr, idx, bracket_span) = arr_box.deref();
+                let (arr, idx, _bracket_span) = arr_box.deref();
                 let flattened_arr_expr_opt = self.flatten_assignable_expr(arr, condition);
                 
                 let idx_local = self.flatten_single_expr(idx, condition)?;
