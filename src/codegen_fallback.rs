@@ -1,6 +1,6 @@
 use std::{iter::zip, ops::Deref};
 
-use crate::{ast::{Module, Value}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{Linker, NamedUUID, get_builtin_uuid}, arena_alloc::UUID, typing::ConcreteType, tokenizer::get_token_type_name};
+use crate::{ast::{Module, Value, IdentifierType}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{Linker, NamedUUID, get_builtin_uuid}, arena_alloc::UUID, typing::ConcreteType, tokenizer::get_token_type_name, flattening::WireSource};
 
 fn get_type_name_size(id : NamedUUID) -> u64 {
     if id == get_builtin_uuid("int") {
@@ -47,7 +47,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<
     for (port, real_port) in zip(&md.interface.interface_wires, &instance.interface) {
         if real_port.id == UUID::INVALID {return None;}
         let wire = &instance.wires[real_port.id];
-        program_text.push_str(if port.is_input {"\tinput"} else {"\toutput"});
+        program_text.push_str(if port.is_input {"\tinput"} else {"\toutput /*mux_wire*/ reg"});
         program_text.push_str(&typ_to_verilog_array(&wire.typ));
         program_text.push(' ');
         program_text.push_str(&wire.name);
@@ -56,6 +56,13 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<
     program_text.push_str(");\n");
 
     for (id, w) in &instance.wires {
+        if let WireSource::NamedWire{read_only : _, identifier_type, decl_id : _} = &md.flattened.instantiations[w.original_wire].extract_wire().inst {
+            // Don't print named inputs and outputs, already did that in interface
+            match identifier_type {
+                IdentifierType::Input | IdentifierType::Output => {continue;}
+                IdentifierType::Local | IdentifierType::State => {}
+            }
+        }
         let wire_or_reg = if let RealWireDataSource::Multiplexer{is_state: initial_value, sources} = &w.source {
             if let StateInitialValue::NotState = initial_value {
                 "/*mux_wire*/ reg"

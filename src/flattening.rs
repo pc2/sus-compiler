@@ -492,7 +492,7 @@ impl FlattenedModule {
         // Setup Wire Fanouts List for faster processing
         let mut connection_fanin : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.instantiations.iter().map(|_| Vec::new()).collect();
 
-        for (id, conn) in &self.instantiations {
+        for (_id, conn) in &self.instantiations {
             if let Instantiation::Connection(conn) = conn {
                 connection_fanin[conn.to.root].push(conn.from.0);
                 if conn.condition != UUID::INVALID {
@@ -534,7 +534,7 @@ impl FlattenedModule {
                         WireSource::Constant{value : _} => {}
                     }
                 }
-                Instantiation::SubModule{module_uuid, name, typ_span, interface_wires} => {
+                Instantiation::SubModule{module_uuid : _, name : _, typ_span : _, interface_wires} => {
                     for port in interface_wires {
                         if port.is_input {
                             func(port.id);
@@ -555,7 +555,7 @@ impl FlattenedModule {
         // Now produce warnings from the unused list
         for (id, inst) in &self.instantiations {
             if !is_instance_used_map[id] {
-                if let Instantiation::Wire(WireInstance{typ : _, inst : WireSource::NamedWire { read_only : _, identifier_type, decl_id : Some(decl_id) }}) = inst {
+                if let Instantiation::Wire(WireInstance{typ : _, inst : WireSource::NamedWire { read_only : _, identifier_type : _, decl_id : Some(decl_id) }}) = inst {
                     self.errors.warn_basic(Span::from(md.declarations[*decl_id].name_token), "Unused Variable: This variable does not affect the output ports of this module");
                 }
             }
