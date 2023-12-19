@@ -515,7 +515,7 @@ impl Linker {
         // First create initial flattening for everything, to produce the necessary interfaces
 
         let mut interface_vec : Vec<(NamedUUID, FlattenedInterface, FlattenedModule)> = Vec::new();
-        let mut initial_flat_vec : Vec<(NamedUUID, FlatAlloc<FlatID, DeclIDMarker>)> = Vec::new();
+        let mut initial_flat_vec : Vec<(NamedUUID, FlatAlloc<Option<FlatID>, DeclIDMarker>)> = Vec::new();
         for (id, named_object) in &self.links.globals {
             println!("Initializing Interface for {}", named_object.get_name());
             if let Named::Module(md) = named_object {

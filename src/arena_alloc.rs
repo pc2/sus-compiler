@@ -2,6 +2,9 @@ use std::{ops::{IndexMut, Index}, marker::PhantomData, iter::Enumerate, fmt};
 
 use crate::block_vector::{BlockVec, BlockVecIterMut, BlockVecIter};
 
+
+// TODO add custom niche for more efficient Options, wait until custom niches are stabilized (https://internals.rust-lang.org/t/nonmaxusize-and-niche-value-optimisation/19661)
+// Maybe use NonZeroUsize (https://doc.rust-lang.org/std/num/struct.NonZeroUsize.html)
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UUID<IndexMarker : UUIDMarker>(usize, PhantomData<IndexMarker>);
 
@@ -12,25 +15,11 @@ pub trait UUIDMarker {
 impl<IndexMarker : UUIDMarker> fmt::Debug for UUID<IndexMarker> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(IndexMarker::DISPLAY_NAME)?;
-        if self.0 == Self::INVALID.0 {
-            f.write_str("INV")
-        } else {
-            self.0.fmt(f)
-        }
+        self.0.fmt(f)
     }
 }
-
-impl<IndexMarker : UUIDMarker> Default for UUID<IndexMarker> {
-    fn default() -> Self {
-        Self::INVALID
-    }
-}
-
-const INVALID_UUID_VALUE : usize = usize::MAX;
 
 impl<IndexMarker : UUIDMarker> UUID<IndexMarker> {
-    pub const INVALID : Self = UUID(INVALID_UUID_VALUE, PhantomData);
-
     pub const fn from_hidden_value(v : usize) -> Self {
         UUID(v, PhantomData)
     }
@@ -97,7 +86,6 @@ impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ArenaAllocator<T,
     type Output = T;
 
     fn index(&self, UUID(uuid, _): UUID<IndexMarker>) -> &Self::Output {
-        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index");
         assert!(self.data[uuid].is_some());
         self.data[uuid].as_ref().unwrap()
     }
@@ -105,7 +93,6 @@ impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ArenaAllocator<T,
 
 impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for ArenaAllocator<T, IndexMarker> {
     fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
-        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index_mut");
         assert!(self.data[uuid].is_some());
         self.data[uuid].as_mut().unwrap()
     }
@@ -208,14 +195,12 @@ impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ArenaVector<T, In
     type Output = T;
 
     fn index(&self, UUID(uuid, _): UUID<IndexMarker>) -> &Self::Output {
-        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index");
         self.data[uuid].as_ref().unwrap()
     }
 }
 
 impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for ArenaVector<T, IndexMarker> {
     fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
-        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index_mut");
         self.data[uuid].as_mut().unwrap()
     }
 }
@@ -269,14 +254,12 @@ impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ListAllocator<T, 
     type Output = T;
 
     fn index(&self, UUID(uuid, _): UUID<IndexMarker>) -> &Self::Output {
-        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index");
         &self.data[uuid]
     }
 }
 
 impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for ListAllocator<T, IndexMarker> {
     fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
-        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index_mut");
         &mut self.data[uuid]
     }
 }
@@ -383,14 +366,12 @@ impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for FlatAlloc<T, Inde
     type Output = T;
 
     fn index(&self, UUID(uuid, _): UUID<IndexMarker>) -> &Self::Output {
-        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index");
         &self.data[uuid]
     }
 }
 
 impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for FlatAlloc<T, IndexMarker> {
     fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
-        assert!(uuid != INVALID_UUID_VALUE, "Invalid UUID passed to index_mut");
         &mut self.data[uuid]
     }
 }

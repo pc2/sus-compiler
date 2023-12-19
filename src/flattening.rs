@@ -81,7 +81,7 @@ impl Instantiation {
 }
 
 struct FlatteningContext<'l, 'm, 'fl> {
-    decl_to_flat_map : FlatAlloc<FlatID, DeclIDMarker>,
+    decl_to_flat_map : FlatAlloc<Option<FlatID>, DeclIDMarker>,
     instantiations : &'fl ListAllocator<Instantiation, FlatIDMarker>,
     errors : &'fl ErrorCollector,
 
@@ -153,7 +153,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
         let (name_expr, name_expr_span) = &func_and_args[0]; // Function name is always there
         let func_instantiation_id = match name_expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {
-                self.decl_to_flat_map[*l]
+                self.decl_to_flat_map[*l].unwrap()
             }
             Expression::Named(LocalOrGlobal::Global(g)) => {
                 let module_ref = self.module.link_info.global_references[*g];
@@ -205,8 +205,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
     fn flatten_single_expr(&self, (expr, expr_span) : &SpanExpression, condition : Option<FlatID>) -> Option<SpanFlatID> {
         let single_connection_side = match expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {
-                assert!(self.decl_to_flat_map[*l] != UUID::INVALID);
-                self.decl_to_flat_map[*l]
+                self.decl_to_flat_map[*l].unwrap()
             }
             Expression::Named(LocalOrGlobal::Global(g)) => {
                 let r = self.module.link_info.global_references[*g];
@@ -260,7 +259,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
     fn flatten_assignable_expr(&self, (expr, span) : &SpanAssignableExpression, condition : Option<FlatID>) -> Option<ConnectionWrite> {
         Some(match expr {
             AssignableExpression::Named{local_idx} => {
-                let root = self.decl_to_flat_map[*local_idx];
+                let root = self.decl_to_flat_map[*local_idx].unwrap();
                 let WireSource::NamedWire { read_only, identifier_type : _, decl_id : _ } = &self.instantiations[root].extract_wire().inst else {
                     unreachable!("Attempting to assign to a Instantiation::PlainWire")
                 };
@@ -300,14 +299,11 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
                 Statement::Declaration(decl_id) => {
                     let decl = &self.module.declarations[*decl_id];
 
-                    let typ = self.map_to_type(&decl.typ.0, &self.module.link_info.global_references) else {continue;};
+                    let typ = self.map_to_type(&decl.typ.0, &self.module.link_info.global_references);
                     let typ_span = decl.typ.1;
 
-                    let decl_typ_root_reference = typ.get_root();
-                    let inst = if decl_typ_root_reference == UUID::INVALID {
-                        Instantiation::Error // Error's covered by linker
-                    } else {
-                        match &self.linker.links.globals[decl_typ_root_reference] {
+                    let inst = if let Some(root_ref) = typ.get_root() {
+                        match &self.linker.links.globals[root_ref] {
                             Named::Constant(c) => {
                                 self.errors.error_basic(typ_span, format!("This should be the type of a declaration, but it refers to the constant '{}'", c.get_full_name()));
                                 Instantiation::Error
@@ -326,10 +322,12 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
                                 Instantiation::Wire(WireInstance{typ, span : typ_span, inst : WireSource::NamedWire{read_only : false, identifier_type : decl.identifier_type, decl_id : Some(*decl_id)}})
                             }
                         }
+                    } else {
+                        Instantiation::Error // Error's covered by linker
                     };
 
                     let wire_id = self.instantiations.alloc(inst);
-                    self.decl_to_flat_map[*decl_id] = wire_id;
+                    self.decl_to_flat_map[*decl_id] = Some(wire_id);
                 }
                 Statement::If{condition : condition_expr, then, els} => {
                     let Some(if_statement_condition) = self.flatten_single_expr(condition_expr, condition) else {continue;};
@@ -444,7 +442,7 @@ impl FlattenedModule {
     Produces an initial FlattenedModule, in which the interface types have already been resolved. 
     Must be further processed by flatten, but this requires all modules to have been Initial Flattened for dependency resolution
     */
-    pub fn initialize_interfaces(linker : &Linker, module : &Module) -> (FlattenedInterface, FlattenedModule, FlatAlloc<FlatID, DeclIDMarker>) {
+    pub fn initialize_interfaces(linker : &Linker, module : &Module) -> (FlattenedInterface, FlattenedModule, FlatAlloc<Option<FlatID>, DeclIDMarker>) {
         let mut interface = FlattenedInterface::new();
         
         let flat_mod = FlattenedModule {
@@ -453,7 +451,7 @@ impl FlattenedModule {
         };
 
         let mut context = FlatteningContext{
-            decl_to_flat_map: module.declarations.iter().map(|_| UUID::INVALID).collect(),
+            decl_to_flat_map: module.declarations.iter().map(|_| None).collect(),
             instantiations: &flat_mod.instantiations,
             errors: &flat_mod.errors,
             linker,
@@ -471,7 +469,7 @@ impl FlattenedModule {
             let wire_id = context.instantiations.alloc(Instantiation::Wire(WireInstance{typ : typ.clone(), span : decl.typ.1, inst : WireSource::NamedWire{read_only: is_input, identifier_type : decl.identifier_type, decl_id : Some(decl_id)}}));
             
             interface.interface_wires.push(FlattenedInterfacePort { wire_id, is_input, typ, port_name: decl.name.clone(), span: decl.span });
-            context.decl_to_flat_map[decl_id] = wire_id;
+            context.decl_to_flat_map[decl_id] = Some(wire_id);
         }
 
         let decl_to_flat_map = context.decl_to_flat_map;
@@ -484,7 +482,7 @@ impl FlattenedModule {
     The Generating Structure of the code is not yet executed. 
     It is template-preserving
     */
-    pub fn flatten(&self, module : &Module, linker : &Linker, decl_to_flat_map : FlatAlloc<FlatID, DeclIDMarker>) {
+    pub fn flatten(&self, module : &Module, linker : &Linker, decl_to_flat_map : FlatAlloc<Option<FlatID>, DeclIDMarker>) {
         let mut context = FlatteningContext {
             decl_to_flat_map : decl_to_flat_map,
             instantiations : &self.instantiations,

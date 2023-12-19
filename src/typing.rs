@@ -39,10 +39,10 @@ impl Type {
             Type::Array(sub) => sub.deref().0.to_string(linker) + "[]",
         }
     }
-    pub fn get_root(&self) -> NamedUUID {
+    pub fn get_root(&self) -> Option<NamedUUID> {
         match self {
-            Type::Invalid => {unreachable!()}
-            Type::Named(name) => *name,
+            Type::Invalid => {None}
+            Type::Named(name) => Some(*name),
             Type::Array(sub) => sub.0.get_root(),
         }
     }
