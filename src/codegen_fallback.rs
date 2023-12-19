@@ -42,10 +42,11 @@ pub fn value_to_str(value : &Value) -> String {
     }
 }
 
-pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<String> {
+pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String {
+    assert!(!instance.errors.did_error(), "Module cannot have experienced an error");
     let mut program_text : String = format!("module {}(\n\tinput clk, \n", md.link_info.name);
-    for (port, real_port) in zip(&md.interface.interface_wires, &instance.interface) {
-        if real_port.id == UUID::INVALID {return None;}
+    let submodule_interface = instance.interface.as_ref().unwrap();
+    for (port, real_port) in zip(&md.interface.interface_wires, submodule_interface) {
         let wire = &instance.wires[real_port.id];
         program_text.push_str(if port.is_input {"\tinput"} else {"\toutput /*mux_wire*/ reg"});
         program_text.push_str(&typ_to_verilog_array(&wire.typ));
@@ -64,7 +65,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<
             }
         }
         let wire_or_reg = if let RealWireDataSource::Multiplexer{is_state: initial_value, sources: _} = &w.source {
-            if let StateInitialValue::NotState = initial_value {
+            if let StateInitialValue::Combinatorial = initial_value {
                 "/*mux_wire*/ reg"
             } else {
                 "reg"
@@ -100,7 +101,8 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<
         program_text.push(' ');
         program_text.push_str(&sm.name);
         program_text.push_str("(\n.clk(clk)");
-        for (port, wire) in zip(&sm.instance.interface, &sm.wires) {
+        let Some(sm_interface) = &sm.instance.interface else {unreachable!()}; // Having an invalid interface in a submodule is an error! This should have been caught before!
+        for (port, wire) in zip(sm_interface, &sm.wires) {
             program_text.push_str(",\n.");
             program_text.push_str(&sm.instance.wires[port.id].name);
             program_text.push('(');
@@ -116,7 +118,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<
             RealWireDataSource::Multiplexer { is_state, sources } => {
                 let output_name = w.name.deref();
                 match is_state {
-                    StateInitialValue::NotState => {
+                    StateInitialValue::Combinatorial => {
                         program_text.push_str(&format!("/*always_comb*/ always @(*) begin\n\t{output_name} <= 1'bX; // Not defined when not valid\n"));
                     }
                     StateInitialValue::State{initial_value : _} => {
@@ -135,8 +137,8 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<
                         }
                     }
                     let from_name = instance.wires[s.from.from].name.deref();
-                    if s.from.condition != UUID::INVALID {
-                        let cond = instance.wires[s.from.condition].name.deref();
+                    if let Some(cond) = s.from.condition {
+                        let cond = instance.wires[cond].name.deref();
                         program_text.push_str(&format!("\tif({cond}) begin {output_name}{path} <= {from_name}; end\n"));
                     } else {
                         program_text.push_str(&format!("\t{output_name}{path} <= {from_name};\n"));
@@ -153,5 +155,5 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> Option<
 
     program_text.push_str("endmodule\n");
 
-    Some(program_text)
+    program_text
 }

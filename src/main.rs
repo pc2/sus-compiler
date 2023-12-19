@@ -28,16 +28,22 @@ use codegen_fallback::gen_verilog_code;
 use dev_aid::syntax_highlighting::*;
 use linker::{Named, Linker, NamedUUID};
 
-fn codegen_to_file(linker : &Linker, id : NamedUUID, md : &Module) {
+fn codegen_to_file(linker : &Linker, id : NamedUUID, md : &Module) -> Option<()> {
     let inst = linker.instantiate(id);
 
     let module_name = md.link_info.name.deref();
+
+    if inst.errors.did_error() {
+        println!("There were errors in {module_name}");
+        return None;
+    }
     println!("Generating Verilog for {module_name}:");
     // gen_ctx.to_circt();
-    let Some(code) = gen_verilog_code(md, &inst) else {println!("Error"); return;};
+    let code = gen_verilog_code(md, &inst);
 
     let mut out_file = File::create(format!("verilog_output/{module_name}.v")).unwrap();
-    write!(out_file, "{}", code).unwrap()
+    write!(out_file, "{}", code).unwrap();
+    Some(())
 }
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {

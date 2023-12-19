@@ -2,7 +2,7 @@ use std::{rc::Rc, ops::Deref, cell::RefCell};
 
 use num::{BigUint, FromPrimitive};
 
-use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Value, Operator, Module, IdentifierType}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWrite, ConnectionWritePathElement, WireSource}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid}};
+use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Value, Operator, Module, IdentifierType}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWrite, ConnectionWritePathElement, WireSource}, errors::{ErrorCollector, error_info}, linker::{Linker, get_builtin_uuid}};
 
 pub mod latency;
 
@@ -20,7 +20,7 @@ pub type SubModuleID = UUID<SubModuleIDMarker>;
 pub struct ConnectFrom {
     pub num_regs : i64,
     pub from : WireID,
-    pub condition : WireID
+    pub condition : Option<WireID>
 }
 
 #[derive(Debug)]
@@ -36,7 +36,7 @@ pub struct MultiplexerSource {
 
 #[derive(Debug)]
 pub enum StateInitialValue {
-    NotState,
+    Combinatorial,
     State{initial_value : Option<Value>}
 }
 
@@ -57,7 +57,9 @@ impl RealWireDataSource {
             RealWireDataSource::Multiplexer { is_state, sources } => {
                 for s in sources {
                     f(s.from.from, s.from.num_regs);
-                    f(s.from.condition, 0);
+                    if let Some(c) = s.from.condition {
+                        f(c, 0);
+                    }
                 }
             }
             RealWireDataSource::UnaryOp { op, right } => {
@@ -103,7 +105,7 @@ pub struct SubModule {
 #[derive(Debug)]
 pub struct InstantiatedModule {
     pub name : Box<str>, // Unique name involving all template arguments
-    pub interface : Vec<InstantiatedInterfacePort>,
+    pub interface : Option<Vec<InstantiatedInterfacePort>>, // Interface is only valid if all wires of the interface were valid
     pub wires : FlatAlloc<RealWire, WireIDMarker>,
     pub submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
     pub errors : ErrorCollector,
@@ -146,17 +148,20 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             Value::Integer(BigUint::from_u64(3333333).unwrap())
         }
     }
-    fn concretize_type(&self, typ : &Type) -> ConcreteType {
+    fn concretize_type(&self, typ : &Type) -> Option<ConcreteType> {
         match typ {
+            Type::Invalid => {
+                None
+            }
             Type::Named(n) => {
-                ConcreteType::Named(*n)
+                Some(ConcreteType::Named(*n))
             }
             Type::Array(arr_box) => {
                 let (arr_content_typ, arr_size_wire) = arr_box.deref();
-                let inner_typ = self.concretize_type(arr_content_typ);
+                let inner_typ = self.concretize_type(arr_content_typ)?;
                 let Value::Integer(v) = self.compute_constant(*arr_size_wire) else {panic!("Not an int, should have been solved beforehand!")};
                 let arr_usize = u64::try_from(v).expect("Array size cannot exceed u64::MAX");
-                ConcreteType::Array(Box::new((inner_typ, arr_usize)))
+                Some(ConcreteType::Array(Box::new((inner_typ, arr_usize))))
             }
         }
     }
@@ -185,7 +190,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             todo!();
         }
 
-        let RealWire{name : _, latency : _, typ : _, original_wire: _, source : RealWireDataSource::Multiplexer { is_state: initial_value, sources }} = &mut self.wires[self.instance_map[to.root].extract_wire()] else {unreachable!("Should only be a writeable wire here")};
+        let RealWire{name : _, latency : _, typ : _, original_wire: _, source : RealWireDataSource::Multiplexer { is_state : _, sources }} = &mut self.wires[self.instance_map[to.root].extract_wire()] else {unreachable!("Should only be a writeable wire here")};
 
         sources.push(MultiplexerSource{from, path : new_path})
     }
@@ -206,8 +211,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                                 RealWireDataSource::ReadOnly
                             } else {
                                 // TODO initial value
-                                let is_state = if *identifier_type == IdentifierType::State {StateInitialValue::State { initial_value: None }} else {StateInitialValue::NotState};
-                                RealWireDataSource::Multiplexer {is_state, sources : Vec::new()}
+                                let is_state = if *identifier_type == IdentifierType::State{StateInitialValue::State{initial_value: None}} else {StateInitialValue::Combinatorial};
+                                RealWireDataSource::Multiplexer{is_state, sources : Vec::new()}
                             };
                             (decl_id.map(|id| self.module.declarations[id].name.clone()), source)
                         }
@@ -225,14 +230,15 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         }
                     };
                     let name = name.unwrap_or_else(|| {format!("_{}", self.wires.get_next_alloc_id().get_hidden_value()).into_boxed_str()});
-                    SubModuleOrWire::Wire(self.wires.alloc(RealWire{ name, latency : i64::MIN /* Invalid */, typ : self.concretize_type(&w.typ), original_wire, source}))
+                    let Some(typ) = self.concretize_type(&w.typ) else {
+                        let typ_name = w.typ.to_string(self.linker);
+                        self.errors.error_basic(w.span, format!("Could not properly instantiate type {typ_name}"));
+                        return; // Exit early, do not produce invalid wires in InstantiatedModule
+                    };
+                    SubModuleOrWire::Wire(self.wires.alloc(RealWire{ name, latency : i64::MIN /* Invalid */, typ, original_wire, source}))
                 }
                 Instantiation::Connection(conn) => {
-                    let condition = if conn.condition != UUID::INVALID {
-                        self.instance_map[conn.condition].extract_wire()
-                    } else {
-                        UUID::INVALID
-                    };
+                    let condition = conn.condition.map(|found_conn| self.instance_map[found_conn].extract_wire());
                     let conn_from = ConnectFrom {
                         num_regs: conn.num_regs,
                         from: self.instance_map[conn.from.0].extract_wire(), // TODO Span?
@@ -248,19 +254,26 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
     }
 
-    fn make_interface(&self) -> Vec<InstantiatedInterfacePort> {
-        self.module.interface.interface_wires.iter().map(|port|  {
-            let real_interface_wire = if port.wire_id != UUID::INVALID {
-                self.instance_map[port.wire_id].extract_wire()
-            } else {
-                UUID::INVALID
-            };
-            InstantiatedInterfacePort {
-                id: real_interface_wire,
-                is_input: port.is_input,
-                absolute_latency: i64::MIN, // INVALID
+    // Returns a proper interface if all wires involved did not produce an error. If a wire did produce an error then returns None. 
+    fn make_interface(&self) -> Option<Vec<InstantiatedInterfacePort>> {
+        let mut result = Vec::new();
+        result.reserve(self.module.interface.interface_wires.len());
+        for port in &self.module.interface.interface_wires {
+            match &self.instance_map[port.wire_id] {
+                SubModuleOrWire::Wire(w) => {
+                    result.push(InstantiatedInterfacePort {
+                        id: *w,
+                        is_input: port.is_input,
+                        absolute_latency: i64::MIN, // INVALID
+                    });
+                }
+                SubModuleOrWire::Unnasigned => {
+                    return None
+                }
+                SubModuleOrWire::SubModule(_) => unreachable!()
             }
-        }).collect()
+        }
+        Some(result)
     }
 }
 

@@ -214,14 +214,14 @@ impl Links {
     fn resolve_dependencies(namespace : &HashMap<Box<str>, NamedUUID>, file : &FileData, link_info : &mut LinkInfo) {
         let mut all_resolved = true;
         for GlobalReference(reference_span, uuid) in &mut link_info.global_references {
-            if *uuid == NamedUUID::INVALID {
+            if uuid.is_none() {
                 let reference_name_str = file.get_span_text(*reference_span);
 
                 *uuid = if let Some(found) = namespace.get(reference_name_str) {
-                    *found
+                    Some(*found)
                 } else {
                     all_resolved = false;
-                    UUID::INVALID
+                    None
                 }
             }
         }
@@ -331,7 +331,7 @@ impl Linker {
                 continue; // Early exit because we know this object contains no linking errors
             }
             for GlobalReference(reference_span, ref_uuid) in &object_link_info.global_references {
-                if *ref_uuid == NamedUUID::INVALID {
+                if ref_uuid.is_none() {
                     let reference_text = file.get_span_text(*reference_span);
                     errors.error_basic(*reference_span, format!("No Value or Type of the name '{reference_text}' was found. Did you forget to import it?"));
                 }
@@ -369,9 +369,11 @@ impl Linker {
         for (_uuid, v) in &mut self.links.globals {
             if let Some(info) = v.get_link_info_mut() { // Builtins can't refer to other things
                 for GlobalReference(_name, v) in &mut info.global_references {
-                    if back_reference_set.contains(v) {
-                        *v = NamedUUID::INVALID;
-                        info.is_fully_linked = false;
+                    if let Some(v_id) = *v {
+                        if back_reference_set.contains(&v_id) {
+                            *v = None;
+                            info.is_fully_linked = false;
+                        }
                     }
                 }
             }
@@ -461,49 +463,51 @@ impl Linker {
         md
     }
 
-    pub fn try_get_constant(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &ErrorCollector) -> Option<Value> {
-        if uuid == UUID::INVALID {
-            return None; // Error reporting already handled by linking
-        }
-        match &self.links.globals[uuid] {
-            Named::Constant(NamedConstant::Builtin(_name, v)) => {
-                Some(v.clone())
-            },
-            other => {
-                let info = other.get_linking_error_location();
-                let infos = if let Some((file, span)) = info.location {
-                    vec![error_info(span, file, "Defined here")]
-                } else {
-                    vec![]
-                };
-                let name = info.name;
-                let ident_type = info.named_type;
-                errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a Constant!"), infos);
-                None
+    pub fn try_get_constant(&self, GlobalReference(identifier_span, ref_uuid) : GlobalReference, errors : &ErrorCollector) -> Option<Value> {
+        if let Some(uuid) = ref_uuid {
+            match &self.links.globals[uuid] {
+                Named::Constant(NamedConstant::Builtin(_name, v)) => {
+                    Some(v.clone())
+                },
+                other => {
+                    let info = other.get_linking_error_location();
+                    let infos = if let Some((file, span)) = info.location {
+                        vec![error_info(span, file, "Defined here")]
+                    } else {
+                        vec![]
+                    };
+                    let name = info.name;
+                    let ident_type = info.named_type;
+                    errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a Constant!"), infos);
+                    None
+                }
             }
+        } else {
+            None
         }
     }
 
-    pub fn try_get_module(&self, GlobalReference(identifier_span, uuid) : GlobalReference, errors : &ErrorCollector) -> Option<&Module> {
-        if uuid == UUID::INVALID {
-            return None; // Error reporting already handled by linking
-        }
-        match &self.links.globals[uuid] {
-            Named::Module(md) => {
-                Some(md)
-            },
-            other => {
-                let info = other.get_linking_error_location();
-                let infos = if let Some((file, span)) = info.location {
-                    vec![error_info(span, file, "Defined here")]
-                } else {
-                    vec![]
-                };
-                let name = info.name;
-                let ident_type = info.named_type;
-                errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a Module!"), infos);
-                None
+    pub fn try_get_module(&self, GlobalReference(identifier_span, ref_uuid) : GlobalReference, errors : &ErrorCollector) -> Option<&Module> {
+        if let Some(uuid) = ref_uuid {
+            match &self.links.globals[uuid] {
+                Named::Module(md) => {
+                    Some(md)
+                },
+                other => {
+                    let info = other.get_linking_error_location();
+                    let infos = if let Some((file, span)) = info.location {
+                        vec![error_info(span, file, "Defined here")]
+                    } else {
+                        vec![]
+                    };
+                    let name = info.name;
+                    let ident_type = info.named_type;
+                    errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a Module!"), infos);
+                    None
+                }
             }
+        } else {
+            None
         }
     }
 

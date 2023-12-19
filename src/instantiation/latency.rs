@@ -37,9 +37,12 @@ impl LatencyComputer {
 
         // Submodules Fanin
         for (_id, sub_mod) in submodules {
-            for (input_wire, input_port) in zip(&sub_mod.wires, &sub_mod.instance.interface) {
+            // All submodules must be fully valid
+            assert!(!sub_mod.instance.errors.did_error());
+            let sub_mod_interface = sub_mod.instance.interface.as_deref().unwrap();
+            for (input_wire, input_port) in zip(&sub_mod.wires, sub_mod_interface) {
                 if !input_port.is_input {continue;}
-                for (output_wire, output_port) in zip(&sub_mod.wires, &sub_mod.instance.interface) {
+                for (output_wire, output_port) in zip(&sub_mod.wires, sub_mod_interface) {
                     if output_port.is_input {continue;}
                     
                     let delta_latency = output_port.absolute_latency - input_port.absolute_latency;

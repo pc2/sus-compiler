@@ -176,7 +176,7 @@ impl Module {
 }
 
 #[derive(Debug,Clone,Copy)]
-pub struct GlobalReference(pub Span, pub NamedUUID); // token index, and name span
+pub struct GlobalReference(pub Span, pub Option<NamedUUID>); // token index, and name span
 
 #[derive(Debug)]
 pub struct ASTRoot {

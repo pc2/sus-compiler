@@ -1,10 +1,11 @@
 use std::ops::Deref;
 
-use crate::{ast::{Value, Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector, arena_alloc::UUID};
+use crate::{ast::{Value, Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector};
 
 // Types contain everything that cannot be expressed at runtime
 #[derive(Debug, Clone)]
 pub enum Type {
+    Invalid,
     Named(NamedUUID),
     /*Contains a wireID pointing to a constant expression for the array size, 
     but doesn't actually take size into account for type checking as that would
@@ -12,6 +13,8 @@ pub enum Type {
     to check array sizes, as then we have concrete numbers*/
     Array(Box<(Type, FlatID)>)
 }
+
+pub type SpanType = (Type, Span);
 
 impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
@@ -27,18 +30,18 @@ impl Eq for Type {}
 impl Type {
     pub fn to_string(&self, linker : &Linker) -> String {
         match self {
+            Type::Invalid => {
+                "{unknown}".to_owned()
+            }
             Type::Named(n) => {
-                if *n == UUID::INVALID {
-                    "{unknown}".to_owned()
-                } else {
-                    linker.links[*n].get_full_name()
-                }
+                linker.links[*n].get_full_name()
             }
             Type::Array(sub) => sub.deref().0.to_string(linker) + "[]",
         }
     }
     pub fn get_root(&self) -> NamedUUID {
         match self {
+            Type::Invalid => {unreachable!()}
             Type::Named(name) => *name,
             Type::Array(sub) => sub.0.get_root(),
         }
@@ -50,7 +53,7 @@ impl Value {
         match self {
             Value::Bool(_) => Type::Named(get_builtin_uuid("bool")),
             Value::Integer(_) => Type::Named(get_builtin_uuid("int")),
-            Value::Invalid => Type::Named(UUID::INVALID),
+            Value::Invalid => Type::Invalid,
         }
     }
 }

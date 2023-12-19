@@ -229,7 +229,7 @@ struct LeftExpression {
 impl<'g, 'file> ASTParserContext<'g, 'file> {
     fn add_global_reference(&mut self, name_span : Span) -> usize {
         let idx = self.global_references.len();
-        self.global_references.push(GlobalReference(name_span, NamedUUID::INVALID));
+        self.global_references.push(GlobalReference(name_span, None));
         idx
     }
 
