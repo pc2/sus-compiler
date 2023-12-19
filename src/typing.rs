@@ -14,8 +14,6 @@ pub enum Type {
     Array(Box<(Type, FlatID)>)
 }
 
-pub type SpanType = (Type, Span);
-
 impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
