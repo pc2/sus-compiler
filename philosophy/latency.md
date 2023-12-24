@@ -41,6 +41,9 @@ Usually it negative backedges would be found on the output of a module, which is
 
 ![Negative Backedge Concept](images/negativeBackedgeConcept.png)
 
+As a more concrete example, consider the write side of a FIFO. 
+![FIFO Negative Backedge](images/fifoExample.png)
+
 ## Requirements for the latency counting system
 - Addition or Removal of any latency registers that do not violate a constraint must not affect the operation of the design.
 - Feedback loops containing only latency are considered combinatorial feedback loops, and are therefore forbidden. Feedback loops must therefore have at least one state register in them. 
@@ -96,6 +99,14 @@ The issue starts when the inputs and outputs don't have predefined absolute late
 
 One may think the solution would simply be to prefer inputs over outputs or something, just to get a deterministic latency assignment. Just move b to be the earliest of the available latencies, but even in this case, if we instead looked at the possibilities of a, and fixed b, we would again make b later by making a earlier. And since there's no way to distinguish meaningfully between inputs, there's no deterministic solution either. 
 
-To this problem I only really see two solutions:
-- Still perform full latency computation when compiling each module separately. In the case of non-deterministic latency assignment, reject the code and require the programmer to add explicit latency annotations. The benefit is better encapsulation, the programmer requires only the module itself to know what latencies are. The downside is of course less flexible modules. 
-- Perform latency computation at integration level, 
+To this problem I only really see three options:
+- Still perform full latency computation when compiling each module separately. In the case of non-deterministic latency assignment, reject the code and require the programmer to add explicit latency annotations. The benefit is better encapsulation, the programmer requires only the module itself to know what latencies are. The downside is of course less flexible modules. Though is this flexibility _really_ needed?
+- Infer absolute latencies on the inputs and outputs of submodules using templates which can be inferred. This would be really handy to allow latency information to flow back into the templating system, thus allowing a FIFO that alters its almostFull threshold based on its input latency. Of course, this makes absolute latency information flow from top-down instead of bottom up, so now getting the latency information back from the module would be impossible. The issue is that templates can't be instantiated partially. Either the submodule takes all of its port latencies from the calling module, or it determines its latencies itself. 
+- Perform latency computation at integration level, we don't define the absolute latencies on the ports of a module, unless the programmer explicitly does so. For simlpicity, this requires that every single module instantiation now compiles to its own Verilog module though, which is less than ideal for debugging. 
+
+### Latency Graph Cycles are the key
+So assigning absolute latencies is difficult, and no good solution can be found in isolated cases. Perhaps another approach would work better. 
+
+In essense, what are the reasons for which we want to count out latencies? The initial one of course was keeping signals in sync. In the vast majority of cases when you pipeline a design, you don't want to cross signals from different time steps. But of course, after pipelining a design, you need to _deal_ with the effect that this module now takes several cycles, and has a certain capacity to store in progress data. 
+
+Maybe instead of trying to infer the latencies from the pipeline with inputs and outputs, we focussed our attention purely on the cycles. These are already nice and constrained. 
