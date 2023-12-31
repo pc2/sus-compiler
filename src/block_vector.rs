@@ -139,7 +139,7 @@ impl<'bv, T, const BLOCK_SIZE : usize> Iterator for BlockVecIter<'bv, T, BLOCK_S
             let selected_idx = self.cur_idx;
             self.cur_idx += 1;
             
-            Some(&self.block_vec[selected_idx])
+            Some(self.block_vec.index(selected_idx))
         } else {
             return None;
         }
@@ -160,25 +160,23 @@ impl<'bv, T, const BLOCK_SIZE : usize> IntoIterator for &'bv BlockVec<T, BLOCK_S
 }
 
 pub struct BlockVecIterMut<'bv, T, const BLOCK_SIZE : usize = 64> {
-    block_vec_iter : <&'bv mut Vec<Box<[MaybeUninit<T>; BLOCK_SIZE]>> as IntoIterator>::IntoIter,
-    current_block : std::slice::IterMut<'bv, MaybeUninit<T>>,
-    remaining : usize
+    block_vec : &'bv mut BlockVec<T, BLOCK_SIZE>,
+    cur_idx : usize
 }
 
 impl<'bv, T, const BLOCK_SIZE : usize> Iterator for BlockVecIterMut<'bv, T, BLOCK_SIZE> {
     type Item = &'bv mut T;
 
     fn next(&mut self) -> Option<&'bv mut T> {
-        if self.remaining > 0 {
-            self.remaining -= 1;
+        if self.cur_idx < self.block_vec.length.get() {
+            let selected_idx = self.cur_idx;
+            self.cur_idx += 1;
             
-            let found = if let Some(elem) = self.current_block.next() {
-                elem
-            } else {
-                self.current_block = self.block_vec_iter.next().unwrap().iter_mut();
-                self.current_block.next().unwrap()
-            };
-            unsafe{Some(found.assume_init_mut())}
+            // SAFETY
+            // Have to cast away the added 'self lifetime. The borrow checker adds it on self.block_vec to prevent us from mutably referencing the same location twice. 
+            // This code always indexes unique elements, and thus we can safely cast away this lifetime. 
+            let original_ref: *mut T = self.block_vec.index_mut(selected_idx);
+            Some(unsafe{&mut *original_ref})
         } else {
             return None;
         }
@@ -193,9 +191,8 @@ impl<'bv, T, const BLOCK_SIZE : usize> IntoIterator for &'bv mut BlockVec<T, BLO
     fn into_iter(self) -> Self::IntoIter {
         let block_vec_iter = self.blocks.get_mut().iter_mut();
         BlockVecIterMut{
-            block_vec_iter,
-            current_block : std::slice::IterMut::default(),
-            remaining : self.length.get()
+            block_vec : self,
+            cur_idx : 0
         }
     }
 }
