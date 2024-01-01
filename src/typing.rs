@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{ast::{Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector};
+use crate::{ast::{Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector, value::Value};
 
 // Types contain everything that cannot be expressed at runtime
 #[derive(Debug, Clone)]
@@ -119,4 +119,23 @@ pub fn typecheck_is_array_indexer<'a>(arr_type : &'a Type, span : Span, linker :
 pub enum ConcreteType {
     Named(NamedUUID),
     Array(Box<(ConcreteType, u64)>)
+}
+
+impl ConcreteType {
+    pub fn get_initial_val(&self, linker : &Linker) -> Value {
+        match self {
+            ConcreteType::Named(_name) => {
+                Value::Unset
+            }
+            ConcreteType::Array(arr) => {
+                let (arr_typ, arr_size) = arr.deref();
+                let mut arr = Vec::new();
+                if *arr_size > 0 {
+                    let content_typ = arr_typ.get_initial_val(linker);
+                    arr.resize(*arr_size as usize, content_typ);
+                }
+                Value::Array(arr.into_boxed_slice())
+            }
+        }
+    }
 }

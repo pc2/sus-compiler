@@ -286,15 +286,24 @@ module Unpack4 : int[4] packed -> int out_stream {
     }
 }
 
-module generative : int a -> int o {
+module generative : int in -> int o, int o2 {
 	gen int x = 5;
 	gen int[x] ys;
 
-	gen int[ys] zs;
+	//gen int[ys] zs;
 
 	gen int[3] ps;
 
-	o = zs[0];
+	gen int[3] a;
+
+	a[2] = 5;
+	a[1] = 2;
+	a[0] = 10;
+	gen int[3] xx = a;
+
+
+	o = a[in];
+	o2 = a[a[1]];
 }
 
 
@@ -327,7 +336,7 @@ module first_bit_idx_24 : bool[24] bits -> int first {
 	int[4] offsets;
 	bool[4] was_nonzero;
 
-	for i in 0..4 {
+	for int i in 0..4 {
 		offsets[i], was_nonzero[i] = first_bit_idx_6(bits[i*6+:6]);
 	}
 }

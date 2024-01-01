@@ -20,6 +20,10 @@ pub enum ConnectionWritePathElement {
     ArrayIdx(SpanFlatID),
     //StructField(FieldID)
 }
+#[derive(Debug)]
+pub enum ConnectionWritePathElementComputed {
+    ArrayIdx(usize)
+}
 
 // These are assignable connections
 #[derive(Debug)]
