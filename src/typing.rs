@@ -1,11 +1,11 @@
 use std::ops::Deref;
 
-use crate::{ast::{Value, Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector};
+use crate::{ast::{Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector};
 
 // Types contain everything that cannot be expressed at runtime
 #[derive(Debug, Clone)]
 pub enum Type {
-    Invalid,
+    Error,
     Named(NamedUUID),
     /*Contains a wireID pointing to a constant expression for the array size, 
     but doesn't actually take size into account for type checking as that would
@@ -28,7 +28,7 @@ impl Eq for Type {}
 impl Type {
     pub fn to_string(&self, linker : &Linker) -> String {
         match self {
-            Type::Invalid => {
+            Type::Error => {
                 "{unknown}".to_owned()
             }
             Type::Named(n) => {
@@ -39,23 +39,12 @@ impl Type {
     }
     pub fn get_root(&self) -> Option<NamedUUID> {
         match self {
-            Type::Invalid => {None}
+            Type::Error => {None}
             Type::Named(name) => Some(*name),
             Type::Array(sub) => sub.0.get_root(),
         }
     }
 }
-
-impl Value {
-    pub fn get_type(&self) -> Type {
-        match self {
-            Value::Bool(_) => Type::Named(get_builtin_uuid("bool")),
-            Value::Integer(_) => Type::Named(get_builtin_uuid("int")),
-            Value::Invalid => Type::Invalid,
-        }
-    }
-}
-
 
 pub fn typecheck_unary_operator(op : Operator, input_typ : &Type, span : Span, linker : &Linker, errors : &ErrorCollector) -> Type {
     const BOOL : Type = Type::Named(get_builtin_uuid("bool"));
@@ -64,6 +53,9 @@ pub fn typecheck_unary_operator(op : Operator, input_typ : &Type, span : Span, l
     if op.op_typ == kw("!") {
         typecheck(input_typ, span, &BOOL, "! input", linker, errors);
         BOOL
+    } else if op.op_typ == kw("-") {
+        typecheck(input_typ, span, &INT, "- input", linker, errors);
+        INT
     } else {
         let gather_type = match op.op_typ {
             x if x == kw("&") => BOOL,

@@ -1,7 +1,7 @@
 
-use num::bigint::BigUint;
+use num::BigInt;
 
-use crate::{tokenizer::*, errors::*, ast::*, linker::FileUUID, flattening::{FlattenedModule, FlattenedInterface}, arena_alloc::FlatAlloc, instantiation::InstantiationList};
+use crate::{tokenizer::*, errors::*, ast::*, linker::FileUUID, flattening::{FlattenedModule, FlattenedInterface}, arena_alloc::FlatAlloc, instantiation::InstantiationList, value::Value};
 
 use std::{iter::Peekable, str::FromStr, ops::Range};
 use core::slice::Iter;
@@ -350,7 +350,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             },
             Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == TOKEN_NUMBER => {
                 let value = &self.file_text[tok.get_range()];
-                (Expression::Constant(Value::Integer(BigUint::from_str(value).unwrap())), Span::from(*pos))
+                (Expression::Constant(Value::Integer(BigInt::from_str(value).unwrap())), Span::from(*pos))
             },
             Some(TokenTreeNode::Block(typ, contents, span)) if *typ == kw("(") => {
                 let mut content_token_stream = TokenStream::new(contents, span.0, span.1);
@@ -450,16 +450,33 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             let mut array_index_token_stream = TokenStream::new(content, block_span.0, block_span.1);
             let expr = self.parse_expression(&mut array_index_token_stream, scope)?;
             self.token_stream_should_be_finished(array_index_token_stream, "type array index");
-            cur_type = (TypeExpression::Array(Box::new((cur_type.0, expr))), Span(first_token.position, block_span.1));
+            cur_type = (TypeExpression::Array(Box::new((cur_type, expr))), Span(first_token.position, block_span.1));
         }
         Some(cur_type)
     }
 
     fn try_parse_declaration(&mut self, token_stream : &mut TokenStream, declarations : &mut FlatAlloc<SignalDeclaration, DeclIDMarker>, scope : &mut LocalVariableContext<'_, 'file>) -> Option<(DeclID, Span)> {
-        let identifier_type = if token_stream.eat_is_plain(kw("state")).is_some() {
-            IdentifierType::State
-        } else {
-            IdentifierType::Local
+        let mut state_kw = token_stream.eat_is_plain(kw("state"));
+        let generative_kw = token_stream.eat_is_plain(kw("gen"));
+        if state_kw.is_none() {
+            state_kw = token_stream.eat_is_plain(kw("state")); // Catch any order
+        }
+
+        let identifier_type = match (generative_kw, state_kw) {
+            (Some(_), None) => {
+                IdentifierType::Generative
+            }
+            (None, Some(_)) => {
+                IdentifierType::State
+            }
+            (None, None) => {
+                IdentifierType::Local
+            }
+            (Some(gen), Some(st)) => {
+                let gen_kw_info = error_info(Span::from(gen.position), self.errors.file, "Also declared as Generative here");
+                self.errors.error_with_info(Span::from(st.position), "Cannot declare local as both State and Generative", vec![gen_kw_info]);
+                IdentifierType::Generative // Fallback, statement is formatted reasonbly well enough
+            }
         };
         
         let typ = self.try_parse_type(token_stream, scope)?;
@@ -537,7 +554,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
                 Some(TokenTreeNode::PlainToken(tok, assign_pos)) if tok.get_type() == kw("=") => {
                     // Ends the loop
                     // T a, T b = x(y);
-                    return self.parse_statement_handle_equals(left_expressions, *assign_pos, token_stream, scope, &mut code_block.statements, start_at);
+                    return self.parse_statement_handle_assignment(left_expressions, *assign_pos, token_stream, scope, &mut code_block.statements, start_at);
                 }
                 Some(TokenTreeNode::PlainToken(tok, _pos)) if tok.get_type() == kw(";") => {
                     // Ends the loop
@@ -577,7 +594,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn parse_statement_handle_equals(&mut self, left_expressions: Vec<LeftExpression>, assign_pos: usize, token_stream: &mut TokenStream<'_>, scope: &mut LocalVariableContext<'_, 'file>, statements: &mut Vec<(Statement, Span)>, start_at: usize) -> Option<()> {
+    fn parse_statement_handle_assignment(&mut self, left_expressions: Vec<LeftExpression>, assign_pos: usize, token_stream: &mut TokenStream<'_>, scope: &mut LocalVariableContext<'_, 'file>, statements: &mut Vec<(Statement, Span)>, start_at: usize) -> Option<()> {
         if left_expressions.len() == 0 {
             self.error_unexpected_token(&[TOKEN_IDENTIFIER], kw("="), assign_pos, "statement");
             None

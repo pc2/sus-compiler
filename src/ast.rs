@@ -1,9 +1,8 @@
 
-use num::bigint::BigUint;
 
-use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID, Linker}, flattening::{FlattenedModule, FlattenedInterface}, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList};
+use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID, Linker}, flattening::{FlattenedModule, FlattenedInterface}, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList, value::Value};
 use core::ops::Range;
-use std::fmt::Display;
+use std::{fmt::Display, ops::Deref};
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
@@ -39,7 +38,8 @@ pub enum IdentifierType {
     Input,
     Output,
     Local,
-    State
+    State,
+    Generative
 }
 
 impl From<usize> for Span {
@@ -58,7 +58,7 @@ pub enum LocalOrGlobal {
 #[derive(Debug, Clone)]
 pub enum TypeExpression {
     Named(usize), // position in referenced globals list
-    Array(Box<(TypeExpression, SpanExpression)>)
+    Array(Box<(SpanTypeExpression, SpanExpression)>)
 }
 
 pub type SpanTypeExpression = (TypeExpression, Span);
@@ -81,13 +81,6 @@ impl Display for Operator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(get_token_type_name(self.op_typ))
     }
-}
-
-#[derive(Debug,Clone)]
-pub enum Value {
-    Bool(bool),
-    Integer(BigUint),
-    Invalid
 }
 
 #[derive(Debug,Clone)]
@@ -249,7 +242,7 @@ impl IterIdentifiers for CodeBlock {
                 Statement::Block(b) => {
                     b.for_each_value(func);
                 },
-                Statement::Declaration(_) => {}
+                Statement::Declaration(_) => {} // Declarations are handled outside of this block
                 Statement::If { condition, then, els } => {
                     condition.for_each_value(func);
                     then.for_each_value(func);
@@ -263,10 +256,26 @@ impl IterIdentifiers for CodeBlock {
     }
 }
 
+impl IterIdentifiers for SpanTypeExpression {
+    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
+        match &self.0 {
+            TypeExpression::Named(n) => {
+                func(LocalOrGlobal::Global(*n), self.1.0);
+            }
+            TypeExpression::Array(arr_box) => {
+                let (arr, arr_idx) = arr_box.deref();
+                arr.for_each_value(func);
+                arr_idx.for_each_value(func);
+            }
+        }
+    }
+}
+
 impl IterIdentifiers for Module {
     fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
         for (pos, decl) in &self.declarations {
             func(LocalOrGlobal::Local(pos), decl.span.1);
+            decl.typ.for_each_value(func);
         }
         self.code.for_each_value(func);
     }

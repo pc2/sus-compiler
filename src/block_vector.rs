@@ -189,7 +189,6 @@ impl<'bv, T, const BLOCK_SIZE : usize> IntoIterator for &'bv mut BlockVec<T, BLO
     type IntoIter = BlockVecIterMut<'bv, T, BLOCK_SIZE>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let block_vec_iter = self.blocks.get_mut().iter_mut();
         BlockVecIterMut{
             block_vec : self,
             cur_idx : 0

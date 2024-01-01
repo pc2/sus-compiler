@@ -26,7 +26,7 @@ impl Token {
     }
 }
 
-pub const ALL_KEYWORDS : [(&'static str, u8); 16] = [
+pub const ALL_KEYWORDS : [(&'static str, u8); 17] = [
     ("template", 0),
     ("module", 0),
     ("pipeline", 0),
@@ -42,7 +42,8 @@ pub const ALL_KEYWORDS : [(&'static str, u8); 16] = [
     ("struct", 0),
     ("enum", 0),
     ("reg", 0),
-    ("finish", 0)
+    ("finish", 0),
+    ("gen", 0)
 ];
 
 // Extra data is opreator prescedence. Lower number is higher prescedence of operators
@@ -72,7 +73,7 @@ pub const ALL_SYMBOLS : [(&'static str, u8); 33] = [
     ("^", 3),
     ("<", 2),
     (">", 2),
-    ("!", 0),// End of operators (see is_operator())
+    ("!", 0),// End of operators (see is_operator()), ! is not a binary operator
     ("#", 0),
     ("=", 0),
     ("(", 0), // Close parens are always 1 larger than their open variant, (see closes())
@@ -118,7 +119,7 @@ pub fn is_operator(typ : TokenTypeIdx) -> bool {
     typ >= kw("<=") && typ <= kw("!")
 }
 pub fn is_unary_operator(typ : TokenTypeIdx) -> bool {
-    typ == kw("|") || typ == kw("&") || typ == kw("^") || typ == kw("+") || typ == kw("*") || typ == kw("!")
+    typ == kw("|") || typ == kw("&") || typ == kw("^") || typ == kw("+") || typ == kw("-") || typ == kw("*") || typ == kw("!")
 }
 pub fn get_token_type_name(typ : TokenTypeIdx) -> &'static str {
     if is_keyword(typ) {

@@ -91,7 +91,7 @@ pub fn lsp_main(port : u16) -> Result<(), Box<dyn Error + Sync + Send>> {
                     SemanticTokenType::NUMBER,
                     SemanticTokenType::FUNCTION,
                     SemanticTokenType::EVENT,
-                    SemanticTokenType::ENUM_MEMBER,
+                    SemanticTokenType::ENUM_MEMBER
                 ],
                 token_modifiers: vec![
                     SemanticTokenModifier::ASYNC, // repurpose ASYNC for "State"
@@ -134,6 +134,7 @@ fn get_semantic_token_type_from_ide_token(tok : &IDEToken) -> u32 {
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => 4,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 3,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Local)) => 3,
+        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Generative)) => 3,
         IDETokenType::Identifier(IDEIdentifierType::Constant) => 9, // make it 'OPERATOR'?
         IDETokenType::Identifier(IDEIdentifierType::Unknown) => 2, // make it 'OPERATOR'?
         IDETokenType::Identifier(IDEIdentifierType::Interface) => 7, // FUNCTION
@@ -146,10 +147,11 @@ fn get_semantic_token_type_from_ide_token(tok : &IDEToken) -> u32 {
     }
 }
 
-
+// Produces a bitset with 'modifier bits'
 fn get_modifiers_for_token(tok : &IDEToken) -> u32 {
     match &tok.typ {
-        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 15, // repurpose ASYNC for "State"
+        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 1, // repurpose ASYNC for "State"
+        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Generative)) => 8, // repurpose READONLY
         _other => 0
     }
 }

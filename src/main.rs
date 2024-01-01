@@ -5,6 +5,7 @@ mod tokenizer;
 mod parser;
 mod errors;
 mod ast;
+mod value;
 mod flattening;
 mod instantiation;
 

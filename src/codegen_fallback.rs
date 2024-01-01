@@ -1,6 +1,6 @@
 use std::{iter::zip, ops::Deref};
 
-use crate::{ast::{Module, Value, IdentifierType}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{NamedUUID, get_builtin_uuid}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::WireSource};
+use crate::{ast::{Module, IdentifierType}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{NamedUUID, get_builtin_uuid}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::WireSource, value::Value};
 
 fn get_type_name_size(id : NamedUUID) -> u64 {
     if id == get_builtin_uuid("int") {
@@ -38,7 +38,17 @@ pub fn value_to_str(value : &Value) -> String {
     match value {
         Value::Bool(b) => if *b {"1'b1"} else {"1'b0"}.to_owned(),
         Value::Integer(v) => v.to_string(),
-        Value::Invalid => "INVALID".to_owned()
+        Value::Array(arr_box) => {
+            let mut result = "[".to_owned();
+            for v in arr_box.iter() {
+                result.push_str(&value_to_str(v));
+                result.push_str(", ");
+            }
+            result.push(']');
+            result
+        }
+        Value::Unset => "Value::Unset".to_owned(),
+        Value::Error => "Value::Error".to_owned(),
     }
 }
 
@@ -61,7 +71,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
             // Don't print named inputs and outputs, already did that in interface
             match identifier_type {
                 IdentifierType::Input | IdentifierType::Output => {continue;}
-                IdentifierType::Local | IdentifierType::State => {}
+                IdentifierType::Local | IdentifierType::State | IdentifierType::Generative => {}
             }
         }
         let wire_or_reg = if let RealWireDataSource::Multiplexer{is_state: initial_value, sources: _} = &w.source {
@@ -86,6 +96,9 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
             }
             RealWireDataSource::ArrayAccess { arr, arr_idx } => {
                 program_text.push_str(&format!(" = {}[{}]", instance.wires[*arr].name, instance.wires[*arr_idx].name));
+            }
+            RealWireDataSource::ConstArrayAccess { arr, arr_idx } => {
+                program_text.push_str(&format!(" = {}[{arr_idx}]", instance.wires[*arr].name));
             }
             RealWireDataSource::Constant { value } => {
                 program_text.push_str(&format!(" = {}", value_to_str(value)));
@@ -129,10 +142,13 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
                     let mut path = String::new();
                     for path_elem in &s.path {
                         match path_elem {
-                            ConnectToPathElem::ArrayConnection { idx_wire } => {
+                            ConnectToPathElem::MuxArrayWrite{idx_wire} => {
                                 path.push('[');
                                 path.push_str(&instance.wires[*idx_wire].name);
                                 path.push(']');
+                            }
+                            ConnectToPathElem::ConstArrayWrite{idx} => {
+                                    path.push_str(&format!("[{idx}]"));
                             }
                         }
                     }
@@ -149,6 +165,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
             RealWireDataSource::UnaryOp{op : _, right : _} => {}
             RealWireDataSource::BinaryOp{op : _, left : _, right : _} => {}
             RealWireDataSource::ArrayAccess{arr : _, arr_idx : _} => {}
+            RealWireDataSource::ConstArrayAccess{arr : _, arr_idx : _} => {}
             RealWireDataSource::Constant{value : _} => {}
         }
     }

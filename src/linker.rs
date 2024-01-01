@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}, rc::Rc};
 
-use crate::{ast::{Module, LinkInfo, Span, Value, GlobalReference, DeclIDMarker}, arena_alloc::{ArenaAllocator, UUID, UUIDMarker, FlatAlloc}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::{FlattenedInterface, FlattenedModule, FlatID}, util::{const_str_position, const_str_position_in_tuples}, instantiation::InstantiatedModule};
+use crate::{ast::{Module, LinkInfo, Span, GlobalReference, DeclIDMarker}, arena_alloc::{ArenaAllocator, UUID, UUIDMarker, FlatAlloc}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::{FlattenedInterface, FlattenedModule, FlatID}, util::{const_str_position, const_str_position_in_tuples}, instantiation::InstantiatedModule, value::Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NamedUUIDMarker;

@@ -226,11 +226,10 @@ module blur2 :
 
 
 module Tree_Multiply : int[4] values -> int total {
-    reg int a = values[0] * values[1];
+    int a = values[0] * values[1];
 	int b = values[2] * values[3];
 	total = a * b;
 }
-
 
 
 
@@ -287,7 +286,16 @@ module Unpack4 : int[4] packed -> int out_stream {
     }
 }
 
+module generative : int a -> int o {
+	gen int x = 5;
+	gen int[x] ys;
 
+	gen int[ys] zs;
+
+	gen int[3] ps;
+
+	o = zs[0];
+}
 
 
 //timeline (bs -> /, true) | (bs -> v, false)
@@ -334,6 +342,8 @@ module permute : bool[128] mbf, int selected_permutation -> bool[128] permuted_m
 module permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid {
 	state bool[128] stored_mbf;
 	state bool[24] stored_valid_permutes = 000000000000000000000000;
+
+	gen int aaaaa = 5;
 
 
 	bool[24] permutes_to_keep;

@@ -74,6 +74,7 @@ fn pretty_print(file_text : &str, tokens : &[Token], ide_infos : &[IDEToken]) {
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => Style::new().blue().bright().underlined(),
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Input)) => Style::new().blue().bright(),
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => Style::new().blue().dim(),
+            IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Generative)) => Style::new().blue().bright().bold(),
             IDETokenType::Identifier(IDEIdentifierType::Constant) => Style::new().blue().bold(),
             IDETokenType::Identifier(IDEIdentifierType::Type) => Style::new().magenta().bright(),
             IDETokenType::Identifier(IDEIdentifierType::Interface) => Style::new().yellow(),
