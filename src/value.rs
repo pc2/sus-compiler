@@ -1,6 +1,8 @@
+use std::ops::Deref;
+
 use num::BigInt;
 
-use crate::{typing::Type, linker::get_builtin_uuid, ast::Operator, tokenizer::kw};
+use crate::{typing::{Type, ConcreteType}, linker::get_builtin_uuid, ast::Operator, tokenizer::kw};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum Value {
@@ -12,12 +14,12 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn get_type(&self) -> Type {
+    pub fn get_type_of_constant(&self) -> Type {
         match self {
             Value::Bool(_) => Type::Named(get_builtin_uuid("bool")),
             Value::Integer(_) => Type::Named(get_builtin_uuid("int")),
-            Value::Array(b) => {
-                Type::Error
+            Value::Array(_b) => {
+                unreachable!("Can't express arrays as constants (yet?)");
                 /*let content_typ = if let Some(b_first) = b.first() {
                     b_first.get_type()
                 } else {
@@ -27,6 +29,27 @@ impl Value {
             }
             Value::Unset => Type::Error,
             Value::Error => Type::Error,
+        }
+    }
+    pub fn is_of_type(&self, typ : &ConcreteType) -> bool {
+        match (self, typ) {
+            (Self::Integer(_), ConcreteType::Named(name)) if *name == get_builtin_uuid("int") => true,
+            (Self::Bool(_), ConcreteType::Named(name)) if *name == get_builtin_uuid("bool") => true,
+            (Self::Array(arr_slice), ConcreteType::Array(arr_typ_box)) => {
+                let (arr_content_typ, arr_size_typ) = arr_typ_box.deref();
+                if arr_slice.len() != *arr_size_typ as usize {
+                    return false;
+                }
+                for v in arr_slice.iter() {
+                    if !v.is_of_type(arr_content_typ) {
+                        return false;
+                    }
+                }
+                true
+            },
+            (Self::Unset, _) => true,
+            (Self::Error, _) => true,
+            _other => false
         }
     }
     pub fn extract_integer(&self) -> &BigInt {

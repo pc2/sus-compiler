@@ -223,10 +223,10 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
             Expression::Named(LocalOrGlobal::Global(g)) => {
                 let r = self.module.link_info.global_references[*g];
                 let cst = self.linker.try_get_constant(r, &self.errors)?;
-                self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : cst.get_type(), is_compiletime : true, span : *expr_span, inst : WireSource::Constant{value : cst}}))
+                self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : cst.get_type_of_constant(), is_compiletime : true, span : *expr_span, inst : WireSource::Constant{value : cst}}))
             }
             Expression::Constant(cst) => {
-                self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : cst.get_type(), is_compiletime : true, span : *expr_span, inst : WireSource::Constant{value : cst.clone()}}))
+                self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : cst.get_type_of_constant(), is_compiletime : true, span : *expr_span, inst : WireSource::Constant{value : cst.clone()}}))
             }
             Expression::UnaryOp(op_box) => {
                 let (op, _op_pos, operate_on) = op_box.deref();

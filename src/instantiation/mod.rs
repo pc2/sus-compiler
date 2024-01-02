@@ -339,6 +339,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     };
                     if w.is_compiletime {
                         let Some(value_computed) = self.compute_compile_time(&w.inst, &typ) else {return};
+                        assert!(value_computed.is_of_type(&typ));
                         SubModuleOrWire::CompileTimeValue(value_computed)
                     } else {
                         let (name, source) = match &w.inst {
