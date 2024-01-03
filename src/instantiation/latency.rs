@@ -1,6 +1,6 @@
 use std::{iter::zip, collections::VecDeque};
 
-use crate::arena_alloc::FlatAlloc;
+use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector};
 
 use super::{WireID, WireIDMarker, RealWire, SubModule, SubModuleIDMarker};
 
@@ -24,6 +24,20 @@ struct LatencyComputer {
     fanouts : FlatAlloc<Vec<FanInOut>, WireIDMarker>
 }
 
+fn convert_fanin_to_fanout(fanins : &FlatAlloc<Vec<FanInOut>, WireIDMarker>) -> FlatAlloc<Vec<FanInOut>, WireIDMarker> {
+    let mut fanouts : FlatAlloc<Vec<FanInOut>, WireIDMarker> = fanins.iter().map(|_| {
+        Vec::new()
+    }).collect();
+
+    for (id, fin) in fanins {
+        for f in fin {
+            fanouts[f.other].push(FanInOut { other: id, delta_latency: f.delta_latency })
+        }
+    }
+
+    fanouts
+}
+
 impl LatencyComputer {
     fn setup(wires : &FlatAlloc<RealWire, WireIDMarker>, submodules : &FlatAlloc<SubModule, SubModuleIDMarker>) -> Self {
         // Wire to wire Fanin
@@ -36,7 +50,8 @@ impl LatencyComputer {
         }).collect();
 
         // Submodules Fanin
-        for (_id, sub_mod) in submodules {
+        assert!(submodules.is_empty());
+        /*for (_id, sub_mod) in submodules {
             // All submodules must be fully valid
             assert!(!sub_mod.instance.errors.did_error());
             let sub_mod_interface = sub_mod.instance.interface.as_deref().unwrap();
@@ -50,18 +65,10 @@ impl LatencyComputer {
                     fanins[*output_wire].push(FanInOut{other: *input_wire, delta_latency});
                 }
             }
-        }
+        }*/
 
         // Process fanouts
-        let mut fanouts : FlatAlloc<Vec<FanInOut>, WireIDMarker> = wires.iter().map(|(id, wire)| {
-            Vec::new()
-        }).collect();
-
-        for (id, fin) in &fanins {
-            for f in fin {
-                fanouts[f.other].push(FanInOut { other: id, delta_latency: f.delta_latency })
-            }
-        }
+        let fanouts = convert_fanin_to_fanout(&fanins);
 
         Self {fanins, fanouts}
     }
@@ -95,59 +102,32 @@ impl LatencyComputer {
 
 struct RuntimeData {
     part_of_path : bool,
-    eliminated : bool,
-    maps_to : WireID
-}
-struct GraphDecycler<'f> {
-    runtime_data : FlatAlloc<RuntimeData, WireIDMarker>,
-    fanins : &'f FlatAlloc<Vec<FanInOut>, WireIDMarker>
+    current_absolute_latency : i64
 }
 
-impl<'f> GraphDecycler<'f> {
-    fn new(fanins : &FlatAlloc<Vec<FanInOut>, WireIDMarker>) -> GraphDecycler {
-        GraphDecycler {
-            runtime_data : fanins.iter().map(|(maps_to, _)| RuntimeData{ part_of_path: false, eliminated: false, maps_to }).collect(),
-            fanins
-        }
-    }
-
-    fn is_part_of_cycle(&mut self, id : WireID) -> Option<WireID> {
-        if self.runtime_data[id].eliminated {return None;}
-
-        if self.runtime_data[id].part_of_path {
-            // TODO Handle start removing cycle
-            return Some(id); // New node was part of path, remove it!
-        }
-        
-        self.runtime_data[id].part_of_path = true;
-
-        for fi in &self.fanins[id] {
-            if let Some(cycle_root) = self.is_part_of_cycle(fi.other) {
-                if id == cycle_root {
-                    // We have returned to the root
-                    // Cycle is now removed
-                    // So we just continue
-                } else {
-                    // Part of the chain towards the root
-                    return Some(cycle_root)
-                }
+fn process_node_recursive(runtime_data : &mut FlatAlloc<RuntimeData, WireIDMarker>, fanouts : &FlatAlloc<Vec<FanInOut>, WireIDMarker>, cur_node : WireID) {
+    runtime_data[cur_node].part_of_path = true;
+    for &FanInOut{other, delta_latency} in &fanouts[cur_node] {
+        let to_node_min_latency = runtime_data[cur_node].current_absolute_latency + delta_latency;
+        if to_node_min_latency > runtime_data[other].current_absolute_latency {
+            if runtime_data[other].part_of_path {
+                todo!("Cycles for positive net latency error!");
+            } else {
+                runtime_data[other].current_absolute_latency = to_node_min_latency;
+                process_node_recursive(runtime_data, fanouts, other);
             }
         }
-
-        self.runtime_data[id].eliminated = true; // Once we finish a node, eliminate it
-        None
     }
+    runtime_data[cur_node].part_of_path = false;
+}
 
-    fn eliminate_cycles(&mut self) {
-        for (id, wire_fanin) in self.fanins {
-            if wire_fanin.is_empty() {
-                // New root to iterate from
-                self.is_part_of_cycle(id);
-            }
+fn find_all_cycles_starting_from(fanouts : &FlatAlloc<Vec<FanInOut>, WireIDMarker>, starting_node : WireID) -> FlatAlloc<RuntimeData, WireIDMarker> {
+    let mut runtime_data : FlatAlloc<RuntimeData, WireIDMarker> = fanouts.iter().map(|_| RuntimeData{
+        part_of_path: false,
+        current_absolute_latency : i64::MIN // Such that new nodes will always be overwritten
+    }).collect();
 
-            
-        }
-
-        todo!()
-    }
+    runtime_data[starting_node].current_absolute_latency = 0;
+    process_node_recursive(&mut runtime_data, fanouts, starting_node);
+    runtime_data
 }

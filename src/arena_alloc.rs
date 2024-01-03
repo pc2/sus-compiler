@@ -354,6 +354,9 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
     pub fn len(&self) -> usize {
         self.data.len()
     }
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
     pub fn iter<'a>(&'a self) -> FlatAllocIter<'a, T, IndexMarker> {
         self.into_iter()
     }

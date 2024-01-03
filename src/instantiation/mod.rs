@@ -89,15 +89,13 @@ pub struct RealWire {
     pub source : RealWireDataSource,
     pub original_wire : FlatID,
     pub typ : ConcreteType,
-    pub latency : i64,
     pub name : Box<str>
 }
 
 #[derive(Debug,Clone,Copy)]
 pub struct InstantiatedInterfacePort {
     pub id : WireID,
-    pub is_input : bool,
-    pub absolute_latency : i64
+    pub is_input : bool
 }
 
 #[derive(Debug)]
@@ -284,8 +282,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
     fn compute_compile_time(&self, wire_inst : &WireSource, typ : &ConcreteType) -> Option<Value> {
         Some(match &wire_inst {
-            WireSource::NamedWire{read_only, identifier_type, decl_id} => {
+            WireSource::NamedWire{read_only, identifier_type: _, decl_id: _} => {
                 /*Do nothing (in fact re-initializes the wire to 'empty'), just corresponds to wire declaration*/
+                if *read_only {
+                    todo!("Modules can't be computed at compile time yet");
+                } 
                 typ.get_initial_val(self.linker)
             }
             WireSource::UnaryOp{op, right} => {
@@ -319,7 +320,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let Instantiation::Wire(WireInstance{typ, inst : _, is_compiletime : _, span}) = &self.module.flattened.instantiations[flat_id.0] else {unreachable!()};
                 let typ = self.concretize_type(typ, *span)?;
                 let name = self.get_unique_name();
-                Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id.0, latency : i64::MAX, typ, name}))
+                Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id.0, typ, name}))
             }
         }
     }
@@ -381,7 +382,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             }
                         };
                         let name = name.unwrap_or_else(|| self.get_unique_name());
-                        SubModuleOrWire::Wire(self.wires.alloc(RealWire{ name, latency : i64::MIN /* Invalid */, typ, original_wire, source}))
+                        SubModuleOrWire::Wire(self.wires.alloc(RealWire{ name, typ, original_wire, source}))
                     }
                 }
                 Instantiation::Connection(conn) => {
@@ -403,8 +404,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 SubModuleOrWire::Wire(w) => {
                     result.push(InstantiatedInterfacePort {
                         id: *w,
-                        is_input: port.is_input,
-                        absolute_latency: i64::MIN, // INVALID
+                        is_input: port.is_input
                     });
                 }
                 SubModuleOrWire::Unnasigned => {

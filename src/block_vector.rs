@@ -54,6 +54,10 @@ impl<T, const BLOCK_SIZE : usize> BlockVec<T, BLOCK_SIZE> {
         self.length.get()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.length.get() == 0
+    }
+
     pub fn iter<'s>(&'s self) -> BlockVecIter<'s, T, BLOCK_SIZE> {
         self.into_iter()
     }
