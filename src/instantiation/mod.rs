@@ -2,7 +2,7 @@ use std::{rc::Rc, ops::Deref, cell::RefCell};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Operator, Module, IdentifierType, Span}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed, WireDeclaration}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid}, value::{Value, compute_unary_op, compute_binary_op}};
+use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Operator, Module, IdentifierType, Span}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed, WireDeclaration, SubModuleInstance}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid}, value::{Value, compute_unary_op, compute_binary_op}};
 
 pub mod latency;
 
@@ -92,12 +92,6 @@ pub struct RealWire {
     pub name : Box<str>
 }
 
-#[derive(Debug,Clone,Copy)]
-pub struct InstantiatedInterfacePort {
-    pub id : WireID,
-    pub is_input : bool
-}
-
 #[derive(Debug)]
 pub struct SubModule {
     pub original_flat : FlatID,
@@ -109,7 +103,7 @@ pub struct SubModule {
 #[derive(Debug)]
 pub struct InstantiatedModule {
     pub name : Box<str>, // Unique name involving all template arguments
-    pub interface : Option<Vec<InstantiatedInterfacePort>>, // Interface is only valid if all wires of the interface were valid
+    pub interface : Option<Vec<WireID>>, // Interface is only valid if all wires of the interface were valid
     pub wires : FlatAlloc<RealWire, WireIDMarker>,
     pub submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
     pub errors : ErrorCollector,
@@ -283,7 +277,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             None
         }
     }
-    fn compute_compile_time(&self, wire_inst : &WireSource, typ : &ConcreteType) -> Option<Value> {
+    fn compute_compile_time(&self, wire_inst : &WireSource) -> Option<Value> {
         Some(match wire_inst {
             &WireSource::WireRead{from_wire} => {
                 self.get_generation_value(from_wire)?.clone()
@@ -330,19 +324,19 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
     }
     fn wire_to_real_wire(&mut self, w: &WireInstance, typ : ConcreteType, original_wire : FlatID) -> Option<WireID> {
-        let (name, source) = match &w.inst {
+        let source = match &w.inst {
             &WireSource::WireRead{from_wire} => {
-                let Instantiation::WireDeclaration(WireDeclaration{typ:_, typ_span:_, read_only:_, identifier_type:_, name:_, name_token:_}) = &self.module.flattened.instantiations[from_wire] else {unreachable!("WireReads must point to a NamedWire!")};
+                /*Assert*/ self.module.flattened.instantiations[from_wire].extract_wire_declaration(); // WireReads must point to a NamedWire!
                 return Some(self.generation_state[from_wire].extract_wire())
             }
             &WireSource::UnaryOp{op, right} => {
                 let right = self.get_wire_or_constant_as_wire(right)?;
-                (None, RealWireDataSource::UnaryOp{op: op, right})
+                RealWireDataSource::UnaryOp{op: op, right}
             }
             &WireSource::BinaryOp{op, left, right} => {
                 let left = self.get_wire_or_constant_as_wire(left)?;
                 let right = self.get_wire_or_constant_as_wire(right)?;
-                (None, RealWireDataSource::BinaryOp{op: op, left, right})
+                RealWireDataSource::BinaryOp{op: op, left, right}
             }
             &WireSource::ArrayAccess{arr, arr_idx} => {
                 let arr = self.get_wire_or_constant_as_wire(arr)?;
@@ -350,12 +344,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     SubModuleOrWire::SubModule(_) => unreachable!(),
                     SubModuleOrWire::Unnasigned => unreachable!(),
                     SubModuleOrWire::Wire(w) => {
-                        (None, RealWireDataSource::ArrayAccess{arr, arr_idx: *w})
+                        RealWireDataSource::ArrayAccess{arr, arr_idx: *w}
                     }
                     SubModuleOrWire::CompileTimeValue(v) => {
                         let arr_idx_wire = self.module.flattened.instantiations[arr_idx].extract_wire();
                         let arr_idx = self.extract_integer_from_value(v, arr_idx_wire.span)?;
-                        (None, RealWireDataSource::ConstArrayAccess{arr, arr_idx})
+                        RealWireDataSource::ConstArrayAccess{arr, arr_idx}
                     }
                 }
             }
@@ -363,16 +357,16 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 unreachable!("Constant cannot be non-compile-time");
             }
         };
-        let name = name.unwrap_or_else(|| self.get_unique_name());
+        let name = self.get_unique_name();
         Some(self.wires.alloc(RealWire{ name, typ, original_wire, source}))
     }
     fn instantiate_flattened_module(&mut self) {
         for (original_wire, inst) in &self.module.flattened.instantiations {
             let instance_to_add : SubModuleOrWire = match inst {
-                Instantiation::SubModule{module_uuid, name, typ_span, interface_wires} => {
+                Instantiation::SubModule(SubModuleInstance{module_uuid, name, typ_span, outputs_start, local_wires}) => {
                     let instance = self.linker.instantiate(*module_uuid);
-                    let interface_real_wires = interface_wires.iter().map(|port| {
-                        self.generation_state[port.id].extract_wire()
+                    let interface_real_wires = local_wires.iter().map(|port| {
+                        self.generation_state[*port].extract_wire()
                     }).collect();
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, wires : interface_real_wires, name : name.clone()}))
                 }
@@ -404,7 +398,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         return; // Exit early, do not produce invalid wires in InstantiatedModule
                     };
                     if w.is_compiletime {
-                        let Some(value_computed) = self.compute_compile_time(&w.inst, &typ) else {return};
+                        let Some(value_computed) = self.compute_compile_time(&w.inst) else {return};
                         assert!(value_computed.is_of_type(&typ));
                         SubModuleOrWire::CompileTimeValue(value_computed)
                     } else {
@@ -423,19 +417,16 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
 
     // Returns a proper interface if all ports involved did not produce an error. If a port did produce an error then returns None. 
-    fn make_interface(&self) -> Option<Vec<InstantiatedInterfacePort>> {
+    fn make_interface(&self) -> Option<Vec<WireID>> {
         let mut result = Vec::new();
         result.reserve(self.module.interface.interface_wires.len());
-        for port in &self.module.interface.interface_wires {
+        for port in self.module.interface.interface_wires.iter() {
             match &self.generation_state[port.wire_id] {
                 SubModuleOrWire::Wire(w) => {
-                    result.push(InstantiatedInterfacePort {
-                        id: *w,
-                        is_input: port.is_input
-                    });
+                    result.push(*w)
                 }
                 SubModuleOrWire::Unnasigned => {
-                    return None
+                    return None // Error building interface
                 }
                 _other => unreachable!() // interface wires cannot point to anything else
             }

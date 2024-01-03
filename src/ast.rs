@@ -155,8 +155,8 @@ pub struct Module {
 impl Module {
     pub fn print_flattened_module(&self, linker : &Linker) {
         println!("Interface:");
-        for port in &self.interface.interface_wires {
-            let port_direction = if port.is_input {"input"} else {"output"};
+        for (port_idx, port) in self.interface.interface_wires.iter().enumerate() {
+            let port_direction = if port_idx < self.interface.outputs_start {"input"} else {"output"};
             let port_type = port.typ.to_string(linker);
             let port_name = &port.port_name;
             println!("    {port_direction} {port_type} {port_name} -> {:?}", port.wire_id);

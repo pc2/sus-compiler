@@ -52,10 +52,14 @@ impl Value {
             _other => false
         }
     }
+
+    #[track_caller]
     pub fn extract_integer(&self) -> &BigInt {
         let Self::Integer(i) = self else {panic!("{:?} is not an integer!", self)};
         i
     }
+
+    #[track_caller]
     pub fn extract_bool(&self) -> bool {
         let Self::Bool(b) = self else {panic!("{:?} is not a bool!", self)};
         *b

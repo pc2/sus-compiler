@@ -1,6 +1,6 @@
 use std::{iter::zip, ops::Deref};
 
-use crate::{ast::{Module, IdentifierType}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{NamedUUID, get_builtin_uuid}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::{Instantiation, WireDeclaration}, value::Value};
+use crate::{ast::{Module, IdentifierType}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{NamedUUID, get_builtin_uuid}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::Instantiation, value::Value};
 
 fn get_type_name_size(id : NamedUUID) -> u64 {
     if id == get_builtin_uuid("int") {
@@ -56,9 +56,9 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
     assert!(!instance.errors.did_error(), "Module cannot have experienced an error");
     let mut program_text : String = format!("module {}(\n\tinput clk, \n", md.link_info.name);
     let submodule_interface = instance.interface.as_ref().unwrap();
-    for (port, real_port) in zip(&md.interface.interface_wires, submodule_interface) {
-        let wire = &instance.wires[real_port.id];
-        program_text.push_str(if port.is_input {"\tinput"} else {"\toutput /*mux_wire*/ reg"});
+    for (port_idx, (port, real_port)) in zip(md.interface.interface_wires.iter(), submodule_interface).enumerate() {
+        let wire = &instance.wires[*real_port];
+        program_text.push_str(if port_idx < md.interface.outputs_start {"\tinput"} else {"\toutput /*mux_wire*/ reg"});
         program_text.push_str(&typ_to_verilog_array(&wire.typ));
         program_text.push(' ');
         program_text.push_str(&wire.name);
@@ -117,7 +117,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
         let Some(sm_interface) = &sm.instance.interface else {unreachable!()}; // Having an invalid interface in a submodule is an error! This should have been caught before!
         for (port, wire) in zip(sm_interface, &sm.wires) {
             program_text.push_str(",\n.");
-            program_text.push_str(&sm.instance.wires[port.id].name);
+            program_text.push_str(&sm.instance.wires[*port].name);
             program_text.push('(');
             program_text.push_str(&instance.wires[*wire].name);
             program_text.push_str(")");
@@ -132,7 +132,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
                 let output_name = w.name.deref();
                 match is_state {
                     StateInitialValue::Combinatorial => {
-                        program_text.push_str(&format!("/*always_comb*/ always @(*) begin\n\t{output_name} <= 1'bX; // Not defined when not valid\n"));
+                        program_text.push_str(&format!("/*always_comb*/ always @(*) begin\n\t{output_name} <= 1'bX; // Combinatorial wires are not defined when not valid\n"));
                     }
                     StateInitialValue::State{initial_value : _} => {
                         program_text.push_str(&format!("/*always_ff*/ always @(posedge clk) begin\n"));
