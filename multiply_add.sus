@@ -303,7 +303,7 @@ module generative : int in -> int o, int o2 {
 
 
 	o = a[in];
-	o2 = a[a[1]];
+	o2 = a[a[0]];
 }
 
 

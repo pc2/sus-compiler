@@ -167,7 +167,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         match IntT::try_from(val) {
             Ok(val) => Some(val),
             Err(e) => {
-                self.errors.error_basic(span, format!("Generative integer too large: {val}"));
+                self.errors.error_basic(span, format!("Generative integer does not fit in {}: {val}", std::any::type_name::<IntT>()));
                 None
             }
         }
@@ -302,7 +302,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let Value::Array(arr_val) = self.get_generation_value(arr)? else {return None};
                 let arr_idx_val = self.get_generation_value(arr_idx)?;
                 let idx : usize = self.extract_integer_from_value(arr_idx_val, arr_idx.1)?;
-                arr_val[idx].clone()
+                if let Some(item) = arr_val.get(idx) {
+                    item.clone()
+                } else {
+                    self.errors.error_basic(arr_idx.1, format!("Compile-Time Array index is out of range: idx: {idx}, array size: {}", arr_val.len()));
+                    return None
+                }
             }
             WireSource::Constant{value} => value.clone()
         })
