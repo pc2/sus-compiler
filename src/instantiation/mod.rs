@@ -2,7 +2,7 @@ use std::{rc::Rc, ops::Deref, cell::RefCell};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Operator, Module, IdentifierType, Span}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, SpanFlatID, WireInstance, Connection, ConnectionWritePathElementComputed}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid}, value::{Value, compute_unary_op, compute_binary_op}};
+use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Operator, Module, IdentifierType, Span}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid}, value::{Value, compute_unary_op, compute_binary_op}};
 
 pub mod latency;
 
@@ -198,8 +198,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         for pe in to_path {
             match pe {
-                ConnectionWritePathElement::ArrayIdx(arr_idx) => {
-                    match &self.generation_state[arr_idx.0] {
+                ConnectionWritePathElement::ArrayIdx{idx, idx_span} => {
+                    match &self.generation_state[*idx] {
                         SubModuleOrWire::SubModule(_) => unreachable!(),
                         SubModuleOrWire::Unnasigned => unreachable!(),
                         SubModuleOrWire::Wire(idx_wire) => {
@@ -208,7 +208,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             new_path.push(ConnectToPathElem::MuxArrayWrite{idx_wire : *idx_wire});
                         }
                         SubModuleOrWire::CompileTimeValue(v) => {
-                            let Some(idx) = self.extract_integer_from_value(v, arr_idx.1) else {return};
+                            let Some(idx) = self.extract_integer_from_value(v, *idx_span) else {return};
                             new_path.push(ConnectToPathElem::ConstArrayWrite{idx});
                         }
                     }
@@ -232,9 +232,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         result.reserve(conn_path.len());
         for p in conn_path {
             match p {
-                ConnectionWritePathElement::ArrayIdx(idx) => {
-                    let Some(idx_val) = self.get_generation_value(idx.0) else {return None};
-                    let Some(idx_val) = self.extract_integer_from_value::<usize>(idx_val, idx.1) else {return None};
+                ConnectionWritePathElement::ArrayIdx{idx, idx_span} => {
+                    let Some(idx_val) = self.get_generation_value(*idx) else {return None};
+                    let Some(idx_val) = self.extract_integer_from_value::<usize>(idx_val, *idx_span) else {return None};
                     result.push(ConnectionWritePathElementComputed::ArrayIdx(idx_val))
                 }
             }
@@ -250,7 +250,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 
                 let condition = conn.condition.map(|found_conn| self.generation_state[found_conn].extract_wire());
 
-                let Some(from) = self.get_wire_or_constant_as_wire(&conn.from) else {return;};
+                let Some(from) = self.get_wire_or_constant_as_wire(conn.from) else {return;};
                 let conn_from = ConnectFrom {
                     num_regs: conn.num_regs,
                     from,
@@ -263,7 +263,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 return;
             }
             SubModuleOrWire::CompileTimeValue(_original_value) => { // Compiletime wire
-                let found_v = self.generation_state[conn.from.0].extract_generation_value().clone();
+                let found_v = self.generation_state[conn.from].extract_generation_value().clone();
                 let Some(cvt_path) = self.convert_connection_path_to_known_values(&conn.to.path) else {return};
                 // Hack to get around the borrow rules here
                 let SubModuleOrWire::CompileTimeValue(v_writable) = &mut self.generation_state[conn.to.root] else {unreachable!()};
@@ -289,26 +289,27 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 } 
                 typ.get_initial_val(self.linker)
             }
-            WireSource::WireRead{from_wire} => {
-                self.get_generation_value(*from_wire)?.clone()
+            &WireSource::WireRead{from_wire} => {
+                self.get_generation_value(from_wire)?.clone()
             }
-            WireSource::UnaryOp{op, right} => {
-                let right_val = self.get_generation_value(right.0)?;
-                compute_unary_op(*op, right_val)
+            &WireSource::UnaryOp{op, right} => {
+                let right_val = self.get_generation_value(right)?;
+                compute_unary_op(op, right_val)
             }
-            WireSource::BinaryOp{op, left, right} => {
-                let left_val = self.get_generation_value(left.0)?;
-                let right_val = self.get_generation_value(right.0)?;
-                compute_binary_op(left_val, *op, right_val)
+            &WireSource::BinaryOp{op, left, right} => {
+                let left_val = self.get_generation_value(left)?;
+                let right_val = self.get_generation_value(right)?;
+                compute_binary_op(left_val, op, right_val)
             }
-            WireSource::ArrayAccess{arr, arr_idx} => {
-                let Value::Array(arr_val) = self.get_generation_value(arr.0)? else {return None};
-                let arr_idx_val = self.get_generation_value(arr_idx.0)?;
-                let idx : usize = self.extract_integer_from_value(arr_idx_val, arr_idx.1)?;
+            &WireSource::ArrayAccess{arr, arr_idx} => {
+                let Value::Array(arr_val) = self.get_generation_value(arr)? else {return None};
+                let arr_idx_val = self.get_generation_value(arr_idx)?;
+                let arr_idx_wire = self.module.flattened.instantiations[arr_idx].extract_wire();
+                let idx : usize = self.extract_integer_from_value(arr_idx_val, arr_idx_wire.span)?;
                 if let Some(item) = arr_val.get(idx) {
                     item.clone()
                 } else {
-                    self.errors.error_basic(arr_idx.1, format!("Compile-Time Array index is out of range: idx: {idx}, array size: {}", arr_val.len()));
+                    self.errors.error_basic(arr_idx_wire.span, format!("Compile-Time Array index is out of range: idx: {idx}, array size: {}", arr_val.len()));
                     return None
                 }
             }
@@ -318,17 +319,17 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn get_unique_name(&self) -> Box<str> {
         format!("_{}", self.wires.get_next_alloc_id().get_hidden_value()).into_boxed_str()
     }
-    fn get_wire_or_constant_as_wire(&mut self, flat_id : &SpanFlatID) -> Option<WireID> {
-        match &self.generation_state[flat_id.0] {
+    fn get_wire_or_constant_as_wire(&mut self, flat_id : FlatID) -> Option<WireID> {
+        match &self.generation_state[flat_id] {
             SubModuleOrWire::SubModule(_) => unreachable!(),
             SubModuleOrWire::Unnasigned => unreachable!(),
             SubModuleOrWire::Wire(w) => Some(*w),
             SubModuleOrWire::CompileTimeValue(v) => {
                 let value = v.clone();
-                let Instantiation::Wire(WireInstance{typ, inst : _, is_compiletime : _, span}) = &self.module.flattened.instantiations[flat_id.0] else {unreachable!()};
+                let Instantiation::Wire(WireInstance{typ, inst : _, is_compiletime : _, span}) = &self.module.flattened.instantiations[flat_id] else {unreachable!()};
                 let typ = self.concretize_type(typ, *span)?;
                 let name = self.get_unique_name();
-                Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id.0, typ, name}))
+                Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id, typ, name}))
             }
         }
     }
@@ -344,29 +345,30 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 };
                 (Some(name.clone()), source)
             }
-            WireSource::WireRead{from_wire} => {
-                let WireSource::NamedWire { read_only, identifier_type, name, name_token } = &self.module.flattened.instantiations[*from_wire].extract_wire().inst else {unreachable!("WireReads must point to a NamedWire!")};
-                return Some(self.generation_state[*from_wire].extract_wire())
+            &WireSource::WireRead{from_wire} => {
+                let WireSource::NamedWire{read_only:_, identifier_type:_, name:_, name_token:_} = &self.module.flattened.instantiations[from_wire].extract_wire().inst else {unreachable!("WireReads must point to a NamedWire!")};
+                return Some(self.generation_state[from_wire].extract_wire())
             }
-            WireSource::UnaryOp{op, right} => {
+            &WireSource::UnaryOp{op, right} => {
                 let right = self.get_wire_or_constant_as_wire(right)?;
-                (None, RealWireDataSource::UnaryOp{op: *op, right})
+                (None, RealWireDataSource::UnaryOp{op: op, right})
             }
-            WireSource::BinaryOp{op, left, right} => {
+            &WireSource::BinaryOp{op, left, right} => {
                 let left = self.get_wire_or_constant_as_wire(left)?;
                 let right = self.get_wire_or_constant_as_wire(right)?;
-                (None, RealWireDataSource::BinaryOp{op: *op, left, right})
+                (None, RealWireDataSource::BinaryOp{op: op, left, right})
             }
-            WireSource::ArrayAccess{arr, arr_idx} => {
+            &WireSource::ArrayAccess{arr, arr_idx} => {
                 let arr = self.get_wire_or_constant_as_wire(arr)?;
-                match &self.generation_state[arr_idx.0] {
+                match &self.generation_state[arr_idx] {
                     SubModuleOrWire::SubModule(_) => unreachable!(),
                     SubModuleOrWire::Unnasigned => unreachable!(),
                     SubModuleOrWire::Wire(w) => {
                         (None, RealWireDataSource::ArrayAccess{arr, arr_idx: *w})
                     }
                     SubModuleOrWire::CompileTimeValue(v) => {
-                        let arr_idx = self.extract_integer_from_value(v, arr_idx.1)?;
+                        let arr_idx_wire = self.module.flattened.instantiations[arr_idx].extract_wire();
+                        let arr_idx = self.extract_integer_from_value(v, arr_idx_wire.span)?;
                         (None, RealWireDataSource::ConstArrayAccess{arr, arr_idx})
                     }
                 }

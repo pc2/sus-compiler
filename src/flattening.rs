@@ -11,13 +11,11 @@ pub struct FlatIDMarker;
 impl UUIDMarker for FlatIDMarker {const DISPLAY_NAME : &'static str = "obj_";}
 pub type FlatID = UUID<FlatIDMarker>;
 
-pub type SpanFlatID = (FlatID, Span);
-
 pub type FieldID = usize;
 
 #[derive(Debug)]
 pub enum ConnectionWritePathElement {
-    ArrayIdx(SpanFlatID),
+    ArrayIdx{idx : FlatID, idx_span : Span},
     //StructField(FieldID)
 }
 #[derive(Debug)]
@@ -42,7 +40,7 @@ impl ConnectionWrite {
 #[derive(Debug)]
 pub struct Connection {
     pub num_regs : i64,
-    pub from : SpanFlatID,
+    pub from : FlatID,
     pub to : ConnectionWrite,
     pub condition : Option<FlatID>
 }
@@ -57,9 +55,9 @@ pub struct InterfacePort {
 pub enum WireSource {
     NamedWire{read_only : bool, identifier_type : IdentifierType, name : Box<str>, name_token : Option<usize>},
     WireRead{from_wire : FlatID}, // Used to add a span to the reference of a wire. 
-    UnaryOp{op : Operator, right : SpanFlatID},
-    BinaryOp{op : Operator, left : SpanFlatID, right : SpanFlatID},
-    ArrayAccess{arr : SpanFlatID, arr_idx : SpanFlatID},
+    UnaryOp{op : Operator, right : FlatID},
+    BinaryOp{op : Operator, left : FlatID, right : FlatID},
+    ArrayAccess{arr : FlatID, arr_idx : FlatID},
     Constant{value : Value},
 }
 
@@ -96,9 +94,9 @@ struct FlatteningContext<'l, 'm, 'fl> {
 }
 
 impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
-    fn typecheck(&self, wire : SpanFlatID, expected : &Type, context : &str) -> Option<()> {
-        let found = &self.instantiations[wire.0].extract_wire().typ;
-        typecheck(found, wire.1, expected, context, self.linker, &self.errors)
+    fn typecheck(&self, wire_id : FlatID, expected : &Type, context : &str) -> Option<()> {
+        let wire = self.instantiations[wire_id].extract_wire();
+        typecheck(&wire.typ, wire.span, expected, context, self.linker, &self.errors)
     }
     pub fn map_to_type(&self, type_expr : &TypeExpression, global_references : &[GlobalReference]) -> Type {
         match type_expr {
@@ -114,7 +112,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
                 let array_element_type = self.map_to_type(&array_type_expr.0, global_references);
                 if let Some(array_size_wire) = self.flatten_single_expr(array_size_expr, None) {
                     self.typecheck(array_size_wire, &Type::Named(get_builtin_uuid("int")), "array size");
-                    Type::Array(Box::new((array_element_type, array_size_wire.0)))
+                    Type::Array(Box::new((array_element_type, array_size_wire)))
                 } else {
                     Type::Error
                 }
@@ -126,9 +124,9 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
         let mut current_type = &self.instantiations[cw.root].extract_wire().typ;
         for p in &cw.path {
             match p {
-                ConnectionWritePathElement::ArrayIdx(idx) => {
+                ConnectionWritePathElement::ArrayIdx{idx, idx_span} => {
                     let index_was_int = self.typecheck(*idx, &Type::Named(get_builtin_uuid("int")), "array index");
-                    current_type = typecheck_is_array_indexer(current_type, idx.1, self.linker, &self.errors)?;
+                    current_type = typecheck_is_array_indexer(current_type, *idx_span, self.linker, &self.errors)?;
                     index_was_int?;
                 }
             }
@@ -141,9 +139,10 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
         let did_typecheck_fail = self.typecheck(connection.from, &expected_type, "connection");
 
         let assign_to_root = self.instantiations[connection.to.root].extract_wire();
-        if assign_to_root.is_compiletime && !self.instantiations[connection.from.0].extract_wire().is_compiletime {
+        let from_wire = self.instantiations[connection.from].extract_wire();
+        if assign_to_root.is_compiletime && !from_wire.is_compiletime {
             let decl_info = error_info(assign_to_root.span, self.errors.file, "Declared here");
-            self.errors.error_with_info(connection.from.1, "Assignments to compile-time variables must themselves be known at compile time", vec![decl_info]);
+            self.errors.error_with_info(from_wire.span, "Assignments to compile-time variables must themselves be known at compile time", vec![decl_info]);
             return None;
         }
         did_typecheck_fail?;// gather all errors, then 
@@ -227,7 +226,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
 
         Some((md, &interface_wires[output_range]))
     }
-    fn flatten_single_expr(&self, (expr, expr_span) : &SpanExpression, condition : Option<FlatID>) -> Option<SpanFlatID> {
+    fn flatten_single_expr(&self, (expr, expr_span) : &SpanExpression, condition : Option<FlatID>) -> Option<FlatID> {
         let span = *expr_span; // for more compact constructors
         let single_connection_side = match expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {
@@ -246,9 +245,9 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
             Expression::UnaryOp(op_box) => {
                 let (op, _op_pos, operate_on) = op_box.deref();
                 let right = self.flatten_single_expr(operate_on, condition)?;
-                let found = self.instantiations[right.0].extract_wire();
-                let output_type = typecheck_unary_operator(*op, &found.typ, right.1, self.linker, &self.errors);
-                self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : output_type, is_compiletime : found.is_compiletime, span, inst : WireSource::UnaryOp{op : *op, right}}))
+                let right_wire = self.instantiations[right].extract_wire();
+                let output_type = typecheck_unary_operator(*op, &right_wire.typ, right_wire.span, self.linker, &self.errors);
+                self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : output_type, is_compiletime : right_wire.is_compiletime, span, inst : WireSource::UnaryOp{op : *op, right}}))
             }
             Expression::BinOp(binop_box) => {
                 let (left_expr, op, _op_pos, right_expr) = binop_box.deref();
@@ -257,7 +256,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
                 let ((input_left_type, input_right_type), output_type) = get_binary_operator_types(*op);
                 self.typecheck(left, &input_left_type, &format!("{op} left"))?;
                 self.typecheck(right, &input_right_type, &format!("{op} right"))?;
-                let is_constant = self.instantiations[left.0].extract_wire().is_compiletime && self.instantiations[right.0].extract_wire().is_compiletime;
+                let is_constant = self.instantiations[left].extract_wire().is_compiletime && self.instantiations[right].extract_wire().is_compiletime;
                 self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : output_type, is_compiletime: is_constant, span, inst : WireSource::BinaryOp{op : *op, left, right}}))
             }
             Expression::Array(arr_box) => {
@@ -266,11 +265,11 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
                 let arr_idx = self.flatten_single_expr(right, condition)?;
                 
                 let index_was_int = self.typecheck(arr_idx, &Type::Named(get_builtin_uuid("int")), "array index");
-                let array_type = &self.instantiations[arr.0].extract_wire().typ;
-                let typ = typecheck_is_array_indexer(array_type, arr.1, self.linker, &self.errors)?.clone();
+                let arr_wire = self.instantiations[arr].extract_wire();
+                let arr_idx_wire = self.instantiations[arr_idx].extract_wire();
+                let typ = typecheck_is_array_indexer(&arr_wire.typ, arr_wire.span, self.linker, &self.errors)?.clone();
                 index_was_int?; // Do both for better typechecking diagnostics
-                let idx_is_constant = self.instantiations[arr_idx.0].extract_wire().is_compiletime;
-                let is_constant = self.instantiations[arr.0].extract_wire().is_compiletime && idx_is_constant;
+                let is_constant = arr_wire.is_compiletime && arr_idx_wire.is_compiletime;
                 self.instantiations.alloc(Instantiation::Wire(WireInstance{typ, is_compiletime: is_constant, span, inst : WireSource::ArrayAccess{arr, arr_idx}}))
             }
             Expression::FuncCall(func_and_args) => {
@@ -285,7 +284,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
                 outputs[0].id
             }
         };
-        Some((single_connection_side, *expr_span))
+        Some(single_connection_side)
     }
     fn flatten_assignable_expr(&self, (expr, span) : &SpanAssignableExpression, condition : Option<FlatID>) -> Option<ConnectionWrite> {
         Some(match expr {
@@ -302,28 +301,29 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
                 ConnectionWrite{root, path : Vec::new(), span : *span}
             }
             AssignableExpression::ArrayIndex(arr_box) => {
-                let (arr, idx, _bracket_span) = arr_box.deref();
+                let (arr, idx_expr, _bracket_span) = arr_box.deref();
                 let flattened_arr_expr_opt = self.flatten_assignable_expr(arr, condition);
                 
-                let idx_local = self.flatten_single_expr(idx, condition)?;
+                let idx = self.flatten_single_expr(idx_expr, condition)?;
 
                 let mut flattened_arr_expr = flattened_arr_expr_opt?; // only unpack the subexpr after flattening the idx, so we catch all errors
 
-                flattened_arr_expr.path.push(ConnectionWritePathElement::ArrayIdx(idx_local));
+                flattened_arr_expr.path.push(ConnectionWritePathElement::ArrayIdx{idx, idx_span : idx_expr.1});
 
                 flattened_arr_expr
             }
         })
     }
-    fn extend_condition(&self, condition : Option<FlatID>, additional_condition : SpanFlatID) -> FlatID {
+    fn extend_condition(&self, condition : Option<FlatID>, additional_condition : FlatID) -> FlatID {
         if let Some(condition) = condition {
             let bool_typ = Type::Named(get_builtin_uuid("bool"));
-            let prev_cond = self.instantiations[condition].extract_wire();
-            assert!(!prev_cond.is_compiletime); // Conditions are only used for runtime conditions. Compile time ifs are handled at instantiation time
-            assert!(prev_cond.typ == bool_typ);
-            self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : bool_typ, is_compiletime : false, span : additional_condition.1, inst : WireSource::BinaryOp{op: Operator{op_typ : kw("&")}, left : (condition, additional_condition.1), right : additional_condition}}))
+            let prev_condition_wire = self.instantiations[condition].extract_wire();
+            let additional_condition_wire = self.instantiations[condition].extract_wire();
+            assert!(!prev_condition_wire.is_compiletime); // Conditions are only used for runtime conditions. Compile time ifs are handled at instantiation time
+            assert!(prev_condition_wire.typ == bool_typ);
+            self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : bool_typ, is_compiletime : false, span : additional_condition_wire.span, inst : WireSource::BinaryOp{op: Operator{op_typ : kw("&")}, left : condition, right : additional_condition}}))
         } else {
-            additional_condition.0
+            additional_condition
         }
     }
     fn flatten_code(&mut self, code : &CodeBlock, condition : Option<FlatID>) {
@@ -366,7 +366,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
                 Statement::If{condition : condition_expr, then, els} => {
                     let Some(if_statement_condition) = self.flatten_single_expr(condition_expr, condition) else {continue;};
 
-                    let condition_is_const = self.instantiations[if_statement_condition.0].extract_wire().is_compiletime;
+                    let condition_is_const = self.instantiations[if_statement_condition].extract_wire().is_compiletime;
 
                     if condition_is_const {
                         println!("TODO generative if statements");
@@ -377,7 +377,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
                     let then_condition = self.extend_condition(condition, if_statement_condition);
                     self.flatten_code(then, Some(then_condition));
                     if let Some(e) = els {
-                        let else_condition_bool = (self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : bool_typ, is_compiletime : false/* Generative If */, span : condition_expr.1, inst : WireSource::UnaryOp{op : Operator{op_typ : kw("!")}, right : if_statement_condition}})), condition_expr.1);
+                        let else_condition_bool = self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : bool_typ, is_compiletime : false/* Generative If */, span : condition_expr.1, inst : WireSource::UnaryOp{op : Operator{op_typ : kw("!")}, right : if_statement_condition}}));
                         let else_condition = self.extend_condition(condition, else_condition_bool);
                         self.flatten_code(e, Some(else_condition));
                     }
@@ -401,7 +401,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
 
                     for (field, to_i) in zip(outputs, to) {
                         let Some(write_side) = self.flatten_assignable_expr(&to_i.expr, condition) else {return;};
-                        self.create_connection(Connection{num_regs : to_i.num_regs, from: (field.id, func_name_span), to: write_side, condition});
+                        self.create_connection(Connection{num_regs : to_i.num_regs, from: field.id, to: write_side, condition});
                     }
                 },
                 Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
@@ -540,7 +540,7 @@ impl FlattenedModule {
 
         for (_id, conn) in &self.instantiations {
             if let Instantiation::Connection(conn) = conn {
-                connection_fanin[conn.to.root].push(conn.from.0);
+                connection_fanin[conn.to.root].push(conn.from);
                 if let Some(cond) = conn.condition {
                     connection_fanin[conn.to.root].push(cond);
                 }
