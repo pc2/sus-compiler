@@ -282,7 +282,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
     fn compute_compile_time(&self, wire_inst : &WireSource, typ : &ConcreteType) -> Option<Value> {
         Some(match &wire_inst {
-            WireSource::NamedWire{read_only, identifier_type: _, decl_id: _} => {
+            WireSource::NamedWire{read_only, identifier_type: _, name : _, name_token : _} => {
                 /*Do nothing (in fact re-initializes the wire to 'empty'), just corresponds to wire declaration*/
                 if *read_only {
                     todo!("Modules can't be computed at compile time yet");
@@ -349,7 +349,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         SubModuleOrWire::CompileTimeValue(value_computed)
                     } else {
                         let (name, source) = match &w.inst {
-                            WireSource::NamedWire{read_only, identifier_type, decl_id} => {
+                            WireSource::NamedWire{read_only, identifier_type, name, name_token : _} => {
                                 let source = if *read_only {
                                     RealWireDataSource::ReadOnly
                                 } else {
@@ -357,7 +357,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                                     let is_state = if *identifier_type == IdentifierType::State{StateInitialValue::State{initial_value: Value::Unset}} else {StateInitialValue::Combinatorial};
                                     RealWireDataSource::Multiplexer{is_state, sources : Vec::new()}
                                 };
-                                (decl_id.map(|id| self.module.declarations[id].name.clone()), source)
+                                (Some(name.clone()), source)
                             }
                             WireSource::UnaryOp{op, right} => {
                                 let Some(right) = self.get_wire_or_constant_as_wire(right) else {return};
