@@ -53,8 +53,8 @@ pub struct InterfacePort {
 
 #[derive(Debug)]
 pub enum WireSource {
-    NamedWire{read_only : bool, identifier_type : IdentifierType, name : Box<str>, name_token : Option<usize>},
     WireRead{from_wire : FlatID}, // Used to add a span to the reference of a wire. 
+    //SubModuleOutput{submodule : FlatID, port_idx : usize},
     UnaryOp{op : Operator, right : FlatID},
     BinaryOp{op : Operator, left : FlatID, right : FlatID},
     ArrayAccess{arr : FlatID, arr_idx : FlatID},
@@ -70,16 +70,39 @@ pub struct WireInstance {
 }
 
 #[derive(Debug)]
+pub struct WireDeclaration {
+    pub typ : Type,
+    pub typ_span : Span,
+    pub read_only : bool,
+    pub identifier_type : IdentifierType,
+    pub name : Box<str>,
+    pub name_token : Option<usize>
+}
+impl WireDeclaration {
+    pub fn get_full_decl_span(&self) -> Span {
+        let name_pos = self.name_token.unwrap(); // Temporary, name_token should always be present for proper declarations. 
+        Span(self.typ_span.0, name_pos)
+    }
+}
+
+#[derive(Debug)]
 pub enum Instantiation {
     SubModule{module_uuid : NamedUUID, name : Box<str>, typ_span : Span, interface_wires : Vec<InterfacePort>},
+    WireDeclaration(WireDeclaration),
     Wire(WireInstance),
     Connection(Connection),
     Error
 }
 
 impl Instantiation {
+    #[track_caller]
     pub fn extract_wire(&self) -> &WireInstance {
-        let Self::Wire(w) = self else {panic!("extract_wire on not a wire!")};
+        let Self::Wire(w) = self else {panic!("extract_wire on not a wire! Found {self:?}")};
+        w
+    }
+    #[track_caller]
+    pub fn extract_wire_declaration(&self) -> &WireDeclaration {
+        let Self::WireDeclaration(w) = self else {panic!("extract_wire on not a WireDeclaration! Found {self:?}")};
         w
     }
 }
@@ -121,7 +144,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
     }
     // May also error, for example when array accesses happen on non-array types
     fn get_connectionwrite_type(&self, cw : &ConnectionWrite) -> Option<&Type> {
-        let mut current_type = &self.instantiations[cw.root].extract_wire().typ;
+        let mut current_type = &self.instantiations[cw.root].extract_wire_declaration().typ;
         for p in &cw.path {
             match p {
                 ConnectionWritePathElement::ArrayIdx{idx, idx_span} => {
@@ -138,10 +161,10 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
 
         let did_typecheck_fail = self.typecheck(connection.from, &expected_type, "connection");
 
-        let assign_to_root = self.instantiations[connection.to.root].extract_wire();
+        let assign_to_root = self.instantiations[connection.to.root].extract_wire_declaration();
         let from_wire = self.instantiations[connection.from].extract_wire();
-        if assign_to_root.is_compiletime && !from_wire.is_compiletime {
-            let decl_info = error_info(assign_to_root.span, self.errors.file, "Declared here");
+        if assign_to_root.identifier_type == IdentifierType::Generative && !from_wire.is_compiletime {
+            let decl_info = error_info(assign_to_root.get_full_decl_span(), self.errors.file, "Declared here");
             self.errors.error_with_info(from_wire.span, "Assignments to compile-time variables must themselves be known at compile time", vec![decl_info]);
             return None;
         }
@@ -151,22 +174,19 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
         Some(())
     }
     fn alloc_module_interface(&self, name : Box<str>, module : &Module, module_uuid : NamedUUID, typ_span : Span) -> Instantiation {
-        let interface_wires = module.interface.interface_wires.iter().map(|port| {
+        let interface_wires = module.interface.interface_wires.iter().enumerate().map(|(port_idx, port)| {
             let identifier_type = if port.is_input {
                 IdentifierType::Input
             } else {
                 IdentifierType::Output
             };
-            let id = self.instantiations.alloc(Instantiation::Wire(WireInstance{
+            let id = self.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
                 typ: port.typ.clone(),
-                is_compiletime : false,
-                span : typ_span,
-                inst : WireSource::NamedWire{
-                    read_only : !port.is_input,
-                    identifier_type,
-                    name : format!("{}_{}", &module.link_info.name, &port.port_name).into_boxed_str(),
-                    name_token : None
-                }
+                typ_span,
+                read_only : !port.is_input,
+                identifier_type,
+                name : format!("{}_{}", &module.link_info.name, &port.port_name).into_boxed_str(),
+                name_token : None
             }));
             InterfacePort{is_input : port.is_input, id}
         }).collect();
@@ -231,8 +251,9 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
         let single_connection_side = match expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {
                 let from_wire = self.decl_to_flat_map[*l].unwrap();
-                let prev_decl = self.instantiations[from_wire].extract_wire();
-                self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : prev_decl.typ.clone(), is_compiletime : prev_decl.is_compiletime, span, inst : WireSource::WireRead{from_wire}}))
+                let Instantiation::WireDeclaration(WireDeclaration { typ, typ_span:_, read_only:_, identifier_type, name:_, name_token:_ }) = &self.instantiations[from_wire] else {unreachable!("Reference to a wire MUST refer to a WireDeclaration, found {:?} instead", &self.instantiations[from_wire])};
+                let is_compiletime = *identifier_type == IdentifierType::Generative;
+                self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : typ.clone(), is_compiletime, span, inst : WireSource::WireRead{from_wire}}))
             }
             Expression::Named(LocalOrGlobal::Global(g)) => {
                 let r = self.module.link_info.global_references[*g];
@@ -290,7 +311,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
         Some(match expr {
             AssignableExpression::Named{local_idx} => {
                 let root = self.decl_to_flat_map[*local_idx].unwrap();
-                let WireSource::NamedWire{read_only, identifier_type : _, name : _, name_token : _} = &self.instantiations[root].extract_wire().inst else {
+                let Instantiation::WireDeclaration(WireDeclaration{read_only, identifier_type : _, name : _, name_token : _, typ : _, typ_span : _}) = &self.instantiations[root] else {
                     unreachable!("Attempting to assign to a Instantiation::PlainWire")
                 };
                 if *read_only {
@@ -352,8 +373,14 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
                             Named::Type(_) => {
                                 assert!(decl.identifier_type != IdentifierType::Input);
                                 assert!(decl.identifier_type != IdentifierType::Output);
-                                let is_compiletime = decl.identifier_type == IdentifierType::Generative;
-                                Instantiation::Wire(WireInstance{typ, is_compiletime, span : typ_span, inst : WireSource::NamedWire{read_only : false, identifier_type : decl.identifier_type, name : decl.name.clone(), name_token : Some(decl.name_token)}})
+                                Instantiation::WireDeclaration(WireDeclaration{
+                                    typ,
+                                    typ_span,
+                                    read_only : false,
+                                    identifier_type : decl.identifier_type,
+                                    name : decl.name.clone(),
+                                    name_token : Some(decl.name_token)
+                                })
                             }
                         }
                     } else {
@@ -401,7 +428,11 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
 
                     for (field, to_i) in zip(outputs, to) {
                         let Some(write_side) = self.flatten_assignable_expr(&to_i.expr, condition) else {return;};
-                        self.create_connection(Connection{num_regs : to_i.num_regs, from: field.id, to: write_side, condition});
+
+                        // temporary
+                        let module_port_wire_decl = self.instantiations[field.id].extract_wire_declaration();
+                        let module_port_proxy = self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : module_port_wire_decl.identifier_type == IdentifierType::Generative, span : *func_span, inst : WireSource::WireRead { from_wire: field.id }}));
+                        self.create_connection(Connection{num_regs : to_i.num_regs, from: module_port_proxy, to: write_side, condition});
                     }
                 },
                 Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
@@ -507,7 +538,14 @@ impl FlattenedModule {
             };
             
             let typ = context.map_to_type(&decl.typ.0, &module.link_info.global_references);
-            let wire_id = context.instantiations.alloc(Instantiation::Wire(WireInstance{typ : typ.clone(), is_compiletime : false, span : decl.typ.1, inst : WireSource::NamedWire{read_only: is_input, identifier_type : decl.identifier_type, name : decl.name.clone(), name_token : Some(decl.name_token)}}));
+            let wire_id = context.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
+                typ : typ.clone(),
+                typ_span : decl.typ.1,
+                read_only: is_input,
+                identifier_type : decl.identifier_type,
+                name : decl.name.clone(),
+                name_token : Some(decl.name_token)
+            }));
             
             interface.interface_wires.push(FlattenedInterfacePort { wire_id, is_input, typ, port_name: decl.name.clone(), span: decl.span });
             context.decl_to_flat_map[decl_id] = Some(wire_id);
@@ -571,6 +609,7 @@ impl FlattenedModule {
                 }
             };
             match &self.instantiations[item] {
+                Instantiation::WireDeclaration(_) => {}
                 Instantiation::Wire(wire) => {
                     match &wire.inst {
                         WireSource::WireRead{from_wire} => {
@@ -600,7 +639,7 @@ impl FlattenedModule {
         // Now produce warnings from the unused list
         for (id, inst) in &self.instantiations {
             if !is_instance_used_map[id] {
-                if let Instantiation::Wire(WireInstance{typ : _, is_compiletime : _, span : _, inst : WireSource::NamedWire { read_only : _, identifier_type : _, name : _, name_token : Some(name_token)}}) = inst {
+                if let Instantiation::WireDeclaration(WireDeclaration{typ : _, typ_span : _, read_only : _, identifier_type : _, name : _, name_token : Some(name_token)}) = inst {
                     self.errors.warn_basic(Span::from(*name_token), "Unused Variable: This variable does not affect the output ports of this module");
                 }
             }

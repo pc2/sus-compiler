@@ -1,6 +1,6 @@
 use std::{iter::zip, ops::Deref};
 
-use crate::{ast::{Module, IdentifierType}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{NamedUUID, get_builtin_uuid}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::WireSource, value::Value};
+use crate::{ast::{Module, IdentifierType}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{NamedUUID, get_builtin_uuid}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::{Instantiation, WireDeclaration}, value::Value};
 
 fn get_type_name_size(id : NamedUUID) -> u64 {
     if id == get_builtin_uuid("int") {
@@ -67,9 +67,9 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
     program_text.push_str(");\n");
 
     for (_id, w) in &instance.wires {
-        if let WireSource::NamedWire{read_only : _, identifier_type, name : _, name_token : _} = &md.flattened.instantiations[w.original_wire].extract_wire().inst {
+        if let Instantiation::WireDeclaration(wire_decl) = &md.flattened.instantiations[w.original_wire] {
             // Don't print named inputs and outputs, already did that in interface
-            match identifier_type {
+            match wire_decl.identifier_type {
                 IdentifierType::Input | IdentifierType::Output => {continue;}
                 IdentifierType::Local | IdentifierType::State | IdentifierType::Generative => {}
             }

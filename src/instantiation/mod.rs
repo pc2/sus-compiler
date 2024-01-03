@@ -2,7 +2,7 @@ use std::{rc::Rc, ops::Deref, cell::RefCell};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Operator, Module, IdentifierType, Span}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid}, value::{Value, compute_unary_op, compute_binary_op}};
+use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Operator, Module, IdentifierType, Span}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed, WireDeclaration}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid}, value::{Value, compute_unary_op, compute_binary_op}};
 
 pub mod latency;
 
@@ -125,14 +125,17 @@ enum SubModuleOrWire {
 }
 
 impl SubModuleOrWire {
+    #[track_caller]
     fn extract_wire(&self) -> WireID {
         let Self::Wire(result) = self else {panic!("Failed wire extraction! Is {self:?} instead")};
         *result
     }
+    #[track_caller]
     fn extract_submodule(&self) -> SubModuleID {
         let Self::SubModule(result) = self else {panic!("Failed SubModule extraction! Is {self:?} instead")};
         *result
     }
+    #[track_caller]
     fn extract_generation_value(&self) -> &Value {
         let Self::CompileTimeValue(result) = self else {panic!("Failed GenerationValue extraction! Is {self:?} instead")};
         result
@@ -282,13 +285,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
     fn compute_compile_time(&self, wire_inst : &WireSource, typ : &ConcreteType) -> Option<Value> {
         Some(match wire_inst {
-            WireSource::NamedWire{read_only, identifier_type: _, name : _, name_token : _} => {
-                /*Do nothing (in fact re-initializes the wire to 'empty'), just corresponds to wire declaration*/
-                if *read_only {
-                    todo!("Modules can't be computed at compile time yet");
-                } 
-                typ.get_initial_val(self.linker)
-            }
             &WireSource::WireRead{from_wire} => {
                 self.get_generation_value(from_wire)?.clone()
             }
@@ -335,18 +331,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
     fn wire_to_real_wire(&mut self, w: &WireInstance, typ : ConcreteType, original_wire : FlatID) -> Option<WireID> {
         let (name, source) = match &w.inst {
-            WireSource::NamedWire{read_only, identifier_type, name, name_token : _} => {
-                let source = if *read_only {
-                    RealWireDataSource::ReadOnly
-                } else {
-                    // TODO initial value
-                    let is_state = if *identifier_type == IdentifierType::State{StateInitialValue::State{initial_value: Value::Unset}} else {StateInitialValue::Combinatorial};
-                    RealWireDataSource::Multiplexer{is_state, sources : Vec::new()}
-                };
-                (Some(name.clone()), source)
-            }
             &WireSource::WireRead{from_wire} => {
-                let WireSource::NamedWire{read_only:_, identifier_type:_, name:_, name_token:_} = &self.module.flattened.instantiations[from_wire].extract_wire().inst else {unreachable!("WireReads must point to a NamedWire!")};
+                let Instantiation::WireDeclaration(WireDeclaration{typ:_, typ_span:_, read_only:_, identifier_type:_, name:_, name_token:_}) = &self.module.flattened.instantiations[from_wire] else {unreachable!("WireReads must point to a NamedWire!")};
                 return Some(self.generation_state[from_wire].extract_wire())
             }
             &WireSource::UnaryOp{op, right} => {
@@ -389,6 +375,29 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         self.generation_state[port.id].extract_wire()
                     }).collect();
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, wires : interface_real_wires, name : name.clone()}))
+                }
+                Instantiation::WireDeclaration(wire_decl) => {
+                    let Some(typ) = self.concretize_type(&wire_decl.typ, wire_decl.typ_span) else {
+                        return; // Exit early, do not produce invalid wires in InstantiatedModule
+                    };
+                    if wire_decl.identifier_type == IdentifierType::Generative {
+                        /*Do nothing (in fact re-initializes the wire to 'empty'), just corresponds to wire declaration*/
+                        if wire_decl.read_only {
+                            todo!("Modules can't be computed at compile time yet");
+                        } 
+                        let initial_value = typ.get_initial_val(self.linker);
+                        assert!(initial_value.is_of_type(&typ));
+                        SubModuleOrWire::CompileTimeValue(initial_value)
+                    } else {
+                        let source = if wire_decl.read_only {
+                            RealWireDataSource::ReadOnly
+                        } else {
+                            // TODO initial value
+                            let is_state = if wire_decl.identifier_type == IdentifierType::State{StateInitialValue::State{initial_value: Value::Unset}} else {StateInitialValue::Combinatorial};
+                            RealWireDataSource::Multiplexer{is_state, sources : Vec::new()}
+                        };
+                        SubModuleOrWire::Wire(self.wires.alloc(RealWire{ name: wire_decl.name.clone(), typ, original_wire, source}))
+                    }
                 }
                 Instantiation::Wire(w) => {
                     let Some(typ) = self.concretize_type(&w.typ, w.span) else {
