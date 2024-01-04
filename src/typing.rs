@@ -15,17 +15,6 @@ pub enum Type {
     Array(Box<(Type, FlatID)>)
 }
 
-impl PartialEq for Type {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Named(l0), Self::Named(r0)) => l0 == r0,
-            (Self::Array(l0), Self::Array(r0)) => l0.deref().0 == r0.deref().0,
-            _ => false,
-        }
-    }
-}
-impl Eq for Type {}
-
 impl Type {
     pub fn to_string(&self, linker : &Linker) -> String {
         match self {
@@ -56,6 +45,16 @@ impl Type {
             Type::Named(_) => {}
             Type::Array(arr_box) => {
                 f(arr_box.deref().1)
+            }
+        }
+    }
+    pub fn contains_error_or_unknown<const CHECK_ERROR : bool, const CHECK_UNKNOWN : bool>(&self) -> bool {
+        match self {
+            Type::Error => CHECK_ERROR,
+            Type::Unknown => CHECK_UNKNOWN,
+            Type::Named(_) => false,
+            Type::Array(arr_box) => {
+                arr_box.deref().0.contains_error_or_unknown::<CHECK_ERROR, CHECK_UNKNOWN>()
             }
         }
     }
@@ -110,15 +109,23 @@ pub fn get_binary_operator_types(op : Operator) -> ((Type, Type), Type) {
     ((Type::Named(a), Type::Named(b)), Type::Named(o))
 }
 
-pub fn typecheck(found : &Type, span : Span, expected : &Type, context : &str, linker : &Linker, errors : &ErrorCollector) -> Option<()> {
-    if expected != found {
+fn type_compare(expected : &Type, found : &Type) -> bool {
+    match (expected, found) {
+        (Type::Named(exp), Type::Named(fnd)) => exp == fnd,
+        (Type::Array(exp), Type::Array(fnd)) => {
+            type_compare(&exp.deref().0, &fnd.deref().0)
+        }
+        (Type::Error, _) | (_, Type::Error) => true, // Just assume correct, because the other side has an error
+        (Type::Unknown, _) | (_, Type::Unknown) => todo!("Type Unification"),
+        _ => false,
+    }
+}
+pub fn typecheck(found : &Type, span : Span, expected : &Type, context : &str, linker : &Linker, errors : &ErrorCollector) {
+    if !type_compare(expected, found) {
         let expected_name = expected.to_string(linker);
         let found_name = found.to_string(linker);
         errors.error_basic(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
-        assert!(expected_name != found_name);
-        None
-    } else {
-        Some(())
+        assert!(expected_name != found_name, "{expected_name} != {found_name}");
     }
 }
 pub fn typecheck_is_array_indexer<'a>(arr_type : &'a Type, span : Span, linker : &Linker, errors : &ErrorCollector) -> Option<&'a Type> {

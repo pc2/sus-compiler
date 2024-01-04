@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}, rc::Rc};
 
-use crate::{ast::{Module, LinkInfo, Span, GlobalReference, DeclIDMarker}, arena_alloc::{ArenaAllocator, UUID, UUIDMarker, FlatAlloc}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::{FlattenedInterface, FlattenedModule, FlatID}, util::{const_str_position, const_str_position_in_tuples}, instantiation::InstantiatedModule, value::Value};
+use crate::{ast::{Module, LinkInfo, Span, GlobalReference}, arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::FlattenedModule, util::{const_str_position, const_str_position_in_tuples}, instantiation::InstantiatedModule, value::Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NamedUUIDMarker;
@@ -526,7 +526,7 @@ impl Linker {
 
             println!("Flattening {}", md.link_info.name);
 
-            let flattened = FlattenedModule::initialize(&self, md);
+            let flattened = FlattenedModule::initialize(&self, md, !md.link_info.is_fully_linked);
 
             let Named::Module(md) = &mut self.links.globals[*id] else {unreachable!()};
             *md.flattened.get_mut() = flattened;

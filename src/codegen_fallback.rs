@@ -53,11 +53,11 @@ pub fn value_to_str(value : &Value) -> String {
 }
 
 pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String {
-    assert!(!instance.errors.did_error(), "Module cannot have experienced an error");
+    assert!(!instance.errors.did_error.get(), "Module cannot have experienced an error");
     let mut program_text : String = format!("module {}(\n\tinput clk, \n", md.link_info.name);
     let submodule_interface = instance.interface.as_ref().unwrap();
     let flattened_borrow = md.flattened.borrow();
-    for (port_idx, (port, real_port)) in zip(flattened_borrow.interface.interface_wires.iter(), submodule_interface).enumerate() {
+    for (port_idx, real_port) in submodule_interface.iter().enumerate() {
         let wire = &instance.wires[*real_port];
         program_text.push_str(if port_idx < flattened_borrow.interface.outputs_start {"\tinput"} else {"\toutput /*mux_wire*/ reg"});
         program_text.push_str(&typ_to_verilog_array(&wire.typ));

@@ -1,7 +1,7 @@
 
 use num::BigInt;
 
-use crate::{tokenizer::*, errors::*, ast::*, linker::FileUUID, flattening::{FlattenedModule, FlattenedInterface}, arena_alloc::FlatAlloc, instantiation::InstantiationList, value::Value};
+use crate::{tokenizer::*, errors::*, ast::*, linker::FileUUID, flattening::FlattenedModule, arena_alloc::FlatAlloc, instantiation::InstantiationList, value::Value};
 
 use std::{iter::Peekable, str::FromStr, ops::Range, cell::RefCell};
 use core::slice::Iter;

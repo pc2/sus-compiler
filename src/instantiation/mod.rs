@@ -2,7 +2,7 @@ use std::{rc::Rc, ops::Deref, cell::RefCell};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Operator, Module, IdentifierType, Span}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed, WireDeclaration, SubModuleInstance, FlattenedModule}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid}, value::{Value, compute_unary_op, compute_binary_op}};
+use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Operator, IdentifierType, Span}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed, FlattenedModule}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid}, value::{Value, compute_unary_op, compute_binary_op}};
 
 pub mod latency;
 
@@ -54,7 +54,7 @@ pub enum RealWireDataSource {
 }
 
 impl RealWireDataSource {
-    fn iter_sources_with_min_latency<F : FnMut(WireID, i64) -> ()>(&self, mut f : F) {
+    fn iter_sources_with_min_latency<F : FnMut(WireID, i64)>(&self, f : &mut F) {
         match self {
             RealWireDataSource::ReadOnly => {}
             RealWireDataSource::Multiplexer { is_state: _, sources } => {
@@ -163,7 +163,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         let Value::Integer(val) = val else {self.errors.error_basic(span, format!("Value is not an int, it is {val:?} instead")); return None};
         match IntT::try_from(val) {
             Ok(val) => Some(val),
-            Err(e) => {
+            Err(_) => {
                 self.errors.error_basic(span, format!("Generative integer does not fit in {}: {val}", std::any::type_name::<IntT>()));
                 None
             }
@@ -171,14 +171,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
     fn concretize_type(&self, typ : &Type, span : Span) -> Option<ConcreteType> {
         match typ {
-            Type::Error => {
-                self.errors.error_basic(span, "Type is {error}".to_owned());
-                None
-            }
-            Type::Unknown => {
-                self.errors.error_basic(span, "Type is {unknown}".to_owned());
-                None
-            }
+            Type::Error | Type::Unknown => unreachable!("Bad types should be caught in flattening: {}", typ.to_string(self.linker)),
             Type::Named(n) => {
                 Some(ConcreteType::Named(*n))
             }
@@ -368,12 +361,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn instantiate_flattened_module(&mut self) {
         for (original_wire, inst) in &self.flattened.instantiations {
             let instance_to_add : SubModuleOrWire = match inst {
-                Instantiation::SubModule(SubModuleInstance{module_uuid, name, typ_span, outputs_start, local_wires}) => {
-                    let Some(instance) = self.linker.instantiate(*module_uuid) else {continue}; // Avoid error from submodule
-                    let interface_real_wires = local_wires.iter().map(|port| {
+                Instantiation::SubModule(submodule) => {
+                    let Some(instance) = self.linker.instantiate(submodule.module_uuid) else {continue}; // Avoid error from submodule
+                    let interface_real_wires = submodule.local_wires.iter().map(|port| {
                         self.generation_state[*port].extract_wire()
                     }).collect();
-                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, wires : interface_real_wires, name : name.clone()}))
+                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, wires : interface_real_wires, name : submodule.name.clone()}))
                 }
                 Instantiation::WireDeclaration(wire_decl) => {
                     let Some(typ) = self.concretize_type(&wire_decl.typ, wire_decl.typ_span) else {
@@ -415,7 +408,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     self.process_connection(conn, original_wire);
                     continue;
                 }
-                Instantiation::Error => {continue}, // TODO Remove Instantiation::Error
             };
             self.generation_state[original_wire] = instance_to_add;
         }
@@ -453,7 +445,7 @@ impl InstantiationList {
     }
 
     pub fn instantiate(&self, name : &str, flattened : &FlattenedModule, linker : &Linker) -> Option<Rc<InstantiatedModule>> {
-        if flattened.errors.did_error() {
+        if flattened.errors.did_error.get() {
             return None;// Don't instantiate modules that already errored. Otherwise instantiator may crash
         }
 
@@ -461,6 +453,11 @@ impl InstantiationList {
         
         // Temporary, no template arguments yet
         if cache_borrow.is_empty() {
+            for (_id, inst) in &flattened.instantiations {
+                inst.for_each_embedded_type(&mut |typ,_span| {
+                    assert!(!typ.contains_error_or_unknown::<true,true>(), "Types brought into instantiation may not contain 'bad types': {typ:?} in {inst:?}");
+                })
+            }    
             let mut context = InstantiationContext{
                 generation_state : flattened.instantiations.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect(),
                 wires : FlatAlloc::new(),

@@ -43,7 +43,7 @@ impl LatencyComputer {
         // Wire to wire Fanin
         let mut fanins : FlatAlloc<Vec<FanInOut>, WireIDMarker> = wires.iter().map(|(id, wire)| {
             let mut fanin = Vec::new();
-            wire.source.iter_sources_with_min_latency(|from, delta_latency| {
+            wire.source.iter_sources_with_min_latency(&mut |from, delta_latency| {
                 fanin.push(FanInOut{other : from, delta_latency});
             });
             fanin

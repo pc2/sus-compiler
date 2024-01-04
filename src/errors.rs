@@ -108,7 +108,7 @@ pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
 #[derive(Debug,Clone)]
 pub struct ErrorCollector {
     errors : RefCell<Vec<CompileError>>,
-    did_error : Cell<bool>,
+    pub did_error : Cell<bool>,
     pub file : FileUUID,
 }
 
@@ -142,9 +142,5 @@ impl ErrorCollector {
     pub fn ingest(&self, source : &Self) {
         assert!(self.file == source.file);
         self.errors.borrow_mut().extend_from_slice(&source.errors.borrow());
-    }
-
-    pub fn did_error(&self) -> bool {
-        self.did_error.get()
     }
 }
