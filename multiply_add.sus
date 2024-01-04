@@ -294,7 +294,7 @@ module generative : int in -> int o, int o2 {
 
 	gen int[3] ps;
 
-	gen int[3] a;
+	gen int[x] a;
 
 	a[2] = 5;
 	a[1] = 2;

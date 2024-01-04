@@ -658,7 +658,9 @@ impl FlattenedModule {
                 }
             };
             match &self.instantiations[item] {
-                Instantiation::WireDeclaration(_) => {}
+                Instantiation::WireDeclaration(decl) => {
+                    decl.typ.for_each_generative_input(&mut func);
+                }
                 Instantiation::Wire(wire) => {
                     wire.source.for_each_input_wire(&mut func);
                 }

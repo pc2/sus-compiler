@@ -49,6 +49,16 @@ impl Type {
             Type::Array(sub) => sub.0.get_root(),
         }
     }
+    pub fn for_each_generative_input<F : FnMut(FlatID)>(&self, f : &mut F) {
+        match self {
+            Type::Error => {}
+            Type::Unknown => {}
+            Type::Named(_) => {}
+            Type::Array(arr_box) => {
+                f(arr_box.deref().1)
+            }
+        }
+    }
 }
 
 pub fn typecheck_unary_operator(op : Operator, input_typ : &Type, span : Span, linker : &Linker, errors : &ErrorCollector) -> Type {
