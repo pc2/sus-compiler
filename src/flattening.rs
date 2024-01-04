@@ -131,10 +131,6 @@ struct FlatteningContext<'l, 'm, 'fl> {
 }
 
 impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
-    /*fn typecheck(&self, wire_id : FlatID, expected : &Type, context : &str) -> Option<()> {
-        let wire = self.instantiations[wire_id].extract_wire();
-        typecheck(&wire.typ, wire.span, expected, context, self.linker, &self.errors)
-    }*/
     pub fn map_to_type(&self, type_expr : &TypeExpression, global_references : &[GlobalReference]) -> Type {
         match type_expr {
             TypeExpression::Named(n) => {
@@ -147,46 +143,18 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
             TypeExpression::Array(b) => {
                 let (array_type_expr, array_size_expr) = b.deref();
                 let array_element_type = self.map_to_type(&array_type_expr.0, global_references);
-                if let Some(array_size_wire) = self.flatten_single_expr(array_size_expr, None) {
-                    //self.typecheck(array_size_wire, &Type::Named(get_builtin_uuid("int")), "array size");
-                    Type::Array(Box::new((array_element_type, array_size_wire)))
+                if let Some(array_size_wire_id) = self.flatten_single_expr(array_size_expr, None) {
+                    let array_size_wire = self.instantiations[array_size_wire_id].extract_wire();
+                    if !array_size_wire.is_compiletime {
+                        self.errors.error_basic(array_size_expr.1, "Array size must be compile time");
+                    }
+                    Type::Array(Box::new((array_element_type, array_size_wire_id)))
                 } else {
                     Type::Error
                 }
             }
         }
     }
-    // May also error, for example when array accesses happen on non-array types
-    /*fn get_connectionwrite_type(&self, cw : &ConnectionWrite) -> Option<&Type> {
-        let mut current_type = &self.instantiations[cw.root].extract_wire_declaration().typ;
-        for p in &cw.path {
-            match p {
-                ConnectionWritePathElement::ArrayIdx{idx, idx_span} => {
-                    let index_was_int = self.typecheck(*idx, &Type::Named(get_builtin_uuid("int")), "array index");
-                    current_type = typecheck_is_array_indexer(current_type, *idx_span, self.linker, &self.errors)?;
-                    index_was_int?;
-                }
-            }
-        }
-        Some(current_type)
-    }
-    fn create_connection(&self, connection : Connection) -> Option<()> {
-        let expected_type = self.get_connectionwrite_type(&connection.to)?;
-
-        let did_typecheck_fail = self.typecheck(connection.from, &expected_type, "connection");
-
-        let assign_to_root = self.instantiations[connection.to.root].extract_wire_declaration();
-        let from_wire = self.instantiations[connection.from].extract_wire();
-        if assign_to_root.identifier_type == IdentifierType::Generative && !from_wire.is_compiletime {
-            let decl_info = error_info(assign_to_root.get_full_decl_span(), self.errors.file, "Declared here");
-            self.errors.error_with_info(from_wire.span, "Assignments to compile-time variables must themselves be known at compile time", vec![decl_info]);
-            return None;
-        }
-        did_typecheck_fail?;// gather all errors, then 
-        self.instantiations.alloc(Instantiation::Connection(connection));
-
-        Some(())
-    }*/
     fn alloc_module_interface(&self, name : Box<str>, module : &Module, module_uuid : NamedUUID, typ_span : Span) -> Instantiation {
         let flattened_borrow = module.flattened.borrow();
         let local_wires : Vec<FlatID> = flattened_borrow.interface.interface_wires.iter().enumerate().map(|(port_idx, port)| {

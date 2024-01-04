@@ -186,7 +186,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let (arr_content_typ, arr_size_wire) = arr_box.deref();
                 let inner_typ = self.concretize_type(arr_content_typ, span)?;
                 let size_val = &self.generation_state[*arr_size_wire];
-                let SubModuleOrWire::CompileTimeValue(cv) = size_val else {self.errors.error_basic(span, format!("Value is not compile time! {size_val:?} instead")); return None;};
+                let cv = size_val.extract_generation_value();
                 let arr_usize = self.extract_integer_from_value(cv, span)?;
                 Some(ConcreteType::Array(Box::new((inner_typ, arr_usize))))
             }
@@ -369,7 +369,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         for (original_wire, inst) in &self.flattened.instantiations {
             let instance_to_add : SubModuleOrWire = match inst {
                 Instantiation::SubModule(SubModuleInstance{module_uuid, name, typ_span, outputs_start, local_wires}) => {
-                    let instance = self.linker.instantiate(*module_uuid);
+                    let Some(instance) = self.linker.instantiate(*module_uuid) else {continue}; // Avoid error from submodule
                     let interface_real_wires = local_wires.iter().map(|port| {
                         self.generation_state[*port].extract_wire()
                     }).collect();
@@ -452,10 +452,13 @@ impl InstantiationList {
         Self{cache : RefCell::new(Vec::new())}
     }
 
-    pub fn instantiate(&self, module : &Module, linker : &Linker) -> Rc<InstantiatedModule> {
+    pub fn instantiate(&self, name : &str, flattened : &FlattenedModule, linker : &Linker) -> Option<Rc<InstantiatedModule>> {
+        if flattened.errors.did_error() {
+            return None;// Don't instantiate modules that already errored. Otherwise instantiator may crash
+        }
+
         let mut cache_borrow = self.cache.borrow_mut();
         
-        let flattened = module.flattened.borrow();
         // Temporary, no template arguments yet
         if cache_borrow.is_empty() {
             let mut context = InstantiationContext{
@@ -471,7 +474,7 @@ impl InstantiationList {
             let interface = context.make_interface();
             
             cache_borrow.push(Rc::new(InstantiatedModule{
-                name : module.link_info.name.clone(),
+                name : name.to_owned().into_boxed_str(),
                 wires : context.wires,
                 submodules : context.submodules,
                 interface,
@@ -480,7 +483,7 @@ impl InstantiationList {
         }
         
         let instance_id = 0; // Temporary, will always be 0 while not template arguments
-        cache_borrow[instance_id].clone()
+        Some(cache_borrow[instance_id].clone())
     }
 
     pub fn collect_errors(&self, errors : &ErrorCollector) {

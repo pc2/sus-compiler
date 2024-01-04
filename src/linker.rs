@@ -553,10 +553,11 @@ impl Linker {
         }
     }
 
-    pub fn instantiate(&self, module_id : NamedUUID) -> Rc<InstantiatedModule> {
+    pub fn instantiate(&self, module_id : NamedUUID) -> Option<Rc<InstantiatedModule>> {
         let Named::Module(md) = &self.links.globals[module_id] else {panic!("{module_id:?} is not a Module!")};
         println!("Instantiating {}", md.link_info.name);
 
-        md.instantiations.instantiate(&md, self)
+        let flattened = md.flattened.borrow();
+        md.instantiations.instantiate(&md.link_info.name, &flattened, self)
     }
 }
