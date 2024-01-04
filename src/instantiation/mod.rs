@@ -2,7 +2,7 @@ use std::{rc::Rc, ops::Deref, cell::RefCell};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Operator, Module, IdentifierType, Span}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed, WireDeclaration, SubModuleInstance}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid}, value::{Value, compute_unary_op, compute_binary_op}};
+use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc}, ast::{Operator, Module, IdentifierType, Span}, typing::{ConcreteType, Type}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed, WireDeclaration, SubModuleInstance, FlattenedModule}, errors::ErrorCollector, linker::{Linker, get_builtin_uuid}, value::{Value, compute_unary_op, compute_binary_op}};
 
 pub mod latency;
 
@@ -154,7 +154,7 @@ struct InstantiationContext<'fl, 'l> {
     submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
     errors : ErrorCollector,
 
-    module : &'fl Module,
+    flattened : &'fl FlattenedModule,
     linker : &'l Linker,
 }
 
@@ -172,7 +172,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn concretize_type(&self, typ : &Type, span : Span) -> Option<ConcreteType> {
         match typ {
             Type::Error => {
-                self.errors.error_basic(span, "Type is invalid".to_owned());
+                self.errors.error_basic(span, "Type is {error}".to_owned());
+                None
+            }
+            Type::Unknown => {
+                self.errors.error_basic(span, "Type is {unknown}".to_owned());
                 None
             }
             Type::Named(n) => {
@@ -217,7 +221,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         let found_typ = &self.wires[from.from].typ;
         if write_to_typ != found_typ {
-            todo!();
+            // todo!();
+            //TODO
         }
 
         let RealWireDataSource::Multiplexer{is_state : _, sources} = &mut self.wires[wire_id].source else {unreachable!("Should only be a writeable wire here")};
@@ -273,7 +278,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         if let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] {
             Some(vv)
         } else {
-            self.errors.error_basic(self.module.flattened.instantiations[v].extract_wire().span, "This variable is not set at this point!");
+            self.errors.error_basic(self.flattened.instantiations[v].extract_wire().span, "This variable is not set at this point!");
             None
         }
     }
@@ -294,7 +299,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             &WireSource::ArrayAccess{arr, arr_idx} => {
                 let Value::Array(arr_val) = self.get_generation_value(arr)? else {return None};
                 let arr_idx_val = self.get_generation_value(arr_idx)?;
-                let arr_idx_wire = self.module.flattened.instantiations[arr_idx].extract_wire();
+                let arr_idx_wire = self.flattened.instantiations[arr_idx].extract_wire();
                 let idx : usize = self.extract_integer_from_value(arr_idx_val, arr_idx_wire.span)?;
                 if let Some(item) = arr_val.get(idx) {
                     item.clone()
@@ -316,7 +321,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             SubModuleOrWire::Wire(w) => Some(*w),
             SubModuleOrWire::CompileTimeValue(v) => {
                 let value = v.clone();
-                let Instantiation::Wire(WireInstance{typ, inst : _, is_compiletime : _, span}) = &self.module.flattened.instantiations[flat_id] else {unreachable!()};
+                let Instantiation::Wire(WireInstance{typ, source : _, is_compiletime : _, span}) = &self.flattened.instantiations[flat_id] else {unreachable!()};
                 let typ = self.concretize_type(typ, *span)?;
                 let name = self.get_unique_name();
                 Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id, typ, name}))
@@ -324,9 +329,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
     }
     fn wire_to_real_wire(&mut self, w: &WireInstance, typ : ConcreteType, original_wire : FlatID) -> Option<WireID> {
-        let source = match &w.inst {
+        let source = match &w.source {
             &WireSource::WireRead{from_wire} => {
-                /*Assert*/ self.module.flattened.instantiations[from_wire].extract_wire_declaration(); // WireReads must point to a NamedWire!
+                /*Assert*/ self.flattened.instantiations[from_wire].extract_wire_declaration(); // WireReads must point to a NamedWire!
                 return Some(self.generation_state[from_wire].extract_wire())
             }
             &WireSource::UnaryOp{op, right} => {
@@ -347,7 +352,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         RealWireDataSource::ArrayAccess{arr, arr_idx: *w}
                     }
                     SubModuleOrWire::CompileTimeValue(v) => {
-                        let arr_idx_wire = self.module.flattened.instantiations[arr_idx].extract_wire();
+                        let arr_idx_wire = self.flattened.instantiations[arr_idx].extract_wire();
                         let arr_idx = self.extract_integer_from_value(v, arr_idx_wire.span)?;
                         RealWireDataSource::ConstArrayAccess{arr, arr_idx}
                     }
@@ -361,7 +366,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         Some(self.wires.alloc(RealWire{ name, typ, original_wire, source}))
     }
     fn instantiate_flattened_module(&mut self) {
-        for (original_wire, inst) in &self.module.flattened.instantiations {
+        for (original_wire, inst) in &self.flattened.instantiations {
             let instance_to_add : SubModuleOrWire = match inst {
                 Instantiation::SubModule(SubModuleInstance{module_uuid, name, typ_span, outputs_start, local_wires}) => {
                     let instance = self.linker.instantiate(*module_uuid);
@@ -398,7 +403,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         return; // Exit early, do not produce invalid wires in InstantiatedModule
                     };
                     if w.is_compiletime {
-                        let Some(value_computed) = self.compute_compile_time(&w.inst) else {return};
+                        let Some(value_computed) = self.compute_compile_time(&w.source) else {return};
                         assert!(value_computed.is_of_type(&typ));
                         SubModuleOrWire::CompileTimeValue(value_computed)
                     } else {
@@ -410,7 +415,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     self.process_connection(conn, original_wire);
                     continue;
                 }
-                Instantiation::Error => {unreachable!()},
+                Instantiation::Error => {continue}, // TODO Remove Instantiation::Error
             };
             self.generation_state[original_wire] = instance_to_add;
         }
@@ -419,8 +424,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     // Returns a proper interface if all ports involved did not produce an error. If a port did produce an error then returns None. 
     fn make_interface(&self) -> Option<Vec<WireID>> {
         let mut result = Vec::new();
-        result.reserve(self.module.interface.interface_wires.len());
-        for port in self.module.interface.interface_wires.iter() {
+        result.reserve(self.flattened.interface.interface_wires.len());
+        for port in self.flattened.interface.interface_wires.iter() {
             match &self.generation_state[port.wire_id] {
                 SubModuleOrWire::Wire(w) => {
                     result.push(*w)
@@ -450,15 +455,16 @@ impl InstantiationList {
     pub fn instantiate(&self, module : &Module, linker : &Linker) -> Rc<InstantiatedModule> {
         let mut cache_borrow = self.cache.borrow_mut();
         
+        let flattened = module.flattened.borrow();
         // Temporary, no template arguments yet
         if cache_borrow.is_empty() {
             let mut context = InstantiationContext{
-                generation_state : module.flattened.instantiations.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect(),
+                generation_state : flattened.instantiations.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect(),
                 wires : FlatAlloc::new(),
                 submodules : FlatAlloc::new(),
-                module : module,
+                flattened : &flattened,
                 linker : linker,
-                errors : ErrorCollector::new(module.flattened.errors.file)
+                errors : ErrorCollector::new(flattened.errors.file)
             };
         
             context.instantiate_flattened_module();

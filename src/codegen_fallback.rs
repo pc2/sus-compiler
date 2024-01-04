@@ -56,9 +56,10 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
     assert!(!instance.errors.did_error(), "Module cannot have experienced an error");
     let mut program_text : String = format!("module {}(\n\tinput clk, \n", md.link_info.name);
     let submodule_interface = instance.interface.as_ref().unwrap();
-    for (port_idx, (port, real_port)) in zip(md.interface.interface_wires.iter(), submodule_interface).enumerate() {
+    let flattened_borrow = md.flattened.borrow();
+    for (port_idx, (port, real_port)) in zip(flattened_borrow.interface.interface_wires.iter(), submodule_interface).enumerate() {
         let wire = &instance.wires[*real_port];
-        program_text.push_str(if port_idx < md.interface.outputs_start {"\tinput"} else {"\toutput /*mux_wire*/ reg"});
+        program_text.push_str(if port_idx < flattened_borrow.interface.outputs_start {"\tinput"} else {"\toutput /*mux_wire*/ reg"});
         program_text.push_str(&typ_to_verilog_array(&wire.typ));
         program_text.push(' ');
         program_text.push_str(&wire.name);
@@ -67,7 +68,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
     program_text.push_str(");\n");
 
     for (_id, w) in &instance.wires {
-        if let Instantiation::WireDeclaration(wire_decl) = &md.flattened.instantiations[w.original_wire] {
+        if let Instantiation::WireDeclaration(wire_decl) = &flattened_borrow.instantiations[w.original_wire] {
             // Don't print named inputs and outputs, already did that in interface
             match wire_decl.identifier_type {
                 IdentifierType::Input | IdentifierType::Output => {continue;}

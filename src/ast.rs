@@ -2,7 +2,7 @@
 
 use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID, Linker}, flattening::{FlattenedModule, FlattenedInterface}, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList, value::Value};
 use core::ops::Range;
-use std::{fmt::Display, ops::Deref};
+use std::{fmt::Display, ops::Deref, cell::RefCell};
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
@@ -146,8 +146,7 @@ pub struct Module {
     pub declarations : FlatAlloc<SignalDeclaration, DeclIDMarker>,
     pub code : CodeBlock,
 
-    pub interface : FlattenedInterface,
-    pub flattened : FlattenedModule,
+    pub flattened : RefCell<FlattenedModule>,
 
     pub instantiations : InstantiationList
 }
@@ -155,14 +154,15 @@ pub struct Module {
 impl Module {
     pub fn print_flattened_module(&self, linker : &Linker) {
         println!("Interface:");
-        for (port_idx, port) in self.interface.interface_wires.iter().enumerate() {
-            let port_direction = if port_idx < self.interface.outputs_start {"input"} else {"output"};
+        let flattened_borrow = self.flattened.borrow();
+        for (port_idx, port) in flattened_borrow.interface.interface_wires.iter().enumerate() {
+            let port_direction = if port_idx < flattened_borrow.interface.outputs_start {"input"} else {"output"};
             let port_type = port.typ.to_string(linker);
             let port_name = &port.port_name;
             println!("    {port_direction} {port_type} {port_name} -> {:?}", port.wire_id);
         }
         println!("Instantiations:");
-        for (id, inst) in &self.flattened.instantiations {
+        for (id, inst) in &flattened_borrow.instantiations {
             println!("    {:?}: {:?}", id, inst);
         }
     }

@@ -6,6 +6,7 @@ use crate::{ast::{Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker,
 #[derive(Debug, Clone)]
 pub enum Type {
     Error,
+    Unknown,
     Named(NamedUUID),
     /*Contains a wireID pointing to a constant expression for the array size, 
     but doesn't actually take size into account for type checking as that would
@@ -29,6 +30,9 @@ impl Type {
     pub fn to_string(&self, linker : &Linker) -> String {
         match self {
             Type::Error => {
+                "{error}".to_owned()
+            }
+            Type::Unknown => {
                 "{unknown}".to_owned()
             }
             Type::Named(n) => {
@@ -39,7 +43,8 @@ impl Type {
     }
     pub fn get_root(&self) -> Option<NamedUUID> {
         match self {
-            Type::Error => {None}
+            Type::Error => None,
+            Type::Unknown => None,
             Type::Named(name) => Some(*name),
             Type::Array(sub) => sub.0.get_root(),
         }

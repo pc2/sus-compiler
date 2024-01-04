@@ -342,7 +342,7 @@ impl Linker {
     fn get_flattening_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
         for v in &self.files[file_uuid].associated_values {
             if let Named::Module(md) = &self.links.globals[*v] {
-                errors.ingest(&md.flattened.errors);
+                errors.ingest(&md.flattened.borrow().errors);
                 md.instantiations.collect_errors(errors);
             }
         }
@@ -514,36 +514,33 @@ impl Linker {
     pub fn recompile_all(&mut self) {
         // First create initial flattening for everything, to produce the necessary interfaces
 
-        let mut interface_vec : Vec<(NamedUUID, FlattenedInterface, FlattenedModule)> = Vec::new();
-        let mut initial_flat_vec : Vec<(NamedUUID, FlatAlloc<Option<FlatID>, DeclIDMarker>)> = Vec::new();
-        for (id, named_object) in &self.links.globals {
-            println!("Initializing Interface for {}", named_object.get_name());
-            if let Named::Module(md) = named_object {
-                // Do initial flattening for ALL modules, regardless of linking errors, to get proper interface
-                // if !md.link_info.is_fully_linked {continue;}
-                let (interface, flattened, decl_to_flat_map) = FlattenedModule::initialize_interfaces(&self, md);
-                interface_vec.push((id, interface, flattened));
-                initial_flat_vec.push((id, decl_to_flat_map));
+        let module_ids : Vec<NamedUUID> = self.links.globals.iter().filter_map(|(id,v)| {
+            if let Named::Module(_) = v {
+                Some(id)
+            } else {
+                None
             }
-        }
+        }).collect();
+        for id in &module_ids {
+            let Named::Module(md) = &self.links.globals[*id] else {unreachable!()};
 
-        for (id, interface, flattened) in interface_vec {
-            let Named::Module(md) = &mut self.links.globals[id] else {unreachable!()};
+            println!("Flattening {}", md.link_info.name);
 
-            md.interface = interface;
-            md.flattened = flattened;
+            let flattened = FlattenedModule::initialize(&self, md);
+
+            let Named::Module(md) = &mut self.links.globals[*id] else {unreachable!()};
+            *md.flattened.get_mut() = flattened;
             md.instantiations.clear_instances();
         }
 
         // Then do proper flattening on every module
-        for (id, decl_to_flat_map) in initial_flat_vec {
-            let Named::Module(md) = &self.links.globals[id] else {unreachable!()};
+        for id in &module_ids {
+            let Named::Module(md) = &self.links.globals[*id] else {unreachable!()};
+            println!("Typechecking {}", &md.link_info.name);
 
-            println!("Flattening {}", &md.link_info.name);
-            // Do check for linking errors when generating code, as this could cause the compiler to error
-            if !md.link_info.is_fully_linked {continue;}
-            md.flattened.flatten(md, &self, decl_to_flat_map);
-            md.flattened.find_unused_variables(md);
+            let mut flattened_mut_borrow = md.flattened.borrow_mut();
+            flattened_mut_borrow.typecheck(self);
+            flattened_mut_borrow.find_unused_variables();
         }
 
         // Can't merge these loops
