@@ -174,7 +174,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
                 typ: port.typ.clone(),
                 typ_span,
                 read_only : port_idx >= flattened_borrow.interface.outputs_start,
-                identifier_type : IdentifierType::Local,
+                identifier_type : IdentifierType::Virtual,
                 name : format!("{}_{}", &name, &port.port_name).into_boxed_str(),
                 name_token : None
             }))
@@ -517,7 +517,8 @@ impl FlattenedModule {
             let is_input = match decl.identifier_type {
                 IdentifierType::Input => true,
                 IdentifierType::Output => false,
-                IdentifierType::Local | IdentifierType::State | IdentifierType::Generative => continue
+                IdentifierType::Local | IdentifierType::State | IdentifierType::Generative => continue,
+                IdentifierType::Virtual => unreachable!()
             };
             
             let typ = context.map_to_type(&decl.typ.0, &module.link_info.global_references);

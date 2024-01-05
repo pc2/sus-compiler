@@ -2,7 +2,7 @@
 
 use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID, Linker}, flattening::FlattenedModule, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList, value::Value};
 use core::ops::Range;
-use std::{fmt::Display, ops::Deref, cell::RefCell};
+use std::{fmt::Display, cell::RefCell};
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
@@ -20,6 +20,11 @@ impl Span {
         let min = tokens[self.0].start.clone();
         let max = tokens[self.1].end.clone();
         min..max
+    }
+    #[track_caller]
+    pub fn assert_is_single_token(&self) -> usize {
+        assert!(self.1 == self.0, "Span is not singleton! {}..{}", self.0, self.1);
+        self.0
     }
 }
 
@@ -39,7 +44,8 @@ pub enum IdentifierType {
     Output,
     Local,
     State,
-    Generative
+    Generative,
+    Virtual // Generated at the interfaces of submodule instantiations
 }
 
 impl From<usize> for Span {
@@ -174,109 +180,4 @@ pub struct GlobalReference(pub Span, pub Option<NamedUUID>); // token index, and
 #[derive(Debug)]
 pub struct ASTRoot {
     pub modules : Vec<Module>
-}
-
-pub trait IterIdentifiers {
-    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> ();
-}
-
-impl IterIdentifiers for SpanExpression {
-    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
-        let (expr, span) = self;
-        match expr {
-            Expression::Named(id) => {
-                assert!(span.0 == span.1);
-                func(*id, span.0);
-            }
-            Expression::Constant(_v) => {}
-            Expression::UnaryOp(b) => {
-                let (_operator, _operator_pos, right) = &**b;
-                right.for_each_value(func);
-            }
-            Expression::BinOp(b) => {
-                let (left, _operator, _operator_pos, right) = &**b;
-                left.for_each_value(func);
-                right.for_each_value(func);
-            }
-            Expression::FuncCall(args) => {
-                for arg in args {
-                    arg.for_each_value(func);
-                }
-            }
-            Expression::Array(b) => {
-                let (array, idx, _bracket_span) = &**b;
-                array.for_each_value(func);
-                idx.for_each_value(func);
-            }
-        }
-    }
-}
-
-impl IterIdentifiers for SpanAssignableExpression {
-    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
-        let (expr, span) = self;
-        match expr {
-            AssignableExpression::Named{local_idx: id} => {
-                assert!(span.0 == span.1);
-                func(LocalOrGlobal::Local(*id), span.0);
-            }
-            AssignableExpression::ArrayIndex(b) => {
-                let (array, idx, _bracket_span) = &**b;
-                array.for_each_value(func);
-                idx.for_each_value(func);
-            }
-        }
-    }
-}
-
-impl IterIdentifiers for CodeBlock {
-    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
-        for (stmt, _span) in &self.statements {
-            match stmt {
-                Statement::Assign{to, eq_sign_position : _, expr} => {
-                    for assign_to in to {
-                        assign_to.expr.for_each_value(func);
-                    }
-                    expr.for_each_value(func);
-                },
-                Statement::Block(b) => {
-                    b.for_each_value(func);
-                },
-                Statement::Declaration(_) => {} // Declarations are handled outside of this block
-                Statement::If { condition, then, els } => {
-                    condition.for_each_value(func);
-                    then.for_each_value(func);
-                    if let Some(e) = &els {
-                        e.for_each_value(func);
-                    }
-                }
-                Statement::TimelineStage(_) => {}
-            }
-        }
-    }
-}
-
-impl IterIdentifiers for SpanTypeExpression {
-    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
-        match &self.0 {
-            TypeExpression::Named(n) => {
-                func(LocalOrGlobal::Global(*n), self.1.0);
-            }
-            TypeExpression::Array(arr_box) => {
-                let (arr, arr_idx) = arr_box.deref();
-                arr.for_each_value(func);
-                arr_idx.for_each_value(func);
-            }
-        }
-    }
-}
-
-impl IterIdentifiers for Module {
-    fn for_each_value<F>(&self, func : &mut F) where F : FnMut(LocalOrGlobal, usize) -> () {
-        for (pos, decl) in &self.declarations {
-            func(LocalOrGlobal::Local(pos), decl.span.1);
-            decl.typ.for_each_value(func);
-        }
-        self.code.for_each_value(func);
-    }
 }

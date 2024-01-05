@@ -72,7 +72,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
             // Don't print named inputs and outputs, already did that in interface
             match wire_decl.identifier_type {
                 IdentifierType::Input | IdentifierType::Output => {continue;}
-                IdentifierType::Local | IdentifierType::State | IdentifierType::Generative => {}
+                IdentifierType::Local | IdentifierType::State | IdentifierType::Generative | IdentifierType::Virtual => {}
             }
         }
         let wire_or_reg = if let RealWireDataSource::Multiplexer{is_state: initial_value, sources: _} = &w.source {

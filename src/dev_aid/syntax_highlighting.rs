@@ -1,7 +1,7 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{ast::*, tokenizer::*, parser::*, linker::{PreLinker, FileData, Links, NamedUUID, Named, Linkable, Linker, FileUUIDMarker, FileUUID}, arena_alloc::ArenaVector};
+use crate::{ast::*, tokenizer::*, parser::*, linker::{PreLinker, FileData, Links, NamedUUID, Named, Linkable, Linker, FileUUIDMarker, FileUUID}, arena_alloc::ArenaVector, flattening::{Instantiation, WireSource}};
 
 use ariadne::FileCache;
 use console::Style;
@@ -75,6 +75,7 @@ fn pretty_print(file_text : &str, tokens : &[Token], ide_infos : &[IDEToken]) {
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Input)) => Style::new().blue().bright(),
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => Style::new().blue().dim(),
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Generative)) => Style::new().blue().bright().bold(),
+            IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Virtual)) => unreachable!(),
             IDETokenType::Identifier(IDEIdentifierType::Constant) => Style::new().blue().bold(),
             IDETokenType::Identifier(IDEIdentifierType::Type) => Style::new().magenta().bright(),
             IDETokenType::Identifier(IDEIdentifierType::Interface) => Style::new().yellow(),
@@ -118,13 +119,29 @@ fn walk_name_color(all_objects : &[NamedUUID], links : &Links, result : &mut [ID
         let object = &links.globals[*obj_uuid];
         match object {
             Named::Module(module) => {
-                module.for_each_value(&mut |name, position| {
-                    result[position].typ = IDETokenType::Identifier(if let LocalOrGlobal::Local(l) = name {
-                        IDEIdentifierType::Value(module.declarations[l].identifier_type)
-                    } else {
-                        IDEIdentifierType::Unknown
-                    });
-                });       
+                let flattened = module.flattened.borrow();
+                for (_id, item) in &flattened.instantiations {
+                    match item {
+                        Instantiation::Wire(w) => {
+                            if let &WireSource::WireRead{from_wire} = &w.source {
+                                let decl = flattened.instantiations[from_wire].extract_wire_declaration();
+                                if decl.identifier_type == IdentifierType::Virtual {continue;} // Virtual wires don't appear in the program text
+                                result[w.span.assert_is_single_token()].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
+                            }
+                        }
+                        Instantiation::WireDeclaration(decl) => {
+                            if decl.identifier_type == IdentifierType::Virtual {continue;} // Virtual wires don't appear in the program text
+                            let Some(name_token) = decl.name_token else {continue};
+                            result[name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
+                        }
+                        Instantiation::Connection(conn) => {
+                            let decl = flattened.instantiations[conn.to.root].extract_wire_declaration();
+                            if decl.identifier_type == IdentifierType::Virtual {continue;} // Virtual wires don't appear in the program text
+                            result[conn.to.span.0].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
+                        }
+                        Instantiation::SubModule(_) => {}
+                    }
+                }
             }
             _other => {}
         }
