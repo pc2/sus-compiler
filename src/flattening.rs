@@ -98,6 +98,14 @@ pub struct SubModuleInstance {
     pub outputs_start : usize,
     pub local_wires : Box<[FlatID]>
 }
+impl SubModuleInstance {
+    pub fn inputs(&self) -> &[FlatID] {
+        &self.local_wires[..self.outputs_start]
+    }
+    pub fn outputs(&self) -> &[FlatID] {
+        &self.local_wires[self.outputs_start..]
+    }
+}
 
 #[derive(Debug)]
 pub enum Instantiation {
@@ -654,14 +662,23 @@ impl FlattenedModule {
     /* Additional Warnings */
     pub fn find_unused_variables(&self) {
         // Setup Wire Fanouts List for faster processing
-        let mut connection_fanin : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.instantiations.iter().map(|_| Vec::new()).collect();
+        let mut gathered_connection_fanin : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.instantiations.iter().map(|_| Vec::new()).collect();
 
-        for (_id, conn) in &self.instantiations {
-            if let Instantiation::Connection(conn) = conn {
-                connection_fanin[conn.to.root].push(conn.from);
-                if let Some(cond) = conn.condition {
-                    connection_fanin[conn.to.root].push(cond);
+        for (inst_id, inst) in &self.instantiations {
+            match inst {
+                Instantiation::Connection(conn) => {
+                    gathered_connection_fanin[conn.to.root].push(conn.from);
+                    if let Some(cond) = conn.condition {
+                        gathered_connection_fanin[conn.to.root].push(cond);
+                    }
                 }
+                Instantiation::SubModule(sm) => {
+                    for w in sm.outputs() {
+                        gathered_connection_fanin[*w].push(inst_id);
+                    }
+                }
+                Instantiation::WireDeclaration(_) => {} // Handle these outside
+                Instantiation::Wire(_) => {}
             }
         }
 
@@ -674,13 +691,8 @@ impl FlattenedModule {
             wire_to_explore_queue.push(port.wire_id);
         }
 
-        println!("Pre Explore");
-        println!("{:?}", connection_fanin);
-        println!("{:?}", is_instance_used_map);
-        println!("{:?}", wire_to_explore_queue);
-
         while let Some(item) = wire_to_explore_queue.pop() {
-            let mut func = |from| {
+            let mut mark_not_unused = |from| {
                 if !is_instance_used_map[from] {
                     is_instance_used_map[from] = true;
                     wire_to_explore_queue.push(from);
@@ -688,25 +700,20 @@ impl FlattenedModule {
             };
             match &self.instantiations[item] {
                 Instantiation::WireDeclaration(decl) => {
-                    decl.typ.for_each_generative_input(&mut func);
+                    decl.typ.for_each_generative_input(&mut mark_not_unused);
                 }
                 Instantiation::Wire(wire) => {
-                    wire.source.for_each_input_wire(&mut func);
+                    wire.source.for_each_input_wire(&mut mark_not_unused);
                 }
                 Instantiation::SubModule(submodule) => {
-                    for (port_id, port) in submodule.local_wires.iter().enumerate() {
-                        if port_id < submodule.outputs_start {
-                            func(*port);
-                        }
+                    for port in submodule.inputs() {
+                        mark_not_unused(*port);
                     }
                 }
                 Instantiation::Connection(_) => {unreachable!()}
             }
-            for from in &connection_fanin[item] {
-                if !is_instance_used_map[*from] {
-                    is_instance_used_map[*from] = true;
-                    wire_to_explore_queue.push(*from);
-                }
+            for from in &gathered_connection_fanin[item] {
+                mark_not_unused(*from);
             }
         }
 
