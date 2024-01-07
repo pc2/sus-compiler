@@ -119,12 +119,11 @@ fn walk_name_color(all_objects : &[NamedUUID], links : &Links, result : &mut [ID
         let object = &links.globals[*obj_uuid];
         match object {
             Named::Module(module) => {
-                let flattened = module.flattened.borrow();
-                for (_id, item) in &flattened.instantiations {
+                for (_id, item) in &module.flattened.instantiations {
                     match item {
                         Instantiation::Wire(w) => {
                             if let &WireSource::WireRead{from_wire} = &w.source {
-                                let decl = flattened.instantiations[from_wire].extract_wire_declaration();
+                                let decl = module.flattened.instantiations[from_wire].extract_wire_declaration();
                                 if decl.identifier_type == IdentifierType::Virtual {continue;} // Virtual wires don't appear in the program text
                                 result[w.span.assert_is_single_token()].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                             }
@@ -135,7 +134,7 @@ fn walk_name_color(all_objects : &[NamedUUID], links : &Links, result : &mut [ID
                             result[name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                         }
                         Instantiation::Connection(conn) => {
-                            let decl = flattened.instantiations[conn.to.root].extract_wire_declaration();
+                            let decl = module.flattened.instantiations[conn.to.root].extract_wire_declaration();
                             if decl.identifier_type == IdentifierType::Virtual {continue;} // Virtual wires don't appear in the program text
                             result[conn.to.span.0].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                         }

@@ -2,7 +2,7 @@
 
 use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::FlattenedModule, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList, value::Value};
 use core::ops::Range;
-use std::{fmt::Display, cell::RefCell};
+use std::fmt::Display;
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
@@ -154,7 +154,7 @@ pub struct Module {
     pub outputs_start : usize,
     pub code : CodeBlock,
 
-    pub flattened : RefCell<FlattenedModule>,
+    pub flattened : FlattenedModule,
 
     pub instantiations : InstantiationList
 }
@@ -162,14 +162,13 @@ pub struct Module {
 impl Module {
     pub fn print_flattened_module(&self) {
         println!("Interface:");
-        let flattened_borrow = self.flattened.borrow();
-        for (port_idx, port) in flattened_borrow.interface_ports.iter().enumerate() {
-            let port_direction = if port_idx < flattened_borrow.outputs_start {"input"} else {"output"};
+        for (port_idx, port) in self.flattened.interface_ports.iter().enumerate() {
+            let port_direction = if port_idx < self.flattened.outputs_start {"input"} else {"output"};
             let port_name = &self.declarations[self.ports[port_idx]].name;
             println!("    {port_direction} {port_name} -> {:?}", *port);
         }
         println!("Instantiations:");
-        for (id, inst) in &flattened_borrow.instantiations {
+        for (id, inst) in &self.flattened.instantiations {
             println!("    {:?}: {:?}", id, inst);
         }
     }

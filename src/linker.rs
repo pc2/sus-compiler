@@ -342,7 +342,7 @@ impl Linker {
     fn get_flattening_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
         for v in &self.files[file_uuid].associated_values {
             if let Named::Module(md) = &self.links.globals[*v] {
-                errors.ingest(&md.flattened.borrow().errors);
+                errors.ingest(&md.flattened.errors);
                 md.instantiations.collect_errors(errors);
             }
         }
@@ -526,21 +526,14 @@ impl Linker {
 
             println!("Flattening {}", md.link_info.name);
 
-            let flattened = FlattenedModule::initialize(&self, md, !md.link_info.is_fully_linked);
+            let mut flattened = FlattenedModule::initialize(&self, md, !md.link_info.is_fully_linked);
+            println!("Typechecking {}", &md.link_info.name);
+            flattened.typecheck(self);
+            flattened.find_unused_variables();
 
             let Named::Module(md) = &mut self.links.globals[*id] else {unreachable!()};
-            *md.flattened.get_mut() = flattened;
+            md.flattened = flattened;
             md.instantiations.clear_instances();
-        }
-
-        // Then do proper flattening on every module
-        for id in &module_ids {
-            let Named::Module(md) = &self.links.globals[*id] else {unreachable!()};
-            println!("Typechecking {}", &md.link_info.name);
-
-            let mut flattened_mut_borrow = md.flattened.borrow_mut();
-            flattened_mut_borrow.typecheck(self);
-            flattened_mut_borrow.find_unused_variables();
         }
 
         // Can't merge these loops, because instantiation can only be done once all modules have been type checked
@@ -557,7 +550,6 @@ impl Linker {
         let Named::Module(md) = &self.links.globals[module_id] else {panic!("{module_id:?} is not a Module!")};
         println!("Instantiating {}", md.link_info.name);
 
-        let flattened = md.flattened.borrow();
-        md.instantiations.instantiate(&md.link_info.name, &flattened, self)
+        md.instantiations.instantiate(&md.link_info.name, &md.flattened, self)
     }
 }

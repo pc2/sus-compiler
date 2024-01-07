@@ -255,7 +255,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
 
         let submodule_local_wires = func_instantiation.local_wires.clone();
         
-        let (inputs, output_range) = md.flattened.borrow().func_call_syntax_interface();
+        let (inputs, output_range) = md.flattened.func_call_syntax_interface();
 
         let mut args = &func_and_args[1..];
 
