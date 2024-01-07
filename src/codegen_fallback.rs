@@ -59,7 +59,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
     let flattened_borrow = md.flattened.borrow();
     for (port_idx, real_port) in submodule_interface.iter().enumerate() {
         let wire = &instance.wires[*real_port];
-        program_text.push_str(if port_idx < flattened_borrow.interface.outputs_start {"\tinput"} else {"\toutput /*mux_wire*/ reg"});
+        program_text.push_str(if port_idx < flattened_borrow.outputs_start {"\tinput"} else {"\toutput /*mux_wire*/ reg"});
         program_text.push_str(&typ_to_verilog_array(&wire.typ));
         program_text.push(' ');
         program_text.push_str(&wire.name);

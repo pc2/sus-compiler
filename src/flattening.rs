@@ -141,16 +141,16 @@ impl Instantiation {
     }
 }
 
-struct FlatteningContext<'l, 'm, 'fl> {
+struct FlatteningContext<'l, 'm> {
     decl_to_flat_map : FlatAlloc<Option<FlatID>, DeclIDMarker>,
-    instantiations : &'fl ListAllocator<Instantiation, FlatIDMarker>,
-    errors : &'fl ErrorCollector,
+    instantiations : ListAllocator<Instantiation, FlatIDMarker>,
+    errors : ErrorCollector,
 
     linker : &'l Linker,
     module : &'m Module,
 }
 
-impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
+impl<'l, 'm> FlatteningContext<'l, 'm> {
     pub fn map_to_type(&self, type_expr : &TypeExpression, global_references : &[GlobalReference]) -> Type {
         match type_expr {
             TypeExpression::Named(n) => {
@@ -175,24 +175,63 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
             }
         }
     }
-    fn alloc_module_interface(&self, name : Box<str>, module : &Module, module_uuid : NamedUUID, typ_span : Span) -> FlatID {
-        let flattened_borrow = module.flattened.borrow();
-        let local_wires : Vec<FlatID> = flattened_borrow.interface.interface_wires.iter().enumerate().map(|(port_idx, port)| {
-            self.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
-                typ: port.typ.clone(),
-                typ_span,
-                read_only : port_idx >= flattened_borrow.interface.outputs_start,
-                identifier_type : IdentifierType::Virtual,
-                name : format!("{}_{}", &name, &port.port_name).into_boxed_str(),
-                name_token : None
-            }))
+
+    fn initialize_interface(&mut self) -> Box<[FlatID]> {
+        let wire_list : Vec<FlatID> = self.module.ports.iter().enumerate().map(|(id, decl_id)|{
+            let is_input = id < self.module.outputs_start;
+
+            let decl = &self.module.declarations[*decl_id];
+
+            let typ = self.map_to_type(&decl.typ.0, &self.module.link_info.global_references);
+            let wire_id = self.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
+                typ : typ.clone(),
+                typ_span : decl.typ.1,
+                read_only: is_input,
+                identifier_type : decl.identifier_type,
+                name : decl.name.clone(),
+                name_token : Some(decl.name_token)
+            }));
+
+            self.decl_to_flat_map[*decl_id] = Some(wire_id);
+
+            wire_id
         }).collect();
 
+        wire_list.into_boxed_slice()
+    }
+    fn alloc_module_interface(&self, name : Box<str>, module : &Module, module_uuid : NamedUUID, typ_span : Span) -> FlatID {
+        let flattened_borrow = module.flattened.borrow();
+        let mut port_idx = 0;
+        let mut local_wires = Vec::new();
+        for (id, decl) in &module.declarations {
+            let is_input = match decl.identifier_type {
+                IdentifierType::Input => true,
+                IdentifierType::Output => false,
+                IdentifierType::Local | IdentifierType::State | IdentifierType::Generative => continue,
+                IdentifierType::Virtual => unreachable!()
+            };
+            
+            let typ = self.map_to_type(&decl.typ.0, &self.module.link_info.global_references);
+
+            let wire_id = self.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
+                typ,
+                typ_span,
+                read_only : port_idx >= flattened_borrow.outputs_start,
+                identifier_type : IdentifierType::Virtual,
+                name : format!("{}_{}", &name, &decl.name).into_boxed_str(),
+                name_token : None
+            }));
+
+            local_wires.push(wire_id);
+
+            port_idx += 1;
+        }
+        
         self.instantiations.alloc(Instantiation::SubModule(SubModuleInstance{
             name,
             module_uuid,
             typ_span,
-            outputs_start : flattened_borrow.interface.outputs_start,
+            outputs_start : flattened_borrow.outputs_start,
             local_wires : local_wires.into_boxed_slice()
         }))
     }
@@ -216,7 +255,7 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
         let func_instantiation = &self.instantiations[func_instantiation_id];
         let Instantiation::SubModule(SubModuleInstance{module_uuid, name : _, typ_span : _, outputs_start:_, local_wires}) = func_instantiation else {unreachable!("It should be proven {func_instantiation:?} was a Module!");};
         let Named::Module(md) = &self.linker.links.globals[*module_uuid] else {unreachable!("UUID Should be a module!");};
-        let (inputs, output_range) = md.flattened.borrow().interface.func_call_syntax_interface();
+        let (inputs, output_range) = md.flattened.borrow().func_call_syntax_interface();
 
         let mut args = &func_and_args[1..];
 
@@ -453,38 +492,16 @@ impl<'l, 'm, 'fl> FlatteningContext<'l, 'm, 'fl> {
 #[derive(Debug)]
 pub struct FlattenedInterfacePort {
     pub wire_id : FlatID,
-    pub typ : Type,
     pub port_name : Box<str>,
     pub span : Span
-}
-
-#[derive(Debug, Default)]
-pub struct FlattenedInterface {
-    pub interface_wires : Box<[FlattenedInterfacePort]>, // Ordered such that all inputs come first, then all outputs
-    pub outputs_start : usize
-}
-
-impl FlattenedInterface {
-    pub fn new() -> Self {
-        FlattenedInterface { interface_wires: Box::new([]), outputs_start : 0 }
-    }
-    // Todo, just treat all inputs and outputs as function call interface
-    pub fn func_call_syntax_interface(&self) -> (Range<FieldID>, Range<FieldID>) {
-        (0..self.outputs_start, self.outputs_start..self.interface_wires.len())
-    }
-    pub fn inputs(&self) -> &[FlattenedInterfacePort] {
-        &self.interface_wires[..self.outputs_start]
-    }
-    pub fn outputs(&self) -> &[FlattenedInterfacePort] {
-        &self.interface_wires[self.outputs_start..]
-    }
 }
 
 #[derive(Debug)]
 pub struct FlattenedModule {
     pub instantiations : ListAllocator<Instantiation, FlatIDMarker>,
     pub errors : ErrorCollector,
-    pub interface : FlattenedInterface
+    pub outputs_start : usize,
+    pub interface_ports : Box<[FlatID]>
 }
 
 impl FlattenedModule {
@@ -492,14 +509,22 @@ impl FlattenedModule {
         FlattenedModule {
             instantiations : ListAllocator::new(),
             errors : ErrorCollector::new(file),
-            interface : FlattenedInterface::new()
+            interface_ports : Box::new([]),
+            outputs_start : 0
         }
     }
-    /* 
-    Required to do this first, this only initializes the interfaces, so that proper flattening can typecheck
-    Produces an initial FlattenedModule, in which the interface types have already been resolved. 
-    Must be further processed by flatten, but this requires all modules to have been Initial Flattened for dependency resolution
-    */
+
+    // Todo, just treat all inputs and outputs as function call interface
+    pub fn func_call_syntax_interface(&self) -> (Range<FieldID>, Range<FieldID>) {
+        (0..self.outputs_start, self.outputs_start..self.interface_ports.len())
+    }
+    pub fn inputs(&self) -> &[FlatID] {
+        &self.interface_ports[..self.outputs_start]
+    }
+    pub fn outputs(&self) -> &[FlatID] {
+        &self.interface_ports[self.outputs_start..]
+    }
+    
     /*
     This method flattens all given code into a simple set of assignments, operators and submodules. 
     It already does basic type checking and assigns a type to every wire. 
@@ -507,59 +532,24 @@ impl FlattenedModule {
     It is template-preserving
     */
     pub fn initialize(linker : &Linker, module : &Module, starts_with_errors : bool) -> FlattenedModule {
-        let instantiations = ListAllocator::new();
-        let errors = ErrorCollector::new(module.link_info.file);
-        errors.did_error.set(starts_with_errors);
-
         let mut context = FlatteningContext{
             decl_to_flat_map: module.declarations.iter().map(|_| None).collect(),
-            instantiations: &instantiations,
-            errors: &errors,
+            instantiations: ListAllocator::new(),
+            errors: ErrorCollector::new(module.link_info.file),
             linker,
             module,
         };
+        context.errors.did_error.set(starts_with_errors);
 
-        let mut inputs = Vec::new();
-        let mut outputs = Vec::new();
-        for (decl_id, decl) in &module.declarations {
-            let is_input = match decl.identifier_type {
-                IdentifierType::Input => true,
-                IdentifierType::Output => false,
-                IdentifierType::Local | IdentifierType::State | IdentifierType::Generative => continue,
-                IdentifierType::Virtual => unreachable!()
-            };
-            
-            let typ = context.map_to_type(&decl.typ.0, &module.link_info.global_references);
-            let wire_id = context.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
-                typ : typ.clone(),
-                typ_span : decl.typ.1,
-                read_only: is_input,
-                identifier_type : decl.identifier_type,
-                name : decl.name.clone(),
-                name_token : Some(decl.name_token)
-            }));
-
-            let port = FlattenedInterfacePort { wire_id, typ, port_name: decl.name.clone(), span: decl.span };
-            if is_input {
-                inputs.push(port);
-            } else {
-                outputs.push(port);
-            }
-            
-            context.decl_to_flat_map[decl_id] = Some(wire_id);
-        }
-
-        let outputs_start = inputs.len();
-        inputs.reserve(outputs.len());
-        inputs.append(&mut outputs);
-        let interface = FlattenedInterface{interface_wires: inputs.into_boxed_slice(), outputs_start};
+        let interface_ports = context.initialize_interface();
         
         context.flatten_code(&module.code, None);
 
         let flat_mod = FlattenedModule {
-            instantiations,
-            errors,
-            interface
+            instantiations : context.instantiations,
+            errors : context.errors,
+            interface_ports,
+            outputs_start : module.outputs_start
         };
         flat_mod
     }
@@ -686,9 +676,9 @@ impl FlattenedModule {
 
         let mut wire_to_explore_queue : Vec<FlatID> = Vec::new();
 
-        for port in self.interface.outputs() {
-            is_instance_used_map[port.wire_id] = true;
-            wire_to_explore_queue.push(port.wire_id);
+        for port in self.outputs() {
+            is_instance_used_map[*port] = true;
+            wire_to_explore_queue.push(*port);
         }
 
         while let Some(item) = wire_to_explore_queue.pop() {

@@ -210,6 +210,15 @@ module multiply_add :
 	total = tmp + c;
 }
 
+module fibonnaci : -> int num {
+	state int current = 1;
+	state int current_prev = 0;
+
+	num = current + current_prev;
+	current_prev = current;
+	current = num;
+}
+
 //timeline (v, true -> /) .. (v, false -> v)*
 module blur2 : 
 	int data,

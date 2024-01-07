@@ -547,7 +547,7 @@ impl Linker {
         for (id, named_object) in &self.links.globals {
             if let Named::Module(md) = named_object {
                 println!("[[{}]]:", md.link_info.name);
-                md.print_flattened_module(self);
+                md.print_flattened_module();
                 let inst = self.instantiate(id);
             }
         }

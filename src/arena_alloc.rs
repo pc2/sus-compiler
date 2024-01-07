@@ -29,6 +29,39 @@ impl<IndexMarker : UUIDMarker> UUID<IndexMarker> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct UUIDRange<IndexMarker : UUIDMarker>(pub UUID<IndexMarker>, pub UUID<IndexMarker>);
+
+impl<IndexMarker : UUIDMarker> IntoIterator for &UUIDRange<IndexMarker> {
+    type Item = UUID<IndexMarker>;
+
+    type IntoIter = UUIDRangeIter<IndexMarker>;
+
+    fn into_iter(self) -> UUIDRangeIter<IndexMarker> {
+        UUIDRangeIter(UUID(self.0.0, PhantomData), UUID(self.1.0, PhantomData))
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct UUIDRangeIter<IndexMarker : UUIDMarker>(UUID<IndexMarker>, UUID<IndexMarker>);
+
+impl<IndexMarker : UUIDMarker> Iterator for UUIDRangeIter<IndexMarker> {
+    type Item = UUID<IndexMarker>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.0.0 == self.1.0 {
+            None
+        } else {
+            let result = UUID(self.0.0, PhantomData);
+            self.0.0 += 1;
+            Some(result)
+        }
+    }
+}
+
+
+
+
 #[derive(Default)]
 pub struct ArenaAllocator<T, IndexMarker> {
     data : Vec<Option<T>>,

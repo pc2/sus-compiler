@@ -150,6 +150,8 @@ pub struct Module {
     pub link_info : LinkInfo,
 
     pub declarations : FlatAlloc<SignalDeclaration, DeclIDMarker>,
+    pub ports : Box<[DeclID]>,
+    pub outputs_start : usize,
     pub code : CodeBlock,
 
     pub flattened : RefCell<FlattenedModule>,
@@ -158,14 +160,13 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn print_flattened_module(&self, linker : &Linker) {
+    pub fn print_flattened_module(&self) {
         println!("Interface:");
         let flattened_borrow = self.flattened.borrow();
-        for (port_idx, port) in flattened_borrow.interface.interface_wires.iter().enumerate() {
-            let port_direction = if port_idx < flattened_borrow.interface.outputs_start {"input"} else {"output"};
-            let port_type = port.typ.to_string(linker);
-            let port_name = &port.port_name;
-            println!("    {port_direction} {port_type} {port_name} -> {:?}", port.wire_id);
+        for (port_idx, port) in flattened_borrow.interface_ports.iter().enumerate() {
+            let port_direction = if port_idx < flattened_borrow.outputs_start {"input"} else {"output"};
+            let port_name = &self.declarations[self.ports[port_idx]].name;
+            println!("    {port_direction} {port_name} -> {:?}", *port);
         }
         println!("Instantiations:");
         for (id, inst) in &flattened_borrow.instantiations {

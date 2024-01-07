@@ -435,11 +435,10 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn parse_signal_declaration(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType, declarations : &mut FlatAlloc<SignalDeclaration, DeclIDMarker>, scope : &mut LocalVariableContext<'_, 'file>) -> Option<()> {
+    fn parse_signal_declaration(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType, declarations : &mut FlatAlloc<SignalDeclaration, DeclIDMarker>, scope : &mut LocalVariableContext<'_, 'file>) -> Option<DeclID> {
         let sig_type = self.try_parse_type(token_stream, scope)?;
         let name = self.eat_identifier(token_stream, "signal declaration")?;
-        self.add_declaration(sig_type, name, identifier_type, declarations, scope);
-        Some(())
+        Some(self.add_declaration(sig_type, name, identifier_type, declarations, scope))
     }
     
     fn try_parse_type(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext) -> Option<SpanTypeExpression> {
@@ -485,10 +484,10 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         Some((local_idx, Span::from(name_token.position)))
     }
 
-    fn parse_bundle(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType, declarations : &mut FlatAlloc<SignalDeclaration, DeclIDMarker>, scope : &mut LocalVariableContext<'_, 'file>) {
+    fn parse_bundle(&mut self, token_stream : &mut TokenStream, interface : &mut Vec<DeclID>, identifier_type : IdentifierType, declarations : &mut FlatAlloc<SignalDeclaration, DeclIDMarker>, scope : &mut LocalVariableContext<'_, 'file>) {
         while token_stream.peek_is_plain(TOKEN_IDENTIFIER) {
-            if let Some(_) = self.parse_signal_declaration(token_stream, identifier_type, declarations, scope) {
-
+            if let Some(id) = self.parse_signal_declaration(token_stream, identifier_type, declarations, scope) {
+                interface.push(id);// Current implementation happens to order inputs then outputs, but refactorings should ensure this remains the case
             } else {
                 // Error during parsing signal decl. Skip till "," or end of scope
                 token_stream.skip_until_one_of(&[kw(","), kw("->"), kw("{"), kw(";")]);
@@ -500,12 +499,18 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         }
     }
 
-    fn parse_interface(&mut self, token_stream : &mut TokenStream, declarations : &mut FlatAlloc<SignalDeclaration, DeclIDMarker>, scope : &mut LocalVariableContext<'_, 'file>) {
-        self.parse_bundle(token_stream, IdentifierType::Input, declarations, scope);
-    
+    fn parse_interface(&mut self, token_stream : &mut TokenStream, declarations : &mut FlatAlloc<SignalDeclaration, DeclIDMarker>, scope : &mut LocalVariableContext<'_, 'file>) -> (Box<[DeclID]>, usize) {
+        // Current implementation happens to order inputs then outputs, but refactorings should ensure this remains the case
+        
+        let mut interface_decls = Vec::new();
+        self.parse_bundle(token_stream, &mut interface_decls, IdentifierType::Input, declarations, scope);
+        
+        let outputs_start = interface_decls.len();
         if token_stream.eat_is_plain(kw("->")).is_some() {
-            self.parse_bundle(token_stream, IdentifierType::Output, declarations, scope);
+            self.parse_bundle(token_stream, &mut interface_decls, IdentifierType::Output, declarations, scope);
         }
+
+        (interface_decls.into_boxed_slice(), outputs_start)
     }
 
     fn parse_statement(&mut self, token_stream : &mut TokenStream, declarations : &mut FlatAlloc<SignalDeclaration, DeclIDMarker>, scope : &mut LocalVariableContext<'_, 'file>, code_block : &mut CodeBlock) -> Option<()> {
@@ -704,7 +709,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
 
         let mut declarations = FlatAlloc::new();
         let mut scope = LocalVariableContext::new_initial();
-        self.parse_interface(token_stream, &mut declarations, &mut scope);
+        let (ports, outputs_start) = self.parse_interface(token_stream, &mut declarations, &mut scope);
 
         let (block_tokens, block_span) = self.eat_block(token_stream, kw("{"), "module")?;
 
@@ -720,7 +725,7 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             global_references : replace(&mut self.global_references, Vec::new()),
             is_fully_linked : false
         };
-        Some(Module{declarations, code, link_info, flattened : RefCell::new(FlattenedModule::empty(self.errors.file)), instantiations : InstantiationList::new()})
+        Some(Module{declarations, ports, outputs_start, code, link_info, flattened : RefCell::new(FlattenedModule::empty(self.errors.file)), instantiations : InstantiationList::new()})
     }
 
     fn parse_ast(mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {

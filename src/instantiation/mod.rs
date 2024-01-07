@@ -416,9 +416,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     // Returns a proper interface if all ports involved did not produce an error. If a port did produce an error then returns None. 
     fn make_interface(&self) -> Option<Vec<WireID>> {
         let mut result = Vec::new();
-        result.reserve(self.flattened.interface.interface_wires.len());
-        for port in self.flattened.interface.interface_wires.iter() {
-            match &self.generation_state[port.wire_id] {
+        result.reserve(self.flattened.interface_ports.len());
+        for port in self.flattened.interface_ports.iter() {
+            match &self.generation_state[*port] {
                 SubModuleOrWire::Wire(w) => {
                     result.push(*w)
                 }
