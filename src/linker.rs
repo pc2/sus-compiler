@@ -543,7 +543,7 @@ impl Linker {
             flattened_mut_borrow.find_unused_variables();
         }
 
-        // Can't merge these loops
+        // Can't merge these loops, because instantiation can only be done once all modules have been type checked
         for (id, named_object) in &self.links.globals {
             if let Named::Module(md) = named_object {
                 println!("[[{}]]:", md.link_info.name);
