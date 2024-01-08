@@ -138,7 +138,7 @@ fn walk_name_color(all_objects : &[NamedUUID], links : &Links, result : &mut [ID
                             if decl.identifier_type == IdentifierType::Virtual {continue;} // Virtual wires don't appear in the program text
                             result[conn.to.span.0].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                         }
-                        Instantiation::SubModule(_) => {}
+                        Instantiation::SubModule(_) | Instantiation::IfStatement(_) => {}
                     }
                 }
             }

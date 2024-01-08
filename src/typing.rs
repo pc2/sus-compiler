@@ -60,23 +60,26 @@ impl Type {
     }
 }
 
+
+pub const BOOL_TYPE : Type = Type::Named(get_builtin_uuid("bool"));
+pub const INT_TYPE : Type = Type::Named(get_builtin_uuid("int"));
+pub const BOOL_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_uuid("bool"));
+pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_uuid("int"));
+
 pub fn typecheck_unary_operator(op : Operator, input_typ : &Type, span : Span, linker : &Linker, errors : &ErrorCollector) -> Type {
-    const BOOL : Type = Type::Named(get_builtin_uuid("bool"));
-    const INT : Type = Type::Named(get_builtin_uuid("int"));
-    
     if op.op_typ == kw("!") {
-        typecheck(input_typ, span, &BOOL, "! input", linker, errors);
-        BOOL
+        typecheck(input_typ, span, &BOOL_TYPE, "! input", linker, errors);
+        BOOL_TYPE
     } else if op.op_typ == kw("-") {
-        typecheck(input_typ, span, &INT, "- input", linker, errors);
-        INT
+        typecheck(input_typ, span, &INT_TYPE, "- input", linker, errors);
+        INT_TYPE
     } else {
         let gather_type = match op.op_typ {
-            x if x == kw("&") => BOOL,
-            x if x == kw("|") => BOOL,
-            x if x == kw("^") => BOOL,
-            x if x == kw("+") => INT,
-            x if x == kw("*") => INT,
+            x if x == kw("&") => BOOL_TYPE,
+            x if x == kw("|") => BOOL_TYPE,
+            x if x == kw("^") => BOOL_TYPE,
+            x if x == kw("+") => INT_TYPE,
+            x if x == kw("*") => INT_TYPE,
             _ => unreachable!()
         };
         if let Some(arr_content_typ) = typecheck_is_array_indexer(input_typ, span, linker, errors) {
@@ -86,27 +89,23 @@ pub fn typecheck_unary_operator(op : Operator, input_typ : &Type, span : Span, l
     }
 }
 pub fn get_binary_operator_types(op : Operator) -> ((Type, Type), Type) {
-    const BOOL : NamedUUID = get_builtin_uuid("bool");
-    const INT : NamedUUID = get_builtin_uuid("int");
-    
-    let (a, b, o) = match op.op_typ {
-        x if x == kw("&") => (BOOL, BOOL, BOOL),
-        x if x == kw("|") => (BOOL, BOOL, BOOL),
-        x if x == kw("^") => (BOOL, BOOL, BOOL),
-        x if x == kw("+") => (INT, INT, INT),
-        x if x == kw("-") => (INT, INT, INT),
-        x if x == kw("*") => (INT, INT, INT),
-        x if x == kw("/") => (INT, INT, INT),
-        x if x == kw("%") => (INT, INT, INT),
-        x if x == kw("==") => (INT, INT, BOOL),
-        x if x == kw("!=") => (INT, INT, BOOL),
-        x if x == kw(">=") => (INT, INT, BOOL),
-        x if x == kw("<=") => (INT, INT, BOOL),
-        x if x == kw(">") => (INT, INT, BOOL),
-        x if x == kw("<") => (INT, INT, BOOL),
+    match op.op_typ {
+        x if x == kw("&") => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
+        x if x == kw("|") => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
+        x if x == kw("^") => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
+        x if x == kw("+") => ((INT_TYPE, INT_TYPE), INT_TYPE),
+        x if x == kw("-") => ((INT_TYPE, INT_TYPE), INT_TYPE),
+        x if x == kw("*") => ((INT_TYPE, INT_TYPE), INT_TYPE),
+        x if x == kw("/") => ((INT_TYPE, INT_TYPE), INT_TYPE),
+        x if x == kw("%") => ((INT_TYPE, INT_TYPE), INT_TYPE),
+        x if x == kw("==") => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
+        x if x == kw("!=") => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
+        x if x == kw(">=") => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
+        x if x == kw("<=") => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
+        x if x == kw(">") => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
+        x if x == kw("<") => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
         _ => unreachable!()
-    };
-    ((Type::Named(a), Type::Named(b)), Type::Named(o))
+    }
 }
 
 fn type_compare(expected : &Type, found : &Type) -> bool {

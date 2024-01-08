@@ -29,23 +29,13 @@ impl<IndexMarker : UUIDMarker> UUID<IndexMarker> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UUIDRange<IndexMarker : UUIDMarker>(pub UUID<IndexMarker>, pub UUID<IndexMarker>);
-
-impl<IndexMarker : UUIDMarker> IntoIterator for &UUIDRange<IndexMarker> {
-    type Item = UUID<IndexMarker>;
-
-    type IntoIter = UUIDRangeIter<IndexMarker>;
-
-    fn into_iter(self) -> UUIDRangeIter<IndexMarker> {
-        UUIDRangeIter(UUID(self.0.0, PhantomData), UUID(self.1.0, PhantomData))
-    }
-}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UUIDRangeIter<IndexMarker : UUIDMarker>(UUID<IndexMarker>, UUID<IndexMarker>);
 
-impl<IndexMarker : UUIDMarker> Iterator for UUIDRangeIter<IndexMarker> {
+impl<IndexMarker : UUIDMarker> Iterator for UUIDRange<IndexMarker> {
     type Item = UUID<IndexMarker>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -59,6 +49,19 @@ impl<IndexMarker : UUIDMarker> Iterator for UUIDRangeIter<IndexMarker> {
     }
 }
 
+impl<IndexMarker : UUIDMarker> UUIDRange<IndexMarker> {
+    pub fn skip_to(&mut self, to : UUID<IndexMarker>) {
+        assert!(to.0 >= self.0.0);
+        assert!(to.0 <= self.1.0);
+        self.0 = to;
+    }
+    pub fn len(&self) -> usize {
+        self.1.0 - self.0.0
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
 
 
 
@@ -275,6 +278,9 @@ impl<T, IndexMarker : UUIDMarker> ListAllocator<T, IndexMarker> {
     pub fn get_next_alloc_id(&self) -> UUID<IndexMarker> {
         UUID(self.data.len(), PhantomData)
     }
+    pub fn id_range(&self) -> UUIDRange<IndexMarker> {
+        UUIDRange(UUID(0, PhantomData), UUID(self.data.len(), PhantomData))
+    }
     pub fn iter<'a>(&'a self) -> ListAllocIterator<'a, T, IndexMarker> {
         self.into_iter()
     }
@@ -386,6 +392,9 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
     }
     pub fn len(&self) -> usize {
         self.data.len()
+    }
+    pub fn id_range(&self) -> UUIDRange<IndexMarker> {
+        UUIDRange(UUID(0, PhantomData), UUID(self.data.len(), PhantomData))
     }
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()

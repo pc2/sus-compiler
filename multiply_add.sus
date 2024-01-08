@@ -310,6 +310,11 @@ module generative : int in -> int o, int o2 {
 	a[0] = 10;
 	gen int[3] xx = a;
 
+	gen bool test = true;
+
+	if test {
+		
+	}
 
 	o = a[in];
 	o2 = a[a[0]];
@@ -339,6 +344,14 @@ module first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros {
 	} else {
 		all_zeros = true;
 	}
+
+	/*first int i in 0..6 where bits[i] {
+		first = i;
+		all_zeros = false;
+	} else {
+		all_zeros = true;
+	}*/
+
 }
 
 module first_bit_idx_24 : bool[24] bits -> int first {

@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use num::BigInt;
 
-use crate::{typing::{Type, ConcreteType}, linker::get_builtin_uuid, ast::Operator, tokenizer::kw};
+use crate::{typing::{Type, ConcreteType, BOOL_TYPE, INT_TYPE}, linker::get_builtin_uuid, ast::Operator, tokenizer::kw};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum Value {
@@ -16,8 +16,8 @@ pub enum Value {
 impl Value {
     pub fn get_type_of_constant(&self) -> Type {
         match self {
-            Value::Bool(_) => Type::Named(get_builtin_uuid("bool")),
-            Value::Integer(_) => Type::Named(get_builtin_uuid("int")),
+            Value::Bool(_) => BOOL_TYPE,
+            Value::Integer(_) => INT_TYPE,
             Value::Array(_b) => {
                 unreachable!("Can't express arrays as constants (yet?)");
                 /*let content_typ = if let Some(b_first) = b.first() {
