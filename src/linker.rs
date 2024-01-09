@@ -267,7 +267,7 @@ impl PreLinker {
     pub fn reserve_file(&mut self) -> FileUUID {
         self.files.reserve()
     }
-    pub fn add_reserved_file(&mut self, file : FileUUID, parse_result : FullParseResult, parsing_errors : ErrorCollector) {
+    pub fn add_reserved_file(&mut self, file : FileUUID, parse_result : FullParseResult) {
         let mut associated_values = Vec::new();
         for md in parse_result.ast.modules {
             let module_name = md.link_info.name.clone();
@@ -275,7 +275,7 @@ impl PreLinker {
             associated_values.push(new_module_uuid);
             self.links.add_name(module_name, new_module_uuid);
         }
-        self.files.alloc_reservation(file, FileData{file_text : parse_result.file_text, tokens: parse_result.tokens, token_hierarchy: parse_result.token_hierarchy, parsing_errors, associated_values});
+        self.files.alloc_reservation(file, FileData{file_text : parse_result.file_text, tokens: parse_result.tokens, token_hierarchy: parse_result.token_hierarchy, parsing_errors : parse_result.ast.errors, associated_values});
     }
 
     // This should be called once all modules have been added. Adds errors for globals it couldn't match
@@ -432,7 +432,7 @@ impl Linker {
         self.files.reserve()
     }
     
-    pub fn add_reserved_file(&mut self, file : FileUUID, parse_result : FullParseResult, parsing_errors : ErrorCollector) {
+    pub fn add_reserved_file(&mut self, file : FileUUID, parse_result : FullParseResult) {
         let mut associated_values = Vec::new();
         for md in parse_result.ast.modules {
             let module_name = md.link_info.name.clone();
@@ -440,7 +440,7 @@ impl Linker {
             associated_values.push(new_module_uuid);
             self.links.add_name(module_name, new_module_uuid);
         }
-        self.files.alloc_reservation(file, FileData { file_text : parse_result.file_text, tokens: parse_result.tokens, token_hierarchy: parse_result.token_hierarchy, parsing_errors, associated_values});
+        self.files.alloc_reservation(file, FileData { file_text : parse_result.file_text, tokens: parse_result.tokens, token_hierarchy: parse_result.token_hierarchy, parsing_errors : parse_result.ast.errors, associated_values});
 
         for (_uuid, val_in_file) in &mut self.links.globals {
             if let Some(link_info) = val_in_file.get_link_info_mut() {
@@ -452,10 +452,10 @@ impl Linker {
         }
     }
 
-    pub fn relink(&mut self, file : FileUUID, parse_result : FullParseResult, parsing_errors : ErrorCollector) {
+    pub fn relink(&mut self, file : FileUUID, parse_result : FullParseResult) {
         self.remove_file_datas(&[file]);
         self.files.revert_to_reservation(file);
-        self.add_reserved_file(file, parse_result, parsing_errors);
+        self.add_reserved_file(file, parse_result);
     }
 
     pub fn get_module(&self, uuid : NamedUUID) -> &Module {

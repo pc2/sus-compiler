@@ -221,7 +221,7 @@ impl<'iter> Iterator for FileIter<'iter> {
     }
 }
 
-pub fn tokenize<'txt>(file_text : &'txt str, errors : &mut ErrorCollector) -> Vec<Token> {
+pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> Vec<Token> {
     let mut result : Vec<Token> = Vec::new();
     let mut file_char_iter = FileIter::new(file_text);
     

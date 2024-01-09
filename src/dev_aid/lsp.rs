@@ -28,13 +28,13 @@ impl LoadedFileCache {
         let found_opt = self.find_uri(&uri);
         let found_opt_was_none = found_opt.is_none();
         let file_uuid : FileUUID = found_opt.unwrap_or_else(|| self.linker.reserve_file());
-        let (full_parse, parsing_errors) = perform_full_semantic_parse(new_file_text, file_uuid);
+        let full_parse = perform_full_semantic_parse(new_file_text, file_uuid);
         
         if found_opt_was_none {
-            self.linker.add_reserved_file(file_uuid, full_parse, parsing_errors);
+            self.linker.add_reserved_file(file_uuid, full_parse);
             self.uris.insert(file_uuid, uri.clone());
         } else {
-            self.linker.relink(file_uuid, full_parse, parsing_errors);
+            self.linker.relink(file_uuid, full_parse);
         }
         self.linker.recompile_all();
     }
@@ -44,8 +44,8 @@ impl LoadedFileCache {
         } else {
             let file_uuid = self.linker.reserve_file();
             let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
-            let (full_parse, parsing_errors) = perform_full_semantic_parse(file_text, file_uuid);
-            self.linker.add_reserved_file(file_uuid, full_parse, parsing_errors);
+            let full_parse = perform_full_semantic_parse(file_text, file_uuid);
+            self.linker.add_reserved_file(file_uuid, full_parse);
             self.uris.insert(file_uuid, uri.clone());
             self.linker.recompile_all();
             file_uuid

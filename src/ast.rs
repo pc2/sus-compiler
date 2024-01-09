@@ -1,6 +1,6 @@
 
 
-use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::FlattenedModule, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList, value::Value};
+use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::FlattenedModule, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList, value::Value, errors::ErrorCollector};
 use core::ops::Range;
 use std::fmt::Display;
 
@@ -185,5 +185,6 @@ pub struct GlobalReference(pub Span, pub Option<NamedUUID>); // token index, and
 
 #[derive(Debug)]
 pub struct ASTRoot {
-    pub modules : Vec<Module>
+    pub modules : Vec<Module>,
+    pub errors : ErrorCollector
 }

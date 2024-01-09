@@ -320,6 +320,12 @@ module generative : int i -> int o, int o2 {
 	o2 = a[a[0]];
 }
 
+module add_stuff_to_indices : int[10] values -> int[10] added_values {
+	for int i in 0..10 {
+		added_values[i] = values[i] + i;
+	}
+}
+
 
 //timeline (bs -> /, true) | (bs -> v, false)
 module first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros {
@@ -354,12 +360,6 @@ module first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros {
 
 }
 
-module add_stuff_to_indices : int[10] values -> int[10] added_values {
-	for int i in 0..10 {
-		added_values[i] = values[i] + i;
-	}
-}
-
 module first_bit_idx_24 : bool[24] bits -> int first {
 	int[4] offsets;
 	bool[4] was_nonzeros;
@@ -369,6 +369,7 @@ module first_bit_idx_24 : bool[24] bits -> int first {
 		for int j in 0..6 {
 			these_bits[j] = bits[i * 6 + j];
 		}
+		
 		int offset, bool was_nonzero = first_bit_idx_6(these_bits);
 		offsets[i] = offset;
 		was_nonzeros[i] = was_nonzero;
