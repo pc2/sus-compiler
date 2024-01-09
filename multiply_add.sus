@@ -295,7 +295,7 @@ module Unpack4 : int[4] packed -> int out_stream {
     }
 }
 
-module generative : int in -> int o, int o2 {
+module generative : int i -> int o, int o2 {
 	gen int x = 5;
 	gen int[x] ys;
 
@@ -316,7 +316,7 @@ module generative : int in -> int o, int o2 {
 		
 	}
 
-	o = a[in];
+	o = a[i];
 	o2 = a[a[0]];
 }
 
@@ -354,12 +354,24 @@ module first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros {
 
 }
 
+module add_stuff_to_indices : int[10] values -> int[10] added_values {
+	for int i in 0..10 {
+		added_values[i] = values[i] + i;
+	}
+}
+
 module first_bit_idx_24 : bool[24] bits -> int first {
 	int[4] offsets;
-	bool[4] was_nonzero;
+	bool[4] was_nonzeros;
 
 	for int i in 0..4 {
-		offsets[i], was_nonzero[i] = first_bit_idx_6(bits[i*6+:6]);
+		bool[6] these_bits;
+		for int j in 0..6 {
+			these_bits[j] = bits[i * 6 + j];
+		}
+		int offset, bool was_nonzero = first_bit_idx_6(these_bits);
+		offsets[i] = offset;
+		was_nonzeros[i] = was_nonzero;
 	}
 }
 
@@ -379,7 +391,7 @@ module permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[12
 
 	bool[24] permutes_to_keep;
 	permutes_to_keep[0] = false;
-	for i in 1..24 {
+	for int i in 1..24 {
 		permutes_to_keep[i] = permutes_to_keep[i-1] | stored_valid_permutes[i-1];
 	}
 

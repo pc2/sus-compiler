@@ -109,7 +109,7 @@ impl SubModuleInstance {
 }
 
 #[derive(Debug)]
-pub struct IfStatement{
+pub struct IfStatement {
     pub is_compiletime : bool,
     pub condition : FlatID,
     pub then_start : FlatID,
@@ -118,12 +118,22 @@ pub struct IfStatement{
 }
 
 #[derive(Debug)]
+// Always is_compiletime
+pub struct ForStatement {
+    pub loop_var_decl : FlatID,
+    pub start : FlatID,
+    pub end : FlatID,
+    pub loop_body : FlatIDRange
+}
+
+#[derive(Debug)]
 pub enum Instantiation {
     SubModule(SubModuleInstance),
     WireDeclaration(WireDeclaration),
     Wire(WireInstance),
     Connection(Connection),
-    IfStatement(IfStatement)
+    IfStatement(IfStatement),
+    ForStatement(ForStatement)
 }
 
 impl Instantiation {
@@ -148,6 +158,7 @@ impl Instantiation {
             Instantiation::SubModule(_) => {}
             Instantiation::Connection(_) => {}
             Instantiation::IfStatement(_) => {}
+            Instantiation::ForStatement(_) => {}
             Instantiation::WireDeclaration(decl) => {
                 f(&decl.typ, decl.typ_span);
             }
@@ -180,7 +191,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
             TypeExpression::Array(b) => {
                 let (array_type_expr, array_size_expr) = b.deref();
                 let array_element_type = self.map_to_type(&array_type_expr.0);
-                if let Some(array_size_wire_id) = self.flatten_single_expr(array_size_expr) {
+                if let Some(array_size_wire_id) = self.flatten_expr(array_size_expr) {
                     let array_size_wire = self.instantiations[array_size_wire_id].extract_wire();
                     if !array_size_wire.is_compiletime {
                         self.errors.error_basic(array_size_expr.1, "Array size must be compile time");
@@ -288,7 +299,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
         }
 
         for (field, arg_expr) in zip(inputs, args) {
-            if let Some(arg_read_side) = self.flatten_single_expr(arg_expr) {
+            if let Some(arg_read_side) = self.flatten_expr(arg_expr) {
                 /*if self.typecheck(arg_read_side, &md.interface.interface_wires[field].typ, "submodule output") == None {
                     continue;
                 }*/
@@ -299,7 +310,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
 
         Some((md, submodule_local_wires, output_range))
     }
-    fn flatten_single_expr(&mut self, (expr, expr_span) : &SpanExpression) -> Option<FlatID> {
+    fn flatten_expr(&mut self, (expr, expr_span) : &SpanExpression) -> Option<FlatID> {
         let (is_compiletime, source) = match expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {
                 let from_wire = self.decl_to_flat_map[*l].unwrap();
@@ -316,14 +327,14 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
             }
             Expression::UnaryOp(op_box) => {
                 let (op, _op_pos, operate_on) = op_box.deref();
-                let right = self.flatten_single_expr(operate_on)?;
+                let right = self.flatten_expr(operate_on)?;
                 let right_wire = self.instantiations[right].extract_wire();
                 (right_wire.is_compiletime, WireSource::UnaryOp{op : *op, right})
             }
             Expression::BinOp(binop_box) => {
                 let (left_expr, op, _op_pos, right_expr) = binop_box.deref();
-                let left = self.flatten_single_expr(left_expr)?;
-                let right = self.flatten_single_expr(right_expr)?;
+                let left = self.flatten_expr(left_expr)?;
+                let right = self.flatten_expr(right_expr)?;
                 let left_wire = self.instantiations[left].extract_wire();
                 let right_wire = self.instantiations[right].extract_wire();
                 let is_compiletime = left_wire.is_compiletime && right_wire.is_compiletime;
@@ -331,8 +342,8 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
             }
             Expression::Array(arr_box) => {
                 let (left, right, _bracket_span) = arr_box.deref();
-                let arr = self.flatten_single_expr(left)?;
-                let arr_idx = self.flatten_single_expr(right)?;
+                let arr = self.flatten_expr(left)?;
+                let arr_idx = self.flatten_expr(right)?;
                 let arr_wire = self.instantiations[arr].extract_wire();
                 let arr_idx_wire = self.instantiations[arr_idx].extract_wire();
                 (arr_wire.is_compiletime && arr_idx_wire.is_compiletime, WireSource::ArrayAccess{arr, arr_idx})
@@ -370,7 +381,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
                 let (arr, idx_expr, _bracket_span) = arr_box.deref();
                 let flattened_arr_expr_opt = self.flatten_assignable_expr(arr);
                 
-                let idx = self.flatten_single_expr(idx_expr)?;
+                let idx = self.flatten_expr(idx_expr)?;
 
                 let mut flattened_arr_expr = flattened_arr_expr_opt?; // only unpack the subexpr after flattening the idx, so we catch all errors
 
@@ -427,30 +438,8 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
 
                     self.decl_to_flat_map[*decl_id] = Some(wire_id);
                 }
-                Statement::If{condition : condition_expr, then, els} => {
-                    let Some(condition) = self.flatten_single_expr(condition_expr) else {continue;};
-
-                    let is_compiletime = self.instantiations[condition].extract_wire().is_compiletime;
-
-                    let if_id = self.instantiations.get_next_alloc_id();
-                    let if_id_proper = self.instantiations.alloc(Instantiation::IfStatement(IfStatement{is_compiletime, condition, then_start : if_id, then_end_else_start : if_id, else_end : if_id}));
-                    assert!(if_id == if_id_proper);
-                    let then_start = self.instantiations.get_next_alloc_id();
-
-                    self.flatten_code(then);
-                    let then_end_else_start = self.instantiations.get_next_alloc_id();
-                    if let Some(e) = els {
-                        self.flatten_code(e);
-                    }
-                    let else_end = self.instantiations.get_next_alloc_id();
-
-                    let Instantiation::IfStatement(ifstmt) = &mut self.instantiations[if_id] else {unreachable!()};
-                    ifstmt.then_start = then_start;
-                    ifstmt.then_end_else_start = then_end_else_start;
-                    ifstmt.else_end = else_end;
-                }
                 Statement::Assign{to, expr : (Expression::FuncCall(func_and_args), func_span), eq_sign_position} => {
-                    let Some((md, interface, outputs_range)) = self.desugar_func_call(&func_and_args, func_span.1) else {return;};
+                    let Some((md, interface, outputs_range)) = self.desugar_func_call(&func_and_args, func_span.1) else {continue};
                     let outputs = &interface[outputs_range];
 
                     let func_name_span = func_and_args[0].1;
@@ -468,7 +457,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
                     }
 
                     for (field, to_i) in zip(outputs, to) {
-                        let Some(write_side) = self.flatten_assignable_expr(&to_i.expr) else {return;};
+                        let Some(write_side) = self.flatten_assignable_expr(&to_i.expr) else {continue};
 
                         // temporary
                         let module_port_wire_decl = self.instantiations[*field].extract_wire_declaration();
@@ -478,9 +467,9 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
                 },
                 Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
                     if to.len() == 1 {
-                        let Some(read_side) = self.flatten_single_expr(non_func_expr) else {return;};
+                        let Some(read_side) = self.flatten_expr(non_func_expr) else {continue};
                         let t = &to[0];
-                        let Some(write_side) = self.flatten_assignable_expr(&t.expr) else {return;};
+                        let Some(write_side) = self.flatten_assignable_expr(&t.expr) else {continue};
                         self.instantiations.alloc(Instantiation::Connection(Connection{num_regs : t.num_regs, from: read_side, to: write_side}));
                     } else {
                         self.errors.error_basic(*stmt_span, format!("Non-function assignments must only output exactly 1 instead of {}", to.len()));
@@ -489,7 +478,52 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
                 Statement::Block(inner_code) => {
                     self.flatten_code(inner_code);
                 },
-                Statement::TimelineStage(_) => {/*TODO */}
+                Statement::If{condition : condition_expr, then, els} => {
+                    let Some(condition) = self.flatten_expr(condition_expr) else {continue};
+
+                    let is_compiletime = self.instantiations[condition].extract_wire().is_compiletime;
+
+                    let if_id = self.instantiations.alloc(Instantiation::IfStatement(IfStatement{is_compiletime, condition, then_start : UUID::PLACEHOLDER, then_end_else_start : UUID::PLACEHOLDER, else_end : UUID::PLACEHOLDER}));
+                    let then_start = self.instantiations.get_next_alloc_id();
+
+                    self.flatten_code(then);
+                    let then_end_else_start = self.instantiations.get_next_alloc_id();
+                    if let Some(e) = els {
+                        self.flatten_code(e);
+                    }
+                    let else_end = self.instantiations.get_next_alloc_id();
+
+                    let Instantiation::IfStatement(if_stmt) = &mut self.instantiations[if_id] else {unreachable!()};
+                    if_stmt.then_start = then_start;
+                    if_stmt.then_end_else_start = then_end_else_start;
+                    if_stmt.else_end = else_end;
+                }
+                Statement::For{var : decl_id, range, code} => {
+                    let decl = &self.module.declarations[*decl_id];
+                    let loop_var_decl = self.flatten_declaration(decl);
+                    self.decl_to_flat_map[*decl_id] = Some(loop_var_decl);
+
+                    let start = self.flatten_expr(&range.from);
+                    let end = self.flatten_expr(&range.to);
+                    
+                    let for_id = if let (Some(start), Some(end)) = (start, end) {
+                        Some(self.instantiations.alloc(Instantiation::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER)})))
+                    } else {
+                        None
+                    };
+
+                    let code_start = self.instantiations.get_next_alloc_id();
+
+                    self.flatten_code(code);
+                    
+                    let code_end = self.instantiations.get_next_alloc_id();
+
+                    if let Some(for_id) = for_id {
+                        let Instantiation::ForStatement(for_stmt) = &mut self.instantiations[for_id] else {unreachable!()};
+
+                        for_stmt.loop_body = UUIDRange(code_start, code_end);
+                    }
+                }
             }
         }
     }
@@ -575,6 +609,13 @@ impl FlattenedModule {
                 Instantiation::IfStatement(stm) => {
                     let wire = &self.instantiations[stm.condition].extract_wire();
                     self.typecheck_wire_is_of_type(wire, &BOOL_TYPE, "if statement condition", linker)
+                }
+                Instantiation::ForStatement(stm) => {
+                    let loop_var = &self.instantiations[stm.loop_var_decl].extract_wire_declaration();
+                    let start = &self.instantiations[stm.start].extract_wire();
+                    let end = &self.instantiations[stm.end].extract_wire();
+                    self.typecheck_wire_is_of_type(start, &loop_var.typ, "for loop", linker);
+                    self.typecheck_wire_is_of_type(end, &loop_var.typ, "for loop", linker);
                 }
                 Instantiation::Wire(w) => {
                     let result_typ = match &w.source {
@@ -677,6 +718,10 @@ impl FlattenedModule {
                         }
                     }
                 }
+                Instantiation::ForStatement(stm) => {
+                    gathered_connection_fanin[stm.loop_var_decl].push(stm.start);
+                    gathered_connection_fanin[stm.loop_var_decl].push(stm.end);
+                }
             }
         }
 
@@ -708,7 +753,7 @@ impl FlattenedModule {
                         mark_not_unused(*port);
                     }
                 }
-                Instantiation::Connection(_) | Instantiation::IfStatement(_) => {unreachable!()}
+                Instantiation::Connection(_) | Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => {unreachable!()}
             }
             for from in &gathered_connection_fanin[item] {
                 mark_not_unused(*from);

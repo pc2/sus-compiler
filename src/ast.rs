@@ -122,8 +122,9 @@ pub struct AssignableExpressionWithModifiers {
 }
 
 #[derive(Debug)]
-pub struct CodeBlock {
-    pub statements : Vec<SpanStatement>
+pub struct RangeExpression {
+    pub from : SpanExpression,
+    pub to : SpanExpression
 }
 
 #[derive(Debug)]
@@ -131,8 +132,13 @@ pub enum Statement {
     Declaration(DeclID),
     Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : SpanExpression}, // num_regs v = expr;
     If{condition : SpanExpression, then : CodeBlock, els : Option<CodeBlock>},
-    Block(CodeBlock),
-    TimelineStage(usize)
+    For{var : DeclID, range : RangeExpression, code : CodeBlock},
+    Block(CodeBlock)
+}
+
+#[derive(Debug)]
+pub struct CodeBlock {
+    pub statements : Vec<SpanStatement>
 }
 
 #[derive(Debug)]

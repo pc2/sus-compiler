@@ -27,6 +27,9 @@ impl<IndexMarker : UUIDMarker> UUID<IndexMarker> {
     pub const fn get_hidden_value(&self) -> usize {
         self.0
     }
+
+    // Used to temporarily write a uuid to a field that's not known yet, such as the extent of a if statement. Should be overwritten later
+    pub const PLACEHOLDER : Self = UUID(usize::MAX, PhantomData);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

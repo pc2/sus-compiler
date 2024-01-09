@@ -519,11 +519,6 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         } else {
             return None;
         };
-        if let Some(token) = token_stream.eat_is_plain(kw("#")) {
-            code_block.statements.push((Statement::TimelineStage(token.position), Span::from(token.position)));
-            return Some(());
-        }
-
 
         let mut left_expressions : Vec<LeftExpression> = Vec::new();
         let mut all_decls = true;
@@ -640,6 +635,12 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             return None;
         }
     }
+    fn parse_range(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext<'_, 'file>) -> Option<RangeExpression> {
+        let left_expr = self.parse_expression(token_stream, scope)?;
+        self.eat_plain(token_stream, kw(".."), "range")?;
+        let right_expr = self.parse_expression(token_stream, scope)?;
+        Some(RangeExpression{from : left_expr, to : right_expr})
+    }
     fn parse_if_statement(&mut self, token_stream : &mut TokenStream, if_token : &TokenContent, declarations : &mut FlatAlloc<SignalDeclaration, DeclIDMarker>, scope : &LocalVariableContext<'_, 'file>) -> Option<(Statement, Span)> {
         let condition = self.parse_expression(token_stream, &scope)?;
 
@@ -663,6 +664,18 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
         };
 
         Some((Statement::If{condition, then: then_content, els: else_content }, Span(if_token.position, span_end)))
+    }
+    fn parse_for_loop(&mut self, token_stream : &mut TokenStream, for_token : &TokenContent, declarations : &mut FlatAlloc<SignalDeclaration, DeclIDMarker>, scope : &mut LocalVariableContext<'_, 'file>) -> Option<(Statement, Span)> {
+        let var = self.parse_signal_declaration(token_stream, IdentifierType::Generative, declarations, scope)?;
+
+        let _in_kw = self.eat_plain(token_stream, kw("in"), "for loop")?;
+
+        let range = self.parse_range(token_stream, scope)?;
+
+        let (for_block, for_block_span) = self.eat_block(token_stream, kw("{"), "Block of for loop")?;
+        let code = self.parse_code_block(for_block, for_block_span, declarations, &scope);
+
+        Some((Statement::For{var, range, code}, Span(for_token.position, for_block_span.1)))
     }
     fn parse_code_block(&mut self, block_tokens : &[TokenTreeNode], span : Span, declarations : &mut FlatAlloc<SignalDeclaration, DeclIDMarker>, outer_scope : &LocalVariableContext<'_, 'file>) -> CodeBlock {
         let mut token_stream = TokenStream::new(block_tokens, span.0, span.1);
@@ -689,6 +702,11 @@ impl<'g, 'file> ASTParserContext<'g, 'file> {
             if let Some(if_token) = token_stream.eat_is_plain(kw("if")) {
                 let Some(if_stmt) = self.parse_if_statement(&mut token_stream, &if_token, declarations, &mut inner_scope) else {continue;};
                 code_block.statements.push(if_stmt);
+            }
+
+            if let Some(for_token) = token_stream.eat_is_plain(kw("for")) {
+                let Some(for_loop_stmt) = self.parse_for_loop(&mut token_stream, &for_token, declarations, &mut inner_scope) else {continue;};
+                code_block.statements.push(for_loop_stmt);
             }
             
             if self.parse_statement(&mut token_stream, declarations, &mut inner_scope, &mut code_block).is_none() {

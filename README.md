@@ -31,7 +31,7 @@ The main goals of the language are roughly listed below:
 ### Major Milestones
 - [ ] Arbitrary forward pipelines full flow
 - [ ] Arbitrary FPGA hardware full flow
-- [ ] Generative Code
+- [x] Generative Code
 - [ ] Templates
 ### Parsing
 - [x] Basic Tokenizer
@@ -46,7 +46,7 @@ The main goals of the language are roughly listed below:
 - [x] Can Parse Blur2 filter
 - [x] If Statements
 - [ ] Structs
-- [ ] For Loops
+- [x] For Loops
 - [ ] Multi-Interface Syntax
 - [ ] Native Module integration syntax
 - [ ] Can Parse FIFO implementation

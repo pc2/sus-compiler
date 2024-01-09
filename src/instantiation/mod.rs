@@ -375,7 +375,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         while let Some(original_wire) = instruction_range.next() {
             let instance_to_add : SubModuleOrWire = match &self.flattened.instantiations[original_wire] {
                 Instantiation::SubModule(submodule) => {
-                    let Some(instance) = self.linker.instantiate(submodule.module_uuid) else {continue}; // Avoid error from submodule
+                    let Some(instance) = self.linker.instantiate(submodule.module_uuid) else {return None}; // Avoid error from submodule
                     let interface_real_wires = submodule.local_wires.iter().map(|port| {
                         self.generation_state[*port].extract_wire()
                     }).collect();
@@ -440,6 +440,29 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         }
                     }
                     instruction_range.skip_to(stm.else_end);
+                    continue;
+                }
+                Instantiation::ForStatement(stm) => {
+                    // TODO Non integer for loops?
+                    let start_val = self.get_generation_value(stm.start)?.extract_integer().clone();
+                    let end_val = self.get_generation_value(stm.end)?.extract_integer().clone();
+                    if start_val > end_val {
+                        let start_flat = &self.flattened.instantiations[stm.start].extract_wire();
+                        let end_flat = &self.flattened.instantiations[stm.end].extract_wire();
+                        self.errors.error_basic(Span(start_flat.span.0, end_flat.span.1), format!("for loop range end is before begin: {start_val}:{end_val}"));
+                        return None;
+                    }
+
+                    let mut current_val = start_val;
+
+                    while current_val < end_val {
+                        let SubModuleOrWire::CompileTimeValue(v) = &mut self.generation_state[stm.loop_var_decl] else {unreachable!()};
+                        *v = Value::Integer(current_val.clone());
+                        current_val += 1;
+                        self.instantiate_flattened_module(stm.loop_body, condition);
+                    }
+
+                    instruction_range.skip_to(stm.loop_body.1);
                     continue;
                 }
             };

@@ -38,7 +38,7 @@ fn codegen_to_file(linker : &Linker, id : NamedUUID, md : &Module) -> Option<()>
         println!("There were errors in {module_name}");
         return None;
     }
-    println!("Generating Verilog for {module_name}:");
+    //println!("Generating Verilog for {module_name}:");
     // gen_ctx.to_circt();
     let code = gen_verilog_code(md, &inst);
 
