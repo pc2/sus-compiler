@@ -381,9 +381,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     let typ = self.concretize_type(&wire_decl.typ, wire_decl.typ_span)?;
                     if wire_decl.identifier_type == IdentifierType::Generative {
                         /*Do nothing (in fact re-initializes the wire to 'empty'), just corresponds to wire declaration*/
-                        if wire_decl.read_only {
+                        /*if wire_decl.read_only { // Don't know why this check is *here*
                             todo!("Modules can't be computed at compile time yet");
-                        } 
+                        }*/
                         let initial_value = typ.get_initial_val(self.linker);
                         assert!(initial_value.is_of_type(&typ));
                         SubModuleOrWire::CompileTimeValue(initial_value)

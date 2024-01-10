@@ -1,8 +1,8 @@
-use std::{ops::{Deref, Range}, iter::zip};
+use std::{ops::{Deref, Range}, iter::zip, cell::{RefCell, Ref}};
 
 use crate::{
     ast::{Span, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, IdentifierType, TypeExpression, DeclIDMarker, DeclID, SpanTypeExpression},
-    linker::{Linker, Named, Linkable, NamedUUID, FileUUID},
+    linker::{Linker, Named, Linkable, NamedUUID, FileUUID, GlobalResolver, ResolvedGlobals},
     errors::{ErrorCollector, error_info}, arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, typing::{Type, typecheck_unary_operator, get_binary_operator_types, typecheck, typecheck_is_array_indexer, BOOL_TYPE, INT_TYPE}, value::Value
 };
 
@@ -178,37 +178,23 @@ impl Instantiation {
     }
 }
 
-struct FlatteningContext<'inst, 'l, 'm> {
+struct FlatteningContext<'inst, 'l, 'm, 'resolved> {
     decl_to_flat_map : FlatAlloc<Option<FlatID>, DeclIDMarker>,
     instantiations : &'inst mut FlatAlloc<Instantiation, FlatIDMarker>,
     errors : ErrorCollector,
     is_remote_declaration : Option<NamedUUID>,
 
-    linker : &'l Linker,
+    linker : GlobalResolver<'l, 'resolved>,
     module : &'m Module,
 }
 
-impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
-    pub fn map_to_type(&mut self, type_expr : &SpanTypeExpression) -> Type {
+impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
+    fn map_to_type(&mut self, type_expr : &SpanTypeExpression) -> Type {
         match &type_expr.0 {
             TypeExpression::Named(n) => {
-                if let Some(found_ref) = self.module.link_info.global_references[*n].1 {
-                    let named = &self.linker.links.globals[found_ref];
-                    match named {
-                        Named::Module(_) => {
-                            self.errors.error_basic(type_expr.1, format!("This should be a type, but it refers to the module '{}'", named.get_full_name()));
-                            Type::Error
-                        }
-                        Named::Constant(_) => {
-                            self.errors.error_basic(type_expr.1, format!("This should be a type, but it refers to the constant '{}'", named.get_full_name()));
-                            Type::Error
-                        }
-                        Named::Type(_typ) => {
-                            Type::Named(found_ref)
-                        }
-                    }
+                if let Some(typ_id) = &self.linker.try_get_type(self.module.link_info.global_references[*n], &self.errors) {
+                    Type::Named(*typ_id)
                 } else {
-                    // Error report handled by linker
                     Type::Error
                 }
             }
@@ -233,7 +219,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         if ONLY_ALLOW_TYPES {
             if let TypeExpression::Named(n) = &decl.typ.0 {
                 if let Some(possible_module_ref) = self.module.link_info.global_references[*n].1 {
-                    if let Named::Module(md) = &self.linker.links.globals[possible_module_ref] {
+                    if let Some(md) = &self.linker.is_module(possible_module_ref) {
                         return self.alloc_module_interface(decl.name.clone(), md,possible_module_ref, decl.typ.1)
                     }
                 }
@@ -270,7 +256,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
             instantiations: self.instantiations,
             errors: ErrorCollector::new(module.link_info.file), // Temporary ErrorCollector, unused
             is_remote_declaration: Some(module_uuid),
-            linker: self.linker,
+            linker: self.linker.new_sublinker(module.link_info.file),
             module,
         };
         
@@ -304,7 +290,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
             }
         };
         let func_instantiation = &self.instantiations[func_instantiation_id].extract_submodule();
-        let Named::Module(md) = &self.linker.links.globals[func_instantiation.module_uuid] else {unreachable!("UUID Should be a module!")};
+        let md = self.linker.get_module(func_instantiation.module_uuid);
 
         let submodule_local_wires = func_instantiation.local_wires.clone();
         
@@ -528,7 +514,8 @@ pub struct FlattenedModule {
     pub instantiations : FlatAlloc<Instantiation, FlatIDMarker>,
     pub errors : ErrorCollector,
     pub outputs_start : usize,
-    pub interface_ports : Box<[FlatID]>
+    pub interface_ports : Box<[FlatID]>,
+    pub resolved_globals : ResolvedGlobals
 }
 
 impl FlattenedModule {
@@ -537,7 +524,8 @@ impl FlattenedModule {
             instantiations : FlatAlloc::new(),
             errors : ErrorCollector::new(file),
             interface_ports : Box::new([]),
-            outputs_start : 0
+            outputs_start : 0,
+            resolved_globals : ResolvedGlobals::new()
         }
     }
 
@@ -560,12 +548,13 @@ impl FlattenedModule {
     */
     pub fn initialize(linker : &Linker, module : &Module, starts_with_errors : bool) -> FlattenedModule {
         let mut instantiations = FlatAlloc::new();
+        let resolved_globals : RefCell<ResolvedGlobals> = RefCell::new(ResolvedGlobals::new());
         let mut context = FlatteningContext{
             decl_to_flat_map: module.declarations.iter().map(|_| None).collect(),
             instantiations: &mut instantiations,
             errors: ErrorCollector::new(module.link_info.file),
             is_remote_declaration : None,
-            linker,
+            linker : GlobalResolver::new(linker, module.link_info.file, &resolved_globals),
             module,
         };
         context.errors.did_error.set(starts_with_errors);
@@ -578,7 +567,8 @@ impl FlattenedModule {
             errors : context.errors,
             instantiations : instantiations,
             interface_ports,
-            outputs_start : module.outputs_start
+            outputs_start : module.outputs_start,
+            resolved_globals : resolved_globals.into_inner()
         }
     }
 
