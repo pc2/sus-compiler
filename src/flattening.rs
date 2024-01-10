@@ -1,7 +1,7 @@
 use std::{ops::{Deref, Range}, iter::zip};
 
 use crate::{
-    ast::{Span, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, IdentifierType, TypeExpression, DeclIDMarker, DeclID},
+    ast::{Span, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, IdentifierType, TypeExpression, DeclIDMarker, DeclID, SpanTypeExpression},
     linker::{Linker, Named, Linkable, NamedUUID, FileUUID},
     errors::{ErrorCollector, error_info}, arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, typing::{Type, typecheck_unary_operator, get_binary_operator_types, typecheck, typecheck_is_array_indexer, BOOL_TYPE, INT_TYPE}, value::Value
 };
@@ -189,18 +189,32 @@ struct FlatteningContext<'inst, 'l, 'm> {
 }
 
 impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
-    pub fn map_to_type(&mut self, type_expr : &TypeExpression) -> Type {
-        match type_expr {
+    pub fn map_to_type(&mut self, type_expr : &SpanTypeExpression) -> Type {
+        match &type_expr.0 {
             TypeExpression::Named(n) => {
                 if let Some(found_ref) = self.module.link_info.global_references[*n].1 {
-                    Type::Named(found_ref)
+                    let named = &self.linker.links.globals[found_ref];
+                    match named {
+                        Named::Module(_) => {
+                            self.errors.error_basic(type_expr.1, format!("This should be a type, but it refers to the module '{}'", named.get_full_name()));
+                            Type::Error
+                        }
+                        Named::Constant(_) => {
+                            self.errors.error_basic(type_expr.1, format!("This should be a type, but it refers to the constant '{}'", named.get_full_name()));
+                            Type::Error
+                        }
+                        Named::Type(_typ) => {
+                            Type::Named(found_ref)
+                        }
+                    }
                 } else {
+                    // Error report handled by linker
                     Type::Error
                 }
             }
             TypeExpression::Array(b) => {
                 let (array_type_expr, array_size_expr) = b.deref();
-                let array_element_type = self.map_to_type(&array_type_expr.0);
+                let array_element_type = self.map_to_type(&array_type_expr);
                 if let Some(array_size_wire_id) = self.flatten_expr(array_size_expr) {
                     let array_size_wire = self.instantiations[array_size_wire_id].extract_wire();
                     if !array_size_wire.is_compiletime {
@@ -213,39 +227,27 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
             }
         }
     }
-    fn flatten_declaration(&mut self, decl_id : DeclID) -> FlatID {
+    fn flatten_declaration<const ONLY_ALLOW_TYPES : bool>(&mut self, decl_id : DeclID, read_only : bool) -> FlatID {
         let decl = &self.module.declarations[decl_id];
 
-        let parsed_typ_expr = self.map_to_type(&decl.typ.0);
-        let typ_span = decl.typ.1;
-
-        let typ = if let Some(root_ref) = parsed_typ_expr.get_root() {
-            match &self.linker.links.globals[root_ref] {
-                Named::Module(md) => {
-                    if let Type::Named(name) = parsed_typ_expr {
-                        return self.alloc_module_interface(decl.name.clone(), md, name, typ_span)
-                    } else {
-                        todo!("Implement submodule arrays");
-                        //Instantiation::Error
+        if ONLY_ALLOW_TYPES {
+            if let TypeExpression::Named(n) = &decl.typ.0 {
+                if let Some(possible_module_ref) = self.module.link_info.global_references[*n].1 {
+                    if let Named::Module(md) = &self.linker.links.globals[possible_module_ref] {
+                        return self.alloc_module_interface(decl.name.clone(), md,possible_module_ref, decl.typ.1)
                     }
                 }
-                Named::Constant(c) => {
-                    self.errors.error_basic(typ_span, format!("This should be the type of a declaration, but it refers to the constant '{}'", c.get_full_name()));
-                    Type::Error
-                }
-                Named::Type(_) => {
-                    parsed_typ_expr
-                }
             }
-        } else {
-            // Error report handled by linker
-            Type::Error
-        };
+        }
+
+        let typ = self.map_to_type(&decl.typ);
+        let typ_span = decl.typ.1;
+
         let inst_id = self.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
             typ,
             typ_span,
             is_remote_declaration : self.is_remote_declaration,
-            read_only : false,
+            read_only,
             identifier_type : decl.identifier_type,
             name : decl.name.clone(),
             name_token : decl.name_token
@@ -257,23 +259,9 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
     fn initialize_interface<const IS_SUBMODULE : bool>(&mut self) -> Box<[FlatID]> {
         self.module.ports.iter().enumerate().map(|(id, decl_id)|{
             let is_input = id < self.module.outputs_start;
+            let read_only = is_input ^ IS_SUBMODULE;
 
-            let decl = &self.module.declarations[*decl_id];
-
-            let typ = self.map_to_type(&decl.typ.0);
-            let wire_id = self.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
-                typ : typ.clone(),
-                typ_span : decl.typ.1,
-                is_remote_declaration : self.is_remote_declaration,
-                read_only: is_input ^ IS_SUBMODULE,
-                identifier_type : decl.identifier_type,
-                name : decl.name.clone(),
-                name_token : decl.name_token
-            }));
-
-            self.decl_to_flat_map[*decl_id] = Some(wire_id);
-
-            wire_id
+            self.flatten_declaration::<false>(*decl_id, read_only)
         }).collect()
     }
     fn alloc_module_interface(&mut self, name : Box<str>, module : &Module, module_uuid : NamedUUID, typ_span : Span) -> FlatID {
@@ -437,7 +425,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         for (stmt, stmt_span) in &code.statements {
             match stmt {
                 Statement::Declaration(decl_id) => {
-                    let _wire_id = self.flatten_declaration(*decl_id);
+                    let _wire_id = self.flatten_declaration::<true>(*decl_id, false);
                 }
                 Statement::Assign{to, expr : (Expression::FuncCall(func_and_args), func_span), eq_sign_position} => {
                     let Some((md, interface, outputs_range)) = self.desugar_func_call(&func_and_args, func_span.1) else {continue};
@@ -500,7 +488,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     if_stmt.else_end = else_end;
                 }
                 Statement::For{var : decl_id, range, code} => {
-                    let loop_var_decl = self.flatten_declaration(*decl_id);
+                    let loop_var_decl = self.flatten_declaration::<false>(*decl_id, false);
 
                     let start = self.flatten_expr(&range.from);
                     let end = self.flatten_expr(&range.to);
