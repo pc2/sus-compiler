@@ -320,9 +320,9 @@ impl<'file> ASTParserContext<'file> {
         }
     }
 
-    fn add_declaration(&mut self, type_expr : SpanTypeExpression, name : TokenContent, identifier_type : IdentifierType, scope : &mut LocalVariableContext<'_, 'file>) -> DeclID {
+    fn add_declaration(&mut self, type_expr : SpanTypeExpression, name : TokenContent, identifier_type : IdentifierType, latency_expr : Option<SpanExpression>, scope : &mut LocalVariableContext<'_, 'file>) -> DeclID {
         let span = Span(type_expr.1.0, name.position);
-        let decl = SignalDeclaration{typ : type_expr, span, name_token : name.position, name : self.file_text[name.text.clone()].into(), identifier_type};
+        let decl = SignalDeclaration{typ : type_expr, span, name_token : name.position, name : self.file_text[name.text.clone()].into(), identifier_type, latency_expr};
         let decl_id = self.declarations.alloc(decl);
         if let Err(conflict) = scope.add_declaration(&self.file_text[name.text.clone()], decl_id) {
             self.errors.error_with_info(span, format!("This name was already declared previously"), vec![
@@ -439,7 +439,8 @@ impl<'file> ASTParserContext<'file> {
     fn parse_signal_declaration(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType, scope : &mut LocalVariableContext<'_, 'file>) -> Option<DeclID> {
         let sig_type = self.try_parse_type(token_stream, scope)?;
         let name = self.eat_identifier(token_stream, "signal declaration")?;
-        Some(self.add_declaration(sig_type, name, identifier_type, scope))
+        let latency_expr = self.parse_optional_latency_decl(token_stream, scope);
+        Some(self.add_declaration(sig_type, name, identifier_type, latency_expr, scope))
     }
     
     fn try_parse_type(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext) -> Option<SpanTypeExpression> {
@@ -453,6 +454,11 @@ impl<'file> ASTParserContext<'file> {
             cur_type = (TypeExpression::Array(Box::new((cur_type, expr))), Span(first_token.position, block_span.1));
         }
         Some(cur_type)
+    }
+
+    fn parse_optional_latency_decl(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext<'_, 'file>) -> Option<SpanExpression> {
+        let _acc_tok = token_stream.eat_is_plain(kw("'"))?;
+        self.parse_expression(token_stream, scope)
     }
 
     fn try_parse_declaration(&mut self, token_stream : &mut TokenStream, scope : &mut LocalVariableContext<'_, 'file>) -> Option<(DeclID, Span)> {
@@ -481,7 +487,8 @@ impl<'file> ASTParserContext<'file> {
         
         let typ = self.try_parse_type(token_stream, scope)?;
         let name_token = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
-        let local_idx = self.add_declaration(typ, name_token.clone(), identifier_type, scope);
+        let latency_expr = self.parse_optional_latency_decl(token_stream, scope);
+        let local_idx = self.add_declaration(typ, name_token.clone(), identifier_type, latency_expr, scope);
         Some((local_idx, Span::from(name_token.position)))
     }
 

@@ -135,7 +135,6 @@ fn get_semantic_token_type_from_ide_token(tok : &IDEToken) -> u32 {
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 3,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Local)) => 3,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Generative)) => 3,
-        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Virtual)) => unreachable!(),
         IDETokenType::Identifier(IDEIdentifierType::Constant) => 9, // make it 'OPERATOR'?
         IDETokenType::Identifier(IDEIdentifierType::Unknown) => 2, // make it 'OPERATOR'?
         IDETokenType::Identifier(IDEIdentifierType::Interface) => 7, // FUNCTION

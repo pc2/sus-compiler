@@ -1,8 +1,8 @@
 use std::{ops::{Deref, Range}, iter::zip};
 
 use crate::{
-    ast::{Span, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, IdentifierType, TypeExpression, DeclIDMarker, SignalDeclaration},
-    linker::{Linker, Named, Linkable, FileUUID, NamedUUID},
+    ast::{Span, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, IdentifierType, TypeExpression, DeclIDMarker, DeclID},
+    linker::{Linker, Named, Linkable, NamedUUID, FileUUID},
     errors::{ErrorCollector, error_info}, arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, typing::{Type, typecheck_unary_operator, get_binary_operator_types, typecheck, typecheck_is_array_indexer, BOOL_TYPE, INT_TYPE}, value::Value
 };
 
@@ -30,13 +30,8 @@ pub enum ConnectionWritePathElementComputed {
 pub struct ConnectionWrite {
     pub root : FlatID,
     pub path : Vec<ConnectionWritePathElement>,
-    pub span : Span
-}
-
-impl ConnectionWrite {
-    pub fn simple(root : FlatID, span : Span) -> ConnectionWrite {
-        ConnectionWrite { root, path: Vec::new(), span }
-    }
+    pub span : Span,
+    pub is_remote_declaration : Option<NamedUUID>
 }
 
 #[derive(Debug)]
@@ -72,6 +67,7 @@ pub struct WireInstance {
     pub typ : Type,
     pub is_compiletime : bool,
     pub span : Span,
+    pub is_remote_declaration : Option<NamedUUID>,
     pub source : WireSource
 }
 
@@ -79,14 +75,16 @@ pub struct WireInstance {
 pub struct WireDeclaration {
     pub typ : Type,
     pub typ_span : Span,
+    pub is_remote_declaration : Option<NamedUUID>,
+    pub name_token : usize,
+    pub name : Box<str>,
     pub read_only : bool,
     pub identifier_type : IdentifierType,
-    pub name : Box<str>,
-    pub name_token : Option<usize>
+    //pub latency_specifier : Option<FlatID>
 }
 impl WireDeclaration {
     pub fn get_full_decl_span(&self) -> Span {
-        let name_pos = self.name_token.unwrap(); // Temporary, name_token should always be present for proper declarations. 
+        let name_pos = self.name_token;
         Span(self.typ_span.0, name_pos)
     }
 }
@@ -96,6 +94,7 @@ pub struct SubModuleInstance {
     pub module_uuid : NamedUUID,
     pub name : Box<str>,
     pub typ_span : Span,
+    pub is_remote_declaration : Option<NamedUUID>,
     pub outputs_start : usize,
     pub local_wires : Box<[FlatID]>
 }
@@ -167,18 +166,29 @@ impl Instantiation {
             }
         }
     }
+
+    pub fn get_location(&self) -> Option<(Span, Option<NamedUUID>)> {
+        match self {
+            Instantiation::SubModule(sm) => Some((sm.typ_span, sm.is_remote_declaration)),
+            Instantiation::WireDeclaration(decl) => Some((decl.typ_span, decl.is_remote_declaration)),
+            Instantiation::Wire(w) => Some((w.span, w.is_remote_declaration)),
+            Instantiation::Connection(conn) => Some((conn.to.span, conn.to.is_remote_declaration)),
+            Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => None
+        }
+    }
 }
 
-struct FlatteningContext<'l, 'm> {
+struct FlatteningContext<'inst, 'l, 'm> {
     decl_to_flat_map : FlatAlloc<Option<FlatID>, DeclIDMarker>,
-    instantiations : FlatAlloc<Instantiation, FlatIDMarker>,
+    instantiations : &'inst mut FlatAlloc<Instantiation, FlatIDMarker>,
     errors : ErrorCollector,
+    is_remote_declaration : Option<NamedUUID>,
 
     linker : &'l Linker,
     module : &'m Module,
 }
 
-impl<'l, 'm> FlatteningContext<'l, 'm> {
+impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
     pub fn map_to_type(&mut self, type_expr : &TypeExpression) -> Type {
         match type_expr {
             TypeExpression::Named(n) => {
@@ -203,9 +213,49 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
             }
         }
     }
+    fn flatten_declaration(&mut self, decl_id : DeclID) -> FlatID {
+        let decl = &self.module.declarations[decl_id];
 
-    fn initialize_interface(&mut self) -> Box<[FlatID]> {
-        let wire_list : Vec<FlatID> = self.module.ports.iter().enumerate().map(|(id, decl_id)|{
+        let parsed_typ_expr = self.map_to_type(&decl.typ.0);
+        let typ_span = decl.typ.1;
+
+        let typ = if let Some(root_ref) = parsed_typ_expr.get_root() {
+            match &self.linker.links.globals[root_ref] {
+                Named::Module(md) => {
+                    if let Type::Named(name) = parsed_typ_expr {
+                        return self.alloc_module_interface(decl.name.clone(), md, name, typ_span)
+                    } else {
+                        todo!("Implement submodule arrays");
+                        //Instantiation::Error
+                    }
+                }
+                Named::Constant(c) => {
+                    self.errors.error_basic(typ_span, format!("This should be the type of a declaration, but it refers to the constant '{}'", c.get_full_name()));
+                    Type::Error
+                }
+                Named::Type(_) => {
+                    parsed_typ_expr
+                }
+            }
+        } else {
+            // Error report handled by linker
+            Type::Error
+        };
+        let inst_id = self.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
+            typ,
+            typ_span,
+            is_remote_declaration : self.is_remote_declaration,
+            read_only : false,
+            identifier_type : decl.identifier_type,
+            name : decl.name.clone(),
+            name_token : decl.name_token
+        }));
+
+        self.decl_to_flat_map[decl_id] = Some(inst_id);
+        inst_id
+    }
+    fn initialize_interface<const IS_SUBMODULE : bool>(&mut self) -> Box<[FlatID]> {
+        self.module.ports.iter().enumerate().map(|(id, decl_id)|{
             let is_input = id < self.module.outputs_start;
 
             let decl = &self.module.declarations[*decl_id];
@@ -214,45 +264,37 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
             let wire_id = self.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
                 typ : typ.clone(),
                 typ_span : decl.typ.1,
-                read_only: is_input,
+                is_remote_declaration : self.is_remote_declaration,
+                read_only: is_input ^ IS_SUBMODULE,
                 identifier_type : decl.identifier_type,
                 name : decl.name.clone(),
-                name_token : Some(decl.name_token)
+                name_token : decl.name_token
             }));
 
             self.decl_to_flat_map[*decl_id] = Some(wire_id);
 
             wire_id
-        }).collect();
-
-        wire_list.into_boxed_slice()
+        }).collect()
     }
     fn alloc_module_interface(&mut self, name : Box<str>, module : &Module, module_uuid : NamedUUID, typ_span : Span) -> FlatID {
-        let mut local_wires = Vec::new();
-        for (port_id, decl_id) in module.ports.iter().enumerate() {
-            let is_input = port_id < module.outputs_start;
-            let decl = &module.declarations[*decl_id];
-            
-            let typ = self.map_to_type(&decl.typ.0);
-
-            let wire_id = self.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
-                typ,
-                typ_span,
-                read_only : !is_input,
-                identifier_type : IdentifierType::Virtual,
-                name : format!("{}_{}", &name, &decl.name).into_boxed_str(),
-                name_token : None
-            }));
-
-            local_wires.push(wire_id);
-        }
+        let mut nested_context = FlatteningContext {
+            decl_to_flat_map: module.declarations.iter().map(|_| None).collect(),
+            instantiations: self.instantiations,
+            errors: ErrorCollector::new(module.link_info.file), // Temporary ErrorCollector, unused
+            is_remote_declaration: Some(module_uuid),
+            linker: self.linker,
+            module,
+        };
+        
+        let local_wires = nested_context.initialize_interface::<true>();
         
         self.instantiations.alloc(Instantiation::SubModule(SubModuleInstance{
             name,
             module_uuid,
+            is_remote_declaration : self.is_remote_declaration,
             typ_span,
             outputs_start : module.outputs_start,
-            local_wires : local_wires.into_boxed_slice()
+            local_wires
         }))
     }
     // Returns the module, full interface, and the output range for the function call syntax
@@ -304,7 +346,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
                     continue;
                 }*/
                 let func_input_port = &submodule_local_wires[field];
-                self.instantiations.alloc(Instantiation::Connection(Connection{num_regs: 0, from: arg_read_side, to: ConnectionWrite::simple(*func_input_port, *name_expr_span)}));
+                self.instantiations.alloc(Instantiation::Connection(Connection{num_regs: 0, from: arg_read_side, to: ConnectionWrite{root : *func_input_port, path : Vec::new(), span : *name_expr_span, is_remote_declaration : self.is_remote_declaration}}));
             }
         }
 
@@ -361,7 +403,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
             }
         };
 
-        let wire_instance = WireInstance{typ : Type::Unknown, span : *expr_span, is_compiletime, source};
+        let wire_instance = WireInstance{typ : Type::Unknown, span : *expr_span, is_compiletime, source, is_remote_declaration : self.is_remote_declaration,};
         Some(self.instantiations.alloc(Instantiation::Wire(wire_instance)))
     }
     fn flatten_assignable_expr(&mut self, (expr, span) : &SpanAssignableExpression) -> Option<ConnectionWrite> {
@@ -375,7 +417,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
                     self.errors.error_with_info(*span, "Cannot Assign to Read-Only value", vec![decl_info]);
                     return None
                 }
-                ConnectionWrite{root, path : Vec::new(), span : *span}
+                ConnectionWrite{root, path : Vec::new(), span : *span, is_remote_declaration : self.is_remote_declaration,}
             }
             AssignableExpression::ArrayIndex(arr_box) => {
                 let (arr, idx_expr, _bracket_span) = arr_box.deref();
@@ -391,52 +433,11 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
             }
         })
     }
-    fn flatten_declaration(&mut self, decl : &SignalDeclaration) -> FlatID {
-        assert!(decl.identifier_type != IdentifierType::Input);
-        assert!(decl.identifier_type != IdentifierType::Output);
-
-        let parsed_typ_expr = self.map_to_type(&decl.typ.0);
-        let typ_span = decl.typ.1;
-
-        let typ = if let Some(root_ref) = parsed_typ_expr.get_root() {
-            match &self.linker.links.globals[root_ref] {
-                Named::Module(md) => {
-                    if let Type::Named(name) = parsed_typ_expr {
-                        return self.alloc_module_interface(decl.name.clone(), md, name, typ_span)
-                    } else {
-                        todo!("Implement submodule arrays");
-                        //Instantiation::Error
-                    }
-                }
-                Named::Constant(c) => {
-                    self.errors.error_basic(typ_span, format!("This should be the type of a declaration, but it refers to the constant '{}'", c.get_full_name()));
-                    Type::Error
-                }
-                Named::Type(_) => {
-                    parsed_typ_expr
-                }
-            }
-        } else {
-            // Error report handled by linker
-            Type::Error
-        };
-        self.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
-            typ,
-            typ_span,
-            read_only : false,
-            identifier_type : decl.identifier_type,
-            name : decl.name.clone(),
-            name_token : Some(decl.name_token)
-        }))
-    }
     fn flatten_code(&mut self, code : &CodeBlock) {
         for (stmt, stmt_span) in &code.statements {
             match stmt {
                 Statement::Declaration(decl_id) => {
-                    let decl = &self.module.declarations[*decl_id];
-                    let wire_id = self.flatten_declaration(decl);
-
-                    self.decl_to_flat_map[*decl_id] = Some(wire_id);
+                    let _wire_id = self.flatten_declaration(*decl_id);
                 }
                 Statement::Assign{to, expr : (Expression::FuncCall(func_and_args), func_span), eq_sign_position} => {
                     let Some((md, interface, outputs_range)) = self.desugar_func_call(&func_and_args, func_span.1) else {continue};
@@ -461,7 +462,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
 
                         // temporary
                         let module_port_wire_decl = self.instantiations[*field].extract_wire_declaration();
-                        let module_port_proxy = self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : module_port_wire_decl.identifier_type == IdentifierType::Generative, span : *func_span, source : WireSource::WireRead { from_wire: *field }}));
+                        let module_port_proxy = self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : module_port_wire_decl.identifier_type == IdentifierType::Generative, span : *func_span, is_remote_declaration : self.is_remote_declaration, source : WireSource::WireRead { from_wire: *field }}));
                         self.instantiations.alloc(Instantiation::Connection(Connection{num_regs : to_i.num_regs, from: module_port_proxy, to: write_side}));
                     }
                 },
@@ -499,9 +500,7 @@ impl<'l, 'm> FlatteningContext<'l, 'm> {
                     if_stmt.else_end = else_end;
                 }
                 Statement::For{var : decl_id, range, code} => {
-                    let decl = &self.module.declarations[*decl_id];
-                    let loop_var_decl = self.flatten_declaration(decl);
-                    self.decl_to_flat_map[*decl_id] = Some(loop_var_decl);
+                    let loop_var_decl = self.flatten_declaration(*decl_id);
 
                     let start = self.flatten_expr(&range.from);
                     let end = self.flatten_expr(&range.to);
@@ -572,26 +571,27 @@ impl FlattenedModule {
     It is template-preserving
     */
     pub fn initialize(linker : &Linker, module : &Module, starts_with_errors : bool) -> FlattenedModule {
+        let mut instantiations = FlatAlloc::new();
         let mut context = FlatteningContext{
             decl_to_flat_map: module.declarations.iter().map(|_| None).collect(),
-            instantiations: FlatAlloc::new(),
+            instantiations: &mut instantiations,
             errors: ErrorCollector::new(module.link_info.file),
+            is_remote_declaration : None,
             linker,
             module,
         };
         context.errors.did_error.set(starts_with_errors);
 
-        let interface_ports = context.initialize_interface();
+        let interface_ports = context.initialize_interface::<false>();
         
         context.flatten_code(&module.code);
 
-        let flat_mod = FlattenedModule {
-            instantiations : context.instantiations,
+        FlattenedModule {
             errors : context.errors,
+            instantiations : instantiations,
             interface_ports,
             outputs_start : module.outputs_start
-        };
-        flat_mod
+        }
     }
 
     /* Type Checking */
@@ -763,8 +763,10 @@ impl FlattenedModule {
         // Now produce warnings from the unused list
         for (id, inst) in &self.instantiations {
             if !is_instance_used_map[id] {
-                if let Instantiation::WireDeclaration(WireDeclaration{typ : _, typ_span : _, read_only : _, identifier_type : _, name : _, name_token : Some(name_token)}) = inst {
-                    self.errors.warn_basic(Span::from(*name_token), "Unused Variable: This variable does not affect the output ports of this module");
+                if let Instantiation::WireDeclaration(decl) = inst {
+                    if decl.is_remote_declaration.is_none() {
+                        self.errors.warn_basic(Span::from(decl.name_token), "Unused Variable: This variable does not affect the output ports of this module");
+                    }
                 }
             }
         }

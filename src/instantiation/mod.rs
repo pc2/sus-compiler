@@ -180,10 +180,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
         }
     }
-    fn extract_bool_from_value(&self, val : &Value, span : Span) -> Option<bool> {
-        let Value::Bool(val) = val else {self.errors.error_basic(span, format!("Value is not a bool, it is {val:?} instead")); return None};
-        Some(*val)
-    }
     fn concretize_type(&self, typ : &Type, span : Span) -> Option<ConcreteType> {
         match typ {
             Type::Error | Type::Unknown => unreachable!("Bad types should be caught in flattening: {}", typ.to_string(self.linker)),
@@ -319,8 +315,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             SubModuleOrWire::Wire(w) => Some(*w),
             SubModuleOrWire::CompileTimeValue(v) => {
                 let value = v.clone();
-                let Instantiation::Wire(WireInstance{typ, source : _, is_compiletime : _, span}) = &self.flattened.instantiations[flat_id] else {unreachable!()};
-                let typ = self.concretize_type(typ, *span)?;
+                let Instantiation::Wire(wire) = &self.flattened.instantiations[flat_id] else {unreachable!()};
+                let typ = self.concretize_type(&wire.typ, wire.span)?;
                 let name = self.get_unique_name();
                 Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id, typ, name}))
             }

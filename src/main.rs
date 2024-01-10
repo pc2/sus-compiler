@@ -35,7 +35,7 @@ fn codegen_to_file(linker : &Linker, id : NamedUUID, md : &Module) -> Option<()>
     let module_name = md.link_info.name.deref();
 
     if inst.errors.did_error.get() {
-        println!("There were errors in {module_name}");
+        println!("There were instantiation errors in {module_name}");
         return None;
     }
     //println!("Generating Verilog for {module_name}:");

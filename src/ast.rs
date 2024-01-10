@@ -44,8 +44,7 @@ pub enum IdentifierType {
     Output,
     Local,
     State,
-    Generative,
-    Virtual // Generated at the interfaces of submodule instantiations
+    Generative
 }
 
 impl From<usize> for Span {
@@ -74,8 +73,9 @@ pub struct SignalDeclaration {
     pub span : Span,
     pub name_token : usize,
     pub typ : SpanTypeExpression,
-    pub name : Box<str>, // File position
-    pub identifier_type : IdentifierType
+    pub name : Box<str>,
+    pub identifier_type : IdentifierType,
+    pub latency_expr : Option<SpanExpression>
 }
 
 #[derive(Debug,Clone,Copy)]

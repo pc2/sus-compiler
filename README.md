@@ -33,6 +33,7 @@ The main goals of the language are roughly listed below:
 - [ ] Arbitrary FPGA hardware full flow
 - [x] Generative Code
 - [ ] Templates
+
 ### Parsing
 - [x] Basic Tokenizer
 - [x] Basic Syntax Error Reporting
@@ -45,6 +46,8 @@ The main goals of the language are roughly listed below:
 - [x] Can Parse Multiply-Add pipeline
 - [x] Can Parse Blur2 filter
 - [x] If Statements
+- [x] Latency Specifiers
+- [ ] Bound Specifiers
 - [ ] Structs
 - [x] For Loops
 - [ ] Multi-Interface Syntax
@@ -71,6 +74,8 @@ The main goals of the language are roughly listed below:
 - [x] Basic LSP for VSCode integration
 - [x] Syntax Highlighting
 - [x] Error and Warning Reporting
+- [ ] Hover type information
+- [ ] Code completion
 - [ ] Per-Line Resource Utilization Reporting
 
 ### Code Generation

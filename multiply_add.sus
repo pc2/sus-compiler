@@ -360,6 +360,11 @@ module first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros {
 
 }
 
+module multiply_add_with_latencies : int a'0, int b'0, int c'0 -> int r'0 {
+    int tmp'1 = multiply(a, b);
+	reg r = tmp + c;
+}
+
 module first_bit_idx_24 : bool[24] bits -> int first {
 	int[4] offsets;
 	bool[4] was_nonzeros;
