@@ -228,12 +228,6 @@ struct LeftExpression {
 }
 
 impl<'file> ASTParserContext<'file> {
-    fn add_global_reference(&mut self, name_span : Span) -> usize {
-        let idx = self.global_references.len();
-        self.global_references.push(GlobalReference(name_span, None));
-        idx
-    }
-
     fn prepare_rollback(&self) -> ASTParserRollbackable {
         ASTParserRollbackable{original_global_references_size : self.global_references.len()}
     }
@@ -345,7 +339,7 @@ impl<'file> ASTParserContext<'file> {
                     LocalOrGlobal::Local(local_idx)
                 } else {
                     // todo namespacing and shit
-                    LocalOrGlobal::Global(self.add_global_reference(Span::from(*pos)))
+                    LocalOrGlobal::Global(Span::from(*pos))
                 };
                 (Expression::Named(ident_ref), Span::from(*pos))
             },
@@ -446,7 +440,7 @@ impl<'file> ASTParserContext<'file> {
     fn try_parse_type(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext) -> Option<SpanTypeExpression> {
         let first_token = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
         // todo namespacing and shit
-        let mut cur_type = (TypeExpression::Named(self.add_global_reference(Span::from(first_token.position))), Span::from(first_token.position)); // TODO add more type info
+        let mut cur_type = (TypeExpression::Named, Span::from(first_token.position)); // TODO add more type info
         while let Some((content, block_span)) = token_stream.eat_is_block(kw("[")) {
             let mut array_index_token_stream = TokenStream::new(content, block_span.0, block_span.1);
             let expr = self.parse_expression(&mut array_index_token_stream, scope)?;

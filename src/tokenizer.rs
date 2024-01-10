@@ -50,12 +50,13 @@ pub const ALL_KEYWORDS : [(&'static str, u8); 19] = [
 
 // Extra data is opreator prescedence. Lower number is higher prescedence of operators
 // ordered by which to prefer when parsing
-pub const ALL_SYMBOLS : [(&'static str, u8); 34] = [
+pub const ALL_SYMBOLS : [(&'static str, u8); 35] = [
     // 'Meta symbols', for comments. Not actually used in further parsing
     ("/*", 0),
     ("//", 0),
     ("*/", 0),
     // Big symbols
+    ("::", 0),
     ("->", 0),
     ("..", 1),
     ("<=", 2), // Start of operators (see is_operator())

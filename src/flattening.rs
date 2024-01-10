@@ -1,8 +1,8 @@
-use std::{ops::{Deref, Range}, iter::zip, cell::{RefCell, Ref}};
+use std::{ops::{Deref, Range}, iter::zip, cell::RefCell};
 
 use crate::{
     ast::{Span, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, IdentifierType, TypeExpression, DeclIDMarker, DeclID, SpanTypeExpression},
-    linker::{Linker, Named, Linkable, NamedUUID, FileUUID, GlobalResolver, ResolvedGlobals},
+    linker::{Linker, NamedUUID, FileUUID, GlobalResolver, ResolvedGlobals},
     errors::{ErrorCollector, error_info}, arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, typing::{Type, typecheck_unary_operator, get_binary_operator_types, typecheck, typecheck_is_array_indexer, BOOL_TYPE, INT_TYPE}, value::Value
 };
 
@@ -31,7 +31,7 @@ pub struct ConnectionWrite {
     pub root : FlatID,
     pub path : Vec<ConnectionWritePathElement>,
     pub span : Span,
-    pub is_remote_declaration : Option<NamedUUID>
+    pub is_remote_declaration : bool
 }
 
 #[derive(Debug)]
@@ -67,7 +67,7 @@ pub struct WireInstance {
     pub typ : Type,
     pub is_compiletime : bool,
     pub span : Span,
-    pub is_remote_declaration : Option<NamedUUID>,
+    pub is_remote_declaration : bool,
     pub source : WireSource
 }
 
@@ -75,7 +75,7 @@ pub struct WireInstance {
 pub struct WireDeclaration {
     pub typ : Type,
     pub typ_span : Span,
-    pub is_remote_declaration : Option<NamedUUID>,
+    pub is_remote_declaration : bool,
     pub name_token : usize,
     pub name : Box<str>,
     pub read_only : bool,
@@ -94,7 +94,7 @@ pub struct SubModuleInstance {
     pub module_uuid : NamedUUID,
     pub name : Box<str>,
     pub typ_span : Span,
-    pub is_remote_declaration : Option<NamedUUID>,
+    pub is_remote_declaration : bool,
     pub outputs_start : usize,
     pub local_wires : Box<[FlatID]>
 }
@@ -167,7 +167,7 @@ impl Instantiation {
         }
     }
 
-    pub fn get_location(&self) -> Option<(Span, Option<NamedUUID>)> {
+    pub fn get_location(&self) -> Option<(Span, bool)> {
         match self {
             Instantiation::SubModule(sm) => Some((sm.typ_span, sm.is_remote_declaration)),
             Instantiation::WireDeclaration(decl) => Some((decl.typ_span, decl.is_remote_declaration)),
@@ -182,7 +182,7 @@ struct FlatteningContext<'inst, 'l, 'm, 'resolved> {
     decl_to_flat_map : FlatAlloc<Option<FlatID>, DeclIDMarker>,
     instantiations : &'inst mut FlatAlloc<Instantiation, FlatIDMarker>,
     errors : ErrorCollector,
-    is_remote_declaration : Option<NamedUUID>,
+    is_remote_declaration : bool,
 
     linker : GlobalResolver<'l, 'resolved>,
     module : &'m Module,
@@ -191,8 +191,8 @@ struct FlatteningContext<'inst, 'l, 'm, 'resolved> {
 impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
     fn map_to_type(&mut self, type_expr : &SpanTypeExpression) -> Type {
         match &type_expr.0 {
-            TypeExpression::Named(n) => {
-                if let Some(typ_id) = &self.linker.try_get_type(self.module.link_info.global_references[*n], &self.errors) {
+            TypeExpression::Named => {
+                if let Some(typ_id) = &self.linker.try_get_type(type_expr.1, &self.errors) {
                     Type::Named(*typ_id)
                 } else {
                     Type::Error
@@ -217,8 +217,8 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
         let decl = &self.module.declarations[decl_id];
 
         if ONLY_ALLOW_TYPES {
-            if let TypeExpression::Named(n) = &decl.typ.0 {
-                if let Some(possible_module_ref) = self.module.link_info.global_references[*n].1 {
+            if let TypeExpression::Named = &decl.typ.0 {
+                if let Some(possible_module_ref) = self.linker.resolve_global(decl.typ.1, &self.errors) {
                     if let Some(md) = &self.linker.is_module(possible_module_ref) {
                         return self.alloc_module_interface(decl.name.clone(), md,possible_module_ref, decl.typ.1)
                     }
@@ -255,7 +255,7 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
             decl_to_flat_map: module.declarations.iter().map(|_| None).collect(),
             instantiations: self.instantiations,
             errors: ErrorCollector::new(module.link_info.file), // Temporary ErrorCollector, unused
-            is_remote_declaration: Some(module_uuid),
+            is_remote_declaration: true,
             linker: self.linker.new_sublinker(module.link_info.file),
             module,
         };
@@ -278,11 +278,11 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
             Expression::Named(LocalOrGlobal::Local(l)) => {
                 self.decl_to_flat_map[*l].unwrap()
             }
-            Expression::Named(LocalOrGlobal::Global(g)) => {
-                let module_ref = self.module.link_info.global_references[*g];
+            Expression::Named(LocalOrGlobal::Global(ref_span)) => {
+                let module_ref = self.linker.resolve_global(*ref_span, &self.errors)?;
 
-                let dependency = self.linker.try_get_module(module_ref, &self.errors)?;
-                self.alloc_module_interface(dependency.link_info.name.clone(), dependency, module_ref.1?, *name_expr_span)
+                let dependency = self.linker.try_get_module(*ref_span, &self.errors)?;
+                self.alloc_module_interface(dependency.link_info.name.clone(), dependency, module_ref, *name_expr_span)
             }
             _other => {
                 self.errors.error_basic(*name_expr_span, "Function call name cannot be an expression");
@@ -333,9 +333,8 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
                 let decl = self.instantiations[from_wire].extract_wire_declaration();
                 (decl.identifier_type == IdentifierType::Generative, WireSource::WireRead{from_wire})
             }
-            Expression::Named(LocalOrGlobal::Global(g)) => {
-                let r = self.module.link_info.global_references[*g];
-                let cst = self.linker.try_get_constant(r, &self.errors)?;
+            Expression::Named(LocalOrGlobal::Global(ref_span)) => {
+                let cst = self.linker.try_get_constant(*ref_span, &self.errors)?;
                 (true, WireSource::Constant{value : cst})
             }
             Expression::Constant(cst) => {
@@ -553,7 +552,7 @@ impl FlattenedModule {
             decl_to_flat_map: module.declarations.iter().map(|_| None).collect(),
             instantiations: &mut instantiations,
             errors: ErrorCollector::new(module.link_info.file),
-            is_remote_declaration : None,
+            is_remote_declaration : false,
             linker : GlobalResolver::new(linker, module.link_info.file, &resolved_globals),
             module,
         };
@@ -742,7 +741,7 @@ impl FlattenedModule {
         for (id, inst) in &self.instantiations {
             if !is_instance_used_map[id] {
                 if let Instantiation::WireDeclaration(decl) = inst {
-                    if decl.is_remote_declaration.is_none() {
+                    if !decl.is_remote_declaration {
                         self.errors.warn_basic(Span::from(decl.name_token), "Unused Variable: This variable does not affect the output ports of this module");
                     }
                 }

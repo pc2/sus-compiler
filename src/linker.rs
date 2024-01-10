@@ -495,8 +495,8 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
         GlobalResolver{linker : self.linker, file : &self.linker.files[file_id], resolved_globals : self.resolved_globals}
     }
 
-    pub fn resolve_global(&self, name : Span) -> Option<NamedUUID> {
-        let name = self.file.get_token_text(name.assert_is_single_token());
+    pub fn resolve_global(&self, name_span : Span, errors : &ErrorCollector) -> Option<NamedUUID> {
+        let name = self.file.get_token_text(name_span.assert_is_single_token());
 
         let mut resolved_globals = self.resolved_globals.borrow_mut();
         if let Some(found) = self.linker.links.global_namespace.get(name) {
@@ -504,6 +504,9 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
             Some(*found)
         } else {
             resolved_globals.all_resolved = false;
+
+            errors.error_basic(name_span, format!("No Value or Type of the name '{name}' was found. Did you forget to import it?"));
+
             None
         }
     }
@@ -520,75 +523,66 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
         }
     }
 
-    pub fn try_get_constant(&self, GlobalReference(identifier_span, ref_uuid) : GlobalReference, errors : &ErrorCollector) -> Option<Value> {
-        if let Some(uuid) = ref_uuid {
-            match &self.linker.links.globals[uuid] {
-                Named::Constant(NamedConstant::Builtin(_name, v)) => {
-                    Some(v.clone())
-                },
-                other => {
-                    let info = other.get_linking_error_location();
-                    let infos = if let Some((file, span)) = info.location {
-                        vec![error_info(span, file, "Defined here")]
-                    } else {
-                        vec![]
-                    };
-                    let name = info.name;
-                    let ident_type = info.named_type;
-                    errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a Constant!"), infos);
-                    None
-                }
+    pub fn try_get_constant(&self, identifier_span : Span, errors : &ErrorCollector) -> Option<Value> {
+        let uuid = self.resolve_global(identifier_span, errors)?;
+        match &self.linker.links.globals[uuid] {
+            Named::Constant(NamedConstant::Builtin(_name, v)) => {
+                Some(v.clone())
+            },
+            other => {
+                let info = other.get_linking_error_location();
+                let infos = if let Some((file, span)) = info.location {
+                    vec![error_info(span, file, "Defined here")]
+                } else {
+                    vec![]
+                };
+                let name = info.name;
+                let ident_type = info.named_type;
+                errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a Constant!"), infos);
+                None
             }
-        } else {
-            None
         }
     }
 
-    pub fn try_get_type(&self, GlobalReference(identifier_span, ref_uuid) : GlobalReference, errors : &ErrorCollector) -> Option<NamedUUID> {
-        if let Some(uuid) = ref_uuid {
-            match &self.linker.links.globals[uuid] {
-                Named::Type(_t) => {
-                    Some(uuid)
-                },
-                other => {
-                    let info = other.get_linking_error_location();
-                    let infos = if let Some((file, span)) = info.location {
-                        vec![error_info(span, file, "Defined here")]
-                    } else {
-                        vec![]
-                    };
-                    let name = info.name;
-                    let ident_type = info.named_type;
-                    errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a Type!"), infos);
-                    None
-                }
+    pub fn try_get_type(&self, identifier_span : Span, errors : &ErrorCollector) -> Option<NamedUUID> {
+        let uuid = self.resolve_global(identifier_span, errors)?;
+        match &self.linker.links.globals[uuid] {
+            Named::Type(_t) => {
+                Some(uuid)
+            },
+            other => {
+                let info = other.get_linking_error_location();
+                let infos = if let Some((file, span)) = info.location {
+                    vec![error_info(span, file, "Defined here")]
+                } else {
+                    vec![]
+                };
+                let name = info.name;
+                let ident_type = info.named_type;
+                errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a Type!"), infos);
+                None
             }
-        } else {
-            None
         }
     }
 
-    pub fn try_get_module(&self, GlobalReference(identifier_span, ref_uuid) : GlobalReference, errors : &ErrorCollector) -> Option<&'linker Module> {
-        if let Some(uuid) = ref_uuid {
-            match &self.linker.links.globals[uuid] {
-                Named::Module(md) => {
-                    Some(md)
-                },
-                other => {
-                    let info = other.get_linking_error_location();
-                    let infos = if let Some((file, span)) = info.location {
-                        vec![error_info(span, file, "Defined here")]
-                    } else {
-                        vec![]
-                    };
-                    let name = info.name;
-                    let ident_type = info.named_type;
-                    errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a Module!"), infos);
-                    None
-                }
+    pub fn try_get_module(&self, identifier_span : Span, errors : &ErrorCollector) -> Option<&'linker Module> {
+        let uuid = self.resolve_global(identifier_span, errors)?;
+        match &self.linker.links.globals[uuid] {
+            Named::Module(md) => {
+                Some(md)
+            },
+            other => {
+                let info = other.get_linking_error_location();
+                let infos = if let Some((file, span)) = info.location {
+                    vec![error_info(span, file, "Defined here")]
+                } else {
+                    vec![]
+                };
+                let name = info.name;
+                let ident_type = info.named_type;
+                errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a Module!"), infos);
+                None
             }
-        } else {
-            None
         }
     }
 }

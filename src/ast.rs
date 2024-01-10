@@ -56,13 +56,13 @@ impl From<usize> for Span {
 #[derive(Debug, Clone, Copy)]
 pub enum LocalOrGlobal {
     Local(DeclID),
-    Global(usize)
+    Global(Span)
 }
 
 
 #[derive(Debug, Clone)]
 pub enum TypeExpression {
-    Named(usize), // position in referenced globals list
+    Named, // SpanTypeExpression Span gives name
     Array(Box<(SpanTypeExpression, SpanExpression)>)
 }
 

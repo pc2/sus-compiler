@@ -123,17 +123,17 @@ fn walk_name_color(all_objects : &[NamedUUID], links : &Links, result : &mut [ID
                         Instantiation::Wire(w) => {
                             if let &WireSource::WireRead{from_wire} = &w.source {
                                 let decl = module.flattened.instantiations[from_wire].extract_wire_declaration();
-                                if decl.is_remote_declaration.is_some() {continue;} // Virtual wires don't appear in this program text
+                                if decl.is_remote_declaration {continue;} // Virtual wires don't appear in this program text
                                 result[w.span.assert_is_single_token()].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                             }
                         }
                         Instantiation::WireDeclaration(decl) => {
-                            if decl.is_remote_declaration.is_some() {continue;} // Virtual wires don't appear in this program text
+                            if decl.is_remote_declaration {continue;} // Virtual wires don't appear in this program text
                             result[decl.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                         }
                         Instantiation::Connection(conn) => {
                             let decl = module.flattened.instantiations[conn.to.root].extract_wire_declaration();
-                            if decl.is_remote_declaration.is_some() {continue;} // Virtual wires don't appear in this program text
+                            if decl.is_remote_declaration {continue;} // Virtual wires don't appear in this program text
                             result[conn.to.span.0].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                         }
                         Instantiation::SubModule(_) | Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => {}
