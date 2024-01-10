@@ -1,7 +1,7 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{ast::*, tokenizer::*, parser::*, linker::{PreLinker, FileData, Links, NamedUUID, Named, Linkable, Linker, FileUUIDMarker, FileUUID}, arena_alloc::ArenaVector, flattening::{Instantiation, WireSource}};
+use crate::{ast::*, tokenizer::*, parser::*, linker::{FileData, Links, NamedUUID, Named, Linkable, Linker, FileUUIDMarker, FileUUID}, arena_alloc::ArenaVector, flattening::{Instantiation, WireSource}};
 
 use ariadne::FileCache;
 use console::Style;
@@ -226,10 +226,10 @@ fn generate_character_offsets(file_text : &str, tokens : &[Token]) -> Vec<Range<
 }
 
 pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<PathBuf, FileUUIDMarker>) {
-    let mut prelinker : PreLinker = PreLinker::new();
+    let mut linker = Linker::new();
     let mut paths_arena = ArenaVector::new();
     for file_path in file_paths {
-        let uuid = prelinker.reserve_file();
+        let uuid = linker.reserve_file();
         let file_text = match std::fs::read_to_string(&file_path) {
             Ok(file_text) => file_text,
             Err(reason) => {
@@ -242,11 +242,9 @@ pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<PathBuf, F
         
         println!("{:?}", full_parse.ast);
 
-        prelinker.add_reserved_file(uuid, full_parse);
+        linker.add_reserved_file(uuid, full_parse);
         paths_arena.insert(uuid, file_path);
     }
-
-    let mut linker = prelinker.link();
 
     linker.recompile_all();
     

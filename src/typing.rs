@@ -30,14 +30,6 @@ impl Type {
             Type::Array(sub) => sub.deref().0.to_string(linker) + "[]",
         }
     }
-    pub fn get_root(&self) -> Option<NamedUUID> {
-        match self {
-            Type::Error => None,
-            Type::Unknown => None,
-            Type::Named(name) => Some(*name),
-            Type::Array(sub) => sub.0.get_root(),
-        }
-    }
     pub fn for_each_generative_input<F : FnMut(FlatID)>(&self, f : &mut F) {
         match self {
             Type::Error => {}

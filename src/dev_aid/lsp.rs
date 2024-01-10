@@ -6,7 +6,7 @@ use lsp_server::{Response, Message, Connection};
 
 use lsp_types::notification::Notification;
 
-use crate::{parser::perform_full_semantic_parse, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::{ErrorCollector, CompileError, ErrorLevel}, linker::{PreLinker, FileUUIDMarker, Linker, FileUUID, FileData, Links}, arena_alloc::ArenaVector};
+use crate::{parser::perform_full_semantic_parse, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::{ErrorCollector, CompileError, ErrorLevel}, linker::{FileUUIDMarker, Linker, FileUUID, FileData, Links}, arena_alloc::ArenaVector};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -299,8 +299,7 @@ fn main_loop(
     params: serde_json::Value,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
 
-    let prelinker = PreLinker::new();
-    let mut file_cache = LoadedFileCache::new(prelinker.link(), ArenaVector::new());
+    let mut file_cache = LoadedFileCache::new(Linker::new(), ArenaVector::new());
 
     let _params: InitializeParams = serde_json::from_value(params).unwrap();
     println!("starting LSP main loop");

@@ -488,7 +488,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     if_stmt.else_end = else_end;
                 }
                 Statement::For{var : decl_id, range, code} => {
-                    let loop_var_decl = self.flatten_declaration::<false>(*decl_id, false);
+                    let loop_var_decl = self.flatten_declaration::<false>(*decl_id, true);
 
                     let start = self.flatten_expr(&range.from);
                     let end = self.flatten_expr(&range.to);

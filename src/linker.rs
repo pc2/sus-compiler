@@ -253,43 +253,6 @@ impl IndexMut<NamedUUID> for Links {
     }
 }
 
-// This is a class that efficiently collects all files when initially starting, and links them together once all are present. 
-// Converts to a proper Linker using self.link()
-pub struct PreLinker {
-    links : Links,
-    files : ArenaAllocator<FileData, FileUUIDMarker>
-}
-
-impl PreLinker {
-    pub fn new() -> PreLinker {
-        PreLinker { links: Links::new(), files: ArenaAllocator::new() }
-    }
-    pub fn reserve_file(&mut self) -> FileUUID {
-        self.files.reserve()
-    }
-    pub fn add_reserved_file(&mut self, file : FileUUID, parse_result : FullParseResult) {
-        let mut associated_values = Vec::new();
-        for md in parse_result.ast.modules {
-            let module_name = md.link_info.name.clone();
-            let new_module_uuid = self.links.globals.alloc(Named::Module(md));
-            associated_values.push(new_module_uuid);
-            self.links.add_name(module_name, new_module_uuid);
-        }
-        self.files.alloc_reservation(file, FileData{file_text : parse_result.file_text, tokens: parse_result.tokens, token_hierarchy: parse_result.token_hierarchy, parsing_errors : parse_result.ast.errors, associated_values});
-    }
-
-    // This should be called once all modules have been added. Adds errors for globals it couldn't match
-    pub fn link(mut self) -> Linker {
-        for (_file_uuid, file) in &self.files {
-            for val_in_file in &file.associated_values {
-                let link_info = self.links.globals[*val_in_file].get_link_info_mut().unwrap();
-                Links::resolve_dependencies(&self.links.global_namespace, &file, link_info);
-            }
-        }
-        Linker{links: self.links, files : self.files}
-    }
-}
-
 fn add_error(info_a: &LinkInfo, info_b: &LinkInfo, errors: &ErrorCollector) {
     let this_object_name = &info_a.name;
     errors.error_with_info(info_a.name_span, format!("Conflicting Declaration for the name '{this_object_name}'"), vec![
@@ -298,6 +261,9 @@ fn add_error(info_a: &LinkInfo, info_b: &LinkInfo, errors: &ErrorCollector) {
 }
 
 impl Linker {
+    pub fn new() -> Linker {
+        Linker{files : ArenaAllocator::new(), links : Links::new()}
+    }
     fn get_linking_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
         let file = &self.files[file_uuid];
 
