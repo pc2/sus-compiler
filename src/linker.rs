@@ -23,10 +23,16 @@ const BUILTIN_CONSTANTS : [(&'static str, Value); 2] = [
 ];
 
 // Goes together with Links::new
-pub const fn get_builtin_uuid(name : &'static str) -> NamedUUID {
+pub const fn get_builtin_type(name : &'static str) -> NamedUUID {
     if let Some(is_type) = const_str_position(name, &BUILTIN_TYPES) {
         NamedUUID::from_hidden_value(is_type)
-    } else if let Some(is_constant) = const_str_position_in_tuples(name, &BUILTIN_CONSTANTS) {
+    } else {
+        unreachable!()
+    }
+}
+
+pub const fn get_builtin_constant(name : &'static str) -> NamedUUID {
+    if let Some(is_constant) = const_str_position_in_tuples(name, &BUILTIN_CONSTANTS) {
         NamedUUID::from_hidden_value(is_constant + BUILTIN_TYPES.len())
     } else {
         unreachable!()
@@ -365,8 +371,7 @@ impl Linker {
     }
 
     pub fn recompile_all(&mut self) {
-        // First create initial flattening for everything, to produce the necessary interfaces
-
+        // Flatten all modules
         let module_ids : Vec<NamedUUID> = self.links.globals.iter().filter_map(|(id,v)| {
             if let Named::Module(_) = v {
                 Some(id)

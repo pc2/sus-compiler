@@ -1,11 +1,11 @@
 use std::{iter::zip, ops::Deref};
 
-use crate::{ast::{Module, IdentifierType}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{NamedUUID, get_builtin_uuid}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::Instantiation, value::Value};
+use crate::{ast::{Module, IdentifierType}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{NamedUUID, get_builtin_type}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::Instantiation, value::Value};
 
 fn get_type_name_size(id : NamedUUID) -> u64 {
-    if id == get_builtin_uuid("int") {
+    if id == get_builtin_type("int") {
         32 // TODO concrete int sizes
-    } else if id == get_builtin_uuid("bool") {
+    } else if id == get_builtin_type("bool") {
         1 // TODO concrete int sizes
     } else {
         println!("TODO Named Structs Size");

@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use num::BigInt;
 
-use crate::{typing::{Type, ConcreteType, BOOL_TYPE, INT_TYPE}, linker::get_builtin_uuid, ast::Operator, tokenizer::kw};
+use crate::{typing::{Type, ConcreteType, BOOL_TYPE, INT_TYPE, INT_CONCRETE_TYPE, BOOL_CONCRETE_TYPE}, ast::Operator, tokenizer::kw};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum Value {
@@ -33,8 +33,8 @@ impl Value {
     }
     pub fn is_of_type(&self, typ : &ConcreteType) -> bool {
         match (self, typ) {
-            (Self::Integer(_), ConcreteType::Named(name)) if *name == get_builtin_uuid("int") => true,
-            (Self::Bool(_), ConcreteType::Named(name)) if *name == get_builtin_uuid("bool") => true,
+            (Self::Integer(_), typ) if *typ == INT_CONCRETE_TYPE => true,
+            (Self::Bool(_), typ) if *typ == BOOL_CONCRETE_TYPE => true,
             (Self::Array(arr_slice), ConcreteType::Array(arr_typ_box)) => {
                 let (arr_content_typ, arr_size_typ) = arr_typ_box.deref();
                 if arr_slice.len() != *arr_size_typ as usize {

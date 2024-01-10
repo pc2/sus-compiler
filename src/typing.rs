@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{ast::{Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector, value::Value};
+use crate::{ast::{Operator, Span}, linker::{get_builtin_type, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector, value::Value};
 
 // Types contain everything that cannot be expressed at runtime
 #[derive(Debug, Clone)]
@@ -65,10 +65,10 @@ impl Type {
 }
 
 
-pub const BOOL_TYPE : Type = Type::Named{id : get_builtin_uuid("bool"), span : None};
-pub const INT_TYPE : Type = Type::Named{id : get_builtin_uuid("int"), span : None};
-pub const BOOL_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_uuid("bool"));
-pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_uuid("int"));
+pub const BOOL_TYPE : Type = Type::Named{id : get_builtin_type("bool"), span : None};
+pub const INT_TYPE : Type = Type::Named{id : get_builtin_type("int"), span : None};
+pub const BOOL_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("bool"));
+pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("int"));
 
 pub fn typecheck_unary_operator(op : Operator, input_typ : &Type, span : Span, linker : &Linker, errors : &ErrorCollector) -> Type {
     if op.op_typ == kw("!") {
