@@ -2,7 +2,7 @@ use std::{rc::Rc, ops::Deref, cell::RefCell};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, ast::{Operator, IdentifierType, Span}, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed, FlattenedModule, FlatIDRange}, errors::ErrorCollector, linker::Linker, value::{Value, compute_unary_op, compute_binary_op}, tokenizer::kw};
+use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, ast::{Operator, IdentifierType, Span}, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed, FlattenedModule, FlatIDRange}, errors::ErrorCollector, linker::{Linker, NamedConstant, Named}, value::{Value, compute_unary_op, compute_binary_op}, tokenizer::kw};
 
 pub mod latency;
 
@@ -183,8 +183,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn concretize_type(&self, typ : &Type, span : Span) -> Option<ConcreteType> {
         match typ {
             Type::Error | Type::Unknown => unreachable!("Bad types should be caught in flattening: {}", typ.to_string(self.linker)),
-            Type::Named(n) => {
-                Some(ConcreteType::Named(*n))
+            Type::Named{id, span : _} => {
+                Some(ConcreteType::Named(*id))
             }
             Type::Array(arr_box) => {
                 let (arr_content_typ, arr_size_wire) = arr_box.deref();
@@ -278,7 +278,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
     fn compute_compile_time(&self, wire_inst : &WireSource) -> Option<Value> {
         Some(match wire_inst {
-            &WireSource::WireRead{from_wire} => {
+            &WireSource::WireRead(from_wire) => {
                 self.get_generation_value(from_wire)?.clone()
             }
             &WireSource::UnaryOp{op, right} => {
@@ -302,7 +302,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     return None
                 }
             }
-            WireSource::Constant{value} => value.clone()
+            WireSource::Constant(value) => value.clone(),
+            WireSource::NamedConstant(id) => {
+                let Named::Constant(NamedConstant::Builtin{name:_, typ:_, val}) = &self.linker.links[*id] else {unreachable!()};
+                val.clone()
+            }
         })
     }
     fn get_unique_name(&self) -> Box<str> {
@@ -324,7 +328,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
     fn wire_to_real_wire(&mut self, w: &WireInstance, typ : ConcreteType, original_wire : FlatID) -> Option<WireID> {
         let source = match &w.source {
-            &WireSource::WireRead{from_wire} => {
+            &WireSource::WireRead(from_wire) => {
                 /*Assert*/ self.flattened.instantiations[from_wire].extract_wire_declaration(); // WireReads must point to a NamedWire!
                 return Some(self.generation_state[from_wire].extract_wire())
             }
@@ -352,7 +356,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     }
                 }
             }
-            WireSource::Constant{value: _} => {
+            WireSource::Constant(_) | WireSource::NamedConstant(_) => {
                 unreachable!("Constant cannot be non-compile-time");
             }
         };

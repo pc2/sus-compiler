@@ -103,61 +103,59 @@ fn add_ide_bracket_depths_recursive<'a>(result : &mut [IDEToken], current_depth 
     }
 }
 
-impl Named {
-    fn get_ide_type(&self) -> IDEIdentifierType{
-        match self {
-            Named::Module(_) => IDEIdentifierType::Interface,
-            Named::Constant(_) => IDEIdentifierType::Constant,
-            Named::Type(_) => IDEIdentifierType::Type,
-        }
+fn set_span_name_color(span : Span, typ : IDEIdentifierType, result : &mut [IDEToken]) {
+    for tok_idx in span {
+        result[tok_idx].typ = IDETokenType::Identifier(typ);
     }
 }
-
 fn walk_name_color(all_objects : &[NamedUUID], links : &Links, result : &mut [IDEToken]) {
     for obj_uuid in all_objects {
         let object = &links.globals[*obj_uuid];
-        match object {
+        let ide_typ = match object {
             Named::Module(module) => {
                 for (_id, item) in &module.flattened.instantiations {
                     match item {
                         Instantiation::Wire(w) => {
-                            if let &WireSource::WireRead{from_wire} = &w.source {
-                                let decl = module.flattened.instantiations[from_wire].extract_wire_declaration();
-                                if decl.is_remote_declaration {continue;} // Virtual wires don't appear in this program text
-                                result[w.span.assert_is_single_token()].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
+                            match &w.source {
+                                &WireSource::WireRead(from_wire) => {
+                                    let decl = module.flattened.instantiations[from_wire].extract_wire_declaration();
+                                    if decl.is_remote_declaration {continue;} // Virtual wires don't appear in this program text
+                                    result[w.span.assert_is_single_token()].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
+                                }
+                                WireSource::UnaryOp { op:_, right:_ } => {}
+                                WireSource::BinaryOp { op:_, left:_, right:_ } => {}
+                                WireSource::ArrayAccess { arr:_, arr_idx:_ } => {}
+                                WireSource::Constant(_) => {}
+                                WireSource::NamedConstant(_name) => {
+                                    set_span_name_color(w.span, IDEIdentifierType::Constant, result);
+                                }
                             }
                         }
                         Instantiation::WireDeclaration(decl) => {
                             if decl.is_remote_declaration {continue;} // Virtual wires don't appear in this program text
                             result[decl.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
+                            decl.typ.for_each_located_type(&mut |_, span| {
+                                set_span_name_color(span, IDEIdentifierType::Type, result);
+                            });
                         }
                         Instantiation::Connection(conn) => {
                             let decl = module.flattened.instantiations[conn.to.root].extract_wire_declaration();
                             if decl.is_remote_declaration {continue;} // Virtual wires don't appear in this program text
                             result[conn.to.span.0].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                         }
-                        Instantiation::SubModule(_) | Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => {}
+                        Instantiation::SubModule(sm) => {
+                            set_span_name_color(sm.typ_span, IDEIdentifierType::Interface, result);
+                        }
+                        Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => {}
                     }
                 }
+                IDEIdentifierType::Interface
             }
-            _other => {}
-        }
+            _other => {todo!("Name Color for non-modules not implemented")}
+        };
         
         let link_info = object.get_link_info().unwrap();
-        let ide_typ = object.get_ide_type();
-        for name_part in link_info.name_span {
-            result[name_part].typ = IDETokenType::Identifier(ide_typ);
-        }
-        for GlobalReference(reference_span, ref_uuid) in &link_info.global_references {
-            let typ = if let Some(id) = ref_uuid {
-                IDETokenType::Identifier(links.globals[*id].get_ide_type())
-            } else {
-                IDETokenType::Invalid
-            };
-            for part_tok in *reference_span {
-                result[part_tok].typ = typ;
-            }
-        }
+        set_span_name_color(link_info.name_span, ide_typ, result);
     }
 }
 

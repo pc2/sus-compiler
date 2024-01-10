@@ -1,6 +1,6 @@
 
 
-use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::{NamedUUID, FileUUID}, flattening::FlattenedModule, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList, value::Value, errors::ErrorCollector};
+use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::FileUUID, flattening::FlattenedModule, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList, value::Value, errors::ErrorCollector};
 use core::ops::Range;
 use std::fmt::Display;
 
@@ -146,9 +146,7 @@ pub struct LinkInfo {
     pub file : FileUUID,
     pub name : Box<str>,
     pub name_span : Span,
-    pub span : Span,
-    pub global_references : Vec<GlobalReference>,
-    pub is_fully_linked : bool // Caches if self.global_references contains any INVALID references. 
+    pub span : Span
 }
 
 #[derive(Debug)]
@@ -179,9 +177,6 @@ impl Module {
         }
     }
 }
-
-#[derive(Debug,Clone,Copy)]
-pub struct GlobalReference(pub Span, pub Option<NamedUUID>); // token index, and name span
 
 #[derive(Debug)]
 pub struct ASTRoot {

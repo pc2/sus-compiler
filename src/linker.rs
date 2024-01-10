@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}, rc::Rc, cell::RefCell};
 
-use crate::{ast::{Module, LinkInfo, Span, GlobalReference}, arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::FlattenedModule, util::{const_str_position, const_str_position_in_tuples}, instantiation::InstantiatedModule, value::Value};
+use crate::{ast::{Module, LinkInfo, Span}, arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::FlattenedModule, util::{const_str_position, const_str_position_in_tuples}, instantiation::InstantiatedModule, value::Value, typing::Type};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NamedUUIDMarker;
@@ -51,7 +51,7 @@ pub trait Linkable {
 
 #[derive(Debug)]
 pub enum NamedConstant {
-    Builtin(&'static str, Value)
+    Builtin{name : &'static str, typ : Type, val : Value}
 }
 
 #[derive(Debug)]
@@ -69,22 +69,22 @@ pub enum Named {
 impl Linkable for NamedConstant {
     fn get_name(&self) -> &'static str {
         match self {
-            NamedConstant::Builtin(name, _) => name
+            NamedConstant::Builtin{name, typ:_, val:_} => name
         }
     }
     fn get_linking_error_location<'a>(&'a self) -> LinkingErrorLocation<'a> {
         match self {
-            NamedConstant::Builtin(name, _) => LinkingErrorLocation { named_type: "Builtin Constant", name, location: None }
+            NamedConstant::Builtin{name, typ:_, val:_} => LinkingErrorLocation { named_type: "Builtin Constant", name, location: None }
         }
     }
     fn get_link_info(&self) -> Option<&LinkInfo> {
         match self {
-            NamedConstant::Builtin(_, _) => None
+            NamedConstant::Builtin{name:_, typ:_, val:_} => None
         }
     }
     fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo> {
         match self {
-            NamedConstant::Builtin(_, _) => None
+            NamedConstant::Builtin{name:_, typ:_, val:_} => None
         }
     }
 }
@@ -163,9 +163,6 @@ impl FileData {
     fn get_token_text(&self, token_idx : usize) -> &str {
         &self.file_text[self.tokens[token_idx].get_range()]
     }
-    fn get_span_text(&self, token_span : Span) -> &str {
-        &self.file_text[self.tokens[token_span.0].get_range().start .. self.tokens[token_span.1].get_range().end]
-    }
 }
 
 // All modules in the workspace
@@ -203,29 +200,12 @@ impl Links {
             assert!(already_exisits.is_none());
         }
         for (name, val) in BUILTIN_CONSTANTS {
-            let id = globals.alloc(Named::Constant(NamedConstant::Builtin(name, val)));
+            let id = globals.alloc(Named::Constant(NamedConstant::Builtin{name, typ : val.get_type_of_constant(), val}));
             let already_exisits = global_namespace.insert(name.into(), id);
             assert!(already_exisits.is_none());
         }
 
         Links{globals, name_colissions : Vec::new(), global_namespace}
-    }
-
-    fn resolve_dependencies(namespace : &HashMap<Box<str>, NamedUUID>, file : &FileData, link_info : &mut LinkInfo) {
-        let mut all_resolved = true;
-        for GlobalReference(reference_span, uuid) in &mut link_info.global_references {
-            if uuid.is_none() {
-                let reference_name_str = file.get_span_text(*reference_span);
-
-                *uuid = if let Some(found) = namespace.get(reference_name_str) {
-                    Some(*found)
-                } else {
-                    all_resolved = false;
-                    None
-                }
-            }
-        }
-        link_info.is_fully_linked = all_resolved;
     }
 
     fn add_name(&mut self, module_name: Box<str>, new_module_uuid: UUID<NamedUUIDMarker>) {
@@ -264,9 +244,7 @@ impl Linker {
     pub fn new() -> Linker {
         Linker{files : ArenaAllocator::new(), links : Links::new()}
     }
-    fn get_linking_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
-        let file = &self.files[file_uuid];
-
+    fn get_duplicate_declaration_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
         // Conflicting Declarations
         for colission in &self.links.name_colissions {
             let info_0 = self.links.globals[colission.0].get_link_info().unwrap(); // Is always valid because colission.0 is 'the thing that conflicts with'
@@ -288,21 +266,6 @@ impl Linker {
                 }
             }
         }
-        
-        // References not found
-        for val_uuid in &self.files[file_uuid].associated_values {
-            let object = &self.links.globals[*val_uuid];
-            let object_link_info = object.get_link_info().unwrap(); // Always valid because it's part of file
-            if object_link_info.is_fully_linked {
-                continue; // Early exit because we know this object contains no linking errors
-            }
-            for GlobalReference(reference_span, ref_uuid) in &object_link_info.global_references {
-                if ref_uuid.is_none() {
-                    let reference_text = file.get_span_text(*reference_span);
-                    errors.error_basic(*reference_span, format!("No Value or Type of the name '{reference_text}' was found. Did you forget to import it?"));
-                }
-            }
-        }
     }
 
     fn get_flattening_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
@@ -315,7 +278,7 @@ impl Linker {
     }
 
     pub fn get_all_errors_in_file(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
-        self.get_linking_errors(file_uuid, errors);
+        self.get_duplicate_declaration_errors(file_uuid, errors);
         self.get_flattening_errors(file_uuid, errors);
     }
 
@@ -328,20 +291,6 @@ impl Linker {
             for v in &self.files[*file].associated_values {
                 back_reference_set.insert(v);
                 self.links.globals.free(*v);
-            }
-        }
-
-        // Remove resolved globals
-        for (_uuid, v) in &mut self.links.globals {
-            if let Some(info) = v.get_link_info_mut() { // Builtins can't refer to other things
-                for GlobalReference(_name, v) in &mut info.global_references {
-                    if let Some(v_id) = *v {
-                        if back_reference_set.contains(&v_id) {
-                            *v = None;
-                            info.is_fully_linked = false;
-                        }
-                    }
-                }
             }
         }
 
@@ -407,15 +356,6 @@ impl Linker {
             self.links.add_name(module_name, new_module_uuid);
         }
         self.files.alloc_reservation(file, FileData { file_text : parse_result.file_text, tokens: parse_result.tokens, token_hierarchy: parse_result.token_hierarchy, parsing_errors : parse_result.ast.errors, associated_values});
-
-        for (_uuid, val_in_file) in &mut self.links.globals {
-            if let Some(link_info) = val_in_file.get_link_info_mut() {
-                if link_info.is_fully_linked {
-                    continue; // Early continue, because we know this object is already fully linked
-                }
-                Links::resolve_dependencies(&self.links.global_namespace, &self.files[link_info.file], link_info);
-            }
-        }
     }
 
     pub fn relink(&mut self, file : FileUUID, parse_result : FullParseResult) {
@@ -439,7 +379,7 @@ impl Linker {
 
             println!("Flattening {}", md.link_info.name);
 
-            let mut flattened = FlattenedModule::initialize(&self, md, !md.link_info.is_fully_linked);
+            let mut flattened = FlattenedModule::initialize(&self, md);
             println!("Typechecking {}", &md.link_info.name);
             flattened.typecheck(self);
             flattened.find_unused_variables();
@@ -523,11 +463,11 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
         }
     }
 
-    pub fn try_get_constant(&self, identifier_span : Span, errors : &ErrorCollector) -> Option<Value> {
+    pub fn try_get_constant(&self, identifier_span : Span, errors : &ErrorCollector) -> Option<NamedUUID> {
         let uuid = self.resolve_global(identifier_span, errors)?;
         match &self.linker.links.globals[uuid] {
-            Named::Constant(NamedConstant::Builtin(_name, v)) => {
-                Some(v.clone())
+            Named::Constant(NamedConstant::Builtin{name:_, typ:_, val:_}) => {
+                Some(uuid)
             },
             other => {
                 let info = other.get_linking_error_location();

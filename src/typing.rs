@@ -7,7 +7,7 @@ use crate::{ast::{Operator, Span}, linker::{get_builtin_uuid, NamedUUID, Linker,
 pub enum Type {
     Error,
     Unknown,
-    Named(NamedUUID),
+    Named{id : NamedUUID, span : Option<Span>},
     /*Contains a wireID pointing to a constant expression for the array size, 
     but doesn't actually take size into account for type checking as that would
     make type checking too difficult. Instead delay until proper instantiation
@@ -24,8 +24,8 @@ impl Type {
             Type::Unknown => {
                 "{unknown}".to_owned()
             }
-            Type::Named(n) => {
-                linker.links[*n].get_full_name()
+            Type::Named{id, span:_} => {
+                linker.links[*id].get_full_name()
             }
             Type::Array(sub) => sub.deref().0.to_string(linker) + "[]",
         }
@@ -34,7 +34,7 @@ impl Type {
         match self {
             Type::Error => {}
             Type::Unknown => {}
-            Type::Named(_) => {}
+            Type::Named{id : _, span : _} => {}
             Type::Array(arr_box) => {
                 f(arr_box.deref().1)
             }
@@ -44,17 +44,29 @@ impl Type {
         match self {
             Type::Error => CHECK_ERROR,
             Type::Unknown => CHECK_UNKNOWN,
-            Type::Named(_) => false,
+            Type::Named{id : _, span : _} => false,
             Type::Array(arr_box) => {
                 arr_box.deref().0.contains_error_or_unknown::<CHECK_ERROR, CHECK_UNKNOWN>()
+            }
+        }
+    }
+    pub fn for_each_located_type<F : FnMut(NamedUUID, Span)>(&self, f : &mut F) {
+        match self {
+            Type::Error => {}
+            Type::Unknown => {}
+            Type::Named { id, span: Some(span) } => {f(*id, *span)}
+            Type::Named { id: _, span: None } => {}
+            Type::Array(arr_box) => {
+                let (arr, _idx) = arr_box.deref();
+                arr.for_each_located_type(f);
             }
         }
     }
 }
 
 
-pub const BOOL_TYPE : Type = Type::Named(get_builtin_uuid("bool"));
-pub const INT_TYPE : Type = Type::Named(get_builtin_uuid("int"));
+pub const BOOL_TYPE : Type = Type::Named{id : get_builtin_uuid("bool"), span : None};
+pub const INT_TYPE : Type = Type::Named{id : get_builtin_uuid("int"), span : None};
 pub const BOOL_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_uuid("bool"));
 pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_uuid("int"));
 
@@ -102,7 +114,7 @@ pub fn get_binary_operator_types(op : Operator) -> ((Type, Type), Type) {
 
 fn type_compare(expected : &Type, found : &Type) -> bool {
     match (expected, found) {
-        (Type::Named(exp), Type::Named(fnd)) => exp == fnd,
+        (Type::Named{id : exp, span : _}, Type::Named{id : fnd, span : _}) => exp == fnd,
         (Type::Array(exp), Type::Array(fnd)) => {
             type_compare(&exp.deref().0, &fnd.deref().0)
         }

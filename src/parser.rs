@@ -6,8 +6,6 @@ use crate::{tokenizer::*, errors::*, ast::*, linker::FileUUID, flattening::Flatt
 use std::{iter::Peekable, str::FromStr, ops::Range};
 use core::slice::Iter;
 
-use std::mem::replace;
-
 #[derive(Clone)]
 struct TokenContent {
     position : usize,
@@ -213,13 +211,7 @@ impl<'it> TokenStream<'it> {
 struct ASTParserContext<'file> {
     errors : ErrorCollector,
     file_text : &'file str,
-    declarations : FlatAlloc<SignalDeclaration, DeclIDMarker>,
-
-    global_references : Vec<GlobalReference>
-}
-
-struct ASTParserRollbackable {
-    original_global_references_size : usize
+    declarations : FlatAlloc<SignalDeclaration, DeclIDMarker>
 }
 
 struct LeftExpression {
@@ -228,14 +220,6 @@ struct LeftExpression {
 }
 
 impl<'file> ASTParserContext<'file> {
-    fn prepare_rollback(&self) -> ASTParserRollbackable {
-        ASTParserRollbackable{original_global_references_size : self.global_references.len()}
-    }
-
-    fn rollback(&mut self, rollback_store : ASTParserRollbackable) {
-        self.global_references.truncate(rollback_store.original_global_references_size);
-    }
-    
     fn error_unexpected_token(&mut self, expected : &[TokenTypeIdx], found : TokenTypeIdx, pos : usize, context : &str) {
         let expected_list_str = join_expected_list(expected);
         self.error_unexpected_token_str(&expected_list_str, found, pos, context);
@@ -532,14 +516,12 @@ impl<'file> ASTParserContext<'file> {
 
             let mut tok_stream_copy = token_stream.clone();
             
-            let rollback_ctx = self.prepare_rollback();
             if let Some((name, span)) = self.try_parse_declaration(&mut tok_stream_copy, scope) {
                 // Maybe it's a declaration?
                 *token_stream = tok_stream_copy;
                 left_expressions.push(LeftExpression{expr : (Expression::Named(LocalOrGlobal::Local(name)), span), num_regs});
                 code_block.statements.push((Statement::Declaration(name), span));
             } else {
-                self.rollback(rollback_ctx);
                 if let Some(expr) = self.parse_expression(token_stream, scope) {
                     // It's an expression instead!
                     left_expressions.push(LeftExpression{expr, num_regs});
@@ -740,9 +722,7 @@ impl<'file> ASTParserContext<'file> {
             file : self.errors.file,
             name : self.file_text[name.text].into(),
             name_span : Span::from(name.position),
-            span,
-            global_references : replace(&mut self.global_references, Vec::new()),
-            is_fully_linked : false
+            span
         };
         let declarations = std::mem::replace(&mut self.declarations, FlatAlloc::new());
         Some(Module{declarations, ports, outputs_start, code, link_info, flattened : FlattenedModule::empty(self.errors.file), instantiations : InstantiationList::new()})
@@ -771,7 +751,7 @@ impl<'file> ASTParserContext<'file> {
 
 
 pub fn parse<'nums, 'g, 'file>(token_hierarchy : &Vec<TokenTreeNode>, file_text : &'file str, num_tokens : usize, errors : ErrorCollector) -> ASTRoot {
-    let context = ASTParserContext{declarations : FlatAlloc::new(), errors, file_text, global_references : Vec::new()};
+    let context = ASTParserContext{declarations : FlatAlloc::new(), errors, file_text};
     let mut token_stream = TokenStream::new(&token_hierarchy, 0, num_tokens);
     context.parse_ast(&mut token_stream)
 }

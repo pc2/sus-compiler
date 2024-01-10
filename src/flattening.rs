@@ -2,7 +2,7 @@ use std::{ops::{Deref, Range}, iter::zip, cell::RefCell};
 
 use crate::{
     ast::{Span, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, IdentifierType, TypeExpression, DeclIDMarker, DeclID, SpanTypeExpression},
-    linker::{Linker, NamedUUID, FileUUID, GlobalResolver, ResolvedGlobals},
+    linker::{Linker, NamedUUID, FileUUID, GlobalResolver, ResolvedGlobals, Named, NamedConstant},
     errors::{ErrorCollector, error_info}, arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, typing::{Type, typecheck_unary_operator, get_binary_operator_types, typecheck, typecheck_is_array_indexer, BOOL_TYPE, INT_TYPE}, value::Value
 };
 
@@ -43,21 +43,23 @@ pub struct Connection {
 
 #[derive(Debug)]
 pub enum WireSource {
-    WireRead{from_wire : FlatID}, // Used to add a span to the reference of a wire. 
+    WireRead(FlatID), // Used to add a span to the reference of a wire. 
     UnaryOp{op : Operator, right : FlatID},
     BinaryOp{op : Operator, left : FlatID, right : FlatID},
     ArrayAccess{arr : FlatID, arr_idx : FlatID},
-    Constant{value : Value},
+    Constant(Value),
+    NamedConstant(NamedUUID),
 }
 
 impl WireSource {
     pub fn for_each_input_wire<F : FnMut(FlatID)>(&self, func : &mut F) {
         match self {
-            &WireSource::WireRead { from_wire } => {func(from_wire)}
+            &WireSource::WireRead(from_wire) => {func(from_wire)}
             &WireSource::UnaryOp { op:_, right } => {func(right)}
             &WireSource::BinaryOp { op:_, left, right } => {func(left); func(right)}
             &WireSource::ArrayAccess { arr, arr_idx } => {func(arr); func(arr_idx)}
-            WireSource::Constant { value:_ } => {}
+            WireSource::Constant(_) => {}
+            &WireSource::NamedConstant(_) => {}
         }
     }
 }
@@ -193,7 +195,7 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
         match &type_expr.0 {
             TypeExpression::Named => {
                 if let Some(typ_id) = &self.linker.try_get_type(type_expr.1, &self.errors) {
-                    Type::Named(*typ_id)
+                    Type::Named{id : *typ_id, span : Some(type_expr.1)}
                 } else {
                     Type::Error
                 }
@@ -331,14 +333,14 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
             Expression::Named(LocalOrGlobal::Local(l)) => {
                 let from_wire = self.decl_to_flat_map[*l].unwrap();
                 let decl = self.instantiations[from_wire].extract_wire_declaration();
-                (decl.identifier_type == IdentifierType::Generative, WireSource::WireRead{from_wire})
+                (decl.identifier_type == IdentifierType::Generative, WireSource::WireRead(from_wire))
             }
             Expression::Named(LocalOrGlobal::Global(ref_span)) => {
                 let cst = self.linker.try_get_constant(*ref_span, &self.errors)?;
-                (true, WireSource::Constant{value : cst})
+                (true, WireSource::NamedConstant(cst))
             }
             Expression::Constant(cst) => {
-                (true, WireSource::Constant{value : cst.clone()})
+                (true, WireSource::Constant(cst.clone()))
             }
             Expression::UnaryOp(op_box) => {
                 let (op, _op_pos, operate_on) = op_box.deref();
@@ -435,7 +437,7 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
 
                         // temporary
                         let module_port_wire_decl = self.instantiations[*field].extract_wire_declaration();
-                        let module_port_proxy = self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : module_port_wire_decl.identifier_type == IdentifierType::Generative, span : *func_span, is_remote_declaration : self.is_remote_declaration, source : WireSource::WireRead { from_wire: *field }}));
+                        let module_port_proxy = self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : module_port_wire_decl.identifier_type == IdentifierType::Generative, span : *func_span, is_remote_declaration : self.is_remote_declaration, source : WireSource::WireRead(*field)}));
                         self.instantiations.alloc(Instantiation::Connection(Connection{num_regs : to_i.num_regs, from: module_port_proxy, to: write_side}));
                     }
                 },
@@ -545,7 +547,7 @@ impl FlattenedModule {
     The Generating Structure of the code is not yet executed. 
     It is template-preserving
     */
-    pub fn initialize(linker : &Linker, module : &Module, starts_with_errors : bool) -> FlattenedModule {
+    pub fn initialize(linker : &Linker, module : &Module) -> FlattenedModule {
         let mut instantiations = FlatAlloc::new();
         let resolved_globals : RefCell<ResolvedGlobals> = RefCell::new(ResolvedGlobals::new());
         let mut context = FlatteningContext{
@@ -556,7 +558,6 @@ impl FlattenedModule {
             linker : GlobalResolver::new(linker, module.link_info.file, &resolved_globals),
             module,
         };
-        context.errors.did_error.set(starts_with_errors);
 
         let interface_ports = context.initialize_interface::<false>();
         
@@ -596,7 +597,7 @@ impl FlattenedModule {
                 }
                 Instantiation::Wire(w) => {
                     let result_typ = match &w.source {
-                        &WireSource::WireRead{from_wire} => {
+                        &WireSource::WireRead(from_wire) => {
                             self.instantiations[from_wire].extract_wire_declaration().typ.clone()
                         }
                         &WireSource::UnaryOp{op, right} => {
@@ -622,8 +623,12 @@ impl FlattenedModule {
                                 Type::Error
                             }
                         }
-                        WireSource::Constant{value} => {
+                        WireSource::Constant(value) => {
                             value.get_type_of_constant()
+                        }
+                        &WireSource::NamedConstant(id) => {
+                            let Named::Constant(NamedConstant::Builtin{name:_, typ, val:_}) = &linker.links.globals[id] else {unreachable!()};
+                            typ.clone()
                         }
                     };
                     let Instantiation::Wire(w) = &mut self.instantiations[elem_id] else {unreachable!()};
