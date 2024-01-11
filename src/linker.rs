@@ -171,19 +171,16 @@ impl FileData {
     }
 }
 
+enum NamespaceElement {
+    Global(NamedUUID),
+    Colission(Box<[NamedUUID]>)
+}
+
 // Represents the fully linked set of all files. Incremental operations such as adding and removing files can be performed
 pub struct Linker {
     pub globals : ArenaAllocator<Named, NamedUUIDMarker>,
-    global_namespace : HashMap<Box<str>, NamedUUID>,
-    name_colissions : Vec<(NamedUUID, NamedUUID)>,
+    global_namespace : HashMap<Box<str>, NamespaceElement>,
     pub files : ArenaAllocator<FileData, FileUUIDMarker>
-}
-
-fn add_error(info_a: &LinkInfo, info_b: &LinkInfo, errors: &ErrorCollector) {
-    let this_object_name = &info_a.name;
-    errors.error_with_info(info_a.name_span, format!("Conflicting Declaration for the name '{this_object_name}'"), vec![
-        error_info(info_b.name_span, info_b.file, "Conflicting Declaration")
-    ]);
 }
 
 impl Linker {
@@ -194,55 +191,76 @@ impl Linker {
         
         for name in BUILTIN_TYPES {
             let id = globals.alloc(Named::Type(NamedType::Builtin(name)));
-            let already_exisits = global_namespace.insert(name.into(), id);
+            let already_exisits = global_namespace.insert(name.into(), NamespaceElement::Global(id));
             assert!(already_exisits.is_none());
         }
         for (name, val) in BUILTIN_CONSTANTS {
             let id = globals.alloc(Named::Constant(NamedConstant::Builtin{name, typ : val.get_type_of_constant(), val}));
-            let already_exisits = global_namespace.insert(name.into(), id);
+            let already_exisits = global_namespace.insert(name.into(), NamespaceElement::Global(id));
             assert!(already_exisits.is_none());
         }
 
-        Linker{files : ArenaAllocator::new(), globals, name_colissions : Vec::new(), global_namespace}
+        Linker{files : ArenaAllocator::new(), globals, global_namespace}
     }
 
     pub fn get_obj_by_name(&self, name : &str) -> Option<&Named> {
-        self.global_namespace.get(name).map(|id| &self.globals[*id])
+        let NamespaceElement::Global(id) = self.global_namespace.get(name)? else {return None};
+        Some(&self.globals[*id])
     }
     pub fn get_obj_id(&self, name : &str) -> Option<NamedUUID> {
-        self.global_namespace.get(name).map(|id| *id)
+        let NamespaceElement::Global(id) = self.global_namespace.get(name)? else {return None};
+        Some(*id)
     }
 
-    fn add_name(&mut self, module_name: Box<str>, new_module_uuid: UUID<NamedUUIDMarker>) {
+    fn add_name(&mut self, module_name: Box<str>, new_module_uuid: NamedUUID) {
         match self.global_namespace.entry(module_name) {
-            std::collections::hash_map::Entry::Occupied(occ) => {
-                self.name_colissions.push((new_module_uuid, *occ.get()));
+            std::collections::hash_map::Entry::Occupied(mut occ) => {
+                let new_val = match occ.get_mut() {
+                    NamespaceElement::Global(g) => {
+                        Box::new([*g, new_module_uuid])
+                    }
+                    NamespaceElement::Colission(coll) => {
+                        let mut vec = std::mem::replace(coll, Box::new([])).into_vec();
+                        vec.reserve(1); // Make sure to only allocate one extra element
+                        vec.push(new_module_uuid);
+                        vec.into_boxed_slice()
+                    }
+                };
+                occ.insert(NamespaceElement::Colission(new_val));
             },
             std::collections::hash_map::Entry::Vacant(vac) => {
-                vac.insert(new_module_uuid);
+                vac.insert(NamespaceElement::Global(new_module_uuid));
             },
         }
     }
     fn get_duplicate_declaration_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
         // Conflicting Declarations
-        for colission in &self.name_colissions {
-            let info_0 = self.globals[colission.0].get_link_info().unwrap(); // Is always valid because colission.0 is 'the thing that conflicts with'
-            let info_1_opt = self.globals[colission.1].get_link_info();
+        for item in &self.global_namespace {
+            let NamespaceElement::Colission(colission) = &item.1 else {continue};
+            let infos : Box<[Option<&LinkInfo>]> = colission.iter().map(|id| self.globals[*id].get_link_info()).collect();
 
-            if info_0.file == file_uuid {
-                if let Some(info_1) = info_1_opt {
-                    add_error(info_0, info_1, errors);
-                    if info_1.file == file_uuid {
-                        add_error(info_1, info_0, errors);
+            for (idx, info) in infos.iter().enumerate() {
+                let Some(info) = info else {continue}; // Is not a builtin
+                if info.file != file_uuid {continue} // Not for this file
+                let mut conflict_infos = Vec::new();
+                let mut builtin_conflict = false;
+                for (idx_2, conflicts_with) in infos.iter().enumerate() {
+                    if idx_2 == idx {continue}
+                    if let Some(conflicts_with) = conflicts_with {
+                        conflict_infos.push(conflicts_with);
+                    } else {
+                        assert!(!builtin_conflict);
+                        builtin_conflict = true;
                     }
+                }
+                let this_object_name = &info.name;
+                let infos = conflict_infos.iter().map(|conf_info| error_info(conf_info.name_span, conf_info.file, "Conflicts with".to_owned())).collect();
+                let reason = if builtin_conflict {
+                    format!("Cannot redeclare the builtin '{this_object_name}'")
                 } else {
-                    let this_object_name = &info_0.name;
-                    errors.error_basic(info_0.name_span, format!("Cannot redeclare the builtin '{this_object_name}'"));
-                }
-            } else if let Some(info_1) = info_1_opt {
-                if info_1.file == file_uuid {
-                    add_error(info_1, info_0, errors);
-                }
+                    format!("'{this_object_name}' conflicts with other declarations:")
+                };
+                errors.error_with_info(info.name_span, reason, infos);
             }
         }
     }
@@ -263,56 +281,30 @@ impl Linker {
 
     pub fn remove_file_datas(&mut self, files : &[FileUUID]) {
         // For quick lookup if a reference disappears
-        let mut back_reference_set = HashSet::new();
+        let mut to_remove_set = HashSet::new();
 
         // Remove the files and their referenced values
         for file in files {
             for v in &self.files[*file].associated_values {
-                back_reference_set.insert(v);
+                to_remove_set.insert(v);
                 self.globals.free(*v);
             }
         }
 
-        // Remove possible conflicts
-        let mut conflict_replacements = HashMap::new();
-        let nc = &mut self.name_colissions;
-        let mut i = 0;
-        while i < nc.len() {
-            let (c_0, c_1) = nc[i];
-            if back_reference_set.contains(&c_1) {
-                let last = *nc.last().unwrap();
-                nc[i] = last;
-                nc.pop();
-            } else {
-                // does not contain c_1, but does contain c_0. Have to recreate conflicts containing c_0 to instead refer to c_1
-                let last = *nc.last().unwrap();
-                nc[i] = last;
-                nc.pop();
-                conflict_replacements.insert(c_0, c_1);
-            }
-            i += 1;
-        }
-        if !conflict_replacements.is_empty() {
-            for conflict in nc {
-                if let Some(replacement) = conflict_replacements.get(&conflict.0) {
-                    conflict.0 = *replacement;
+        // Remove from global namespace
+        self.global_namespace.retain(|_, v|  {
+            match v {
+                NamespaceElement::Global(g) => {
+                    !to_remove_set.contains(g)
+                }
+                NamespaceElement::Colission(colission) => {
+                    let mut retain_vec = std::mem::replace::<Box<[NamedUUID]>>(colission, Box::new([])).into_vec();
+                    retain_vec.retain(|g| !to_remove_set.contains(g));
+                    *colission = retain_vec.into_boxed_slice();
+                    colission.len() > 0
                 }
             }
-
-            // Remove names from the global namespace
-            self.global_namespace.retain(|_k, v| -> bool {
-                !back_reference_set.contains(v)
-            });
-        } else {
-            // Remove names from the global namespace, also have to rename renamed things
-            self.global_namespace.retain(|_k, v| -> bool {
-                if let Some(found_replacement) = conflict_replacements.get(v) {
-                    *v = *found_replacement;
-                    return true;
-                }
-                !back_reference_set.contains(v)
-            });
-        }
+        });
     }
 
     pub fn remove_files(&mut self, files : &[FileUUID]) {
@@ -417,7 +409,7 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
         let name = self.file.get_token_text(name_span.assert_is_single_token());
 
         let mut resolved_globals = self.resolved_globals.borrow_mut();
-        if let Some(found) = self.linker.global_namespace.get(name) {
+        if let Some(NamespaceElement::Global(found)) = self.linker.global_namespace.get(name) {
             resolved_globals.referenced_globals.push(*found);
             Some(*found)
         } else {
