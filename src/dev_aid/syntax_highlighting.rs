@@ -1,7 +1,7 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{ast::*, tokenizer::*, parser::*, linker::{FileData, Links, NamedUUID, Named, Linkable, Linker, FileUUIDMarker, FileUUID}, arena_alloc::ArenaVector, flattening::{Instantiation, WireSource}};
+use crate::{ast::*, tokenizer::*, parser::*, linker::{FileData, NamedUUID, Named, Linkable, Linker, FileUUIDMarker, FileUUID}, arena_alloc::ArenaVector, flattening::{Instantiation, WireSource}};
 
 use ariadne::FileCache;
 use console::Style;
@@ -108,9 +108,9 @@ fn set_span_name_color(span : Span, typ : IDEIdentifierType, result : &mut [IDET
         result[tok_idx].typ = IDETokenType::Identifier(typ);
     }
 }
-fn walk_name_color(all_objects : &[NamedUUID], links : &Links, result : &mut [IDEToken]) {
+fn walk_name_color(all_objects : &[NamedUUID], linker : &Linker, result : &mut [IDEToken]) {
     for obj_uuid in all_objects {
-        let object = &links.globals[*obj_uuid];
+        let object = &linker.globals[*obj_uuid];
         let ide_typ = match object {
             Named::Module(module) => {
                 for (_id, item) in &module.flattened.instantiations {
@@ -159,7 +159,7 @@ fn walk_name_color(all_objects : &[NamedUUID], links : &Links, result : &mut [ID
     }
 }
 
-pub fn create_token_ide_info<'a>(parsed: &FileData, links : &Links) -> Vec<IDEToken> {
+pub fn create_token_ide_info<'a>(parsed: &FileData, linker : &Linker) -> Vec<IDEToken> {
     let mut result : Vec<IDEToken> = Vec::new();
     result.reserve(parsed.tokens.len());
 
@@ -191,7 +191,7 @@ pub fn create_token_ide_info<'a>(parsed: &FileData, links : &Links) -> Vec<IDETo
 
     add_ide_bracket_depths_recursive(&mut result, 0, &parsed.token_hierarchy);
 
-    walk_name_color(&parsed.associated_values, links, &mut result);
+    walk_name_color(&parsed.associated_values, linker, &mut result);
 
     result
 }
@@ -271,6 +271,6 @@ pub fn syntax_highlight_file(linker : &Linker, file_uuid : FileUUID, settings : 
         print_tokens(&f.file_text, &f.tokens);
     }
 
-    let ide_tokens = create_token_ide_info(f, &linker.links);
+    let ide_tokens = create_token_ide_info(f, linker);
     pretty_print(&f.file_text, &f.tokens, &ide_tokens);
 }

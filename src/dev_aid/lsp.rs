@@ -6,7 +6,7 @@ use lsp_server::{Response, Message, Connection};
 
 use lsp_types::notification::Notification;
 
-use crate::{parser::perform_full_semantic_parse, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::{ErrorCollector, CompileError, ErrorLevel}, linker::{FileUUIDMarker, Linker, FileUUID, FileData, Links}, arena_alloc::ArenaVector};
+use crate::{parser::perform_full_semantic_parse, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::{ErrorCollector, CompileError, ErrorLevel}, linker::{FileUUIDMarker, Linker, FileUUID, FileData}, arena_alloc::ArenaVector};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -183,9 +183,9 @@ impl SemanticTokensDeltaAccumulator {
     }
 }
 
-fn do_syntax_highlight(file_data : &FileData, links : &Links) -> (SemanticTokensResult, Vec<std::ops::Range<Position>>) {
+fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> (SemanticTokensResult, Vec<std::ops::Range<Position>>) {
     let file_text = &file_data.file_text;
-    let ide_tokens = create_token_ide_info(&file_data, links);
+    let ide_tokens = create_token_ide_info(&file_data, linker);
 
     let mut semantic_tokens_acc = SemanticTokensDeltaAccumulator{prev : Position {line : 0, character : 0}, semantic_tokens : Vec::new()};
     semantic_tokens_acc.semantic_tokens.reserve(file_data.tokens.len());
@@ -330,7 +330,7 @@ fn main_loop(
                         
                         let file_data = &file_cache.linker.files[uuid];
 
-                        let (syntax_highlight, token_positions) = do_syntax_highlight(file_data, &file_cache.linker.links);
+                        let (syntax_highlight, token_positions) = do_syntax_highlight(file_data, &file_cache.linker);
 
                         let result = serde_json::to_value(&syntax_highlight).unwrap();
                         connection.sender.send(Message::Response(Response{

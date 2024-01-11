@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}, ops::{IndexMut, Index}, rc::Rc, cell::RefCell};
+use std::{collections::{HashMap, HashSet}, rc::Rc, cell::RefCell};
 
 use crate::{ast::{Module, LinkInfo, Span}, arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::FlattenedModule, util::{const_str_position, const_str_position_in_tuples}, instantiation::InstantiatedModule, value::Value, typing::Type};
 
@@ -171,31 +171,23 @@ impl FileData {
     }
 }
 
-// All modules in the workspace
-pub struct Links {
-    pub globals : ArenaAllocator<Named, NamedUUIDMarker>,
-    global_namespace : HashMap<Box<str>, NamedUUID>,
-    name_colissions : Vec<(NamedUUID, NamedUUID)>
-}
-
-impl Links {
-    pub fn get_obj_by_name(&self, name : &str) -> Option<&Named> {
-        self.global_namespace.get(name).map(|id| &self.globals[*id])
-    }
-    pub fn get_obj_id(&self, name : &str) -> Option<NamedUUID> {
-        self.global_namespace.get(name).map(|id| *id)
-    }
-}
-
 // Represents the fully linked set of all files. Incremental operations such as adding and removing files can be performed
 pub struct Linker {
-    pub links : Links,
-    pub files : ArenaAllocator<FileData, FileUUIDMarker>,
+    pub globals : ArenaAllocator<Named, NamedUUIDMarker>,
+    global_namespace : HashMap<Box<str>, NamedUUID>,
+    name_colissions : Vec<(NamedUUID, NamedUUID)>,
+    pub files : ArenaAllocator<FileData, FileUUIDMarker>
 }
 
-impl Links {
-    // Goes together with get_builtin_uuid
-    pub fn new() -> Links {
+fn add_error(info_a: &LinkInfo, info_b: &LinkInfo, errors: &ErrorCollector) {
+    let this_object_name = &info_a.name;
+    errors.error_with_info(info_a.name_span, format!("Conflicting Declaration for the name '{this_object_name}'"), vec![
+        error_info(info_b.name_span, info_b.file, "Conflicting Declaration")
+    ]);
+}
+
+impl Linker {
+    pub fn new() -> Linker {
         // Add builtins
         let mut globals = ArenaAllocator::new();
         let mut global_namespace = HashMap::new();
@@ -211,7 +203,14 @@ impl Links {
             assert!(already_exisits.is_none());
         }
 
-        Links{globals, name_colissions : Vec::new(), global_namespace}
+        Linker{files : ArenaAllocator::new(), globals, name_colissions : Vec::new(), global_namespace}
+    }
+
+    pub fn get_obj_by_name(&self, name : &str) -> Option<&Named> {
+        self.global_namespace.get(name).map(|id| &self.globals[*id])
+    }
+    pub fn get_obj_id(&self, name : &str) -> Option<NamedUUID> {
+        self.global_namespace.get(name).map(|id| *id)
     }
 
     fn add_name(&mut self, module_name: Box<str>, new_module_uuid: UUID<NamedUUIDMarker>) {
@@ -224,37 +223,11 @@ impl Links {
             },
         }
     }
-}
-
-impl Index<NamedUUID> for Links {
-    type Output = Named;
-
-    fn index(&self, index: NamedUUID) -> &Self::Output {
-        &self.globals[index]
-    }
-}
-impl IndexMut<NamedUUID> for Links {
-    fn index_mut(&mut self, index: NamedUUID) -> &mut Self::Output {
-        &mut self.globals[index]
-    }
-}
-
-fn add_error(info_a: &LinkInfo, info_b: &LinkInfo, errors: &ErrorCollector) {
-    let this_object_name = &info_a.name;
-    errors.error_with_info(info_a.name_span, format!("Conflicting Declaration for the name '{this_object_name}'"), vec![
-        error_info(info_b.name_span, info_b.file, "Conflicting Declaration")
-    ]);
-}
-
-impl Linker {
-    pub fn new() -> Linker {
-        Linker{files : ArenaAllocator::new(), links : Links::new()}
-    }
     fn get_duplicate_declaration_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
         // Conflicting Declarations
-        for colission in &self.links.name_colissions {
-            let info_0 = self.links.globals[colission.0].get_link_info().unwrap(); // Is always valid because colission.0 is 'the thing that conflicts with'
-            let info_1_opt = self.links.globals[colission.1].get_link_info();
+        for colission in &self.name_colissions {
+            let info_0 = self.globals[colission.0].get_link_info().unwrap(); // Is always valid because colission.0 is 'the thing that conflicts with'
+            let info_1_opt = self.globals[colission.1].get_link_info();
 
             if info_0.file == file_uuid {
                 if let Some(info_1) = info_1_opt {
@@ -276,7 +249,7 @@ impl Linker {
 
     fn get_flattening_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
         for v in &self.files[file_uuid].associated_values {
-            if let Named::Module(md) = &self.links.globals[*v] {
+            if let Named::Module(md) = &self.globals[*v] {
                 errors.ingest(&md.flattened.errors);
                 md.instantiations.collect_errors(errors);
             }
@@ -296,13 +269,13 @@ impl Linker {
         for file in files {
             for v in &self.files[*file].associated_values {
                 back_reference_set.insert(v);
-                self.links.globals.free(*v);
+                self.globals.free(*v);
             }
         }
 
         // Remove possible conflicts
         let mut conflict_replacements = HashMap::new();
-        let nc = &mut self.links.name_colissions;
+        let nc = &mut self.name_colissions;
         let mut i = 0;
         while i < nc.len() {
             let (c_0, c_1) = nc[i];
@@ -327,12 +300,12 @@ impl Linker {
             }
 
             // Remove names from the global namespace
-            self.links.global_namespace.retain(|_k, v| -> bool {
+            self.global_namespace.retain(|_k, v| -> bool {
                 !back_reference_set.contains(v)
             });
         } else {
             // Remove names from the global namespace, also have to rename renamed things
-            self.links.global_namespace.retain(|_k, v| -> bool {
+            self.global_namespace.retain(|_k, v| -> bool {
                 if let Some(found_replacement) = conflict_replacements.get(v) {
                     *v = *found_replacement;
                     return true;
@@ -357,9 +330,9 @@ impl Linker {
         let mut associated_values = Vec::new();
         for md in parse_result.ast.modules {
             let module_name = md.link_info.name.clone();
-            let new_module_uuid = self.links.globals.alloc(Named::Module(md));
+            let new_module_uuid = self.globals.alloc(Named::Module(md));
             associated_values.push(new_module_uuid);
-            self.links.add_name(module_name, new_module_uuid);
+            self.add_name(module_name, new_module_uuid);
         }
         self.files.alloc_reservation(file, FileData { file_text : parse_result.file_text, tokens: parse_result.tokens, token_hierarchy: parse_result.token_hierarchy, parsing_errors : parse_result.ast.errors, associated_values});
     }
@@ -372,7 +345,7 @@ impl Linker {
 
     pub fn recompile_all(&mut self) {
         // Flatten all modules
-        let module_ids : Vec<NamedUUID> = self.links.globals.iter().filter_map(|(id,v)| {
+        let module_ids : Vec<NamedUUID> = self.globals.iter().filter_map(|(id,v)| {
             if let Named::Module(_) = v {
                 Some(id)
             } else {
@@ -380,7 +353,7 @@ impl Linker {
             }
         }).collect();
         for id in &module_ids {
-            let Named::Module(md) = &self.links.globals[*id] else {unreachable!()};
+            let Named::Module(md) = &self.globals[*id] else {unreachable!()};
 
             println!("Flattening {}", md.link_info.name);
 
@@ -389,13 +362,13 @@ impl Linker {
             flattened.typecheck(self);
             flattened.find_unused_variables();
 
-            let Named::Module(md) = &mut self.links.globals[*id] else {unreachable!()};
+            let Named::Module(md) = &mut self.globals[*id] else {unreachable!()};
             md.flattened = flattened;
             md.instantiations.clear_instances();
         }
 
         // Can't merge these loops, because instantiation can only be done once all modules have been type checked
-        for (id, named_object) in &self.links.globals {
+        for (id, named_object) in &self.globals {
             if let Named::Module(md) = named_object {
                 println!("[[{}]]:", md.link_info.name);
                 md.print_flattened_module();
@@ -405,7 +378,7 @@ impl Linker {
     }
 
     pub fn instantiate(&self, module_id : NamedUUID) -> Option<Rc<InstantiatedModule>> {
-        let Named::Module(md) = &self.links.globals[module_id] else {panic!("{module_id:?} is not a Module!")};
+        let Named::Module(md) = &self.globals[module_id] else {panic!("{module_id:?} is not a Module!")};
         println!("Instantiating {}", md.link_info.name);
 
         md.instantiations.instantiate(&md.link_info.name, &md.flattened, self)
@@ -444,7 +417,7 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
         let name = self.file.get_token_text(name_span.assert_is_single_token());
 
         let mut resolved_globals = self.resolved_globals.borrow_mut();
-        if let Some(found) = self.linker.links.global_namespace.get(name) {
+        if let Some(found) = self.linker.global_namespace.get(name) {
             resolved_globals.referenced_globals.push(*found);
             Some(*found)
         } else {
@@ -461,7 +434,7 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
     }
 
     pub fn is_module(&self, uuid : NamedUUID) -> Option<&'linker Module> {
-        if let Named::Module(md) = &self.linker.links.globals[uuid] {
+        if let Named::Module(md) = &self.linker.globals[uuid] {
             Some(md)
         } else {
             None
@@ -470,7 +443,7 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
 
     pub fn try_get_constant(&self, identifier_span : Span, errors : &ErrorCollector) -> Option<NamedUUID> {
         let uuid = self.resolve_global(identifier_span, errors)?;
-        match &self.linker.links.globals[uuid] {
+        match &self.linker.globals[uuid] {
             Named::Constant(NamedConstant::Builtin{name:_, typ:_, val:_}) => {
                 Some(uuid)
             },
@@ -491,7 +464,7 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
 
     pub fn try_get_type(&self, identifier_span : Span, errors : &ErrorCollector) -> Option<NamedUUID> {
         let uuid = self.resolve_global(identifier_span, errors)?;
-        match &self.linker.links.globals[uuid] {
+        match &self.linker.globals[uuid] {
             Named::Type(_t) => {
                 Some(uuid)
             },
@@ -512,7 +485,7 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
 
     pub fn try_get_module(&self, identifier_span : Span, errors : &ErrorCollector) -> Option<&'linker Module> {
         let uuid = self.resolve_global(identifier_span, errors)?;
-        match &self.linker.links.globals[uuid] {
+        match &self.linker.globals[uuid] {
             Named::Module(md) => {
                 Some(md)
             },

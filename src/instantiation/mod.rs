@@ -304,7 +304,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
             WireSource::Constant(value) => value.clone(),
             WireSource::NamedConstant(id) => {
-                let Named::Constant(NamedConstant::Builtin{name:_, typ:_, val}) = &self.linker.links[*id] else {unreachable!()};
+                let Named::Constant(NamedConstant::Builtin{name:_, typ:_, val}) = &self.linker.globals[*id] else {unreachable!()};
                 val.clone()
             }
         })

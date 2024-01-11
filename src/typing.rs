@@ -25,7 +25,7 @@ impl Type {
                 "{unknown}".to_owned()
             }
             Type::Named{id, span:_} => {
-                linker.links[*id].get_full_name()
+                linker.globals[*id].get_full_name()
             }
             Type::Array(sub) => sub.deref().0.to_string(linker) + "[]",
         }

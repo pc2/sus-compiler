@@ -103,11 +103,11 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     if let Some(module_name) = codegen {
         //let gen_ctx = codegen::GenerationContext::new();
         
-        let Some(id) = linker.links.get_obj_id(&module_name) else {
+        let Some(id) = linker.get_obj_id(&module_name) else {
             panic!("Module {module_name} does not exist!");
         };
 
-        let Named::Module(md) = &linker.links.globals[id] else {
+        let Named::Module(md) = &linker.globals[id] else {
             panic!("{module_name} is not a Module!");
         };
         
@@ -115,7 +115,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     }
 
     if codegen_all {
-        for (id, obj) in &linker.links.globals {
+        for (id, obj) in &linker.globals {
             if let Named::Module(md) = obj {
                 codegen_to_file(&linker, id, md);
             }

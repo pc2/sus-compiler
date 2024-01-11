@@ -627,7 +627,7 @@ impl FlattenedModule {
                             value.get_type_of_constant()
                         }
                         &WireSource::NamedConstant(id) => {
-                            let Named::Constant(NamedConstant::Builtin{name:_, typ, val:_}) = &linker.links.globals[id] else {unreachable!()};
+                            let Named::Constant(NamedConstant::Builtin{name:_, typ, val:_}) = &linker.globals[id] else {unreachable!()};
                             typ.clone()
                         }
                     };
