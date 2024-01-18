@@ -2,7 +2,7 @@ use std::{ops::{Deref, Range}, iter::zip, cell::RefCell};
 
 use crate::{
     ast::{Span, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, IdentifierType, TypeExpression, DeclIDMarker, DeclID, SpanTypeExpression},
-    linker::{Linker, NamedUUID, FileUUID, GlobalResolver, ResolvedGlobals, Named, NamedConstant},
+    linker::{Linker, FileUUID, GlobalResolver, ResolvedGlobals, NamedConstant, ConstantUUID, ModuleUUID, NameElem},
     errors::{ErrorCollector, error_info}, arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, typing::{Type, typecheck_unary_operator, get_binary_operator_types, typecheck, typecheck_is_array_indexer, BOOL_TYPE, INT_TYPE}, value::Value
 };
 
@@ -48,7 +48,7 @@ pub enum WireSource {
     BinaryOp{op : Operator, left : FlatID, right : FlatID},
     ArrayAccess{arr : FlatID, arr_idx : FlatID},
     Constant(Value),
-    NamedConstant(NamedUUID),
+    NamedConstant(ConstantUUID),
 }
 
 impl WireSource {
@@ -93,7 +93,7 @@ impl WireDeclaration {
 
 #[derive(Debug)]
 pub struct SubModuleInstance {
-    pub module_uuid : NamedUUID,
+    pub module_uuid : ModuleUUID,
     pub name : Box<str>,
     pub typ_span : Span,
     pub is_remote_declaration : bool,
@@ -194,7 +194,7 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
     fn map_to_type(&mut self, type_expr : &SpanTypeExpression) -> Type {
         match &type_expr.0 {
             TypeExpression::Named => {
-                if let Some(typ_id) = &self.linker.try_get_type(type_expr.1, &self.errors) {
+                if let Some(typ_id) = &self.linker.resolve_type(type_expr.1, &self.errors) {
                     Type::Named{id : *typ_id, span : Some(type_expr.1)}
                 } else {
                     Type::Error
@@ -220,10 +220,9 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
 
         if ONLY_ALLOW_TYPES {
             if let TypeExpression::Named = &decl.typ.0 {
-                if let Some(possible_module_ref) = self.linker.resolve_global(decl.typ.1, &self.errors) {
-                    if let Some(md) = &self.linker.is_module(possible_module_ref) {
-                        return self.alloc_module_interface(decl.name.clone(), md,possible_module_ref, decl.typ.1)
-                    }
+                if let Some(NameElem::Module(module_id)) = self.linker.try_resolve_global(decl.typ.1) {
+                    let md = &self.linker.get_module(module_id);
+                    return self.alloc_module_interface(decl.name.clone(), md, module_id, decl.typ.1)
                 }
             }
         }
@@ -252,7 +251,7 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
             self.flatten_declaration::<false>(*decl_id, read_only)
         }).collect()
     }
-    fn alloc_module_interface(&mut self, name : Box<str>, module : &Module, module_uuid : NamedUUID, typ_span : Span) -> FlatID {
+    fn alloc_module_interface(&mut self, name : Box<str>, module : &Module, module_uuid : ModuleUUID, typ_span : Span) -> FlatID {
         let mut nested_context = FlatteningContext {
             decl_to_flat_map: module.declarations.iter().map(|_| None).collect(),
             instantiations: self.instantiations,
@@ -281,10 +280,9 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
                 self.decl_to_flat_map[*l].unwrap()
             }
             Expression::Named(LocalOrGlobal::Global(ref_span)) => {
-                let module_ref = self.linker.resolve_global(*ref_span, &self.errors)?;
-
-                let dependency = self.linker.try_get_module(*ref_span, &self.errors)?;
-                self.alloc_module_interface(dependency.link_info.name.clone(), dependency, module_ref, *name_expr_span)
+                let module_id = self.linker.resolve_module(*ref_span, &self.errors)?;
+                let md = self.linker.get_module(module_id);
+                self.alloc_module_interface(md.link_info.name.clone(), md, module_id, *name_expr_span)
             }
             _other => {
                 self.errors.error_basic(*name_expr_span, "Function call name cannot be an expression");
@@ -336,7 +334,7 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
                 (decl.identifier_type == IdentifierType::Generative, WireSource::WireRead(from_wire))
             }
             Expression::Named(LocalOrGlobal::Global(ref_span)) => {
-                let cst = self.linker.try_get_constant(*ref_span, &self.errors)?;
+                let cst = self.linker.resolve_constant(*ref_span, &self.errors)?;
                 (true, WireSource::NamedConstant(cst))
             }
             Expression::Constant(cst) => {
@@ -627,7 +625,7 @@ impl FlattenedModule {
                             value.get_type_of_constant()
                         }
                         &WireSource::NamedConstant(id) => {
-                            let Named::Constant(NamedConstant::Builtin{name:_, typ, val:_}) = &linker.globals[id] else {unreachable!()};
+                            let NamedConstant::Builtin{name:_, typ, val:_} = &linker.constants[id];
                             typ.clone()
                         }
                     };

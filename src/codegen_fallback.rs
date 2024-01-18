@@ -1,8 +1,8 @@
 use std::{iter::zip, ops::Deref};
 
-use crate::{ast::{Module, IdentifierType}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{NamedUUID, get_builtin_type}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::Instantiation, value::Value};
+use crate::{ast::{Module, IdentifierType}, instantiation::{InstantiatedModule, RealWireDataSource, StateInitialValue, ConnectToPathElem}, linker::{get_builtin_type, TypeUUID}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::Instantiation, value::Value};
 
-fn get_type_name_size(id : NamedUUID) -> u64 {
+fn get_type_name_size(id : TypeUUID) -> u64 {
     if id == get_builtin_type("int") {
         32 // TODO concrete int sizes
     } else if id == get_builtin_type("bool") {

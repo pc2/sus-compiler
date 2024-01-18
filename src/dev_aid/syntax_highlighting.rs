@@ -1,7 +1,7 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{ast::*, tokenizer::*, parser::*, linker::{FileData, NamedUUID, Named, Linkable, Linker, FileUUIDMarker, FileUUID}, arena_alloc::ArenaVector, flattening::{Instantiation, WireSource}};
+use crate::{ast::*, tokenizer::*, parser::*, linker::{FileData, Linker, FileUUIDMarker, FileUUID, NameElem}, arena_alloc::ArenaVector, flattening::{Instantiation, WireSource}};
 
 use ariadne::FileCache;
 use console::Style;
@@ -108,11 +108,11 @@ fn set_span_name_color(span : Span, typ : IDEIdentifierType, result : &mut [IDET
         result[tok_idx].typ = IDETokenType::Identifier(typ);
     }
 }
-fn walk_name_color(all_objects : &[NamedUUID], linker : &Linker, result : &mut [IDEToken]) {
+fn walk_name_color(all_objects : &[NameElem], linker : &Linker, result : &mut [IDEToken]) {
     for obj_uuid in all_objects {
-        let object = &linker.globals[*obj_uuid];
-        let ide_typ = match object {
-            Named::Module(module) => {
+        let (ide_typ, link_info) = match obj_uuid {
+            NameElem::Module(id) => {
+                let module = &linker.modules[*id];
                 for (_id, item) in &module.flattened.instantiations {
                     match item {
                         Instantiation::Wire(w) => {
@@ -149,12 +149,11 @@ fn walk_name_color(all_objects : &[NamedUUID], linker : &Linker, result : &mut [
                         Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => {}
                     }
                 }
-                IDEIdentifierType::Interface
+                (IDEIdentifierType::Interface, &module.link_info)
             }
             _other => {todo!("Name Color for non-modules not implemented")}
         };
         
-        let link_info = object.get_link_info().unwrap();
         set_span_name_color(link_info.name_span, ide_typ, result);
     }
 }

@@ -27,9 +27,9 @@ use std::path::PathBuf;
 use ast::Module;
 use codegen_fallback::gen_verilog_code;
 use dev_aid::syntax_highlighting::*;
-use linker::{Named, Linker, NamedUUID};
+use linker::{Linker, ModuleUUID};
 
-fn codegen_to_file(linker : &Linker, id : NamedUUID, md : &Module) -> Option<()> {
+fn codegen_to_file(linker : &Linker, id : ModuleUUID, md : &Module) -> Option<()> {
     let inst = linker.instantiate(id)?;
 
     let module_name = md.link_info.name.deref();
@@ -103,22 +103,18 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     if let Some(module_name) = codegen {
         //let gen_ctx = codegen::GenerationContext::new();
         
-        let Some(id) = linker.get_obj_id(&module_name) else {
+        let Some(id) = linker.get_module_id(&module_name) else {
             panic!("Module {module_name} does not exist!");
         };
 
-        let Named::Module(md) = &linker.globals[id] else {
-            panic!("{module_name} is not a Module!");
-        };
+        let md = &linker.modules[id];
         
         codegen_to_file(&linker, id, md);
     }
 
     if codegen_all {
-        for (id, obj) in &linker.globals {
-            if let Named::Module(md) = obj {
-                codegen_to_file(&linker, id, md);
-            }
+        for (id, md) in &linker.modules {
+            codegen_to_file(&linker, id, md);
         }
     }
 

@@ -2,7 +2,7 @@ use std::{rc::Rc, ops::Deref, cell::RefCell};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, ast::{Operator, IdentifierType, Span}, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed, FlattenedModule, FlatIDRange}, errors::ErrorCollector, linker::{Linker, NamedConstant, Named}, value::{Value, compute_unary_op, compute_binary_op}, tokenizer::kw};
+use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, ast::{Operator, IdentifierType, Span}, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed, FlattenedModule, FlatIDRange}, errors::ErrorCollector, linker::{Linker, NamedConstant}, value::{Value, compute_unary_op, compute_binary_op}, tokenizer::kw};
 
 pub mod latency;
 
@@ -304,7 +304,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
             WireSource::Constant(value) => value.clone(),
             WireSource::NamedConstant(id) => {
-                let Named::Constant(NamedConstant::Builtin{name:_, typ:_, val}) = &self.linker.globals[*id] else {unreachable!()};
+                let NamedConstant::Builtin{name:_, typ:_, val} = &self.linker.constants[*id];
                 val.clone()
             }
         })

@@ -1,13 +1,13 @@
 use std::ops::Deref;
 
-use crate::{ast::{Operator, Span}, linker::{get_builtin_type, NamedUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector, value::Value};
+use crate::{ast::{Operator, Span}, linker::{get_builtin_type, TypeUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector, value::Value};
 
 // Types contain everything that cannot be expressed at runtime
 #[derive(Debug, Clone)]
 pub enum Type {
     Error,
     Unknown,
-    Named{id : NamedUUID, span : Option<Span>},
+    Named{id : TypeUUID, span : Option<Span>},
     /*Contains a wireID pointing to a constant expression for the array size, 
     but doesn't actually take size into account for type checking as that would
     make type checking too difficult. Instead delay until proper instantiation
@@ -25,7 +25,7 @@ impl Type {
                 "{unknown}".to_owned()
             }
             Type::Named{id, span:_} => {
-                linker.globals[*id].get_full_name()
+                linker.types[*id].get_full_name()
             }
             Type::Array(sub) => sub.deref().0.to_string(linker) + "[]",
         }
@@ -50,7 +50,7 @@ impl Type {
             }
         }
     }
-    pub fn for_each_located_type<F : FnMut(NamedUUID, Span)>(&self, f : &mut F) {
+    pub fn for_each_located_type<F : FnMut(TypeUUID, Span)>(&self, f : &mut F) {
         match self {
             Type::Error => {}
             Type::Unknown => {}
@@ -142,7 +142,7 @@ pub fn typecheck_is_array_indexer<'a>(arr_type : &'a Type, span : Span, linker :
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ConcreteType {
-    Named(NamedUUID),
+    Named(TypeUUID),
     Array(Box<(ConcreteType, u64)>)
 }
 
