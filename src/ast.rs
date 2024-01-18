@@ -149,6 +149,12 @@ pub struct LinkInfo {
     pub span : Span
 }
 
+impl LinkInfo {
+    pub fn get_full_name(&self) -> String {
+        format!("::{}", self.name)
+    }
+}
+
 #[derive(Debug)]
 pub struct Module {
     pub link_info : LinkInfo,

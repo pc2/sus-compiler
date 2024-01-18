@@ -49,9 +49,9 @@ pub const fn get_builtin_constant(name : &'static str) -> ConstantUUID {
     }
 }
 
-pub struct LinkingErrorLocation<'a> {
+pub struct LinkingErrorLocation {
     pub named_type : &'static str,
-    pub name : &'a str,
+    pub full_name : String,
     pub location : Option<(FileUUID, Span)>
 }
 
@@ -60,7 +60,7 @@ pub trait Linkable {
     fn get_full_name(&self) -> String {
         format!("::{}", self.get_name())
     }
-    fn get_linking_error_location<'a>(&'a self) -> LinkingErrorLocation<'a>;
+    fn get_linking_error_location(&self) -> LinkingErrorLocation;
     fn get_link_info(&self) -> Option<&LinkInfo>;
     fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo>;
 }
@@ -81,10 +81,8 @@ impl Linkable for NamedConstant {
             NamedConstant::Builtin{name, typ:_, val:_} => name
         }
     }
-    fn get_linking_error_location<'a>(&'a self) -> LinkingErrorLocation<'a> {
-        match self {
-            NamedConstant::Builtin{name, typ:_, val:_} => LinkingErrorLocation { named_type: "Builtin Constant", name, location: None }
-        }
+    fn get_linking_error_location(&self) -> LinkingErrorLocation {
+        LinkingErrorLocation { named_type: "Builtin Constant", full_name : self.get_full_name(), location: None }
     }
     fn get_link_info(&self) -> Option<&LinkInfo> {
         match self {
@@ -104,10 +102,8 @@ impl Linkable for NamedType {
             NamedType::Builtin(name) => name,
         }
     }
-    fn get_linking_error_location<'a>(&'a self) -> LinkingErrorLocation<'a> {
-        match self {
-            NamedType::Builtin(name) => LinkingErrorLocation { named_type: "Builtin Type", name, location: None },
-        }
+    fn get_linking_error_location(&self) -> LinkingErrorLocation {
+        LinkingErrorLocation { named_type: "Builtin Type", full_name : self.get_full_name(), location: None }
     }
     fn get_link_info(&self) -> Option<&LinkInfo> {
         match self {
@@ -223,11 +219,11 @@ impl Linker {
             }
         }
     }
-    fn get_linking_error_location<'a>(&'a self, global : NameElem) -> LinkingErrorLocation<'a> {
+    fn get_linking_error_location(&self, global : NameElem) -> LinkingErrorLocation {
         match global {
             NameElem::Module(id) => {
                 let md = &self.modules[id];
-                LinkingErrorLocation{named_type: "Module", name : &md.link_info.name, location: Some((md.link_info.file, md.link_info.name_span))}
+                LinkingErrorLocation{named_type: "Module", full_name : md.link_info.get_full_name(), location: Some((md.link_info.file, md.link_info.name_span))}
             }
             NameElem::Type(id) => self.types[id].get_linking_error_location(),
             NameElem::Constant(id) => self.constants[id].get_linking_error_location(),
@@ -410,32 +406,38 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
         let name = self.file.get_token_text(name_span.assert_is_single_token());
 
         let mut resolved_globals = self.resolved_globals.borrow_mut();
-        if let Some(NamespaceElement::Global(found)) = self.linker.global_namespace.get(name) {
-            resolved_globals.referenced_globals.push(*found);
-            Some(*found)
-        } else {
-            resolved_globals.all_resolved = false;
+        match self.linker.global_namespace.get(name) {
+            Some(NamespaceElement::Global(found)) => {
+                resolved_globals.referenced_globals.push(*found);
+                Some(*found)
+            }
+            Some(NamespaceElement::Colission(coll)) => {
+                resolved_globals.all_resolved = false;
 
-            errors.error_basic(name_span, format!("No Value or Type of the name '{name}' was found. Did you forget to import it?"));
+                let decl_infos = coll.iter().map(|collider_global| {
+                    let err_loc = self.linker.get_linking_error_location(*collider_global);
+                    if let Some((file, span)) = err_loc.location {
+                        error_info(span, file, format!("{} {} declared here", err_loc.named_type, err_loc.full_name))
+                    } else {
+                        // Kinda hacky, point the 'builtin' back to the declaration location because builtins don't have a location
+                        error_info(name_span, errors.file, format!("{} {}", err_loc.named_type, err_loc.full_name))
+                    }
+                }).collect();
 
-            None
+                errors.error_with_info(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."), decl_infos);
+
+                None
+            }
+            None => {
+                resolved_globals.all_resolved = false;
+
+                errors.error_basic(name_span, format!("No Global of the name '{name}' was found. Did you forget to import it?"));
+
+                None
+            }
         }
     }
 
-    pub fn try_resolve_global(&self, name_span : Span) -> Option<NameElem> {
-        let name = self.file.get_token_text(name_span.assert_is_single_token());
-
-        let mut resolved_globals = self.resolved_globals.borrow_mut();
-        if let Some(NamespaceElement::Global(found)) = self.linker.global_namespace.get(name) {
-            resolved_globals.referenced_globals.push(*found);
-            Some(*found)
-        } else {
-            resolved_globals.all_resolved = false;
-
-            None
-        }
-    }
-    
     pub fn get_module(&self, uuid : ModuleUUID) -> &'linker Module {
         &self.linker.modules[uuid]
     }
@@ -447,7 +449,7 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
         } else {
             vec![]
         };
-        let name = info.name;
+        let name = info.full_name;
         let ident_type = info.named_type;
         errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a {expected}!"), infos);
     }

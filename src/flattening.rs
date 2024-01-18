@@ -215,19 +215,29 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
             }
         }
     }
-    fn flatten_declaration<const ONLY_ALLOW_TYPES : bool>(&mut self, decl_id : DeclID, read_only : bool) -> FlatID {
+    fn flatten_declaration<const ALLOW_MODULES : bool>(&mut self, decl_id : DeclID, read_only : bool) -> FlatID {
         let decl = &self.module.declarations[decl_id];
 
-        if ONLY_ALLOW_TYPES {
-            if let TypeExpression::Named = &decl.typ.0 {
-                if let Some(NameElem::Module(module_id)) = self.linker.try_resolve_global(decl.typ.1) {
-                    let md = &self.linker.get_module(module_id);
-                    return self.alloc_module_interface(decl.name.clone(), md, module_id, decl.typ.1)
+        let typ : Type = if let TypeExpression::Named = &decl.typ.0 {
+            match self.linker.resolve_global(decl.typ.1, &self.errors) {
+                Some(NameElem::Module(id)) if ALLOW_MODULES => {
+                    let md = &self.linker.get_module(id);
+                    return self.alloc_module_interface(decl.name.clone(), md, id, decl.typ.1)
                 }
+                Some(NameElem::Type(id)) => {
+                    Type::Named{id, span : Some(decl.typ.1)}
+                }
+                Some(global_module_or_type) => {
+                    let accepted = if ALLOW_MODULES {"Type or Module"} else {"Type"};
+                    self.linker.make_bad_error_location_error(global_module_or_type, accepted, decl.typ.1, &self.errors);
+                    Type::Error
+                }
+                None => Type::Error
             }
-        }
+        } else {
+            self.map_to_type(&decl.typ)
+        };
 
-        let typ = self.map_to_type(&decl.typ);
         let typ_span = decl.typ.1;
 
         let inst_id = self.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
