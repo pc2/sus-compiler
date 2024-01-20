@@ -384,33 +384,46 @@ impl ResolvedGlobals {
     }
 }
 
-pub struct GlobalResolver<'linker, 'resolved_list> {
+pub struct GlobalResolver<'linker> {
     linker : &'linker Linker,
     file : &'linker FileData,
-    resolved_globals : &'resolved_list RefCell<ResolvedGlobals>
+    resolved_globals : RefCell<Option<ResolvedGlobals>>
 }
 
-impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
-    pub fn new(linker : &'linker Linker, file_id : FileUUID, resolved_globals : &'resolved_list RefCell<ResolvedGlobals>) -> GlobalResolver<'linker, 'resolved_list> {
+impl<'linker> GlobalResolver<'linker> {
+    pub fn new(linker : &'linker Linker, file_id : FileUUID) -> GlobalResolver<'linker> {
         GlobalResolver{
             linker,
             file : &linker.files[file_id],
-            resolved_globals
+            resolved_globals : RefCell::new(Some(ResolvedGlobals::new()))
         }
     }
 
-    pub fn new_sublinker(&self, file_id : FileUUID) -> GlobalResolver<'linker, 'resolved_list> {
+    pub fn extract_resolved_globals(&self) -> ResolvedGlobals {
+        let sub_resolved = self.resolved_globals.replace(None);
+        sub_resolved.unwrap()
+    }
+
+    pub fn new_sublinker(&self, file_id : FileUUID) -> GlobalResolver<'linker> {
+        let this_resolved = self.extract_resolved_globals();
         GlobalResolver{
             linker : self.linker,
             file : &self.linker.files[file_id],
-            resolved_globals : self.resolved_globals
+            resolved_globals : RefCell::new(Some(this_resolved))
         }
+    }
+
+    pub fn reabsorb_sublinker(&self, sub : Self) {
+        let sub_resolved = sub.extract_resolved_globals();
+        let old_should_be_none = self.resolved_globals.replace(Some(sub_resolved));
+        assert!(old_should_be_none.is_none());
     }
 
     pub fn resolve_global(&self, name_span : Span, errors : &ErrorCollector) -> Option<NameElem> {
         let name = self.file.get_token_text(name_span.assert_is_single_token());
 
-        let mut resolved_globals = self.resolved_globals.borrow_mut();
+        let mut resolved_globals_borrow = self.resolved_globals.borrow_mut();
+        let resolved_globals = resolved_globals_borrow.as_mut().unwrap();
         match self.linker.global_namespace.get(name) {
             Some(NamespaceElement::Global(found)) => {
                 resolved_globals.referenced_globals.push(*found);
@@ -498,5 +511,12 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
     }
     pub fn get_type(&self, index: TypeUUID) -> &'linker NamedType {
         &self.linker.types[index]
+    }
+}
+
+impl<'linker> Drop for GlobalResolver<'linker> {
+    fn drop(&mut self) {
+        // resolved_globals must have been consumed
+        assert!(self.resolved_globals.get_mut().is_none());
     }
 }

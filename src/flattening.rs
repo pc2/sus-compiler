@@ -1,4 +1,4 @@
-use std::{ops::Deref, iter::zip, cell::RefCell};
+use std::{ops::Deref, iter::zip};
 
 use crate::{
     ast::{Span, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, IdentifierType, TypeExpression, DeclIDMarker, DeclID, SpanTypeExpression, InterfacePorts},
@@ -169,13 +169,13 @@ impl Instantiation {
     }
 }
 
-struct FlatteningContext<'inst, 'l, 'm, 'resolved> {
+struct FlatteningContext<'inst, 'l, 'm> {
     decl_to_flat_map : FlatAlloc<Option<FlatID>, DeclIDMarker>,
     instantiations : &'inst mut FlatAlloc<Instantiation, FlatIDMarker>,
     errors : ErrorCollector,
     is_remote_declaration : bool,
 
-    linker : GlobalResolver<'l, 'resolved>,
+    linker : GlobalResolver<'l>,
     pub type_list_for_naming : &'l ArenaAllocator<NamedType, TypeUUIDMarker>,
     module : &'m Module,
 }
@@ -189,7 +189,7 @@ fn must_be_compiletime(wire : &WireInstance, context : &str, errors : &ErrorColl
     must_be_compiletime_with_info(wire, context, errors, || Vec::new());
 }
 
-impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
+impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
     fn map_to_type(&mut self, type_expr : &SpanTypeExpression) -> Type {
         match &type_expr.0 {
             TypeExpression::Named => {
@@ -281,6 +281,8 @@ impl<'inst, 'l, 'm, 'resolved> FlatteningContext<'inst, 'l, 'm, 'resolved> {
         
         let interface_ports = nested_context.initialize_interface::<true>();
         
+        self.linker.reabsorb_sublinker(nested_context.linker);
+
         self.instantiations.alloc(Instantiation::SubModule(SubModuleInstance{
             name,
             module_uuid,
@@ -758,13 +760,12 @@ impl FlattenedModule {
     */
     pub fn initialize(linker : &Linker, module : &Module) -> FlattenedModule {
         let mut instantiations = FlatAlloc::new();
-        let resolved_globals : RefCell<ResolvedGlobals> = RefCell::new(ResolvedGlobals::new());
         let mut context = FlatteningContext{
             decl_to_flat_map: module.declarations.iter().map(|_| None).collect(),
             instantiations: &mut instantiations,
             errors: ErrorCollector::new(module.link_info.file),
             is_remote_declaration : false,
-            linker : GlobalResolver::new(linker, module.link_info.file, &resolved_globals),
+            linker : GlobalResolver::new(linker, module.link_info.file),
             type_list_for_naming : &linker.types,
             module,
         };
@@ -777,9 +778,9 @@ impl FlattenedModule {
 
         FlattenedModule {
             errors : context.errors,
+            resolved_globals : context.linker.extract_resolved_globals(),
             instantiations : instantiations,
             interface_ports,
-            resolved_globals : resolved_globals.into_inner()
         }
     }
 }
