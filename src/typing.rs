@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{ast::{Operator, Span}, linker::{get_builtin_type, TypeUUID, Linker, Linkable}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector, value::Value};
+use crate::{ast::{Operator, Span}, linker::{get_builtin_type, TypeUUID, Linker, Linkable, NamedType, TypeUUIDMarker}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector, value::Value, arena_alloc::ArenaAllocator};
 
 // Types contain everything that cannot be expressed at runtime
 #[derive(Debug, Clone)]
@@ -16,7 +16,7 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn to_string(&self, linker : &Linker) -> String {
+    pub fn to_string(&self, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>) -> String {
         match self {
             Type::Error => {
                 "{error}".to_owned()
@@ -25,9 +25,9 @@ impl Type {
                 "{unknown}".to_owned()
             }
             Type::Named{id, span:_} => {
-                linker.types[*id].get_full_name()
+                linker_types[*id].get_full_name()
             }
-            Type::Array(sub) => sub.deref().0.to_string(linker) + "[]",
+            Type::Array(sub) => sub.deref().0.to_string(linker_types) + "[]",
         }
     }
     pub fn for_each_generative_input<F : FnMut(FlatID)>(&self, f : &mut F) {
@@ -70,12 +70,12 @@ pub const INT_TYPE : Type = Type::Named{id : get_builtin_type("int"), span : Non
 pub const BOOL_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("bool"));
 pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("int"));
 
-pub fn typecheck_unary_operator(op : Operator, input_typ : &Type, span : Span, linker : &Linker, errors : &ErrorCollector) -> Type {
+pub fn typecheck_unary_operator(op : Operator, input_typ : &Type, span : Span, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) -> Type {
     if op.op_typ == kw("!") {
-        typecheck(input_typ, span, &BOOL_TYPE, "! input", linker, errors);
+        typecheck(input_typ, span, &BOOL_TYPE, "! input", linker_types, errors);
         BOOL_TYPE
     } else if op.op_typ == kw("-") {
-        typecheck(input_typ, span, &INT_TYPE, "- input", linker, errors);
+        typecheck(input_typ, span, &INT_TYPE, "- input", linker_types, errors);
         INT_TYPE
     } else {
         let gather_type = match op.op_typ {
@@ -86,8 +86,8 @@ pub fn typecheck_unary_operator(op : Operator, input_typ : &Type, span : Span, l
             x if x == kw("*") => INT_TYPE,
             _ => unreachable!()
         };
-        if let Some(arr_content_typ) = typecheck_is_array_indexer(input_typ, span, linker, errors) {
-            typecheck(arr_content_typ, span, &gather_type, &format!("{op} input"), linker, errors);
+        if let Some(arr_content_typ) = typecheck_is_array_indexer(input_typ, span, linker_types, errors) {
+            typecheck(arr_content_typ, span, &gather_type, &format!("{op} input"), linker_types, errors);
         }
         gather_type
     }
@@ -123,17 +123,17 @@ fn type_compare(expected : &Type, found : &Type) -> bool {
         _ => false,
     }
 }
-pub fn typecheck(found : &Type, span : Span, expected : &Type, context : &str, linker : &Linker, errors : &ErrorCollector) {
+pub fn typecheck(found : &Type, span : Span, expected : &Type, context : &str, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) {
     if !type_compare(expected, found) {
-        let expected_name = expected.to_string(linker);
-        let found_name = found.to_string(linker);
+        let expected_name = expected.to_string(linker_types);
+        let found_name = found.to_string(linker_types);
         errors.error_basic(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
         assert!(expected_name != found_name, "{expected_name} != {found_name}");
     }
 }
-pub fn typecheck_is_array_indexer<'a>(arr_type : &'a Type, span : Span, linker : &Linker, errors : &ErrorCollector) -> Option<&'a Type> {
+pub fn typecheck_is_array_indexer<'a>(arr_type : &'a Type, span : Span, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) -> Option<&'a Type> {
     let Type::Array(arr_element_type) = arr_type else {
-        let arr_type_name = arr_type.to_string(linker);
+        let arr_type_name = arr_type.to_string(linker_types);
         errors.error_basic(span, format!("Typing Error: Attempting to index into this, but it is not of array type, instead found a {arr_type_name}"));
         return None;
     };

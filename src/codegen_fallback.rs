@@ -56,9 +56,9 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
     assert!(!instance.errors.did_error.get(), "Module cannot have experienced an error");
     let mut program_text : String = format!("module {}(\n\tinput clk, \n", md.link_info.name);
     let submodule_interface = instance.interface.as_ref().unwrap();
-    for (port_idx, real_port) in submodule_interface.iter().enumerate() {
-        let wire = &instance.wires[*real_port];
-        program_text.push_str(if port_idx < md.flattened.outputs_start {"\tinput"} else {"\toutput /*mux_wire*/ reg"});
+    for (real_port, is_input) in submodule_interface.iter() {
+        let wire = &instance.wires[real_port];
+        program_text.push_str(if is_input {"\tinput"} else {"\toutput /*mux_wire*/ reg"});
         program_text.push_str(&typ_to_verilog_array(&wire.typ));
         program_text.push(' ');
         program_text.push_str(&wire.name);
@@ -114,12 +114,12 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
         program_text.push(' ');
         program_text.push_str(&sm.name);
         program_text.push_str("(\n.clk(clk)");
-        let Some(sm_interface) = &sm.instance.interface else {unreachable!()}; // Having an invalid interface in a submodule is an error! This should have been caught before!
-        for (port, wire) in zip(sm_interface, &sm.wires) {
+        let sm_interface = sm.instance.interface.as_ref().unwrap(); // Having an invalid interface in a submodule is an error! This should have been caught before!
+        for (port, wire) in zip(sm_interface.iter(), sm.wires.iter()) {
             program_text.push_str(",\n.");
-            program_text.push_str(&sm.instance.wires[*port].name);
+            program_text.push_str(&sm.instance.wires[port.0].name);
             program_text.push('(');
-            program_text.push_str(&instance.wires[*wire].name);
+            program_text.push_str(&instance.wires[wire.0].name);
             program_text.push_str(")");
         }
         program_text.push_str("\n);\n");

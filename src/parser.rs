@@ -485,7 +485,7 @@ impl<'file> ASTParserContext<'file> {
         }
     }
 
-    fn parse_interface(&mut self, token_stream : &mut TokenStream, scope : &mut LocalVariableContext<'_, 'file>) -> (Box<[DeclID]>, usize) {
+    fn parse_interface(&mut self, token_stream : &mut TokenStream, scope : &mut LocalVariableContext<'_, 'file>) -> InterfacePorts<DeclID> {
         // Current implementation happens to order inputs then outputs, but refactorings should ensure this remains the case
         
         let mut interface_decls = Vec::new();
@@ -496,7 +496,7 @@ impl<'file> ASTParserContext<'file> {
             self.parse_bundle(token_stream, &mut interface_decls, IdentifierType::Output, scope);
         }
 
-        (interface_decls.into_boxed_slice(), outputs_start)
+        InterfacePorts{ports : interface_decls.into_boxed_slice(), outputs_start}
     }
 
     fn parse_statement(&mut self, token_stream : &mut TokenStream, scope : &mut LocalVariableContext<'_, 'file>, code_block : &mut CodeBlock) -> Option<()> {
@@ -710,7 +710,7 @@ impl<'file> ASTParserContext<'file> {
         self.eat_plain(token_stream, kw(":"), "module")?;
 
         let mut scope = LocalVariableContext::new_initial();
-        let (ports, outputs_start) = self.parse_interface(token_stream, &mut scope);
+        let ports = self.parse_interface(token_stream, &mut scope);
 
         let (block_tokens, block_span) = self.eat_block(token_stream, kw("{"), "module")?;
 
@@ -725,7 +725,7 @@ impl<'file> ASTParserContext<'file> {
             span
         };
         let declarations = std::mem::replace(&mut self.declarations, FlatAlloc::new());
-        Some(Module{declarations, ports, outputs_start, code, link_info, flattened : FlattenedModule::empty(self.errors.file), instantiations : InstantiationList::new()})
+        Some(Module{declarations, ports, code, link_info, flattened : FlattenedModule::empty(self.errors.file), instantiations : InstantiationList::new()})
     }
 
     fn parse_ast(mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {

@@ -348,10 +348,8 @@ impl Linker {
             let md = &self.modules[id];// Have to get them like this, so we don't have a mutable borrow on self.modules across the loop
             println!("Flattening {}", md.link_info.name);
 
-            let mut flattened = FlattenedModule::initialize(&self, md);
+            let flattened = FlattenedModule::initialize(&self, md);
             println!("Typechecking {}", &md.link_info.name);
-            flattened.typecheck(self);
-            flattened.find_unused_variables();
 
             let md = &mut self.modules[id]; // Convert to mutable ptr
             md.flattened = flattened;
@@ -389,17 +387,24 @@ impl ResolvedGlobals {
 pub struct GlobalResolver<'linker, 'resolved_list> {
     linker : &'linker Linker,
     file : &'linker FileData,
-
     resolved_globals : &'resolved_list RefCell<ResolvedGlobals>
 }
 
 impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
     pub fn new(linker : &'linker Linker, file_id : FileUUID, resolved_globals : &'resolved_list RefCell<ResolvedGlobals>) -> GlobalResolver<'linker, 'resolved_list> {
-        GlobalResolver{linker, file : &linker.files[file_id], resolved_globals}
+        GlobalResolver{
+            linker,
+            file : &linker.files[file_id],
+            resolved_globals
+        }
     }
 
     pub fn new_sublinker(&self, file_id : FileUUID) -> GlobalResolver<'linker, 'resolved_list> {
-        GlobalResolver{linker : self.linker, file : &self.linker.files[file_id], resolved_globals : self.resolved_globals}
+        GlobalResolver{
+            linker : self.linker,
+            file : &self.linker.files[file_id],
+            resolved_globals : self.resolved_globals
+        }
     }
 
     pub fn resolve_global(&self, name_span : Span, errors : &ErrorCollector) -> Option<NameElem> {
@@ -436,10 +441,6 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
                 None
             }
         }
-    }
-
-    pub fn get_module(&self, uuid : ModuleUUID) -> &'linker Module {
-        &self.linker.modules[uuid]
     }
 
     pub fn make_bad_error_location_error(&self, elem : NameElem, expected : &str, identifier_span : Span, errors : &ErrorCollector) {
@@ -487,5 +488,15 @@ impl<'linker, 'resolved_list> GlobalResolver<'linker, 'resolved_list> {
                 None
             }
         }
+    }
+
+    pub fn get_module(&self, index: ModuleUUID) -> &'linker Module {
+        &self.linker.modules[index]
+    }
+    pub fn get_constant(&self, index: ConstantUUID) -> &'linker NamedConstant {
+        &self.linker.constants[index]
+    }
+    pub fn get_type(&self, index: TypeUUID) -> &'linker NamedType {
+        &self.linker.types[index]
     }
 }

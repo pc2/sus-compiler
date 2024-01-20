@@ -2,7 +2,7 @@
 
 use crate::{tokenizer::{TokenTypeIdx, get_token_type_name}, linker::FileUUID, flattening::FlattenedModule, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList, value::Value, errors::ErrorCollector};
 use core::ops::Range;
-use std::fmt::Display;
+use std::{fmt::Display, iter::zip};
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
@@ -155,13 +155,49 @@ impl LinkInfo {
     }
 }
 
+
+#[derive(Debug, Clone)]
+pub struct InterfacePorts<ID : Clone + Copy> {
+    pub outputs_start : usize,
+    pub ports : Box<[ID]>
+}
+
+impl<ID : Clone + Copy> InterfacePorts<ID> {
+    pub fn empty() -> Self {
+        InterfacePorts{outputs_start : 0, ports : Box::new([])}
+    }
+
+    // Todo, just treat all inputs and outputs as function call interface
+    pub fn func_call_syntax_inputs(&self) -> Range<usize> {
+        0..self.outputs_start
+    }
+    pub fn func_call_syntax_outputs(&self) -> Range<usize> {
+        self.outputs_start..self.ports.len()
+    }
+    pub fn inputs(&self) -> &[ID] {
+        &self.ports[..self.outputs_start]
+    }
+    pub fn outputs(&self) -> &[ID] {
+        &self.ports[self.outputs_start..]
+    }
+
+    pub fn map<OtherID : Clone + Copy, MapFn : FnMut(ID, /*is_input : */bool) -> OtherID>(&self, f : &mut MapFn) -> InterfacePorts<OtherID> {
+        InterfacePorts{
+            ports : self.ports.iter().enumerate().map(|(idx, v)| f(*v, idx < self.outputs_start)).collect(),
+            outputs_start : self.outputs_start
+        }
+    }
+    pub fn iter(&self) -> impl Iterator<Item = (ID, /*is_input : */bool)> + '_ {
+        self.ports.iter().enumerate().map(|(idx, v)| (*v, idx < self.outputs_start))
+    }
+}
+
 #[derive(Debug)]
 pub struct Module {
     pub link_info : LinkInfo,
 
     pub declarations : FlatAlloc<SignalDeclaration, DeclIDMarker>,
-    pub ports : Box<[DeclID]>,
-    pub outputs_start : usize,
+    pub ports : InterfacePorts<DeclID>,
     pub code : CodeBlock,
 
     pub flattened : FlattenedModule,
@@ -172,10 +208,10 @@ pub struct Module {
 impl Module {
     pub fn print_flattened_module(&self) {
         println!("Interface:");
-        for (port_idx, port) in self.flattened.interface_ports.iter().enumerate() {
-            let port_direction = if port_idx < self.flattened.outputs_start {"input"} else {"output"};
-            let port_name = &self.declarations[self.ports[port_idx]].name;
-            println!("    {port_direction} {port_name} -> {:?}", *port);
+        for ((port, is_input), port_decl) in zip(self.flattened.interface_ports.iter(), self.ports.ports.iter()) {
+            let port_direction = if is_input {"input"} else {"output"};
+            let port_name = &self.declarations[*port_decl].name;
+            println!("    {port_direction} {port_name} -> {:?}", port);
         }
         println!("Instantiations:");
         for (id, inst) in &self.flattened.instantiations {
