@@ -231,6 +231,17 @@ module blur2 :
 		blurred = data + prev;
 	}
 	prev = data;
+
+	gen int a;
+
+	gen bool b = true;
+	bool bb = false;
+
+	if bb {
+		a = 5;
+	} else {
+		a = 3;
+	}
 }
 
 

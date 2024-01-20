@@ -436,7 +436,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instantiation::IfStatement(stm) => {
                     let then_range = UUIDRange(stm.then_start, stm.then_end_else_start);
                     let else_range = UUIDRange(stm.then_end_else_start, stm.else_end);
-                    if stm.is_compiletime {
+                    let if_condition_wire = self.flattened.instantiations[stm.condition].extract_wire();
+                    if if_condition_wire.is_compiletime {
                         let condition_val = self.get_generation_value(stm.condition)?;
                         let run_range = if condition_val.extract_bool() {
                             then_range
