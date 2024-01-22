@@ -700,7 +700,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
     }
 
     /* 
-        ==== Additional Warnings
+        ==== Additional Warnings ====
     */
     fn find_unused_variables(&self, interface : &InterfacePorts<FlatID>) {
         // Setup Wire Fanouts List for faster processing

@@ -235,7 +235,7 @@ module blur2 :
 	gen int a;
 
 	gen bool b = true;
-	bool bb = false;
+	gen bool bb = false;
 
 	if bb {
 		a = 5;
