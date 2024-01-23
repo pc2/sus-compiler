@@ -1,7 +1,7 @@
 use std::{ops::Deref, iter::zip};
 
 use crate::{
-    ast::{Span, Module, Expression, SpanExpression, LocalOrGlobal, Operator, AssignableExpression, SpanAssignableExpression, Statement, CodeBlock, IdentifierType, TypeExpression, DeclIDMarker, DeclID, SpanTypeExpression, InterfacePorts},
+    ast::{AssignableExpression, CodeBlock, DeclID, DeclIDMarker, Expression, IdentifierType, InterfacePorts, LocalOrGlobal, Module, Operator, SignalDeclaration, Span, SpanAssignableExpression, SpanExpression, SpanTypeExpression, Statement, TypeExpression},
     linker::{Linker, FileUUID, GlobalResolver, ResolvedGlobals, NamedConstant, ConstantUUID, ModuleUUID, NameElem, NamedType, TypeUUIDMarker},
     errors::{ErrorCollector, error_info, ErrorInfo}, arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange, ArenaAllocator}, typing::{Type, typecheck_unary_operator, get_binary_operator_types, typecheck, typecheck_is_array_indexer, BOOL_TYPE, INT_TYPE}, value::Value
 };
@@ -84,12 +84,13 @@ pub struct WireDeclaration {
     pub identifier_type : IdentifierType,
     pub latency_specifier : Option<FlatID>
 }
-impl WireDeclaration {
-    pub fn get_full_decl_span(&self) -> Span {
-        let name_pos = self.name_token;
-        Span(self.typ_span.0, name_pos)
-    }
+
+#[derive(Debug)]
+pub struct WireInitialValue {
+    pub to : ConnectionWrite,
+    pub initial_val : FlatID
 }
+
 
 #[derive(Debug)]
 pub struct SubModuleInstance {
@@ -121,6 +122,7 @@ pub struct ForStatement {
 pub enum Instantiation {
     SubModule(SubModuleInstance),
     WireDeclaration(WireDeclaration),
+    WireInitialValue(WireInitialValue),
     Wire(WireInstance),
     Connection(Connection),
     IfStatement(IfStatement),
@@ -146,10 +148,7 @@ impl Instantiation {
 
     pub fn for_each_embedded_type<F : FnMut(&Type, Span)>(&self, f : &mut F) {
         match self {
-            Instantiation::SubModule(_) => {}
-            Instantiation::Connection(_) => {}
-            Instantiation::IfStatement(_) => {}
-            Instantiation::ForStatement(_) => {}
+            Instantiation::SubModule(_) | Instantiation::Connection(_) | Instantiation::IfStatement(_) | Instantiation::ForStatement(_) | Instantiation::WireInitialValue(_) => {}
             Instantiation::WireDeclaration(decl) => {
                 f(&decl.typ, decl.typ_span);
             }
@@ -165,7 +164,7 @@ impl Instantiation {
             Instantiation::WireDeclaration(decl) => Some((decl.typ_span, decl.is_remote_declaration)),
             Instantiation::Wire(w) => Some((w.span, w.is_remote_declaration)),
             Instantiation::Connection(conn) => Some((conn.to.span, conn.to.is_remote_declaration)),
-            Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => None
+            Instantiation::IfStatement(_) | Instantiation::ForStatement(_) | Instantiation::WireInitialValue(_) => None
         }
     }
 }
@@ -417,6 +416,11 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                 Statement::Declaration(decl_id) => {
                     let _wire_id = self.flatten_declaration::<true>(*decl_id, false);
                 }
+                Statement::Initial{to, eq_sign_position : _, value_expr} => {
+                    let flat_to = self.flatten_assignable_expr(to).unwrap();
+                    let initial_val = self.flatten_expr(value_expr).unwrap();
+                    self.instantiations.alloc(Instantiation::WireInitialValue(WireInitialValue{to : flat_to, initial_val}));
+                }
                 Statement::Assign{to, expr : (Expression::FuncCall(func_and_args), func_span), eq_sign_position} => {
                     let Some((md, interface)) = self.desugar_func_call(&func_and_args, func_span.1) else {continue};
                     let output_range = interface.func_call_syntax_outputs();
@@ -507,8 +511,35 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
     /*
         ==== Typechecking ====
     */
+    fn make_declared_here(&self, decl : &WireDeclaration) -> ErrorInfo {
+        error_info(Span(decl.typ_span.0, decl.name_token), self.errors.file, "Declared here")
+    }
+
     fn typecheck_wire_is_of_type(&self, wire : &WireInstance, expected : &Type, context : &str) {
         typecheck(&wire.typ, wire.span, expected, context, self.type_list_for_naming, &self.errors);
+    }
+
+    fn typecheck_connection(&self, to : &ConnectionWrite, from : FlatID) {
+        // Typecheck digging down into write side
+        let conn_root = self.instantiations[to.root].extract_wire_declaration();
+        let mut write_to_type = Some(&conn_root.typ);
+        for p in &to.path {
+            match p {
+                &ConnectionWritePathElement::ArrayIdx{idx, idx_span} => {
+                    let idx_wire = self.instantiations[idx].extract_wire();
+                    self.typecheck_wire_is_of_type(idx_wire, &INT_TYPE, "array index");
+                    if let Some(wr) = write_to_type {
+                        write_to_type = typecheck_is_array_indexer(wr, idx_span, self.type_list_for_naming, &self.errors);
+                    }
+                }
+            }
+        }
+
+        // Typecheck the value with target type
+        let from_wire = self.instantiations[from].extract_wire();
+        if let Some(target_type) = write_to_type {
+            self.typecheck_wire_is_of_type(from_wire, &target_type, "connection");
+        }
     }
 
     fn typecheck(&mut self) {
@@ -526,6 +557,9 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     decl.typ.for_each_generative_input(&mut |param_id| {
                         self.typecheck_wire_is_of_type(self.instantiations[param_id].extract_wire(), &INT_TYPE, "Array size");
                     });
+                }
+                Instantiation::WireInitialValue(wire_init) => {
+                    self.typecheck_connection(&wire_init.to, wire_init.initial_val);
                 }
                 Instantiation::IfStatement(stm) => {
                     let wire = &self.instantiations[stm.condition].extract_wire();
@@ -578,26 +612,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     w.typ = result_typ;
                 }
                 Instantiation::Connection(conn) => {
-                    // Typecheck digging down into write side
-                    let conn_root = self.instantiations[conn.to.root].extract_wire_declaration();
-                    let mut write_to_type = Some(&conn_root.typ);
-                    for p in &conn.to.path {
-                        match p {
-                            &ConnectionWritePathElement::ArrayIdx{idx, idx_span} => {
-                                let idx_wire = self.instantiations[idx].extract_wire();
-                                self.typecheck_wire_is_of_type(idx_wire, &INT_TYPE, "array index");
-                                if let Some(wr) = write_to_type {
-                                    write_to_type = typecheck_is_array_indexer(wr, idx_span, self.type_list_for_naming, &self.errors);
-                                }
-                            }
-                        }
-                    }
-
-                    // Typecheck the value with target type
-                    let from_wire = self.instantiations[conn.from].extract_wire();
-                    if let Some(target_type) = write_to_type {
-                        self.typecheck_wire_is_of_type(from_wire, &target_type, "connection");
-                    }
+                    self.typecheck_connection(&conn.to, conn.from);
                 }
             }
         }
@@ -648,7 +663,14 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                         self.must_be_compiletime(self.instantiations[param_id].extract_wire(), "Array size");
                     });
                 }
-
+                Instantiation::WireInitialValue(wire_init) => {
+                    let decl = self.instantiations[wire_init.to.root].extract_wire_declaration();
+                    if decl.identifier_type != IdentifierType::State {
+                        self.errors.error_with_info(wire_init.to.span, "Initial values can only be given to state registers!", vec![self.make_declared_here(decl)])
+                    }
+                    let from_wire = self.instantiations[wire_init.initial_val].extract_wire();
+                    self.must_be_compiletime(from_wire, "initial value assignment")
+                }
                 Instantiation::Wire(wire) => {
                     let mut is_generative = true;
                     if let WireSource::WireRead(from) = &wire.source {
@@ -673,14 +695,14 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     if conn_root_decl.identifier_type == IdentifierType::Generative {
                         let from_wire = self.instantiations[conn.from].extract_wire();
                         // Check that whatever's written to this declaration is also generative
-                        self.must_be_compiletime_with_info(from_wire, "Assignments to generative variables", || vec![error_info(conn_root_decl.get_full_decl_span(), self.errors.file, "Declared here")]);
+                        self.must_be_compiletime_with_info(from_wire, "Assignments to generative variables", || vec![self.make_declared_here(conn_root_decl)]);
 
                         // Check that this declaration isn't used in a non-compiletime if
                         let declared_at_depth = declaration_depths[conn.to.root].unwrap();
     
                         if runtime_if_stack.len() > declared_at_depth {
                             let mut infos = Vec::new();
-                            infos.push(error_info(conn_root_decl.get_full_decl_span(), self.errors.file, "Declared here"));
+                            infos.push(self.make_declared_here(conn_root_decl));
                             for (_, if_cond_span) in &runtime_if_stack[declared_at_depth..] {
                                 infos.push(error_info(*if_cond_span, self.errors.file, "Runtime Condition here"));
                             }
@@ -704,30 +726,40 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
     */
     fn find_unused_variables(&self, interface : &InterfacePorts<FlatID>) {
         // Setup Wire Fanouts List for faster processing
-        let mut gathered_connection_fanin : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.instantiations.iter().map(|_| Vec::new()).collect();
+        let mut instance_fanins : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.instantiations.iter().map(|_| Vec::new()).collect();
 
         for (inst_id, inst) in self.instantiations.iter() {
             match inst {
                 Instantiation::Connection(conn) => {
-                    gathered_connection_fanin[conn.to.root].push(conn.from);
+                    instance_fanins[conn.to.root].push(conn.from);
                 }
                 Instantiation::SubModule(sm) => {
                     for w in sm.interface_ports.outputs() {
-                        gathered_connection_fanin[*w].push(inst_id);
+                        instance_fanins[*w].push(inst_id);
+                    }
+                    for port in sm.interface_ports.inputs() {
+                        instance_fanins[inst_id].push(*port);
                     }
                 }
-                Instantiation::WireDeclaration(_) => {} // Handle these outside
-                Instantiation::Wire(_) => {}
+                Instantiation::WireDeclaration(decl) => {
+                    decl.typ.for_each_generative_input(&mut |id| instance_fanins[inst_id].push(id));
+                }
+                Instantiation::WireInitialValue(init_val) => {
+                    instance_fanins[init_val.to.root].push(init_val.initial_val);
+                }
+                Instantiation::Wire(wire) => {
+                    wire.source.for_each_input_wire(&mut |id| instance_fanins[inst_id].push(id));
+                }
                 Instantiation::IfStatement(stm) => {
                     for id in UUIDRange(stm.then_start, stm.else_end) {
                         if let Instantiation::Connection(conn) = &self.instantiations[id] {
-                            gathered_connection_fanin[conn.to.root].push(stm.condition);
+                            instance_fanins[conn.to.root].push(stm.condition);
                         }
                     }
                 }
                 Instantiation::ForStatement(stm) => {
-                    gathered_connection_fanin[stm.loop_var_decl].push(stm.start);
-                    gathered_connection_fanin[stm.loop_var_decl].push(stm.end);
+                    instance_fanins[stm.loop_var_decl].push(stm.start);
+                    instance_fanins[stm.loop_var_decl].push(stm.end);
                 }
             }
         }
@@ -742,28 +774,11 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         }
 
         while let Some(item) = wire_to_explore_queue.pop() {
-            let mut mark_not_unused = |from| {
-                if !is_instance_used_map[from] {
-                    is_instance_used_map[from] = true;
-                    wire_to_explore_queue.push(from);
+            for from in &instance_fanins[item] {
+                if !is_instance_used_map[*from] {
+                    is_instance_used_map[*from] = true;
+                    wire_to_explore_queue.push(*from);
                 }
-            };
-            match &self.instantiations[item] {
-                Instantiation::WireDeclaration(decl) => {
-                    decl.typ.for_each_generative_input(&mut mark_not_unused);
-                }
-                Instantiation::Wire(wire) => {
-                    wire.source.for_each_input_wire(&mut mark_not_unused);
-                }
-                Instantiation::SubModule(submodule) => {
-                    for port in submodule.interface_ports.inputs() {
-                        mark_not_unused(*port);
-                    }
-                }
-                Instantiation::Connection(_) | Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => {unreachable!()}
-            }
-            for from in &gathered_connection_fanin[item] {
-                mark_not_unused(*from);
             }
         }
 

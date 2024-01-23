@@ -46,7 +46,7 @@ pub enum StateInitialValue {
 #[derive(Debug)]
 pub enum RealWireDataSource {
     ReadOnly,
-    Multiplexer{is_state : StateInitialValue, sources : Vec<MultiplexerSource>},
+    Multiplexer{is_state : Option<Value>, sources : Vec<MultiplexerSource>},
     UnaryOp{op : Operator, right : WireID},
     BinaryOp{op : Operator, left : WireID, right : WireID},
     ArrayAccess{arr : WireID, arr_idx : WireID},
@@ -406,8 +406,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         let source = if wire_decl.read_only {
                             RealWireDataSource::ReadOnly
                         } else {
-                            // TODO initial value
-                            let is_state = if wire_decl.identifier_type == IdentifierType::State{StateInitialValue::State{initial_value: Value::Unset}} else {StateInitialValue::Combinatorial};
+                            let is_state = if wire_decl.identifier_type == IdentifierType::State {
+                                Some(Value::Unset)
+                            } else {
+                                None
+                            };
                             RealWireDataSource::Multiplexer{is_state, sources : Vec::new()}
                         };
                         let latency_specifier = if let Some(lat_spec_flat) = wire_decl.latency_specifier {
@@ -418,6 +421,15 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         };
                         SubModuleOrWire::Wire(self.wires.alloc(RealWire{name: wire_decl.name.clone(), typ, original_wire, source, latency_specifier}))
                     }
+                }
+                Instantiation::WireInitialValue(init_val) => {
+                    let found_v = self.get_generation_value(init_val.initial_val)?.clone();
+                    let cvt_path = self.convert_connection_path_to_known_values(&init_val.to.path)?;
+                    // Hack to get around the borrow rules here
+                    let SubModuleOrWire::Wire(w) = &mut self.generation_state[init_val.to.root] else {unreachable!()};
+                    let RealWireDataSource::Multiplexer{is_state : Some(initial_value), sources : _} = &mut self.wires[*w].source else {unreachable!()};
+                    write_gen_variable(initial_value, &cvt_path, found_v);
+                    continue;
                 }
                 Instantiation::Wire(w) => {
                     let typ = self.concretize_type(&w.typ, w.span)?;

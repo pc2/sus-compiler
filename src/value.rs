@@ -53,6 +53,13 @@ impl Value {
         }
     }
 
+    pub fn is_valid(&self) -> bool {
+        match self {
+            Value::Unset | Value::Error => false,
+            _other => true
+        }
+    }
+
     #[track_caller]
     pub fn extract_integer(&self) -> &BigInt {
         let Self::Integer(i) = self else {panic!("{:?} is not an integer!", self)};

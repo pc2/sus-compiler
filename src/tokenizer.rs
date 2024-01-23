@@ -26,7 +26,7 @@ impl Token {
     }
 }
 
-pub const ALL_KEYWORDS : [(&'static str, u8); 19] = [
+pub const ALL_KEYWORDS : [(&'static str, u8); 20] = [
     ("template", 0),
     ("module", 0),
     ("pipeline", 0),
@@ -45,7 +45,8 @@ pub const ALL_KEYWORDS : [(&'static str, u8); 19] = [
     ("enum", 0),
     ("reg", 0),
     ("finish", 0),
-    ("gen", 0)
+    ("gen", 0),
+    ("initial", 0)
 ];
 
 // Extra data is opreator prescedence. Lower number is higher prescedence of operators

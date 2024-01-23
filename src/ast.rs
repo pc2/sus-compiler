@@ -130,6 +130,7 @@ pub struct RangeExpression {
 #[derive(Debug)]
 pub enum Statement {
     Declaration(DeclID),
+    Initial{to : SpanAssignableExpression, eq_sign_position : usize, value_expr : SpanExpression},
     Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : SpanExpression}, // num_regs v = expr;
     If{condition : SpanExpression, then : CodeBlock, els : Option<CodeBlock>},
     For{var : DeclID, range : RangeExpression, code : CodeBlock},

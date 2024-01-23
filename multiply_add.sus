@@ -256,7 +256,8 @@ module Tree_Multiply : int[4] values -> int total {
 
 //timeline (X, false -> /)* .. (X, true -> T)
 module Accumulator : int term, bool done -> int total {
-    state int tot = 0; // Initial value, not a real assignment
+    state int tot;
+	initial tot = 0;
 
     int new_tot = tot + term;
     if done {
@@ -270,7 +271,8 @@ module Accumulator : int term, bool done -> int total {
 
 //timeline (a, true -> /) | (a, false -> /) .. (a, false -> r)* .. (a, true -> r)
 module blur : int a, bool done -> int result {
-	state bool working = false; // Initial value, not a real assignment
+	state bool working;
+	initial working = false;
 	state int prev;
 
 	if working {
@@ -284,7 +286,8 @@ module blur : int a, bool done -> int result {
 
 //timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
 module Unpack4 : int[4] packed -> int out_stream {
-    state int st = 0; // Initial value, not a real assignment
+    state int st;
+	initial st = 0;
     state int[3] stored_packed;
 
     if st == 0 {

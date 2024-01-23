@@ -578,7 +578,7 @@ impl<'file> ASTParserContext<'file> {
         }
     }
 
-    fn parse_statement_handle_assignment(&mut self, left_expressions: Vec<LeftExpression>, assign_pos: usize, token_stream: &mut TokenStream<'_>, scope: &mut LocalVariableContext<'_, 'file>, statements: &mut Vec<(Statement, Span)>, start_at: usize) -> Option<()> {
+    fn parse_statement_handle_assignment(&mut self, left_expressions: Vec<LeftExpression>, assign_pos: usize, token_stream: &mut TokenStream<'_>, scope: &mut LocalVariableContext<'_, 'file>, statements: &mut Vec<SpanStatement>, start_at: usize) -> Option<()> {
         if left_expressions.len() == 0 {
             self.error_unexpected_token(&[TOKEN_IDENTIFIER], kw("="), assign_pos, "statement");
             None
@@ -625,7 +625,7 @@ impl<'file> ASTParserContext<'file> {
         let right_expr = self.parse_expression(token_stream, scope)?;
         Some(RangeExpression{from : left_expr, to : right_expr})
     }
-    fn parse_if_statement(&mut self, token_stream : &mut TokenStream, if_token : &TokenContent, scope : &LocalVariableContext<'_, 'file>) -> Option<(Statement, Span)> {
+    fn parse_if_statement(&mut self, token_stream : &mut TokenStream, if_token : TokenContent, scope : &LocalVariableContext<'_, 'file>) -> Option<SpanStatement> {
         let condition = self.parse_expression(token_stream, &scope)?;
 
         let (then_block, then_block_span) = self.eat_block(token_stream, kw("{"), "Then block of if statement")?;
@@ -633,11 +633,12 @@ impl<'file> ASTParserContext<'file> {
         
         let (else_content, span_end) = if let Some(_else_tok) = token_stream.eat_is_plain(kw("else")) {
             if let Some(continuation_if) = token_stream.eat_is_plain(kw("if")) {
-                if let Some(stmt) = self.parse_if_statement(token_stream, &continuation_if, scope) {
+                let cont_if_pos = continuation_if.position;
+                if let Some(stmt) = self.parse_if_statement(token_stream, continuation_if, scope) {
                     let end = stmt.1.1;
                     (Some(CodeBlock{statements : vec![stmt]}), end)
                 } else {
-                    (Some(CodeBlock{statements : Vec::new()}), continuation_if.position)
+                    (Some(CodeBlock{statements : Vec::new()}), cont_if_pos)
                 }
             } else {
                 let (else_block, else_block_span) = self.eat_block(token_stream, kw("{"), "Else block of if statement")?;
@@ -649,7 +650,7 @@ impl<'file> ASTParserContext<'file> {
 
         Some((Statement::If{condition, then: then_content, els: else_content }, Span(if_token.position, span_end)))
     }
-    fn parse_for_loop(&mut self, token_stream : &mut TokenStream, for_token : &TokenContent, scope : &mut LocalVariableContext<'_, 'file>) -> Option<(Statement, Span)> {
+    fn parse_for_loop(&mut self, token_stream : &mut TokenStream, for_token : TokenContent, scope : &mut LocalVariableContext<'_, 'file>) -> Option<SpanStatement> {
         let var = self.parse_signal_declaration(token_stream, IdentifierType::Generative, scope)?;
 
         let _in_kw = self.eat_plain(token_stream, kw("in"), "for loop")?;
@@ -661,6 +662,16 @@ impl<'file> ASTParserContext<'file> {
 
         Some((Statement::For{var, range, code}, Span(for_token.position, for_block_span.1)))
     }
+
+    fn parse_initial_value(&mut self, token_stream : &mut TokenStream, initial_token : TokenContent, scope : &LocalVariableContext<'_, 'file>) -> Option<SpanStatement> {
+        let to = self.parse_unit_expression(token_stream, scope)?;
+        let assignable_to = self.convert_expression_to_assignable_expression(to)?;
+        let eq_pos = self.eat_plain(token_stream, kw("="), "initial value assignment")?;
+        let value_expr = self.parse_expression(token_stream, scope)?;
+        let semicolon_pos = self.eat_plain(token_stream, kw(";"), "initial value assignment")?;
+        Some((Statement::Initial{to: assignable_to, eq_sign_position: eq_pos, value_expr}, Span(initial_token.position, semicolon_pos)))
+    }
+
     fn parse_code_block(&mut self, block_tokens : &[TokenTreeNode], span : Span, outer_scope : &LocalVariableContext<'_, 'file>) -> CodeBlock {
         let mut token_stream = TokenStream::new(block_tokens, span.0, span.1);
 
@@ -684,13 +695,20 @@ impl<'file> ASTParserContext<'file> {
 
             // If statements
             if let Some(if_token) = token_stream.eat_is_plain(kw("if")) {
-                let Some(if_stmt) = self.parse_if_statement(&mut token_stream, &if_token, &mut inner_scope) else {continue;};
+                let Some(if_stmt) = self.parse_if_statement(&mut token_stream, if_token, &mut inner_scope) else {continue;};
                 code_block.statements.push(if_stmt);
             }
 
+            // For loop
             if let Some(for_token) = token_stream.eat_is_plain(kw("for")) {
-                let Some(for_loop_stmt) = self.parse_for_loop(&mut token_stream, &for_token, &mut inner_scope) else {continue;};
+                let Some(for_loop_stmt) = self.parse_for_loop(&mut token_stream, for_token, &mut inner_scope) else {continue;};
                 code_block.statements.push(for_loop_stmt);
+            }
+
+            // Initial value for state register
+            if let Some(initial_token) = token_stream.eat_is_plain(kw("initial")) {
+                let Some(initial_stmt) = self.parse_initial_value(&mut token_stream, initial_token, &mut inner_scope) else {continue;};
+                code_block.statements.push(initial_stmt);
             }
             
             if self.parse_statement(&mut token_stream, &mut inner_scope, &mut code_block).is_none() {

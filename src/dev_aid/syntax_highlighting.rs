@@ -138,6 +138,10 @@ fn walk_name_color(all_objects : &[NameElem], linker : &Linker, result : &mut [I
                                 set_span_name_color(span, IDEIdentifierType::Type, result);
                             });
                         }
+                        Instantiation::WireInitialValue(init_val) => {
+                            let decl = module.flattened.instantiations[init_val.to.root].extract_wire_declaration();
+                            result[init_val.to.span.0].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
+                        }
                         Instantiation::Connection(conn) => {
                             let decl = module.flattened.instantiations[conn.to.root].extract_wire_declaration();
                             if decl.is_remote_declaration {continue;} // Virtual wires don't appear in this program text
