@@ -38,12 +38,6 @@ pub struct MultiplexerSource {
 }
 
 #[derive(Debug)]
-pub enum StateInitialValue {
-    Combinatorial,
-    State{initial_value : Value} // Value::Unset for non initialized State
-}
-
-#[derive(Debug)]
 pub enum RealWireDataSource {
     ReadOnly,
     Multiplexer{is_state : Option<Value>, sources : Vec<MultiplexerSource>},

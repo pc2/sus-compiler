@@ -1,7 +1,7 @@
 use std::{ops::Deref, iter::zip};
 
 use crate::{
-    ast::{AssignableExpression, CodeBlock, DeclID, DeclIDMarker, Expression, IdentifierType, InterfacePorts, LocalOrGlobal, Module, Operator, SignalDeclaration, Span, SpanAssignableExpression, SpanExpression, SpanTypeExpression, Statement, TypeExpression},
+    ast::{AssignableExpression, CodeBlock, DeclID, DeclIDMarker, Expression, IdentifierType, InterfacePorts, LocalOrGlobal, Module, Operator, Span, SpanAssignableExpression, SpanExpression, SpanTypeExpression, Statement, TypeExpression},
     linker::{Linker, FileUUID, GlobalResolver, ResolvedGlobals, NamedConstant, ConstantUUID, ModuleUUID, NameElem, NamedType, TypeUUIDMarker},
     errors::{ErrorCollector, error_info, ErrorInfo}, arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange, ArenaAllocator}, typing::{Type, typecheck_unary_operator, get_binary_operator_types, typecheck, typecheck_is_array_indexer, BOOL_TYPE, INT_TYPE}, value::Value
 };
@@ -158,13 +158,14 @@ impl Instantiation {
         }
     }
 
-    pub fn get_location(&self) -> Option<(Span, bool)> {
+    pub fn get_location_if_in_this_module(&self) -> Option<Span> {
         match self {
-            Instantiation::SubModule(sm) => Some((sm.typ_span, sm.is_remote_declaration)),
-            Instantiation::WireDeclaration(decl) => Some((decl.typ_span, decl.is_remote_declaration)),
-            Instantiation::Wire(w) => Some((w.span, w.is_remote_declaration)),
-            Instantiation::Connection(conn) => Some((conn.to.span, conn.to.is_remote_declaration)),
-            Instantiation::IfStatement(_) | Instantiation::ForStatement(_) | Instantiation::WireInitialValue(_) => None
+            Instantiation::SubModule(sm) => sm.is_remote_declaration.then_some(sm.typ_span),
+            Instantiation::WireDeclaration(decl) => decl.is_remote_declaration.then_some(decl.typ_span),
+            Instantiation::Wire(w) => w.is_remote_declaration.then_some(w.span),
+            Instantiation::Connection(conn) => conn.to.is_remote_declaration.then_some(conn.to.span),
+            Instantiation::WireInitialValue(init_val) => init_val.to.is_remote_declaration.then_some(init_val.to.span),
+            Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => None
         }
     }
 }
@@ -204,7 +205,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
     fn flatten_declaration<const ALLOW_MODULES : bool>(&mut self, decl_id : DeclID, read_only : bool) -> FlatID {
         let decl = &self.module.declarations[decl_id];
 
-        let typ : Type = if let TypeExpression::Named = &decl.typ.0 {
+        let typ = if let TypeExpression::Named = &decl.typ.0 {
             match self.linker.resolve_global(decl.typ.1, &self.errors) {
                 Some(NameElem::Module(id)) if ALLOW_MODULES => {
                     let md = &self.linker.get_module(id);
