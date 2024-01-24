@@ -194,11 +194,8 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
             TypeExpression::Array(b) => {
                 let (array_type_expr, array_size_expr) = b.deref();
                 let array_element_type = self.map_to_type(&array_type_expr);
-                if let Some(array_size_wire_id) = self.flatten_expr(array_size_expr) {
-                    Type::Array(Box::new((array_element_type, array_size_wire_id)))
-                } else {
-                    Type::Error
-                }
+                let array_size_wire_id = self.flatten_expr(array_size_expr);
+                Type::Array(Box::new((array_element_type, array_size_wire_id)))
             }
         }
     }
@@ -228,12 +225,9 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         let typ_span = decl.typ.1;
 
         let latency_specifier = if let Some(lat_expr) = &decl.latency_expr {
-            if let Some(latency_spec) = self.flatten_expr(lat_expr) {
-                self.must_be_compiletime(self.instantiations[latency_spec].extract_wire(), "Latency specifier");
-                Some(latency_spec)
-            } else {
-                None
-            }
+            let latency_spec = self.flatten_expr(lat_expr);
+            self.must_be_compiletime(self.instantiations[latency_spec].extract_wire(), "Latency specifier");
+            Some(latency_spec)
         } else {
             None
         };
@@ -325,64 +319,72 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         }
 
         for (field, arg_expr) in zip(inputs, args) {
-            if let Some(arg_read_side) = self.flatten_expr(arg_expr) {
-                /*if self.typecheck(arg_read_side, &md.interface.interface_wires[field].typ, "submodule output") == None {
-                    continue;
-                }*/
-                let func_input_port = &submodule_local_wires.ports[field];
-                self.instantiations.alloc(Instantiation::Connection(Connection{num_regs: 0, from: arg_read_side, to: ConnectionWrite{root : *func_input_port, path : Vec::new(), span : *name_expr_span, is_remote_declaration : self.is_remote_declaration}}));
-            }
+            let arg_read_side = self.flatten_expr(arg_expr);
+            let func_input_port = &submodule_local_wires.ports[field];
+            self.instantiations.alloc(Instantiation::Connection(Connection{num_regs: 0, from: arg_read_side, to: ConnectionWrite{root : *func_input_port, path : Vec::new(), span : *name_expr_span, is_remote_declaration : self.is_remote_declaration}}));
         }
 
         Some((md, submodule_local_wires))
     }
-    fn flatten_expr(&mut self, (expr, expr_span) : &SpanExpression) -> Option<FlatID> {
+    fn flatten_expr(&mut self, (expr, expr_span) : &SpanExpression) -> FlatID {
         let source = match expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {
                 let from_wire = self.decl_to_flat_map[*l].unwrap();
                 WireSource::WireRead(from_wire)
             }
             Expression::Named(LocalOrGlobal::Global(ref_span)) => {
-                let cst = self.linker.resolve_constant(*ref_span, &self.errors)?;
-                WireSource::NamedConstant(cst)
+                if let Some(cst) = self.linker.resolve_constant(*ref_span, &self.errors) {
+                    WireSource::NamedConstant(cst)
+                } else {
+                    WireSource::Constant(Value::Error)
+                }
             }
             Expression::Constant(cst) => {
                 WireSource::Constant(cst.clone())
             }
             Expression::UnaryOp(op_box) => {
                 let (op, _op_pos, operate_on) = op_box.deref();
-                let right = self.flatten_expr(operate_on)?;
+                let right = self.flatten_expr(operate_on);
                 WireSource::UnaryOp{op : *op, right}
             }
             Expression::BinOp(binop_box) => {
                 let (left_expr, op, _op_pos, right_expr) = binop_box.deref();
-                let left = self.flatten_expr(left_expr)?;
-                let right = self.flatten_expr(right_expr)?;
+                let left = self.flatten_expr(left_expr);
+                let right = self.flatten_expr(right_expr);
                 WireSource::BinaryOp{op : *op, left, right}
             }
             Expression::Array(arr_box) => {
                 let (left, right, _bracket_span) = arr_box.deref();
-                let arr = self.flatten_expr(left)?;
-                let arr_idx = self.flatten_expr(right)?;
+                let arr = self.flatten_expr(left);
+                let arr_idx = self.flatten_expr(right);
                 WireSource::ArrayAccess{arr, arr_idx}
             }
             Expression::FuncCall(func_and_args) => {
-                let (md, interface_wires) = self.desugar_func_call(func_and_args, expr_span.1)?;
+                if let Some((md, interface_wires)) = self.desugar_func_call(func_and_args, expr_span.1) {
+                    let output_range = interface_wires.func_call_syntax_outputs();
 
-                let output_range = interface_wires.func_call_syntax_outputs();
+                    if output_range.len() != 1 {
+                        let info = error_info(md.link_info.span, md.link_info.file, "Module Defined here");
+                        self.errors.error_with_info(*expr_span, "A function called in this context may only return one result. Split this function call into a separate line instead.", vec![info]);
+                    }
 
-                if output_range.len() != 1 {
-                    let info = error_info(md.link_info.span, md.link_info.file, "Module Defined here");
-                    self.errors.error_with_info(*expr_span, "A function called in this context may only return one result. Split this function call into a separate line instead.", vec![info]);
-                    return None;
+                    if output_range.len() >= 1 {
+                        return interface_wires.ports[output_range.start];
+                    }
                 }
-
-                return Some(interface_wires.ports[output_range.start])
+                // Function desugaring or using threw an error
+                WireSource::Constant(Value::Error)
             }
         };
 
-        let wire_instance = WireInstance{typ : Type::Unknown, is_compiletime : IS_GEN_UNINIT, span : *expr_span, source, is_remote_declaration : self.is_remote_declaration,};
-        Some(self.instantiations.alloc(Instantiation::Wire(wire_instance)))
+        let wire_instance = WireInstance{
+            typ : Type::Unknown,
+            is_compiletime : IS_GEN_UNINIT,
+            span : *expr_span,
+            source,
+            is_remote_declaration : self.is_remote_declaration
+        };
+        self.instantiations.alloc(Instantiation::Wire(wire_instance))
     }
     fn flatten_assignable_expr(&mut self, (expr, span) : &SpanAssignableExpression) -> Option<ConnectionWrite> {
         Some(match expr {
@@ -401,7 +403,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                 let (arr, idx_expr, _bracket_span) = arr_box.deref();
                 let flattened_arr_expr_opt = self.flatten_assignable_expr(arr);
                 
-                let idx = self.flatten_expr(idx_expr)?;
+                let idx = self.flatten_expr(idx_expr);
 
                 let mut flattened_arr_expr = flattened_arr_expr_opt?; // only unpack the subexpr after flattening the idx, so we catch all errors
 
@@ -418,8 +420,8 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     let _wire_id = self.flatten_declaration::<true>(*decl_id, false);
                 }
                 Statement::Initial{to, eq_sign_position : _, value_expr} => {
-                    let flat_to = self.flatten_assignable_expr(to).unwrap();
-                    let initial_val = self.flatten_expr(value_expr).unwrap();
+                    let initial_val = self.flatten_expr(value_expr);
+                    let Some(flat_to) = self.flatten_assignable_expr(to) else {continue};
                     self.instantiations.alloc(Instantiation::WireInitialValue(WireInitialValue{to : flat_to, initial_val}));
                 }
                 Statement::Assign{to, expr : (Expression::FuncCall(func_and_args), func_span), eq_sign_position} => {
@@ -441,18 +443,17 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                         }
                     }
 
-                    for (field, to_i) in zip(outputs, to) {
-                        let Some(write_side) = self.flatten_assignable_expr(&to_i.expr) else {continue};
-
-                        // temporary
+                    for (field, to_i) in zip(outputs, to) {                        
                         let module_port_wire_decl = self.instantiations[*field].extract_wire_declaration();
                         let module_port_proxy = self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : *func_span, is_remote_declaration : self.is_remote_declaration, source : WireSource::WireRead(*field)}));
+                        let Some(write_side) = self.flatten_assignable_expr(&to_i.expr) else {continue};
+
                         self.instantiations.alloc(Instantiation::Connection(Connection{num_regs : to_i.num_regs, from: module_port_proxy, to: write_side}));
                     }
                 },
                 Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
+                    let read_side = self.flatten_expr(non_func_expr);
                     if to.len() == 1 {
-                        let Some(read_side) = self.flatten_expr(non_func_expr) else {continue};
                         let t = &to[0];
                         let Some(write_side) = self.flatten_assignable_expr(&t.expr) else {continue};
                         self.instantiations.alloc(Instantiation::Connection(Connection{num_regs : t.num_regs, from: read_side, to: write_side}));
@@ -464,7 +465,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     self.flatten_code(inner_code);
                 },
                 Statement::If{condition : condition_expr, then, els} => {
-                    let Some(condition) = self.flatten_expr(condition_expr) else {continue};
+                    let condition = self.flatten_expr(condition_expr);
 
                     let if_id = self.instantiations.alloc(Instantiation::IfStatement(IfStatement{condition, then_start : UUID::PLACEHOLDER, then_end_else_start : UUID::PLACEHOLDER, else_end : UUID::PLACEHOLDER}));
                     let then_start = self.instantiations.get_next_alloc_id();
@@ -487,11 +488,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     let start = self.flatten_expr(&range.from);
                     let end = self.flatten_expr(&range.to);
                     
-                    let for_id = if let (Some(start), Some(end)) = (start, end) {
-                        Some(self.instantiations.alloc(Instantiation::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER)})))
-                    } else {
-                        None
-                    };
+                    let for_id = self.instantiations.alloc(Instantiation::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER)}));
 
                     let code_start = self.instantiations.get_next_alloc_id();
 
@@ -499,11 +496,9 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     
                     let code_end = self.instantiations.get_next_alloc_id();
 
-                    if let Some(for_id) = for_id {
-                        let Instantiation::ForStatement(for_stmt) = &mut self.instantiations[for_id] else {unreachable!()};
+                    let Instantiation::ForStatement(for_stmt) = &mut self.instantiations[for_id] else {unreachable!()};
 
-                        for_stmt.loop_body = UUIDRange(code_start, code_end);
-                    }
+                    for_stmt.loop_body = UUIDRange(code_start, code_end);
                 }
             }
         }
