@@ -2,7 +2,7 @@ use std::{rc::Rc, ops::Deref, cell::RefCell};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, ast::{Operator, IdentifierType, Span, InterfacePorts}, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, flattening::{FlatID, Instantiation, FlatIDMarker, ConnectionWritePathElement, WireSource, WireInstance, Connection, ConnectionWritePathElementComputed, FlattenedModule, FlatIDRange}, errors::ErrorCollector, linker::{Linker, NamedConstant}, value::{Value, compute_unary_op, compute_binary_op}, tokenizer::kw};
+use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, ast::{Operator, IdentifierType, Span, InterfacePorts}, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, flattening::{Write, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instantiation, WireInstance, WireSource, WriteType}, errors::ErrorCollector, linker::{Linker, NamedConstant}, value::{Value, compute_unary_op, compute_binary_op}, tokenizer::kw};
 
 pub mod latency_algorithm;
 pub mod latency;
@@ -152,11 +152,8 @@ struct InstantiationContext<'fl, 'l> {
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn get_generation_value(&self, v : FlatID) -> Option<&Value> {
         if let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] {
-            if let Value::Unset = vv {
-                self.errors.error_basic(self.flattened.instantiations[v].extract_wire().span, "This variable is set but it's Value::Unset!");
-                None
-            } else if let Value::Error = vv {
-                self.errors.error_basic(self.flattened.instantiations[v].extract_wire().span, "This variable is set but it's Value::Error!");
+            if let Value::Unset | Value::Error = vv {
+                self.errors.error_basic(self.flattened.instantiations[v].extract_wire().span, format!("This variable is set but it's {vv:?}!"));
                 None
             } else {
                 Some(vv)
@@ -245,31 +242,43 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
         Some(result)
     }
-    fn process_connection(&mut self, conn : &Connection, original_wire : FlatID, condition : Option<WireID>) -> Option<()> {
-        match &self.generation_state[conn.to.root] {
-            SubModuleOrWire::SubModule(_) => unreachable!(),
-            SubModuleOrWire::Unnasigned => unreachable!(),
-            SubModuleOrWire::Wire(w) => { // Runtime wire
-                let deref_w = *w;
-                
-                let from = self.get_wire_or_constant_as_wire(conn.from)?;
-                let conn_from = ConnectFrom {
-                    num_regs: conn.num_regs,
-                    from,
-                    condition,
-                    original_wire
+    fn process_connection(&mut self, conn : &Write, original_wire : FlatID, condition : Option<WireID>) -> Option<()> {
+        match conn.write_type {
+            WriteType::Connection{num_regs} => {
+                match &self.generation_state[conn.to.root] {
+                    SubModuleOrWire::SubModule(_) => unreachable!(),
+                    SubModuleOrWire::Unnasigned => unreachable!(),
+                    SubModuleOrWire::Wire(w) => { // Runtime wire
+                        let deref_w = *w;
+                        
+                        let from = self.get_wire_or_constant_as_wire(conn.from)?;
+                        let conn_from = ConnectFrom {
+                            num_regs,
+                            from,
+                            condition,
+                            original_wire
+                        };
+                        
+                        self.process_connection_to_wire(&conn.to.path, conn_from, deref_w)?;
+                    }
+                    SubModuleOrWire::CompileTimeValue(_original_value) => { // Compiletime wire
+                        let found_v = self.generation_state[conn.from].extract_generation_value().clone();
+                        let cvt_path = self.convert_connection_path_to_known_values(&conn.to.path)?;
+                        // Hack to get around the borrow rules here
+                        let SubModuleOrWire::CompileTimeValue(v_writable) = &mut self.generation_state[conn.to.root] else {unreachable!()};
+                        write_gen_variable(v_writable, &cvt_path, found_v);
+                    }
                 };
-                
-                self.process_connection_to_wire(&conn.to.path, conn_from, deref_w)?;
             }
-            SubModuleOrWire::CompileTimeValue(_original_value) => { // Compiletime wire
-                let found_v = self.generation_state[conn.from].extract_generation_value().clone();
+            WriteType::Initial => {
+                let found_v = self.get_generation_value(conn.from)?.clone();
                 let cvt_path = self.convert_connection_path_to_known_values(&conn.to.path)?;
                 // Hack to get around the borrow rules here
-                let SubModuleOrWire::CompileTimeValue(v_writable) = &mut self.generation_state[conn.to.root] else {unreachable!()};
-                write_gen_variable(v_writable, &cvt_path, found_v);
+                let SubModuleOrWire::Wire(w) = &mut self.generation_state[conn.to.root] else {unreachable!()};
+                let RealWireDataSource::Multiplexer{is_state : Some(initial_value), sources : _} = &mut self.wires[*w].source else {unreachable!()};
+                write_gen_variable(initial_value, &cvt_path, found_v);
             }
-        };
+        }
         Some(())
     }
     fn compute_compile_time(&self, wire_inst : &WireSource) -> Option<Value> {
@@ -386,7 +395,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     });
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, wires : interface_real_wires, name : submodule.name.clone()}))
                 }
-                Instantiation::WireDeclaration(wire_decl) => {
+                Instantiation::Declaration(wire_decl) => {
                     let typ = self.concretize_type(&wire_decl.typ, wire_decl.typ_span)?;
                     if wire_decl.identifier_type == IdentifierType::Generative {
                         /*Do nothing (in fact re-initializes the wire to 'empty'), just corresponds to wire declaration*/
@@ -416,15 +425,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         SubModuleOrWire::Wire(self.wires.alloc(RealWire{name: wire_decl.name.clone(), typ, original_wire, source, latency_specifier}))
                     }
                 }
-                Instantiation::WireInitialValue(init_val) => {
-                    let found_v = self.get_generation_value(init_val.initial_val)?.clone();
-                    let cvt_path = self.convert_connection_path_to_known_values(&init_val.to.path)?;
-                    // Hack to get around the borrow rules here
-                    let SubModuleOrWire::Wire(w) = &mut self.generation_state[init_val.to.root] else {unreachable!()};
-                    let RealWireDataSource::Multiplexer{is_state : Some(initial_value), sources : _} = &mut self.wires[*w].source else {unreachable!()};
-                    write_gen_variable(initial_value, &cvt_path, found_v);
-                    continue;
-                }
                 Instantiation::Wire(w) => {
                     let typ = self.concretize_type(&w.typ, w.span)?;
                     if w.is_compiletime {
@@ -436,7 +436,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         SubModuleOrWire::Wire(wire_found)
                     }
                 }
-                Instantiation::Connection(conn) => {
+                Instantiation::Write(conn) => {
                     self.process_connection(conn, original_wire, condition);
                     continue;
                 }

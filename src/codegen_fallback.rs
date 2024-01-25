@@ -84,7 +84,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
     program_text.push_str(");\n");
 
     for (_id, w) in &instance.wires {
-        if let Instantiation::WireDeclaration(wire_decl) = &md.flattened.instantiations[w.original_wire] {
+        if let Instantiation::Declaration(wire_decl) = &md.flattened.instantiations[w.original_wire] {
             // Don't print named inputs and outputs, already did that in interface
             match wire_decl.identifier_type {
                 IdentifierType::Input | IdentifierType::Output => {continue;}

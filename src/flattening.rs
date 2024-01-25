@@ -33,8 +33,14 @@ pub struct ConnectionWrite {
 }
 
 #[derive(Debug)]
-pub struct Connection {
-    pub num_regs : i64,
+pub enum WriteType {
+    Connection{num_regs : i64},
+    Initial
+}
+
+#[derive(Debug)]
+pub struct Write {
+    pub write_type : WriteType,
     pub from : FlatID,
     pub to : ConnectionWrite
 }
@@ -74,7 +80,7 @@ pub struct WireInstance {
 }
 
 #[derive(Debug)]
-pub struct WireDeclaration {
+pub struct Declaration {
     pub typ : Type,
     pub typ_span : Span,
     pub is_remote_declaration : bool,
@@ -84,13 +90,6 @@ pub struct WireDeclaration {
     pub identifier_type : IdentifierType,
     pub latency_specifier : Option<FlatID>
 }
-
-#[derive(Debug)]
-pub struct WireInitialValue {
-    pub to : ConnectionWrite,
-    pub initial_val : FlatID
-}
-
 
 #[derive(Debug)]
 pub struct SubModuleInstance {
@@ -121,10 +120,9 @@ pub struct ForStatement {
 #[derive(Debug)]
 pub enum Instantiation {
     SubModule(SubModuleInstance),
-    WireDeclaration(WireDeclaration),
-    WireInitialValue(WireInitialValue),
+    Declaration(Declaration),
     Wire(WireInstance),
-    Connection(Connection),
+    Write(Write),
     IfStatement(IfStatement),
     ForStatement(ForStatement)
 }
@@ -136,8 +134,8 @@ impl Instantiation {
         w
     }
     #[track_caller]
-    pub fn extract_wire_declaration(&self) -> &WireDeclaration {
-        let Self::WireDeclaration(w) = self else {panic!("extract_wire on not a WireDeclaration! Found {self:?}")};
+    pub fn extract_wire_declaration(&self) -> &Declaration {
+        let Self::Declaration(w) = self else {panic!("extract_wire on not a WireDeclaration! Found {self:?}")};
         w
     }
     #[track_caller]
@@ -148,8 +146,8 @@ impl Instantiation {
 
     pub fn for_each_embedded_type<F : FnMut(&Type, Span)>(&self, f : &mut F) {
         match self {
-            Instantiation::SubModule(_) | Instantiation::Connection(_) | Instantiation::IfStatement(_) | Instantiation::ForStatement(_) | Instantiation::WireInitialValue(_) => {}
-            Instantiation::WireDeclaration(decl) => {
+            Instantiation::SubModule(_) | Instantiation::Write(_) | Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => {}
+            Instantiation::Declaration(decl) => {
                 f(&decl.typ, decl.typ_span);
             }
             Instantiation::Wire(w) => {
@@ -161,10 +159,9 @@ impl Instantiation {
     pub fn get_location_if_in_this_module(&self) -> Option<Span> {
         match self {
             Instantiation::SubModule(sm) => sm.is_remote_declaration.then_some(sm.typ_span),
-            Instantiation::WireDeclaration(decl) => decl.is_remote_declaration.then_some(decl.typ_span),
+            Instantiation::Declaration(decl) => decl.is_remote_declaration.then_some(decl.typ_span),
             Instantiation::Wire(w) => w.is_remote_declaration.then_some(w.span),
-            Instantiation::Connection(conn) => conn.to.is_remote_declaration.then_some(conn.to.span),
-            Instantiation::WireInitialValue(init_val) => init_val.to.is_remote_declaration.then_some(init_val.to.span),
+            Instantiation::Write(conn) => conn.to.is_remote_declaration.then_some(conn.to.span),
             Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => None
         }
     }
@@ -232,7 +229,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
             None
         };
 
-        let inst_id = self.instantiations.alloc(Instantiation::WireDeclaration(WireDeclaration{
+        let inst_id = self.instantiations.alloc(Instantiation::Declaration(Declaration{
             typ,
             typ_span,
             is_remote_declaration : self.is_remote_declaration,
@@ -321,7 +318,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         for (field, arg_expr) in zip(inputs, args) {
             let arg_read_side = self.flatten_expr(arg_expr);
             let func_input_port = &submodule_local_wires.ports[field];
-            self.instantiations.alloc(Instantiation::Connection(Connection{num_regs: 0, from: arg_read_side, to: ConnectionWrite{root : *func_input_port, path : Vec::new(), span : *name_expr_span, is_remote_declaration : self.is_remote_declaration}}));
+            self.instantiations.alloc(Instantiation::Write(Write{write_type : WriteType::Connection{num_regs: 0}, from: arg_read_side, to: ConnectionWrite{root : *func_input_port, path : Vec::new(), span : *name_expr_span, is_remote_declaration : self.is_remote_declaration}}));
         }
 
         Some((md, submodule_local_wires))
@@ -422,7 +419,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                 Statement::Initial{to, eq_sign_position : _, value_expr} => {
                     let initial_val = self.flatten_expr(value_expr);
                     let Some(flat_to) = self.flatten_assignable_expr(to) else {continue};
-                    self.instantiations.alloc(Instantiation::WireInitialValue(WireInitialValue{to : flat_to, initial_val}));
+                    self.instantiations.alloc(Instantiation::Write(Write{write_type : WriteType::Initial, to : flat_to, from : initial_val}));
                 }
                 Statement::Assign{to, expr : (Expression::FuncCall(func_and_args), func_span), eq_sign_position} => {
                     let Some((md, interface)) = self.desugar_func_call(&func_and_args, func_span.1) else {continue};
@@ -448,7 +445,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                         let module_port_proxy = self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : *func_span, is_remote_declaration : self.is_remote_declaration, source : WireSource::WireRead(*field)}));
                         let Some(write_side) = self.flatten_assignable_expr(&to_i.expr) else {continue};
 
-                        self.instantiations.alloc(Instantiation::Connection(Connection{num_regs : to_i.num_regs, from: module_port_proxy, to: write_side}));
+                        self.instantiations.alloc(Instantiation::Write(Write{write_type : WriteType::Connection{num_regs: to_i.num_regs}, from: module_port_proxy, to: write_side}));
                     }
                 },
                 Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
@@ -456,7 +453,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     if to.len() == 1 {
                         let t = &to[0];
                         let Some(write_side) = self.flatten_assignable_expr(&t.expr) else {continue};
-                        self.instantiations.alloc(Instantiation::Connection(Connection{num_regs : t.num_regs, from: read_side, to: write_side}));
+                        self.instantiations.alloc(Instantiation::Write(Write{write_type : WriteType::Connection{num_regs: t.num_regs}, from: read_side, to: write_side}));
                     } else {
                         self.errors.error_basic(*stmt_span, format!("Non-function assignments must only output exactly 1 instead of {}", to.len()));
                     }
@@ -507,7 +504,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
     /*
         ==== Typechecking ====
     */
-    fn make_declared_here(&self, decl : &WireDeclaration) -> ErrorInfo {
+    fn make_declared_here(&self, decl : &Declaration) -> ErrorInfo {
         error_info(Span(decl.typ_span.0, decl.name_token), self.errors.file, "Declared here")
     }
 
@@ -544,7 +541,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         for elem_id in look_at_queue {
             match &self.instantiations[elem_id] {
                 Instantiation::SubModule(_) => {}
-                Instantiation::WireDeclaration(decl) => {
+                Instantiation::Declaration(decl) => {
                     if let Some(latency_spec) = decl.latency_specifier {
                         let latency_spec_wire = &self.instantiations[latency_spec].extract_wire();
                         self.typecheck_wire_is_of_type(latency_spec_wire, &INT_TYPE, "latency specifier");
@@ -553,9 +550,6 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     decl.typ.for_each_generative_input(&mut |param_id| {
                         self.typecheck_wire_is_of_type(self.instantiations[param_id].extract_wire(), &INT_TYPE, "Array size");
                     });
-                }
-                Instantiation::WireInitialValue(wire_init) => {
-                    self.typecheck_connection(&wire_init.to, wire_init.initial_val);
                 }
                 Instantiation::IfStatement(stm) => {
                     let wire = &self.instantiations[stm.condition].extract_wire();
@@ -607,7 +601,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     let Instantiation::Wire(w) = &mut self.instantiations[elem_id] else {unreachable!()};
                     w.typ = result_typ;
                 }
-                Instantiation::Connection(conn) => {
+                Instantiation::Write(conn) => {
                     self.typecheck_connection(&conn.to, conn.from);
                 }
             }
@@ -649,7 +643,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
             }
             match &self.instantiations[inst_id] {
                 Instantiation::SubModule(_) => {}
-                Instantiation::WireDeclaration(decl) => {
+                Instantiation::Declaration(decl) => {
                     if decl.identifier_type == IdentifierType::Generative {
                         assert!(declaration_depths[inst_id].is_none());
                         declaration_depths[inst_id] = Some(runtime_if_stack.len())
@@ -658,14 +652,6 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     decl.typ.for_each_generative_input(&mut |param_id| {
                         self.must_be_compiletime(self.instantiations[param_id].extract_wire(), "Array size");
                     });
-                }
-                Instantiation::WireInitialValue(wire_init) => {
-                    let decl = self.instantiations[wire_init.to.root].extract_wire_declaration();
-                    if decl.identifier_type != IdentifierType::State {
-                        self.errors.error_with_info(wire_init.to.span, "Initial values can only be given to state registers!", vec![self.make_declared_here(decl)])
-                    }
-                    let from_wire = self.instantiations[wire_init.initial_val].extract_wire();
-                    self.must_be_compiletime(from_wire, "initial value assignment")
                 }
                 Instantiation::Wire(wire) => {
                     let mut is_generative = true;
@@ -685,24 +671,33 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     let Instantiation::Wire(wire) = &mut self.instantiations[inst_id] else {unreachable!()};
                     wire.is_compiletime = is_generative;
                 }
-                Instantiation::Connection(conn) => {
-                    let conn_root_decl = self.instantiations[conn.to.root].extract_wire_declaration();
+                Instantiation::Write(conn) => {
+                    let decl = self.instantiations[conn.to.root].extract_wire_declaration();
+                    let from_wire = self.instantiations[conn.from].extract_wire();
+                    match conn.write_type {
+                        WriteType::Connection{num_regs : _} => {
+                            if decl.identifier_type == IdentifierType::Generative {
+                                // Check that whatever's written to this declaration is also generative
+                                self.must_be_compiletime_with_info(from_wire, "Assignments to generative variables", || vec![self.make_declared_here(decl)]);
 
-                    if conn_root_decl.identifier_type == IdentifierType::Generative {
-                        let from_wire = self.instantiations[conn.from].extract_wire();
-                        // Check that whatever's written to this declaration is also generative
-                        self.must_be_compiletime_with_info(from_wire, "Assignments to generative variables", || vec![self.make_declared_here(conn_root_decl)]);
-
-                        // Check that this declaration isn't used in a non-compiletime if
-                        let declared_at_depth = declaration_depths[conn.to.root].unwrap();
-    
-                        if runtime_if_stack.len() > declared_at_depth {
-                            let mut infos = Vec::new();
-                            infos.push(self.make_declared_here(conn_root_decl));
-                            for (_, if_cond_span) in &runtime_if_stack[declared_at_depth..] {
-                                infos.push(error_info(*if_cond_span, self.errors.file, "Runtime Condition here"));
+                                // Check that this declaration isn't used in a non-compiletime if
+                                let declared_at_depth = declaration_depths[conn.to.root].unwrap();
+            
+                                if runtime_if_stack.len() > declared_at_depth {
+                                    let mut infos = Vec::new();
+                                    infos.push(self.make_declared_here(decl));
+                                    for (_, if_cond_span) in &runtime_if_stack[declared_at_depth..] {
+                                        infos.push(error_info(*if_cond_span, self.errors.file, "Runtime Condition here"));
+                                    }
+                                    self.errors.error_with_info(conn.to.span, "Cannot write to generative variables in runtime conditional block", infos);
+                                }
                             }
-                            self.errors.error_with_info(conn.to.span, "Cannot write to generative variables in runtime conditional block", infos);
+                        }
+                        WriteType::Initial => {
+                            if decl.identifier_type != IdentifierType::State {
+                                self.errors.error_with_info(conn.to.span, "Initial values can only be given to state registers!", vec![self.make_declared_here(decl)])
+                            }
+                            self.must_be_compiletime(from_wire, "initial value assignment")
                         }
                     }
                 }
@@ -726,7 +721,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
 
         for (inst_id, inst) in self.instantiations.iter() {
             match inst {
-                Instantiation::Connection(conn) => {
+                Instantiation::Write(conn) => {
                     instance_fanins[conn.to.root].push(conn.from);
                 }
                 Instantiation::SubModule(sm) => {
@@ -737,18 +732,15 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                         instance_fanins[inst_id].push(*port);
                     }
                 }
-                Instantiation::WireDeclaration(decl) => {
+                Instantiation::Declaration(decl) => {
                     decl.typ.for_each_generative_input(&mut |id| instance_fanins[inst_id].push(id));
-                }
-                Instantiation::WireInitialValue(init_val) => {
-                    instance_fanins[init_val.to.root].push(init_val.initial_val);
                 }
                 Instantiation::Wire(wire) => {
                     wire.source.for_each_input_wire(&mut |id| instance_fanins[inst_id].push(id));
                 }
                 Instantiation::IfStatement(stm) => {
                     for id in UUIDRange(stm.then_start, stm.else_end) {
-                        if let Instantiation::Connection(conn) = &self.instantiations[id] {
+                        if let Instantiation::Write(conn) = &self.instantiations[id] {
                             instance_fanins[conn.to.root].push(stm.condition);
                         }
                     }
@@ -781,7 +773,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         // Now produce warnings from the unused list
         for (id, inst) in self.instantiations.iter() {
             if !is_instance_used_map[id] {
-                if let Instantiation::WireDeclaration(decl) = inst {
+                if let Instantiation::Declaration(decl) = inst {
                     if !decl.is_remote_declaration {
                         self.errors.warn_basic(Span::from(decl.name_token), "Unused Variable: This variable does not affect the output ports of this module");
                     }
