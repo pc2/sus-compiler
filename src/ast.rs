@@ -116,9 +116,16 @@ pub enum AssignableExpression {
 }
 
 #[derive(Debug)]
+pub enum AssignableExpressionModifiers {
+    LatencyAdding{num_regs : i64, regs_span : Span},
+    Initial{initial_token : usize},
+    NoModifiers
+}
+
+#[derive(Debug)]
 pub struct AssignableExpressionWithModifiers {
     pub expr : SpanAssignableExpression,
-    pub num_regs : i64
+    pub modifiers : AssignableExpressionModifiers
 }
 
 #[derive(Debug)]
@@ -130,7 +137,6 @@ pub struct RangeExpression {
 #[derive(Debug)]
 pub enum Statement {
     Declaration(DeclID),
-    Initial{to : SpanAssignableExpression, eq_sign_position : usize, value_expr : SpanExpression},
     Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : SpanExpression}, // num_regs v = expr;
     If{condition : SpanExpression, then : CodeBlock, els : Option<CodeBlock>},
     For{var : DeclID, range : RangeExpression, code : CodeBlock},

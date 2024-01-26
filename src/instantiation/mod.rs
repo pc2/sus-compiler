@@ -244,7 +244,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
     fn process_connection(&mut self, conn : &Write, original_wire : FlatID, condition : Option<WireID>) -> Option<()> {
         match conn.write_type {
-            WriteType::Connection{num_regs} => {
+            WriteType::Connection{num_regs, regs_span : _} => {
                 match &self.generation_state[conn.to.root] {
                     SubModuleOrWire::SubModule(_) => unreachable!(),
                     SubModuleOrWire::Unnasigned => unreachable!(),

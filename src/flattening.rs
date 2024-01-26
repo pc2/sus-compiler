@@ -1,7 +1,7 @@
 use std::{ops::Deref, iter::zip};
 
 use crate::{
-    ast::{AssignableExpression, CodeBlock, DeclID, DeclIDMarker, Expression, IdentifierType, InterfacePorts, LocalOrGlobal, Module, Operator, Span, SpanAssignableExpression, SpanExpression, SpanTypeExpression, Statement, TypeExpression},
+    ast::{AssignableExpression, AssignableExpressionModifiers, CodeBlock, DeclID, DeclIDMarker, Expression, IdentifierType, InterfacePorts, LocalOrGlobal, Module, Operator, Span, SpanAssignableExpression, SpanExpression, SpanTypeExpression, Statement, TypeExpression},
     linker::{Linker, FileUUID, GlobalResolver, ResolvedGlobals, NamedConstant, ConstantUUID, ModuleUUID, NameElem, NamedType, TypeUUIDMarker},
     errors::{ErrorCollector, error_info, ErrorInfo}, arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange, ArenaAllocator}, typing::{Type, typecheck_unary_operator, get_binary_operator_types, typecheck, typecheck_is_array_indexer, BOOL_TYPE, INT_TYPE}, value::Value
 };
@@ -34,7 +34,7 @@ pub struct ConnectionWrite {
 
 #[derive(Debug)]
 pub enum WriteType {
-    Connection{num_regs : i64},
+    Connection{num_regs : i64, regs_span : Option<Span>},
     Initial
 }
 
@@ -318,7 +318,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         for (field, arg_expr) in zip(inputs, args) {
             let arg_read_side = self.flatten_expr(arg_expr);
             let func_input_port = &submodule_local_wires.ports[field];
-            self.instantiations.alloc(Instantiation::Write(Write{write_type : WriteType::Connection{num_regs: 0}, from: arg_read_side, to: ConnectionWrite{root : *func_input_port, path : Vec::new(), span : *name_expr_span, is_remote_declaration : self.is_remote_declaration}}));
+            self.instantiations.alloc(Instantiation::Write(Write{write_type : WriteType::Connection{num_regs : 0, regs_span : None}, from: arg_read_side, to: ConnectionWrite{root : *func_input_port, path : Vec::new(), span : *name_expr_span, is_remote_declaration : self.is_remote_declaration}}));
         }
 
         Some((md, submodule_local_wires))
@@ -410,16 +410,19 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
             }
         })
     }
+
+    fn flatten_assignment_modifiers(&mut self, modifiers : &AssignableExpressionModifiers) -> WriteType {
+        match modifiers {
+            &AssignableExpressionModifiers::LatencyAdding{num_regs, regs_span} => WriteType::Connection{num_regs, regs_span : Some(regs_span)},
+            AssignableExpressionModifiers::Initial{initial_token : _} => WriteType::Initial,
+            AssignableExpressionModifiers::NoModifiers => WriteType::Connection{num_regs : 0, regs_span : None},
+        }
+    }
     fn flatten_code(&mut self, code : &CodeBlock) {
         for (stmt, stmt_span) in &code.statements {
             match stmt {
                 Statement::Declaration(decl_id) => {
                     let _wire_id = self.flatten_declaration::<true>(*decl_id, false);
-                }
-                Statement::Initial{to, eq_sign_position : _, value_expr} => {
-                    let initial_val = self.flatten_expr(value_expr);
-                    let Some(flat_to) = self.flatten_assignable_expr(to) else {continue};
-                    self.instantiations.alloc(Instantiation::Write(Write{write_type : WriteType::Initial, to : flat_to, from : initial_val}));
                 }
                 Statement::Assign{to, expr : (Expression::FuncCall(func_and_args), func_span), eq_sign_position} => {
                     let Some((md, interface)) = self.desugar_func_call(&func_and_args, func_span.1) else {continue};
@@ -445,7 +448,8 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                         let module_port_proxy = self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : *func_span, is_remote_declaration : self.is_remote_declaration, source : WireSource::WireRead(*field)}));
                         let Some(write_side) = self.flatten_assignable_expr(&to_i.expr) else {continue};
 
-                        self.instantiations.alloc(Instantiation::Write(Write{write_type : WriteType::Connection{num_regs: to_i.num_regs}, from: module_port_proxy, to: write_side}));
+                        let write_type = self.flatten_assignment_modifiers(&to_i.modifiers);
+                        self.instantiations.alloc(Instantiation::Write(Write{write_type, from: module_port_proxy, to: write_side}));
                     }
                 },
                 Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
@@ -453,7 +457,8 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     if to.len() == 1 {
                         let t = &to[0];
                         let Some(write_side) = self.flatten_assignable_expr(&t.expr) else {continue};
-                        self.instantiations.alloc(Instantiation::Write(Write{write_type : WriteType::Connection{num_regs: t.num_regs}, from: read_side, to: write_side}));
+                        let write_type = self.flatten_assignment_modifiers(&t.modifiers);
+                        self.instantiations.alloc(Instantiation::Write(Write{write_type, from: read_side, to: write_side}));
                     } else {
                         self.errors.error_basic(*stmt_span, format!("Non-function assignments must only output exactly 1 instead of {}", to.len()));
                     }
@@ -675,7 +680,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     let decl = self.instantiations[conn.to.root].extract_wire_declaration();
                     let from_wire = self.instantiations[conn.from].extract_wire();
                     match conn.write_type {
-                        WriteType::Connection{num_regs : _} => {
+                        WriteType::Connection{num_regs : _, regs_span : _} => {
                             if decl.identifier_type == IdentifierType::Generative {
                                 // Check that whatever's written to this declaration is also generative
                                 self.must_be_compiletime_with_info(from_wire, "Assignments to generative variables", || vec![self.make_declared_here(decl)]);

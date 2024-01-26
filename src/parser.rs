@@ -216,7 +216,7 @@ struct ASTParserContext<'file> {
 
 struct LeftExpression {
     expr : SpanExpression,
-    num_regs : i64
+    modifiers : AssignableExpressionModifiers
 }
 
 impl<'file> ASTParserContext<'file> {
@@ -499,6 +499,29 @@ impl<'file> ASTParserContext<'file> {
         InterfacePorts{ports : interface_decls.into_boxed_slice(), outputs_start}
     }
 
+    fn parse_assign_modifiers(&mut self, token_stream : &mut TokenStream) -> AssignableExpressionModifiers {
+        let mut num_regs = 0;
+        let mut first_reg_last_reg_tok : Option<Span> = None;
+        while let Some(tok) = token_stream.eat_is_plain(kw("reg")) {
+            if let Some(first_last) = &mut first_reg_last_reg_tok {
+                first_last.1 = tok.position;
+            } else {
+                first_reg_last_reg_tok = Some(Span(tok.position, tok.position));
+            }
+            num_regs += 1;
+        }
+        if let Some(first_reg_last_reg_tok) = first_reg_last_reg_tok {
+            return AssignableExpressionModifiers::LatencyAdding{num_regs, regs_span: first_reg_last_reg_tok};
+        }
+        
+        // Initial value for state register
+        if let Some(initial_token) = token_stream.eat_is_plain(kw("initial")) {
+            return AssignableExpressionModifiers::Initial{initial_token : initial_token.position}
+        }
+
+        AssignableExpressionModifiers::NoModifiers
+    }
+
     fn parse_statement(&mut self, token_stream : &mut TokenStream, scope : &mut LocalVariableContext<'_, 'file>, code_block : &mut CodeBlock) -> Option<()> {
         let start_at = if let Some(peek) = token_stream.peek() {
             peek.get_span().0
@@ -509,22 +532,19 @@ impl<'file> ASTParserContext<'file> {
         let mut left_expressions : Vec<LeftExpression> = Vec::new();
         let mut all_decls = true;
         loop { // Loop over a number of declarations possibly
-            let mut num_regs = 0;
-            while let Some(_tok) = token_stream.eat_is_plain(kw("reg")) {
-                num_regs += 1;
-            }
+            let modifiers = self.parse_assign_modifiers(token_stream);
 
             let mut tok_stream_copy = token_stream.clone();
             
             if let Some((name, span)) = self.try_parse_declaration(&mut tok_stream_copy, scope) {
                 // Maybe it's a declaration?
                 *token_stream = tok_stream_copy;
-                left_expressions.push(LeftExpression{expr : (Expression::Named(LocalOrGlobal::Local(name)), span), num_regs});
+                left_expressions.push(LeftExpression{expr : (Expression::Named(LocalOrGlobal::Local(name)), span), modifiers});
                 code_block.statements.push((Statement::Declaration(name), span));
             } else {
                 if let Some(expr) = self.parse_expression(token_stream, scope) {
                     // It's an expression instead!
-                    left_expressions.push(LeftExpression{expr, num_regs});
+                    left_expressions.push(LeftExpression{expr, modifiers});
                     all_decls = false;
                 } else {
                     // Also not, error then
@@ -584,7 +604,7 @@ impl<'file> ASTParserContext<'file> {
             None
         } else if let Some(value) = self.parse_expression(token_stream, scope) {
             let converted_left : Vec<AssignableExpressionWithModifiers> = left_expressions.into_iter().filter_map(&mut |le: LeftExpression| {
-                Some(AssignableExpressionWithModifiers{expr : self.convert_expression_to_assignable_expression(le.expr)?, num_regs : le.num_regs})
+                Some(AssignableExpressionWithModifiers{expr : self.convert_expression_to_assignable_expression(le.expr)?, modifiers : le.modifiers})
             }).collect();
             let end_at = value.1.1;
             statements.push((Statement::Assign{to : converted_left, eq_sign_position : Some(assign_pos), expr : value}, Span(start_at, end_at)));
@@ -663,15 +683,6 @@ impl<'file> ASTParserContext<'file> {
         Some((Statement::For{var, range, code}, Span(for_token.position, for_block_span.1)))
     }
 
-    fn parse_initial_value(&mut self, token_stream : &mut TokenStream, initial_token : TokenContent, scope : &LocalVariableContext<'_, 'file>) -> Option<SpanStatement> {
-        let to = self.parse_unit_expression(token_stream, scope)?;
-        let assignable_to = self.convert_expression_to_assignable_expression(to)?;
-        let eq_pos = self.eat_plain(token_stream, kw("="), "initial value assignment")?;
-        let value_expr = self.parse_expression(token_stream, scope)?;
-        let semicolon_pos = self.eat_plain(token_stream, kw(";"), "initial value assignment")?;
-        Some((Statement::Initial{to: assignable_to, eq_sign_position: eq_pos, value_expr}, Span(initial_token.position, semicolon_pos)))
-    }
-
     fn parse_code_block(&mut self, block_tokens : &[TokenTreeNode], span : Span, outer_scope : &LocalVariableContext<'_, 'file>) -> CodeBlock {
         let mut token_stream = TokenStream::new(block_tokens, span.0, span.1);
 
@@ -703,12 +714,6 @@ impl<'file> ASTParserContext<'file> {
             if let Some(for_token) = token_stream.eat_is_plain(kw("for")) {
                 let Some(for_loop_stmt) = self.parse_for_loop(&mut token_stream, for_token, &mut inner_scope) else {continue;};
                 code_block.statements.push(for_loop_stmt);
-            }
-
-            // Initial value for state register
-            if let Some(initial_token) = token_stream.eat_is_plain(kw("initial")) {
-                let Some(initial_stmt) = self.parse_initial_value(&mut token_stream, initial_token, &mut inner_scope) else {continue;};
-                code_block.statements.push(initial_stmt);
             }
             
             if self.parse_statement(&mut token_stream, &mut inner_scope, &mut code_block).is_none() {

@@ -108,6 +108,8 @@ fn convert_fanin_to_fanout(fanins : &Vec<Vec<FanInOut>>) -> Vec<Vec<FanInOut>> {
 }
 
 fn latencies_equal(a : &[i64], b : &[i64]) -> bool {
+    assert!(a.len() == b.len());
+
     let diff = a[0] - b[0];
 
     for (x, y) in zip(a.iter(), b.iter()) {
