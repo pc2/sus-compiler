@@ -119,7 +119,7 @@ fn walk_name_color(all_objects : &[NameElem], linker : &Linker, result : &mut [I
                             match &w.source {
                                 &WireSource::WireRead(from_wire) => {
                                     let decl = module.flattened.instantiations[from_wire].extract_wire_declaration();
-                                    if decl.is_remote_declaration {continue;} // Virtual wires don't appear in this program text
+                                    if !decl.is_declared_in_this_module {continue;} // Virtual wires don't appear in this program text
                                     result[w.span.assert_is_single_token()].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                                 }
                                 WireSource::UnaryOp { op:_, right:_ } => {}
@@ -132,7 +132,7 @@ fn walk_name_color(all_objects : &[NameElem], linker : &Linker, result : &mut [I
                             }
                         }
                         Instantiation::Declaration(decl) => {
-                            if decl.is_remote_declaration {continue;} // Virtual wires don't appear in this program text
+                            if !decl.is_declared_in_this_module {continue;} // Virtual wires don't appear in this program text
                             result[decl.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                             decl.typ.for_each_located_type(&mut |_, span| {
                                 set_span_name_color(span, IDEIdentifierType::Type, result);
@@ -140,7 +140,7 @@ fn walk_name_color(all_objects : &[NameElem], linker : &Linker, result : &mut [I
                         }
                         Instantiation::Write(conn) => {
                             let decl = module.flattened.instantiations[conn.to.root].extract_wire_declaration();
-                            if decl.is_remote_declaration {continue;} // Virtual wires don't appear in this program text
+                            if !decl.is_declared_in_this_module {continue;} // Virtual wires don't appear in this program text
                             result[conn.to.span.0].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                         }
                         Instantiation::SubModule(sm) => {

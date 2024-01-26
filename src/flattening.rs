@@ -29,7 +29,7 @@ pub struct ConnectionWrite {
     pub root : FlatID,
     pub path : Vec<ConnectionWritePathElement>,
     pub span : Span,
-    pub is_remote_declaration : bool
+    pub is_declared_in_this_module : bool
 }
 
 #[derive(Debug)]
@@ -75,7 +75,7 @@ pub struct WireInstance {
     pub typ : Type,
     pub is_compiletime : bool,
     pub span : Span,
-    pub is_remote_declaration : bool,
+    pub is_declared_in_this_module : bool,
     pub source : WireSource
 }
 
@@ -83,7 +83,7 @@ pub struct WireInstance {
 pub struct Declaration {
     pub typ : Type,
     pub typ_span : Span,
-    pub is_remote_declaration : bool,
+    pub is_declared_in_this_module : bool,
     pub name_token : usize,
     pub name : Box<str>,
     pub read_only : bool,
@@ -96,7 +96,7 @@ pub struct SubModuleInstance {
     pub module_uuid : ModuleUUID,
     pub name : Box<str>,
     pub typ_span : Span,
-    pub is_remote_declaration : bool,
+    pub is_declared_in_this_module : bool,
     pub interface_ports : InterfacePorts<FlatID>
 }
 
@@ -158,10 +158,10 @@ impl Instantiation {
 
     pub fn get_location_if_in_this_module(&self) -> Option<Span> {
         match self {
-            Instantiation::SubModule(sm) => sm.is_remote_declaration.then_some(sm.typ_span),
-            Instantiation::Declaration(decl) => decl.is_remote_declaration.then_some(decl.typ_span),
-            Instantiation::Wire(w) => w.is_remote_declaration.then_some(w.span),
-            Instantiation::Write(conn) => conn.to.is_remote_declaration.then_some(conn.to.span),
+            Instantiation::SubModule(sm) => sm.is_declared_in_this_module.then_some(sm.typ_span),
+            Instantiation::Declaration(decl) => decl.is_declared_in_this_module.then_some(decl.typ_span),
+            Instantiation::Wire(w) => w.is_declared_in_this_module.then_some(w.span),
+            Instantiation::Write(conn) => conn.to.is_declared_in_this_module.then_some(conn.to.span),
             Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => None
         }
     }
@@ -171,7 +171,7 @@ struct FlatteningContext<'inst, 'l, 'm> {
     decl_to_flat_map : FlatAlloc<Option<FlatID>, DeclIDMarker>,
     instantiations : &'inst mut FlatAlloc<Instantiation, FlatIDMarker>,
     errors : ErrorCollector,
-    is_remote_declaration : bool,
+    is_declared_in_this_module : bool,
 
     linker : GlobalResolver<'l>,
     pub type_list_for_naming : &'l ArenaAllocator<NamedType, TypeUUIDMarker>,
@@ -232,7 +232,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         let inst_id = self.instantiations.alloc(Instantiation::Declaration(Declaration{
             typ,
             typ_span,
-            is_remote_declaration : self.is_remote_declaration,
+            is_declared_in_this_module : self.is_declared_in_this_module,
             read_only,
             identifier_type : decl.identifier_type,
             name : decl.name.clone(),
@@ -255,7 +255,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
             decl_to_flat_map: module.declarations.iter().map(|_| None).collect(),
             instantiations: self.instantiations,
             errors: ErrorCollector::new(module.link_info.file), // Temporary ErrorCollector, unused
-            is_remote_declaration: true,
+            is_declared_in_this_module: false,
             linker: self.linker.new_sublinker(module.link_info.file),
             type_list_for_naming: self.type_list_for_naming,
             module,
@@ -268,7 +268,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         self.instantiations.alloc(Instantiation::SubModule(SubModuleInstance{
             name,
             module_uuid,
-            is_remote_declaration : self.is_remote_declaration,
+            is_declared_in_this_module : self.is_declared_in_this_module,
             typ_span,
             interface_ports
         }))
@@ -318,7 +318,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         for (field, arg_expr) in zip(inputs, args) {
             let arg_read_side = self.flatten_expr(arg_expr);
             let func_input_port = &submodule_local_wires.ports[field];
-            self.instantiations.alloc(Instantiation::Write(Write{write_type : WriteType::Connection{num_regs : 0, regs_span : None}, from: arg_read_side, to: ConnectionWrite{root : *func_input_port, path : Vec::new(), span : *name_expr_span, is_remote_declaration : self.is_remote_declaration}}));
+            self.instantiations.alloc(Instantiation::Write(Write{write_type : WriteType::Connection{num_regs : 0, regs_span : None}, from: arg_read_side, to: ConnectionWrite{root : *func_input_port, path : Vec::new(), span : *name_expr_span, is_declared_in_this_module : self.is_declared_in_this_module}}));
         }
 
         Some((md, submodule_local_wires))
@@ -379,7 +379,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
             is_compiletime : IS_GEN_UNINIT,
             span : *expr_span,
             source,
-            is_remote_declaration : self.is_remote_declaration
+            is_declared_in_this_module : self.is_declared_in_this_module
         };
         self.instantiations.alloc(Instantiation::Wire(wire_instance))
     }
@@ -394,7 +394,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     self.errors.error_with_info(*span, "Cannot Assign to Read-Only value", vec![decl_info]);
                     return None
                 }
-                ConnectionWrite{root, path : Vec::new(), span : *span, is_remote_declaration : self.is_remote_declaration,}
+                ConnectionWrite{root, path : Vec::new(), span : *span, is_declared_in_this_module : self.is_declared_in_this_module,}
             }
             AssignableExpression::ArrayIndex(arr_box) => {
                 let (arr, idx_expr, _bracket_span) = arr_box.deref();
@@ -445,7 +445,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
 
                     for (field, to_i) in zip(outputs, to) {                        
                         let module_port_wire_decl = self.instantiations[*field].extract_wire_declaration();
-                        let module_port_proxy = self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : *func_span, is_remote_declaration : self.is_remote_declaration, source : WireSource::WireRead(*field)}));
+                        let module_port_proxy = self.instantiations.alloc(Instantiation::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : *func_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::WireRead(*field)}));
                         let Some(write_side) = self.flatten_assignable_expr(&to_i.expr) else {continue};
 
                         let write_type = self.flatten_assignment_modifiers(&to_i.modifiers);
@@ -779,7 +779,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         for (id, inst) in self.instantiations.iter() {
             if !is_instance_used_map[id] {
                 if let Instantiation::Declaration(decl) = inst {
-                    if !decl.is_remote_declaration {
+                    if decl.is_declared_in_this_module {
                         self.errors.warn_basic(Span::from(decl.name_token), "Unused Variable: This variable does not affect the output ports of this module");
                     }
                 }
@@ -825,7 +825,7 @@ impl FlattenedModule {
             decl_to_flat_map: module.declarations.iter().map(|_| None).collect(),
             instantiations: &mut instantiations,
             errors: ErrorCollector::new(module.link_info.file),
-            is_remote_declaration : false,
+            is_declared_in_this_module : true,
             linker : GlobalResolver::new(linker, module.link_info.file),
             type_list_for_naming : &linker.types,
             module,
