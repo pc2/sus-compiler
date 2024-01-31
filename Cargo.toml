@@ -4,7 +4,6 @@ version = "0.0.1"
 authors = ["VonTum <lennart.vanhirtum@gmail.com>"]
 edition = "2021"
 repository = "https://github.com/pc2/sus-compiler"
-license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -13,6 +12,10 @@ console = "0.15.7" # for terminal colors
 # chumsky = "0.9.2"
 ariadne = "0.3.0" # for nice errors
 num = "*"
+
+# Tree sitter
+tree-sitter = "0.20.10"
+tree-sitter-sus = {path = "tree-sitter-sus"}
 
 # calyx-ir = {version = "0.6.1", optional = true}
 # calyx-opt = {version = "0.6.1", optional = true}
