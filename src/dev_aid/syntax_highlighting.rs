@@ -45,13 +45,13 @@ fn pretty_print_chunk_with_whitespace(whitespace_start : usize, file_text : &str
     print!("{}{}", whitespace_text, st.apply_to(&file_text[text_span]));
 }
 
-fn print_tokens(file_text : &str, tokens : &[Token]) {
+fn print_tokens(file_text : &str, tokens : &TokenizeResult) {
     let mut whitespace_start : usize = 0;
-    for (tok_idx, token) in tokens.iter().enumerate() {
+    for tok_idx in 0..tokens.len() {
         let styles = [Style::new().magenta(), Style::new().yellow(), Style::new().blue()];
         let st = styles[tok_idx % styles.len()].clone().underlined();
         
-        let token_range = token.get_range();
+        let token_range = tokens.get_token_range(tok_idx);
         pretty_print_chunk_with_whitespace(whitespace_start, file_text, token_range.clone(), st);
         whitespace_start = token_range.end;
     }
@@ -59,7 +59,7 @@ fn print_tokens(file_text : &str, tokens : &[Token]) {
     print!("{}\n", &file_text[whitespace_start..file_text.len()]);
 }
 
-fn pretty_print(file_text : &str, tokens : &[Token], ide_infos : &[IDEToken]) {
+fn pretty_print(file_text : &str, tokens : &TokenizeResult, ide_infos : &[IDEToken]) {
     let mut whitespace_start : usize = 0;
 
     for (tok_idx, token) in ide_infos.iter().enumerate() {
@@ -85,7 +85,7 @@ fn pretty_print(file_text : &str, tokens : &[Token], ide_infos : &[IDEToken]) {
             }
         };
         
-        let tok_span = tokens[tok_idx].get_range();
+        let tok_span = tokens.get_token_range(tok_idx);
         pretty_print_chunk_with_whitespace(whitespace_start, file_text, tok_span.clone(), st);
         whitespace_start = tok_span.end;
     }
@@ -162,8 +162,7 @@ pub fn create_token_ide_info<'a>(parsed: &FileData, linker : &Linker) -> Vec<IDE
     let mut result : Vec<IDEToken> = Vec::new();
     result.reserve(parsed.tokens.len());
 
-    for t in &parsed.tokens {
-        let tok_typ = t.get_type();
+    for &tok_typ in &parsed.tokens.token_types {
         let initial_typ = if is_keyword(tok_typ) {
             IDETokenType::Keyword
         } else if is_bracket(tok_typ) != IsBracket::NotABracket {
@@ -196,14 +195,14 @@ pub fn create_token_ide_info<'a>(parsed: &FileData, linker : &Linker) -> Vec<IDE
 }
 
 // Outputs character_offsets.len() == tokens.len() + 1 to include EOF token
-fn generate_character_offsets(file_text : &str, tokens : &[Token]) -> Vec<Range<usize>> {
+fn generate_character_offsets(file_text : &str, tokens : &TokenizeResult) -> Vec<Range<usize>> {
     let mut character_offsets : Vec<Range<usize>> = Vec::new();
     character_offsets.reserve(tokens.len());
     
     let mut cur_char = 0;
     let mut whitespace_start = 0;
-    for tok in tokens {
-        let tok_range = tok.get_range();
+    for tok_idx in 0..tokens.len() {
+        let tok_range = tokens.get_token_range(tok_idx);
 
         // whitespace
         cur_char += file_text[whitespace_start..tok_range.start].chars().count();

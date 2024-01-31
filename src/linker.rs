@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, rc::Rc, cell::RefCell};
 
-use crate::{ast::{Module, LinkInfo, Span}, arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, parser::{FullParseResult, TokenTreeNode}, tokenizer::Token, errors::{ErrorCollector, error_info}, flattening::FlattenedModule, util::{const_str_position, const_str_position_in_tuples}, instantiation::InstantiatedModule, value::Value, typing::Type};
+use crate::{arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, ast::{Module, LinkInfo, Span}, errors::{ErrorCollector, error_info}, flattening::FlattenedModule, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode}, tokenizer::TokenizeResult, typing::Type, util::{const_str_position, const_str_position_in_tuples}, value::Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModuleUUIDMarker;
@@ -119,7 +119,7 @@ impl Linkable for NamedType {
 
 pub struct FileData {
     pub file_text : String,
-    pub tokens : Vec<Token>,
+    pub tokens : TokenizeResult,
     pub token_hierarchy : Vec<TokenTreeNode>,
     pub parsing_errors : ErrorCollector,
     pub associated_values : Vec<NameElem>
@@ -127,7 +127,7 @@ pub struct FileData {
 
 impl FileData {
     fn get_token_text(&self, token_idx : usize) -> &str {
-        &self.file_text[self.tokens[token_idx].get_range()]
+        &self.file_text[self.tokens.get_token_range(token_idx)]
     }
 }
 

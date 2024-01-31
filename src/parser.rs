@@ -13,20 +13,20 @@ struct TokenContent {
 }
 
 pub enum TokenTreeNode {
-    PlainToken(Token, usize), // Has the index of the given token to the global Token array
+    PlainToken{tok_typ : TokenTypeIdx, range : Range<usize>, tok_idx : usize}, // Has the index of the given token to the global Token array
     // Code between '{' and '}', '(' and ')', or '[' and ']' exclusive. Contains sublist of tokens, index of open, index of close bracket
     Block(TokenTypeIdx, Vec<Self>, Span), 
 }
 impl TokenTreeNode {
     fn get_token_type(&self) -> TokenTypeIdx {
         match self {
-            Self::PlainToken(tok, _pos) => tok.get_type(),
+            Self::PlainToken{tok_typ, range : _, tok_idx : _} => *tok_typ,
             Self::Block(typ, _content, _span) => *typ
         }
     }
     fn get_span(&self) -> Span {
         match self {
-            Self::PlainToken(_typ, pos) => Span::from(*pos),
+            Self::PlainToken{tok_typ: _, range : _, tok_idx} => Span::from(*tok_idx),
             Self::Block(_typ, _content, span) => *span
         }
     }
@@ -51,18 +51,17 @@ struct TokenHierarchyStackElem {
     parent : Vec<TokenTreeNode>
 }
 
-pub fn to_token_hierarchy(tokens : &[Token], errors : &ErrorCollector) -> Vec<TokenTreeNode> {
+pub fn to_token_hierarchy(tokens : &TokenizeResult, errors : &ErrorCollector) -> Vec<TokenTreeNode> {
     let mut cur_token_slab : Vec<TokenTreeNode> = Vec::new();
     let mut stack : Vec<TokenHierarchyStackElem> = Vec::new(); // Type of opening bracket, token position, Token Subtree
 
-    for (idx, &tok) in tokens.iter().enumerate() {
-        let tok_typ = tok.get_type();
+    for (tok_idx, &tok_typ) in tokens.token_types.iter().enumerate() {
         if tok_typ == TOKEN_COMMENT || tok_typ == TOKEN_INVALID { // At this stage the comments are filtered out
             continue;
         }
         match is_bracket(tok_typ) {
             IsBracket::Open => {
-                stack.push(TokenHierarchyStackElem{open_bracket : tok_typ, open_bracket_pos : idx, parent : cur_token_slab});
+                stack.push(TokenHierarchyStackElem{open_bracket : tok_typ, open_bracket_pos : tok_idx, parent : cur_token_slab});
                 cur_token_slab = Vec::new();
             },
             IsBracket::Close => {
@@ -70,27 +69,27 @@ pub fn to_token_hierarchy(tokens : &[Token], errors : &ErrorCollector) -> Vec<To
                     if let Some(cur_block) = stack.pop() {
                         if closes(cur_block.open_bracket, tok_typ) { // All is well. This bracket was closed properly. Happy path!
                             let mut parent_cur_token_slab = cur_block.parent;
-                            parent_cur_token_slab.push(TokenTreeNode::Block(cur_block.open_bracket, cur_token_slab, Span(cur_block.open_bracket_pos, idx)));
+                            parent_cur_token_slab.push(TokenTreeNode::Block(cur_block.open_bracket, cur_token_slab, Span(cur_block.open_bracket_pos, tok_idx)));
                             cur_token_slab = parent_cur_token_slab;
                             break;
                         } else {
                             if !stack.iter().any(|prev_bracket| closes(prev_bracket.open_bracket, tok_typ)) { // Any bracket in the stack closes this?
-                                error_unopened_bracket(idx, tok_typ, cur_block.open_bracket_pos, errors);
+                                error_unopened_bracket(tok_idx, tok_typ, cur_block.open_bracket_pos, errors);
                                 stack.push(cur_block); // Push the previous bracket back onto bracket stack, as we disregarded erroneous closing bracket
                                 break;
                             } else {
-                                error_unclosed_bracket(cur_block.open_bracket_pos, tokens[cur_block.open_bracket_pos].get_type(), idx, errors);
+                                error_unclosed_bracket(cur_block.open_bracket_pos, tokens.token_types[cur_block.open_bracket_pos], tok_idx, errors);
                             }
                         }
                     } else {
                         // Too many close brackets
-                        errors.error_basic(Span::from(idx), "A close bracket had no corresponding opening bracket.");
+                        errors.error_basic(Span::from(tok_idx), "A close bracket had no corresponding opening bracket.");
                         break;
                     }
                 }
             },
             IsBracket::NotABracket => {
-                cur_token_slab.push(TokenTreeNode::PlainToken(tok, idx));
+                cur_token_slab.push(TokenTreeNode::PlainToken{tok_typ, range : tokens.get_token_range(tok_idx), tok_idx});
             }
         }
     }
@@ -170,18 +169,18 @@ impl<'it> TokenStream<'it> {
         }
     }
     fn peek_is_plain(&mut self, expected : TokenTypeIdx) -> bool {
-        if let Some(TokenTreeNode::PlainToken(tok, _place)) = self.iter.peek() {
-            if tok.get_type() == expected {
+        if let Some(TokenTreeNode::PlainToken{tok_typ, range : _, tok_idx : _}) = self.iter.peek() {
+            if *tok_typ == expected {
                 return true;
             }
         }
         false
     }
     fn eat_is_plain(&mut self, expected : TokenTypeIdx) -> Option<TokenContent> {
-        if let Some(TokenTreeNode::PlainToken(tok, pos)) = self.peek() {
-            if tok.get_type() == expected {
+        if let Some(TokenTreeNode::PlainToken{tok_typ, range, tok_idx}) = self.peek() {
+            if *tok_typ == expected {
                 self.next();
-                return Some(TokenContent{position : *pos, text : tok.get_range()});
+                return Some(TokenContent{position : *tok_idx, text : range.clone()});
             }
         }
         None
@@ -240,8 +239,8 @@ impl<'file> ASTParserContext<'file> {
             None => {
                 self.errors.error_basic(Span::from(unexpected_eof_idx), format!("Unexpected End of Scope while parsing {context}. Expected {expected_list_str}"))
             }
-            Some(TokenTreeNode::PlainToken(tok, pos)) => {
-                self.error_unexpected_token_str(expected_list_str, tok.get_type(), *pos, context);
+            Some(TokenTreeNode::PlainToken{tok_typ, range: _, tok_idx}) => {
+                self.error_unexpected_token_str(expected_list_str, *tok_typ, *tok_idx, context);
             }
             Some(TokenTreeNode::Block(typ, _, span)) => {
                 let tok_typ_name = get_token_type_name(*typ);
@@ -255,8 +254,8 @@ impl<'file> ASTParserContext<'file> {
         assert!(is_bracket(expected) == IsBracket::NotABracket);
         
         match token_stream.next() {
-            Some(TokenTreeNode::PlainToken(tok, idx)) if tok.get_type() == expected => {
-                Some(TokenContent{position : *idx, text : tok.get_range()})
+            Some(TokenTreeNode::PlainToken{tok_typ, range, tok_idx}) if *tok_typ == expected => {
+                Some(TokenContent{position : *tok_idx, text : range.clone()})
             },
             other => {
                 self.error_unexpected_tree_node(&[expected], other, token_stream.unexpected_eof_token, context);
@@ -313,23 +312,23 @@ impl<'file> ASTParserContext<'file> {
     // For expression 
     fn parse_unit_expression(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext) -> Option<SpanExpression> {
         let mut base_expr : (Expression, Span) = match token_stream.next() {
-            Some(TokenTreeNode::PlainToken(tok, pos)) if is_unary_operator(tok.get_type()) => {
+            Some(TokenTreeNode::PlainToken{tok_typ, range: _, tok_idx}) if is_unary_operator(*tok_typ) => {
                 let found_expr = self.parse_unit_expression(token_stream, scope)?;
-                let new_span = Span(*pos, found_expr.1.1);
-                return Some((Expression::UnaryOp(Box::new((Operator{op_typ : tok.get_type()}, *pos, found_expr))), new_span));
+                let new_span = Span(*tok_idx, found_expr.1.1);
+                return Some((Expression::UnaryOp(Box::new((Operator{op_typ : *tok_typ}, *tok_idx, found_expr))), new_span));
             },
-            Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == TOKEN_IDENTIFIER => {
-                let ident_ref = if let Some(local_idx) = scope.get_declaration_for(&self.file_text[tok.get_range()]) {
+            Some(TokenTreeNode::PlainToken{tok_typ, range, tok_idx}) if *tok_typ == TOKEN_IDENTIFIER => {
+                let ident_ref = if let Some(local_idx) = scope.get_declaration_for(&self.file_text[range.clone()]) {
                     LocalOrGlobal::Local(local_idx)
                 } else {
                     // todo namespacing and shit
-                    LocalOrGlobal::Global(Span::from(*pos))
+                    LocalOrGlobal::Global(Span::from(*tok_idx))
                 };
-                (Expression::Named(ident_ref), Span::from(*pos))
+                (Expression::Named(ident_ref), Span::from(*tok_idx))
             },
-            Some(TokenTreeNode::PlainToken(tok, pos)) if tok.get_type() == TOKEN_NUMBER => {
-                let value = &self.file_text[tok.get_range()];
-                (Expression::Constant(Value::Integer(BigInt::from_str(value).unwrap())), Span::from(*pos))
+            Some(TokenTreeNode::PlainToken{tok_typ, range, tok_idx}) if *tok_typ == TOKEN_NUMBER => {
+                let value = &self.file_text[range.clone()];
+                (Expression::Constant(Value::Integer(BigInt::from_str(value).unwrap())), Span::from(*tok_idx))
             },
             Some(TokenTreeNode::Block(typ, contents, span)) if *typ == kw("(") => {
                 let mut content_token_stream = TokenStream::new(contents, span.0, span.1);
@@ -390,10 +389,10 @@ impl<'file> ASTParserContext<'file> {
         loop {
             let mut grabbed_symbol = self.parse_unit_expression(token_stream, scope)?;
             match token_stream.peek() {
-                Some(TokenTreeNode::PlainToken(tok, op_pos)) if is_operator(tok.get_type()) => {
+                Some(TokenTreeNode::PlainToken{tok_typ, range: _, tok_idx}) if is_operator(*tok_typ) => {
                     //let operator_prescedence = get_binary_operator_prescedence(*typ);
                     while let Some((left_expr, stack_op, stack_op_pos)) = stack.pop() {
-                        if get_binary_operator_prescedence(stack_op) >= get_binary_operator_prescedence(tok.get_type()) {
+                        if get_binary_operator_prescedence(stack_op) >= get_binary_operator_prescedence(*tok_typ) {
                             grabbed_symbol = Expression::new_binop(left_expr, Operator{op_typ : stack_op}, stack_op_pos, grabbed_symbol);
                         } else {
                             stack.push((left_expr, stack_op, stack_op_pos)); // oops, shouldn't have popped it
@@ -402,7 +401,7 @@ impl<'file> ASTParserContext<'file> {
                     }
 
                     token_stream.next(); // commit operator peek
-                    stack.push((grabbed_symbol, tok.get_type(), *op_pos));
+                    stack.push((grabbed_symbol, *tok_typ, *tok_idx));
                 },
                 _other => {
                     while let Some((left_expr, stack_op, stack_op_pos)) = stack.pop() {
@@ -552,15 +551,15 @@ impl<'file> ASTParserContext<'file> {
                 }
             }
             match token_stream.next() {
-                Some(TokenTreeNode::PlainToken(tok, _pos)) if tok.get_type() == kw(",") => {
+                Some(TokenTreeNode::PlainToken{tok_typ, range:_, tok_idx:_}) if *tok_typ == kw(",") => {
                     continue; // parse next declaration
                 }
-                Some(TokenTreeNode::PlainToken(tok, assign_pos)) if tok.get_type() == kw("=") => {
+                Some(TokenTreeNode::PlainToken{tok_typ, range:_, tok_idx}) if *tok_typ == kw("=") => {
                     // Ends the loop
                     // T a, T b = x(y);
-                    return self.parse_statement_handle_assignment(left_expressions, *assign_pos, token_stream, scope, &mut code_block.statements, start_at);
+                    return self.parse_statement_handle_assignment(left_expressions, *tok_idx, token_stream, scope, &mut code_block.statements, start_at);
                 }
-                Some(TokenTreeNode::PlainToken(tok, _pos)) if tok.get_type() == kw(";") => {
+                Some(TokenTreeNode::PlainToken{tok_typ, range:_, tok_idx:_}) if *tok_typ == kw(";") => {
                     // Ends the loop
                     return self.parse_statement_handle_end(left_expressions, all_decls, &mut code_block.statements);
                 }
@@ -756,8 +755,8 @@ impl<'file> ASTParserContext<'file> {
 
         while let Some(t) = outer_token_iter.next() {
             match t {
-                TokenTreeNode::PlainToken(tok, module_kw_pos) if tok.get_type() == kw("module") => {
-                    if let Some(module) = self.parse_module(outer_token_iter, *module_kw_pos) {
+                TokenTreeNode::PlainToken{tok_typ, range:_, tok_idx} if *tok_typ == kw("module") => {
+                    if let Some(module) = self.parse_module(outer_token_iter, *tok_idx) {
                         modules.push(module);
                     }
                 },
@@ -783,7 +782,7 @@ pub fn parse<'nums, 'g, 'file>(token_hierarchy : &Vec<TokenTreeNode>, file_text 
 
 pub struct FullParseResult {
     pub file_text : String,
-    pub tokens : Vec<Token>,
+    pub tokens : TokenizeResult,
     pub token_hierarchy : Vec<TokenTreeNode>,
     pub ast : ASTRoot
 }

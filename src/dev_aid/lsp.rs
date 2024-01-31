@@ -198,7 +198,7 @@ fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> (SemanticToke
         let typ = get_semantic_token_type_from_ide_token(ide_tok);
         let mod_bits = get_modifiers_for_token(ide_tok);
 
-        let tok_range = file_data.tokens[tok_idx].get_range();
+        let tok_range = file_data.tokens.get_token_range(tok_idx);
         let whitespace_text = &file_text[cur_whitespace_start..tok_range.start];
         cur_whitespace_start = tok_range.end;
         let token_text = &file_text[tok_range];

@@ -2,29 +2,10 @@ use std::ops::Range;
 use std::str::CharIndices;
 
 use crate::ast::Span;
-use crate::errors::*;
+use crate::errors::ErrorCollector;
 use crate::util::const_str_position_in_tuples;
 
 pub type TokenTypeIdx = u8;
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct Token {
-    typ : TokenTypeIdx,
-    from : usize,
-    to : usize
-}
-
-impl Token {
-    pub fn new(typ : TokenTypeIdx, range : Range<usize>) -> Self {
-        Self{typ, from : range.start, to : range.end}
-    }
-    pub fn get_type(&self) -> TokenTypeIdx {
-        self.typ
-    }
-    pub fn get_range(&self) -> Range<usize> {
-        self.from..self.to
-    }
-}
 
 pub const ALL_KEYWORDS : [(&'static str, u8); 20] = [
     ("template", 0),
@@ -224,8 +205,39 @@ impl<'iter> Iterator for FileIter<'iter> {
     }
 }
 
-pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> Vec<Token> {
-    let mut result : Vec<Token> = Vec::new();
+pub struct TokenizeResult {
+    pub token_types : Vec<TokenTypeIdx>,
+    // List of all boundaries. Starts with 0, in whitespace mode, and then alternatingly switch to being a token, switch to being whitespace, back and forth
+    // The span of token i is given by token_boundaries[i*2+1..i*2+2]
+    // Ends at the end of the file
+    pub token_boundaries : Vec<usize>
+}
+impl TokenizeResult {
+    fn new() -> Self {
+        TokenizeResult{token_types : Vec::new(), token_boundaries : vec![0]}
+    }
+    // Result can be used for error reporting
+    fn push(&mut self, typ : TokenTypeIdx, rng : Range<usize>) {
+        self.token_types.push(typ);
+        self.token_boundaries.push(rng.start);
+        self.token_boundaries.push(rng.end);
+    }
+    fn push_invalid<S : Into<String>>(&mut self, rng : Range<usize>, errors : &ErrorCollector, motivation : S) {
+        let new_idx = self.token_types.len();
+        self.push(TOKEN_INVALID, rng);
+        errors.error_basic(Span::from(new_idx), motivation);
+    }
+
+    pub fn len(&self) -> usize {
+        self.token_types.len()
+    }
+    pub fn get_token_range(&self, token_idx : usize) -> Range<usize> {
+        self.token_boundaries[token_idx*2+1]..self.token_boundaries[token_idx*2+2]
+    }
+}
+
+pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> TokenizeResult {
+    let mut result = TokenizeResult::new();
     let mut file_char_iter = FileIter::new(file_text);
     
     while let Some((mut file_pos, cur_char)) = file_char_iter.next() {
@@ -239,22 +251,20 @@ pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> Vec<To
             
             let word_str = &file_text[word.clone()];
             let mut word_chars = word_str.chars();
-            let tok_typ = if word_chars.next().unwrap().is_digit(10) {
+            if word_chars.next().unwrap().is_digit(10) {
                 // It's a number
                 if word_chars.find(|v| !v.is_digit(10)).is_some() {
-                    errors.error_basic(Span::from(result.len()), "Unexpected letter within number");
-                    TOKEN_INVALID
+                    result.push_invalid(word, errors, "Unexpected letter within number");
                 } else {
-                    TOKEN_NUMBER
+                    result.push(TOKEN_NUMBER, word);
                 }
             } else {
                 if let Some(found) = const_str_position_in_tuples(word_str, &ALL_KEYWORDS) {
-                    found as TokenTypeIdx
+                    result.push(found as TokenTypeIdx, word);
                 } else {
-                    TOKEN_IDENTIFIER
+                    result.push(TOKEN_IDENTIFIER, word);
                 }
             };
-            result.push(Token::new(tok_typ, word));
 
             if let Some((next_pos_i, next_char)) = new_cur_char {
                 if next_char.is_whitespace() {
@@ -284,7 +294,7 @@ pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> Vec<To
                     file_text.len()
                 };
                 let comment_span = file_pos..end_pos;
-                result.push(Token::new(TOKEN_COMMENT, comment_span));
+                result.push(TOKEN_COMMENT, comment_span);
 
             } else if symbol_tok_id == kw("/*") {
                 // Open single multi-line comment
@@ -294,18 +304,16 @@ pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> Vec<To
                     file_text.len()
                 };
                 let comment_span = file_pos..end_pos;
-                result.push(Token::new(TOKEN_COMMENT, comment_span));
+                result.push(TOKEN_COMMENT, comment_span);
                 
             } else if symbol_tok_id == kw("*/") {
                 // Unexpected close comment
-                errors.error_basic(Span::from(result.len()), "Unexpected comment closer when not in comment");
-                result.push(Token::new(TOKEN_INVALID, file_pos..file_pos + 2));
+                result.push_invalid(file_pos..file_pos + 2, errors, "Unexpected comment closer when not in comment");
             } else {
-                result.push(Token::new(symbol_tok_id, file_pos..file_pos + symbol_text.len()));
+                result.push(symbol_tok_id, file_pos..file_pos + symbol_text.len());
             }
         } else { // Symbol not found!
-            errors.error_basic(Span::from(result.len()), "Unexpected character");
-            result.push(Token::new(TOKEN_INVALID, file_pos..file_pos + cur_char.len_utf8()));
+            result.push_invalid(file_pos..file_pos + cur_char.len_utf8(), errors, "Unexpected character");
         }
     }
 
