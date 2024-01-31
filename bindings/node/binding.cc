@@ -4,7 +4,7 @@
 
 using namespace v8;
 
-extern "C" TSLanguage * tree_sitter_SUS();
+extern "C" TSLanguage * tree_sitter_sus();
 
 namespace {
 
@@ -17,12 +17,12 @@ void Init(Local<Object> exports, Local<Object> module) {
 
   Local<Function> constructor = Nan::GetFunction(tpl).ToLocalChecked();
   Local<Object> instance = constructor->NewInstance(Nan::GetCurrentContext()).ToLocalChecked();
-  Nan::SetInternalFieldPointer(instance, 0, tree_sitter_SUS());
+  Nan::SetInternalFieldPointer(instance, 0, tree_sitter_sus());
 
-  Nan::Set(instance, Nan::New("name").ToLocalChecked(), Nan::New("SUS").ToLocalChecked());
+  Nan::Set(instance, Nan::New("name").ToLocalChecked(), Nan::New("sus").ToLocalChecked());
   Nan::Set(module, Nan::New("exports").ToLocalChecked(), instance);
 }
 
-NODE_MODULE(tree_sitter_SUS_binding, Init)
+NODE_MODULE(tree_sitter_sus_binding, Init)
 
 }  // namespace

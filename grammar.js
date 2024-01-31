@@ -8,7 +8,7 @@ function commaSep(rule) {
 }
 
 module.exports = grammar({
-    name: 'SUS',
+    name: 'sus',
 
     rules: {
         // TODO: add the actual grammar rules

@@ -1,10 +1,10 @@
 [package]
-name = "tree-sitter-SUS"
-description = "SUS grammar for the tree-sitter parsing library"
+name = "tree-sitter-sus"
+description = "sus grammar for the tree-sitter parsing library"
 version = "0.0.1"
-keywords = ["incremental", "parsing", "SUS"]
+keywords = ["incremental", "parsing", "sus"]
 categories = ["parsing", "text-editors"]
-repository = "https://github.com/tree-sitter/tree-sitter-SUS"
+repository = "https://github.com/tree-sitter/tree-sitter-sus"
 edition = "2018"
 license = "MIT"
 

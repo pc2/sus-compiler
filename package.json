@@ -1,7 +1,7 @@
 {
-  "name": "tree-sitter-SUS",
+  "name": "tree-sitter-sus",
   "version": "0.0.1",
-  "description": "SUS grammar for tree-sitter",
+  "description": "sus grammar for tree-sitter",
   "main": "bindings/node",
   "keywords": [
     "parsing",
