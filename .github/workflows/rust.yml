@@ -15,7 +15,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - name: Build
       # Don't try to build codegen, as it needs to link against LLVM
       run: cargo build --verbose --features lsp
