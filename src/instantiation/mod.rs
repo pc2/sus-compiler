@@ -482,7 +482,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     if start_val > end_val {
                         let start_flat = &self.flattened.instantiations[stm.start].extract_wire();
                         let end_flat = &self.flattened.instantiations[stm.end].extract_wire();
-                        self.errors.error_basic(Span(start_flat.span.0, end_flat.span.1), format!("for loop range end is before begin: {start_val}:{end_val}"));
+                        self.errors.error_basic(Span::new_overarching(start_flat.span, end_flat.span), format!("for loop range end is before begin: {start_val}:{end_val}"));
                         return None;
                     }
 

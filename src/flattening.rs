@@ -156,7 +156,7 @@ impl Instantiation {
         }
     }
 
-    pub fn get_location_if_in_this_module(&self) -> Option<Span> {
+    pub fn get_location_of_module_part(&self) -> Option<Span> {
         match self {
             Instantiation::SubModule(sm) => sm.is_declared_in_this_module.then_some(sm.typ_span),
             Instantiation::Declaration(decl) => decl.is_declared_in_this_module.then_some(decl.typ_span),
@@ -274,7 +274,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         }))
     }
     // Returns the module, full interface, and the output range for the function call syntax
-    fn desugar_func_call(&mut self, func_and_args : &[SpanExpression], closing_bracket_pos : usize) -> Option<(&Module, InterfacePorts<FlatID>)> {
+    fn desugar_func_call(&mut self, func_and_args : &[SpanExpression], func_call_span : Span) -> Option<(&Module, InterfacePorts<FlatID>)> {
         let (name_expr, name_expr_span) = &func_and_args[0]; // Function name is always there
         let func_instantiation_id = match name_expr {
             Expression::Named(LocalOrGlobal::Local(l)) => {
@@ -305,13 +305,13 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
             let module_info = vec![error_info(md.link_info.span, md.link_info.file, "Interface defined here")];
             if arg_count > expected_arg_count {
                 // Too many args, complain about excess args at the end
-                let excess_args_span = Span(args[expected_arg_count].1.0, closing_bracket_pos - 1);
+                let excess_args_span = Span::new_overarching(args[expected_arg_count].1, func_call_span).dont_include_last_token();
                 self.errors.error_with_info(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."), module_info);
                 // Shorten args to still get proper type checking for smaller arg array
                 args = &args[..expected_arg_count];
             } else {
                 // Too few args, mention missing argument names
-                self.errors.error_with_info(Span::from(closing_bracket_pos), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."), module_info);
+                self.errors.error_with_info(func_call_span.only_last_token(), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."), module_info);
             }
         }
 
@@ -357,7 +357,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                 WireSource::ArrayAccess{arr, arr_idx}
             }
             Expression::FuncCall(func_and_args) => {
-                if let Some((md, interface_wires)) = self.desugar_func_call(func_and_args, expr_span.1) {
+                if let Some((md, interface_wires)) = self.desugar_func_call(func_and_args, *expr_span) {
                     let output_range = interface_wires.func_call_syntax_outputs();
 
                     if output_range.len() != 1 {
@@ -425,7 +425,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     let _wire_id = self.flatten_declaration::<true>(*decl_id, false);
                 }
                 Statement::Assign{to, expr : (Expression::FuncCall(func_and_args), func_span), eq_sign_position} => {
-                    let Some((md, interface)) = self.desugar_func_call(&func_and_args, func_span.1) else {continue};
+                    let Some((md, interface)) = self.desugar_func_call(&func_and_args, *func_span) else {continue};
                     let output_range = interface.func_call_syntax_outputs();
                     let outputs = &interface.ports[output_range];
 
@@ -435,10 +435,10 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     if num_targets != num_func_outputs {
                         let info = vec![error_info(md.link_info.span, md.link_info.file, "Module Defined here")];
                         if num_targets > num_func_outputs {
-                            let excess_results_span = Span(to[num_func_outputs].expr.1.0, to.last().unwrap().expr.1.1);
+                            let excess_results_span = Span::new_overarching(to[num_func_outputs].expr.1, to.last().unwrap().expr.1);
                             self.errors.error_with_info(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
                         } else {
-                            let too_few_targets_pos = if let Some(eq) = eq_sign_position {Span::from(*eq)} else {func_name_span};
+                            let too_few_targets_pos = if let Some(eq) = eq_sign_position {Span::new_single_token(*eq)} else {func_name_span};
                             self.errors.error_with_info(too_few_targets_pos, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
                         }
                     }
@@ -510,7 +510,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
         ==== Typechecking ====
     */
     fn make_declared_here(&self, decl : &Declaration) -> ErrorInfo {
-        error_info(Span(decl.typ_span.0, decl.name_token), self.errors.file, "Declared here")
+        error_info(Span::new_extend_to_include_token(decl.typ_span, decl.name_token), self.errors.file, "Declared here")
     }
 
     fn typecheck_wire_is_of_type(&self, wire : &WireInstance, expected : &Type, context : &str) {
@@ -780,7 +780,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
             if !is_instance_used_map[id] {
                 if let Instantiation::Declaration(decl) = inst {
                     if decl.is_declared_in_this_module {
-                        self.errors.warn_basic(Span::from(decl.name_token), "Unused Variable: This variable does not affect the output ports of this module");
+                        self.errors.warn_basic(Span::new_single_token(decl.name_token), "Unused Variable: This variable does not affect the output ports of this module");
                     }
                 }
             }

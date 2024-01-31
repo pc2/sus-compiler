@@ -209,7 +209,7 @@ pub struct TokenizeResult {
     pub token_types : Vec<TokenTypeIdx>,
     // List of all boundaries. Starts with 0, in whitespace mode, and then alternatingly switch to being a token, switch to being whitespace, back and forth
     // The span of token i is given by token_boundaries[i*2+1..i*2+2]
-    // Ends at the end of the file
+    // Ends at the end of the file, with a final whitespace block
     pub token_boundaries : Vec<usize>
 }
 impl TokenizeResult {
@@ -223,9 +223,8 @@ impl TokenizeResult {
         self.token_boundaries.push(rng.end);
     }
     fn push_invalid<S : Into<String>>(&mut self, rng : Range<usize>, errors : &ErrorCollector, motivation : S) {
-        let new_idx = self.token_types.len();
+        errors.error_basic(Span::new_single_token(self.token_types.len()), motivation);
         self.push(TOKEN_INVALID, rng);
-        errors.error_basic(Span::from(new_idx), motivation);
     }
 
     pub fn len(&self) -> usize {
@@ -317,5 +316,6 @@ pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> Tokeni
         }
     }
 
+    result.token_boundaries.push(file_text.len());
     result
 }

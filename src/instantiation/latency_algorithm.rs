@@ -1,6 +1,5 @@
 use std::iter::zip;
 
-
 #[derive(Debug)]
 pub enum LatencyCountingError {
     PositiveNetLatencyCycle{nodes_involved : Vec<usize>},
@@ -65,17 +64,20 @@ fn count_latency(part_of_path : &mut [bool], absolute_latency : &mut [i64], fano
 }
 
 fn solve_latencies(fanins : &[Vec<FanInOut>], fanouts : &[Vec<FanInOut>], inputs : &[usize], outputs : &[usize]) -> Result<Vec<i64>, LatencyCountingError> {
-    let mut part_of_path : Vec<bool> = fanouts.iter().map(|_| false).collect();
+    assert!(fanins.len() == fanouts.len());
+
+    let mut part_of_path : Vec<bool> = vec![false; fanouts.len()];
 
     // Forwards are all performed in the same block. This block is then also used as the output latencies
-    let mut absolute_latencies_forward : Vec<i64> = fanouts.iter().map(|_| i64::MIN).collect();
+    let mut absolute_latencies_forward : Vec<i64> = vec![i64::MIN; fanouts.len()];
+    let mut absolute_latencies_backward_combined : Vec<i64> = vec![i64::MAX; fanouts.len()];
 
     // To find input latencies based on output latencies, we use a separate block to go backwards. 
     // These are done one at a time, such that we can find conflicting latencies. 
-    let mut absolute_latencies_backward_temporary : Vec<i64> = fanouts.iter().map(|_| i64::MIN).collect();
+    let mut absolute_latencies_backward_temporary : Vec<i64> = vec![i64::MIN; fanouts.len()];
 
-    let mut output_was_covered : Vec<bool> = outputs.iter().map(|_id| false).collect();
-    let mut input_node_assignments : Vec<i64> = inputs.iter().map(|_id| i64::MIN).collect();
+    let mut output_was_covered : Vec<bool> = vec![false; outputs.len()];
+    let mut input_node_assignments : Vec<i64> = vec![i64::MIN; inputs.len()];
 
     input_node_assignments[0] = 0; // Provide a seed to start the algorithm
 
@@ -124,6 +126,13 @@ fn solve_latencies(fanins : &[Vec<FanInOut>], fanouts : &[Vec<FanInOut>], inputs
                                     bad_ports.push((*output, -found_inv_latency, *assignment))
                                 }// else we're fine
                             }
+                        }
+                    }
+
+                    // Add backwards latencies to combined list
+                    for (from, to) in zip(absolute_latencies_backward_temporary.iter(), absolute_latencies_backward_combined.iter_mut()) {
+                        if *from != i64::MIN && -*from < *to {
+                            *to = -*from;
                         }
                     }
                 }
@@ -223,8 +232,6 @@ mod tests {
         let should_be_err = solve_latencies_infer_ports(&graph);
 
         assert!(matches!(should_be_err, Err(LatencyCountingError::ConflictingPortLatency{bad_ports:_})))
-
-        //assert!(latencies_equal(&found_latencies, &correct_latencies));
     }
     
     #[test]
@@ -242,8 +249,6 @@ mod tests {
         let should_be_err = solve_latencies_infer_ports(&graph);
 
         assert!(matches!(should_be_err, Err(LatencyCountingError::DisjointNodes{nodes_not_reached: _})))
-
-        //assert!(latencies_equal(&found_latencies, &correct_latencies));
     }
     
     #[test]
@@ -259,8 +264,6 @@ mod tests {
         let should_be_err = solve_latencies_infer_ports(&graph);
 
         assert!(matches!(should_be_err, Err(LatencyCountingError::PositiveNetLatencyCycle{nodes_involved: _})))
-
-        //assert!(latencies_equal(&found_latencies, &correct_latencies));
     }
 }
 
