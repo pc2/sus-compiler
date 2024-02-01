@@ -14,7 +14,8 @@ const PREC = {
     xor: 5,
     additive: 6,
     multiplicative: 7,
-    unary: 8
+    unary: 8,
+    namespace_path : 9
 }
 
 module.exports = grammar({
@@ -36,8 +37,17 @@ module.exports = grammar({
         identifier: $ => /[\p{L}_][\p{L}_\d]*/,
         number: $ => /\d[\d_]*/,
 
-        type: $ => seq(
+        global_identifier: $ => prec.left(PREC.namespace_path, seq(
+            optional("::"),
             $.identifier,
+            repeat(seq(
+                "::",
+                $.identifier
+            ))
+        )),
+
+        type: $ => seq(
+            $.global_identifier,
             repeat(seq(
                 '[',
                 $._expression,
@@ -63,7 +73,6 @@ module.exports = grammar({
             $.identifier
         ),
 
-        paren_expr: $ => seq('(', $._expression, ')'),
         unary_op: $ => prec(PREC.unary, seq(
             choice('+', '-', '*', '!', '|', '&', '^'),
             $._expression
@@ -71,27 +80,39 @@ module.exports = grammar({
 
         binary_op: $ => {
             const TABLE = [
-              [PREC.compare, choice('==', '!=', '<', '<=', '>', '>=')],
-              [PREC.and, '&'],
-              [PREC.or, '|'],
-              [PREC.xor, '^'],
-              [PREC.additive, choice('+', '-')],
-              [PREC.multiplicative, choice('*', '/', '%')],
+                [PREC.compare, choice('==', '!=', '<', '<=', '>', '>=')],
+                [PREC.and, '&'],
+                [PREC.or, '|'],
+                [PREC.xor, '^'],
+                [PREC.additive, choice('+', '-')],
+                [PREC.multiplicative, choice('*', '/', '%')],
             ];
-      
+
             return choice(...TABLE.map(([precedence, operator]) => prec.left(precedence, seq(
-              $._expression,
-              operator,
-              $._expression
+                $._expression,
+                operator,
+                $._expression
             ))));
-          },
+        },
+
+        func_call: $ => seq(
+            choice(
+                $.identifier,
+                $.global_identifier
+            ),
+            '(',
+            commaSep($._expression),
+            ')'
+        ),
 
         _expression: $ => choice(
             $.assignable_expr,
+            $.global_identifier,
             $.number,
-            $.paren_expr,
+            seq('(', $._expression, ')'),
             $.unary_op,
-            $.binary_op
+            $.binary_op,
+            $.func_call
         ),
 
         range: $ => seq(
@@ -107,7 +128,10 @@ module.exports = grammar({
         ),
         
         _assign_left_side: $ => commaSep1(seq(
-            repeat('reg'),
+            choice(
+                repeat('reg'),
+                'initial'
+            ),
             choice(
                 $.assignable_expr,
                 $.declaration
@@ -158,7 +182,6 @@ module.exports = grammar({
 
         single_line_comment: $ => /\/\/[^\n]*\n/,
         multi_line_comment: $ => /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\//,
-        
     },
 
     extras: $ => [
