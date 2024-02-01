@@ -15,5 +15,14 @@
   },
   "scripts": {
     "test": "tree-sitter test"
-  }
+  },
+  "repository": "https://github.com/pc2/tree-sitter-sus",
+  "tree-sitter": [
+    {
+      "scope": "source.sus",
+      "file-types": [
+        "sus"
+      ]
+    }
+  ]
 }
