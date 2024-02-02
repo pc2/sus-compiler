@@ -199,7 +199,7 @@ module b: HandShake hs -> {
 
 
 
-
+// (a*b) + c
 module multiply_add : 
 	int a,
 	int b,
@@ -207,7 +207,7 @@ module multiply_add :
 	-> int total {
 
 	reg int tmp = a * b;
-	total = tmp + c;
+	reg total = tmp + c;
 }
 
 module fibonnaci : -> int num {
