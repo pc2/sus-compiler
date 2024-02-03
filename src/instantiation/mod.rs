@@ -1,11 +1,10 @@
-use std::{rc::Rc, ops::Deref, cell::RefCell};
+use std::{cell::RefCell, iter::zip, ops::Deref, rc::Rc};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, ast::{Operator, IdentifierType, Span, InterfacePorts}, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, flattening::{Write, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instantiation, WireInstance, WireSource, WriteType}, errors::ErrorCollector, linker::{Linker, NamedConstant}, value::{Value, compute_unary_op, compute_binary_op}, tokenizer::kw};
+use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, ast::{Operator, IdentifierType, Span, InterfacePorts}, errors::ErrorCollector, flattening::{Write, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instantiation, WireInstance, WireSource, WriteType}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, tokenizer::kw, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{Value, compute_unary_op, compute_binary_op}};
 
 pub mod latency_algorithm;
-pub mod latency;
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
 pub struct WireIDMarker;
@@ -16,6 +15,9 @@ pub type WireID = UUID<WireIDMarker>;
 pub struct SubModuleIDMarker;
 impl UUIDMarker for SubModuleIDMarker {const DISPLAY_NAME : &'static str = "submodule_";}
 pub type SubModuleID = UUID<SubModuleIDMarker>;
+
+// Temporary value before proper latency is given
+pub const LATENCY_UNSET : i64 = i64::MIN;
 
 #[derive(Debug)]
 pub struct ConnectFrom {
@@ -56,7 +58,7 @@ impl RealWireDataSource {
                 for s in sources {
                     f(s.from.from, s.from.num_regs);
                     if let Some(c) = s.from.condition {
-                        f(c, 0);
+                        f(c, s.from.num_regs);
                     }
                 }
             }
@@ -85,7 +87,7 @@ pub struct RealWire {
     pub original_wire : FlatID,
     pub typ : ConcreteType,
     pub name : Box<str>,
-    pub latency_specifier : Option<u64>
+    pub absolute_latency : i64
 }
 
 #[derive(Debug)]
@@ -99,10 +101,9 @@ pub struct SubModule {
 #[derive(Debug)]
 pub struct InstantiatedModule {
     pub name : Box<str>, // Unique name involving all template arguments
-    pub interface : Option<InterfacePorts<WireID>>, // Interface is only valid if all wires of the interface were valid
+    pub interface : InterfacePorts<WireID>, // Interface is only valid if all wires of the interface were valid
     pub wires : FlatAlloc<RealWire, WireIDMarker>,
-    pub submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
-    pub errors : ErrorCollector,
+    pub submodules : FlatAlloc<SubModule, SubModuleIDMarker>
 }
 
 #[derive(Debug,Clone)]
@@ -143,6 +144,7 @@ struct InstantiationContext<'fl, 'l> {
     generation_state : FlatAlloc<SubModuleOrWire, FlatIDMarker>,
     wires : FlatAlloc<RealWire, WireIDMarker>,
     submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
+    specified_latencies : Vec<(WireID, i64)>,
     errors : ErrorCollector,
 
     flattened : &'fl FlattenedModule,
@@ -218,8 +220,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         let found_typ = &self.wires[from.from].typ;
         if write_to_typ != found_typ {
-            // todo!();
-            //TODO
+            let from_flattened_wire = self.flattened.instantiations[self.wires[from.from].original_wire].extract_wire();
+            let to_flattened_decl = self.flattened.instantiations[self.wires[wire_id].original_wire].extract_wire_declaration();
+
+            let found_typ_name = found_typ.to_string(&self.linker.types);
+            let write_to_typ_name = write_to_typ.to_string(&self.linker.types);
+
+            self.errors.error_with_info(from_flattened_wire.span, format!("Instantiation TypeError: Can't assign {found_typ_name} to {write_to_typ_name}"), vec![to_flattened_decl.make_declared_here(self.errors.file)]);
         }
 
         let RealWireDataSource::Multiplexer{is_state : _, sources} = &mut self.wires[wire_id].source else {unreachable!("Should only be a writeable wire here")};
@@ -327,7 +334,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let Instantiation::Wire(wire) = &self.flattened.instantiations[flat_id] else {unreachable!()};
                 let typ = self.concretize_type(&wire.typ, wire.span)?;
                 let name = self.get_unique_name();
-                Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id, typ, name, latency_specifier : None}))
+                Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id, typ, name, absolute_latency : LATENCY_UNSET}))
             }
         }
     }
@@ -366,7 +373,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
         };
         let name = self.get_unique_name();
-        Some(self.wires.alloc(RealWire{name, typ, original_wire, source, latency_specifier : None}))
+        Some(self.wires.alloc(RealWire{name, typ, original_wire, source, absolute_latency : LATENCY_UNSET}))
     }
     fn extend_condition(&mut self, condition : Option<WireID>, additional_condition : WireID, original_wire : FlatID) -> WireID {
         if let Some(condition) = condition {
@@ -379,7 +386,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     left : condition,
                     right : additional_condition
                 },
-                latency_specifier : None})
+                absolute_latency : LATENCY_UNSET})
         } else {
             additional_condition
         }
@@ -416,13 +423,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             };
                             RealWireDataSource::Multiplexer{is_state, sources : Vec::new()}
                         };
-                        let latency_specifier = if let Some(lat_spec_flat) = wire_decl.latency_specifier {
+                        let wire_id = self.wires.alloc(RealWire{name: wire_decl.name.clone(), typ, original_wire, source, absolute_latency : LATENCY_UNSET});
+                        if let Some(lat_spec_flat) = wire_decl.latency_specifier {
                             let val = self.get_generation_value(lat_spec_flat)?;
-                            Some(self.extract_integer_from_value(val, self.flattened.instantiations[lat_spec_flat].extract_wire().span)?)
-                        } else {
-                            None
-                        };
-                        SubModuleOrWire::Wire(self.wires.alloc(RealWire{name: wire_decl.name.clone(), typ, original_wire, source, latency_specifier}))
+                            let specified_absolute_latency : i64 = self.extract_integer_from_value(val, self.flattened.instantiations[lat_spec_flat].extract_wire().span)?;
+                            self.specified_latencies.push((wire_id, specified_absolute_latency));
+                        }
+                        SubModuleOrWire::Wire(wire_id)
                     }
                 }
                 Instantiation::Wire(w) => {
@@ -466,7 +473,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                                     op : Operator{op_typ : kw("!")},
                                     right : condition_wire
                                 },
-                                latency_specifier : None
+                                absolute_latency : LATENCY_UNSET
                             });
                             let else_cond = self.extend_condition(condition, else_condition_bool, original_wire);
                             self.instantiate_flattened_module(else_range, Some(else_cond));
@@ -504,8 +511,77 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         Some(())
     }
 
+    // Computes all latencies involved
+    pub fn compute_latencies(&mut self, ports : &InterfacePorts<WireID>) -> Option<()> {
+        // Wire to wire Fanin
+        let mut fanins : Vec<Vec<FanInOut>> = self.wires.iter().map(|(_id, wire)| {
+            let mut fanin = Vec::new();
+            wire.source.iter_sources_with_min_latency(&mut |from, delta_latency| {
+                fanin.push(FanInOut{other : from.get_hidden_value(), delta_latency});
+            });
+            fanin
+        }).collect();
+        
+        // Submodules Fanin
+        //assert!(self.submodules.is_empty());
+        for (_id, sub_mod) in &self.submodules {
+            for (self_input, submodule_input) in zip(sub_mod.wires.inputs(), sub_mod.instance.interface.inputs()) {
+                for (self_output, submodule_output) in zip(sub_mod.wires.outputs(), sub_mod.instance.interface.outputs()) {
+                    
+                    let delta_latency = sub_mod.instance.wires[*submodule_output].absolute_latency - sub_mod.instance.wires[*submodule_input].absolute_latency;
+    
+                    fanins[self_output.get_hidden_value()].push(FanInOut{other: self_input.get_hidden_value(), delta_latency});
+                }
+            }
+        }
+        
+        // Process fanouts
+        let fanouts = convert_fanin_to_fanout(&fanins);
+
+        let inputs : Vec<usize> = ports.inputs().iter().map(|input| input.get_hidden_value()).collect();
+        let outputs : Vec<usize> = ports.outputs().iter().map(|input| input.get_hidden_value()).collect();
+
+        match solve_latencies(&fanins, &fanouts, &inputs, &outputs) {
+            Ok(latencies) => {
+                for (wire, lat) in zip(self.wires.iter_mut(), latencies.iter()) {
+                    wire.1.absolute_latency = *lat;
+                }
+                Some(())
+            }
+            Err(err) => {
+                match err {
+                    LatencyCountingError::PositiveNetLatencyCycle { cycle_nodes } => {
+                        for n in cycle_nodes {
+                            if let Some(source_location) = self.flattened.instantiations[self.wires[WireID::from_hidden_value(n)].original_wire].get_location_of_module_part() {
+                                self.errors.error_basic(source_location, "This operation is part of a net-positive latency cycle");
+                            }
+                        }
+                    }
+                    LatencyCountingError::ConflictingPortLatency { bad_ports } => {
+                        for port in bad_ports {
+                            let port_decl = self.flattened.instantiations[self.wires[WireID::from_hidden_value(port.0)].original_wire].extract_wire_declaration();
+                            self.errors.error_basic(Span::new_single_token(port_decl.name_token), format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
+                        }
+                    }
+                    LatencyCountingError::DisjointNodes { start_node, nodes_not_reached } => {
+                        let start_port_decl = self.flattened.instantiations[self.wires[WireID::from_hidden_value(start_node)].original_wire].extract_wire_declaration();
+
+                        for n in nodes_not_reached {
+                            if let Some(source_location) = self.flattened.instantiations[self.wires[WireID::from_hidden_value(n)].original_wire].get_location_of_module_part() {
+                                self.errors.error_with_info(source_location, format!("Latency Counting couldn't reach this node from '{}'", start_port_decl.name), vec![start_port_decl.make_declared_here(self.errors.file)]);
+                            }
+                        }
+                    }
+                    LatencyCountingError::NotImplemented => {}
+                }
+                None
+            }
+        }
+    }
+    
+
     // Returns a proper interface if all ports involved did not produce an error. If a port did produce an error then returns None. 
-    fn make_interface(&self) -> Option<InterfacePorts<WireID>> {
+    fn make_interface(&self) -> InterfacePorts<WireID> {
         let mut result = Vec::new();
         result.reserve(self.flattened.interface_ports.ports.len());
         for port in self.flattened.interface_ports.ports.iter() {
@@ -514,12 +590,36 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     result.push(*w)
                 }
                 SubModuleOrWire::Unnasigned => {
-                    return None // Error building interface
+                    unreachable!() // Error building interface
                 }
                 _other => unreachable!() // interface wires cannot point to anything else
             }
         }
-        Some(InterfacePorts{ports : result.into_boxed_slice(), outputs_start : self.flattened.interface_ports.outputs_start})
+        InterfacePorts{ports : result.into_boxed_slice(), outputs_start : self.flattened.interface_ports.outputs_start}
+    }
+
+
+    fn instantiate_full(&mut self) -> Option<InterfacePorts<WireID>> {
+        if self.flattened.errors.did_error.get() {
+            return None;// Don't instantiate modules that already errored. Otherwise instantiator may crash
+        }
+
+        for (_id, inst) in &self.flattened.instantiations {
+            inst.for_each_embedded_type(&mut |typ,_span| {
+                assert!(!typ.contains_error_or_unknown::<true,true>(), "Types brought into instantiation may not contain 'bad types': {typ:?} in {inst:?}");
+            })
+        }
+        
+    
+        self.instantiate_flattened_module(self.flattened.instantiations.id_range(), None)?;
+        let interface = self.make_interface();
+        self.compute_latencies(&interface)?;
+        
+        if self.errors.did_error.get() {
+            return None
+        }
+
+        Some(interface)
     }
 }
 
@@ -527,7 +627,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
 #[derive(Debug)]
 pub struct InstantiationList {
-    cache : RefCell<Vec<Rc<InstantiatedModule>>>
+    cache : RefCell<Vec<(Option<Rc<InstantiatedModule>>, ErrorCollector)>>
 }
 
 impl InstantiationList {
@@ -536,48 +636,44 @@ impl InstantiationList {
     }
 
     pub fn instantiate(&self, name : &str, flattened : &FlattenedModule, linker : &Linker) -> Option<Rc<InstantiatedModule>> {
-        if flattened.errors.did_error.get() {
-            return None;// Don't instantiate modules that already errored. Otherwise instantiator may crash
-        }
-
         let mut cache_borrow = self.cache.borrow_mut();
         
         // Temporary, no template arguments yet
         if cache_borrow.is_empty() {
-            for (_id, inst) in &flattened.instantiations {
-                inst.for_each_embedded_type(&mut |typ,_span| {
-                    assert!(!typ.contains_error_or_unknown::<true,true>(), "Types brought into instantiation may not contain 'bad types': {typ:?} in {inst:?}");
-                })
-            }    
             let mut context = InstantiationContext{
                 generation_state : flattened.instantiations.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect(),
                 wires : FlatAlloc::new(),
                 submodules : FlatAlloc::new(),
+                specified_latencies : Vec::new(),
                 flattened : &flattened,
                 linker : linker,
                 errors : ErrorCollector::new(flattened.errors.file)
             };
-        
-            context.instantiate_flattened_module(flattened.instantiations.id_range(), None);
-            let interface = context.make_interface();
-            
-            cache_borrow.push(Rc::new(InstantiatedModule{
-                name : name.to_owned().into_boxed_str(),
-                wires : context.wires,
-                submodules : context.submodules,
-                interface,
-                errors : context.errors
-            }));
+
+            if let Some(interface) = context.instantiate_full() {
+                let result = Some(Rc::new(InstantiatedModule{
+                    name : name.to_owned().into_boxed_str(),
+                    wires : context.wires,
+                    submodules : context.submodules,
+                    interface,
+                }));
+
+                cache_borrow.push((result.clone(), context.errors));
+                return result;
+            } else {
+                cache_borrow.push((None, context.errors));
+                return None;
+            };
         }
         
         let instance_id = 0; // Temporary, will always be 0 while not template arguments
-        Some(cache_borrow[instance_id].clone())
+        cache_borrow[instance_id].0.clone()
     }
 
     pub fn collect_errors(&self, errors : &ErrorCollector) {
         let cache_borrow = self.cache.borrow();
         for inst in cache_borrow.deref() {
-            errors.ingest(&inst.errors);
+            errors.ingest(&inst.1);
         }
     }
 

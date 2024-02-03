@@ -31,14 +31,13 @@ use dev_aid::syntax_highlighting::*;
 use linker::{Linker, ModuleUUID};
 
 fn codegen_to_file(linker : &Linker, id : ModuleUUID, md : &Module) -> Option<()> {
-    let inst = linker.instantiate(id)?;
+    let Some(inst) = linker.instantiate(id) else {
+        println!("Module {} instantiation encountered errors.", md.link_info.name);
+        return None;
+    };
 
     let module_name = md.link_info.name.deref();
 
-    if inst.errors.did_error.get() {
-        println!("There were instantiation errors in {module_name}");
-        return None;
-    }
     //println!("Generating Verilog for {module_name}:");
     // gen_ctx.to_circt();
     let code = gen_verilog_code(md, &inst);

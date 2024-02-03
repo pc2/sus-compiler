@@ -70,10 +70,8 @@ pub fn write_path_to_string(instance : &InstantiatedModule, path : &[ConnectToPa
 }
 
 pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String {
-    assert!(!instance.errors.did_error.get(), "Module cannot have experienced an error");
     let mut program_text : String = format!("module {}(\n\tinput clk, \n", md.link_info.name);
-    let submodule_interface = instance.interface.as_ref().unwrap();
-    for (real_port, is_input) in submodule_interface.iter() {
+    for (real_port, is_input) in instance.interface.iter() {
         let wire = &instance.wires[real_port];
         program_text.push_str(if is_input {"\tinput"} else {"\toutput /*mux_wire*/ reg"});
         program_text.push_str(&typ_to_verilog_array(&wire.typ));
@@ -141,8 +139,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
         program_text.push(' ');
         program_text.push_str(&sm.name);
         program_text.push_str("(\n.clk(clk)");
-        let sm_interface = sm.instance.interface.as_ref().unwrap(); // Having an invalid interface in a submodule is an error! This should have been caught before!
-        for (port, wire) in zip(sm_interface.iter(), sm.wires.iter()) {
+        for (port, wire) in zip(sm.instance.interface.iter(), sm.wires.iter()) {
             program_text.push_str(",\n.");
             program_text.push_str(&sm.instance.wires[port.0].name);
             program_text.push('(');

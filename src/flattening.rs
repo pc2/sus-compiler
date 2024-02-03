@@ -91,6 +91,12 @@ pub struct Declaration {
     pub latency_specifier : Option<FlatID>
 }
 
+impl Declaration {
+    pub fn make_declared_here(&self, file : FileUUID) -> ErrorInfo {
+        error_info(Span::new_extend_to_include_token(self.typ_span, self.name_token), file, "Declared here")
+    }
+}
+
 #[derive(Debug)]
 pub struct SubModuleInstance {
     pub module_uuid : ModuleUUID,
@@ -159,7 +165,7 @@ impl Instantiation {
     pub fn get_location_of_module_part(&self) -> Option<Span> {
         match self {
             Instantiation::SubModule(sm) => sm.is_declared_in_this_module.then_some(sm.typ_span),
-            Instantiation::Declaration(decl) => decl.is_declared_in_this_module.then_some(decl.typ_span),
+            Instantiation::Declaration(decl) => decl.is_declared_in_this_module.then_some(Span::new_single_token(decl.name_token)),
             Instantiation::Wire(w) => w.is_declared_in_this_module.then_some(w.span),
             Instantiation::Write(conn) => conn.to.is_declared_in_this_module.then_some(conn.to.span),
             Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => None
@@ -223,7 +229,6 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
 
         let latency_specifier = if let Some(lat_expr) = &decl.latency_expr {
             let latency_spec = self.flatten_expr(lat_expr);
-            self.must_be_compiletime(self.instantiations[latency_spec].extract_wire(), "Latency specifier");
             Some(latency_spec)
         } else {
             None
@@ -509,10 +514,6 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
     /*
         ==== Typechecking ====
     */
-    fn make_declared_here(&self, decl : &Declaration) -> ErrorInfo {
-        error_info(Span::new_extend_to_include_token(decl.typ_span, decl.name_token), self.errors.file, "Declared here")
-    }
-
     fn typecheck_wire_is_of_type(&self, wire : &WireInstance, expected : &Type, context : &str) {
         typecheck(&wire.typ, wire.span, expected, context, self.type_list_for_naming, &self.errors);
     }
@@ -654,6 +655,10 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                         declaration_depths[inst_id] = Some(runtime_if_stack.len())
                     }
 
+                    if let Some(latency_specifier) = decl.latency_specifier {
+                        self.must_be_compiletime(self.instantiations[latency_specifier].extract_wire(), "Latency specifier");
+                    }
+
                     decl.typ.for_each_generative_input(&mut |param_id| {
                         self.must_be_compiletime(self.instantiations[param_id].extract_wire(), "Array size");
                     });
@@ -683,14 +688,14 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                         WriteType::Connection{num_regs : _, regs_span : _} => {
                             if decl.identifier_type == IdentifierType::Generative {
                                 // Check that whatever's written to this declaration is also generative
-                                self.must_be_compiletime_with_info(from_wire, "Assignments to generative variables", || vec![self.make_declared_here(decl)]);
+                                self.must_be_compiletime_with_info(from_wire, "Assignments to generative variables", || vec![decl.make_declared_here(self.errors.file)]);
 
                                 // Check that this declaration isn't used in a non-compiletime if
                                 let declared_at_depth = declaration_depths[conn.to.root].unwrap();
             
                                 if runtime_if_stack.len() > declared_at_depth {
                                     let mut infos = Vec::new();
-                                    infos.push(self.make_declared_here(decl));
+                                    infos.push(decl.make_declared_here(self.errors.file));
                                     for (_, if_cond_span) in &runtime_if_stack[declared_at_depth..] {
                                         infos.push(error_info(*if_cond_span, self.errors.file, "Runtime Condition here"));
                                     }
@@ -700,7 +705,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                         }
                         WriteType::Initial => {
                             if decl.identifier_type != IdentifierType::State {
-                                self.errors.error_with_info(conn.to.span, "Initial values can only be given to state registers!", vec![self.make_declared_here(decl)])
+                                self.errors.error_with_info(conn.to.span, "Initial values can only be given to state registers!", vec![decl.make_declared_here(self.errors.file)])
                             }
                             self.must_be_compiletime(from_wire, "initial value assignment")
                         }

@@ -163,4 +163,15 @@ impl ConcreteType {
             }
         }
     }
+    pub fn to_string(&self, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>) -> String {
+        match self {
+            ConcreteType::Named(id) => {
+                linker_types[*id].get_full_name()
+            }
+            ConcreteType::Array(sub) => {
+                let (elem_typ, arr_size) = sub.deref();
+                format!("{}[{}]", elem_typ.to_string(linker_types), arr_size)
+            }
+        }
+    }
 }

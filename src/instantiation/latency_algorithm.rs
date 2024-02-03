@@ -2,19 +2,18 @@ use std::iter::zip;
 
 #[derive(Debug)]
 pub enum LatencyCountingError {
-    PositiveNetLatencyCycle{nodes_involved : Vec<usize>},
+    PositiveNetLatencyCycle{cycle_nodes : Vec<usize>},
     ConflictingPortLatency{bad_ports : Vec<(usize, i64, i64)>},
-    DisjointNodes{nodes_not_reached : Vec<usize>}
+    DisjointNodes{start_node : usize, nodes_not_reached : Vec<usize>},
+    NotImplemented
 }
-
-
 
 pub struct FanInOut {
     pub other : usize,
     pub delta_latency : i64
 }
 
-fn convert_fanin_to_fanout(fanins : &[Vec<FanInOut>]) -> Vec<Vec<FanInOut>> {
+pub fn convert_fanin_to_fanout(fanins : &[Vec<FanInOut>]) -> Vec<Vec<FanInOut>> {
     let mut fanouts : Vec<Vec<FanInOut>> = fanins.iter().map(|_| {
         Vec::new()
     }).collect();
@@ -56,16 +55,16 @@ fn count_latency_recursive(part_of_path : &mut [bool], absolute_latency : &mut [
     Ok(())
 }
 
-fn make_cycle_error_from_path(mut nodes_involved : Vec<usize>) -> LatencyCountingError {
-    let mut nodes_iter = nodes_involved.iter().enumerate();
+fn make_cycle_error_from_path(mut cycle_nodes : Vec<usize>) -> LatencyCountingError {
+    let mut nodes_iter = cycle_nodes.iter().enumerate();
         let first_node_in_cycle = nodes_iter.next().unwrap().1;
         for (idx, node) in nodes_iter {
             if node == first_node_in_cycle {
-                nodes_involved.truncate(idx);
+                cycle_nodes.truncate(idx);
                 break;
             }
         }
-        LatencyCountingError::PositiveNetLatencyCycle{nodes_involved}
+        LatencyCountingError::PositiveNetLatencyCycle{cycle_nodes}
 }
 
 fn count_latency(part_of_path : &mut [bool], absolute_latency : &mut [i64], fanouts : &[Vec<FanInOut>], start_node : usize) -> Result<(), LatencyCountingError> {
@@ -124,8 +123,13 @@ impl<'d> LatencySolver<'d> {
         Self{fanins, fanouts, inputs, outputs, part_of_path, absolute_latencies_backward_temporary, touched_backwards, output_was_covered, input_node_assignments}
     }
     
-    fn seed(&mut self) {
-        self.input_node_assignments[0] = 0; // Provide a seed to start the algorithm
+    fn seed(&mut self) -> Result<(), LatencyCountingError> {
+        if let Some(v) = self.input_node_assignments.get_mut(0) { // Provide a seed to start the algorithm
+            *v = 0;
+            Ok(())
+        } else {
+            Err(LatencyCountingError::NotImplemented)
+        }
     }
 
     fn solve_latencies(&mut self) -> Result<Vec<i64>, LatencyCountingError> {
@@ -174,7 +178,7 @@ impl<'d> LatencySolver<'d> {
                                 } else {
                                     if -found_inv_latency != *assignment {
                                         // Error because two outputs are attempting to create differing input latencies
-                                        bad_ports.push((*output, -found_inv_latency, *assignment))
+                                        bad_ports.push((*input, -found_inv_latency, *assignment))
                                     }// else we're fine
                                 }
                             }
@@ -208,14 +212,14 @@ impl<'d> LatencySolver<'d> {
         if nodes_not_reached.is_empty() {
             Ok(absolute_latencies_forward)
         } else {
-            Err(LatencyCountingError::DisjointNodes{nodes_not_reached})
+            Err(LatencyCountingError::DisjointNodes{start_node: self.inputs[0], nodes_not_reached})
         }
     }
 }
 
-fn solve_latencies(fanins : &[Vec<FanInOut>], fanouts : &[Vec<FanInOut>], inputs : &[usize], outputs : &[usize]) -> Result<Vec<i64>, LatencyCountingError> {
+pub fn solve_latencies(fanins : &[Vec<FanInOut>], fanouts : &[Vec<FanInOut>], inputs : &[usize], outputs : &[usize]) -> Result<Vec<i64>, LatencyCountingError> {
     let mut latency_solver = LatencySolver::new(fanins, fanouts, inputs, outputs);
-    latency_solver.seed();
+    latency_solver.seed()?;
     latency_solver.solve_latencies()
 }
 
@@ -359,7 +363,7 @@ mod tests {
 
         let should_be_err = solve_latencies_infer_ports(&graph);
 
-        assert!(matches!(should_be_err, Err(LatencyCountingError::DisjointNodes{nodes_not_reached: _})))
+        assert!(matches!(should_be_err, Err(LatencyCountingError::DisjointNodes{start_node: _, nodes_not_reached: _})))
     }
     
     #[test]
@@ -374,7 +378,7 @@ mod tests {
 
         let should_be_err = solve_latencies_infer_ports(&graph);
 
-        assert!(matches!(should_be_err, Err(LatencyCountingError::PositiveNetLatencyCycle{nodes_involved: _})))
+        assert!(matches!(should_be_err, Err(LatencyCountingError::PositiveNetLatencyCycle{cycle_nodes: _})))
     }
 }
 

@@ -395,7 +395,6 @@ module first_bit_idx_24 : bool[24] bits -> int first {
 	}
 }
 
-
 module permute : bool[128] mbf, int selected_permutation -> bool[128] permuted_mbf {
 	// cvt_to_double
 	permuted_mbf = mbf;
@@ -420,4 +419,47 @@ module permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[12
 	stored_valid_permutes = stored_valid_permutes & permutes_to_keep;
 
 	permuted_out = permute(stored_mbf, current_permutation_idx);
+}
+
+
+
+module disjoint_ports : int a, int b, int c -> int result {
+	reg result = a + b;
+	// don't touch c
+}
+
+module undeteriminable_input_latency : int a, int b -> int x, int y {
+	reg int a_d = a;
+    reg int t = a_d + b;
+    reg reg reg int a_ddd = a;
+    x = t + a_ddd;
+    y = t;
+}
+
+module manually_specified_input_latency : int a'0, int b'1 -> int x, int y {
+	reg int a_d = a;
+    reg int t = a_d + b;
+    reg reg reg int a_ddd = a;
+    x = t + a_ddd;
+    y = t;
+}
+
+module bad_cycle : int a -> int r {
+	state int test;
+	initial test = 0;
+
+	reg int new_test = test + a;
+	test = new_test;
+
+	r = new_test;
+}
+
+module good_cycle : int a -> int r {
+	state int test;
+	initial test = 0;
+
+	int new_test = test + a;
+	test = new_test;
+
+	r = new_test;
 }
