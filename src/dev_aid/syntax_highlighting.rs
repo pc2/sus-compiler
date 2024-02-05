@@ -1,7 +1,7 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{ast::*, tokenizer::*, parser::*, linker::{FileData, Linker, FileUUIDMarker, FileUUID, NameElem}, arena_alloc::ArenaVector, flattening::{Instantiation, WireSource}};
+use crate::{ast::*, tokenizer::*, parser::*, linker::{FileData, Linker, FileUUIDMarker, FileUUID, NameElem}, arena_alloc::ArenaVector, flattening::{Instruction, WireSource}};
 
 use ariadne::FileCache;
 use console::Style;
@@ -113,12 +113,12 @@ fn walk_name_color(all_objects : &[NameElem], linker : &Linker, result : &mut [I
         let (ide_typ, link_info) = match obj_uuid {
             NameElem::Module(id) => {
                 let module = &linker.modules[*id];
-                for (_id, item) in &module.flattened.instantiations {
+                for (_id, item) in &module.flattened.instructions {
                     match item {
-                        Instantiation::Wire(w) => {
+                        Instruction::Wire(w) => {
                             match &w.source {
                                 &WireSource::WireRead(from_wire) => {
-                                    let decl = module.flattened.instantiations[from_wire].extract_wire_declaration();
+                                    let decl = module.flattened.instructions[from_wire].extract_wire_declaration();
                                     if !decl.is_declared_in_this_module {continue;} // Virtual wires don't appear in this program text
                                     result[w.span.assert_is_single_token()].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                                 }
@@ -131,22 +131,22 @@ fn walk_name_color(all_objects : &[NameElem], linker : &Linker, result : &mut [I
                                 }
                             }
                         }
-                        Instantiation::Declaration(decl) => {
+                        Instruction::Declaration(decl) => {
                             if !decl.is_declared_in_this_module {continue;} // Virtual wires don't appear in this program text
                             result[decl.name_token].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
-                            decl.typ.for_each_located_type(&mut |_, span| {
+                            decl.typ_expr.for_each_located_type(&mut |_, span| {
                                 set_span_name_color(span, IDEIdentifierType::Type, result);
                             });
                         }
-                        Instantiation::Write(conn) => {
-                            let decl = module.flattened.instantiations[conn.to.root].extract_wire_declaration();
+                        Instruction::Write(conn) => {
+                            let decl = module.flattened.instructions[conn.to.root].extract_wire_declaration();
                             if !decl.is_declared_in_this_module {continue;} // Virtual wires don't appear in this program text
                             result[conn.to.span.0].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                         }
-                        Instantiation::SubModule(sm) => {
-                            set_span_name_color(sm.typ_span, IDEIdentifierType::Interface, result);
+                        Instruction::SubModule(sm) => {
+                            set_span_name_color(sm.module_name_span, IDEIdentifierType::Interface, result);
                         }
-                        Instantiation::IfStatement(_) | Instantiation::ForStatement(_) => {}
+                        Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
                     }
                 }
                 (IDEIdentifierType::Interface, &module.link_info)

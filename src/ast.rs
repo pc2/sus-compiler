@@ -48,6 +48,13 @@ impl Span {
     pub fn whole_file_span(tokens : &TokenizeResult) -> Span {
         Span(0, tokens.token_types.len())
     }
+    pub fn contains_token(&self, token_idx : usize) -> bool {
+        self.0 >= token_idx && self.1 <= token_idx
+    }
+    // Not really a useful quantity. Should only be used comparatively, find which is the nested-most span
+    pub fn size(&self) -> usize {
+        self.1 - self.0
+    }
     #[track_caller]
     pub fn assert_is_single_token(&self) -> usize {
         assert!(self.1 == self.0, "Span is not singleton! {}..{}", self.0, self.1);
@@ -242,7 +249,7 @@ impl Module {
             println!("    {port_direction} {port_name} -> {:?}", port);
         }
         println!("Instantiations:");
-        for (id, inst) in &self.flattened.instantiations {
+        for (id, inst) in &self.flattened.instructions {
             println!("    {:?}: {:?}", id, inst);
         }
     }

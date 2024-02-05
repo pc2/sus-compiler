@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, rc::Rc, cell::RefCell};
 
-use crate::{arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, ast::{Module, LinkInfo, Span}, errors::{ErrorCollector, error_info}, flattening::FlattenedModule, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode}, tokenizer::TokenizeResult, typing::Type, util::{const_str_position, const_str_position_in_tuples}, value::Value};
+use crate::{arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, ast::{Module, LinkInfo, Span}, errors::{ErrorCollector, error_info}, flattening::{FlatID, FlattenedModule, Instruction}, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode}, tokenizer::TokenizeResult, typing::Type, util::{const_str_position, const_str_position_in_tuples}, value::Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModuleUUIDMarker;
@@ -360,7 +360,9 @@ impl Linker {
         for (id, md) in &self.modules {
             println!("[[{}]]:", md.link_info.name);
             md.print_flattened_module();
-            let inst = self.instantiate(id);
+            // Already instantiate any modules without parameters
+            // Currently this is all modules
+            let _inst = self.instantiate(id);
         }
     }
 

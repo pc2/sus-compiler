@@ -1,6 +1,6 @@
 use std::{iter::zip, ops::Deref};
 
-use crate::{ast::{Module, IdentifierType}, instantiation::{ConnectToPathElem, InstantiatedModule, RealWireDataSource}, linker::{get_builtin_type, TypeUUID}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::Instantiation, value::Value};
+use crate::{ast::{Module, IdentifierType}, instantiation::{ConnectToPathElem, InstantiatedModule, RealWireDataSource}, linker::{get_builtin_type, TypeUUID}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::Instruction, value::Value};
 
 fn get_type_name_size(id : TypeUUID) -> u64 {
     if id == get_builtin_type("int") {
@@ -82,7 +82,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
     program_text.push_str(");\n");
 
     for (_id, w) in &instance.wires {
-        if let Instantiation::Declaration(wire_decl) = &md.flattened.instantiations[w.original_wire] {
+        if let Instruction::Declaration(wire_decl) = &md.flattened.instructions[w.original_wire] {
             // Don't print named inputs and outputs, already did that in interface
             match wire_decl.identifier_type {
                 IdentifierType::Input | IdentifierType::Output => {continue;}

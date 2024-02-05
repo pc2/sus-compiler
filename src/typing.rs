@@ -2,12 +2,50 @@ use std::ops::Deref;
 
 use crate::{ast::{Operator, Span}, linker::{get_builtin_type, TypeUUID, Linker, Linkable, NamedType, TypeUUIDMarker}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector, value::Value, arena_alloc::ArenaAllocator};
 
+// These are 
+#[derive(Debug, Clone)]
+pub enum ResolvedTypeExpr {
+    Error(Span),
+    Named(Span, TypeUUID),
+    Array(Span, Box<(ResolvedTypeExpr, FlatID)>)
+}
+
+impl ResolvedTypeExpr {
+    pub fn for_each_located_type<F : FnMut(Option<TypeUUID>, Span)>(&self, f : &mut F) {
+        match self {
+            ResolvedTypeExpr::Error(span) => {f(None, *span)}
+            ResolvedTypeExpr::Named(span, id) => {f(Some(*id), *span)}
+            ResolvedTypeExpr::Array(_span, arr_box) => {
+                let (arr, _idx) = arr_box.deref();
+                arr.for_each_located_type(f);
+            }
+        }
+    }
+
+    pub fn get_span(&self) -> Span {
+        match self {
+            ResolvedTypeExpr::Error(span) | ResolvedTypeExpr::Named(span, _) | ResolvedTypeExpr::Array(span, _) => *span
+        }
+    }
+
+    pub fn to_type(&self) -> Type {
+        match self {
+            ResolvedTypeExpr::Error(_) => Type::Error,
+            ResolvedTypeExpr::Named(_, id) => Type::Named(*id),
+            ResolvedTypeExpr::Array(_, arr_box) => {
+                let (elem_typ, arr_idx) = arr_box.deref();
+                Type::Array(Box::new((elem_typ.to_type(), *arr_idx)))
+            }
+        }
+    }
+}
+
 // Types contain everything that cannot be expressed at runtime
 #[derive(Debug, Clone)]
 pub enum Type {
     Error,
     Unknown,
-    Named{id : TypeUUID, span : Option<Span>},
+    Named(TypeUUID),
     /*Contains a wireID pointing to a constant expression for the array size, 
     but doesn't actually take size into account for type checking as that would
     make type checking too difficult. Instead delay until proper instantiation
@@ -24,7 +62,7 @@ impl Type {
             Type::Unknown => {
                 "{unknown}".to_owned()
             }
-            Type::Named{id, span:_} => {
+            Type::Named(id) => {
                 linker_types[*id].get_full_name()
             }
             Type::Array(sub) => sub.deref().0.to_string(linker_types) + "[]",
@@ -32,9 +70,7 @@ impl Type {
     }
     pub fn for_each_generative_input<F : FnMut(FlatID)>(&self, f : &mut F) {
         match self {
-            Type::Error => {}
-            Type::Unknown => {}
-            Type::Named{id : _, span : _} => {}
+            Type::Error | Type::Unknown | Type::Named(_) => {}
             Type::Array(arr_box) => {
                 f(arr_box.deref().1)
             }
@@ -44,29 +80,17 @@ impl Type {
         match self {
             Type::Error => CHECK_ERROR,
             Type::Unknown => CHECK_UNKNOWN,
-            Type::Named{id : _, span : _} => false,
+            Type::Named(_id) => false,
             Type::Array(arr_box) => {
                 arr_box.deref().0.contains_error_or_unknown::<CHECK_ERROR, CHECK_UNKNOWN>()
-            }
-        }
-    }
-    pub fn for_each_located_type<F : FnMut(TypeUUID, Span)>(&self, f : &mut F) {
-        match self {
-            Type::Error => {}
-            Type::Unknown => {}
-            Type::Named { id, span: Some(span) } => {f(*id, *span)}
-            Type::Named { id: _, span: None } => {}
-            Type::Array(arr_box) => {
-                let (arr, _idx) = arr_box.deref();
-                arr.for_each_located_type(f);
             }
         }
     }
 }
 
 
-pub const BOOL_TYPE : Type = Type::Named{id : get_builtin_type("bool"), span : None};
-pub const INT_TYPE : Type = Type::Named{id : get_builtin_type("int"), span : None};
+pub const BOOL_TYPE : Type = Type::Named(get_builtin_type("bool"));
+pub const INT_TYPE : Type = Type::Named(get_builtin_type("int"));
 pub const BOOL_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("bool"));
 pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("int"));
 
@@ -114,7 +138,7 @@ pub fn get_binary_operator_types(op : Operator) -> ((Type, Type), Type) {
 
 fn type_compare(expected : &Type, found : &Type) -> bool {
     match (expected, found) {
-        (Type::Named{id : exp, span : _}, Type::Named{id : fnd, span : _}) => exp == fnd,
+        (Type::Named(exp), Type::Named(fnd)) => exp == fnd,
         (Type::Array(exp), Type::Array(fnd)) => {
             type_compare(&exp.deref().0, &fnd.deref().0)
         }

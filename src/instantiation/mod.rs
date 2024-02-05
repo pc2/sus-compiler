@@ -2,7 +2,7 @@ use std::{cell::RefCell, iter::zip, ops::Deref, rc::Rc};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, ast::{Operator, IdentifierType, Span, InterfacePorts}, errors::ErrorCollector, flattening::{Write, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instantiation, WireInstance, WireSource, WriteType}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, tokenizer::kw, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{Value, compute_unary_op, compute_binary_op}};
+use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, ast::{Operator, IdentifierType, Span, InterfacePorts}, errors::ErrorCollector, flattening::{Write, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instruction, WireInstance, WireSource, WriteType}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, tokenizer::kw, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{Value, compute_unary_op, compute_binary_op}};
 
 pub mod latency_algorithm;
 
@@ -155,13 +155,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn get_generation_value(&self, v : FlatID) -> Option<&Value> {
         if let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] {
             if let Value::Unset | Value::Error = vv {
-                self.errors.error_basic(self.flattened.instantiations[v].extract_wire().span, format!("This variable is set but it's {vv:?}!"));
+                self.errors.error_basic(self.flattened.instructions[v].extract_wire().span, format!("This variable is set but it's {vv:?}!"));
                 None
             } else {
                 Some(vv)
             }
         } else {
-            self.errors.error_basic(self.flattened.instantiations[v].extract_wire().span, "This variable is not set at this point!");
+            self.errors.error_basic(self.flattened.instructions[v].extract_wire().span, "This variable is not set at this point!");
             None
         }
     }
@@ -178,7 +178,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn concretize_type(&self, typ : &Type, span : Span) -> Option<ConcreteType> {
         match typ {
             Type::Error | Type::Unknown => unreachable!("Bad types should be caught in flattening: {}", typ.to_string(&self.linker.types)),
-            Type::Named{id, span : _} => {
+            Type::Named(id) => {
                 Some(ConcreteType::Named(*id))
             }
             Type::Array(arr_box) => {
@@ -220,8 +220,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         let found_typ = &self.wires[from.from].typ;
         if write_to_typ != found_typ {
-            let from_flattened_wire = self.flattened.instantiations[self.wires[from.from].original_wire].extract_wire();
-            let to_flattened_decl = self.flattened.instantiations[self.wires[wire_id].original_wire].extract_wire_declaration();
+            let from_flattened_wire = self.flattened.instructions[self.wires[from.from].original_wire].extract_wire();
+            let to_flattened_decl = self.flattened.instructions[self.wires[wire_id].original_wire].extract_wire_declaration();
 
             let found_typ_name = found_typ.to_string(&self.linker.types);
             let write_to_typ_name = write_to_typ.to_string(&self.linker.types);
@@ -305,7 +305,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             &WireSource::ArrayAccess{arr, arr_idx} => {
                 let Value::Array(arr_val) = self.get_generation_value(arr)? else {return None};
                 let arr_idx_val = self.get_generation_value(arr_idx)?;
-                let arr_idx_wire = self.flattened.instantiations[arr_idx].extract_wire();
+                let arr_idx_wire = self.flattened.instructions[arr_idx].extract_wire();
                 let idx : usize = self.extract_integer_from_value(arr_idx_val, arr_idx_wire.span)?;
                 if let Some(item) = arr_val.get(idx) {
                     item.clone()
@@ -331,7 +331,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             SubModuleOrWire::Wire(w) => Some(*w),
             SubModuleOrWire::CompileTimeValue(v) => {
                 let value = v.clone();
-                let Instantiation::Wire(wire) = &self.flattened.instantiations[flat_id] else {unreachable!()};
+                let Instruction::Wire(wire) = &self.flattened.instructions[flat_id] else {unreachable!()};
                 let typ = self.concretize_type(&wire.typ, wire.span)?;
                 let name = self.get_unique_name();
                 Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id, typ, name, absolute_latency : LATENCY_UNSET}))
@@ -341,7 +341,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn wire_to_real_wire(&mut self, w: &WireInstance, typ : ConcreteType, original_wire : FlatID) -> Option<WireID> {
         let source = match &w.source {
             &WireSource::WireRead(from_wire) => {
-                /*Assert*/ self.flattened.instantiations[from_wire].extract_wire_declaration(); // WireReads must point to a NamedWire!
+                /*Assert*/ self.flattened.instructions[from_wire].extract_wire_declaration(); // WireReads must point to a NamedWire!
                 return Some(self.generation_state[from_wire].extract_wire())
             }
             &WireSource::UnaryOp{op, right} => {
@@ -362,7 +362,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         RealWireDataSource::ArrayAccess{arr, arr_idx: *w}
                     }
                     SubModuleOrWire::CompileTimeValue(v) => {
-                        let arr_idx_wire = self.flattened.instantiations[arr_idx].extract_wire();
+                        let arr_idx_wire = self.flattened.instructions[arr_idx].extract_wire();
                         let arr_idx = self.extract_integer_from_value(v, arr_idx_wire.span)?;
                         RealWireDataSource::ConstArrayAccess{arr, arr_idx}
                     }
@@ -394,16 +394,16 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn instantiate_flattened_module(&mut self, flat_range : FlatIDRange, condition : Option<WireID>) -> Option<()> {
         let mut instruction_range = flat_range.into_iter();
         while let Some(original_wire) = instruction_range.next() {
-            let instance_to_add : SubModuleOrWire = match &self.flattened.instantiations[original_wire] {
-                Instantiation::SubModule(submodule) => {
+            let instance_to_add : SubModuleOrWire = match &self.flattened.instructions[original_wire] {
+                Instruction::SubModule(submodule) => {
                     let Some(instance) = self.linker.instantiate(submodule.module_uuid) else {return None}; // Avoid error from submodule
                     let interface_real_wires = submodule.interface_ports.map(&mut |port, _is_input| {
                         self.generation_state[port].extract_wire()
                     });
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, wires : interface_real_wires, name : submodule.name.clone()}))
                 }
-                Instantiation::Declaration(wire_decl) => {
-                    let typ = self.concretize_type(&wire_decl.typ, wire_decl.typ_span)?;
+                Instruction::Declaration(wire_decl) => {
+                    let typ = self.concretize_type(&wire_decl.typ, wire_decl.typ_expr.get_span())?;
                     if wire_decl.identifier_type == IdentifierType::Generative {
                         /*Do nothing (in fact re-initializes the wire to 'empty'), just corresponds to wire declaration*/
                         /*if wire_decl.read_only { // Don't know why this check is *here*
@@ -426,13 +426,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         let wire_id = self.wires.alloc(RealWire{name: wire_decl.name.clone(), typ, original_wire, source, absolute_latency : LATENCY_UNSET});
                         if let Some(lat_spec_flat) = wire_decl.latency_specifier {
                             let val = self.get_generation_value(lat_spec_flat)?;
-                            let specified_absolute_latency : i64 = self.extract_integer_from_value(val, self.flattened.instantiations[lat_spec_flat].extract_wire().span)?;
+                            let specified_absolute_latency : i64 = self.extract_integer_from_value(val, self.flattened.instructions[lat_spec_flat].extract_wire().span)?;
                             self.specified_latencies.push((wire_id, specified_absolute_latency));
                         }
                         SubModuleOrWire::Wire(wire_id)
                     }
                 }
-                Instantiation::Wire(w) => {
+                Instruction::Wire(w) => {
                     let typ = self.concretize_type(&w.typ, w.span)?;
                     if w.is_compiletime {
                         let value_computed = self.compute_compile_time(&w.source)?;
@@ -443,14 +443,14 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         SubModuleOrWire::Wire(wire_found)
                     }
                 }
-                Instantiation::Write(conn) => {
+                Instruction::Write(conn) => {
                     self.process_connection(conn, original_wire, condition);
                     continue;
                 }
-                Instantiation::IfStatement(stm) => {
+                Instruction::IfStatement(stm) => {
                     let then_range = UUIDRange(stm.then_start, stm.then_end_else_start);
                     let else_range = UUIDRange(stm.then_end_else_start, stm.else_end);
-                    let if_condition_wire = self.flattened.instantiations[stm.condition].extract_wire();
+                    let if_condition_wire = self.flattened.instructions[stm.condition].extract_wire();
                     if if_condition_wire.is_compiletime {
                         let condition_val = self.get_generation_value(stm.condition)?;
                         let run_range = if condition_val.extract_bool() {
@@ -482,13 +482,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     instruction_range.skip_to(stm.else_end);
                     continue;
                 }
-                Instantiation::ForStatement(stm) => {
+                Instruction::ForStatement(stm) => {
                     // TODO Non integer for loops?
                     let start_val = self.get_generation_value(stm.start)?.extract_integer().clone();
                     let end_val = self.get_generation_value(stm.end)?.extract_integer().clone();
                     if start_val > end_val {
-                        let start_flat = &self.flattened.instantiations[stm.start].extract_wire();
-                        let end_flat = &self.flattened.instantiations[stm.end].extract_wire();
+                        let start_flat = &self.flattened.instructions[stm.start].extract_wire();
+                        let end_flat = &self.flattened.instructions[stm.end].extract_wire();
                         self.errors.error_basic(Span::new_overarching(start_flat.span, end_flat.span), format!("for loop range end is before begin: {start_val}:{end_val}"));
                         return None;
                     }
@@ -552,22 +552,22 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 match err {
                     LatencyCountingError::PositiveNetLatencyCycle { cycle_nodes } => {
                         for n in cycle_nodes {
-                            if let Some(source_location) = self.flattened.instantiations[self.wires[WireID::from_hidden_value(n)].original_wire].get_location_of_module_part() {
+                            if let Some(source_location) = self.flattened.instructions[self.wires[WireID::from_hidden_value(n)].original_wire].get_location_of_module_part() {
                                 self.errors.error_basic(source_location, "This operation is part of a net-positive latency cycle");
                             }
                         }
                     }
                     LatencyCountingError::ConflictingPortLatency { bad_ports } => {
                         for port in bad_ports {
-                            let port_decl = self.flattened.instantiations[self.wires[WireID::from_hidden_value(port.0)].original_wire].extract_wire_declaration();
+                            let port_decl = self.flattened.instructions[self.wires[WireID::from_hidden_value(port.0)].original_wire].extract_wire_declaration();
                             self.errors.error_basic(Span::new_single_token(port_decl.name_token), format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
                         }
                     }
                     LatencyCountingError::DisjointNodes { start_node, nodes_not_reached } => {
-                        let start_port_decl = self.flattened.instantiations[self.wires[WireID::from_hidden_value(start_node)].original_wire].extract_wire_declaration();
+                        let start_port_decl = self.flattened.instructions[self.wires[WireID::from_hidden_value(start_node)].original_wire].extract_wire_declaration();
 
                         for n in nodes_not_reached {
-                            if let Some(source_location) = self.flattened.instantiations[self.wires[WireID::from_hidden_value(n)].original_wire].get_location_of_module_part() {
+                            if let Some(source_location) = self.flattened.instructions[self.wires[WireID::from_hidden_value(n)].original_wire].get_location_of_module_part() {
                                 self.errors.error_with_info(source_location, format!("Latency Counting couldn't reach this node from '{}'", start_port_decl.name), vec![start_port_decl.make_declared_here(self.errors.file)]);
                             }
                         }
@@ -604,14 +604,14 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             return None;// Don't instantiate modules that already errored. Otherwise instantiator may crash
         }
 
-        for (_id, inst) in &self.flattened.instantiations {
+        for (_id, inst) in &self.flattened.instructions {
             inst.for_each_embedded_type(&mut |typ,_span| {
                 assert!(!typ.contains_error_or_unknown::<true,true>(), "Types brought into instantiation may not contain 'bad types': {typ:?} in {inst:?}");
             })
         }
         
     
-        self.instantiate_flattened_module(self.flattened.instantiations.id_range(), None)?;
+        self.instantiate_flattened_module(self.flattened.instructions.id_range(), None)?;
         let interface = self.make_interface();
         self.compute_latencies(&interface)?;
         
@@ -641,7 +641,7 @@ impl InstantiationList {
         // Temporary, no template arguments yet
         if cache_borrow.is_empty() {
             let mut context = InstantiationContext{
-                generation_state : flattened.instantiations.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect(),
+                generation_state : flattened.instructions.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect(),
                 wires : FlatAlloc::new(),
                 submodules : FlatAlloc::new(),
                 specified_latencies : Vec::new(),
