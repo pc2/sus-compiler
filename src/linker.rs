@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, rc::Rc, cell::RefCell};
 
-use crate::{arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, ast::{Module, LinkInfo, Span}, errors::{ErrorCollector, error_info}, flattening::{FlatID, FlattenedModule, Instruction}, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode}, tokenizer::TokenizeResult, typing::Type, util::{const_str_position, const_str_position_in_tuples}, value::Value};
+use crate::{arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, ast::{Module, LinkInfo, Span}, errors::{ErrorCollector, error_info}, flattening::{ConnectionWrite, FlatID, FlattenedModule, Instruction, WireInstance}, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode}, tokenizer::TokenizeResult, typing::{WrittenType, Type}, util::{const_str_position, const_str_position_in_tuples}, value::Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModuleUUIDMarker;
@@ -371,6 +371,81 @@ impl Linker {
         println!("Instantiating {}", md.link_info.name);
 
         md.instantiations.instantiate(&md.link_info.name, &md.flattened, self)
+    }
+
+    pub fn get_info_about_source_location<'linker>(&'linker self, token_idx : usize, file : FileUUID) -> Option<(LocationInfo<'linker>, Span)> {
+        let mut location_builder = LocationInfoBuilder::new(token_idx);
+        
+        for global in &self.files[file].associated_values {
+            match *global {
+                NameElem::Module(md_id) => {
+                    let md = &self.modules[md_id];
+                    if md.link_info.span.contains_token(token_idx) {
+                        for (_id, inst) in &md.flattened.instructions {
+                            match inst {
+                                Instruction::SubModule(sm) => {
+                                    location_builder.update(sm.module_name_span, LocationInfo::Global(NameElem::Module(sm.module_uuid)));
+                                }
+                                Instruction::Declaration(decl) => {
+                                    if let Some(typ) = decl.typ_expr.get_deepest_selected(token_idx) {
+                                        location_builder.update(typ.get_span(), LocationInfo::Type(typ));
+                                    }
+                                }
+                                Instruction::Wire(wire) => {
+                                    location_builder.update(wire.span, LocationInfo::Wire(md, wire));
+                                }
+                                Instruction::Write(write) => {
+                                    location_builder.update(Span::new_single_token(write.to.span.0), LocationInfo::WriteWire(md, &write.to));
+                                }
+                                Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
+                            };
+                        }
+                        break;
+                    }
+                }
+                NameElem::Type(_) => {
+                    todo!()
+                }
+                NameElem::Constant(_) => {
+                    todo!()
+                }
+            }
+        }
+        if let Some(instr) = location_builder.best_instruction {
+            Some((instr, location_builder.best_span))
+        } else {
+            None
+        }
+    }
+}
+
+pub enum LocationInfo<'linker> {
+    WriteWire(&'linker Module, &'linker ConnectionWrite),
+    Wire(&'linker Module, &'linker WireInstance),
+    Type(&'linker WrittenType),
+    Global(NameElem)
+}
+
+struct LocationInfoBuilder<'linker> {
+    best_instruction : Option<LocationInfo<'linker>>,
+    best_span : Span,
+    token_idx : usize
+}
+
+impl<'linker> LocationInfoBuilder<'linker> {
+    fn new(token_idx : usize) -> Self {
+        Self{
+            best_instruction : None,
+            best_span : Span(0, usize::MAX),
+            token_idx
+        }
+    }
+    fn update(&mut self, span : Span, info : LocationInfo<'linker>) {
+        if span.contains_token(self.token_idx) && span.size() <= self.best_span.size() {
+            assert!(span.size() < self.best_span.size());
+            self.best_span = span;
+            self.best_instruction = Some(info);
+        }
     }
 }
 

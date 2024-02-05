@@ -4,18 +4,18 @@ use crate::{ast::{Operator, Span}, linker::{get_builtin_type, TypeUUID, Linker, 
 
 // These are 
 #[derive(Debug, Clone)]
-pub enum ResolvedTypeExpr {
+pub enum WrittenType {
     Error(Span),
     Named(Span, TypeUUID),
-    Array(Span, Box<(ResolvedTypeExpr, FlatID)>)
+    Array(Span, Box<(WrittenType, FlatID)>)
 }
 
-impl ResolvedTypeExpr {
+impl WrittenType {
     pub fn for_each_located_type<F : FnMut(Option<TypeUUID>, Span)>(&self, f : &mut F) {
         match self {
-            ResolvedTypeExpr::Error(span) => {f(None, *span)}
-            ResolvedTypeExpr::Named(span, id) => {f(Some(*id), *span)}
-            ResolvedTypeExpr::Array(_span, arr_box) => {
+            WrittenType::Error(span) => {f(None, *span)}
+            WrittenType::Named(span, id) => {f(Some(*id), *span)}
+            WrittenType::Array(_span, arr_box) => {
                 let (arr, _idx) = arr_box.deref();
                 arr.for_each_located_type(f);
             }
@@ -24,15 +24,34 @@ impl ResolvedTypeExpr {
 
     pub fn get_span(&self) -> Span {
         match self {
-            ResolvedTypeExpr::Error(span) | ResolvedTypeExpr::Named(span, _) | ResolvedTypeExpr::Array(span, _) => *span
+            WrittenType::Error(span) | WrittenType::Named(span, _) | WrittenType::Array(span, _) => *span
+        }
+    }
+
+    pub fn get_deepest_selected(&self, token_idx : usize) -> Option<&WrittenType> {
+        let span = self.get_span();
+        if span.contains_token(token_idx) {
+            match self {
+                WrittenType::Error(_span) | WrittenType::Named(_span, _) => {}
+                WrittenType::Array(_span, arr_box) => {
+                    let (arr_typ, _idx) = arr_box.deref();
+                    let sub = arr_typ.get_deepest_selected(token_idx);
+                    if sub.is_some() {
+                        return sub;
+                    }
+                }
+            }
+            Some(self)
+        } else {
+            None
         }
     }
 
     pub fn to_type(&self) -> Type {
         match self {
-            ResolvedTypeExpr::Error(_) => Type::Error,
-            ResolvedTypeExpr::Named(_, id) => Type::Named(*id),
-            ResolvedTypeExpr::Array(_, arr_box) => {
+            WrittenType::Error(_) => Type::Error,
+            WrittenType::Named(_, id) => Type::Named(*id),
+            WrittenType::Array(_, arr_box) => {
                 let (elem_typ, arr_idx) = arr_box.deref();
                 Type::Array(Box::new((elem_typ.to_type(), *arr_idx)))
             }

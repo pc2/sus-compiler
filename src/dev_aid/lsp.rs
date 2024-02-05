@@ -6,7 +6,7 @@ use lsp_server::{Response, Message, Connection};
 
 use lsp_types::notification::Notification;
 
-use crate::{parser::perform_full_semantic_parse, dev_aid::syntax_highlighting::create_token_ide_info, ast::{IdentifierType, Span}, errors::{ErrorCollector, CompileError, ErrorLevel}, linker::{FileUUIDMarker, Linker, FileUUID, FileData}, arena_alloc::ArenaVector};
+use crate::{arena_alloc::ArenaVector, ast::{IdentifierType, Span}, dev_aid::syntax_highlighting::create_token_ide_info, errors::{ErrorCollector, CompileError, ErrorLevel}, linker::{FileUUIDMarker, Linker, FileUUID, FileData}, parser::perform_full_semantic_parse, tokenizer::{CharLine, TokenizeResult}};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -69,13 +69,13 @@ pub fn lsp_main(port : u16) -> Result<(), Box<dyn Error + Sync + Send>> {
     // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
         definition_provider: Some(OneOf::Left(true)),
-        /*document_highlight_provider: Some(OneOf::Right(
+        document_highlight_provider: Some(OneOf::Right(
             DocumentHighlightOptions{
                 work_done_progress_options: WorkDoneProgressOptions{
-                    work_done_progress: Some(true)
+                    work_done_progress: Some(false)
                 }
             }
-        )),*/
+        )),
         semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions{
             work_done_progress_options: WorkDoneProgressOptions {
                 work_done_progress: Some(false)
@@ -170,8 +170,7 @@ impl SemanticTokensDeltaAccumulator {
         }
 
         let delta_col = position.character - self.prev.character;
-        self.prev.character = position.character;
-        self.prev.line = position.line;
+        self.prev = position;
 
         self.semantic_tokens.push(SemanticToken{
             delta_line: delta_line,
@@ -183,80 +182,42 @@ impl SemanticTokensDeltaAccumulator {
     }
 }
 
-fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> (SemanticTokensResult, Vec<std::ops::Range<Position>>) {
-    let file_text = &file_data.file_text;
+fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> SemanticTokensResult {
     let ide_tokens = create_token_ide_info(&file_data, linker);
 
     let mut semantic_tokens_acc = SemanticTokensDeltaAccumulator{prev : Position {line : 0, character : 0}, semantic_tokens : Vec::new()};
     semantic_tokens_acc.semantic_tokens.reserve(file_data.tokens.len());
-    let mut positions : Vec<std::ops::Range<Position>> = Vec::new();
-    positions.reserve(file_data.tokens.len());
 
-    let mut cur_whitespace_start = 0;
-    let mut cur_position = Position{line : 0, character : 0};
     for (tok_idx, ide_tok) in ide_tokens.iter().enumerate() {
         let typ = get_semantic_token_type_from_ide_token(ide_tok);
         let mod_bits = get_modifiers_for_token(ide_tok);
 
-        let tok_range = file_data.tokens.get_token_range(tok_idx);
-        let whitespace_text = &file_text[cur_whitespace_start..tok_range.start];
-        cur_whitespace_start = tok_range.end;
-        let token_text = &file_text[tok_range];
 
-        // skip through whitespace
-        for c in whitespace_text.chars() {
-            if c == '\n' {
-                cur_position.line += 1;
-                cur_position.character = 0;
-            } else {
-                cur_position.character += 1;
-            }
-        }
-        let real_token_start_position = cur_position;
-        let mut part_start_position = cur_position;
-        for c in token_text.chars() {
-            if c == '\n' {
-                semantic_tokens_acc.push(part_start_position, cur_position.character - part_start_position.character, typ, mod_bits);
-                cur_position.line += 1;
-                cur_position.character = 0;
-                part_start_position = cur_position;
-            } else {
-                cur_position.character += 1;
-            }
-        }
-        semantic_tokens_acc.push(part_start_position, cur_position.character - part_start_position.character, typ, mod_bits);
-        positions.push(real_token_start_position..cur_position);
+        let tok_range = file_data.tokens.get_token_linechar_range(tok_idx);
+        let start_pos = Position{line : tok_range.start.line as u32, character : tok_range.start.character as u32};
+        let end_pos = Position{line : tok_range.end.line as u32, character : tok_range.end.character as u32};
+        semantic_tokens_acc.push(start_pos, end_pos.character - start_pos.character, typ, mod_bits)
     }
 
-    let eof_start = cur_position.clone();
-    for c in file_text[cur_whitespace_start..].chars() {
-        if c == '\n' {
-            cur_position.line += 1;
-            cur_position.character = 0;
-        } else {
-            cur_position.character += 1;
-        }
-    }
-    positions.push(eof_start..cur_position);
-
-    (SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
+    SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
         result_id: None,
         data: semantic_tokens_acc.semantic_tokens
-    }), positions)
+    })
 }
 
 use lsp_types::Diagnostic;
 
-fn cvt_span_to_lsp_range(ch_sp : Span, token_positions : &[std::ops::Range<Position>]) -> lsp_types::Range {
+fn cvt_span_to_lsp_range(ch_sp : Span, tokens : &TokenizeResult) -> lsp_types::Range {
+    let rng = tokens.get_span_linechar_range(ch_sp);
     Range {
-        start: token_positions[ch_sp.0].start,
-        end: token_positions[ch_sp.1].end
+        start: Position{character : rng.start.character as u32, line : rng.start.line as u32},
+        end: Position{character : rng.end.character as u32, line : rng.end.line as u32}
     }
 }
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn convert_diagnostic(err : CompileError, token_positions : &[std::ops::Range<Position>], uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
-    let error_pos = cvt_span_to_lsp_range(err.position, token_positions);
+fn convert_diagnostic(err : CompileError, tokens : &TokenizeResult, uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
+    let error_pos = cvt_span_to_lsp_range(err.position, tokens);
 
     let severity = match err.level {
         ErrorLevel::Error => DiagnosticSeverity::ERROR,
@@ -264,7 +225,7 @@ fn convert_diagnostic(err : CompileError, token_positions : &[std::ops::Range<Po
     };
     let mut related_info = Vec::new();
     for info in err.infos {
-        let info_pos = cvt_span_to_lsp_range(info.position, token_positions);
+        let info_pos = cvt_span_to_lsp_range(info.position, tokens);
         let location = Location{uri : uris[info.file].clone(), range : info_pos};
         related_info.push(DiagnosticRelatedInformation { location, message: info.info });
     }
@@ -272,11 +233,11 @@ fn convert_diagnostic(err : CompileError, token_positions : &[std::ops::Range<Po
 }
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, token_positions : &[std::ops::Range<Position>], uris : &ArenaVector<Url, FileUUIDMarker>) -> Result<(), Box<dyn Error + Sync + Send>> {
+fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, token_boundaries : &TokenizeResult, uris : &ArenaVector<Url, FileUUIDMarker>) -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut diag_vec : Vec<Diagnostic> = Vec::new();
     let (err_vec, file) = errors.get();
     for err in err_vec {
-        diag_vec.push(convert_diagnostic(err, token_positions, uris));
+        diag_vec.push(convert_diagnostic(err, token_boundaries, uris));
     }
     
     let params = &PublishDiagnosticsParams{
@@ -316,6 +277,14 @@ fn main_loop(
                         let params : GotoDefinitionParams = serde_json::from_value(req.params).expect("JSON Encoding Error while parsing params");
                         println!("got gotoDefinition request: {params:?}");
 
+                        let pos = &params.text_document_position_params.position;
+                        let text_document = &params.text_document_position_params.text_document;
+
+                        let uuid = file_cache.ensure_contains_file(&text_document.uri);
+                        
+                        
+                        let file_data = &file_cache.linker.files[uuid];
+
                         let result = Some(GotoDefinitionResponse::Array(Vec::new()));
                         let result = serde_json::to_value(&result).unwrap();
                         let resp = Response { id: req.id, result: Some(result), error: None };
@@ -330,7 +299,7 @@ fn main_loop(
                         
                         let file_data = &file_cache.linker.files[uuid];
 
-                        let (syntax_highlight, token_positions) = do_syntax_highlight(file_data, &file_cache.linker);
+                        let syntax_highlight = do_syntax_highlight(file_data, &file_cache.linker);
 
                         let result = serde_json::to_value(&syntax_highlight).unwrap();
                         connection.sender.send(Message::Response(Response{
@@ -340,11 +309,13 @@ fn main_loop(
                         // println!("Flattening...");
                         file_cache.linker.recompile_all();
 
-                        let mut errors = file_cache.linker.files[uuid].parsing_errors.clone();
+                        let file_data = &file_cache.linker.files[uuid]; // Have to grab it again because previous line mutates
+
+                        let mut errors = file_data.parsing_errors.clone();
                         file_cache.linker.get_all_errors_in_file(uuid, &mut errors);
 
                         // println!("Errors: {:?}", &errors);
-                        send_errors_warnings(&connection, errors, &token_positions, &file_cache.uris)?;
+                        send_errors_warnings(&connection, errors, &file_data.tokens, &file_cache.uris)?;
                     },
                     // TODO ...
                     req => {

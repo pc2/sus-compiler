@@ -205,16 +205,23 @@ impl<'iter> Iterator for FileIter<'iter> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct CharLine {
+    pub line : usize,
+    pub character : usize
+}
+
 pub struct TokenizeResult {
     pub token_types : Vec<TokenTypeIdx>,
     // List of all boundaries. Starts with 0, in whitespace mode, and then alternatingly switch to being a token, switch to being whitespace, back and forth
     // The span of token i is given by token_boundaries[i*2+1..i*2+2]
     // Ends at the end of the file, with a final whitespace block
-    pub token_boundaries : Vec<usize>
+    pub token_boundaries : Vec<usize>,
+    pub token_boundaries_as_char_lines : Vec<CharLine>
 }
 impl TokenizeResult {
     fn new() -> Self {
-        TokenizeResult{token_types : Vec::new(), token_boundaries : vec![0]}
+        TokenizeResult{token_types : Vec::new(), token_boundaries : vec![0], token_boundaries_as_char_lines : Vec::new()}
     }
     // Result can be used for error reporting
     fn push(&mut self, typ : TokenTypeIdx, rng : Range<usize>) {
@@ -226,12 +233,37 @@ impl TokenizeResult {
         errors.error_basic(Span::new_single_token(self.token_types.len()), motivation);
         self.push(TOKEN_INVALID, rng);
     }
+    fn finalize(&mut self, file_text : &str) {
+        let mut cur_position = CharLine{line: 0, character: 0};
+        let mut start = 0;
+        self.token_boundaries_as_char_lines = self.token_boundaries.iter().map(|part_end| {
+            for c in file_text[start..*part_end].chars() {
+                if c == '\n' {
+                    cur_position.line += 1;
+                    cur_position.character = 0;
+                } else {
+                    cur_position.character += 1;
+                }
+            }
+            start = *part_end;
+            cur_position
+        }).collect();
+    }
 
     pub fn len(&self) -> usize {
         self.token_types.len()
     }
     pub fn get_token_range(&self, token_idx : usize) -> Range<usize> {
         self.token_boundaries[token_idx*2+1]..self.token_boundaries[token_idx*2+2]
+    }
+    pub fn get_token_linechar_range(&self, token_idx : usize) -> Range<CharLine> {
+        self.token_boundaries_as_char_lines[token_idx*2+1]..self.token_boundaries_as_char_lines[token_idx*2+2]
+    }
+    pub fn get_span_range(&self, span : Span) -> Range<usize> {
+        self.token_boundaries[span.0*2+1]..self.token_boundaries[span.1*2+2]
+    }
+    pub fn get_span_linechar_range(&self, span : Span) -> Range<CharLine> {
+        self.token_boundaries_as_char_lines[span.0*2+1]..self.token_boundaries_as_char_lines[span.1*2+2]
     }
 }
 
@@ -302,8 +334,15 @@ pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> Tokeni
                 } else {
                     file_text.len()
                 };
-                let comment_span = file_pos..end_pos;
-                result.push(TOKEN_COMMENT, comment_span);
+                let mut part_start = file_pos;
+                for (idx, c) in file_text[file_pos..end_pos].char_indices() {
+                    if c == '\n' {
+                        let real_idx = file_pos + idx;
+                        result.push(TOKEN_COMMENT, part_start..real_idx);
+                        part_start = real_idx + 1;
+                    }
+                }
+                result.push(TOKEN_COMMENT, part_start..end_pos);
                 
             } else if symbol_tok_id == kw("*/") {
                 // Unexpected close comment
@@ -317,5 +356,6 @@ pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> Tokeni
     }
 
     result.token_boundaries.push(file_text.len());
+    result.finalize(file_text);
     result
 }

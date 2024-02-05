@@ -3,7 +3,7 @@ use std::{ops::Deref, iter::zip};
 use crate::{
     ast::{AssignableExpression, AssignableExpressionModifiers, CodeBlock, DeclID, DeclIDMarker, Expression, IdentifierType, InterfacePorts, LocalOrGlobal, Module, Operator, Span, SpanAssignableExpression, SpanExpression, SpanTypeExpression, Statement, TypeExpression},
     linker::{Linker, FileUUID, GlobalResolver, ResolvedGlobals, NamedConstant, ConstantUUID, ModuleUUID, NameElem, NamedType, TypeUUIDMarker},
-    errors::{ErrorCollector, error_info, ErrorInfo}, arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange, ArenaAllocator}, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, ResolvedTypeExpr, Type, BOOL_TYPE, INT_TYPE}, value::Value
+    errors::{ErrorCollector, error_info, ErrorInfo}, arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange, ArenaAllocator}, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, WrittenType, Type, BOOL_TYPE, INT_TYPE}, value::Value
 };
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
@@ -81,7 +81,7 @@ pub struct WireInstance {
 
 #[derive(Debug)]
 pub struct Declaration {
-    pub typ_expr : ResolvedTypeExpr,
+    pub typ_expr : WrittenType,
     pub typ : Type,
     pub is_declared_in_this_module : bool,
     pub name_token : usize,
@@ -185,20 +185,20 @@ struct FlatteningContext<'inst, 'l, 'm> {
 }
 
 impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
-    fn map_to_type(&mut self, type_expr : &SpanTypeExpression) -> ResolvedTypeExpr {
+    fn map_to_type(&mut self, type_expr : &SpanTypeExpression) -> WrittenType {
         match &type_expr.0 {
             TypeExpression::Named => {
                 if let Some(typ_id) = &self.linker.resolve_type(type_expr.1, &self.errors) {
-                    ResolvedTypeExpr::Named(type_expr.1, *typ_id)
+                    WrittenType::Named(type_expr.1, *typ_id)
                 } else {
-                    ResolvedTypeExpr::Error(type_expr.1)
+                    WrittenType::Error(type_expr.1)
                 }
             }
             TypeExpression::Array(b) => {
                 let (array_type_expr, array_size_expr) = b.deref();
                 let array_element_type = self.map_to_type(&array_type_expr);
                 let array_size_wire_id = self.flatten_expr(array_size_expr);
-                ResolvedTypeExpr::Array(type_expr.1, Box::new((array_element_type, array_size_wire_id)))
+                WrittenType::Array(type_expr.1, Box::new((array_element_type, array_size_wire_id)))
             }
         }
     }
@@ -212,14 +212,14 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     return self.alloc_module_interface(decl.name.clone(), md, id, decl.typ.1)
                 }
                 Some(NameElem::Type(id)) => {
-                    ResolvedTypeExpr::Named(decl.typ.1, id)
+                    WrittenType::Named(decl.typ.1, id)
                 }
                 Some(global_module_or_type) => {
                     let accepted = if ALLOW_MODULES {"Type or Module"} else {"Type"};
                     self.linker.make_bad_error_location_error(global_module_or_type, accepted, decl.typ.1, &self.errors);
-                    ResolvedTypeExpr::Error(decl.typ.1)
+                    WrittenType::Error(decl.typ.1)
                 }
-                None => ResolvedTypeExpr::Error(decl.typ.1)
+                None => WrittenType::Error(decl.typ.1)
             }
         } else {
             self.map_to_type(&decl.typ)
