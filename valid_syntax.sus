@@ -1,0 +1,228 @@
+
+
+
+module multiply_add : 
+	int a,
+	int b,
+	int c
+	-> int total {
+
+	reg int tmp = a * b;
+	total = tmp + c;
+}
+
+module fibonnaci : -> int num {
+	state int current = 1;
+	state int current_prev = 0;
+
+	num = current + current_prev;
+	current_prev = current;
+	current = num;
+}
+
+//timeline (v, true -> /) .. (v, false -> v)*
+module blur2 : 
+	int data,
+	bool first
+	-> int blurred {
+	
+	state int prev;
+
+	if !first {
+		blurred = data + prev;
+	}
+	prev = data;
+
+	gen int a;
+
+	gen bool b = true;
+	gen bool bb = false;
+
+	if bb {
+		a = 5;
+	} else {
+		a = 3;
+	}
+}
+
+
+module Tree_Multiply : int[4] values -> int total {
+    int a = values[0] * values[1];
+	int b = values[2] * values[3];
+	total = a * b;
+}
+
+
+
+
+//timeline (X, false -> /)* .. (X, true -> T)
+module Accumulator : int term, bool done -> int total {
+    state int tot;
+	initial tot = 0;
+
+    int new_tot = tot + term;
+    if done {
+        total = new_tot;
+        tot = 0; // Must restore initial conditions
+    } else {
+        tot = new_tot;
+    }
+}
+
+
+//timeline (a, true -> /) | (a, false -> /) .. (a, false -> r)* .. (a, true -> r)
+module blur : int a, bool done -> int result {
+	state bool working;
+	initial working = false;
+	state int prev;
+
+	if working {
+		reg reg reg result = prev + a; // Add a pipeline stage for shits and giggles
+	}
+	prev = a;
+	working = !done;
+}
+
+
+
+//timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
+module Unpack4 : int[4] packed -> int out_stream {
+    state int st;
+	initial st = 0;
+    state int[3] stored_packed;
+
+    if st == 0 {
+        out_stream = packed[0];
+        stored_packed[0] = packed[1]; // Shorthand notation is possible here "stored_packed[0:2] = packed[1:3];"
+        stored_packed[1] = packed[2];
+        stored_packed[2] = packed[3];
+        st = 1;
+    } else if st == 1 {
+        out_stream = stored_packed[0];
+        st = 2;
+    } else if st == 2 {
+        out_stream = stored_packed[1];
+        st = 3;
+    } else if st == 3 {
+        out_stream = stored_packed[2];
+        st = 0; // Must restore initial conditions
+        //finish; // packet is hereby finished. 
+    }
+}
+
+module generative : int i -> int o, int o2 {
+	gen int x = 5;
+	gen int[x] ys;
+
+	//gen int[ys] zs;
+
+	gen int[3] ps;
+
+	gen int[x] a;
+
+	a[2] = 5;
+	a[1] = 2;
+	a[0] = 10;
+	gen int[3] xx = a;
+
+	gen bool test = true;
+
+	if test {
+		
+	}
+
+	o = a[i];
+	o2 = a[a[0]];
+}
+
+module add_stuff_to_indices : int[10] values -> int[10] added_values {
+	for int i in 0..10 {
+		int sum = values[i] + i;
+		added_values[i] = sum;
+	}
+}
+
+
+//timeline (bs -> /, true) | (bs -> v, false)
+module first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros {
+	if bits[0] {
+		first = 0;
+		all_zeros = false;
+	} else if bits[1] {
+		first = 1;
+		all_zeros = false;
+	} else if bits[2] {
+		first = 2;
+		all_zeros = false;
+	} else if bits[3] {
+		first = 3;
+		all_zeros = false;
+	} else if bits[4] {
+		first = 4;
+		all_zeros = false;
+	} else if bits[5] {
+		first = 5;
+		all_zeros = false;
+	} else {
+		all_zeros = true;
+	}
+
+	/*first int i in 0..6 where bits[i] {
+		first = i;
+		all_zeros = false;
+	} else {
+		all_zeros = true;
+	}*/
+
+}
+
+
+module disjoint_ports : int a, int b, int c -> int result {
+	reg result = a + b;
+	// don't touch c
+}
+
+module undeteriminable_input_latency : int a, int b -> int x, int y {
+	reg int a_d = a;
+    reg int t = a_d + b;
+    reg reg reg int a_ddd = a;
+    x = t + a_ddd;
+    y = t;
+}
+
+module determinable_input_latency : int a, int b -> int x, int y {
+	reg int a_d = a;
+    reg int t = a_d + b;
+    reg reg int a_ddd = a;
+    x = t + a_ddd;
+    y = t;
+}
+
+module specified_input_latency : int a'0, int b'1 -> int x, int y {
+	reg int a_d = a;
+    reg int t = a_d + b;
+    reg reg reg int a_ddd = a;
+    x = t + a_ddd;
+    y = t;
+}
+
+module bad_cycle : int a -> int r {
+	state int test;
+	initial test = 0;
+
+	reg int new_test = test + a;
+	test = new_test;
+
+	r = new_test;
+}
+
+module good_cycle : int a -> int r {
+	state int test;
+	initial test = 0;
+
+	int new_test = test + a;
+	test = new_test;
+
+	r = new_test;
+}
+

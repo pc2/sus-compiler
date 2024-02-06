@@ -210,6 +210,16 @@ pub struct CharLine {
     pub line : usize,
     pub character : usize
 }
+impl PartialOrd for CharLine {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for CharLine {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.line.cmp(&other.line).then(self.character.cmp(&other.character))
+    }
+}
 
 pub struct TokenizeResult {
     pub token_types : Vec<TokenTypeIdx>,
@@ -264,6 +274,15 @@ impl TokenizeResult {
     }
     pub fn get_span_linechar_range(&self, span : Span) -> Range<CharLine> {
         self.token_boundaries_as_char_lines[span.0*2+1]..self.token_boundaries_as_char_lines[span.1*2+2]
+    }
+
+    pub fn get_token_on_or_left_of(&self, char_line : CharLine) -> usize {
+        match self.token_boundaries_as_char_lines.binary_search(&char_line) {
+            Ok(idx) | Err(idx) => {
+                assert!(idx >= 1);
+                return (idx - 1) / 2;
+            }
+        }
     }
 }
 

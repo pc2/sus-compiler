@@ -436,7 +436,15 @@ module undeteriminable_input_latency : int a, int b -> int x, int y {
     y = t;
 }
 
-module manually_specified_input_latency : int a'0, int b'1 -> int x, int y {
+module determinable_input_latency : int a, int b -> int x, int y {
+	reg int a_d = a;
+    reg int t = a_d + b;
+    reg reg int a_ddd = a;
+    x = t + a_ddd;
+    y = t;
+}
+
+module specified_input_latency : int a'0, int b'1 -> int x, int y {
 	reg int a_d = a;
     reg int t = a_d + b;
     reg reg reg int a_ddd = a;

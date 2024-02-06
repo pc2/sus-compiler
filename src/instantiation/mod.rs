@@ -680,4 +680,13 @@ impl InstantiationList {
     pub fn clear_instances(&mut self) {
         self.cache.borrow_mut().clear()
     }
+
+    pub fn for_each_instance<F : FnMut(&InstantiatedModule)>(&self, mut f : F) {
+        let borrow = self.cache.borrow();
+        for v in borrow.iter() {
+            if let Some(vv) = &v.0 {
+                f(vv.as_ref())
+            }
+        }
+    }
 }

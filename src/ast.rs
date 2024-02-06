@@ -49,7 +49,7 @@ impl Span {
         Span(0, tokens.token_types.len())
     }
     pub fn contains_token(&self, token_idx : usize) -> bool {
-        self.0 >= token_idx && self.1 <= token_idx
+        token_idx >= self.0 && token_idx <= self.1
     }
     // Not really a useful quantity. Should only be used comparatively, find which is the nested-most span
     pub fn size(&self) -> usize {

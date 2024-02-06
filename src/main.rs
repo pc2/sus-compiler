@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let _executable_path = args.next();
 
     let mut file_paths : Vec<PathBuf> = Vec::new();
-    let mut is_lsp = false;
+    let mut is_lsp = None;
     let mut codegen = None;
     let mut codegen_all = false;
     let mut test_sus_sitter = false;
@@ -91,7 +91,10 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--lsp" => {
-                is_lsp = true;
+                is_lsp = Some(false);
+            }
+            "--lsp-debug" => {
+                is_lsp = Some(true);
             }
             "--codegen" => {
                 codegen = Some(args.next().expect("Expected a module name after --codegen"));
@@ -112,8 +115,8 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     }
     
     #[cfg(feature = "lsp")]
-    if is_lsp {
-        return dev_aid::lsp::lsp_main(25000);
+    if let Some(debug) = is_lsp {
+        return dev_aid::lsp::lsp_main(25000, debug);
     }
     if file_paths.len() == 0 {
         // Quick debugging

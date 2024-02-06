@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, rc::Rc, cell::RefCell};
 
-use crate::{arena_alloc::{ArenaAllocator, UUID, UUIDMarker}, ast::{Module, LinkInfo, Span}, errors::{ErrorCollector, error_info}, flattening::{ConnectionWrite, FlatID, FlattenedModule, Instruction, WireInstance}, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode}, tokenizer::TokenizeResult, typing::{WrittenType, Type}, util::{const_str_position, const_str_position_in_tuples}, value::Value};
+use crate::{arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, ast::{LinkInfo, Module, Span}, errors::{error_info, ErrorCollector}, flattening::{ConnectionWrite, FlatID, FlattenedModule, Instruction, WireInstance, WireSource}, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode}, tokenizer::TokenizeResult, typing::{Type, WrittenType}, util::{const_str_position, const_str_position_in_tuples}, value::Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModuleUUIDMarker;
@@ -219,6 +219,13 @@ impl Linker {
             }
         }
     }
+    pub fn get_full_name(&self, global : NameElem) -> String {
+        match global {
+            NameElem::Module(id) => self.modules[id].link_info.get_full_name(),
+            NameElem::Type(id) => self.types[id].get_full_name(),
+            NameElem::Constant(id) => self.constants[id].get_full_name(),
+        }
+    }
     fn get_linking_error_location(&self, global : NameElem) -> LinkingErrorLocation {
         match global {
             NameElem::Module(id) => {
@@ -381,7 +388,8 @@ impl Linker {
                 NameElem::Module(md_id) => {
                     let md = &self.modules[md_id];
                     if md.link_info.span.contains_token(token_idx) {
-                        for (_id, inst) in &md.flattened.instructions {
+                        location_builder.update(md.link_info.name_span, LocationInfo::Global(NameElem::Module(md_id)));
+                        for (id, inst) in &md.flattened.instructions {
                             match inst {
                                 Instruction::SubModule(sm) => {
                                     location_builder.update(sm.module_name_span, LocationInfo::Global(NameElem::Module(sm.module_uuid)));
@@ -392,10 +400,15 @@ impl Linker {
                                     }
                                 }
                                 Instruction::Wire(wire) => {
-                                    location_builder.update(wire.span, LocationInfo::Wire(md, wire));
+                                    let loc_info = if let WireSource::WireRead(decl_id) = &wire.source {
+                                        LocationInfo::WireRef(md, *decl_id)
+                                    } else {
+                                        LocationInfo::Temporary(md, id, wire)
+                                    };
+                                    location_builder.update(wire.span, loc_info);
                                 }
                                 Instruction::Write(write) => {
-                                    location_builder.update(Span::new_single_token(write.to.span.0), LocationInfo::WriteWire(md, &write.to));
+                                    location_builder.update(Span::new_single_token(write.to.span.0), LocationInfo::WireRef(md, write.to.root));
                                 }
                                 Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
                             };
@@ -419,9 +432,10 @@ impl Linker {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum LocationInfo<'linker> {
-    WriteWire(&'linker Module, &'linker ConnectionWrite),
-    Wire(&'linker Module, &'linker WireInstance),
+    WireRef(&'linker Module, FlatID),
+    Temporary(&'linker Module, FlatID, &'linker WireInstance),
     Type(&'linker WrittenType),
     Global(NameElem)
 }
