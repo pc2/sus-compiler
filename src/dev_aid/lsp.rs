@@ -6,7 +6,7 @@ use lsp_server::{Connection, Message, Response};
 
 use lsp_types::notification::Notification;
 
-use crate::{arena_alloc::ArenaVector, ast::{IdentifierType, Span}, dev_aid::syntax_highlighting::create_token_ide_info, errors::{CompileError, ErrorCollector, ErrorLevel}, flattening::{WireInstance, WireSource}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse, tokenizer::{CharLine, TokenizeResult}};
+use crate::{arena_alloc::ArenaVector, ast::{IdentifierType, Span}, dev_aid::syntax_highlighting::create_token_ide_info, errors::{CompileError, ErrorCollector, ErrorLevel}, flattening::{WireInstance, WireSource}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse, tokenizer::{CharLine, TokenizeResult}, typing::Type};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -342,10 +342,30 @@ fn main_loop(connection: Connection, params: serde_json::Value, debug : bool) ->
                         println!("got gotoDefinition request: {params:?}");
 
                         file_cache.ensure_contains_file(&params.text_document_position_params.text_document.uri);
-                        serde_json::to_value(&if let Some((info, range)) = get_hover_info(&file_cache, &params.text_document_position_params) {
-                            
-                            
-                            GotoDefinitionResponse::Array(Vec::new())
+                        serde_json::to_value(&if let Some((info, _range)) = get_hover_info(&file_cache, &params.text_document_position_params) {
+                            match info {
+                                LocationInfo::WireRef(md, decl_id) => {
+                                    let uri = file_cache.uris[md.link_info.file].clone();
+                                    let decl = md.flattened.instructions[decl_id].extract_wire_declaration();
+                                    let range = to_position_range(file_cache.linker.files[md.link_info.file].tokens.get_token_linechar_range(decl.name_token));
+                                    GotoDefinitionResponse::Scalar(Location{uri, range})
+                                }
+                                LocationInfo::Temporary(_, _, _) => {
+                                    GotoDefinitionResponse::Array(Vec::new())
+                                }
+                                LocationInfo::Type(_) => {
+                                    GotoDefinitionResponse::Array(Vec::new())
+                                }
+                                LocationInfo::Global(id) => {
+                                    if let Some(link_info) = file_cache.linker.get_link_info(id) {
+                                        let uri = file_cache.uris[link_info.file].clone();
+                                        let range = to_position_range(file_cache.linker.files[link_info.file].tokens.get_span_linechar_range(link_info.name_span));
+                                        GotoDefinitionResponse::Scalar(Location{uri, range})
+                                    } else {
+                                        GotoDefinitionResponse::Array(Vec::new())
+                                    }
+                                }
+                            }
                         } else {
                             GotoDefinitionResponse::Array(Vec::new())
                         })

@@ -208,8 +208,8 @@ impl Linker {
             },
         }
     }
-    fn get_link_info(&self, name_elem : NameElem) -> Option<&LinkInfo> {
-        match name_elem {
+    pub fn get_link_info(&self, global : NameElem) -> Option<&LinkInfo> {
+        match global {
             NameElem::Module(md_id) => Some(&self.modules[md_id].link_info),
             NameElem::Type(_) => {
                 None // Can't define types yet
@@ -240,7 +240,7 @@ impl Linker {
         // Conflicting Declarations
         for item in &self.global_namespace {
             let NamespaceElement::Colission(colission) = &item.1 else {continue};
-            let infos : Box<[Option<&LinkInfo>]> = colission.iter().map(|id| self.get_link_info(*id)).collect();
+            let infos : Vec<Option<&LinkInfo>> = colission.iter().map(|id| self.get_link_info(*id)).collect();
 
             for (idx, info) in infos.iter().enumerate() {
                 let Some(info) = info else {continue}; // Is not a builtin
@@ -395,8 +395,14 @@ impl Linker {
                                     location_builder.update(sm.module_name_span, LocationInfo::Global(NameElem::Module(sm.module_uuid)));
                                 }
                                 Instruction::Declaration(decl) => {
-                                    if let Some(typ) = decl.typ_expr.get_deepest_selected(token_idx) {
-                                        location_builder.update(typ.get_span(), LocationInfo::Type(typ));
+                                    match decl.typ_expr.get_deepest_selected(token_idx) {
+                                        Some(WrittenType::Named(span, name_id)) => {
+                                            location_builder.update(*span, LocationInfo::Global(NameElem::Type(*name_id)));
+                                        }
+                                        Some(typ) => {
+                                            location_builder.update(typ.get_span(), LocationInfo::Type(typ));
+                                        }
+                                        None => {}
                                     }
                                 }
                                 Instruction::Wire(wire) => {
