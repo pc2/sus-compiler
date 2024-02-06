@@ -1,5 +1,5 @@
 
-use std::{error::Error, net::SocketAddr};
+use std::{error::Error, ffi::OsStr, fs::read_dir, net::SocketAddr};
 use lsp_types::{notification::*, request::Request, *};
 
 use lsp_server::{Connection, Message, Response};
@@ -24,7 +24,7 @@ impl LoadedFileCache {
             .find(|(_uuid, uri_found)| **uri_found == *uri)
             .map(|(uuid, _uri_found)| uuid)
     }
-    fn update_text(&mut self, uri : Url, new_file_text : String) -> FileUUID {
+    fn update_text(&mut self, uri : Url, new_file_text : String) {
         let found_opt = self.find_uri(&uri);
         let found_opt_was_none = found_opt.is_none();
         let file_uuid : FileUUID = found_opt.unwrap_or_else(|| self.linker.reserve_file());
@@ -37,8 +37,6 @@ impl LoadedFileCache {
             self.linker.relink(file_uuid, full_parse);
         }
         self.linker.recompile_all();
-
-        file_uuid
     }
     fn ensure_contains_file(&mut self, uri : &Url) -> FileUUID {
         if let Some(found) = self.find_uri(uri) {
@@ -215,8 +213,9 @@ fn cvt_span_to_lsp_range(ch_sp : Span, tokens : &TokenizeResult) -> lsp_types::R
 }
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn convert_diagnostic(err : CompileError, tokens : &TokenizeResult, uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
-    let error_pos = cvt_span_to_lsp_range(err.position, tokens);
+fn convert_diagnostic(err : CompileError, main_tokens : &TokenizeResult, linker : &Linker, uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
+    assert!(err.position.1 < main_tokens.token_types.len(), "bad error: {}", err.reason);
+    let error_pos = cvt_span_to_lsp_range(err.position, main_tokens);
 
     let severity = match err.level {
         ErrorLevel::Error => DiagnosticSeverity::ERROR,
@@ -224,7 +223,9 @@ fn convert_diagnostic(err : CompileError, tokens : &TokenizeResult, uris : &Aren
     };
     let mut related_info = Vec::new();
     for info in err.infos {
-        let info_pos = cvt_span_to_lsp_range(info.position, tokens);
+        let info_tokens = &linker.files[info.file].tokens;
+        assert!(info.position.1 < info_tokens.token_types.len(), "bad info: {}; in err: {}", info.info, err.reason);
+        let info_pos = cvt_span_to_lsp_range(info.position, info_tokens);
         let location = Location{uri : uris[info.file].clone(), range : info_pos};
         related_info.push(DiagnosticRelatedInformation { location, message: info.info });
     }
@@ -232,11 +233,11 @@ fn convert_diagnostic(err : CompileError, tokens : &TokenizeResult, uris : &Aren
 }
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, token_boundaries : &TokenizeResult, uris : &ArenaVector<Url, FileUUIDMarker>) -> Result<(), Box<dyn Error + Sync + Send>> {
+fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, main_tokens : &TokenizeResult, linker : &Linker, uris : &ArenaVector<Url, FileUUIDMarker>) -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut diag_vec : Vec<Diagnostic> = Vec::new();
     let (err_vec, file) = errors.get();
     for err in err_vec {
-        diag_vec.push(convert_diagnostic(err, token_boundaries, uris));
+        diag_vec.push(convert_diagnostic(err, main_tokens, linker, uris));
     }
     
     let params = &PublishDiagnosticsParams{
@@ -268,11 +269,48 @@ fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::T
     Some((info, Some(to_position_range(char_line_range))))
 }
 
+fn push_all_errors(connection: &Connection, file_cache : &LoadedFileCache) -> Result<(), Box<dyn Error + Sync + Send>> {
+    for (uuid, file_data) in &file_cache.linker.files {
+        let errors = file_cache.linker.get_all_errors_in_file(uuid);
+    
+        // println!("Errors: {:?}", &errors);
+        send_errors_warnings(&connection, errors, &file_data.tokens, &file_cache.linker, &file_cache.uris)?;
+    }
+    Ok(())
+}
+
+fn initialize_all_files(init_params : &InitializeParams) -> LoadedFileCache {
+    let mut linker = Linker::new();
+    let mut uris = ArenaVector::new();
+
+    if let Some(workspace_folder) = &init_params.workspace_folders {
+        for folder in workspace_folder {
+            let Ok(path) = folder.uri.to_file_path() else {continue};
+
+            for file in std::fs::read_dir(path).unwrap() {
+                let file_path = file.unwrap().path();
+                if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
+                    let file_uuid = linker.reserve_file();
+                    let file_text = std::fs::read_to_string(&file_path).unwrap();
+                    let full_parse = perform_full_semantic_parse(file_text, file_uuid);
+                    linker.add_reserved_file(file_uuid, full_parse);
+                    uris.insert(file_uuid, Url::from_file_path(&file_path).unwrap());
+                }
+            }
+        }
+    }
+    let mut result = LoadedFileCache::new(linker, uris);
+    result.linker.recompile_all();
+    result
+}
+
 fn main_loop(connection: Connection, params: serde_json::Value, debug : bool) -> Result<(), Box<dyn Error + Sync + Send>> {
+    let params: InitializeParams = serde_json::from_value(params).unwrap();
 
-    let mut file_cache = LoadedFileCache::new(Linker::new(), ArenaVector::new());
+    let mut file_cache = initialize_all_files(&params);
 
-    let _params: InitializeParams = serde_json::from_value(params).unwrap();
+    push_all_errors(&connection, &file_cache)?;
+
     println!("starting LSP main loop");
     for msg in &connection.receiver {
         println!("got msg: {msg:?}");
@@ -398,18 +436,12 @@ fn main_loop(connection: Connection, params: serde_json::Value, debug : bool) ->
                 match not.method.as_str() {
                     notification::DidChangeTextDocument::METHOD => {
                         let params : DidChangeTextDocumentParams = serde_json::from_value(not.params).expect("JSON Encoding Error while parsing params");
-                        let uuid = file_cache.update_text(params.text_document.uri, params.content_changes.into_iter().next().unwrap().text);
+                        file_cache.update_text(params.text_document.uri, params.content_changes.into_iter().next().unwrap().text);
 
-                        // println!("Flattening...");
-                        file_cache.linker.recompile_all();
+                        push_all_errors(&connection, &file_cache)?;
+                    }
+                    notification::DidDeleteFiles::METHOD => {
 
-                        let file_data = &file_cache.linker.files[uuid]; // Have to grab it again because previous line mutates
-
-                        let mut errors = file_data.parsing_errors.clone();
-                        file_cache.linker.get_all_errors_in_file(uuid, &mut errors);
-
-                        // println!("Errors: {:?}", &errors);
-                        send_errors_warnings(&connection, errors, &file_data.tokens, &file_cache.uris)?;
                     }
                     other => {
                         println!("got notification: {other:?}");

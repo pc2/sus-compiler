@@ -253,8 +253,7 @@ pub fn print_all_errors(linker : &Linker, paths_arena : &ArenaVector<PathBuf, Fi
     for (file_uuid, f) in &linker.files {
         let token_offsets = generate_character_offsets(&f.file_text, &f.tokens);
 
-        let mut errors = f.parsing_errors.clone();
-        linker.get_all_errors_in_file(file_uuid, &mut errors);
+        let errors = linker.get_all_errors_in_file(file_uuid);
 
         for err in errors.get().0 {
             err.pretty_print_error(f.parsing_errors.file, &token_offsets, &paths_arena, &mut file_cache);

@@ -282,9 +282,11 @@ impl Linker {
         }
     }
 
-    pub fn get_all_errors_in_file(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
-        self.get_duplicate_declaration_errors(file_uuid, errors);
-        self.get_flattening_errors(file_uuid, errors);
+    pub fn get_all_errors_in_file(&self, file_uuid : FileUUID) -> ErrorCollector {
+        let errors = self.files[file_uuid].parsing_errors.clone();
+        self.get_duplicate_declaration_errors(file_uuid, &errors);
+        self.get_flattening_errors(file_uuid, &errors);
+        errors
     }
 
     pub fn remove_file_datas(&mut self, files : &[FileUUID]) {
