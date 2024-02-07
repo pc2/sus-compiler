@@ -255,7 +255,7 @@ fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, main_t
     Ok(())
 }
 
-fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::TextDocumentPositionParams) -> Option<(LocationInfo<'l>, Option<lsp_types::Range>)> {
+fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::TextDocumentPositionParams) -> Option<(LocationInfo<'l>, lsp_types::Range)> {
     let uuid = file_cache.find_uri(&text_pos.text_document.uri).unwrap();
     
     let file_data = &file_cache.linker.files[uuid];
@@ -266,7 +266,7 @@ fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::T
     //let span = Span::new_single_token(token_idx);
 
     let char_line_range = file_data.tokens.get_span_linechar_range(span);
-    Some((info, Some(to_position_range(char_line_range))))
+    Some((info, to_position_range(char_line_range)))
 }
 
 fn push_all_errors(connection: &Connection, file_cache : &LoadedFileCache) -> Result<(), Box<dyn Error + Sync + Send>> {
@@ -309,8 +309,8 @@ fn gather_hover_infos(md: &Module, id: FlatID, is_generative : bool, file_cache:
         if is_generative {
             let value_str = match &inst.generation_state[id] {
                 SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => unreachable!(),
-                SubModuleOrWire::CompileTimeValue(v) => format!("``` = {}```", v.to_string()),
-                SubModuleOrWire::Unnasigned => format!("```never assigned to```"),
+                SubModuleOrWire::CompileTimeValue(v) => format!(" = {}", v.to_string()),
+                SubModuleOrWire::Unnasigned => format!("never assigned to"),
             };
             hover_list.push(MarkedString::String(value_str));
         } else {
@@ -318,12 +318,12 @@ fn gather_hover_infos(md: &Module, id: FlatID, is_generative : bool, file_cache:
                 if wire.original_wire != id {continue}
                 let typ_str = wire.typ.to_string(&file_cache.linker.types);
                 let name_str = &wire.name;
-                let latency_str = if wire.absolute_latency == LATENCY_UNSET {
+                let latency_str = if wire.absolute_latency != LATENCY_UNSET {
                     format!("{}", wire.absolute_latency)
                 } else {
                     "?".to_owned()
                 };
-                hover_list.push(MarkedString::String(format!("```{typ_str} {name_str}'{latency_str}```")));
+                hover_list.push(MarkedString::String(format!("{typ_str} {name_str}'{latency_str}")));
             }
         }
     });
@@ -367,7 +367,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                         }
                     };
                 }
-                Hover{contents: HoverContents::Array(hover_list), range}
+                Hover{contents: HoverContents::Array(hover_list), range: Some(range)}
             } else {
                 Hover{contents: HoverContents::Array(Vec::new()), range: None}
             })
@@ -415,7 +415,15 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
 
             serde_json::to_value(&SemanticTokensResult::Tokens(lsp_types::SemanticTokens {result_id: None, data: do_syntax_highlight(file_data, &file_cache.linker)}))
         }
-        // TODO ...
+        /*request::DocumentHighlightRequest::METHOD => {
+            let params : DocumentHighlightParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
+
+            if let Some((hover_info, span)) = get_hover_info(file_cache, &params.text_document_position_params) {
+                
+            }
+
+            todo!()
+        }*/
         req => {
             println!("Other request: {req:?}");
             Ok(serde_json::Value::Null)
