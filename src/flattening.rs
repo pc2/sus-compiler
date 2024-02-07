@@ -822,7 +822,7 @@ impl FlattenedModule {
     The Generating Structure of the code is not yet executed. 
     It is template-preserving
     */
-    pub fn initialize(linker : &Linker, module : &Module) -> FlattenedModule {
+    pub fn flatten(linker : &Linker, module : &Module) -> FlattenedModule {
         let mut instructions = FlatAlloc::new();
         let mut context = FlatteningContext{
             decl_to_flat_map: module.declarations.iter().map(|_| None).collect(),

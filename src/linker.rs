@@ -357,7 +357,7 @@ impl Linker {
             let md = &self.modules[id];// Have to get them like this, so we don't have a mutable borrow on self.modules across the loop
             println!("Flattening {}", md.link_info.name);
 
-            let flattened = FlattenedModule::initialize(&self, md);
+            let flattened = FlattenedModule::flatten(&self, md);
             println!("Typechecking {}", &md.link_info.name);
 
             let md = &mut self.modules[id]; // Convert to mutable ptr
@@ -366,9 +366,8 @@ impl Linker {
         }
 
         // Can't merge these loops, because instantiation can only be done once all modules have been type checked
-        for (id, md) in &self.modules {
-            println!("[[{}]]:", md.link_info.name);
-            md.print_flattened_module();
+        for (id, _md) in &self.modules {
+            //md.print_flattened_module();
             // Already instantiate any modules without parameters
             // Currently this is all modules
             let _inst = self.instantiate(id);

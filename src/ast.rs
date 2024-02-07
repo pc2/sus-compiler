@@ -242,6 +242,7 @@ pub struct Module {
 
 impl Module {
     pub fn print_flattened_module(&self) {
+        println!("[[{}]]:", self.link_info.name);
         println!("Interface:");
         for ((port, is_input), port_decl) in zip(self.flattened.interface_ports.iter(), self.ports.ports.iter()) {
             let port_direction = if is_input {"input"} else {"output"};

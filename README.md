@@ -29,10 +29,11 @@ The main goals of the language are roughly listed below:
 
 ## Tasks
 ### Major Milestones
-- [ ] Arbitrary forward pipelines full flow
+- [ ] Arbitrary single-clock full flow
 - [ ] Arbitrary FPGA hardware full flow
 - [x] Generative Code
 - [ ] Templates
+- [ ] Type Templates
 
 ### Parsing
 - [x] Basic Tokenizer
@@ -60,7 +61,6 @@ The main goals of the language are roughly listed below:
 ### Linking and Name Resolution
 - [x] Single File Name Resolution
 - [x] Multi File Name Resolution
-- [x] Incremental Linking
 - [ ] Incremental Compilation
 - [ ] Multi-Threaded Compilation
 
@@ -68,21 +68,34 @@ The main goals of the language are roughly listed below:
 - [x] Basic Type Checking (bools, ints, arrays, etc)
 - [ ] Types for Interfaces
 - [ ] Integer and Array Bounds Checking
-- [ ] Latency Checking
+
+### Latency Counting
+- [x] Basic latency assignment algorithm
+- [x] Net-positive latency cycles error
+- [x] Disjoint nodes error
+- [x] Indeterminable port latency
+- [ ] Integrate into Verilog generation
+- [ ] Negative Registers
+- [ ] Latency Cuts
 
 ### LSP
 - [x] Basic LSP for VSCode integration
 - [x] Syntax Highlighting
 - [x] Error and Warning Reporting
-- [ ] Hover type information
+- [x] Hover type information
+- [x] Go to definition
+- [x] File Creation/Deletion/Rename
+- [ ] Show last generation value
+- [ ] Find all references
+- [ ] Highlighting
 - [ ] Code completion
 - [ ] Per-Line Resource Utilization Reporting
 
 ### Code Generation
 - [x] Expression Flattening
 - [ ] State Machine Generation
-- [ ] Can Generate Verilog for Multiply-Add pipeline
-- [ ] Can Generate Verilog for Blur2 filter
+- [x] Can Generate Verilog for Multiply-Add pipeline
+- [x] Can Generate Verilog for Blur2 filter
 - [ ] Can Generate Verilog for FIFO
 - [ ] Timing Failure extraction from vendor tools
 

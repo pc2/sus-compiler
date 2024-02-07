@@ -304,149 +304,162 @@ fn initialize_all_files(init_params : &InitializeParams) -> LoadedFileCache {
     result
 }
 
-fn main_loop(connection: Connection, params: serde_json::Value, debug : bool) -> Result<(), Box<dyn Error + Sync + Send>> {
-    let params: InitializeParams = serde_json::from_value(params).unwrap();
+fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut LoadedFileCache, debug : bool) -> Result<serde_json::Value, serde_json::Error> {
+    match method {
+        request::HoverRequest::METHOD => {
+            let params : HoverParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
+            println!("HoverRequest");
 
-    let mut file_cache = initialize_all_files(&params);
+            file_cache.ensure_contains_file(&params.text_document_position_params.text_document.uri);
+            serde_json::to_value(&if let Some((info, range)) = get_hover_info(&file_cache, &params.text_document_position_params) {
+                let mut hover_list : Vec<MarkedString> = Vec::new();
+                if debug {
+                    hover_list.push(MarkedString::String(format!("{info:?}")))
+                } else {
+                    match info {
+                        LocationInfo::WireRef(md, decl_id) => {
+                            let decl = md.flattened.instructions[decl_id].extract_wire_declaration();
+                            let typ_str = decl.typ.to_string(&file_cache.linker.types);
+                            let name_str = &decl.name;
+                            hover_list.push(MarkedString::String(format!("{typ_str} {name_str}")));
+                            
+                            md.instantiations.for_each_instance(|inst| {
+                                for (_id, wire) in &inst.wires {
+                                    if wire.original_wire != decl_id {continue}
+                                    let typ_str = wire.typ.to_string(&file_cache.linker.types);
+                                    let name_str = &wire.name;
+                                    let latency = wire.absolute_latency;
+                                    hover_list.push(MarkedString::String(format!("{typ_str} {name_str}'{latency}")));
+                                }
+                            });
+                        }
+                        LocationInfo::Temporary(md, id, wire) => {
+                            let typ_str = wire.typ.to_string(&file_cache.linker.types);
+
+                            hover_list.push(MarkedString::String(format!("{typ_str}")));
+                            md.instantiations.for_each_instance(|inst| {
+                                for (_id, wire) in &inst.wires {
+                                    if wire.original_wire != id {continue}
+                                    let typ_str = wire.typ.to_string(&file_cache.linker.types);
+                                    let name_str = &wire.name;
+                                    let latency = wire.absolute_latency;
+                                    hover_list.push(MarkedString::String(format!("{typ_str} {name_str}'{latency}")));
+                                }
+                            });
+                        }
+                        LocationInfo::Type(typ) => {
+                            hover_list.push(MarkedString::String(typ.to_type().to_string(&file_cache.linker.types)));
+                        }
+                        LocationInfo::Global(global) => {
+                            hover_list.push(MarkedString::String(file_cache.linker.get_full_name(global)));
+                        }
+                    };
+                }
+                Hover{contents: HoverContents::Array(hover_list), range}
+            } else {
+                Hover{contents: HoverContents::Array(Vec::new()), range: None}
+            })
+        }
+        request::GotoDefinition::METHOD => {
+            let params : GotoDefinitionParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
+            println!("GotoDefinition");
+
+            file_cache.ensure_contains_file(&params.text_document_position_params.text_document.uri);
+            serde_json::to_value(&if let Some((info, _range)) = get_hover_info(&file_cache, &params.text_document_position_params) {
+                match info {
+                    LocationInfo::WireRef(md, decl_id) => {
+                        let uri = file_cache.uris[md.link_info.file].clone();
+                        let decl = md.flattened.instructions[decl_id].extract_wire_declaration();
+                        let range = to_position_range(file_cache.linker.files[md.link_info.file].tokens.get_token_linechar_range(decl.name_token));
+                        GotoDefinitionResponse::Scalar(Location{uri, range})
+                    }
+                    LocationInfo::Temporary(_, _, _) => {
+                        GotoDefinitionResponse::Array(Vec::new())
+                    }
+                    LocationInfo::Type(_) => {
+                        GotoDefinitionResponse::Array(Vec::new())
+                    }
+                    LocationInfo::Global(id) => {
+                        if let Some(link_info) = file_cache.linker.get_link_info(id) {
+                            let uri = file_cache.uris[link_info.file].clone();
+                            let range = to_position_range(file_cache.linker.files[link_info.file].tokens.get_span_linechar_range(link_info.name_span));
+                            GotoDefinitionResponse::Scalar(Location{uri, range})
+                        } else {
+                            GotoDefinitionResponse::Array(Vec::new())
+                        }
+                    }
+                }
+            } else {
+                GotoDefinitionResponse::Array(Vec::new())
+            })
+        }
+        request::SemanticTokensFullRequest::METHOD => {
+            let params : SemanticTokensParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
+            println!("SemanticTokensFullRequest");
+
+            let uuid = file_cache.ensure_contains_file(&params.text_document.uri);
+            
+            let file_data = &file_cache.linker.files[uuid];
+
+            serde_json::to_value(&SemanticTokensResult::Tokens(lsp_types::SemanticTokens {result_id: None, data: do_syntax_highlight(file_data, &file_cache.linker)}))
+        }
+        // TODO ...
+        req => {
+            println!("Other request: {req:?}");
+            Ok(serde_json::Value::Null)
+        }
+    }
+}
+
+fn handle_notification(connection: &Connection, notification : lsp_server::Notification, file_cache : &mut LoadedFileCache, initialize_params : &InitializeParams) -> Result<(), Box<dyn Error + Sync + Send>> {
+    match notification.method.as_str() {
+        notification::DidChangeTextDocument::METHOD => {
+            println!("DidChangeTextDocument");
+            let params : DidChangeTextDocumentParams = serde_json::from_value(notification.params).expect("JSON Encoding Error while parsing params");
+            file_cache.update_text(params.text_document.uri, params.content_changes.into_iter().next().unwrap().text);
+
+            push_all_errors(connection, &file_cache)?;
+        }
+        notification::DidChangeWatchedFiles::METHOD => {
+            println!("Workspace Files modified");
+            *file_cache = initialize_all_files(initialize_params);
+            
+            push_all_errors(&connection, &file_cache)?;
+        }
+        other => {
+            println!("got notification: {other:?}");
+        }
+    }
+    Ok(())
+}
+
+fn main_loop(connection: Connection, initialize_params: serde_json::Value, debug : bool) -> Result<(), Box<dyn Error + Sync + Send>> {
+    let initialize_params: InitializeParams = serde_json::from_value(initialize_params).unwrap();
+
+    let mut file_cache = initialize_all_files(&initialize_params);
 
     push_all_errors(&connection, &file_cache)?;
 
     println!("starting LSP main loop");
     for msg in &connection.receiver {
-        println!("got msg: {msg:?}");
         match msg {
             Message::Request(req) => {
-                let response_value = match req.method.as_str() {
-                    request::Shutdown::METHOD => {
-                        println!("Shutdown request");
-                        return Ok(());
-                    }
-                    request::HoverRequest::METHOD => {
-                        let params : HoverParams = serde_json::from_value(req.params).expect("JSON Encoding Error while parsing params");
-                        println!("got hover request: {params:?}");
+                if req.method.as_str() == request::Shutdown::METHOD {
+                    println!("Shutdown request");
+                    return Ok(());
+                }
 
-                        file_cache.ensure_contains_file(&params.text_document_position_params.text_document.uri);
-                        serde_json::to_value(&if let Some((info, range)) = get_hover_info(&file_cache, &params.text_document_position_params) {
-                            let mut hover_list : Vec<MarkedString> = Vec::new();
-                            if debug {
-                                hover_list.push(MarkedString::String(format!("{info:?}")))
-                            } else {
-                                match info {
-                                    LocationInfo::WireRef(md, decl_id) => {
-                                        let decl = md.flattened.instructions[decl_id].extract_wire_declaration();
-                                        let typ_str = decl.typ.to_string(&file_cache.linker.types);
-                                        let name_str = &decl.name;
-                                        hover_list.push(MarkedString::String(format!("{typ_str} {name_str}")));
-                                        
-                                        md.instantiations.for_each_instance(|inst| {
-                                            for (_id, wire) in &inst.wires {
-                                                if wire.original_wire != decl_id {continue}
-                                                let typ_str = wire.typ.to_string(&file_cache.linker.types);
-                                                let name_str = &wire.name;
-                                                let latency = wire.absolute_latency;
-                                                hover_list.push(MarkedString::String(format!("{typ_str} {name_str}'{latency}")));
-                                            }
-                                        });
-                                    }
-                                    LocationInfo::Temporary(md, id, wire) => {
-                                        let typ_str = wire.typ.to_string(&file_cache.linker.types);
-
-                                        hover_list.push(MarkedString::String(format!("{typ_str}")));
-                                        md.instantiations.for_each_instance(|inst| {
-                                            for (_id, wire) in &inst.wires {
-                                                if wire.original_wire != id {continue}
-                                                let typ_str = wire.typ.to_string(&file_cache.linker.types);
-                                                let name_str = &wire.name;
-                                                let latency = wire.absolute_latency;
-                                                hover_list.push(MarkedString::String(format!("{typ_str} {name_str}'{latency}")));
-                                            }
-                                        });
-                                    }
-                                    LocationInfo::Type(typ) => {
-                                        hover_list.push(MarkedString::String(typ.to_type().to_string(&file_cache.linker.types)));
-                                    }
-                                    LocationInfo::Global(global) => {
-                                        hover_list.push(MarkedString::String(file_cache.linker.get_full_name(global)));
-                                    }
-                                };
-                            }
-                            Hover{contents: HoverContents::Array(hover_list), range}
-                        } else {
-                            Hover{contents: HoverContents::Array(Vec::new()), range: None}
-                        })
-                    }
-                    request::GotoDefinition::METHOD => {
-                        let params : GotoDefinitionParams = serde_json::from_value(req.params).expect("JSON Encoding Error while parsing params");
-                        println!("got gotoDefinition request: {params:?}");
-
-                        file_cache.ensure_contains_file(&params.text_document_position_params.text_document.uri);
-                        serde_json::to_value(&if let Some((info, _range)) = get_hover_info(&file_cache, &params.text_document_position_params) {
-                            match info {
-                                LocationInfo::WireRef(md, decl_id) => {
-                                    let uri = file_cache.uris[md.link_info.file].clone();
-                                    let decl = md.flattened.instructions[decl_id].extract_wire_declaration();
-                                    let range = to_position_range(file_cache.linker.files[md.link_info.file].tokens.get_token_linechar_range(decl.name_token));
-                                    GotoDefinitionResponse::Scalar(Location{uri, range})
-                                }
-                                LocationInfo::Temporary(_, _, _) => {
-                                    GotoDefinitionResponse::Array(Vec::new())
-                                }
-                                LocationInfo::Type(_) => {
-                                    GotoDefinitionResponse::Array(Vec::new())
-                                }
-                                LocationInfo::Global(id) => {
-                                    if let Some(link_info) = file_cache.linker.get_link_info(id) {
-                                        let uri = file_cache.uris[link_info.file].clone();
-                                        let range = to_position_range(file_cache.linker.files[link_info.file].tokens.get_span_linechar_range(link_info.name_span));
-                                        GotoDefinitionResponse::Scalar(Location{uri, range})
-                                    } else {
-                                        GotoDefinitionResponse::Array(Vec::new())
-                                    }
-                                }
-                            }
-                        } else {
-                            GotoDefinitionResponse::Array(Vec::new())
-                        })
-                    }
-                    request::SemanticTokensFullRequest::METHOD => {
-                        let params : SemanticTokensParams = serde_json::from_value(req.params).expect("JSON Encoding Error while parsing params");
-                        println!("got fullSemanticTokens request: {params:?}");
-
-                        let uuid = file_cache.ensure_contains_file(&params.text_document.uri);
-                        
-                        let file_data = &file_cache.linker.files[uuid];
-
-                        serde_json::to_value(&SemanticTokensResult::Tokens(lsp_types::SemanticTokens {result_id: None, data: do_syntax_highlight(file_data, &file_cache.linker)}))
-                    }
-                    // TODO ...
-                    req => {
-                        println!("Other request: {req:?}");
-                        continue;
-                    }
-                };
+                let response_value = handle_request(&req.method, req.params, &mut file_cache, debug);
 
                 let result = response_value.unwrap();
-                let response = Response { id : req.id, result: Some(result), error: None };
+                let response = Response{id : req.id, result: Some(result), error: None};
                 connection.sender.send(Message::Response(response))?;
             }
             Message::Response(resp) => {
                 println!("got response: {resp:?}");
             }
-            Message::Notification(not) => {
-                match not.method.as_str() {
-                    notification::DidChangeTextDocument::METHOD => {
-                        let params : DidChangeTextDocumentParams = serde_json::from_value(not.params).expect("JSON Encoding Error while parsing params");
-                        file_cache.update_text(params.text_document.uri, params.content_changes.into_iter().next().unwrap().text);
-
-                        push_all_errors(&connection, &file_cache)?;
-                    }
-                    notification::DidDeleteFiles::METHOD => {
-
-                    }
-                    other => {
-                        println!("got notification: {other:?}");
-                    }
-                }
+            Message::Notification(notification) => {
+                handle_notification(&connection, notification, &mut file_cache, &initialize_params)?;
             }
         }
     }
