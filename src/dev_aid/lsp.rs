@@ -6,7 +6,7 @@ use lsp_server::{Connection, Message, Response};
 
 use lsp_types::notification::Notification;
 
-use crate::{arena_alloc::ArenaVector, ast::{IdentifierType, Span}, dev_aid::syntax_highlighting::create_token_ide_info, errors::{CompileError, ErrorCollector, ErrorLevel}, flattening::{WireInstance, WireSource}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse, tokenizer::{CharLine, TokenizeResult}, typing::Type};
+use crate::{arena_alloc::ArenaVector, ast::{IdentifierType, Module, Span}, dev_aid::syntax_highlighting::create_token_ide_info, errors::{CompileError, ErrorCollector, ErrorLevel}, flattening::{FlatID, WireInstance, WireSource}, instantiation::{SubModuleOrWire, LATENCY_UNSET}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse, tokenizer::{CharLine, TokenizeResult}, typing::Type};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 
@@ -304,6 +304,31 @@ fn initialize_all_files(init_params : &InitializeParams) -> LoadedFileCache {
     result
 }
 
+fn gather_hover_infos(md: &Module, id: FlatID, is_generative : bool, file_cache: &LoadedFileCache, hover_list: &mut Vec<MarkedString>) {
+    md.instantiations.for_each_instance(|inst| {
+        if is_generative {
+            let value_str = match &inst.generation_state[id] {
+                SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => unreachable!(),
+                SubModuleOrWire::CompileTimeValue(v) => format!("``` = {}```", v.to_string()),
+                SubModuleOrWire::Unnasigned => format!("```never assigned to```"),
+            };
+            hover_list.push(MarkedString::String(value_str));
+        } else {
+            for (_id, wire) in &inst.wires {
+                if wire.original_wire != id {continue}
+                let typ_str = wire.typ.to_string(&file_cache.linker.types);
+                let name_str = &wire.name;
+                let latency_str = if wire.absolute_latency == LATENCY_UNSET {
+                    format!("{}", wire.absolute_latency)
+                } else {
+                    "?".to_owned()
+                };
+                hover_list.push(MarkedString::String(format!("```{typ_str} {name_str}'{latency_str}```")));
+            }
+        }
+    });
+}
+
 fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut LoadedFileCache, debug : bool) -> Result<serde_json::Value, serde_json::Error> {
     match method {
         request::HoverRequest::METHOD => {
@@ -321,31 +346,18 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                             let decl = md.flattened.instructions[decl_id].extract_wire_declaration();
                             let typ_str = decl.typ.to_string(&file_cache.linker.types);
                             let name_str = &decl.name;
-                            hover_list.push(MarkedString::String(format!("{typ_str} {name_str}")));
-                            
-                            md.instantiations.for_each_instance(|inst| {
-                                for (_id, wire) in &inst.wires {
-                                    if wire.original_wire != decl_id {continue}
-                                    let typ_str = wire.typ.to_string(&file_cache.linker.types);
-                                    let name_str = &wire.name;
-                                    let latency = wire.absolute_latency;
-                                    hover_list.push(MarkedString::String(format!("{typ_str} {name_str}'{latency}")));
-                                }
-                            });
+
+                            let identifier_type_keyword = decl.identifier_type.get_keyword();
+                            hover_list.push(MarkedString::String(format!("{identifier_type_keyword} {typ_str} {name_str}")));
+
+                            gather_hover_infos(md, decl_id, decl.identifier_type.is_generative(), file_cache, &mut hover_list);
                         }
                         LocationInfo::Temporary(md, id, wire) => {
                             let typ_str = wire.typ.to_string(&file_cache.linker.types);
 
-                            hover_list.push(MarkedString::String(format!("{typ_str}")));
-                            md.instantiations.for_each_instance(|inst| {
-                                for (_id, wire) in &inst.wires {
-                                    if wire.original_wire != id {continue}
-                                    let typ_str = wire.typ.to_string(&file_cache.linker.types);
-                                    let name_str = &wire.name;
-                                    let latency = wire.absolute_latency;
-                                    hover_list.push(MarkedString::String(format!("{typ_str} {name_str}'{latency}")));
-                                }
-                            });
+                            let gen_kw = if wire.is_compiletime {"gen "} else {""};
+                            hover_list.push(MarkedString::String(format!("{gen_kw}{typ_str}")));
+                            gather_hover_infos(md, id, wire.is_compiletime, file_cache, &mut hover_list);
                         }
                         LocationInfo::Type(typ) => {
                             hover_list.push(MarkedString::String(typ.to_type().to_string(&file_cache.linker.types)));
@@ -423,7 +435,7 @@ fn handle_notification(connection: &Connection, notification : lsp_server::Notif
         notification::DidChangeWatchedFiles::METHOD => {
             println!("Workspace Files modified");
             *file_cache = initialize_all_files(initialize_params);
-            
+
             push_all_errors(&connection, &file_cache)?;
         }
         other => {

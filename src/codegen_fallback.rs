@@ -1,6 +1,6 @@
 use std::{iter::zip, ops::Deref};
 
-use crate::{ast::{Module, IdentifierType}, instantiation::{ConnectToPathElem, InstantiatedModule, RealWireDataSource}, linker::{get_builtin_type, TypeUUID}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::Instruction, value::Value};
+use crate::{ast::Module, instantiation::{ConnectToPathElem, InstantiatedModule, RealWireDataSource}, linker::{get_builtin_type, TypeUUID}, typing::ConcreteType, tokenizer::get_token_type_name, flattening::Instruction};
 
 fn get_type_name_size(id : TypeUUID) -> u64 {
     if id == get_builtin_type("int") {
@@ -31,24 +31,6 @@ fn typ_to_verilog_array(typ : &ConcreteType) -> String {
             let (sub_typ, size) = arr.deref();
             typ_to_verilog_array(sub_typ) + &arr_str(*size)
         }
-    }
-}
-
-pub fn value_to_str(value : &Value) -> String {
-    match value {
-        Value::Bool(b) => if *b {"1'b1"} else {"1'b0"}.to_owned(),
-        Value::Integer(v) => v.to_string(),
-        Value::Array(arr_box) => {
-            let mut result = "[".to_owned();
-            for v in arr_box.iter() {
-                result.push_str(&value_to_str(v));
-                result.push_str(", ");
-            }
-            result.push(']');
-            result
-        }
-        Value::Unset => "Value::Unset".to_owned(),
-        Value::Error => "Value::Error".to_owned(),
     }
 }
 
@@ -84,9 +66,8 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
     for (_id, w) in &instance.wires {
         if let Instruction::Declaration(wire_decl) = &md.flattened.instructions[w.original_wire] {
             // Don't print named inputs and outputs, already did that in interface
-            match wire_decl.identifier_type {
-                IdentifierType::Input | IdentifierType::Output => {continue;}
-                IdentifierType::Local | IdentifierType::State | IdentifierType::Generative => {}
+            if wire_decl.identifier_type.is_port() {
+                continue;
             }
         }
         let wire_or_reg = if let RealWireDataSource::Multiplexer{is_state, sources: _} = &w.source {
@@ -117,7 +98,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
                 program_text.push_str(&format!(" = {}[{arr_idx}];\n", instance.wires[*arr].name));
             }
             RealWireDataSource::Constant { value } => {
-                program_text.push_str(&format!(" = {};\n", value_to_str(value)));
+                program_text.push_str(&format!(" = {};\n", value.to_string()));
             }
             RealWireDataSource::ReadOnly => {
                 program_text.push_str(";\n");
@@ -126,7 +107,7 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
                 program_text.push_str(";\n");
                 if let Some(initial_value) = is_state {
                     if initial_value.is_valid() {
-                        let initial_value_str = value_to_str(initial_value);
+                        let initial_value_str = initial_value.to_string();
                         program_text.push_str(&format!("initial {wire_name} = {initial_value_str};\n"));
                     }
                 }

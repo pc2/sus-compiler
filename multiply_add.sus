@@ -101,12 +101,20 @@ module dwiogo : bool[512] data -> bool[256] out {
 
 
 
-timeline (v -> v) .. (/ -> v) .. (/ -> v) .. (/ -> v)
-module packer : T[256] data /* v _ _ _ */ -> T[64] out { /* v v v v */
-    state bool[256] save = data[256:511];
-	out = data[0:255];
-	#
-	out = save;
+timeline (v, true -> v) .. (/, false -> v) .. (/, false -> v) .. (/, false -> v)
+module packer : bool[256] data /* v _ _ _ */, bool valid -> bool[64] o { /* v v v v */
+    state bool[192] save = data[64:256];
+	state int part;
+	initial part = 3;
+	if valid {
+		part = 0;
+		o = data[0:64];
+	} else {
+		o = save[part*64 - 64:part*64];
+		if part < 3 {
+			part = part + 1;
+		}
+	}
 }
 
 
@@ -210,13 +218,16 @@ module multiply_add :
 	reg total = tmp + c;
 }
 
-module fibonnaci : -> int num {
+module fibonnaci : bool next -> int num {
 	state int current = 1;
 	state int current_prev = 0;
 
-	num = current + current_prev;
-	current_prev = current;
-	current = num;
+	if next {
+		num = current + current_prev;
+		current_prev = current;
+		current = num;
+		reg int delay_current = current;
+	}
 }
 
 //timeline (v, true -> /) .. (v, false -> v)*

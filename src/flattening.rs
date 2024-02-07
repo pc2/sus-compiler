@@ -648,7 +648,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
             match &self.instructions[inst_id] {
                 Instruction::SubModule(_) => {}
                 Instruction::Declaration(decl) => {
-                    if decl.identifier_type == IdentifierType::Generative {
+                    if decl.identifier_type.is_generative() {
                         assert!(declaration_depths[inst_id].is_none());
                         declaration_depths[inst_id] = Some(runtime_if_stack.len())
                     }
@@ -665,7 +665,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     let mut is_generative = true;
                     if let WireSource::WireRead(from) = &wire.source {
                         let decl = self.instructions[*from].extract_wire_declaration();
-                        if decl.identifier_type != IdentifierType::Generative {
+                        if !decl.identifier_type.is_generative() {
                             is_generative = false;
                         }
                     } else {
@@ -684,7 +684,7 @@ impl<'inst, 'l, 'm> FlatteningContext<'inst, 'l, 'm> {
                     let from_wire = self.instructions[conn.from].extract_wire();
                     match conn.write_type {
                         WriteType::Connection{num_regs : _, regs_span : _} => {
-                            if decl.identifier_type == IdentifierType::Generative {
+                            if decl.identifier_type.is_generative() {
                                 // Check that whatever's written to this declaration is also generative
                                 self.must_be_compiletime_with_info(from_wire, "Assignments to generative variables", || vec![decl.make_declared_here(self.errors.file)]);
 

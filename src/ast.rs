@@ -81,6 +81,24 @@ pub enum IdentifierType {
     Generative
 }
 
+impl IdentifierType {
+    pub fn get_keyword(&self) -> &'static str {
+        match self {
+            IdentifierType::Input => "input",
+            IdentifierType::Output => "output",
+            IdentifierType::Local => "",
+            IdentifierType::State => "state",
+            IdentifierType::Generative => "gen",
+        }
+    }
+    pub fn is_generative(&self) -> bool {
+        *self == IdentifierType::Generative
+    }
+    pub fn is_port(&self) -> bool {
+        *self == IdentifierType::Input || *self == IdentifierType::Output
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum LocalOrGlobal {
     Local(DeclID),

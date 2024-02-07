@@ -71,6 +71,24 @@ impl Value {
         let Self::Bool(b) = self else {panic!("{:?} is not a bool!", self)};
         *b
     }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            Value::Bool(b) => if *b {"1'b1"} else {"1'b0"}.to_owned(),
+            Value::Integer(v) => v.to_string(),
+            Value::Array(arr_box) => {
+                let mut result = "[".to_owned();
+                for v in arr_box.iter() {
+                    result.push_str(&v.to_string());
+                    result.push_str(", ");
+                }
+                result.push(']');
+                result
+            }
+            Value::Unset => "Value::Unset".to_owned(),
+            Value::Error => "Value::Error".to_owned(),
+        }
+    }
 }
 
 pub fn compute_unary_op(op : Operator, v : &Value) -> Value {

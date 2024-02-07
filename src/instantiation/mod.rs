@@ -103,11 +103,12 @@ pub struct InstantiatedModule {
     pub name : Box<str>, // Unique name involving all template arguments
     pub interface : InterfacePorts<WireID>, // Interface is only valid if all wires of the interface were valid
     pub wires : FlatAlloc<RealWire, WireIDMarker>,
-    pub submodules : FlatAlloc<SubModule, SubModuleIDMarker>
+    pub submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
+    pub generation_state : FlatAlloc<SubModuleOrWire, FlatIDMarker>
 }
 
 #[derive(Debug,Clone)]
-enum SubModuleOrWire {
+pub enum SubModuleOrWire {
     SubModule(SubModuleID),
     Wire(WireID),
     CompileTimeValue(Value),
@@ -117,12 +118,12 @@ enum SubModuleOrWire {
 
 impl SubModuleOrWire {
     #[track_caller]
-    fn extract_wire(&self) -> WireID {
+    pub fn extract_wire(&self) -> WireID {
         let Self::Wire(result) = self else {panic!("Failed wire extraction! Is {self:?} instead")};
         *result
     }
     #[track_caller]
-    fn extract_generation_value(&self) -> &Value {
+    pub fn extract_generation_value(&self) -> &Value {
         let Self::CompileTimeValue(result) = self else {panic!("Failed GenerationValue extraction! Is {self:?} instead")};
         result
     }
@@ -404,7 +405,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 }
                 Instruction::Declaration(wire_decl) => {
                     let typ = self.concretize_type(&wire_decl.typ, wire_decl.typ_expr.get_span())?;
-                    if wire_decl.identifier_type == IdentifierType::Generative {
+                    if wire_decl.identifier_type.is_generative() {
                         /*Do nothing (in fact re-initializes the wire to 'empty'), just corresponds to wire declaration*/
                         /*if wire_decl.read_only { // Don't know why this check is *here*
                             todo!("Modules can't be computed at compile time yet");
@@ -627,7 +628,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
 #[derive(Debug)]
 pub struct InstantiationList {
-    cache : RefCell<Vec<(Option<Rc<InstantiatedModule>>, ErrorCollector)>>
+    cache : RefCell<Vec<(Rc<InstantiatedModule>, ErrorCollector)>>
 }
 
 impl InstantiationList {
@@ -650,24 +651,31 @@ impl InstantiationList {
                 errors : ErrorCollector::new(flattened.errors.file)
             };
 
-            if let Some(interface) = context.instantiate_full() {
-                let result = Some(Rc::new(InstantiatedModule{
-                    name : name.to_owned().into_boxed_str(),
-                    wires : context.wires,
-                    submodules : context.submodules,
-                    interface,
-                }));
+            let interface = context.instantiate_full();
+            let result = Rc::new(InstantiatedModule{
+                name : name.to_owned().into_boxed_str(),
+                wires : context.wires,
+                submodules : context.submodules,
+                interface : interface.unwrap_or(InterfacePorts::empty()), // Empty value. Invalid interface can't get accessed from result of this method, as that should have produced an error
+                generation_state : context.generation_state
+            });
 
-                cache_borrow.push((result.clone(), context.errors));
-                return result;
-            } else {
-                cache_borrow.push((None, context.errors));
+            if context.errors.did_error.get() {
+                cache_borrow.push((result, context.errors));
                 return None;
-            };
+            } else {
+                cache_borrow.push((result.clone(), context.errors));
+                return Some(result);
+            }
         }
         
         let instance_id = 0; // Temporary, will always be 0 while not template arguments
-        cache_borrow[instance_id].0.clone()
+        let instance = &cache_borrow[instance_id];
+        if instance.1.did_error.get() {
+            Some(instance.0.clone())
+        } else {
+            None
+        }
     }
 
     pub fn collect_errors(&self, errors : &ErrorCollector) {
@@ -681,12 +689,12 @@ impl InstantiationList {
         self.cache.borrow_mut().clear()
     }
 
+    // Also passes over invalid instances. Instance validity should not be assumed!
+    // Only used for things like syntax highlighting
     pub fn for_each_instance<F : FnMut(&InstantiatedModule)>(&self, mut f : F) {
         let borrow = self.cache.borrow();
         for v in borrow.iter() {
-            if let Some(vv) = &v.0 {
-                f(vv.as_ref())
-            }
+            f(v.0.as_ref())
         }
     }
 }

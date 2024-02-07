@@ -7,13 +7,12 @@ use crate::util::const_str_position_in_tuples;
 
 pub type TokenTypeIdx = u8;
 
-pub const ALL_KEYWORDS : [(&'static str, u8); 20] = [
+pub const ALL_KEYWORDS : [(&'static str, u8); 18] = [
     ("template", 0),
     ("module", 0),
     ("pipeline", 0),
     ("interface", 0),
     ("timeline", 0),
-    ("loop", 0),
     ("assume", 0),
     ("state", 0),
     ("if", 0),
@@ -25,7 +24,6 @@ pub const ALL_KEYWORDS : [(&'static str, u8); 20] = [
     ("struct", 0),
     ("enum", 0),
     ("reg", 0),
-    ("finish", 0),
     ("gen", 0),
     ("initial", 0)
 ];
@@ -91,23 +89,23 @@ pub const fn kw(name : &str) -> TokenTypeIdx {
     } else if let Some(found) = const_str_position_in_tuples(name, &ALL_SYMBOLS) {
         (found + ALL_KEYWORDS.len()) as TokenTypeIdx
     } else {
-        panic!();
+        panic!("Not a valid keyword");
     }
 }
 
-pub fn is_keyword(typ : TokenTypeIdx) -> bool {
+pub const fn is_keyword(typ : TokenTypeIdx) -> bool {
     typ < ALL_KEYWORDS.len() as TokenTypeIdx
 }
-pub fn is_symbol(typ : TokenTypeIdx) -> bool {
+pub const fn is_symbol(typ : TokenTypeIdx) -> bool {
     typ < TOKEN_IDENTIFIER
 }
-pub fn is_operator(typ : TokenTypeIdx) -> bool {
+pub const fn is_operator(typ : TokenTypeIdx) -> bool {
     typ >= kw("<=") && typ <= kw("!")
 }
-pub fn is_unary_operator(typ : TokenTypeIdx) -> bool {
+pub const fn is_unary_operator(typ : TokenTypeIdx) -> bool {
     typ == kw("|") || typ == kw("&") || typ == kw("^") || typ == kw("+") || typ == kw("-") || typ == kw("*") || typ == kw("!")
 }
-pub fn get_token_type_name(typ : TokenTypeIdx) -> &'static str {
+pub const fn get_token_type_name(typ : TokenTypeIdx) -> &'static str {
     if is_keyword(typ) {
         ALL_KEYWORDS[typ as usize].0
     } else if is_symbol(typ) {

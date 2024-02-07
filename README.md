@@ -48,6 +48,7 @@ The main goals of the language are roughly listed below:
 - [x] Can Parse Blur2 filter
 - [x] If Statements
 - [x] Latency Specifiers
+- [ ] Array Slices
 - [ ] Bound Specifiers
 - [ ] Structs
 - [x] For Loops
@@ -74,6 +75,7 @@ The main goals of the language are roughly listed below:
 - [x] Net-positive latency cycles error
 - [x] Disjoint nodes error
 - [x] Indeterminable port latency
+- [ ] Latency for output-only modules
 - [ ] Integrate into Verilog generation
 - [ ] Negative Registers
 - [ ] Latency Cuts
