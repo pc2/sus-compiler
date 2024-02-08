@@ -1,6 +1,6 @@
 [
   {
-    "type": "assignable_expr",
+    "type": "array_op",
     "named": true,
     "fields": {},
     "children": {
@@ -8,7 +8,50 @@
       "required": true,
       "types": [
         {
-          "type": "assignable_expr",
+          "type": "array_op",
+          "named": true
+        },
+        {
+          "type": "binary_op",
+          "named": true
+        },
+        {
+          "type": "func_call",
+          "named": true
+        },
+        {
+          "type": "global_identifier",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "unary_op",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "array_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "array_op",
+          "named": true
+        },
+        {
+          "type": "array_type",
           "named": true
         },
         {
@@ -47,7 +90,7 @@
       "required": true,
       "types": [
         {
-          "type": "assignable_expr",
+          "type": "array_op",
           "named": true
         },
         {
@@ -60,6 +103,10 @@
         },
         {
           "type": "global_identifier",
+          "named": true
+        },
+        {
+          "type": "identifier",
           "named": true
         },
         {
@@ -117,7 +164,7 @@
       "required": true,
       "types": [
         {
-          "type": "assignable_expr",
+          "type": "array_op",
           "named": true
         },
         {
@@ -134,6 +181,10 @@
         },
         {
           "type": "global_identifier",
+          "named": true
+        },
+        {
+          "type": "identifier",
           "named": true
         },
         {
@@ -165,20 +216,73 @@
   {
     "type": "declaration",
     "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "type",
-          "named": true
-        }
-      ]
+    "fields": {
+      "latency_spec": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": "array_op",
+            "named": true
+          },
+          {
+            "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "func_call",
+            "named": true
+          },
+          {
+            "type": "global_identifier",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "unary_op",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "type": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "array_type",
+            "named": true
+          },
+          {
+            "type": "global_identifier",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -190,7 +294,7 @@
       "required": true,
       "types": [
         {
-          "type": "assignable_expr",
+          "type": "array_op",
           "named": true
         },
         {
@@ -203,6 +307,10 @@
         },
         {
           "type": "global_identifier",
+          "named": true
+        },
+        {
+          "type": "identifier",
           "named": true
         },
         {
@@ -248,7 +356,7 @@
       "required": true,
       "types": [
         {
-          "type": "assignable_expr",
+          "type": "array_op",
           "named": true
         },
         {
@@ -302,7 +410,7 @@
       "required": true,
       "types": [
         {
-          "type": "assignable_expr",
+          "type": "array_op",
           "named": true
         },
         {
@@ -319,6 +427,10 @@
         },
         {
           "type": "global_identifier",
+          "named": true
+        },
+        {
+          "type": "identifier",
           "named": true
         },
         {
@@ -339,21 +451,52 @@
   {
     "type": "module",
     "named": true,
-    "fields": {},
+    "fields": {
+      "inputs": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": "declaration",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "outputs": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": "declaration",
+            "named": true
+          }
+        ]
+      }
+    },
     "children": {
-      "multiple": true,
+      "multiple": false,
       "required": true,
       "types": [
         {
           "type": "block",
-          "named": true
-        },
-        {
-          "type": "declaration",
-          "named": true
-        },
-        {
-          "type": "identifier",
           "named": true
         }
       ]
@@ -368,7 +511,7 @@
       "required": true,
       "types": [
         {
-          "type": "assignable_expr",
+          "type": "array_op",
           "named": true
         },
         {
@@ -381,6 +524,10 @@
         },
         {
           "type": "global_identifier",
+          "named": true
+        },
+        {
+          "type": "identifier",
           "named": true
         },
         {
@@ -410,41 +557,6 @@
     }
   },
   {
-    "type": "type",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "assignable_expr",
-          "named": true
-        },
-        {
-          "type": "binary_op",
-          "named": true
-        },
-        {
-          "type": "func_call",
-          "named": true
-        },
-        {
-          "type": "global_identifier",
-          "named": true
-        },
-        {
-          "type": "number",
-          "named": true
-        },
-        {
-          "type": "unary_op",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "unary_op",
     "named": true,
     "fields": {},
@@ -453,7 +565,7 @@
       "required": true,
       "types": [
         {
-          "type": "assignable_expr",
+          "type": "array_op",
           "named": true
         },
         {
@@ -466,6 +578,10 @@
         },
         {
           "type": "global_identifier",
+          "named": true
+        },
+        {
+          "type": "identifier",
           "named": true
         },
         {
@@ -493,6 +609,10 @@
   },
   {
     "type": "&",
+    "named": false
+  },
+  {
+    "type": "'",
     "named": false
   },
   {

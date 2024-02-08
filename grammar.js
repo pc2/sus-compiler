@@ -1,10 +1,10 @@
 
-function commaSep1(rule) {
-  return seq(rule, repeat(seq(',', rule)))
+function sepSeq1(rule, sepChar) {
+  return seq(rule, repeat(seq(sepChar, rule)))
 }
 
-function commaSep(rule) {
-  return optional(commaSep1(rule))
+function sepSeq(rule, sepChar) {
+  return optional(sepSeq1(rule, sepChar))
 }
 
 const PREC = {
@@ -27,41 +27,35 @@ module.exports = grammar({
 
         module: $ => seq(
             'module',
-            $.identifier,
+            field('name', $.identifier),
             ':',
-            commaSep($.declaration),
+            field('inputs', sepSeq($.declaration, ',')),
             '->',
-            commaSep($.declaration),
+            field('outputs', sepSeq($.declaration, ',')),
             $.block
         ),
         identifier: $ => /[\p{L}_][\p{L}_\d]*/,
         number: $ => /\d[\d_]*/,
 
         global_identifier: $ => prec.left(PREC.namespace_path, seq(
-            optional("::"),
-            $.identifier,
-            repeat(seq(
-                "::",
-                $.identifier
-            ))
+            optional('::'),
+            sepSeq1($.identifier, '::')
         )),
 
-        type: $ => seq(
+        _maybe_global_identifier: $ => choice(
+            prec(1, $.identifier),
+            prec(0, $.global_identifier)
+        ),
+        
+        array_type: $ => seq(
+            $._type,
+            '[',
+            $._expression,
+            ']'
+        ),
+        _type: $ => choice(
             $.global_identifier,
-            repeat(seq(
-                '[',
-                $._expression,
-                ']'
-            ))
-        ),     
-
-        assignable_expr: $ => seq(
-            $.identifier,
-            repeat(seq(
-                '[',
-                $._expression,
-                ']'
-            ))
+            $.array_type
         ),
 
         declaration: $ => seq(
@@ -69,8 +63,12 @@ module.exports = grammar({
                 'state',
                 'gen'
             )),
-            $.type,
-            $.identifier
+            field('type', $._type),
+            field('name', $.identifier),
+            optional(seq(
+                '\'',
+                field('latency_spec', $._expression)
+            ))
         ),
 
         unary_op: $ => prec(PREC.unary, seq(
@@ -95,19 +93,23 @@ module.exports = grammar({
             ))));
         },
 
+        array_op: $ => seq(
+            $._expression,
+            '[',
+            $._expression,
+            ']'
+        ),
+
         func_call: $ => seq(
-            choice(
-                $.identifier,
-                $.global_identifier
-            ),
+            $._maybe_global_identifier,
             '(',
-            commaSep($._expression),
+            sepSeq($._expression, ','),
             ')'
         ),
 
         _expression: $ => choice(
-            $.assignable_expr,
-            $.global_identifier,
+            $._maybe_global_identifier,
+            $.array_op,
             $.number,
             seq('(', $._expression, ')'),
             $.unary_op,
@@ -127,30 +129,24 @@ module.exports = grammar({
             '}'
         ),
         
-        _assign_left_side: $ => commaSep1(seq(
+        _assign_left_side: $ => sepSeq1(seq(
             choice(
                 repeat('reg'),
                 'initial'
             ),
             choice(
-                $.assignable_expr,
+                $._expression,
                 $.declaration
             )
-        )),
+        ), ','),
         decl_assign_statement: $ => seq(
             $._assign_left_side,
             '=',
-            $._expression,
-            ';'
+            $._expression
         ),
-        decl_statement: $ => seq(
-            $.declaration,
-            ';'
-        ),
-        expression_statement: $ => seq(
-            $._expression,
-            ';'
-        ),
+        decl_statement: $ => $.declaration,
+        expression_statement: $ => $._expression,
+
         if_statement: $ => seq(
             'if',
             $._expression,
@@ -172,9 +168,9 @@ module.exports = grammar({
         ),
         _statement: $ => choice(
             $.block,
-            $.decl_assign_statement,
-            $.decl_statement,
-            $.expression_statement,
+            seq($.decl_assign_statement, ';'),
+            seq($.decl_statement, ';'),
+            seq($.expression_statement, ';'),
             $.if_statement,
             $.for_statement
         ),
@@ -183,6 +179,10 @@ module.exports = grammar({
         single_line_comment: $ => /\/\/[^\n]*\n/,
         multi_line_comment: $ => /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\//,
     },
+
+    conflicts: $ => [
+        [$._maybe_global_identifier, $._type]
+    ],
 
     extras: $ => [
         /\s+/,
