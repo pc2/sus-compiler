@@ -1,12 +1,22 @@
 
-use std::{error::Error, ffi::OsStr, fs::read_dir, net::SocketAddr};
+use std::{error::Error, ffi::OsStr, net::SocketAddr};
 use lsp_types::{notification::*, request::Request, *};
 
 use lsp_server::{Connection, Message, Response};
 
 use lsp_types::notification::Notification;
 
-use crate::{arena_alloc::ArenaVector, ast::{IdentifierType, Module, Span}, dev_aid::syntax_highlighting::create_token_ide_info, errors::{CompileError, ErrorCollector, ErrorLevel}, flattening::{FlatID, WireInstance, WireSource}, instantiation::{SubModuleOrWire, LATENCY_UNSET}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse, tokenizer::{CharLine, TokenizeResult}, typing::Type};
+use crate::{
+    arena_alloc::ArenaVector, 
+    ast::{IdentifierType, Module, Span}, 
+    dev_aid::syntax_highlighting::create_token_ide_info, 
+    errors::{CompileError, ErrorCollector, ErrorLevel}, 
+    flattening::FlatID, 
+    instantiation::{SubModuleOrWire, LATENCY_UNSET}, 
+    linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, 
+    parser::perform_full_semantic_parse, 
+    tokenizer::{CharLine, TokenizeResult}
+};
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
 

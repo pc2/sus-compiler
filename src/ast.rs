@@ -1,14 +1,8 @@
 
 
-use crate::{tokenizer::{get_token_type_name, TokenTypeIdx, TokenizeResult}, linker::FileUUID, flattening::FlattenedModule, arena_alloc::{UUIDMarker, UUID, FlatAlloc}, instantiation::InstantiationList, value::Value, errors::ErrorCollector};
+use crate::{errors::ErrorCollector, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID, tokenizer::{get_token_type_name, TokenTypeIdx, TokenizeResult}, value::Value};
 use core::ops::Range;
-use std::{fmt::Display, iter::zip};
-
-
-#[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
-pub struct DeclIDMarker;
-impl UUIDMarker for DeclIDMarker {const DISPLAY_NAME : &'static str = "decl_";}
-pub type DeclID = UUID<DeclIDMarker>;
+use std::fmt::Display;
 
 
 // Token span. Indices are INCLUSIVE
@@ -60,6 +54,13 @@ impl Span {
         assert!(self.1 == self.0, "Span is not singleton! {}..{}", self.0, self.1);
         self.0
     }
+    pub fn is_single_token(&self) -> Option<usize> {
+        if self.0 == self.1 {
+            Some(self.0)
+        } else {
+            None
+        }
+    }
 }
 
 impl IntoIterator for Span {
@@ -99,14 +100,7 @@ impl IdentifierType {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum LocalOrGlobal {
-    Local(DeclID),
-    Global(Span)
-}
-
-
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum TypeExpression {
     Named, // SpanTypeExpression Span gives name
     Array(Box<(SpanTypeExpression, SpanExpression)>)
@@ -114,9 +108,8 @@ pub enum TypeExpression {
 
 pub type SpanTypeExpression = (TypeExpression, Span);
 
-#[derive(Debug,Clone)]
+#[derive(Debug)]
 pub struct SignalDeclaration {
-    pub span : Span,
     pub name_token : usize,
     pub typ : SpanTypeExpression,
     pub name : Box<str>,
@@ -135,9 +128,14 @@ impl Display for Operator {
     }
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug)]
+pub struct Identifier {
+    pub span : Span
+}
+
+#[derive(Debug)]
 pub enum Expression {
-    Named(LocalOrGlobal),
+    Named(Identifier),
     Constant(Value),
     UnaryOp(Box<(Operator, usize/*Operator token */, SpanExpression)>),
     BinOp(Box<(SpanExpression, Operator, usize/*Operator token */, SpanExpression)>),
@@ -152,13 +150,12 @@ impl Expression {
     }
 }
 pub type SpanExpression = (Expression, Span);
-pub type SpanAssignableExpression = (AssignableExpression, Span);
 pub type SpanStatement = (Statement, Span);
 
 #[derive(Debug)]
-pub enum AssignableExpression {
-    Named{local_idx : DeclID},
-    ArrayIndex(Box<(SpanAssignableExpression, SpanExpression, Span/* Brackets */)>)
+pub enum LeftExpression {
+    Assignable(Expression),
+    Declaration(SignalDeclaration)
 }
 
 #[derive(Debug)]
@@ -170,7 +167,8 @@ pub enum AssignableExpressionModifiers {
 
 #[derive(Debug)]
 pub struct AssignableExpressionWithModifiers {
-    pub expr : SpanAssignableExpression,
+    pub expr : LeftExpression,
+    pub span : Span,
     pub modifiers : AssignableExpressionModifiers
 }
 
@@ -182,10 +180,9 @@ pub struct RangeExpression {
 
 #[derive(Debug)]
 pub enum Statement {
-    Declaration(DeclID),
-    Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : SpanExpression}, // num_regs v = expr;
+    Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : Option<SpanExpression>}, // num_regs v = expr;
     If{condition : SpanExpression, then : CodeBlock, els : Option<CodeBlock>},
-    For{var : DeclID, range : RangeExpression, code : CodeBlock},
+    For{var : SignalDeclaration, range : RangeExpression, code : CodeBlock},
     Block(CodeBlock)
 }
 
@@ -206,6 +203,13 @@ impl LinkInfo {
     pub fn get_full_name(&self) -> String {
         format!("::{}", self.name)
     }
+}
+
+
+#[derive(Debug)]
+pub struct ParsedInterface {
+    pub ports : Vec<SignalDeclaration>,
+    pub outputs_start : usize
 }
 
 
@@ -249,8 +253,7 @@ impl<ID : Clone + Copy> InterfacePorts<ID> {
 pub struct Module {
     pub link_info : LinkInfo,
 
-    pub declarations : FlatAlloc<SignalDeclaration, DeclIDMarker>,
-    pub ports : InterfacePorts<DeclID>,
+    pub interface : ParsedInterface,
     pub code : CodeBlock,
 
     pub flattened : FlattenedModule,
@@ -262,9 +265,9 @@ impl Module {
     pub fn print_flattened_module(&self) {
         println!("[[{}]]:", self.link_info.name);
         println!("Interface:");
-        for ((port, is_input), port_decl) in zip(self.flattened.interface_ports.iter(), self.ports.ports.iter()) {
+        for (port, is_input) in self.flattened.interface_ports.iter() {
             let port_direction = if is_input {"input"} else {"output"};
-            let port_name = &self.declarations[*port_decl].name;
+            let port_name = &self.flattened.instructions[port].extract_wire_declaration().name;
             println!("    {port_direction} {port_name} -> {:?}", port);
         }
         println!("Instantiations:");

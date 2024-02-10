@@ -1,9 +1,9 @@
 
 use num::BigInt;
 
-use crate::{tokenizer::*, errors::*, ast::*, linker::FileUUID, flattening::FlattenedModule, arena_alloc::FlatAlloc, instantiation::InstantiationList, value::Value};
+use crate::{tokenizer::*, errors::*, ast::*, linker::FileUUID, flattening::FlattenedModule, instantiation::InstantiationList, value::Value};
 
-use std::{iter::Peekable, str::FromStr, ops::Range};
+use std::{iter::Peekable, ops::Range, str::FromStr};
 use core::slice::Iter;
 
 #[derive(Clone)]
@@ -101,41 +101,6 @@ pub fn to_token_hierarchy(tokens : &TokenizeResult, errors : &ErrorCollector) ->
     cur_token_slab
 }
 
-struct LocalVariableContext<'prev, 'file> {
-    locals : Vec<(&'file str, DeclID)>,
-    prev : Option<&'prev LocalVariableContext<'prev, 'file>>
-}
-
-impl<'prev, 'file> LocalVariableContext<'prev, 'file> {
-    pub fn get_declaration_for(&self, name : &'file str) -> Option<DeclID> {
-        for (decl_name, unique_id) in &self.locals {
-            if *decl_name == name {
-                return Some(*unique_id);
-            }
-        }
-        if let Some(p) = self.prev {
-            p.get_declaration_for(name)
-        } else {
-            None
-        }
-    }
-    pub fn add_declaration(&mut self, new_local_name : &'file str, new_local_unique_id : DeclID) -> Result<(), DeclID> { // Returns conflicting signal declaration
-        for (existing_local_name, existing_local_id) in &self.locals {
-            if new_local_name == *existing_local_name {
-                return Err(*existing_local_id)
-            }
-        }
-        self.locals.push((new_local_name, new_local_unique_id));
-        Ok(())
-    }
-    pub fn new_initial() -> Self {
-        Self{locals : Vec::new(), prev : None}
-    }
-    pub fn new_extend(prev : &'prev Self) -> Self {
-        Self{locals : Vec::new(), prev : Some(prev)}
-    }
-}
-
 #[derive(Clone)]
 struct TokenStream<'it> {
     iter : Peekable<Iter<'it, TokenTreeNode>>,
@@ -205,17 +170,21 @@ impl<'it> TokenStream<'it> {
             self.next();
         }
     }
+    fn skip_while_one_of_plain(&mut self, while_types : &[TokenTypeIdx], mut start_idx : usize) -> usize {
+        while let Some(TokenTreeNode::PlainToken{tok_typ, range:_, tok_idx}) = self.peek() {
+            if !while_types.iter().any(|t| *t == *tok_typ) {
+                break;
+            }
+            start_idx = *tok_idx;
+            self.next();
+        }
+        start_idx
+    }
 }
 
 struct ASTParserContext<'file> {
     errors : ErrorCollector,
-    file_text : &'file str,
-    declarations : FlatAlloc<SignalDeclaration, DeclIDMarker>
-}
-
-struct LeftExpression {
-    expr : SpanExpression,
-    modifiers : AssignableExpressionModifiers
+    file_text : &'file str
 }
 
 impl<'file> ASTParserContext<'file> {
@@ -297,34 +266,41 @@ impl<'file> ASTParserContext<'file> {
         }
     }
 
-    fn add_declaration(&mut self, type_expr : SpanTypeExpression, name : TokenContent, identifier_type : IdentifierType, latency_expr : Option<SpanExpression>, scope : &mut LocalVariableContext<'_, 'file>) -> DeclID {
-        let span = Span::new_extend_to_include_token(type_expr.1, name.tok_idx);
-        let decl = SignalDeclaration{typ : type_expr, span, name_token : name.tok_idx, name : self.file_text[name.text.clone()].into(), identifier_type, latency_expr};
-        let decl_id = self.declarations.alloc(decl);
-        if let Err(conflict) = scope.add_declaration(&self.file_text[name.text.clone()], decl_id) {
-            self.errors.error_with_info(span, format!("This name was already declared previously"), vec![
-                error_info(self.declarations[conflict].span, self.errors.file.clone(), "Previous declaration")
-            ]);
-        }
-        decl_id
+    fn make_declaration(&mut self, type_expr : SpanTypeExpression, name : TokenContent, identifier_type : IdentifierType, latency_expr : Option<SpanExpression>) -> SignalDeclaration {
+        SignalDeclaration{typ : type_expr, name_token : name.tok_idx, name : self.file_text[name.text.clone()].into(), identifier_type, latency_expr}
     }
 
-    // For expression 
-    fn parse_unit_expression(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext) -> Option<SpanExpression> {
+    fn parse_identifier(&mut self, start_token_idx : usize, token_stream : &mut TokenStream) -> Span {
+        let span_end = token_stream.skip_while_one_of_plain(&[TOKEN_IDENTIFIER, kw("::")], start_token_idx);
+        Span::new_across_tokens(start_token_idx, span_end)
+        /*let (start_scope, first_identifier) : (StartScope, Box<str>) = if start_tok_typ == kw("::") {
+            let identifier_token = self.eat_identifier(token_stream, "identifier path")?;
+            span_end = identifier_token.tok_idx;
+            (StartScope::Root, self.file_text[identifier_token.text].to_owned().into_boxed_str())
+        } else if start_tok_typ == TOKEN_IDENTIFIER {
+            (StartScope::Local, self.file_text[range].to_owned().into_boxed_str())
+        } else {
+            unreachable!()
+        };
+        let mut path = vec![first_identifier];
+        while let Some(_) = token_stream.eat_is_plain(kw("::")) {
+            let identifier_token = self.eat_identifier(token_stream, "identifier path")?;
+            span_end = identifier_token.tok_idx;
+            path.push(self.file_text[identifier_token.text].to_owned().into_boxed_str());
+        }
+        Some((Identifier{start_scope, path}, Span::new_across_tokens(start_token_idx, span_end)))*/
+    }
+    
+    fn parse_unit_expression(&mut self, token_stream : &mut TokenStream) -> Option<SpanExpression> {
         let mut base_expr : (Expression, Span) = match token_stream.next() {
             Some(TokenTreeNode::PlainToken{tok_typ, range: _, tok_idx}) if is_unary_operator(*tok_typ) => {
-                let found_expr = self.parse_unit_expression(token_stream, scope)?;
+                let found_expr = self.parse_unit_expression(token_stream)?;
                 let new_span = Span::new_extend_before(*tok_idx, found_expr.1);
                 return Some((Expression::UnaryOp(Box::new((Operator{op_typ : *tok_typ}, *tok_idx, found_expr))), new_span));
             },
-            Some(TokenTreeNode::PlainToken{tok_typ, range, tok_idx}) if *tok_typ == TOKEN_IDENTIFIER => {
-                let ident_ref = if let Some(local_idx) = scope.get_declaration_for(&self.file_text[range.clone()]) {
-                    LocalOrGlobal::Local(local_idx)
-                } else {
-                    // todo namespacing and shit
-                    LocalOrGlobal::Global(Span::new_single_token(*tok_idx))
-                };
-                (Expression::Named(ident_ref), Span::new_single_token(*tok_idx))
+            Some(TokenTreeNode::PlainToken{tok_typ, range:_, tok_idx}) if *tok_typ == TOKEN_IDENTIFIER || *tok_typ == kw("::") => {
+                let span = self.parse_identifier(*tok_idx, token_stream);
+                (Expression::Named(Identifier{span}), span)
             },
             Some(TokenTreeNode::PlainToken{tok_typ, range, tok_idx}) if *tok_typ == TOKEN_NUMBER => {
                 let value = &self.file_text[range.clone()];
@@ -332,7 +308,7 @@ impl<'file> ASTParserContext<'file> {
             },
             Some(TokenTreeNode::Block(typ, contents, span)) if *typ == kw("(") => {
                 let mut content_token_stream = TokenStream::new(contents, *span);
-                if let Some(result) = self.parse_expression(&mut content_token_stream, scope) {
+                if let Some(result) = self.parse_expression(&mut content_token_stream) {
                     if let Some(erroneous_found_token) = content_token_stream.peek() {
                         // The expression should cover the whole brackets! 
                         let infos = vec![
@@ -360,7 +336,7 @@ impl<'file> ASTParserContext<'file> {
                 args.push(base_expr);
                 let mut content_tokens_iter = TokenStream::new(content, *bracket_span);
                 while content_tokens_iter.peek().is_some() {
-                    if let Some(expr) = self.parse_expression(&mut content_tokens_iter, scope) {
+                    if let Some(expr) = self.parse_expression(&mut content_tokens_iter) {
                         args.push(expr);
                         if content_tokens_iter.peek().is_some() {
                             self.eat_plain(&mut content_tokens_iter, kw(","), if *typ == kw("[") {"array index arguments"} else {"function call arguments"});
@@ -372,7 +348,7 @@ impl<'file> ASTParserContext<'file> {
                 base_expr = (Expression::FuncCall(args), total_span)
             } else if *typ == kw("[") {
                 let mut arg_token_stream = TokenStream::new(content, *bracket_span);
-                let arg = self.parse_expression(&mut arg_token_stream, scope)?;
+                let arg = self.parse_expression(&mut arg_token_stream)?;
                 base_expr = (Expression::Array(Box::new((base_expr, arg, *bracket_span))), total_span)
             } else {
                 break;
@@ -382,11 +358,11 @@ impl<'file> ASTParserContext<'file> {
         Some(base_expr)
     }
 
-    fn parse_expression(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext) -> Option<SpanExpression> {
+    fn parse_expression(&mut self, token_stream : &mut TokenStream) -> Option<SpanExpression> {
         // Shunting-yard algorithm with single stack
         let mut stack : Vec<(SpanExpression, TokenTypeIdx, usize)> = Vec::new();
         loop {
-            let mut grabbed_symbol = self.parse_unit_expression(token_stream, scope)?;
+            let mut grabbed_symbol = self.parse_unit_expression(token_stream)?;
             match token_stream.peek() {
                 Some(TokenTreeNode::PlainToken{tok_typ, range: _, tok_idx}) if is_operator(*tok_typ) => {
                     //let operator_prescedence = get_binary_operator_prescedence(*typ);
@@ -412,32 +388,32 @@ impl<'file> ASTParserContext<'file> {
         }
     }
 
-    fn parse_signal_declaration(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType, scope : &mut LocalVariableContext<'_, 'file>) -> Option<DeclID> {
-        let sig_type = self.try_parse_type(token_stream, scope)?;
+    fn parse_signal_declaration(&mut self, token_stream : &mut TokenStream, identifier_type : IdentifierType) -> Option<SignalDeclaration> {
+        let sig_type = self.try_parse_type(token_stream)?;
         let name = self.eat_identifier(token_stream, "signal declaration")?;
-        let latency_expr = self.parse_optional_latency_decl(token_stream, scope);
-        Some(self.add_declaration(sig_type, name, identifier_type, latency_expr, scope))
+        let latency_expr = self.parse_optional_latency_decl(token_stream);
+        Some(self.make_declaration(sig_type, name, identifier_type, latency_expr))
     }
     
-    fn try_parse_type(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext) -> Option<SpanTypeExpression> {
+    fn try_parse_type(&mut self, token_stream : &mut TokenStream) -> Option<SpanTypeExpression> {
         let first_token = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
         // todo namespacing and shit
         let mut cur_type = (TypeExpression::Named, Span::new_single_token(first_token.tok_idx)); // TODO add more type info
         while let Some((content, block_span)) = token_stream.eat_is_block(kw("[")) {
             let mut array_index_token_stream = TokenStream::new(content, block_span);
-            let expr = self.parse_expression(&mut array_index_token_stream, scope)?;
+            let expr = self.parse_expression(&mut array_index_token_stream)?;
             self.token_stream_should_be_finished(array_index_token_stream, "type array index");
             cur_type = (TypeExpression::Array(Box::new((cur_type, expr))), Span::new_extend_before(first_token.tok_idx, block_span));
         }
         Some(cur_type)
     }
 
-    fn parse_optional_latency_decl(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext<'_, 'file>) -> Option<SpanExpression> {
+    fn parse_optional_latency_decl(&mut self, token_stream : &mut TokenStream) -> Option<SpanExpression> {
         let _acc_tok = token_stream.eat_is_plain(kw("'"))?;
-        self.parse_expression(token_stream, scope)
+        self.parse_expression(token_stream)
     }
 
-    fn try_parse_declaration(&mut self, token_stream : &mut TokenStream, scope : &mut LocalVariableContext<'_, 'file>) -> Option<(DeclID, Span)> {
+    fn try_parse_declaration(&mut self, token_stream : &mut TokenStream) -> Option<(SignalDeclaration, Span)> {
         let mut state_kw = token_stream.eat_is_plain(kw("state"));
         let generative_kw = token_stream.eat_is_plain(kw("gen"));
         if state_kw.is_none() {
@@ -461,17 +437,17 @@ impl<'file> ASTParserContext<'file> {
             }
         };
         
-        let typ = self.try_parse_type(token_stream, scope)?;
+        let typ = self.try_parse_type(token_stream)?;
         let name_token = token_stream.eat_is_plain(TOKEN_IDENTIFIER)?;
-        let latency_expr = self.parse_optional_latency_decl(token_stream, scope);
-        let local_idx = self.add_declaration(typ, name_token.clone(), identifier_type, latency_expr, scope);
+        let latency_expr = self.parse_optional_latency_decl(token_stream);
+        let local_idx = self.make_declaration(typ, name_token.clone(), identifier_type, latency_expr);
         Some((local_idx, Span::new_single_token(name_token.tok_idx)))
     }
 
-    fn parse_bundle(&mut self, token_stream : &mut TokenStream, interface : &mut Vec<DeclID>, identifier_type : IdentifierType, scope : &mut LocalVariableContext<'_, 'file>) {
+    fn parse_bundle(&mut self, token_stream : &mut TokenStream, decls : &mut Vec<SignalDeclaration>, identifier_type : IdentifierType) {
         while token_stream.peek_is_plain(TOKEN_IDENTIFIER) {
-            if let Some(id) = self.parse_signal_declaration(token_stream, identifier_type, scope) {
-                interface.push(id);// Current implementation happens to order inputs then outputs, but refactorings should ensure this remains the case
+            if let Some(id) = self.parse_signal_declaration(token_stream, identifier_type) {
+                decls.push(id);// Current implementation happens to order inputs then outputs, but refactorings should ensure this remains the case
             } else {
                 // Error during parsing signal decl. Skip till "," or end of scope
                 token_stream.skip_until_one_of(&[kw(","), kw("->"), kw("{"), kw(";")]);
@@ -483,18 +459,18 @@ impl<'file> ASTParserContext<'file> {
         }
     }
 
-    fn parse_interface(&mut self, token_stream : &mut TokenStream, scope : &mut LocalVariableContext<'_, 'file>) -> InterfacePorts<DeclID> {
+    fn parse_interface(&mut self, token_stream : &mut TokenStream) -> ParsedInterface {
         // Current implementation happens to order inputs then outputs, but refactorings should ensure this remains the case
         
-        let mut interface_decls = Vec::new();
-        self.parse_bundle(token_stream, &mut interface_decls, IdentifierType::Input, scope);
+        let mut ports = Vec::new();
+        self.parse_bundle(token_stream, &mut ports, IdentifierType::Input);
         
-        let outputs_start = interface_decls.len();
+        let outputs_start = ports.len();
         if token_stream.eat_is_plain(kw("->")).is_some() {
-            self.parse_bundle(token_stream, &mut interface_decls, IdentifierType::Output, scope);
+            self.parse_bundle(token_stream, &mut ports, IdentifierType::Output);
         }
 
-        InterfacePorts{ports : interface_decls.into_boxed_slice(), outputs_start}
+        ParsedInterface{ports, outputs_start}
     }
 
     fn parse_assign_modifiers(&mut self, token_stream : &mut TokenStream) -> AssignableExpressionModifiers {
@@ -520,139 +496,107 @@ impl<'file> ASTParserContext<'file> {
         AssignableExpressionModifiers::NoModifiers
     }
 
-    fn parse_statement(&mut self, token_stream : &mut TokenStream, scope : &mut LocalVariableContext<'_, 'file>, code_block : &mut CodeBlock) -> Option<()> {
-        let start_at = if let Some(peek) = token_stream.peek() {
-            peek.get_span().0
-        } else {
-            return None;
-        };
-
-        let mut left_expressions : Vec<LeftExpression> = Vec::new();
-        let mut all_decls = true;
+    fn parse_statement(&mut self, token_stream : &mut TokenStream) -> Option<SpanStatement> {
+        let mut left_expressions : Vec<AssignableExpressionWithModifiers> = Vec::new();
         loop { // Loop over a number of declarations possibly
             let modifiers = self.parse_assign_modifiers(token_stream);
 
             let mut tok_stream_copy = token_stream.clone();
             
-            if let Some((name, span)) = self.try_parse_declaration(&mut tok_stream_copy, scope) {
+            if let Some((decl, span)) = self.try_parse_declaration(&mut tok_stream_copy) {
                 // Maybe it's a declaration?
                 *token_stream = tok_stream_copy;
-                left_expressions.push(LeftExpression{expr : (Expression::Named(LocalOrGlobal::Local(name)), span), modifiers});
-                code_block.statements.push((Statement::Declaration(name), span));
+                left_expressions.push(AssignableExpressionWithModifiers{expr : LeftExpression::Declaration(decl), span, modifiers});
+            } else if let Some((expr, span)) = self.parse_expression(token_stream) {
+                // It's an expression instead!
+                left_expressions.push(AssignableExpressionWithModifiers{expr: LeftExpression::Assignable(expr), span, modifiers});
             } else {
-                if let Some(expr) = self.parse_expression(token_stream, scope) {
-                    // It's an expression instead!
-                    left_expressions.push(LeftExpression{expr, modifiers});
-                    all_decls = false;
-                } else {
-                    // Also not, error then
-                    //token_stream.skip_until_one_of(&[kw(","), kw("="), kw(";")]);
-                }
+                // Also not, error then
+                //token_stream.skip_until_one_of(&[kw(","), kw("="), kw(";")]);
             }
             match token_stream.next() {
                 Some(TokenTreeNode::PlainToken{tok_typ, range:_, tok_idx:_}) if *tok_typ == kw(",") => {
                     continue; // parse next declaration
                 }
-                Some(TokenTreeNode::PlainToken{tok_typ, range:_, tok_idx}) if *tok_typ == kw("=") => {
-                    // Ends the loop
+                Some(TokenTreeNode::PlainToken{tok_typ, range:_, tok_idx : eq_sign_pos}) if *tok_typ == kw("=") => {
                     // T a, T b = x(y);
-                    return self.parse_statement_handle_assignment(left_expressions, *tok_idx, token_stream, scope, &mut code_block.statements, start_at);
+                    return Some(self.parse_statement_handle_assignment(left_expressions, *eq_sign_pos, token_stream));
                 }
                 Some(TokenTreeNode::PlainToken{tok_typ, range:_, tok_idx:_}) if *tok_typ == kw(";") => {
-                    // Ends the loop
-                    return self.parse_statement_handle_end(left_expressions, all_decls, &mut code_block.statements);
+                    // T a;
+                    // f(3, a);
+                    return self.parse_statement_no_assignment(left_expressions);
                 }
                 None => {
-                    // Ends the loop
-                    return self.parse_statement_handle_end(left_expressions, all_decls, &mut code_block.statements);
+                    return self.parse_statement_no_assignment(left_expressions);
                 }
                 other => {
-                    self.error_unexpected_tree_node(&[kw(";"), kw("="), kw(","), kw("if")], other, token_stream.unexpected_eof_token, "statement");
-                    return None
+                    self.error_unexpected_tree_node(&[kw(";"), kw("="), kw(","), kw("if"), kw("for")], other, token_stream.unexpected_eof_token, "statement");
+                    return None;
                 }
             }
         }
     }
 
-    fn convert_expression_to_assignable_expression(&mut self, (expr, span) : SpanExpression) -> Option<SpanAssignableExpression> {
-        match expr {
-            Expression::Named(n) => {
-                if let LocalOrGlobal::Local(local_idx) = n {
-                    Some((AssignableExpression::Named{local_idx}, span))
-                } else {
-                    self.errors.error_basic(span, "Can only assign to local variables");
-                    None
-                }
-            },
-            Expression::Array(b) => {
-                let (arr, idx, bracket_span) = *b;
-                let assignable_arr = self.convert_expression_to_assignable_expression(arr)?;
-                Some((AssignableExpression::ArrayIndex(Box::new((assignable_arr, idx, bracket_span))), span))
-            },
-            Expression::Constant(_) => {self.errors.error_basic(span, "Cannot assign to constant"); None},
-            Expression::UnaryOp(_) => {self.errors.error_basic(span, "Cannot assign to the result of an operator"); None},
-            Expression::BinOp(_) => {self.errors.error_basic(span, "Cannot assign to the result of an operator"); None},
-            Expression::FuncCall(_) => {self.errors.error_basic(span, "Cannot assign to function call"); None},
-        }
-    }
-
-    fn parse_statement_handle_assignment(&mut self, left_expressions: Vec<LeftExpression>, assign_pos: usize, token_stream: &mut TokenStream<'_>, scope: &mut LocalVariableContext<'_, 'file>, statements: &mut Vec<SpanStatement>, start_at: usize) -> Option<()> {
-        if left_expressions.len() == 0 {
+    fn parse_statement_handle_assignment(&mut self, left_expressions: Vec<AssignableExpressionWithModifiers>, assign_pos: usize, token_stream: &mut TokenStream<'_>) -> SpanStatement {
+        let mut span = if let Some(first_left_expr) = left_expressions.first() {
+            first_left_expr.span
+        } else {
             self.error_unexpected_token(&[TOKEN_IDENTIFIER], kw("="), assign_pos, "statement");
-            None
-        } else if let Some(value) = self.parse_expression(token_stream, scope) {
-            let converted_left : Vec<AssignableExpressionWithModifiers> = left_expressions.into_iter().filter_map(&mut |le: LeftExpression| {
-                Some(AssignableExpressionWithModifiers{expr : self.convert_expression_to_assignable_expression(le.expr)?, modifiers : le.modifiers})
-            }).collect();
-            let span = Span::new_extend_before(start_at, value.1);
-            statements.push((Statement::Assign{to : converted_left, eq_sign_position : Some(assign_pos), expr : value}, span));
-            
-            self.eat_plain(token_stream, kw(";"), "right-hand side of expression")?;
-            Some(())
+            Span::new_single_token(assign_pos)
+        };
+        
+        let expr = if let Some(assign_expr) = self.parse_expression(token_stream) {
+            span = Span::new_overarching(span, assign_expr.1);
+            let _ = self.eat_plain(token_stream, kw(";"), "right-hand side of expression"); // Error report handled by eat_plain
+
+            Some(assign_expr)
         } else {
             None
             // errors reported by self.parse_expression
-        }
+        };
+
+        (Statement::Assign{to : left_expressions, eq_sign_position : Some(assign_pos), expr}, span)
     }
 
-    fn parse_statement_handle_end(&mut self, left_expressions: Vec<LeftExpression>, all_decls: bool, statements: &mut Vec<(Statement, Span)>) -> Option<()> {
-        // Declarations or single expression only
-        // T a;
-        // myFunc(x, y);
-        if left_expressions.len() == 0 {
-            return None
-        } else if left_expressions.len() == 1 {
-            // Is a single big expression, or a single declaration
-            let le = left_expressions.into_iter().next().unwrap();
-            if all_decls {
-                // decls have been taken care of during try_parse_declaration step
-                return Some(());
+    // Declarations or single expression only
+    // T a;
+    // myFunc(x, y);
+    fn parse_statement_no_assignment(&mut self, left_expressions: Vec<AssignableExpressionWithModifiers>) -> Option<(Statement, Span)> {
+        if left_expressions.len() == 1 {
+            // Is a single big expression
+            let single_assignable = left_expressions.into_iter().next().unwrap();
+            if let AssignableExpressionWithModifiers{expr : LeftExpression::Assignable(expr), span, modifiers : AssignableExpressionModifiers::NoModifiers} = single_assignable {
+                Some((Statement::Assign{to : Vec::new(), eq_sign_position : None, expr : Some((expr, span))}, span))
             } else {
-                let expr_span = le.expr.1;
-                statements.push((Statement::Assign{to : Vec::new(), eq_sign_position : None, expr : le.expr}, expr_span));
-                return None;
+                let span = single_assignable.span;
+                Some((Statement::Assign{to: vec![single_assignable], eq_sign_position: None, expr: None}, span))
             }
+        } else if let (Some(first_elem), Some(last_elem)) = (left_expressions.first(), left_expressions.last()) {
+            // Several declarations. Should never be assignable but this should be caught in Flattening
+            let span = Span::new_overarching(first_elem.span, last_elem.span);
+            Some((Statement::Assign{to: left_expressions, eq_sign_position: None, expr: None}, span))
         } else {
-            self.errors.error_basic(Span::new_overarching(left_expressions[1].expr.1, left_expressions[left_expressions.len()-1].expr.1), "Multiple declarations are only allowed in function call syntax: int a, int b = f(x);");
-            return None;
+            // No statement, just a single semicolon
+            None
         }
     }
-    fn parse_range(&mut self, token_stream : &mut TokenStream, scope : &LocalVariableContext<'_, 'file>) -> Option<RangeExpression> {
-        let left_expr = self.parse_expression(token_stream, scope)?;
+    fn parse_range(&mut self, token_stream : &mut TokenStream) -> Option<RangeExpression> {
+        let left_expr = self.parse_expression(token_stream)?;
         self.eat_plain(token_stream, kw(".."), "range")?;
-        let right_expr = self.parse_expression(token_stream, scope)?;
+        let right_expr = self.parse_expression(token_stream)?;
         Some(RangeExpression{from : left_expr, to : right_expr})
     }
-    fn parse_if_statement(&mut self, token_stream : &mut TokenStream, if_token : TokenContent, scope : &LocalVariableContext<'_, 'file>) -> Option<SpanStatement> {
-        let condition = self.parse_expression(token_stream, &scope)?;
+    fn parse_if_statement(&mut self, token_stream : &mut TokenStream, if_token : TokenContent) -> Option<SpanStatement> {
+        let condition = self.parse_expression(token_stream)?;
 
         let (then_block, then_block_span) = self.eat_block(token_stream, kw("{"), "Then block of if statement")?;
-        let then_content = self.parse_code_block(then_block, then_block_span, &scope);
+        let then_content = self.parse_code_block(then_block, then_block_span);
         
         let (else_content, span) = if let Some(_else_tok) = token_stream.eat_is_plain(kw("else")) {
             if let Some(continuation_if) = token_stream.eat_is_plain(kw("if")) {
                 let cont_if_pos = continuation_if.tok_idx;
-                if let Some(stmt) = self.parse_if_statement(token_stream, continuation_if, scope) {
+                if let Some(stmt) = self.parse_if_statement(token_stream, continuation_if) {
                     let span = stmt.1;
                     (Some(CodeBlock{statements : vec![stmt]}), Span::new_extend_before(if_token.tok_idx, span))
                 } else {
@@ -660,7 +604,7 @@ impl<'file> ASTParserContext<'file> {
                 }
             } else {
                 let (else_block, else_block_span) = self.eat_block(token_stream, kw("{"), "Else block of if statement")?;
-                (Some(self.parse_code_block(else_block, else_block_span, &scope)), Span::new_extend_before(if_token.tok_idx, else_block_span))
+                (Some(self.parse_code_block(else_block, else_block_span)), Span::new_extend_before(if_token.tok_idx, else_block_span))
             }
         } else {
             (None, Span::new_extend_before(if_token.tok_idx, then_block_span))
@@ -668,27 +612,24 @@ impl<'file> ASTParserContext<'file> {
 
         Some((Statement::If{condition, then: then_content, els: else_content }, span))
     }
-    fn parse_for_loop(&mut self, token_stream : &mut TokenStream, for_token : TokenContent, scope : &mut LocalVariableContext<'_, 'file>) -> Option<SpanStatement> {
-        let var = self.parse_signal_declaration(token_stream, IdentifierType::Generative, scope)?;
+    fn parse_for_loop(&mut self, token_stream : &mut TokenStream, for_token : TokenContent) -> Option<SpanStatement> {
+        let var = self.parse_signal_declaration(token_stream, IdentifierType::Generative)?;
 
         let _in_kw = self.eat_plain(token_stream, kw("in"), "for loop")?;
 
-        let range = self.parse_range(token_stream, scope)?;
+        let range = self.parse_range(token_stream)?;
 
         let (for_block, for_block_span) = self.eat_block(token_stream, kw("{"), "Block of for loop")?;
-        let code = self.parse_code_block(for_block, for_block_span, &scope);
+        let code = self.parse_code_block(for_block, for_block_span);
 
         Some((Statement::For{var, range, code}, Span(for_token.tok_idx, for_block_span.1)))
     }
 
-    fn parse_code_block(&mut self, block_tokens : &[TokenTreeNode], span : Span, outer_scope : &LocalVariableContext<'_, 'file>) -> CodeBlock {
+    fn parse_code_block(&mut self, block_tokens : &[TokenTreeNode], span : Span) -> CodeBlock {
         let mut token_stream = TokenStream::new(block_tokens, span);
 
         let mut code_block = CodeBlock{statements : Vec::new()};
         
-        let mut inner_scope = LocalVariableContext::new_extend(outer_scope);
-
-
         while token_stream.peek().is_some() {
             // Allow empty statements
             if token_stream.eat_is_plain(kw(";")).is_some() {
@@ -696,7 +637,7 @@ impl<'file> ASTParserContext<'file> {
             }
             if let Some(TokenTreeNode::Block(typ, contents, block_span)) = token_stream.peek() {
                 if *typ == kw("{") {
-                    code_block.statements.push((Statement::Block(self.parse_code_block(contents, *block_span, &inner_scope)), *block_span));
+                    code_block.statements.push((Statement::Block(self.parse_code_block(contents, *block_span)), *block_span));
                     token_stream.next();
                     continue; // Can't add condition to if let, so have to do some weird control flow here
                 }
@@ -704,20 +645,21 @@ impl<'file> ASTParserContext<'file> {
 
             // If statements
             if let Some(if_token) = token_stream.eat_is_plain(kw("if")) {
-                let Some(if_stmt) = self.parse_if_statement(&mut token_stream, if_token, &mut inner_scope) else {continue;};
+                let Some(if_stmt) = self.parse_if_statement(&mut token_stream, if_token) else {continue;};
                 code_block.statements.push(if_stmt);
-            }
+            } else 
 
             // For loop
             if let Some(for_token) = token_stream.eat_is_plain(kw("for")) {
-                let Some(for_loop_stmt) = self.parse_for_loop(&mut token_stream, for_token, &mut inner_scope) else {continue;};
+                let Some(for_loop_stmt) = self.parse_for_loop(&mut token_stream, for_token) else {continue;};
                 code_block.statements.push(for_loop_stmt);
-            }
+            } else 
             
-            if self.parse_statement(&mut token_stream, &mut inner_scope, &mut code_block).is_none() {
+            if let Some(stmt) = self.parse_statement(&mut token_stream) {
+                code_block.statements.push(stmt);
+            } else {
                 // Error recovery. Find end of statement
                 token_stream.next();
-                //token_stream.skip_until_one_of(&[kw(";"), kw("{")]);
             }
         }
 
@@ -730,12 +672,11 @@ impl<'file> ASTParserContext<'file> {
         let name = self.eat_identifier(token_stream, "module")?;
         self.eat_plain(token_stream, kw(":"), "module")?;
 
-        let mut scope = LocalVariableContext::new_initial();
-        let ports = self.parse_interface(token_stream, &mut scope);
+        let interface = self.parse_interface(token_stream);
 
         let (block_tokens, block_span) = self.eat_block(token_stream, kw("{"), "module")?;
 
-        let code = self.parse_code_block(block_tokens, block_span, &scope);
+        let code = self.parse_code_block(block_tokens, block_span);
 
         let span = Span(declaration_start_idx, token_stream.last_idx);
         
@@ -745,8 +686,8 @@ impl<'file> ASTParserContext<'file> {
             name_span : Span::new_single_token(name.tok_idx),
             span
         };
-        let declarations = std::mem::replace(&mut self.declarations, FlatAlloc::new());
-        Some(Module{declarations, ports, code, link_info, flattened : FlattenedModule::empty(self.errors.file), instantiations : InstantiationList::new()})
+
+        Some(Module{interface, code, link_info, flattened : FlattenedModule::empty(self.errors.file), instantiations : InstantiationList::new()})
     }
 
     fn parse_ast(mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {
@@ -772,7 +713,7 @@ impl<'file> ASTParserContext<'file> {
 
 
 pub fn parse<'nums, 'g, 'file>(token_hierarchy : &Vec<TokenTreeNode>, file_text : &'file str, whole_file_span : Span, errors : ErrorCollector) -> ASTRoot {
-    let context = ASTParserContext{declarations : FlatAlloc::new(), errors, file_text};
+    let context = ASTParserContext{errors, file_text};
     let mut token_stream = TokenStream::new(&token_hierarchy, whole_file_span);
     context.parse_ast(&mut token_stream)
 }

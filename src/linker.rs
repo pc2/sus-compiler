@@ -126,8 +126,11 @@ pub struct FileData {
 }
 
 impl FileData {
-    fn get_token_text(&self, token_idx : usize) -> &str {
+    pub fn get_token_text(&self, token_idx : usize) -> &str {
         &self.file_text[self.tokens.get_token_range(token_idx)]
+    }
+    pub fn get_span_text(&self, span : Span) -> &str {
+        &self.file_text[self.tokens.get_span_range(span)]
     }
 }
 
@@ -137,6 +140,7 @@ pub enum NameElem {
     Type(TypeUUID),
     Constant(ConstantUUID)
 }
+
 enum NamespaceElement {
     Global(NameElem),
     Colission(Box<[NameElem]>)
@@ -484,7 +488,7 @@ impl ResolvedGlobals {
 
 pub struct GlobalResolver<'linker> {
     linker : &'linker Linker,
-    file : &'linker FileData,
+    pub file : &'linker FileData,
     resolved_globals : RefCell<Option<ResolvedGlobals>>
 }
 
@@ -517,15 +521,15 @@ impl<'linker> GlobalResolver<'linker> {
         assert!(old_should_be_none.is_none());
     }
 
-    pub fn resolve_global(&self, name_span : Span, errors : &ErrorCollector) -> Option<NameElem> {
-        let name = self.file.get_token_text(name_span.assert_is_single_token());
+    pub fn resolve_global<'error_collector>(&self, name_span : Span, errors : &'error_collector ErrorCollector) -> ResolvedNameElem<'linker, 'error_collector> {
+        let name = self.file.get_span_text(name_span);
 
         let mut resolved_globals_borrow = self.resolved_globals.borrow_mut();
         let resolved_globals = resolved_globals_borrow.as_mut().unwrap();
         match self.linker.global_namespace.get(name) {
             Some(NamespaceElement::Global(found)) => {
                 resolved_globals.referenced_globals.push(*found);
-                Some(*found)
+                ResolvedNameElem{name_elem: Some(*found), linker: self.linker, span: name_span, errors}
             }
             Some(NamespaceElement::Colission(coll)) => {
                 resolved_globals.all_resolved = false;
@@ -542,61 +546,14 @@ impl<'linker> GlobalResolver<'linker> {
 
                 errors.error_with_info(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."), decl_infos);
 
-                None
+                ResolvedNameElem{name_elem: None, linker: self.linker, span: name_span, errors}
             }
             None => {
                 resolved_globals.all_resolved = false;
 
                 errors.error_basic(name_span, format!("No Global of the name '{name}' was found. Did you forget to import it?"));
 
-                None
-            }
-        }
-    }
-
-    pub fn make_bad_error_location_error(&self, elem : NameElem, expected : &str, identifier_span : Span, errors : &ErrorCollector) {
-        let info = self.linker.get_linking_error_location(elem);
-        let infos = if let Some((file, span)) = info.location {
-            vec![error_info(span, file, "Defined here")]
-        } else {
-            vec![]
-        };
-        let name = info.full_name;
-        let ident_type = info.named_type;
-        errors.error_with_info(identifier_span, format!("{ident_type} {name} is not a {expected}!"), infos);
-    }
-    pub fn resolve_constant(&self, identifier_span : Span, errors : &ErrorCollector) -> Option<ConstantUUID> {
-        match self.resolve_global(identifier_span, errors)? {
-            NameElem::Constant(id) => {
-                Some(id)
-            },
-            other => {
-                self.make_bad_error_location_error(other, "Constant", identifier_span, errors);
-                None
-            }
-        }
-    }
-
-    pub fn resolve_type(&self, identifier_span : Span, errors : &ErrorCollector) -> Option<TypeUUID> {
-        match self.resolve_global(identifier_span, errors)? {
-            NameElem::Type(id) => {
-                Some(id)
-            },
-            other => {
-                self.make_bad_error_location_error(other, "Type", identifier_span, errors);
-                None
-            }
-        }
-    }
-
-    pub fn resolve_module(&self, identifier_span : Span, errors : &ErrorCollector) -> Option<ModuleUUID> {
-        match self.resolve_global(identifier_span, errors)? {
-            NameElem::Module(id) => {
-                Some(id)
-            },
-            other => {
-                self.make_bad_error_location_error(other, "Module", identifier_span, errors);
-                None
+                ResolvedNameElem{name_elem: None, linker: self.linker, span: name_span, errors}
             }
         }
     }
@@ -618,3 +575,52 @@ impl<'linker> Drop for GlobalResolver<'linker> {
         assert!(self.resolved_globals.get_mut().is_none());
     }
 }
+
+
+pub struct ResolvedNameElem<'l, 'e> {
+    pub name_elem : Option<NameElem>,
+    pub span : Span,
+    linker : &'l Linker,
+    pub errors : &'e ErrorCollector
+}
+
+impl<'l, 'e> ResolvedNameElem<'l, 'e> {
+    pub fn not_expected_global_error(self, expected : &str) {
+        let info = self.linker.get_linking_error_location(self.name_elem.unwrap());
+        let infos = if let Some((file, definition_span)) = info.location {
+            vec![error_info(definition_span, file, "Defined here")]
+        } else {
+            vec![]
+        };
+        let name = &info.full_name;
+        let global_type = info.named_type;
+        self.errors.error_with_info(self.span, format!("{name} is not a {expected}, it is a {global_type} instead!"), infos);
+    }
+    pub fn expect_constant(self) -> Option<ConstantUUID> {
+        if let NameElem::Constant(id) = self.name_elem? {
+            Some(id)
+        } else {
+            self.not_expected_global_error("Constant");
+            None
+        }
+    }
+
+    pub fn expect_type(self) -> Option<TypeUUID> {
+        if let NameElem::Type(id) = self.name_elem? {
+            Some(id)
+        } else {
+            self.not_expected_global_error("Type");
+            None
+        }
+    }
+
+    pub fn expect_module(self) -> Option<ModuleUUID> {
+        if let NameElem::Module(id) = self.name_elem? {
+            Some(id)
+        } else {
+            self.not_expected_global_error("Module");
+            None
+        }
+    }
+}
+

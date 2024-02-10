@@ -1,3 +1,5 @@
+//#![allow(dead_code)]
+
 mod util;
 mod block_vector;
 mod arena_alloc;
