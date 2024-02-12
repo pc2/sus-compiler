@@ -409,6 +409,9 @@ impl Linker {
                                         }
                                         None => {}
                                     }
+                                    if decl.is_free_standing_decl && decl.name_token == token_idx {
+                                        location_builder.update(Span::new_single_token(decl.name_token), LocationInfo::WireRef(md, id));
+                                    }
                                 }
                                 Instruction::Wire(wire) => {
                                     let loc_info = if let WireSource::WireRead(decl_id) = &wire.source {

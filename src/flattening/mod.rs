@@ -90,6 +90,8 @@ pub struct Declaration {
     pub name_token : usize,
     pub name : Box<str>,
     pub read_only : bool,
+    // If the program text already covers the write, then lsp stuff on this declaration shouldn't use it. 
+    pub is_free_standing_decl : bool,
     pub identifier_type : IdentifierType,
     pub latency_specifier : Option<FlatID>
 }
@@ -222,7 +224,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
             }
         }
     }
-    fn flatten_declaration<const ALLOW_MODULES : bool>(&mut self, decl : &'l SignalDeclaration, read_only : bool) -> FlatID {
+    fn flatten_declaration<const ALLOW_MODULES : bool>(&mut self, decl : &'l SignalDeclaration, read_only : bool, is_free_standing_decl : bool) -> FlatID {
         let typ_expr = if let TypeExpression::Named = &decl.typ.0 {
             let resolved = self.linker.resolve_global(decl.typ.1, &self.errors);
             match resolved.name_elem {
@@ -257,6 +259,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
             typ_expr,
             is_declared_in_this_module : self.is_declared_in_this_module,
             read_only,
+            is_free_standing_decl,
             identifier_type : decl.identifier_type,
             name : decl.name.clone(),
             name_token : decl.name_token,
@@ -285,7 +288,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
             let is_input = idx < self.module.interface.outputs_start;
             let read_only = is_input ^ IS_SUBMODULE;
 
-            self.flatten_declaration::<false>(port_decl, read_only)
+            self.flatten_declaration::<false>(port_decl, read_only, true)
         }).collect();
         InterfacePorts{ports, outputs_start : self.module.interface.outputs_start}
     }
@@ -451,13 +454,13 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
             Expression::FuncCall(_) => {self.errors.error_basic(span, "Cannot assign to submodule call"); None},
         }
     }
-    fn flatten_left_expr(&mut self, left : &'l LeftExpression, span : Span) -> Option<ConnectionWrite> {
+    fn flatten_left_expr(&mut self, left : &'l LeftExpression, span : Span, gets_assigned : bool) -> Option<ConnectionWrite> {
         match left {
             LeftExpression::Assignable(assignable) => {
                 self.flatten_assignable_expr(assignable, span)
             }
             LeftExpression::Declaration(decl) => {
-                let root = self.flatten_declaration::<true>(decl, false);
+                let root = self.flatten_declaration::<true>(decl, false, !gets_assigned);
                 Some(ConnectionWrite{root, path: Vec::new(), span, is_declared_in_this_module: true})
             }
         }
@@ -507,7 +510,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
                     for (field, to_i) in zip(outputs, to) {                        
                         let module_port_wire_decl = self.instructions[*field].extract_wire_declaration();
                         let module_port_proxy = self.instructions.alloc(Instruction::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : *func_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::WireRead(*field)}));
-                        let Some(write_side) = self.flatten_left_expr(&to_i.expr, to_i.span) else {continue};
+                        let Some(write_side) = self.flatten_left_expr(&to_i.expr, to_i.span, true) else {continue};
 
                         let write_type = self.flatten_assignment_modifiers(&to_i.modifiers);
                         self.instructions.alloc(Instruction::Write(Write{write_type, from: module_port_proxy, to: write_side}));
@@ -517,7 +520,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
                     let read_side = non_func_expr.as_ref().map(|some_expr| self.flatten_expr(some_expr));
                     if to.len() == 1 {
                         let t = &to[0];
-                        let Some(write_side) = self.flatten_left_expr(&t.expr, t.span) else {continue};
+                        let Some(write_side) = self.flatten_left_expr(&t.expr, t.span, non_func_expr.is_some()) else {continue};
                         let write_type = self.flatten_assignment_modifiers(&t.modifiers);
                         if let Some(read_side) = read_side {
                             self.instructions.alloc(Instruction::Write(Write{write_type, from: read_side, to: write_side}));
@@ -548,7 +551,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
                     if_stmt.else_end = else_end;
                 }
                 Statement::For{var, range, code} => {
-                    let loop_var_decl = self.flatten_declaration::<false>(var, true);
+                    let loop_var_decl = self.flatten_declaration::<false>(var, true, true);
 
                     let start = self.flatten_expr(&range.from);
                     let end = self.flatten_expr(&range.to);
