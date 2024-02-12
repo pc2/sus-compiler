@@ -2,7 +2,8 @@ use std::iter::zip;
 
 #[derive(Debug)]
 pub enum LatencyCountingError {
-    PositiveNetLatencyCycle{cycle_nodes : Vec<usize>},
+    InsufficientLatencySlackBetweenSetWires{conflict_nodes : Vec<usize>},
+    PositiveNetLatencyCycle{conflict_nodes : Vec<usize>},
     ConflictingPortLatency{bad_ports : Vec<(usize, i64, i64)>},
     DisjointNodes{start_node : usize, nodes_not_reached : Vec<usize>},
     NotImplemented
@@ -27,6 +28,11 @@ pub fn convert_fanin_to_fanout(fanins : &[Vec<FanInOut>]) -> Vec<Vec<FanInOut>> 
     fanouts
 }
 
+struct LatencyStackElem<'d> {
+    node_idx : usize,
+    remaining_fanout : std::slice::Iter<'d, FanInOut>
+}
+
 /*
     Algorithm:
     Initialize all inputs at latency 0
@@ -34,53 +40,47 @@ pub fn convert_fanin_to_fanout(fanins : &[Vec<FanInOut>]) -> Vec<Vec<FanInOut>> 
     Then backward pass, moving nodes forward in latency as much as possible. 
     Only moving forward is possible, and only when not confliciting with a later node
 */
-fn count_latency_recursive(part_of_path : &mut [bool], absolute_latency : &mut [i64], fanouts : &[Vec<FanInOut>], cur_node : usize) -> Result<(), Vec<usize>> {
-    part_of_path[cur_node] = true;
-    for &FanInOut{other, delta_latency} in &fanouts[cur_node] {
-        let to_node_min_latency = absolute_latency[cur_node] + delta_latency;
-        if to_node_min_latency > absolute_latency[other] {
-            if part_of_path[other] {
-                //todo!("Cycles for positive net latency error!");
-                return Err(vec![other]);
-            } else {
-                absolute_latency[other] = to_node_min_latency;
-                if let Err(mut bad_cycle_nodes) = count_latency_recursive(part_of_path, absolute_latency, fanouts, other) {
-                    bad_cycle_nodes.push(cur_node);
-                    return Err(bad_cycle_nodes);
+fn count_latency<'d>(is_latency_pinned : &mut [bool], absolute_latency : &mut [i64], fanouts : &'d [Vec<FanInOut>], start_node : usize, stack : &mut Vec<LatencyStackElem<'d>>) -> Result<(), LatencyCountingError> {
+    assert!(absolute_latency[start_node] != i64::MIN);
+    
+    assert!(stack.is_empty());
+
+    is_latency_pinned[start_node] = true;
+    stack.push(LatencyStackElem{node_idx : start_node, remaining_fanout : fanouts[start_node].iter()});
+
+    while let Some(top) = stack.last_mut() {
+        if let Some(&FanInOut{other, delta_latency}) = top.remaining_fanout.next() {
+            let to_node_min_latency = absolute_latency[top.node_idx] + delta_latency;
+            if to_node_min_latency > absolute_latency[other] {
+                if is_latency_pinned[other] {
+                    // Positive latency cycle error detected!
+                    return Err(if let Some(conflict_begin) = stack.iter().position(|elem| elem.node_idx == other) {
+                        let conflict_nodes = stack[conflict_begin..].iter().map(|elem| elem.node_idx).collect();
+                        LatencyCountingError::PositiveNetLatencyCycle { conflict_nodes }
+                    } else {
+                        let conflict_nodes = stack.iter().map(|elem| elem.node_idx).collect();
+                        LatencyCountingError::InsufficientLatencySlackBetweenSetWires { conflict_nodes }
+                    });
+                } else {
+                    absolute_latency[other] = to_node_min_latency;
+                    stack.push(LatencyStackElem{node_idx : other, remaining_fanout : fanouts[other].iter()});
+                    is_latency_pinned[other] = true;
                 }
             }
+        } else {
+            is_latency_pinned[top.node_idx] = false;
+            stack.pop();
         }
     }
-    part_of_path[cur_node] = false;
+
     Ok(())
 }
 
-fn make_cycle_error_from_path(mut cycle_nodes : Vec<usize>) -> LatencyCountingError {
-    let mut nodes_iter = cycle_nodes.iter().enumerate();
-        let first_node_in_cycle = nodes_iter.next().unwrap().1;
-        for (idx, node) in nodes_iter {
-            if node == first_node_in_cycle {
-                cycle_nodes.truncate(idx);
-                break;
-            }
-        }
-        LatencyCountingError::PositiveNetLatencyCycle{cycle_nodes}
-}
-
-fn count_latency(part_of_path : &mut [bool], absolute_latency : &mut [i64], fanouts : &[Vec<FanInOut>], start_node : usize) -> Result<(), LatencyCountingError> {
-    assert!(absolute_latency[start_node] != i64::MIN);
-
-    for p in part_of_path.iter() {assert!(!*p);}
-    count_latency_recursive(part_of_path, absolute_latency, fanouts, start_node).map_err(make_cycle_error_from_path)?;
-    for p in part_of_path.iter() {assert!(!*p);}
-    Ok(())
-}
-
-fn count_latency_from(part_of_path : &mut [bool], absolute_latency : &mut [i64], fanouts : &[Vec<FanInOut>], start_node : usize, start_value : i64) -> Result<(), LatencyCountingError> {
+fn count_latency_from<'d>(is_latency_pinned : &mut [bool], absolute_latency : &mut [i64], fanouts : &'d [Vec<FanInOut>], start_node : usize, start_value : i64, stack : &mut Vec<LatencyStackElem<'d>>) -> Result<(), LatencyCountingError> {
     assert!(absolute_latency[start_node] == i64::MIN);
     absolute_latency[start_node] = start_value;
     
-    count_latency(part_of_path, absolute_latency, fanouts, start_node)?;
+    count_latency(is_latency_pinned, absolute_latency, fanouts, start_node, stack)?;
     Ok(())
 }
 
@@ -98,7 +98,9 @@ struct LatencySolver<'d> {
     inputs : &'d [usize],
     outputs : &'d [usize],
 
-    part_of_path : Vec<bool>,
+    is_latency_pinned : Vec<bool>,
+
+    stack : Vec<LatencyStackElem<'d>>,
 
     // To find input latencies based on output latencies, we use a separate block to go backwards. 
     // These are done one at a time, such that we can find conflicting latencies. 
@@ -112,15 +114,24 @@ struct LatencySolver<'d> {
 impl<'d> LatencySolver<'d> {
     fn new(fanins : &'d [Vec<FanInOut>], fanouts : &'d [Vec<FanInOut>], inputs : &'d [usize], outputs : &'d [usize]) -> Self {
         assert!(fanins.len() == fanouts.len());
+        
+        for i in inputs {
+            assert!(fanins[*i].is_empty());
+        }
+        // Actually, outputs *can* have fanout. You can still use the value of an output to compute other stuff
+        // Inputs however, cannot have fanin
+        /*for o in outputs {
+            assert!(fanouts[*o].is_empty());
+        }*/
 
         // Initialize main buffers
-        let part_of_path : Vec<bool> = vec![false; fanouts.len()];
+        let is_latency_pinned : Vec<bool> = vec![false; fanouts.len()];
         let absolute_latencies_backward_temporary : Vec<i64> = vec![i64::MIN; fanouts.len()];
         let touched_backwards : Vec<bool> = vec![false; fanouts.len()];
         let output_was_covered : Vec<bool> = vec![false; outputs.len()];
         let input_node_assignments : Vec<i64> = vec![i64::MIN; inputs.len()];
 
-        Self{fanins, fanouts, inputs, outputs, part_of_path, absolute_latencies_backward_temporary, touched_backwards, output_was_covered, input_node_assignments}
+        Self{fanins, fanouts, inputs, outputs, stack : Vec::new(), is_latency_pinned, absolute_latencies_backward_temporary, touched_backwards, output_was_covered, input_node_assignments}
     }
     
     fn seed(&mut self) -> Result<(), LatencyCountingError> {
@@ -145,7 +156,7 @@ impl<'d> LatencySolver<'d> {
             for (input_wire, assignment) in zip(self.inputs.iter(), self.input_node_assignments.iter()) {
                 if *assignment != i64::MIN {
                     if absolute_latencies_forward[*input_wire] == i64::MIN {
-                        count_latency_from(&mut self.part_of_path, &mut absolute_latencies_forward, self.fanouts, *input_wire, *assignment)?;
+                        count_latency_from(&mut self.is_latency_pinned, &mut absolute_latencies_forward, self.fanouts, *input_wire, *assignment, &mut self.stack)?;
                     } else {
                         // Erroneous is unreachable, because conflicting assignments should have been caught when they're put into the input_node_assignments list
                         assert!(absolute_latencies_forward[*input_wire] == *assignment);
@@ -153,10 +164,7 @@ impl<'d> LatencySolver<'d> {
                     cur_num_valid_start_nodes += 1;
                 }
             }
-            if cur_num_valid_start_nodes == last_num_valid_start_nodes {
-                break;
-            }
-
+            if cur_num_valid_start_nodes == last_num_valid_start_nodes {break;}
             last_num_valid_start_nodes = cur_num_valid_start_nodes;
 
             // Find new backwards starting nodes
@@ -168,7 +176,7 @@ impl<'d> LatencySolver<'d> {
                         // new latency
                         // Reset temporary buffer
                         for v in &self.absolute_latencies_backward_temporary {assert!(*v == i64::MIN);}
-                        count_latency_from(&mut self.part_of_path, &mut self.absolute_latencies_backward_temporary, self.fanins, *output, -absolute_latencies_forward[*output])?;
+                        count_latency_from(&mut self.is_latency_pinned, &mut self.absolute_latencies_backward_temporary, self.fanins, *output, -absolute_latencies_forward[*output], &mut self.stack)?;
                         
                         for (input, assignment) in zip(self.inputs.iter(), self.input_node_assignments.iter_mut()) {
                             let found_inv_latency = self.absolute_latencies_backward_temporary[*input];
@@ -203,7 +211,7 @@ impl<'d> LatencySolver<'d> {
         invert_latency(&mut absolute_latencies_forward);
         for (start_node, fanin_of_output) in self.touched_backwards.iter().enumerate() {
             if *fanin_of_output && (absolute_latencies_forward[start_node] != i64::MIN) {
-                count_latency(&mut self.part_of_path, &mut absolute_latencies_forward, self.fanins, start_node)?;
+                count_latency(&mut self.is_latency_pinned, &mut absolute_latencies_forward, self.fanins, start_node, &mut self.stack)?;
             }
         }
         invert_latency(&mut absolute_latencies_forward);
@@ -378,7 +386,7 @@ mod tests {
 
         let should_be_err = solve_latencies_infer_ports(&graph);
 
-        assert!(matches!(should_be_err, Err(LatencyCountingError::PositiveNetLatencyCycle{cycle_nodes: _})))
+        assert!(matches!(should_be_err, Err(LatencyCountingError::PositiveNetLatencyCycle{conflict_nodes: _})))
     }
 }
 

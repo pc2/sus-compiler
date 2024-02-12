@@ -547,10 +547,17 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
             Err(err) => {
                 match err {
-                    LatencyCountingError::PositiveNetLatencyCycle { cycle_nodes } => {
-                        for n in cycle_nodes {
+                    LatencyCountingError::PositiveNetLatencyCycle { conflict_nodes } => {
+                        for n in conflict_nodes {
                             if let Some(source_location) = self.flattened.instructions[self.wires[WireID::from_hidden_value(n)].original_wire].get_location_of_module_part() {
                                 self.errors.error_basic(source_location, "This operation is part of a net-positive latency cycle");
+                            }
+                        }
+                    }
+                    LatencyCountingError::InsufficientLatencySlackBetweenSetWires { conflict_nodes } => {
+                        for n in conflict_nodes {
+                            if let Some(source_location) = self.flattened.instructions[self.wires[WireID::from_hidden_value(n)].original_wire].get_location_of_module_part() {
+                                self.errors.error_basic(source_location, "This operation is part of a path between latency fixed wires which contains too little latency slack");
                             }
                         }
                     }
