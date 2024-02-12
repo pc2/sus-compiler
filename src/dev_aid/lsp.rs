@@ -137,7 +137,6 @@ fn get_semantic_token_type_from_ide_token(tok : &IDEToken) -> u32 {
         IDETokenType::Comment => 0,
         IDETokenType::Keyword => 1,
         IDETokenType::Operator => 2,
-        IDETokenType::TimelineStage => 8,// EVENT seems to get a good colour
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Input)) => 4,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => 4,
         IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 3,

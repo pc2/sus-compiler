@@ -21,7 +21,6 @@ pub enum IDETokenType {
     Comment,
     Keyword,
     Operator,
-    TimelineStage,
     Identifier(IDEIdentifierType),
     Number,
     Invalid,
@@ -68,7 +67,6 @@ fn pretty_print(file_text : &str, tokens : &TokenizeResult, ide_infos : &[IDETok
             IDETokenType::Comment => Style::new().green().dim(),
             IDETokenType::Keyword => Style::new().blue(),
             IDETokenType::Operator => Style::new().white().bright(),
-            IDETokenType::TimelineStage => Style::new().red().bold(),
             IDETokenType::Identifier(IDEIdentifierType::Unknown) => Style::new().red().underlined(),
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Local)) => Style::new().blue().bright(),
             IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => Style::new().blue().bright().underlined(),
@@ -168,11 +166,7 @@ pub fn create_token_ide_info<'a>(parsed: &FileData, linker : &Linker) -> Vec<IDE
         } else if is_bracket(tok_typ) != IsBracket::NotABracket {
             IDETokenType::InvalidBracket // Brackets are initially invalid. They should be overwritten by the token_hierarchy step. The ones that don't get overwritten are invalid
         } else if is_symbol(tok_typ) {
-            if tok_typ == kw("#") {
-                IDETokenType::TimelineStage
-            } else {
-                IDETokenType::Operator
-            }
+            IDETokenType::Operator
         } else if tok_typ == TOKEN_IDENTIFIER {
             IDETokenType::Identifier(IDEIdentifierType::Unknown)
         } else if tok_typ == TOKEN_NUMBER {

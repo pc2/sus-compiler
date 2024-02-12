@@ -622,7 +622,7 @@ impl<'file> ASTParserContext<'file> {
         let (for_block, for_block_span) = self.eat_block(token_stream, kw("{"), "Block of for loop")?;
         let code = self.parse_code_block(for_block, for_block_span);
 
-        Some((Statement::For{var, range, code}, Span(for_token.tok_idx, for_block_span.1)))
+        Some((Statement::For{var, range, code}, Span::new_extend_before(for_token.tok_idx, for_block_span)))
     }
 
     fn parse_code_block(&mut self, block_tokens : &[TokenTreeNode], span : Span) -> CodeBlock {
@@ -678,7 +678,7 @@ impl<'file> ASTParserContext<'file> {
 
         let code = self.parse_code_block(block_tokens, block_span);
 
-        let span = Span(declaration_start_idx, token_stream.last_idx);
+        let span = Span::new_across_tokens(declaration_start_idx, token_stream.last_idx);
         
         let link_info = LinkInfo{
             file : self.errors.file,

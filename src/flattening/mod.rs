@@ -430,13 +430,8 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
         match expr {
             Expression::Named(local_idx) => {
                 let root = self.resolve_identifier(local_idx).expect_local("assignments")?;
-                let decl = self.instructions[root].extract_wire_declaration();
 
-                if decl.read_only {
-                    self.errors.error_with_info(span, "Cannot Assign to Read-Only value", vec![decl.make_declared_here(self.errors.file)]);
-                    return None
-                }
-                Some(ConnectionWrite{root, path : Vec::new(), span, is_declared_in_this_module : self.is_declared_in_this_module,})
+                Some(ConnectionWrite{root, path : Vec::new(), span, is_declared_in_this_module : self.is_declared_in_this_module})
             }
             Expression::Array(arr_box) => {
                 let (arr, idx_expr, _bracket_span) = arr_box.deref();
@@ -746,6 +741,11 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
                 }
                 Instruction::Write(conn) => {
                     let decl = self.instructions[conn.to.root].extract_wire_declaration();
+
+                    if decl.read_only {
+                        self.errors.error_with_info(conn.to.span, "Cannot Assign to Read-Only value", vec![decl.make_declared_here(self.errors.file)]);
+                    }
+
                     let from_wire = self.instructions[conn.from].extract_wire();
                     match conn.write_type {
                         WriteType::Connection{num_regs : _, regs_span : _} => {

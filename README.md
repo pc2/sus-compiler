@@ -65,10 +65,11 @@ The main goals of the language are roughly listed below:
 - [ ] Incremental Compilation
 - [ ] Multi-Threaded Compilation
 
-### Type and Bound Checking
+### Safety
 - [x] Basic Type Checking (bools, ints, arrays, etc)
 - [ ] Types for Interfaces
 - [ ] Integer and Array Bounds Checking
+- [ ] Conflicting assignments (such as calling the same module twice in a single cycle, multiple assignments to a single variable)
 
 ### Latency Counting
 - [x] Basic latency assignment algorithm

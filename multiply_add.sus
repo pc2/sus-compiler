@@ -257,9 +257,9 @@ module blur2 :
 
 
 module Tree_Multiply : int[4] values -> int total {
-    int a = values[0] * values[1];
-	int b = values[2] * values[3];
-	total = a * b;
+	reg int a = values[0] * values[1];
+	reg int b = values[2] * values[3];
+	reg total = a * b;
 }
 
 
@@ -272,7 +272,7 @@ module Accumulator : int term, bool done -> int total {
 
     int new_tot = tot + term;
     if done {
-        total = new_tot;
+        reg total = new_tot;
         tot = 0; // Must restore initial conditions
     } else {
         tot = new_tot;
