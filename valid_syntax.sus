@@ -2,9 +2,9 @@
 
 
 module multiply_add_valid : 
-	int a,
-	int b,
-	int c
+	int a'0,
+	int b'0,
+	int c'1
 	-> int total {
 
 	reg int tmp = a * b;
@@ -184,30 +184,41 @@ module disjoint_ports_valid : int a, int b, int c -> int result {
 
 module undeteriminable_input_latency_valid : int a, int b -> int x, int y {
 	reg int a_d = a;
-    reg int t = a_d + b;
-    reg reg reg int a_ddd = a;
-    x = t + a_ddd;
+    int t = a_d + b;
+    reg reg reg int a_dd = a;
+	reg int t_d = t;
+    x = t_d + a_dd;
     y = t;
 }
 
 module determinable_input_latency_valid : int a, int b -> int x, int y {
 	reg int a_d = a;
-    reg int t = a_d + b;
-    reg reg int a_ddd = a;
-    x = t + a_ddd;
+    int t = a_d + b;
+    reg reg int a_dd = a;
+	reg int t_d = t;
+    x = t_d + a_dd;
     y = t;
 }
 
 module specified_input_latency_valid : int a'0, int b'1 -> int x, int y {
 	reg int a_d = a;
-    reg int t = a_d + b;
-    reg reg reg int a_ddd = a;
-    x = t + a_ddd;
+    int t = a_d + b;
+    reg reg reg int a_dd = a;
+	reg int t_d = t;
+    x = t_d + a_dd;
     y = t;
 }
 
+module determinable : int a -> int x {
+	reg int a_d = a;
+    int t = a_d;
+    reg reg reg int a_dd = a;
+	reg int t_d = t;
+    x = t_d + a_dd;
+}
+
 module bad_cycle_valid : int a -> int r {
-	state int test;
+	state int test'0;
 	initial test = 0;
 
 	reg int new_test = test + a;

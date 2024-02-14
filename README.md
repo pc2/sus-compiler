@@ -76,8 +76,10 @@ The main goals of the language are roughly listed below:
 - [x] Net-positive latency cycles error
 - [x] Disjoint nodes error
 - [x] Indeterminable port latency
-- [ ] Latency Counting uses latency specifiers
-- [ ] Latency for output-only modules
+- [x] Latency Counting uses latency specifiers
+- [x] Latency for output-only modules
+- [ ] Latency Counting is invariant across arbitrary algorithm starting nodes
+- [ ] Latency Counting for "disjoint Input-Output blocks"
 - [ ] Integrate into Verilog generation
 - [ ] Negative Registers
 - [ ] Latency Cuts

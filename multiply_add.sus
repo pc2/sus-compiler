@@ -434,6 +434,10 @@ module permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[12
 
 
 
+module test_single_wire : int a -> int o {
+	o = a;
+}
+
 module disjoint_ports : int a, int b, int c -> int result {
 	reg result = a + b;
 	// don't touch c
@@ -441,26 +445,38 @@ module disjoint_ports : int a, int b, int c -> int result {
 
 module undeteriminable_input_latency : int a, int b -> int x, int y {
 	reg int a_d = a;
-    reg int t = a_d + b;
-    reg reg reg int a_ddd = a;
-    x = t + a_ddd;
+    int t = a_d + b;
+    reg reg reg int a_dd = a;
+	reg int t_d = t;
+    x = t_d + a_dd;
     y = t;
 }
 
 module determinable_input_latency : int a, int b -> int x, int y {
 	reg int a_d = a;
-    reg int t = a_d + b;
-    reg reg int a_ddd = a;
-    x = t + a_ddd;
+    int t = a_d + b;
+    reg reg int a_dd = a;
+	reg int t_d = t;
+    x = t_d + a_dd;
     y = t;
 }
 
 module specified_input_latency : int a'0, int b'1 -> int x, int y {
 	reg int a_d = a;
-    reg int t = a_d + b;
-    reg reg reg int a_ddd = a;
-    x = t + a_ddd;
+    int t = a_d + b;
+    reg reg reg int a_dd = a;
+	reg int t_d = t;
+    x = t_d + a_dd;
     y = t;
+}
+
+// This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible. 
+module determinable_because_no_input_output_ports : int a -> int x {
+	reg int a_d = a;
+    int t = a_d;
+    reg reg reg int a_dd = a;
+	reg int t_d = t;
+    x = t_d + a_dd;
 }
 
 module bad_cycle : int a -> int r {
@@ -481,4 +497,31 @@ module good_cycle : int a -> int r {
 	test = new_test;
 
 	r = new_test;
+}
+
+module input_only : int i -> {
+	state int loop;
+	initial loop = 0;
+	loop = loop + i;
+}
+
+module multiple_inputs_only : int i, int i2 -> {
+	state int loop;
+	initial loop = 0;
+	loop = loop + i + i2;
+}
+
+module output_only : -> int o {
+	state int loop;
+	initial loop = 0;
+	loop = loop + 1;
+	reg o = loop;
+}
+
+module multiple_outputs_only : -> int o, int o2 {
+	state int loop;
+	initial loop = 0;
+	loop = loop + 1;
+	reg o = loop;
+	reg reg o2 = loop;
 }

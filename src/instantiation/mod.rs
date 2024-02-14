@@ -17,7 +17,7 @@ impl UUIDMarker for SubModuleIDMarker {const DISPLAY_NAME : &'static str = "subm
 pub type SubModuleID = UUID<SubModuleIDMarker>;
 
 // Temporary value before proper latency is given
-pub const LATENCY_UNSET : i64 = i64::MIN;
+pub const CALCULATE_LATENCY_LATER : i64 = i64::MIN;
 
 #[derive(Debug)]
 pub struct ConnectFrom {
@@ -87,6 +87,7 @@ pub struct RealWire {
     pub original_wire : FlatID,
     pub typ : ConcreteType,
     pub name : Box<str>,
+    // Before latency counting, non i64::MIN values specify specified latency
     pub absolute_latency : i64
 }
 
@@ -335,7 +336,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let Instruction::Wire(wire) = &self.flattened.instructions[flat_id] else {unreachable!()};
                 let typ = self.concretize_type(&wire.typ, wire.span)?;
                 let name = self.get_unique_name();
-                Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id, typ, name, absolute_latency : LATENCY_UNSET}))
+                Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id, typ, name, absolute_latency : CALCULATE_LATENCY_LATER}))
             }
         }
     }
@@ -374,7 +375,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
         };
         let name = self.get_unique_name();
-        Some(self.wires.alloc(RealWire{name, typ, original_wire, source, absolute_latency : LATENCY_UNSET}))
+        Some(self.wires.alloc(RealWire{name, typ, original_wire, source, absolute_latency : CALCULATE_LATENCY_LATER}))
     }
     fn extend_condition(&mut self, condition : Option<WireID>, additional_condition : WireID, original_wire : FlatID) -> WireID {
         if let Some(condition) = condition {
@@ -387,7 +388,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     left : condition,
                     right : additional_condition
                 },
-                absolute_latency : LATENCY_UNSET})
+                absolute_latency : CALCULATE_LATENCY_LATER})
         } else {
             additional_condition
         }
@@ -420,7 +421,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             };
                             RealWireDataSource::Multiplexer{is_state, sources : Vec::new()}
                         };
-                        let wire_id = self.wires.alloc(RealWire{name: wire_decl.name.clone(), typ, original_wire, source, absolute_latency : LATENCY_UNSET});
+                        let absolute_latency = if let Some(spec) = &wire_decl.latency_specifier {
+                            self.extract_integer_from_value(self.get_generation_value(*spec)?, self.flattened.instructions[*spec].extract_wire().span)?
+                        } else {
+                            CALCULATE_LATENCY_LATER
+                        };
+                        let wire_id = self.wires.alloc(RealWire{name: wire_decl.name.clone(), typ, original_wire, source, absolute_latency});
                         if let Some(lat_spec_flat) = wire_decl.latency_specifier {
                             let val = self.get_generation_value(lat_spec_flat)?;
                             let specified_absolute_latency : i64 = self.extract_integer_from_value(val, self.flattened.instructions[lat_spec_flat].extract_wire().span)?;
@@ -470,7 +476,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                                     op : Operator{op_typ : kw("!")},
                                     right : condition_wire
                                 },
-                                absolute_latency : LATENCY_UNSET
+                                absolute_latency : CALCULATE_LATENCY_LATER
                             });
                             let else_cond = self.extend_condition(condition, else_condition_bool, original_wire);
                             self.instantiate_flattened_module(else_range, Some(else_cond));
@@ -518,12 +524,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             });
             fanin
         }).collect();
+        let initial_latencies : Vec<i64> = self.wires.iter().map(|(_id, wire)| wire.absolute_latency).collect();
         
         // Submodules Fanin
         //assert!(self.submodules.is_empty());
         for (_id, sub_mod) in &self.submodules {
-            for (self_input, submodule_input) in zip(sub_mod.wires.inputs(), sub_mod.instance.interface.inputs()) {
-                for (self_output, submodule_output) in zip(sub_mod.wires.outputs(), sub_mod.instance.interface.outputs()) {
+            for (self_output, submodule_output) in zip(sub_mod.wires.outputs(), sub_mod.instance.interface.outputs()) {
+                for (self_input, submodule_input) in zip(sub_mod.wires.inputs(), sub_mod.instance.interface.inputs()) {
                     
                     let delta_latency = sub_mod.instance.wires[*submodule_output].absolute_latency - sub_mod.instance.wires[*submodule_input].absolute_latency;
     
@@ -538,7 +545,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         let inputs : Vec<usize> = ports.inputs().iter().map(|input| input.get_hidden_value()).collect();
         let outputs : Vec<usize> = ports.outputs().iter().map(|input| input.get_hidden_value()).collect();
 
-        match solve_latencies(&fanins, &fanouts, &inputs, &outputs) {
+        
+        match solve_latencies(&fanins, &fanouts, &inputs, &outputs, initial_latencies) {
             Ok(latencies) => {
                 for (wire, lat) in zip(self.wires.iter_mut(), latencies.iter()) {
                     wire.1.absolute_latency = *lat;

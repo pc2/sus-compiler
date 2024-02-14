@@ -12,7 +12,7 @@ use crate::{
     dev_aid::syntax_highlighting::create_token_ide_info, 
     errors::{CompileError, ErrorCollector, ErrorLevel}, 
     flattening::FlatID, 
-    instantiation::{SubModuleOrWire, LATENCY_UNSET}, 
+    instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, 
     linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, 
     parser::perform_full_semantic_parse, 
     tokenizer::{CharLine, TokenizeResult}
@@ -327,7 +327,7 @@ fn gather_hover_infos(md: &Module, id: FlatID, is_generative : bool, file_cache:
                 if wire.original_wire != id {continue}
                 let typ_str = wire.typ.to_string(&file_cache.linker.types);
                 let name_str = &wire.name;
-                let latency_str = if wire.absolute_latency != LATENCY_UNSET {
+                let latency_str = if wire.absolute_latency != CALCULATE_LATENCY_LATER {
                     format!("{}", wire.absolute_latency)
                 } else {
                     "?".to_owned()
