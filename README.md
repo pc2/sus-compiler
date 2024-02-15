@@ -78,10 +78,10 @@ The main goals of the language are roughly listed below:
 - [x] Indeterminable port latency
 - [x] Latency Counting uses latency specifiers
 - [x] Latency for output-only modules
-- [ ] Latency Counting is invariant across arbitrary algorithm starting nodes
+- [x] Latency Counting is invariant across arbitrary algorithm starting nodes
 - [ ] Latency Counting for "disjoint Input-Output blocks"
 - [ ] Integrate into Verilog generation
-- [ ] Negative Registers
+- [ ] Latency Offsets
 - [ ] Latency Cuts
 
 ### LSP

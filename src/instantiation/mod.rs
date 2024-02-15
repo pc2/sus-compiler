@@ -4,6 +4,8 @@ use num::BigInt;
 
 use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, ast::{Operator, IdentifierType, Span, InterfacePorts}, errors::ErrorCollector, flattening::{Write, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instruction, WireInstance, WireSource, WriteType}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, tokenizer::kw, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{Value, compute_unary_op, compute_binary_op}};
 
+use self::latency_algorithm::SpecifiedLatency;
+
 pub mod latency_algorithm;
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
@@ -422,7 +424,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             RealWireDataSource::Multiplexer{is_state, sources : Vec::new()}
                         };
                         let absolute_latency = if let Some(spec) = &wire_decl.latency_specifier {
-                            self.extract_integer_from_value(self.get_generation_value(*spec)?, self.flattened.instructions[*spec].extract_wire().span)?
+                            if wire_decl.is_declared_in_this_module {
+                                self.extract_integer_from_value(self.get_generation_value(*spec)?, self.flattened.instructions[*spec].extract_wire().span)?
+                            } else {
+                                CALCULATE_LATENCY_LATER
+                            }
                         } else {
                             CALCULATE_LATENCY_LATER
                         };
@@ -517,14 +523,17 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     // Computes all latencies involved
     pub fn compute_latencies(&mut self, ports : &InterfacePorts<WireID>) -> Option<()> {
         // Wire to wire Fanin
-        let mut fanins : Vec<Vec<FanInOut>> = self.wires.iter().map(|(_id, wire)| {
+        let mut initial_latencies = Vec::new();
+        let mut fanins : Vec<Vec<FanInOut>> = self.wires.iter().map(|(id, wire)| {
             let mut fanin = Vec::new();
             wire.source.iter_sources_with_min_latency(&mut |from, delta_latency| {
                 fanin.push(FanInOut{other : from.get_hidden_value(), delta_latency});
             });
+            if wire.absolute_latency != CALCULATE_LATENCY_LATER {
+                initial_latencies.push(SpecifiedLatency { wire: id.get_hidden_value(), latency: wire.absolute_latency })
+            }
             fanin
         }).collect();
-        let initial_latencies : Vec<i64> = self.wires.iter().map(|(_id, wire)| wire.absolute_latency).collect();
         
         // Submodules Fanin
         //assert!(self.submodules.is_empty());
@@ -548,43 +557,46 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         
         match solve_latencies(&fanins, &fanouts, &inputs, &outputs, initial_latencies) {
             Ok(latencies) => {
-                for (wire, lat) in zip(self.wires.iter_mut(), latencies.iter()) {
-                    wire.1.absolute_latency = *lat;
+                for ((_id, wire), lat) in zip(self.wires.iter_mut(), latencies.iter()) {
+                    wire.absolute_latency = *lat;
+                    if *lat == CALCULATE_LATENCY_LATER {
+                        if let Some(source_location) = self.flattened.instructions[wire.original_wire].get_location_of_module_part() {
+                            self.errors.error_basic(source_location, format!("Latency Counting couldn't reach this node"));
+                        }
+                    }
                 }
                 Some(())
             }
             Err(err) => {
                 match err {
-                    LatencyCountingError::PositiveNetLatencyCycle { conflict_nodes } => {
-                        for n in conflict_nodes {
+                    LatencyCountingError::NetPositiveLatencyCycle { conflict_path, net_positive_latency_amount } => {
+                        for n in conflict_path {
                             if let Some(source_location) = self.flattened.instructions[self.wires[WireID::from_hidden_value(n)].original_wire].get_location_of_module_part() {
-                                self.errors.error_basic(source_location, "This operation is part of a net-positive latency cycle");
+                                self.errors.error_basic(source_location, format!("This operation is part of a net-positive latency cycle of {net_positive_latency_amount}"));
                             }
                         }
                     }
-                    LatencyCountingError::InsufficientLatencySlackBetweenSetWires { conflict_nodes } => {
-                        for n in conflict_nodes {
-                            if let Some(source_location) = self.flattened.instructions[self.wires[WireID::from_hidden_value(n)].original_wire].get_location_of_module_part() {
-                                self.errors.error_basic(source_location, "This operation is part of a path between latency fixed wires which contains too little latency slack");
-                            }
-                        }
-                    }
-                    LatencyCountingError::ConflictingPortLatency { bad_ports } => {
+                    LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
                         for port in bad_ports {
                             let port_decl = self.flattened.instructions[self.wires[WireID::from_hidden_value(port.0)].original_wire].extract_wire_declaration();
                             self.errors.error_basic(Span::new_single_token(port_decl.name_token), format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
                         }
                     }
-                    LatencyCountingError::DisjointNodes { start_node, nodes_not_reached } => {
-                        let start_port_decl = self.flattened.instructions[self.wires[WireID::from_hidden_value(start_node)].original_wire].extract_wire_declaration();
-
-                        for n in nodes_not_reached {
-                            if let Some(source_location) = self.flattened.instructions[self.wires[WireID::from_hidden_value(n)].original_wire].get_location_of_module_part() {
-                                self.errors.error_with_info(source_location, format!("Latency Counting couldn't reach this node from '{}'", start_port_decl.name), vec![start_port_decl.make_declared_here(self.errors.file)]);
-                            }
-                        }
+                    LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path, path_latency } => {
+                        let start_wire = &self.wires[WireID::from_hidden_value(*conflict_path.first().unwrap())];
+                        let end_wire = &self.wires[WireID::from_hidden_value(*conflict_path.last().unwrap())];
+                        let start_decl = self.flattened.instructions[start_wire.original_wire].extract_wire_declaration();
+                        let end_decl = self.flattened.instructions[end_wire.original_wire].extract_wire_declaration();
+                        let end_latency_decl = self.flattened.instructions[end_decl.latency_specifier.unwrap()].extract_wire();
+                        let reason = format!("Conflicting specified latency. The specified latency is {}, but the path from {} (specified at absolute latency {}) is at least {path_latency}", end_wire.absolute_latency, start_decl.name, start_wire.absolute_latency);
+                        self.errors.error_with_info(end_latency_decl.span, reason, vec![start_decl.make_declared_here(self.errors.file)]);
+                        /*for wire in conflict_path {
+                            let bad_wire = &self.wires[WireID::from_hidden_value(wire.0)];
+                            let decl = self.flattened.instructions[bad_wire.original_wire].extract_wire_declaration();
+                            let latency_decl = self.flattened.instructions[decl.latency_specifier.unwrap()].extract_wire();
+                            
+                        }*/
                     }
-                    LatencyCountingError::NotImplemented => {}
                 }
                 None
             }

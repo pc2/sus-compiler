@@ -452,19 +452,19 @@ module undeteriminable_input_latency : int a, int b -> int x, int y {
     y = t;
 }
 
-module determinable_input_latency : int a, int b -> int x, int y {
+module specified_input_latency : int a'0, int b'1 -> int x, int y {
 	reg int a_d = a;
     int t = a_d + b;
-    reg reg int a_dd = a;
+    reg reg reg int a_dd = a;
 	reg int t_d = t;
     x = t_d + a_dd;
     y = t;
 }
 
-module specified_input_latency : int a'0, int b'1 -> int x, int y {
+module determinable_input_latency : int a, int b -> int x, int y {
 	reg int a_d = a;
     int t = a_d + b;
-    reg reg reg int a_dd = a;
+    reg reg int a_dd = a;
 	reg int t_d = t;
     x = t_d + a_dd;
     y = t;
@@ -477,6 +477,12 @@ module determinable_because_no_input_output_ports : int a -> int x {
     reg reg reg int a_dd = a;
 	reg int t_d = t;
     x = t_d + a_dd;
+}
+
+// This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible. 
+module conflicting_latency_declarations : int a'1 -> int x'2 {
+	reg int nio = a;
+	reg x = nio;
 }
 
 module bad_cycle : int a -> int r {

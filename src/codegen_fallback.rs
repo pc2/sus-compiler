@@ -6,7 +6,7 @@ fn get_type_name_size(id : TypeUUID) -> u64 {
     if id == get_builtin_type("int") {
         32 // TODO concrete int sizes
     } else if id == get_builtin_type("bool") {
-        1 // TODO concrete int sizes
+        1
     } else {
         println!("TODO Named Structs Size");
         1 // todo!() // Named structs are not implemented yet
