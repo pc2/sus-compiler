@@ -1,3 +1,5 @@
+use crate::list_of_lists::ListOfLists;
+
 
 #[derive(Debug)]
 pub enum LatencyCountingError {
@@ -6,23 +8,18 @@ pub enum LatencyCountingError {
     IndeterminablePortLatency{bad_ports : Vec<(usize, i64, i64)>}
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct FanInOut {
     pub other : usize,
     pub delta_latency : i64
 }
 
-pub fn convert_fanin_to_fanout(fanins : &[Vec<FanInOut>]) -> Vec<Vec<FanInOut>> {
-    let mut fanouts : Vec<Vec<FanInOut>> = fanins.iter().map(|_| {
-        Vec::new()
-    }).collect();
-
-    for (id, fin) in fanins.iter().enumerate() {
-        for f in fin {
-            fanouts[f.other].push(FanInOut { other: id, delta_latency: f.delta_latency })
-        }
-    }
-
-    fanouts
+pub fn convert_fanin_to_fanout(fanins : &ListOfLists<FanInOut>) -> ListOfLists<FanInOut> {
+    ListOfLists::from_random_access_iterator(
+        fanins.len(),
+        fanins.iter_flattened().map(|v| v.other),
+        fanins.iter_flattened_by_bucket().map(|(bucket, &FanInOut{ other, delta_latency })| (other, FanInOut{other:bucket, delta_latency}))
+    )
 }
 
 struct LatencyStackElem<'d> {
@@ -39,7 +36,7 @@ struct LatencyStackElem<'d> {
 
     Leaves is_latency_pinned[start_node] == false
 */
-fn count_latency<'d>(is_latency_pinned : &mut [bool], absolute_latency : &mut [i64], fanouts : &'d [Vec<FanInOut>], start_node : usize, stack : &mut Vec<LatencyStackElem<'d>>) -> Result<(), LatencyCountingError> {
+fn count_latency<'d>(is_latency_pinned : &mut [bool], absolute_latency : &mut [i64], fanouts : &'d ListOfLists<FanInOut>, start_node : usize, stack : &mut Vec<LatencyStackElem<'d>>) -> Result<(), LatencyCountingError> {
     assert!(absolute_latency[start_node] != i64::MIN);
     
     assert!(stack.is_empty());
@@ -95,13 +92,13 @@ struct PortData {
 
 struct LatencySolverSide<'d> {
     sources : Vec<PortData>,
-    fanouts : &'d [Vec<FanInOut>],
+    fanouts : &'d ListOfLists<FanInOut>,
 
     precomputed_seed_nodes : Vec<i64>,
 }
 
 impl<'d> LatencySolverSide<'d> {
-    fn new(fanouts : &'d [Vec<FanInOut>], sources : &[usize]) -> Self {
+    fn new(fanouts : &'d ListOfLists<FanInOut>, sources : &[usize]) -> Self {
         Self{fanouts, sources : sources.iter().map(|w| PortData{wire:*w, already_covered: false, absolute_latency: i64::MIN}).collect(), precomputed_seed_nodes : vec![i64::MIN; fanouts.len()]}
     }
     fn push_to_destination_ports(destination_ports : &mut [PortData], latency_buffer : &mut [i64]) -> Result<bool, LatencyCountingError> {
@@ -172,7 +169,7 @@ impl<'d> LatencySolverSide<'d> {
             //assert!(self.is_latency_pinned[*output] == false);
             is_latency_pinned[port.wire] = true;
             temporary_buffer[port.wire] = port.absolute_latency;
-            count_latency(is_latency_pinned, temporary_buffer, self.fanouts, port.wire, stack)?;
+            count_latency(is_latency_pinned, temporary_buffer, &self.fanouts, port.wire, stack)?;
             is_latency_pinned[port.wire] = true;
             
             something_found |= Self::push_to_destination_ports(&mut destination.sources, temporary_buffer)?;
@@ -183,13 +180,13 @@ impl<'d> LatencySolverSide<'d> {
 }
 
 
-fn extract_solution<'d>(mut latencies : Vec<i64>, fanins : &'d [Vec<FanInOut>], is_latency_pinned : &mut [bool], stack : &mut Vec<LatencyStackElem<'d>>) -> Result<Vec<i64>, LatencyCountingError> {
+fn extract_solution<'d>(mut latencies : Vec<i64>, fanins : &'d ListOfLists<FanInOut>, is_latency_pinned : &mut [bool], stack : &mut Vec<LatencyStackElem<'d>>) -> Result<Vec<i64>, LatencyCountingError> {
     // Also add nodes in fanin not dependent on an input to this input-output cluster. 
     // Nodes in fanout are included implicitly due to forward being the default direction
     invert_latency(&mut latencies);
     for start_node in 0..fanins.len() {
         if latencies[start_node] != i64::MIN {
-            count_latency(is_latency_pinned, &mut latencies, fanins, start_node, stack)?;
+            count_latency(is_latency_pinned, &mut latencies, &fanins, start_node, stack)?;
         }
     }
     invert_latency(&mut latencies);
@@ -197,7 +194,7 @@ fn extract_solution<'d>(mut latencies : Vec<i64>, fanins : &'d [Vec<FanInOut>], 
     Ok(latencies)
 }
 
-pub fn solve_latencies<'d>(fanins : &'d [Vec<FanInOut>], fanouts : &'d [Vec<FanInOut>], inputs : &'d [usize], outputs : &'d [usize], mut specified_latencies : Vec<SpecifiedLatency>) -> Result<Vec<i64>, LatencyCountingError> {
+pub fn solve_latencies<'d>(fanins : &'d ListOfLists<FanInOut>, fanouts : &'d ListOfLists<FanInOut>, inputs : &'d [usize], outputs : &'d [usize], mut specified_latencies : Vec<SpecifiedLatency>) -> Result<Vec<i64>, LatencyCountingError> {
     assert!(fanins.len() == fanouts.len());
     let mut input_side = LatencySolverSide::new(fanouts, inputs);
     let mut output_side = LatencySolverSide::new(fanins, outputs);
@@ -237,7 +234,7 @@ pub fn solve_latencies<'d>(fanins : &'d [Vec<FanInOut>], fanouts : &'d [Vec<FanI
     }
     for source in &input_side.sources {
         if source.absolute_latency != i64::MIN {
-            count_latency(&mut is_latency_pinned, &mut resulting_forward_latencies, fanouts, source.wire, &mut stack)?;
+            count_latency(&mut is_latency_pinned, &mut resulting_forward_latencies, &fanouts, source.wire, &mut stack)?;
         }
     }
 
@@ -254,14 +251,15 @@ mod tests {
     }
 
     // makes inputs for fanins, outputs for fanouts
-    fn infer_ports(fanins : &[Vec<FanInOut>]) -> Vec<usize> {
+    fn infer_ports(fanins : &ListOfLists<FanInOut>) -> Vec<usize> {
         fanins.iter().enumerate().filter_map(|(idx, v)| v.is_empty().then_some(idx)).collect()
     }
 
-    fn solve_latencies_infer_ports(fanins : &[Vec<FanInOut>], specified_latencies : Vec<SpecifiedLatency>) -> Result<Vec<i64>, LatencyCountingError> {
+    fn solve_latencies_infer_ports(fanins : &ListOfLists<FanInOut>, specified_latencies : Vec<SpecifiedLatency>) -> Result<Vec<i64>, LatencyCountingError> {
+        let fanins = fanins.into();
         let fanouts = convert_fanin_to_fanout(fanins);
         
-        let inputs = infer_ports(&fanins);
+        let inputs = infer_ports(fanins);
         let outputs = infer_ports(&fanouts);
         
         solve_latencies(fanins, &fanouts, &inputs, &outputs, specified_latencies)
@@ -282,15 +280,16 @@ mod tests {
     
     #[test]
     fn check_correct_latency_basic() {
-        let fanins = [
-            /*0*/vec![],
-            /*1*/vec![mk_fan(0, 0)],
-            /*2*/vec![mk_fan(1, 1),mk_fan(5, 1)],
-            /*3*/vec![mk_fan(2, 0)],
-            /*4*/vec![],
-            /*5*/vec![mk_fan(4, 0),mk_fan(1, 1)],
-            /*6*/vec![mk_fan(5, 0)]
+        let fanins : [&[FanInOut]; 7] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 0)],
+            /*2*/&[mk_fan(1, 1),mk_fan(5, 1)],
+            /*3*/&[mk_fan(2, 0)],
+            /*4*/&[],
+            /*5*/&[mk_fan(4, 0),mk_fan(1, 1)],
+            /*6*/&[mk_fan(5, 0)]
         ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
 
         let correct_latencies = [0,0,2,2,1,1,1];
 
@@ -306,15 +305,16 @@ mod tests {
     
     #[test]
     fn check_correct_latency_backwards() {
-        let fanins = [
-            /*0*/vec![],
-            /*1*/vec![mk_fan(0, 0)],
-            /*2*/vec![mk_fan(1, 1),mk_fan(5, 1)],
-            /*3*/vec![mk_fan(2, 0)],
-            /*4*/vec![],
-            /*5*/vec![mk_fan(4, 0),mk_fan(1, 1)],
-            /*6*/vec![mk_fan(5, 0)]
+        let fanins : [&[FanInOut]; 7] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 0)],
+            /*2*/&[mk_fan(1, 1),mk_fan(5, 1)],
+            /*3*/&[mk_fan(2, 0)],
+            /*4*/&[],
+            /*5*/&[mk_fan(4, 0),mk_fan(1, 1)],
+            /*6*/&[mk_fan(5, 0)]
         ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
 
         let correct_latencies = [-1,-1,1,1,0,0,0];
 
@@ -330,15 +330,16 @@ mod tests {
     
     #[test]
     fn check_correct_latency_from_any_start_node() {
-        let fanins = [
-            /*0*/vec![],
-            /*1*/vec![mk_fan(0, 0)],
-            /*2*/vec![mk_fan(1, 1),mk_fan(5, 1)],
-            /*3*/vec![mk_fan(2, 0)],
-            /*4*/vec![],
-            /*5*/vec![mk_fan(4, 0),mk_fan(1, 1)],
-            /*6*/vec![mk_fan(5, 0)]
+        let fanins : [&[FanInOut]; 7] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 0)],
+            /*2*/&[mk_fan(1, 1),mk_fan(5, 1)],
+            /*3*/&[mk_fan(2, 0)],
+            /*4*/&[],
+            /*5*/&[mk_fan(4, 0),mk_fan(1, 1)],
+            /*6*/&[mk_fan(5, 0)]
         ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
 
         let correct_latencies = [0,0,2,2,1,1,1];
 
@@ -357,16 +358,17 @@ mod tests {
     
     #[test]
     fn check_correct_latency_with_superfluous_input() {
-        let fanins = [
-            /*0*/vec![],
-            /*1*/vec![mk_fan(0, 0)],
-            /*2*/vec![mk_fan(1, 1),mk_fan(5, 1)],
-            /*3*/vec![mk_fan(2, 0)],
-            /*4*/vec![],
-            /*5*/vec![mk_fan(4, 0),mk_fan(1, 1),mk_fan(7, 2)],
-            /*6*/vec![mk_fan(5, 0)],
-            /*7*/vec![] // superfluous input
+        let fanins : [&[FanInOut]; 8] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 0)],
+            /*2*/&[mk_fan(1, 1),mk_fan(5, 1)],
+            /*3*/&[mk_fan(2, 0)],
+            /*4*/&[],
+            /*5*/&[mk_fan(4, 0),mk_fan(1, 1),mk_fan(7, 2)],
+            /*6*/&[mk_fan(5, 0)],
+            /*7*/&[] // superfluous input
         ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
 
         let correct_latencies = [0,0,2,2,1,1,1,-1];
 
@@ -382,16 +384,17 @@ mod tests {
     
     #[test]
     fn check_correct_latency_with_superfluous_output() {
-        let fanins = [
-            /*0*/vec![],
-            /*1*/vec![mk_fan(0, 0)],
-            /*2*/vec![mk_fan(1, 1),mk_fan(5, 1)],
-            /*3*/vec![mk_fan(2, 0)],
-            /*4*/vec![],
-            /*5*/vec![mk_fan(4, 0),mk_fan(1, 1)],
-            /*6*/vec![mk_fan(5, 0)],
-            /*7*/vec![mk_fan(5, 2)] // superfluous output
+        let fanins : [&[FanInOut]; 8] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 0)],
+            /*2*/&[mk_fan(1, 1),mk_fan(5, 1)],
+            /*3*/&[mk_fan(2, 0)],
+            /*4*/&[],
+            /*5*/&[mk_fan(4, 0),mk_fan(1, 1)],
+            /*6*/&[mk_fan(5, 0)],
+            /*7*/&[mk_fan(5, 2)] // superfluous output
         ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
 
         let correct_latencies = [-1,-1,1,1,0,0,0,2];
 
@@ -407,15 +410,16 @@ mod tests {
     
     #[test]
     fn check_conflicting_port_latency() {
-        let fanins = [
-            /*0*/vec![],
-            /*1*/vec![mk_fan(0, 0)],
-            /*2*/vec![mk_fan(1, 3),mk_fan(5, 1)],
-            /*3*/vec![mk_fan(2, 0)],
-            /*4*/vec![],
-            /*5*/vec![mk_fan(4, 0),mk_fan(1, 1)],
-            /*6*/vec![mk_fan(5, 0)]
+        let fanins : [&[FanInOut]; 7] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 0)],
+            /*2*/&[mk_fan(1, 3),mk_fan(5, 1)],
+            /*3*/&[mk_fan(2, 0)],
+            /*4*/&[],
+            /*5*/&[mk_fan(4, 0),mk_fan(1, 1)],
+            /*6*/&[mk_fan(5, 0)]
         ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
 
         let should_be_err = solve_latencies_infer_ports(&fanins, Vec::new());
 
@@ -424,15 +428,16 @@ mod tests {
     
     #[test]
     fn check_conflicting_port_latency_with_any_starting_node_does_error() {
-        let fanins = [
-            /*0*/vec![],
-            /*1*/vec![mk_fan(0, 0)],
-            /*2*/vec![mk_fan(1, 3),mk_fan(5, 1)],
-            /*3*/vec![mk_fan(2, 0)],
-            /*4*/vec![],
-            /*5*/vec![mk_fan(4, 0),mk_fan(1, 1)],
-            /*6*/vec![mk_fan(5, 0)]
+        let fanins : [&[FanInOut]; 7] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 0)],
+            /*2*/&[mk_fan(1, 3),mk_fan(5, 1)],
+            /*3*/&[mk_fan(2, 0)],
+            /*4*/&[],
+            /*5*/&[mk_fan(4, 0),mk_fan(1, 1)],
+            /*6*/&[mk_fan(5, 0)]
         ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
 
         for starting_node in 0..7 {
             println!("starting_node: {starting_node}");
@@ -442,15 +447,16 @@ mod tests {
     
     #[test]
     fn check_conflicting_port_latency_resolved() {
-        let fanins = [
-            /*0*/vec![],
-            /*1*/vec![mk_fan(0, 0)],
-            /*2*/vec![mk_fan(1, 3),mk_fan(5, 1)],
-            /*3*/vec![mk_fan(2, 0)],
-            /*4*/vec![],
-            /*5*/vec![mk_fan(4, 0),mk_fan(1, 1)],
-            /*6*/vec![mk_fan(5, 0)]
+        let fanins : [&[FanInOut]; 7] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 0)],
+            /*2*/&[mk_fan(1, 3),mk_fan(5, 1)],
+            /*3*/&[mk_fan(2, 0)],
+            /*4*/&[],
+            /*5*/&[mk_fan(4, 0),mk_fan(1, 1)],
+            /*6*/&[mk_fan(5, 0)]
         ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
 
         let found_latencies = solve_latencies_infer_ports(&fanins, vec![SpecifiedLatency{wire:0,latency:0}, SpecifiedLatency{wire:4,latency:2}]).unwrap();
 
@@ -461,15 +467,16 @@ mod tests {
     
     #[test]
     fn check_conflicting_port_specifiers() {
-        let fanins = [
-            /*0*/vec![],
-            /*1*/vec![mk_fan(0, 0)],
-            /*2*/vec![mk_fan(1, 1),mk_fan(5, 1)],
-            /*3*/vec![mk_fan(2, 0)],
-            /*4*/vec![],
-            /*5*/vec![mk_fan(4, 0),mk_fan(1, 1)],
-            /*6*/vec![mk_fan(5, 0)]
+        let fanins : [&[FanInOut]; 7] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 0)],
+            /*2*/&[mk_fan(1, 1),mk_fan(5, 1)],
+            /*3*/&[mk_fan(2, 0)],
+            /*4*/&[],
+            /*5*/&[mk_fan(4, 0),mk_fan(1, 1)],
+            /*6*/&[mk_fan(5, 0)]
         ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
 
         let should_be_err = solve_latencies_infer_ports(&fanins, vec![SpecifiedLatency{wire: 0, latency : 0}, SpecifiedLatency{wire: 3, latency : 1}]);
 
@@ -479,15 +486,16 @@ mod tests {
     
     #[test]
     fn check_conflicting_inline_specifiers() {
-        let fanins = [
-            /*0*/vec![],
-            /*1*/vec![mk_fan(0, 0)],
-            /*2*/vec![mk_fan(1, 1),mk_fan(5, 1)],
-            /*3*/vec![mk_fan(2, 0)],
-            /*4*/vec![],
-            /*5*/vec![mk_fan(4, 0),mk_fan(1, 1)],
-            /*6*/vec![mk_fan(5, 0)]
+        let fanins : [&[FanInOut]; 7] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 0)],
+            /*2*/&[mk_fan(1, 1),mk_fan(5, 1)],
+            /*3*/&[mk_fan(2, 0)],
+            /*4*/&[],
+            /*5*/&[mk_fan(4, 0),mk_fan(1, 1)],
+            /*6*/&[mk_fan(5, 0)]
         ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
 
         let should_be_err = solve_latencies_infer_ports(&fanins, vec![SpecifiedLatency{wire: 1, latency : 0}, SpecifiedLatency{wire: 5, latency : 0}]);
 
@@ -496,11 +504,12 @@ mod tests {
     
     #[test]
     fn check_conflicting_inline_specifiers_bad_case() {
-        let fanins = [
-            /*0*/vec![],
-            /*1*/vec![mk_fan(2, 1)],
-            /*2*/vec![mk_fan(0, 1)],
+        let fanins : [&[FanInOut]; 3] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(2, 1)],
+            /*2*/&[mk_fan(0, 1)],
         ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
 
         let should_be_err = solve_latencies_infer_ports(&fanins, vec![SpecifiedLatency{wire: 0, latency : 0}, SpecifiedLatency{wire: 1, latency : 1}]);
         println!("{should_be_err:?}");
@@ -514,15 +523,16 @@ mod tests {
     
     #[test]
     fn check_disjoint() {
-        let fanins = [
-            /*0*/vec![],
-            /*1*/vec![mk_fan(0, 0)],
-            /*2*/vec![mk_fan(1, 3)],
-            /*3*/vec![mk_fan(2, 0)],
-            /*4*/vec![],
-            /*5*/vec![mk_fan(4, 0)],
-            /*6*/vec![mk_fan(5, 0)]
+        let fanins : [&[FanInOut]; 7] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 0)],
+            /*2*/&[mk_fan(1, 3)],
+            /*3*/&[mk_fan(2, 0)],
+            /*4*/&[],
+            /*5*/&[mk_fan(4, 0)],
+            /*6*/&[mk_fan(5, 0)]
         ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
 
         let partial_result = solve_latencies_infer_ports(&fanins, vec![SpecifiedLatency{ wire: 0, latency: 0 }]).unwrap();
 
@@ -531,13 +541,14 @@ mod tests {
     
     #[test]
     fn check_bad_cycle() {
-        let fanins = [
-            /*0*/vec![],
-            /*1*/vec![mk_fan(0, 0), mk_fan(4, -4)],
-            /*2*/vec![mk_fan(1, 3)],
-            /*3*/vec![mk_fan(2, 0)],
-            /*4*/vec![mk_fan(2, 2)],
+        let fanins : [&[FanInOut]; 5] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 0), mk_fan(4, -4)],
+            /*2*/&[mk_fan(1, 3)],
+            /*3*/&[mk_fan(2, 0)],
+            /*4*/&[mk_fan(2, 2)],
         ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
 
         let should_be_err = solve_latencies_infer_ports(&fanins, Vec::new());
 

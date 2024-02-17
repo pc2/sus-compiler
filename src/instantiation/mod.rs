@@ -2,7 +2,7 @@ use std::{cell::RefCell, iter::zip, ops::Deref, rc::Rc};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{UUID, UUIDMarker, FlatAlloc, UUIDRange}, ast::{Operator, IdentifierType, Span, InterfacePorts}, errors::ErrorCollector, flattening::{Write, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instruction, WireInstance, WireSource, WriteType}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, tokenizer::kw, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{Value, compute_unary_op, compute_binary_op}};
+use crate::{arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{IdentifierType, InterfacePorts, Operator, Span}, errors::ErrorCollector, flattening::{ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instruction, WireInstance, WireSource, Write, WriteType}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, list_of_lists::ListOfLists, tokenizer::kw, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{compute_binary_op, compute_unary_op, Value}};
 
 use self::latency_algorithm::SpecifiedLatency;
 
@@ -522,29 +522,31 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
     // Computes all latencies involved
     pub fn compute_latencies(&mut self, ports : &InterfacePorts<WireID>) -> Option<()> {
+        let mut fanins : ListOfLists<FanInOut> = ListOfLists::new_with_groups_capacity(self.wires.len());
+        
         // Wire to wire Fanin
         let mut initial_latencies = Vec::new();
-        let mut fanins : Vec<Vec<FanInOut>> = self.wires.iter().map(|(id, wire)| {
-            let mut fanin = Vec::new();
+        for (id, wire) in &self.wires {
+            fanins.new_group();
             wire.source.iter_sources_with_min_latency(&mut |from, delta_latency| {
-                fanin.push(FanInOut{other : from.get_hidden_value(), delta_latency});
+                fanins.push_to_last_group(FanInOut{other : from.get_hidden_value(), delta_latency});
             });
+
+            // Submodules Fanin
+            for (_id, sub_mod) in &self.submodules {
+                for (self_output, submodule_output) in zip(sub_mod.wires.outputs(), sub_mod.instance.interface.outputs()) {
+                    if *self_output != id {continue}
+                    for (self_input, submodule_input) in zip(sub_mod.wires.inputs(), sub_mod.instance.interface.inputs()) {
+                        
+                        let delta_latency = sub_mod.instance.wires[*submodule_output].absolute_latency - sub_mod.instance.wires[*submodule_input].absolute_latency;
+        
+                        fanins.push_to_last_group(FanInOut{other: self_input.get_hidden_value(), delta_latency});
+                    }
+                }
+            }
+
             if wire.absolute_latency != CALCULATE_LATENCY_LATER {
                 initial_latencies.push(SpecifiedLatency { wire: id.get_hidden_value(), latency: wire.absolute_latency })
-            }
-            fanin
-        }).collect();
-        
-        // Submodules Fanin
-        //assert!(self.submodules.is_empty());
-        for (_id, sub_mod) in &self.submodules {
-            for (self_output, submodule_output) in zip(sub_mod.wires.outputs(), sub_mod.instance.interface.outputs()) {
-                for (self_input, submodule_input) in zip(sub_mod.wires.inputs(), sub_mod.instance.interface.inputs()) {
-                    
-                    let delta_latency = sub_mod.instance.wires[*submodule_output].absolute_latency - sub_mod.instance.wires[*submodule_input].absolute_latency;
-    
-                    fanins[self_output.get_hidden_value()].push(FanInOut{other: self_input.get_hidden_value(), delta_latency});
-                }
             }
         }
         

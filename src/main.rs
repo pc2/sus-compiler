@@ -3,6 +3,8 @@
 mod util;
 mod block_vector;
 mod arena_alloc;
+mod list_of_lists;
+
 mod tokenizer;
 mod parser;
 mod errors;
