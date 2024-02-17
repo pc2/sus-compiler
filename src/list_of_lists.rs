@@ -45,14 +45,15 @@ impl<T> ListOfLists<T> {
         Runs through the entire iterator twice.
         Once to collect the size for each target group, and once to place all the results
 
-        MUST pass an iterator that iterates through the target indices first, then one that passes over the same indices with the data
+        MUST pass a cloneable iterator that iterates through all elements you wish to add. 
+        A clone of the iterator may not behave differently
     */
-    pub fn from_random_access_iterator<IndexIterT: Iterator<Item = usize>, IterT: Iterator<Item = (usize, T)>>(num_groups : usize, index_iter : IndexIterT, iter: IterT) -> Self {
+    pub fn from_random_access_iterator<IterT: Iterator<Item = (usize, T)> + Clone>(num_groups : usize, iter: IterT) -> Self {
         // We'll be reusing this vector for the resulting start_ends vector, so already have it at the right size
         // First we use the memory to collect group sizes
         let mut start_ends : Vec<usize> = vec![0; num_groups + 1];
 
-        for to_idx in index_iter {
+        for (to_idx, _) in iter.clone() {
             start_ends[to_idx+1] += 1;
         }
 
@@ -131,7 +132,7 @@ impl<'a, T> IndexMut<usize> for ListOfLists<T> {
 }
 
 
-
+#[derive(Debug, Clone)]
 pub struct ListOfListsFlatOriginIter<'a, T> {
     buf_iter : std::iter::Enumerate<std::slice::Iter<'a, T>>,
     ends : &'a [usize],
@@ -152,6 +153,7 @@ impl<'a, T> Iterator for ListOfListsFlatOriginIter<'a, T> {
     }
 }
 
+#[derive(Debug)]
 pub struct ListOfListsFlatOriginIterMut<'a, T> {
     buf_iter : std::iter::Enumerate<std::slice::IterMut<'a, T>>,
     ends : &'a [usize],
@@ -174,6 +176,7 @@ impl<'a, T> Iterator for ListOfListsFlatOriginIterMut<'a, T> {
 
 // Basic iterators
 
+#[derive(Debug, Clone)]
 pub struct ListOfListsIter<'a, T> {
     buf : &'a [T],
     start : usize,
@@ -191,6 +194,7 @@ impl<'a, T> Iterator for ListOfListsIter<'a, T> {
     }
 }
 
+#[derive(Debug)]
 pub struct ListOfListsIterMut<'a, T> {
     buf : &'a mut [T],
     start : usize,

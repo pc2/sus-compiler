@@ -17,7 +17,6 @@ pub struct FanInOut {
 pub fn convert_fanin_to_fanout(fanins : &ListOfLists<FanInOut>) -> ListOfLists<FanInOut> {
     ListOfLists::from_random_access_iterator(
         fanins.len(),
-        fanins.iter_flattened().map(|v| v.other),
         fanins.iter_flattened_by_bucket().map(|(bucket, &FanInOut{ other, delta_latency })| (other, FanInOut{other:bucket, delta_latency}))
     )
 }
