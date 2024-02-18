@@ -51,18 +51,20 @@ pub fn write_path_to_string(instance : &InstantiatedModule, path : &[ConnectToPa
     result
 }
 
-pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String {
-    let mut program_text : String = format!("module {}(\n\tinput clk, \n", md.link_info.name);
+pub fn write_verilog_code<Stream : std::fmt::Write>(md : &Module, instance : &InstantiatedModule, program_text : &mut Stream) -> Result<(), std::fmt::Error> {
+    // First output the interface of the module
+    writeln!(program_text, "module {}(", md.link_info.name)?;
+    writeln!(program_text, "\tinput clk,")?;
     for (real_port, is_input) in instance.interface.iter() {
         let wire = &instance.wires[real_port];
-        program_text.push_str(if is_input {"\tinput"} else {"\toutput /*mux_wire*/ reg"});
-        program_text.push_str(&typ_to_verilog_array(&wire.typ));
-        program_text.push(' ');
-        program_text.push_str(&wire.name);
-        program_text.push_str(",\n");
+        let input_or_output = if is_input {"input"} else {"output /*mux_wire*/ reg"};
+        let wire_typ = typ_to_verilog_array(&wire.typ);
+        let wire_name = &wire.name;
+        writeln!(program_text, "\t{input_or_output}{wire_typ} {wire_name},")?;
     }
-    program_text.push_str(");\n");
+    writeln!(program_text, ");\n")?;
 
+    // Then output all declarations, and the wires we can already assign
     for (_id, w) in &instance.wires {
         if let Instruction::Declaration(wire_decl) = &md.flattened.instructions[w.original_wire] {
             // Don't print named inputs and outputs, already did that in interface
@@ -79,66 +81,65 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
         } else {"wire"};
 
         let wire_name = &w.name;
-        program_text.push_str(wire_or_reg);
-        program_text.push_str(&typ_to_verilog_array(&w.typ));
-        program_text.push(' ');
-        program_text.push_str(wire_name);
+        let type_str = typ_to_verilog_array(&w.typ);
+        write!(program_text, "{wire_or_reg}{type_str} {wire_name}")?;
 
         match &w.source {
             RealWireDataSource::UnaryOp { op, right } => {
-                program_text.push_str(&format!(" = {}{};\n", get_token_type_name(op.op_typ), instance.wires[*right].name));
+                writeln!(program_text, " = {}{};", get_token_type_name(op.op_typ), instance.wires[*right].name)?;
             }
             RealWireDataSource::BinaryOp { op, left, right } => {
-                program_text.push_str(&format!(" = {} {} {};\n", instance.wires[*left].name, get_token_type_name(op.op_typ), instance.wires[*right].name));
+                writeln!(program_text, " = {} {} {};", instance.wires[*left].name, get_token_type_name(op.op_typ), instance.wires[*right].name)?;
             }
             RealWireDataSource::ArrayAccess { arr, arr_idx } => {
-                program_text.push_str(&format!(" = {}[{}];\n", instance.wires[*arr].name, instance.wires[*arr_idx].name));
+                writeln!(program_text, " = {}[{}];", instance.wires[*arr].name, instance.wires[*arr_idx].name)?;
             }
             RealWireDataSource::ConstArrayAccess { arr, arr_idx } => {
-                program_text.push_str(&format!(" = {}[{arr_idx}];\n", instance.wires[*arr].name));
+                writeln!(program_text, " = {}[{arr_idx}];", instance.wires[*arr].name)?;
             }
             RealWireDataSource::Constant { value } => {
-                program_text.push_str(&format!(" = {};\n", value.to_string()));
+                writeln!(program_text, " = {};", value.to_string())?;
             }
             RealWireDataSource::ReadOnly => {
-                program_text.push_str(";\n");
+                writeln!(program_text, ";")?;
             }
             RealWireDataSource::Multiplexer{is_state, sources : _} => {
-                program_text.push_str(";\n");
+                writeln!(program_text, ";")?;
                 if let Some(initial_value) = is_state {
                     if initial_value.is_valid() {
                         let initial_value_str = initial_value.to_string();
-                        program_text.push_str(&format!("initial {wire_name} = {initial_value_str};\n"));
+                        writeln!(program_text, "initial {wire_name} = {initial_value_str};")?;
                     }
                 }
             }
         }
     }
     
+    // Output all submodules
     for (_id, sm) in &instance.submodules {
-        program_text.push_str(&sm.instance.name);
-        program_text.push(' ');
-        program_text.push_str(&sm.name);
-        program_text.push_str("(\n.clk(clk)");
+        let sm_instance_name = &sm.instance.name;
+        let sm_name = &sm.name;
+        writeln!(program_text, "{sm_instance_name} {sm_name}(")?;
+        writeln!(program_text, ".clk(clk),")?;
         for (port, wire) in zip(sm.instance.interface.iter(), sm.wires.iter()) {
-            program_text.push_str(",\n.");
-            program_text.push_str(&sm.instance.wires[port.0].name);
-            program_text.push('(');
-            program_text.push_str(&instance.wires[wire.0].name);
-            program_text.push_str(")");
+            let port_name = &sm.instance.wires[port.0].name;
+            let wire_name = &instance.wires[wire.0].name;
+            writeln!(program_text, "\t.{port_name}({wire_name}),")?;
         }
-        program_text.push_str("\n);\n");
+        writeln!(program_text, ");")?;
     }
 
+    // For multiplexers, output 
     for (_id, w) in &instance.wires {
         match &w.source {
             RealWireDataSource::ReadOnly => {}
             RealWireDataSource::Multiplexer{is_state, sources} => {
                 let output_name = w.name.deref();
                 if is_state.is_some() {
-                    program_text.push_str(&format!("/*always_ff*/ always @(posedge clk) begin\n"));
+                    writeln!(program_text, "/*always_ff*/ always @(posedge clk) begin")?;
                 } else {
-                    program_text.push_str(&format!("/*always_comb*/ always @(*) begin\n\t{output_name} <= 1'bX; // Combinatorial wires are not defined when not valid\n"));
+                    writeln!(program_text, "/*always_comb*/ always @(*) begin")?;
+                    writeln!(program_text, "\t{output_name} <= 1'bX; // Combinatorial wires are not defined when not valid")?;
                 }
                 
                 for s in sources {
@@ -146,12 +147,12 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
                     let from_name = instance.wires[s.from.from].name.deref();
                     if let Some(cond) = s.from.condition {
                         let cond = instance.wires[cond].name.deref();
-                        program_text.push_str(&format!("\tif({cond}) begin {output_name}{path} <= {from_name}; end\n"));
+                        writeln!(program_text, "\tif({cond}) begin {output_name}{path} <= {from_name}; end")?;
                     } else {
-                        program_text.push_str(&format!("\t{output_name}{path} <= {from_name};\n"));
+                        writeln!(program_text, "\t{output_name}{path} <= {from_name};")?;
                     }
                 }
-                program_text.push_str("end\n");
+                writeln!(program_text, "end")?;
             }
             RealWireDataSource::UnaryOp{op : _, right : _} => {}
             RealWireDataSource::BinaryOp{op : _, left : _, right : _} => {}
@@ -161,7 +162,15 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String 
         }
     }
 
-    program_text.push_str("endmodule\n");
+    writeln!(program_text, "endmodule")?;
+
+    Ok(())
+}
+
+pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule) -> String {
+    let mut program_text = String::new();
+
+    write_verilog_code(md, instance, &mut program_text).unwrap();
 
     program_text
 }
