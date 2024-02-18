@@ -79,10 +79,9 @@ The main goals of the language are roughly listed below:
 - [x] Latency Counting uses latency specifiers
 - [x] Latency for output-only modules
 - [x] Latency Counting is invariant across arbitrary algorithm starting nodes
-- [ ] Latency Counting for "disjoint Input-Output blocks"
-- [ ] Integrate into Verilog generation
-- [ ] Latency Offsets
-- [ ] Latency Cuts
+- [x] Integrate into Verilog generation
+- [ ] Latency rebasing
+- [ ] Latency Cuts & Latency Counting for "disjoint Input-Output blocks"
 
 ### LSP
 - [x] Basic LSP for VSCode integration

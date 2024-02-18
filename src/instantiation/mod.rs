@@ -1,4 +1,4 @@
-use std::{cell::RefCell, iter::zip, ops::Deref, rc::Rc};
+use std::{cell::RefCell, cmp::max, iter::zip, ops::Deref, rc::Rc};
 
 use num::BigInt;
 
@@ -90,7 +90,8 @@ pub struct RealWire {
     pub typ : ConcreteType,
     pub name : Box<str>,
     // Before latency counting, non i64::MIN values specify specified latency
-    pub absolute_latency : i64
+    pub absolute_latency : i64,
+    pub needed_until : i64 // If needed only the same cycle it is generated, then this is absolue_latency.
 }
 
 #[derive(Debug)]
@@ -338,7 +339,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let Instruction::Wire(wire) = &self.flattened.instructions[flat_id] else {unreachable!()};
                 let typ = self.concretize_type(&wire.typ, wire.span)?;
                 let name = self.get_unique_name();
-                Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id, typ, name, absolute_latency : CALCULATE_LATENCY_LATER}))
+                Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id, typ, name, absolute_latency : CALCULATE_LATENCY_LATER, needed_until : CALCULATE_LATENCY_LATER}))
             }
         }
     }
@@ -377,7 +378,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
         };
         let name = self.get_unique_name();
-        Some(self.wires.alloc(RealWire{name, typ, original_wire, source, absolute_latency : CALCULATE_LATENCY_LATER}))
+        Some(self.wires.alloc(RealWire{name, typ, original_wire, source, absolute_latency : CALCULATE_LATENCY_LATER, needed_until : CALCULATE_LATENCY_LATER}))
     }
     fn extend_condition(&mut self, condition : Option<WireID>, additional_condition : WireID, original_wire : FlatID) -> WireID {
         if let Some(condition) = condition {
@@ -390,7 +391,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     left : condition,
                     right : additional_condition
                 },
-                absolute_latency : CALCULATE_LATENCY_LATER})
+                absolute_latency : CALCULATE_LATENCY_LATER, needed_until : CALCULATE_LATENCY_LATER})
         } else {
             additional_condition
         }
@@ -432,7 +433,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         } else {
                             CALCULATE_LATENCY_LATER
                         };
-                        let wire_id = self.wires.alloc(RealWire{name: wire_decl.name.clone(), typ, original_wire, source, absolute_latency});
+                        let wire_id = self.wires.alloc(RealWire{name: wire_decl.name.clone(), typ, original_wire, source, absolute_latency, needed_until : CALCULATE_LATENCY_LATER});
                         if let Some(lat_spec_flat) = wire_decl.latency_specifier {
                             let val = self.get_generation_value(lat_spec_flat)?;
                             let specified_absolute_latency : i64 = self.extract_integer_from_value(val, self.flattened.instructions[lat_spec_flat].extract_wire().span)?;
@@ -482,7 +483,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                                     op : Operator{op_typ : kw("!")},
                                     right : condition_wire
                                 },
-                                absolute_latency : CALCULATE_LATENCY_LATER
+                                absolute_latency : CALCULATE_LATENCY_LATER, needed_until : CALCULATE_LATENCY_LATER
                             });
                             let else_cond = self.extend_condition(condition, else_condition_bool, original_wire);
                             self.instantiate_flattened_module(else_range, Some(else_cond));
@@ -602,7 +603,21 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 }
                 None
             }
+        }?;
+
+        // Compute needed_untils
+        for id in self.wires.id_range() {
+            let wire = &self.wires[id];
+            let mut needed_until = wire.absolute_latency;
+            for target_fanout in &fanouts[id.get_hidden_value()] {
+                let target_wire = &self.wires[UUID::from_hidden_value(target_fanout.other)];
+
+                needed_until = max(needed_until, target_wire.absolute_latency);
+            }
+            self.wires[id].needed_until = needed_until;
         }
+
+        Some(())
     }
     
 
@@ -696,7 +711,7 @@ impl InstantiationList {
         
         let instance_id = 0; // Temporary, will always be 0 while not template arguments
         let instance = &cache_borrow[instance_id];
-        if instance.1.did_error.get() {
+        if !instance.1.did_error.get() {
             Some(instance.0.clone())
         } else {
             None

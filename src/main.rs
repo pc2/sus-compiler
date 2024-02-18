@@ -37,6 +37,7 @@ use linker::{Linker, ModuleUUID};
 fn codegen_to_file(linker : &Linker, id : ModuleUUID, md : &Module) -> Option<()> {
     let Some(inst) = linker.instantiate(id) else {
         println!("Module {} instantiation encountered errors.", md.link_info.name);
+
         return None;
     };
 
@@ -44,7 +45,7 @@ fn codegen_to_file(linker : &Linker, id : ModuleUUID, md : &Module) -> Option<()
 
     //println!("Generating Verilog for {module_name}:");
     // gen_ctx.to_circt();
-    let code = gen_verilog_code(md, &inst);
+    let code = gen_verilog_code(md, &inst, true);
 
     let mut out_file = File::create(format!("verilog_output/{module_name}.v")).unwrap();
     write!(out_file, "{}", code).unwrap();
