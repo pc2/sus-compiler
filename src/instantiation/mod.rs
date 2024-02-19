@@ -521,12 +521,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         Some(())
     }
 
-    // Computes all latencies involved
-    pub fn compute_latencies(&mut self, ports : &InterfacePorts<WireID>) -> Option<()> {
+    fn make_fanins(&self) -> (ListOfLists<FanInOut>, Vec<SpecifiedLatency>) {
         let mut fanins : ListOfLists<FanInOut> = ListOfLists::new_with_groups_capacity(self.wires.len());
+        let mut initial_latencies = Vec::new();
         
         // Wire to wire Fanin
-        let mut initial_latencies = Vec::new();
         for (id, wire) in &self.wires {
             fanins.new_group();
             wire.source.iter_sources_with_min_latency(&mut |from, delta_latency| {
@@ -534,6 +533,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             });
 
             // Submodules Fanin
+            // This creates two way connections, from any input i to output o it creates a |o| - |i| length connection, and a -(|o| - |i|) backward connection. This fixes them to be an exact latency apart. 
+            // This is O(lots) but doesn't matter, usually very few submodules. Fix this if needed
             for (_id, sub_mod) in &self.submodules {
                 for (self_output, submodule_output) in zip(sub_mod.wires.outputs(), sub_mod.instance.interface.outputs()) {
                     if *self_output != id {continue}
@@ -544,12 +545,29 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         fanins.push_to_last_group(FanInOut{other: self_input.get_hidden_value(), delta_latency});
                     }
                 }
+                // Also have to add inverse connections, such that the ports of the module are well and truly fixed together
+                for (self_input, submodule_input) in zip(sub_mod.wires.inputs(), sub_mod.instance.interface.inputs()) {
+                    if *self_input != id {continue}
+                    for (self_output, submodule_output) in zip(sub_mod.wires.outputs(), sub_mod.instance.interface.outputs()) {
+                        
+                        let delta_latency = sub_mod.instance.wires[*submodule_output].absolute_latency - sub_mod.instance.wires[*submodule_input].absolute_latency;
+        
+                        fanins.push_to_last_group(FanInOut{other: self_output.get_hidden_value(), delta_latency : -delta_latency});
+                    }
+                }
             }
 
             if wire.absolute_latency != CALCULATE_LATENCY_LATER {
                 initial_latencies.push(SpecifiedLatency { wire: id.get_hidden_value(), latency: wire.absolute_latency })
             }
         }
+
+        (fanins, initial_latencies)
+    }
+
+    // Computes all latencies involved
+    pub fn compute_latencies(&mut self, ports : &InterfacePorts<WireID>) -> Option<()> {
+        let (fanins, initial_latencies) = self.make_fanins();
         
         // Process fanouts
         let fanouts = convert_fanin_to_fanout(&fanins);

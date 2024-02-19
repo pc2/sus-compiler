@@ -1,7 +1,7 @@
 # SUS Language
 A Hardware Description Language focussed on strong type and temporal safety features
 
-Main Inspirations: TL-Verilog, Filament, Rust
+Main Inspirations: [TL-Verilog](https://arxiv.org/abs/1811.01780), [Filament](https://rachitnigam.com/files/pubs/filament.pdf), [Spade](https://spade-lang.org/), [Rust](https://www.rust-lang.org/)
 
 ## Core philosophy
 This project is an attempt to create a safety-first, correct-by-default HDL. It must make programming easier and safer without sacrificing on low level control. Much akin to what Rust is for the software industry. 
@@ -288,11 +288,12 @@ Constants specifically require that the modules the constant affect aren't being
 ### Temporal safety
 - Operations may only happen on data of the same 'time slice' within a stream
 - "Happens-before" relations -> proving FIFOs
+- LTL assertions of hardware
 
 ### Strong Typing
 - Actual data types
 - sized integers   (Min-max), not necessarily on power of 2 boundary
-- representation independent integers
+- representation independent integers?
 - Structs
 - Include Rust-style enum types?
 - operator overloading?
