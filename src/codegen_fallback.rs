@@ -76,18 +76,35 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
         result
     }
     
+    fn add_latency_registers(&mut self, w : &RealWire) -> Result<(), std::fmt::Error> {
+        if self.use_latency {
+            // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
+            for i in w.absolute_latency..w.needed_until {
+                let from = wire_name_with_latency(w, i, self.use_latency);
+                let to = wire_name_with_latency(w, i+1, self.use_latency);
+
+                writeln!(self.program_text, "always @(posedge clk) begin {to} <= {from}; end // Latency register")?;
+            }
+        }
+        Ok(())
+    }
+
     fn write_verilog_code(&mut self) -> Result<(), std::fmt::Error> {
         // First output the interface of the module
         writeln!(self.program_text, "module {}(", self.md.link_info.name)?;
         writeln!(self.program_text, "\tinput clk,")?;
         for (real_port, is_input) in self.instance.interface.iter() {
-            let wire = &self.instance.wires[real_port];
+            let port_wire = &self.instance.wires[real_port];
             let input_or_output = if is_input {"input"} else {"output /*mux_wire*/ reg"};
-            let wire_typ = typ_to_verilog_array(&wire.typ);
-            let wire_name = wire_name_self_latency(wire, self.use_latency);
+            let wire_typ = typ_to_verilog_array(&port_wire.typ);
+            let wire_name = wire_name_self_latency(port_wire, self.use_latency);
             writeln!(self.program_text, "\t{input_or_output}{wire_typ} {wire_name},")?;
         }
         writeln!(self.program_text, ");\n")?;
+        for (real_port, _is_input) in self.instance.interface.iter() {
+            let port_wire = &self.instance.wires[real_port];
+            self.add_latency_registers(port_wire)?;
+        }
 
         // Then output all declarations, and the wires we can already assign
         for (_id, w) in &self.instance.wires {
@@ -138,15 +155,7 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
                     }
                 }
             }
-            if self.use_latency {
-                // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
-                for i in w.absolute_latency..w.needed_until {
-                    let from = wire_name_with_latency(w, i, self.use_latency);
-                    let to = wire_name_with_latency(w, i+1, self.use_latency);
-
-                    writeln!(self.program_text, "always @(posedge clk) begin {to} <= {from}; end // Latency register")?;
-                }
-            }
+            self.add_latency_registers(w)?;
         }
         
         // Output all submodules
