@@ -125,15 +125,6 @@ pub struct FileData {
     pub associated_values : Vec<NameElem>
 }
 
-impl FileData {
-    pub fn get_token_text(&self, token_idx : usize) -> &str {
-        &self.file_text.file_text[self.file_text.get_token_range(token_idx)]
-    }
-    pub fn get_span_text(&self, span : Span) -> &str {
-        &self.file_text.file_text[self.file_text.get_span_range(span)]
-    }
-}
-
 #[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
 pub enum NameElem {
     Module(ModuleUUID),
@@ -526,7 +517,7 @@ impl<'linker> GlobalResolver<'linker> {
     }
 
     pub fn resolve_global<'error_collector>(&self, name_span : Span, errors : &'error_collector ErrorCollector) -> ResolvedNameElem<'linker, 'error_collector> {
-        let name = self.file.get_span_text(name_span);
+        let name = &self.file.file_text[name_span];
 
         let mut resolved_globals_borrow = self.resolved_globals.borrow_mut();
         let resolved_globals = resolved_globals_borrow.as_mut().unwrap();

@@ -1,9 +1,9 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{arena_alloc::ArenaVector, ast::*, file_position::{FileText, Span}, flattening::{Instruction, WireSource}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, NameElem}, parser::*, tokenizer::*};
+use crate::{arena_alloc::ArenaVector, ast::*, errors::{CompileError, ErrorLevel}, file_position::{FileText, Span}, flattening::{Instruction, WireSource}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, NameElem}, parser::*, tokenizer::*};
 
-use ariadne::FileCache;
+use ariadne::*;
 use console::Style;
 
 
@@ -219,9 +219,9 @@ fn generate_character_offsets(file_text : &FileText) -> Vec<Range<usize>> {
     character_offsets
 }
 
-pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<PathBuf, FileUUIDMarker>) {
+pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<(PathBuf, Source), FileUUIDMarker>) {
     let mut linker = Linker::new();
-    let mut paths_arena = ArenaVector::new();
+    let mut paths_arena : ArenaVector<(PathBuf, Source), FileUUIDMarker> = ArenaVector::new();
     for file_path in file_paths {
         let uuid = linker.reserve_file();
         let file_text = match std::fs::read_to_string(&file_path) {
@@ -236,8 +236,8 @@ pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<PathBuf, F
         
         println!("{:?}", full_parse.ast);
 
+        paths_arena.insert(uuid, (file_path, Source::from(&full_parse.file_text.file_text)));
         linker.add_reserved_file(uuid, full_parse);
-        paths_arena.insert(uuid, file_path);
     }
 
     linker.recompile_all();
@@ -245,16 +245,69 @@ pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<PathBuf, F
     (linker, paths_arena)
 }
 
-pub fn print_all_errors(linker : &Linker, paths_arena : &ArenaVector<PathBuf, FileUUIDMarker>) {
-    let mut file_cache : FileCache = Default::default();
-    
+
+struct CustomSpan {
+    file : FileUUID,
+    span : Range<usize>
+}
+impl ariadne::Span for CustomSpan {
+    type SourceId = FileUUID;
+
+    fn source(&self) -> &FileUUID { &self.file }
+    fn start(&self) -> usize { self.span.start }
+    fn end(&self) -> usize { self.span.end }
+}
+
+// Requires that character_ranges.len() == tokens.len() + 1 to include EOF token
+pub fn pretty_print_error<AriadneCache : Cache<FileUUID>>(error : &CompileError, file : FileUUID, character_ranges : &[Range<usize>], file_cache : &mut AriadneCache) {
+    // Generate & choose some colours for each of our elements
+    let (err_color, report_kind) = match error.level {
+        ErrorLevel::Error => (Color::Red, ReportKind::Error),
+        ErrorLevel::Warning => (Color::Yellow, ReportKind::Warning),
+    };
+    let info_color = Color::Blue;
+
+    let error_span = error.position.to_range(character_ranges);
+
+    let mut report: ReportBuilder<'_, CustomSpan> = Report::build(report_kind, file, error_span.start);
+    report = report
+        .with_message(&error.reason)
+        .with_label(
+            Label::new(CustomSpan{file : file, span : error_span})
+                .with_message(&error.reason)
+                .with_color(err_color)
+        );
+
+    for info in &error.infos {
+        let info_span = info.position.to_range(character_ranges);
+        report = report.with_label(
+            Label::new(CustomSpan{file : info.file, span : info_span})
+                .with_message(&info.info)
+                .with_color(info_color)
+        )
+    }
+
+    report.finish().eprint(file_cache).unwrap();
+}
+
+impl Cache<FileUUID> for ArenaVector<(PathBuf, Source), FileUUIDMarker> {
+    fn fetch(&mut self, id: &FileUUID) -> Result<&Source, Box<dyn std::fmt::Debug + '_>> {
+        Ok(&self[*id].1)
+    }
+    fn display<'a>(&self, id: &'a FileUUID) -> Option<Box<dyn std::fmt::Display + 'a>> {
+        let text : String = self[*id].0.to_string_lossy().into_owned();
+        Some(Box::new(text))
+    }
+}
+
+pub fn print_all_errors(linker : &Linker, paths_arena : &mut ArenaVector<(PathBuf, Source), FileUUIDMarker>) {
     for (file_uuid, f) in &linker.files {
         let token_offsets = generate_character_offsets(&f.file_text);
 
         let errors = linker.get_all_errors_in_file(file_uuid);
 
         for err in errors.get().0 {
-            err.pretty_print_error(f.parsing_errors.file, &token_offsets, &paths_arena, &mut file_cache);
+            pretty_print_error(&err, f.parsing_errors.file, &token_offsets, paths_arena);
         }
     }
 }

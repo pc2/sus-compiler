@@ -139,9 +139,9 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         return Ok(())
     }
 
-    let (linker, paths_arena) = compile_all(file_paths);
-    print_all_errors(&linker, &paths_arena);
-    for (id, path) in &paths_arena {
+    let (linker, mut paths_arena) = compile_all(file_paths);
+    print_all_errors(&linker, &mut paths_arena);
+    for (id, (path, _)) in &paths_arena {
         println!("\n\n[{}]: ", path.to_string_lossy());
         syntax_highlight_file(&linker, id, &settings);
     }

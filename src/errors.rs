@@ -1,9 +1,8 @@
 
 
-use std::{ops::Range, path::{Path, PathBuf}, cell::{RefCell, Cell}};
+use std::cell::{RefCell, Cell};
 
-use crate::{linker::{FileUUID, FileUUIDMarker}, arena_alloc::ArenaVector, file_position::Span};
-use ariadne::*;
+use crate::{linker::FileUUID, file_position::Span};
 
 use crate::tokenizer::{TokenTypeIdx, get_token_type_name};
 
@@ -28,77 +27,24 @@ pub struct CompileError {
     pub level : ErrorLevel
 }
 
-struct CustomSpan<'a> {
-    file : &'a Path,
-    span : Range<usize>
-}
-impl<'a> ariadne::Span for CustomSpan<'a> {
-    type SourceId = Path;
-
-    fn source(&self) -> &Self::SourceId { &self.file }
-    fn start(&self) -> usize { self.span.start }
-    fn end(&self) -> usize { self.span.end }
-}
-
-impl CompileError {
-    // Requires that character_ranges.len() == tokens.len() + 1 to include EOF token
-    pub fn pretty_print_error(&self, file : FileUUID, character_ranges : &[Range<usize>], paths : &ArenaVector<PathBuf, FileUUIDMarker>, file_cache : &mut FileCache) {
-        // Generate & choose some colours for each of our elements
-        let (err_color, report_kind) = match self.level {
-            ErrorLevel::Error => (Color::Red, ReportKind::Error),
-            ErrorLevel::Warning => (Color::Yellow, ReportKind::Warning),
-        };
-        let info_color = Color::Blue;
-
-        let error_span = self.position.to_range(character_ranges);
-
-        let file_path = &paths[file];
-
-        let mut report: ReportBuilder<'_, CustomSpan> = Report::build(report_kind, file_path, error_span.start);
-        report = report
-            .with_message(&self.reason)
-            .with_label(
-                Label::new(CustomSpan{file : file_path, span : error_span})
-                    .with_message(&self.reason)
-                    .with_color(err_color)
-            );
-
-        for info in &self.infos {
-            let info_span = info.position.to_range(character_ranges);
-            report = report.with_label(
-                Label::new(CustomSpan{file : &paths[info.file], span : info_span})
-                    .with_message(&info.info)
-                    .with_color(info_color)
-            )
-        }
-            /*.with_note(format!(
-                "Outputs of {} expressions must coerce to the same type",
-                "match".fg(out)
-            ))*/
-        report.finish()
-        .eprint(file_cache)
-        .unwrap();
-    }
-}
-
 pub fn error_info<S : Into<String>>(position : Span, file : FileUUID, reason : S) -> ErrorInfo {
     ErrorInfo{position, file, info : reason.into()}
 }
 
 pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
+    use std::fmt::Write;
+    
     assert!(!expected.is_empty());
     let mut result = String::new();
     for exp in expected.get(..expected.len() - 1).unwrap() {
-        result += "'";
-        result += get_token_type_name(*exp);
-        result += "',";
+        let tok_typ_name = get_token_type_name(*exp);
+        writeln!(&mut result, "'{tok_typ_name}',").unwrap();
     }
     if expected.len() >= 2 {
         result += " or ";
     }
-    result += "'";
-    result += get_token_type_name(expected[expected.len() - 1]);
-    result += "'";
+    let tok_typ_name = get_token_type_name(expected[expected.len() - 1]);
+    writeln!(&mut result, "'{tok_typ_name}'").unwrap();
     result
 }
 

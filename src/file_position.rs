@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::ops::{Index, Range};
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq,Hash)]
@@ -113,8 +113,6 @@ impl Ord for CharLine {
 }
 
 
-
-
 pub struct FileText {
     pub file_text : String,
     // List of all boundaries. Starts with 0, in whitespace mode, and then alternatingly switch to being a token, switch to being whitespace, back and forth
@@ -175,5 +173,13 @@ impl FileText {
 
     pub fn is_span_valid(&self, span : Span) -> bool {
         span.1 < self.num_tokens()
+    }
+}
+
+impl Index<Span> for FileText {
+    type Output = str;
+
+    fn index(&self, index: Span) -> &str {
+        &self.file_text[self.get_span_range(index)]
     }
 }
