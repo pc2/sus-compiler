@@ -8,7 +8,8 @@ use lsp_types::notification::Notification;
 
 use crate::{
     arena_alloc::ArenaVector, 
-    ast::{IdentifierType, Module, Span}, 
+    file_position::Span,
+    ast::{IdentifierType, Module}, 
     dev_aid::syntax_highlighting::create_token_ide_info, 
     errors::{CompileError, ErrorCollector, ErrorLevel}, 
     flattening::FlatID, 
@@ -223,7 +224,7 @@ fn cvt_span_to_lsp_range(ch_sp : Span, tokens : &TokenizeResult) -> lsp_types::R
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
 fn convert_diagnostic(err : CompileError, main_tokens : &TokenizeResult, linker : &Linker, uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
-    assert!(err.position.1 < main_tokens.token_types.len(), "bad error: {}", err.reason);
+    assert!(main_tokens.is_span_valid(err.position), "bad error: {}", err.reason);
     let error_pos = cvt_span_to_lsp_range(err.position, main_tokens);
 
     let severity = match err.level {
@@ -233,7 +234,7 @@ fn convert_diagnostic(err : CompileError, main_tokens : &TokenizeResult, linker 
     let mut related_info = Vec::new();
     for info in err.infos {
         let info_tokens = &linker.files[info.file].tokens;
-        assert!(info.position.1 < info_tokens.token_types.len(), "bad info: {}; in err: {}", info.info, err.reason);
+        assert!(info_tokens.is_span_valid(info.position), "bad info: {}; in err: {}", info.info, err.reason);
         let info_pos = cvt_span_to_lsp_range(info.position, info_tokens);
         let location = Location{uri : uris[info.file].clone(), range : info_pos};
         related_info.push(DiagnosticRelatedInformation { location, message: info.info });

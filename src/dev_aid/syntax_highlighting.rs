@@ -1,7 +1,7 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{ast::*, tokenizer::*, parser::*, linker::{FileData, Linker, FileUUIDMarker, FileUUID, NameElem}, arena_alloc::ArenaVector, flattening::{Instruction, WireSource}};
+use crate::{arena_alloc::ArenaVector, ast::*, file_position::Span, flattening::{Instruction, WireSource}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, NameElem}, parser::*, tokenizer::*};
 
 use ariadne::FileCache;
 use console::Style;

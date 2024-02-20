@@ -2,7 +2,7 @@ use std::{cell::RefCell, cmp::max, iter::zip, ops::Deref, rc::Rc};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{IdentifierType, InterfacePorts, Operator, Span}, errors::ErrorCollector, flattening::{ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instruction, WireInstance, WireSource, Write, WriteType}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, list_of_lists::ListOfLists, tokenizer::kw, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{compute_binary_op, compute_unary_op, Value}};
+use crate::{arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{IdentifierType, InterfacePorts, Operator}, errors::ErrorCollector, file_position::Span, flattening::{ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instruction, WireInstance, WireSource, Write, WriteType}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, list_of_lists::ListOfLists, tokenizer::kw, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{compute_binary_op, compute_unary_op, Value}};
 
 use self::latency_algorithm::SpecifiedLatency;
 

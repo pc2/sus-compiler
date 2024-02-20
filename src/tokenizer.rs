@@ -1,8 +1,8 @@
 use std::ops::Range;
 use std::str::CharIndices;
 
-use crate::ast::Span;
 use crate::errors::ErrorCollector;
+use crate::file_position::Span;
 use crate::util::const_str_position_in_tuples;
 
 pub type TokenTypeIdx = u8;
@@ -281,6 +281,10 @@ impl TokenizeResult {
                 return (idx - 1) / 2;
             }
         }
+    }
+
+    pub fn is_span_valid(&self, span : Span) -> bool {
+        span.1 < self.token_types.len()
     }
 }
 

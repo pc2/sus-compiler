@@ -2,7 +2,7 @@
 
 use std::{ops::Range, path::{Path, PathBuf}, cell::{RefCell, Cell}};
 
-use crate::{ast::Span, linker::{FileUUID, FileUUIDMarker}, arena_alloc::ArenaVector};
+use crate::{linker::{FileUUID, FileUUIDMarker}, arena_alloc::ArenaVector, file_position::Span};
 use ariadne::*;
 
 use crate::tokenizer::{TokenTypeIdx, get_token_type_name};

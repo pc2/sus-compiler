@@ -1,7 +1,7 @@
 
 use num::BigInt;
 
-use crate::{tokenizer::*, errors::*, ast::*, linker::FileUUID, flattening::FlattenedModule, instantiation::InstantiationList, value::Value};
+use crate::{ast::*, errors::*, file_position::{BracketSpan, Span}, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID, tokenizer::*, value::Value};
 
 use std::{iter::Peekable, ops::Range, str::FromStr};
 use core::slice::Iter;

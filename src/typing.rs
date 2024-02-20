@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{ast::{Operator, Span}, linker::{get_builtin_type, TypeUUID, Linker, Linkable, NamedType, TypeUUIDMarker}, tokenizer::kw, flattening::FlatID, errors::ErrorCollector, value::Value, arena_alloc::ArenaAllocator};
+use crate::{arena_alloc::ArenaAllocator, ast::Operator, errors::ErrorCollector, file_position::Span, flattening::FlatID, linker::{get_builtin_type, Linkable, Linker, NamedType, TypeUUID, TypeUUIDMarker}, tokenizer::kw, value::Value};
 
 // These are 
 #[derive(Debug, Clone)]

@@ -4,7 +4,7 @@ pub mod name_context;
 use std::{ops::Deref, iter::zip};
 
 use crate::{
-    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{AssignableExpressionModifiers, BracketSpan, CodeBlock, Expression, Identifier, IdentifierType, InterfacePorts, LeftExpression, Module, Operator, SignalDeclaration, Span, SpanExpression, SpanTypeExpression, Statement, TypeExpression}, errors::{error_info, ErrorCollector, ErrorInfo}, linker::{ConstantUUID, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker}, tokenizer::TOKEN_IDENTIFIER, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE}, value::Value
+    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{AssignableExpressionModifiers, CodeBlock, Expression, Identifier, IdentifierType, InterfacePorts, LeftExpression, Module, Operator, SignalDeclaration, SpanExpression, SpanTypeExpression, Statement, TypeExpression}, errors::{error_info, ErrorCollector, ErrorInfo}, file_position::{BracketSpan, Span}, linker::{ConstantUUID, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker}, tokenizer::TOKEN_IDENTIFIER, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE}, value::Value
 };
 
 use self::name_context::LocalVariableContext;

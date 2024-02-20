@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, rc::Rc, cell::RefCell};
 
-use crate::{arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, ast::{LinkInfo, Module, Span}, errors::{error_info, ErrorCollector}, flattening::{FlatID, FlattenedModule, Instruction, WireInstance, WireSource}, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode}, tokenizer::TokenizeResult, typing::{Type, WrittenType}, util::{const_str_position, const_str_position_in_tuples}, value::Value};
+use crate::{arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, ast::{LinkInfo, Module}, errors::{error_info, ErrorCollector}, file_position::Span, flattening::{FlatID, FlattenedModule, Instruction, WireInstance, WireSource}, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode}, tokenizer::TokenizeResult, typing::{Type, WrittenType}, util::{const_str_position, const_str_position_in_tuples}, value::Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModuleUUIDMarker;
@@ -464,7 +464,7 @@ impl<'linker> LocationInfoBuilder<'linker> {
     fn new(token_idx : usize) -> Self {
         Self{
             best_instruction : None,
-            best_span : Span(0, usize::MAX),
+            best_span : Span::MAX_POSSIBLE_SPAN,
             token_idx
         }
     }
