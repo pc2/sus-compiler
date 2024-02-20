@@ -154,6 +154,11 @@ impl Instruction {
         let Self::SubModule(sm) = self else {panic!("extract_wire on not a SubModule! Found {self:?}")};
         sm
     }
+    #[track_caller]
+    pub fn extract_write(&self) -> &Write {
+        let Self::Write(sm) = self else {panic!("extract_write on not a Write! Found {self:?}")};
+        sm
+    }
 
     pub fn for_each_embedded_type<F : FnMut(&Type, Span)>(&self, f : &mut F) {
         match self {

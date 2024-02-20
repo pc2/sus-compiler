@@ -495,6 +495,24 @@ module bad_cycle : int a -> int r {
 	r = new_test;
 }
 
+module module_taking_time : int data_in'0 -> int data_out'3 {
+	data_out = data_in;
+}
+
+module bad_cycle2 : int a -> int r {
+	state int test;
+	initial test = 0;
+
+	test = module_taking_time(test+a);
+
+	r = test;
+}
+
+module module_taking_a_lot_of_time : int data_in'0 -> int data_out'300 {
+	data_out = data_in;
+}
+
+
 module good_cycle : int a -> int r {
 	state int test;
 	initial test = 0;

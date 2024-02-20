@@ -1,11 +1,34 @@
 use crate::list_of_lists::ListOfLists;
 
 
+#[derive(Debug, Clone, Copy)]
+pub struct SpecifiedLatency {
+    pub wire : usize,
+    pub latency : i64
+}
+
 #[derive(Debug)]
 pub enum LatencyCountingError {
-    ConflictingSpecifiedLatencies{conflict_path : Vec<usize>, path_latency : i64},
-    NetPositiveLatencyCycle{conflict_path : Vec<usize>, net_positive_latency_amount : i64},
+    ConflictingSpecifiedLatencies{conflict_path : Vec<SpecifiedLatency>},
+    NetPositiveLatencyCycle{conflict_path : Vec<SpecifiedLatency>, net_roundtrip_latency : i64},
     IndeterminablePortLatency{bad_ports : Vec<(usize, i64, i64)>}
+}
+
+fn invert_lc_error(err : LatencyCountingError) -> LatencyCountingError {
+    match err {
+        LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path:_} => {
+            unreachable!("LatencyCountingError::ConflictingSpecifiedLatencies should not appear in backwards exploration, because port conflicts should have been found in the forward pass already");
+            // conflict_path.reverse();
+            // for c in &mut conflict_path {c.latency = -c.latency;}
+            // LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path, path_latency }
+        }
+        LatencyCountingError::NetPositiveLatencyCycle { mut conflict_path, net_roundtrip_latency } => {
+            conflict_path.reverse();
+            for c in &mut conflict_path {c.latency = -c.latency;}
+            LatencyCountingError::NetPositiveLatencyCycle { conflict_path, net_roundtrip_latency } 
+        }
+        other => other
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -49,11 +72,11 @@ fn count_latency<'d>(is_latency_pinned : &mut [bool], absolute_latency : &mut [i
                 if is_latency_pinned[other] {
                     // Positive latency cycle error detected!
                     return Err(if let Some(conflict_begin) = stack.iter().position(|elem| elem.node_idx == other) {
-                        let conflict_path = stack[conflict_begin..].iter().map(|elem| elem.node_idx).collect();
-                        LatencyCountingError::NetPositiveLatencyCycle { conflict_path, net_positive_latency_amount : to_node_min_latency - absolute_latency[other] }
+                        let conflict_path = stack[conflict_begin..].iter().map(|elem| SpecifiedLatency{wire : elem.node_idx, latency : absolute_latency[elem.node_idx]}).collect();
+                        LatencyCountingError::NetPositiveLatencyCycle { conflict_path, net_roundtrip_latency : to_node_min_latency - absolute_latency[start_node] }
                     } else {
-                        let conflict_path = stack.iter().map(|elem| elem.node_idx).chain(std::iter::once(other)).collect();
-                        LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path, path_latency : to_node_min_latency - absolute_latency[start_node] }
+                        let conflict_path = stack.iter().map(|elem| SpecifiedLatency{wire : elem.node_idx, latency : absolute_latency[elem.node_idx]}).chain(std::iter::once(SpecifiedLatency{wire : other, latency : to_node_min_latency})).collect();
+                        LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path }
                     });
                 } else {
                     absolute_latency[other] = to_node_min_latency;
@@ -76,11 +99,6 @@ fn invert_latency(latencies : &mut [i64]) {
             *lat = -*lat;
         }
     }
-}
-
-pub struct SpecifiedLatency {
-    pub wire : usize,
-    pub latency : i64
 }
 
 struct PortData {
@@ -212,11 +230,11 @@ pub fn solve_latencies<'d>(fanins : &'d ListOfLists<FanInOut>, fanouts : &'d Lis
     for l in &mut specified_latencies {
         l.latency = -l.latency;
     }
-    found_new_ports |= output_side.init_with_given_latencies(&specified_latencies, &mut input_side, &mut is_latency_pinned, &mut stack)?;
+    found_new_ports |= output_side.init_with_given_latencies(&specified_latencies, &mut input_side, &mut is_latency_pinned, &mut stack).map_err(invert_lc_error)?;
 
     while found_new_ports {
         found_new_ports = input_side.discover_connected_ports(&mut output_side, &mut temporary_buffer, &mut is_latency_pinned, &mut stack)?;
-        found_new_ports |= output_side.discover_connected_ports(&mut input_side, &mut temporary_buffer, &mut is_latency_pinned, &mut stack)?;
+        found_new_ports |= output_side.discover_connected_ports(&mut input_side, &mut temporary_buffer, &mut is_latency_pinned, &mut stack).map_err(invert_lc_error)?;
     }
 
     let mut resulting_forward_latencies = input_side.precomputed_seed_nodes;
@@ -480,7 +498,9 @@ mod tests {
         let should_be_err = solve_latencies_infer_ports(&fanins, vec![SpecifiedLatency{wire: 0, latency : 0}, SpecifiedLatency{wire: 3, latency : 1}]);
 
         println!("{should_be_err:?}");
-        assert!(matches!(should_be_err, Err(LatencyCountingError::ConflictingSpecifiedLatencies{conflict_path: _, path_latency : 2})))
+        let Err(LatencyCountingError::ConflictingSpecifiedLatencies{conflict_path}) = should_be_err else {unreachable!()};
+        let path_latency = conflict_path.last().unwrap().latency - conflict_path.first().unwrap().latency;
+        assert_eq!(path_latency, 2);
     }
     
     #[test]
@@ -498,7 +518,9 @@ mod tests {
 
         let should_be_err = solve_latencies_infer_ports(&fanins, vec![SpecifiedLatency{wire: 1, latency : 0}, SpecifiedLatency{wire: 5, latency : 0}]);
 
-        assert!(matches!(should_be_err, Err(LatencyCountingError::ConflictingSpecifiedLatencies{conflict_path: _, path_latency : 1})))
+        let Err(LatencyCountingError::ConflictingSpecifiedLatencies{conflict_path}) = should_be_err else {unreachable!()};
+        let path_latency = conflict_path.last().unwrap().latency - conflict_path.first().unwrap().latency;
+        assert_eq!(path_latency, 1);
     }
     
     #[test]
@@ -513,11 +535,14 @@ mod tests {
         let should_be_err = solve_latencies_infer_ports(&fanins, vec![SpecifiedLatency{wire: 0, latency : 0}, SpecifiedLatency{wire: 1, latency : 1}]);
         println!("{should_be_err:?}");
 
-        if let Err(LatencyCountingError::ConflictingSpecifiedLatencies{conflict_path, path_latency : 2}) = should_be_err {
-            assert_eq!(conflict_path, [0,2,1])
-        } else {
-            assert!(false);
-        }
+        
+        let Err(LatencyCountingError::ConflictingSpecifiedLatencies{conflict_path}) = should_be_err else {unreachable!()};
+        let path_latency = conflict_path.last().unwrap().latency - conflict_path.first().unwrap().latency;
+        assert_eq!(path_latency, 2);
+        
+        assert_eq!(conflict_path[0].wire, 0);
+        assert_eq!(conflict_path[1].wire, 2);
+        assert_eq!(conflict_path[2].wire, 1);
     }
     
     #[test]
@@ -551,7 +576,8 @@ mod tests {
 
         let should_be_err = solve_latencies_infer_ports(&fanins, Vec::new());
 
-        assert!(matches!(should_be_err, Err(LatencyCountingError::NetPositiveLatencyCycle{conflict_path: _, net_positive_latency_amount: 1})))
+        let Err(LatencyCountingError::NetPositiveLatencyCycle{conflict_path, net_roundtrip_latency}) = should_be_err else {unreachable!()};
+        assert_eq!(net_roundtrip_latency, 1);
     }
 }
 

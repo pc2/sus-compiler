@@ -26,7 +26,7 @@ pub struct ConnectFrom {
     pub num_regs : i64,
     pub from : WireID,
     pub condition : Option<WireID>,
-    pub original_wire : FlatID
+    pub original_connection : FlatID
 }
 
 #[derive(Debug)]
@@ -39,6 +39,18 @@ pub enum ConnectToPathElem {
 pub struct MultiplexerSource {
     pub path : Vec<ConnectToPathElem>,
     pub from : ConnectFrom
+}
+
+impl MultiplexerSource {
+    pub fn for_each_source<F : FnMut(WireID)>(&self, mut f : F) {
+        f(self.from.from);
+        for path_elem in &self.path {
+            match path_elem {
+                ConnectToPathElem::MuxArrayWrite { idx_wire } => {f(*idx_wire)}
+                ConnectToPathElem::ConstArrayWrite { idx:_ } => {}
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -254,7 +266,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
         Some(result)
     }
-    fn process_connection(&mut self, conn : &Write, original_wire : FlatID, condition : Option<WireID>) -> Option<()> {
+    fn process_connection(&mut self, conn : &Write, original_connection : FlatID, condition : Option<WireID>) -> Option<()> {
         match conn.write_type {
             WriteType::Connection{num_regs, regs_span : _} => {
                 match &self.generation_state[conn.to.root] {
@@ -268,7 +280,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             num_regs,
                             from,
                             condition,
-                            original_wire
+                            original_connection
                         };
                         
                         self.process_connection_to_wire(&conn.to.path, conn_from, deref_w)?;
@@ -590,10 +602,33 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
             Err(err) => {
                 match err {
-                    LatencyCountingError::NetPositiveLatencyCycle { conflict_path, net_positive_latency_amount } => {
-                        for n in conflict_path {
-                            if let Some(source_location) = self.flattened.instructions[self.wires[WireID::from_hidden_value(n)].original_wire].get_location_of_module_part() {
-                                self.errors.error_basic(source_location, format!("This operation is part of a net-positive latency cycle of {net_positive_latency_amount}"));
+                    LatencyCountingError::NetPositiveLatencyCycle { conflict_path, net_roundtrip_latency } => {
+                        let writes_involved = gather_all_mux_inputs(&self.wires, &conflict_path);
+                        assert!(!writes_involved.is_empty());
+                        let (first_write, later_writes) = writes_involved.split_first().unwrap();
+                        let first_write_desired_latency = first_write.to_latency + net_roundtrip_latency;
+                        let mut path_message = make_path_info_string(later_writes, first_write.to_latency, &first_write.to_wire.name);
+                        write_path_elem_to_string(&mut path_message, &first_write.to_wire.name, first_write_desired_latency, writes_involved.last().unwrap().to_latency);
+                        let unique_write_instructions = filter_unique_write_flats(&writes_involved, &self.flattened.instructions);
+                        let rest_of_message = format!(" part of a net-positive latency cycle of +{net_roundtrip_latency}\n\n{path_message}\nWhich conflicts with the starting latency");
+                        
+                        let mut did_place_error = false;
+                        for wr in &unique_write_instructions {
+                            match wr.write_type {
+                                WriteType::Connection { num_regs, regs_span } => {
+                                    if num_regs >= 1 {
+                                        did_place_error = true;
+                                        let this_register_plural = if num_regs == 1 {"This register is"} else {"These registers are"};
+                                        self.errors.error_basic(regs_span.unwrap(), format!("{this_register_plural}{rest_of_message}"));
+                                    }
+                                }
+                                WriteType::Initial => {unreachable!("Initial assignment can only be from compile-time constant. Cannot be part of latency loop. ")}
+                            }
+                        }
+                        // Fallback if no register annotations used
+                        if !did_place_error {
+                            for wr in unique_write_instructions {
+                                self.errors.error_basic(wr.to.span, format!("This write is{rest_of_message}"));
                             }
                         }
                     }
@@ -603,20 +638,22 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             self.errors.error_basic(Span::new_single_token(port_decl.name_token), format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
                         }
                     }
-                    LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path, path_latency } => {
-                        let start_wire = &self.wires[WireID::from_hidden_value(*conflict_path.first().unwrap())];
-                        let end_wire = &self.wires[WireID::from_hidden_value(*conflict_path.last().unwrap())];
+                    LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path } => {
+                        let start_wire = &self.wires[WireID::from_hidden_value(conflict_path.first().unwrap().wire)];
+                        let end_wire = &self.wires[WireID::from_hidden_value(conflict_path.last().unwrap().wire)];
                         let start_decl = self.flattened.instructions[start_wire.original_wire].extract_wire_declaration();
                         let end_decl = self.flattened.instructions[end_wire.original_wire].extract_wire_declaration();
                         let end_latency_decl = self.flattened.instructions[end_decl.latency_specifier.unwrap()].extract_wire();
-                        let reason = format!("Conflicting specified latency. The specified latency is {}, but the path from {} (specified at absolute latency {}) is at least {path_latency}", end_wire.absolute_latency, start_decl.name, start_wire.absolute_latency);
+                        
+
+                        let writes_involved = gather_all_mux_inputs(&self.wires, &conflict_path);
+                        let path_message = make_path_info_string(&writes_involved, start_wire.absolute_latency, &start_wire.name);
+                        //assert!(!writes_involved.is_empty());
+
+                        let end_name = &end_wire.name;
+                        let specified_end_latency = end_wire.absolute_latency;
+                        let reason = format!("Conflicting specified latency\n\n{path_message}\nBut this was specified as {end_name}'{specified_end_latency}");
                         self.errors.error_with_info(end_latency_decl.span, reason, vec![start_decl.make_declared_here(self.errors.file)]);
-                        /*for wire in conflict_path {
-                            let bad_wire = &self.wires[WireID::from_hidden_value(wire.0)];
-                            let decl = self.flattened.instructions[bad_wire.original_wire].extract_wire_declaration();
-                            let latency_decl = self.flattened.instructions[decl.latency_specifier.unwrap()].extract_wire();
-                            
-                        }*/
                     }
                 }
                 None
@@ -680,6 +717,76 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         Some(interface)
     }
+}
+
+
+struct PathMuxSource<'s> {
+    to_wire : &'s RealWire,
+    to_latency : i64,
+    mux_input : &'s MultiplexerSource
+}
+fn gather_all_mux_inputs<'w>(wires : &'w FlatAlloc<RealWire, WireIDMarker>, conflict_iter : &[SpecifiedLatency]) -> Vec<PathMuxSource<'w>> {
+    let mut connection_list = Vec::new();
+    for window in conflict_iter.windows(2) {
+        let [from, to] = window else {unreachable!()};
+        let from_wire_id = WireID::from_hidden_value(from.wire);
+        //let from_wire = &self.wires[from_wire_id];
+        let to_wire_id = WireID::from_hidden_value(to.wire);
+        let to_wire = &wires[to_wire_id];
+        let RealWireDataSource::Multiplexer { is_state:_, sources } = &to_wire.source else {continue}; // We can only name multiplexers
+
+        //let decl_id = to_wire.original_wire;
+        //let Instruction::Declaration(decl) = &self.flattened.instructions[decl_id] else {unreachable!()};
+
+        for s in sources {
+            let mut predecessor_found = false;
+            s.for_each_source(|source| {
+                if source == from_wire_id {
+                    predecessor_found = true;
+                }
+            });
+            if predecessor_found {
+                connection_list.push(PathMuxSource{to_wire, mux_input : s, to_latency : to.latency});
+            }
+        }
+    }
+    connection_list
+}
+
+fn write_path_elem_to_string(result : &mut String, decl_name : &str, to_absolute_latency : i64, prev_absolute_latency : i64) {
+    use std::fmt::Write;
+
+    let delta_latency = to_absolute_latency - prev_absolute_latency;
+
+    let plus_sign = if delta_latency >= 0 {"+"} else {""};
+
+    writeln!(result, "-> {decl_name}'{to_absolute_latency} ({plus_sign}{delta_latency})").unwrap();
+}
+fn make_path_info_string(writes : &[PathMuxSource<'_>], from_latency : i64, from_name : &str) -> String {
+   let mut prev_decl_absolute_latency = from_latency;
+    let mut result = format!("{from_name}'{prev_decl_absolute_latency}\n");
+
+    for wr in writes {
+        let decl_name = &wr.to_wire.name;
+
+        let to_absolute_latency = wr.to_latency;
+        
+        write_path_elem_to_string(&mut result, &decl_name, to_absolute_latency, prev_decl_absolute_latency);
+
+        prev_decl_absolute_latency = to_absolute_latency;
+    }
+
+    result
+}
+
+fn filter_unique_write_flats<'w>(writes : &'w [PathMuxSource<'w>], instructions : &'w FlatAlloc<Instruction, FlatIDMarker>) -> Vec<&'w crate::flattening::Write> {
+    let mut result : Vec<&'w crate::flattening::Write> = Vec::new();
+    for w in writes {
+        let original_write = instructions[w.mux_input.from.original_connection].extract_write();
+        
+        if !result.iter().any(|found_write| std::ptr::eq(*found_write, original_write)) {result.push(original_write)}
+    }
+    result
 }
 
 
