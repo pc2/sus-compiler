@@ -1,7 +1,7 @@
 
 use num::BigInt;
 
-use crate::{ast::*, errors::*, file_position::{BracketSpan, Span}, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID, tokenizer::*, value::Value};
+use crate::{ast::*, errors::*, file_position::{BracketSpan, FileText, Span}, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID, tokenizer::*, value::Value};
 
 use std::{iter::Peekable, ops::Range, str::FromStr};
 use core::slice::Iter;
@@ -51,11 +51,11 @@ struct TokenHierarchyStackElem {
     parent : Vec<TokenTreeNode>
 }
 
-pub fn to_token_hierarchy(tokens : &TokenizeResult, errors : &ErrorCollector) -> Vec<TokenTreeNode> {
+pub fn to_token_hierarchy(token_types : &[TokenTypeIdx], file_text : &FileText, errors : &ErrorCollector) -> Vec<TokenTreeNode> {
     let mut cur_token_slab : Vec<TokenTreeNode> = Vec::new();
     let mut stack : Vec<TokenHierarchyStackElem> = Vec::new(); // Type of opening bracket, token position, Token Subtree
 
-    for (tok_idx, &tok_typ) in tokens.token_types.iter().enumerate() {
+    for (tok_idx, &tok_typ) in token_types.iter().enumerate() {
         if tok_typ == TOKEN_COMMENT || tok_typ == TOKEN_INVALID { // At this stage the comments are filtered out
             continue;
         }
@@ -78,7 +78,7 @@ pub fn to_token_hierarchy(tokens : &TokenizeResult, errors : &ErrorCollector) ->
                                 stack.push(cur_block); // Push the previous bracket back onto bracket stack, as we disregarded erroneous closing bracket
                                 break;
                             } else {
-                                error_unclosed_bracket(cur_block.open_bracket_pos, tokens.token_types[cur_block.open_bracket_pos], tok_idx, errors);
+                                error_unclosed_bracket(cur_block.open_bracket_pos, token_types[cur_block.open_bracket_pos], tok_idx, errors);
                             }
                         }
                     } else {
@@ -89,7 +89,7 @@ pub fn to_token_hierarchy(tokens : &TokenizeResult, errors : &ErrorCollector) ->
                 }
             },
             IsBracket::NotABracket => {
-                cur_token_slab.push(TokenTreeNode::PlainToken{tok_typ, range : tokens.get_token_range(tok_idx), tok_idx});
+                cur_token_slab.push(TokenTreeNode::PlainToken{tok_typ, range : file_text.get_token_range(tok_idx), tok_idx});
             }
         }
     }
@@ -720,8 +720,8 @@ pub fn parse<'nums, 'g, 'file>(token_hierarchy : &Vec<TokenTreeNode>, file_text 
 
 
 pub struct FullParseResult {
-    pub file_text : String,
-    pub tokens : TokenizeResult,
+    pub file_text : FileText,
+    pub tokens : Vec<TokenTypeIdx>,
     pub token_hierarchy : Vec<TokenTreeNode>,
     pub ast : ASTRoot
 }
@@ -729,11 +729,13 @@ pub struct FullParseResult {
 pub fn perform_full_semantic_parse<'txt>(file_text : String, file : FileUUID) -> FullParseResult {
     let errors = ErrorCollector::new(file);
 
-    let tokens = tokenize(&file_text, &errors);
+    let (tokens, token_boundaries) = tokenize(&file_text, &errors);
 
-    let token_hierarchy = to_token_hierarchy(&tokens, &errors);
+    let file_text = FileText::new(file_text, token_boundaries);
+    
+    let token_hierarchy = to_token_hierarchy(&tokens, &file_text, &errors);
 
-    let ast = parse(&token_hierarchy, &file_text, Span::whole_file_span(&tokens), errors);
+    let ast = parse(&token_hierarchy, &file_text.file_text, file_text.whole_file_span(), errors);
 
     FullParseResult{
         file_text,

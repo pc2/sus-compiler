@@ -1,12 +1,8 @@
 use std::ops::Range;
 
-use crate::tokenizer::TokenizeResult;
-
-
-
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq,Hash)]
-pub struct Span(pub usize, pub usize);
+pub struct Span(usize, usize);
 
 impl Span {
     pub const MAX_POSSIBLE_SPAN : Span = Span(0, usize::MAX);
@@ -39,9 +35,6 @@ impl Span {
     pub fn new_across_tokens(start_tok : usize, end_tok : usize) -> Span {
         assert!(start_tok <= end_tok);
         Span(start_tok, end_tok)
-    }
-    pub fn whole_file_span(tokens : &TokenizeResult) -> Span {
-        Span(0, tokens.token_types.len())
     }
     pub fn contains_token(&self, token_idx : usize) -> bool {
         token_idx >= self.0 && token_idx <= self.1
@@ -102,3 +95,85 @@ impl BracketSpan {
 }
 
 
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct CharLine {
+    pub line : usize,
+    pub character : usize
+}
+impl PartialOrd for CharLine {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for CharLine {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.line.cmp(&other.line).then(self.character.cmp(&other.character))
+    }
+}
+
+
+
+
+pub struct FileText {
+    pub file_text : String,
+    // List of all boundaries. Starts with 0, in whitespace mode, and then alternatingly switch to being a token, switch to being whitespace, back and forth
+    // The span of token i is given by token_boundaries[i*2+1..i*2+2]
+    // Ends at the end of the file, with a final whitespace block
+    token_boundaries : Vec<usize>,
+    token_boundaries_as_char_lines : Vec<CharLine>
+}
+
+impl FileText {
+    pub fn new(file_text : String, token_boundaries : Vec<usize>) -> Self {
+        let mut cur_position = CharLine{line: 0, character: 0};
+        let mut start = 0;
+        let token_boundaries_as_char_lines = token_boundaries.iter().map(|part_end| {
+            for c in file_text[start..*part_end].chars() {
+                if c == '\n' {
+                    cur_position.line += 1;
+                    cur_position.character = 0;
+                } else {
+                    cur_position.character += 1;
+                }
+            }
+            start = *part_end;
+            cur_position
+        }).collect();
+
+        FileText{file_text, token_boundaries, token_boundaries_as_char_lines}
+    }
+    
+    pub fn num_tokens(&self) -> usize {
+        (self.token_boundaries.len() - 2) / 2
+    }
+    pub fn get_token_range(&self, token_idx : usize) -> Range<usize> {
+        self.token_boundaries[token_idx*2+1]..self.token_boundaries[token_idx*2+2]
+    }
+    pub fn get_token_linechar_range(&self, token_idx : usize) -> Range<CharLine> {
+        self.token_boundaries_as_char_lines[token_idx*2+1]..self.token_boundaries_as_char_lines[token_idx*2+2]
+    }
+    pub fn get_span_range(&self, span : Span) -> Range<usize> {
+        self.token_boundaries[span.0*2+1]..self.token_boundaries[span.1*2+2]
+    }
+    pub fn get_span_linechar_range(&self, span : Span) -> Range<CharLine> {
+        self.token_boundaries_as_char_lines[span.0*2+1]..self.token_boundaries_as_char_lines[span.1*2+2]
+    }
+
+    pub fn get_token_on_or_left_of(&self, char_line : CharLine) -> usize {
+        match self.token_boundaries_as_char_lines.binary_search(&char_line) {
+            Ok(idx) | Err(idx) => {
+                assert!(idx >= 1);
+                return (idx - 1) / 2;
+            }
+        }
+    }
+
+    pub fn whole_file_span(&self) -> Span {
+        Span(0, self.num_tokens() - 1)
+    }
+
+    pub fn is_span_valid(&self, span : Span) -> bool {
+        span.1 < self.num_tokens()
+    }
+}

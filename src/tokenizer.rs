@@ -203,33 +203,16 @@ impl<'iter> Iterator for FileIter<'iter> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct CharLine {
-    pub line : usize,
-    pub character : usize
-}
-impl PartialOrd for CharLine {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-impl Ord for CharLine {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.line.cmp(&other.line).then(self.character.cmp(&other.character))
-    }
-}
-
-pub struct TokenizeResult {
-    pub token_types : Vec<TokenTypeIdx>,
+struct TokenGatherer {
+    token_types : Vec<TokenTypeIdx>,
     // List of all boundaries. Starts with 0, in whitespace mode, and then alternatingly switch to being a token, switch to being whitespace, back and forth
     // The span of token i is given by token_boundaries[i*2+1..i*2+2]
     // Ends at the end of the file, with a final whitespace block
-    pub token_boundaries : Vec<usize>,
-    pub token_boundaries_as_char_lines : Vec<CharLine>
+    token_boundaries : Vec<usize>
 }
-impl TokenizeResult {
+impl TokenGatherer {
     fn new() -> Self {
-        TokenizeResult{token_types : Vec::new(), token_boundaries : vec![0], token_boundaries_as_char_lines : Vec::new()}
+        TokenGatherer{token_types : Vec::new(), token_boundaries : vec![0]}
     }
     // Result can be used for error reporting
     fn push(&mut self, typ : TokenTypeIdx, rng : Range<usize>) {
@@ -241,55 +224,14 @@ impl TokenizeResult {
         errors.error_basic(Span::new_single_token(self.token_types.len()), motivation);
         self.push(TOKEN_INVALID, rng);
     }
-    fn finalize(&mut self, file_text : &str) {
-        let mut cur_position = CharLine{line: 0, character: 0};
-        let mut start = 0;
-        self.token_boundaries_as_char_lines = self.token_boundaries.iter().map(|part_end| {
-            for c in file_text[start..*part_end].chars() {
-                if c == '\n' {
-                    cur_position.line += 1;
-                    cur_position.character = 0;
-                } else {
-                    cur_position.character += 1;
-                }
-            }
-            start = *part_end;
-            cur_position
-        }).collect();
-    }
-
-    pub fn len(&self) -> usize {
-        self.token_types.len()
-    }
-    pub fn get_token_range(&self, token_idx : usize) -> Range<usize> {
-        self.token_boundaries[token_idx*2+1]..self.token_boundaries[token_idx*2+2]
-    }
-    pub fn get_token_linechar_range(&self, token_idx : usize) -> Range<CharLine> {
-        self.token_boundaries_as_char_lines[token_idx*2+1]..self.token_boundaries_as_char_lines[token_idx*2+2]
-    }
-    pub fn get_span_range(&self, span : Span) -> Range<usize> {
-        self.token_boundaries[span.0*2+1]..self.token_boundaries[span.1*2+2]
-    }
-    pub fn get_span_linechar_range(&self, span : Span) -> Range<CharLine> {
-        self.token_boundaries_as_char_lines[span.0*2+1]..self.token_boundaries_as_char_lines[span.1*2+2]
-    }
-
-    pub fn get_token_on_or_left_of(&self, char_line : CharLine) -> usize {
-        match self.token_boundaries_as_char_lines.binary_search(&char_line) {
-            Ok(idx) | Err(idx) => {
-                assert!(idx >= 1);
-                return (idx - 1) / 2;
-            }
-        }
-    }
-
-    pub fn is_span_valid(&self, span : Span) -> bool {
-        span.1 < self.token_types.len()
+    fn finalize(mut self, file_text : &str) -> (Vec<TokenTypeIdx>, Vec<usize>) {
+        self.token_boundaries.push(file_text.len());
+        (self.token_types, self.token_boundaries)
     }
 }
 
-pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> TokenizeResult {
-    let mut result = TokenizeResult::new();
+pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> (Vec<TokenTypeIdx>, Vec<usize>) {
+    let mut result = TokenGatherer::new();
     let mut file_char_iter = FileIter::new(file_text);
     
     while let Some((mut file_pos, cur_char)) = file_char_iter.next() {
@@ -377,6 +319,5 @@ pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> Tokeni
     }
 
     result.token_boundaries.push(file_text.len());
-    result.finalize(file_text);
-    result
+    result.finalize(file_text)
 }

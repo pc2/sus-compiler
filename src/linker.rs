@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, rc::Rc, cell::RefCell};
 
-use crate::{arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, ast::{LinkInfo, Module}, errors::{error_info, ErrorCollector}, file_position::Span, flattening::{FlatID, FlattenedModule, Instruction, WireInstance, WireSource}, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode}, tokenizer::TokenizeResult, typing::{Type, WrittenType}, util::{const_str_position, const_str_position_in_tuples}, value::Value};
+use crate::{arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, ast::{LinkInfo, Module}, errors::{error_info, ErrorCollector}, file_position::{FileText, Span}, flattening::{FlatID, FlattenedModule, Instruction, WireInstance, WireSource}, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode}, tokenizer::TokenTypeIdx, typing::{Type, WrittenType}, util::{const_str_position, const_str_position_in_tuples}, value::Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModuleUUIDMarker;
@@ -118,8 +118,8 @@ impl Linkable for NamedType {
 }
 
 pub struct FileData {
-    pub file_text : String,
-    pub tokens : TokenizeResult,
+    pub file_text : FileText,
+    pub tokens : Vec<TokenTypeIdx>,
     pub token_hierarchy : Vec<TokenTreeNode>,
     pub parsing_errors : ErrorCollector,
     pub associated_values : Vec<NameElem>
@@ -127,10 +127,10 @@ pub struct FileData {
 
 impl FileData {
     pub fn get_token_text(&self, token_idx : usize) -> &str {
-        &self.file_text[self.tokens.get_token_range(token_idx)]
+        &self.file_text.file_text[self.file_text.get_token_range(token_idx)]
     }
     pub fn get_span_text(&self, span : Span) -> &str {
-        &self.file_text[self.tokens.get_span_range(span)]
+        &self.file_text.file_text[self.file_text.get_span_range(span)]
     }
 }
 

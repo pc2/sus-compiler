@@ -1,7 +1,7 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{arena_alloc::ArenaVector, ast::*, file_position::Span, flattening::{Instruction, WireSource}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, NameElem}, parser::*, tokenizer::*};
+use crate::{arena_alloc::ArenaVector, ast::*, file_position::{FileText, Span}, flattening::{Instruction, WireSource}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, NameElem}, parser::*, tokenizer::*};
 
 use ariadne::FileCache;
 use console::Style;
@@ -44,21 +44,21 @@ fn pretty_print_chunk_with_whitespace(whitespace_start : usize, file_text : &str
     print!("{}{}", whitespace_text, st.apply_to(&file_text[text_span]));
 }
 
-fn print_tokens(file_text : &str, tokens : &TokenizeResult) {
+fn print_tokens(file_text : &FileText) {
     let mut whitespace_start : usize = 0;
-    for tok_idx in 0..tokens.len() {
+    for tok_idx in 0..file_text.num_tokens() {
         let styles = [Style::new().magenta(), Style::new().yellow(), Style::new().blue()];
         let st = styles[tok_idx % styles.len()].clone().underlined();
         
-        let token_range = tokens.get_token_range(tok_idx);
-        pretty_print_chunk_with_whitespace(whitespace_start, file_text, token_range.clone(), st);
+        let token_range = file_text.get_token_range(tok_idx);
+        pretty_print_chunk_with_whitespace(whitespace_start, &file_text.file_text, token_range.clone(), st);
         whitespace_start = token_range.end;
     }
 
-    print!("{}\n", &file_text[whitespace_start..file_text.len()]);
+    print!("{}\n", &file_text.file_text[whitespace_start..]);
 }
 
-fn pretty_print(file_text : &str, tokens : &TokenizeResult, ide_infos : &[IDEToken]) {
+fn pretty_print(file_text : &FileText, ide_infos : &[IDEToken]) {
     let mut whitespace_start : usize = 0;
 
     for (tok_idx, token) in ide_infos.iter().enumerate() {
@@ -83,12 +83,12 @@ fn pretty_print(file_text : &str, tokens : &TokenizeResult, ide_infos : &[IDETok
             }
         };
         
-        let tok_span = tokens.get_token_range(tok_idx);
-        pretty_print_chunk_with_whitespace(whitespace_start, file_text, tok_span.clone(), st);
+        let tok_span = file_text.get_token_range(tok_idx);
+        pretty_print_chunk_with_whitespace(whitespace_start, &file_text.file_text, tok_span.clone(), st);
         whitespace_start = tok_span.end;
     }
 
-    print!("{}\n", &file_text[whitespace_start..file_text.len()]);
+    print!("{}\n", &file_text.file_text[whitespace_start..]);
 }
 
 fn add_ide_bracket_depths_recursive<'a>(result : &mut [IDEToken], current_depth : usize, token_hierarchy : &[TokenTreeNode]) {
@@ -164,7 +164,7 @@ pub fn create_token_ide_info<'a>(parsed: &FileData, linker : &Linker) -> Vec<IDE
     let mut result : Vec<IDEToken> = Vec::new();
     result.reserve(parsed.tokens.len());
 
-    for &tok_typ in &parsed.tokens.token_types {
+    for &tok_typ in &parsed.tokens {
         let initial_typ = if is_keyword(tok_typ) {
             IDETokenType::Keyword
         } else if is_bracket(tok_typ) != IsBracket::NotABracket {
@@ -193,27 +193,27 @@ pub fn create_token_ide_info<'a>(parsed: &FileData, linker : &Linker) -> Vec<IDE
 }
 
 // Outputs character_offsets.len() == tokens.len() + 1 to include EOF token
-fn generate_character_offsets(file_text : &str, tokens : &TokenizeResult) -> Vec<Range<usize>> {
+fn generate_character_offsets(file_text : &FileText) -> Vec<Range<usize>> {
     let mut character_offsets : Vec<Range<usize>> = Vec::new();
-    character_offsets.reserve(tokens.len());
+    character_offsets.reserve(file_text.num_tokens());
     
     let mut cur_char = 0;
     let mut whitespace_start = 0;
-    for tok_idx in 0..tokens.len() {
-        let tok_range = tokens.get_token_range(tok_idx);
+    for tok_idx in 0..file_text.num_tokens() {
+        let tok_range = file_text.get_token_range(tok_idx);
 
         // whitespace
-        cur_char += file_text[whitespace_start..tok_range.start].chars().count();
+        cur_char += file_text.file_text[whitespace_start..tok_range.start].chars().count();
         let token_start_char = cur_char;
         
         // actual text
-        cur_char += file_text[tok_range.clone()].chars().count();
+        cur_char += file_text.file_text[tok_range.clone()].chars().count();
         character_offsets.push(token_start_char..cur_char);
         whitespace_start = tok_range.end;
     }
 
     // Final char offset for EOF
-    let num_chars_in_file = cur_char + file_text[whitespace_start..].chars().count();
+    let num_chars_in_file = cur_char + file_text.file_text[whitespace_start..].chars().count();
     character_offsets.push(cur_char..num_chars_in_file);
 
     character_offsets
@@ -249,7 +249,7 @@ pub fn print_all_errors(linker : &Linker, paths_arena : &ArenaVector<PathBuf, Fi
     let mut file_cache : FileCache = Default::default();
     
     for (file_uuid, f) in &linker.files {
-        let token_offsets = generate_character_offsets(&f.file_text, &f.tokens);
+        let token_offsets = generate_character_offsets(&f.file_text);
 
         let errors = linker.get_all_errors_in_file(file_uuid);
 
@@ -263,9 +263,9 @@ pub fn syntax_highlight_file(linker : &Linker, file_uuid : FileUUID, settings : 
     let f = &linker.files[file_uuid];
 
     if settings.show_tokens {
-        print_tokens(&f.file_text, &f.tokens);
+        print_tokens(&f.file_text);
     }
 
     let ide_tokens = create_token_ide_info(f, linker);
-    pretty_print(&f.file_text, &f.tokens, &ide_tokens);
+    pretty_print(&f.file_text, &ide_tokens);
 }

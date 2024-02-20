@@ -281,7 +281,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
     fn resolve_identifier(&self, identifier : &Identifier) -> LocalOrGlobal {
         // Possibly local
         if let Some(single_tok_idx) = identifier.span.is_single_token() {
-            assert!(self.linker.file.tokens.token_types[single_tok_idx] == TOKEN_IDENTIFIER);
+            assert!(self.linker.file.tokens[single_tok_idx] == TOKEN_IDENTIFIER);
             if let Some(decl_id) = self.local_variable_context.get_declaration_for(self.linker.file.get_token_text(single_tok_idx)) {
                 return LocalOrGlobal::Local(decl_id);
             }

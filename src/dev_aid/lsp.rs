@@ -7,16 +7,7 @@ use lsp_server::{Connection, Message, Response};
 use lsp_types::notification::Notification;
 
 use crate::{
-    arena_alloc::ArenaVector, 
-    file_position::Span,
-    ast::{IdentifierType, Module}, 
-    dev_aid::syntax_highlighting::create_token_ide_info, 
-    errors::{CompileError, ErrorCollector, ErrorLevel}, 
-    flattening::FlatID, 
-    instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, 
-    linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, 
-    parser::perform_full_semantic_parse, 
-    tokenizer::{CharLine, TokenizeResult}
+    arena_alloc::ArenaVector, ast::{IdentifierType, Module}, dev_aid::syntax_highlighting::create_token_ide_info, errors::{CompileError, ErrorCollector, ErrorLevel}, file_position::{CharLine, FileText, Span}, flattening::FlatID, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse
 };
 
 use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
@@ -187,7 +178,7 @@ fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> Vec<SemanticT
         let typ = get_semantic_token_type_from_ide_token(ide_tok);
         let mod_bits = get_modifiers_for_token(ide_tok);
 
-        let tok_range = file_data.tokens.get_token_linechar_range(tok_idx);
+        let tok_range = file_data.file_text.get_token_linechar_range(tok_idx);
         let start_pos = to_position(tok_range.start);
         let end_pos = to_position(tok_range.end);
 
@@ -214,8 +205,8 @@ fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> Vec<SemanticT
 
 use lsp_types::Diagnostic;
 
-fn cvt_span_to_lsp_range(ch_sp : Span, tokens : &TokenizeResult) -> lsp_types::Range {
-    let rng = tokens.get_span_linechar_range(ch_sp);
+fn cvt_span_to_lsp_range(ch_sp : Span, file_text : &FileText) -> lsp_types::Range {
+    let rng = file_text.get_span_linechar_range(ch_sp);
     Range {
         start: Position{character : rng.start.character as u32, line : rng.start.line as u32},
         end: Position{character : rng.end.character as u32, line : rng.end.line as u32}
@@ -223,9 +214,9 @@ fn cvt_span_to_lsp_range(ch_sp : Span, tokens : &TokenizeResult) -> lsp_types::R
 }
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn convert_diagnostic(err : CompileError, main_tokens : &TokenizeResult, linker : &Linker, uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
-    assert!(main_tokens.is_span_valid(err.position), "bad error: {}", err.reason);
-    let error_pos = cvt_span_to_lsp_range(err.position, main_tokens);
+fn convert_diagnostic(err : CompileError, main_file_text : &FileText, linker : &Linker, uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
+    assert!(main_file_text.is_span_valid(err.position), "bad error: {}", err.reason);
+    let error_pos = cvt_span_to_lsp_range(err.position, main_file_text);
 
     let severity = match err.level {
         ErrorLevel::Error => DiagnosticSeverity::ERROR,
@@ -233,9 +224,9 @@ fn convert_diagnostic(err : CompileError, main_tokens : &TokenizeResult, linker 
     };
     let mut related_info = Vec::new();
     for info in err.infos {
-        let info_tokens = &linker.files[info.file].tokens;
-        assert!(info_tokens.is_span_valid(info.position), "bad info: {}; in err: {}", info.info, err.reason);
-        let info_pos = cvt_span_to_lsp_range(info.position, info_tokens);
+        let info_file_text = &linker.files[info.file].file_text;
+        assert!(info_file_text.is_span_valid(info.position), "bad info: {}; in err: {}", info.info, err.reason);
+        let info_pos = cvt_span_to_lsp_range(info.position, info_file_text);
         let location = Location{uri : uris[info.file].clone(), range : info_pos};
         related_info.push(DiagnosticRelatedInformation { location, message: info.info });
     }
@@ -243,11 +234,11 @@ fn convert_diagnostic(err : CompileError, main_tokens : &TokenizeResult, linker 
 }
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, main_tokens : &TokenizeResult, linker : &Linker, uris : &ArenaVector<Url, FileUUIDMarker>) -> Result<(), Box<dyn Error + Sync + Send>> {
+fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, main_file_text : &FileText, linker : &Linker, uris : &ArenaVector<Url, FileUUIDMarker>) -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut diag_vec : Vec<Diagnostic> = Vec::new();
     let (err_vec, file) = errors.get();
     for err in err_vec {
-        diag_vec.push(convert_diagnostic(err, main_tokens, linker, uris));
+        diag_vec.push(convert_diagnostic(err, main_file_text, linker, uris));
     }
     
     let params = &PublishDiagnosticsParams{
@@ -270,12 +261,12 @@ fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::T
     
     let file_data = &file_cache.linker.files[uuid];
 
-    let token_idx = file_data.tokens.get_token_on_or_left_of(from_position(text_pos.position));
+    let token_idx = file_data.file_text.get_token_on_or_left_of(from_position(text_pos.position));
 
     let (info, span) = file_cache.linker.get_info_about_source_location(token_idx, uuid)?;
     //let span = Span::new_single_token(token_idx);
 
-    let char_line_range = file_data.tokens.get_span_linechar_range(span);
+    let char_line_range = file_data.file_text.get_span_linechar_range(span);
     Some((info, to_position_range(char_line_range)))
 }
 
@@ -284,7 +275,7 @@ fn push_all_errors(connection: &Connection, file_cache : &LoadedFileCache) -> Re
         let errors = file_cache.linker.get_all_errors_in_file(uuid);
     
         // println!("Errors: {:?}", &errors);
-        send_errors_warnings(&connection, errors, &file_data.tokens, &file_cache.linker, &file_cache.uris)?;
+        send_errors_warnings(&connection, errors, &file_data.file_text, &file_cache.linker, &file_cache.uris)?;
     }
     Ok(())
 }
@@ -392,7 +383,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                     LocationInfo::WireRef(md, decl_id) => {
                         let uri = file_cache.uris[md.link_info.file].clone();
                         let decl = md.flattened.instructions[decl_id].extract_wire_declaration();
-                        let range = to_position_range(file_cache.linker.files[md.link_info.file].tokens.get_token_linechar_range(decl.name_token));
+                        let range = to_position_range(file_cache.linker.files[md.link_info.file].file_text.get_token_linechar_range(decl.name_token));
                         GotoDefinitionResponse::Scalar(Location{uri, range})
                     }
                     LocationInfo::Temporary(_, _, _) => {
@@ -404,7 +395,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                     LocationInfo::Global(id) => {
                         if let Some(link_info) = file_cache.linker.get_link_info(id) {
                             let uri = file_cache.uris[link_info.file].clone();
-                            let range = to_position_range(file_cache.linker.files[link_info.file].tokens.get_span_linechar_range(link_info.name_span));
+                            let range = to_position_range(file_cache.linker.files[link_info.file].file_text.get_span_linechar_range(link_info.name_span));
                             GotoDefinitionResponse::Scalar(Location{uri, range})
                         } else {
                             GotoDefinitionResponse::Array(Vec::new())
