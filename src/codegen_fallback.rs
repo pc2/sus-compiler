@@ -78,12 +78,14 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
     
     fn add_latency_registers(&mut self, w : &RealWire) -> Result<(), std::fmt::Error> {
         if self.use_latency {
+            let type_str = typ_to_verilog_array(&w.typ);
+
             // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
             for i in w.absolute_latency..w.needed_until {
                 let from = wire_name_with_latency(w, i, self.use_latency);
                 let to = wire_name_with_latency(w, i+1, self.use_latency);
 
-                writeln!(self.program_text, "always @(posedge clk) begin {to} <= {from}; end // Latency register")?;
+                writeln!(self.program_text, "reg{type_str} {to}; always @(posedge clk) begin {to} <= {from}; end // Latency register")?;
             }
         }
         Ok(())
