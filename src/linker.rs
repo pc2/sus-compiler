@@ -422,7 +422,7 @@ impl Linker {
                                     location_builder.update(wire.span, loc_info);
                                 }
                                 Instruction::Write(write) => {
-                                    location_builder.update(Span::new_single_token(write.to.span.0), LocationInfo::WireRef(md, write.to.root));
+                                    location_builder.update(write.to.root_span, LocationInfo::WireRef(md, write.to.root));
                                 }
                                 Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
                             };
@@ -470,7 +470,8 @@ impl<'linker> LocationInfoBuilder<'linker> {
     }
     fn update(&mut self, span : Span, info : LocationInfo<'linker>) {
         if span.contains_token(self.token_idx) && span.size() <= self.best_span.size() {
-            assert!(span.size() < self.best_span.size());
+            //assert!(span.size() < self.best_span.size());
+            // May not be the case. Do prioritize later ones, as they tend to be nested
             self.best_span = span;
             self.best_instruction = Some(info);
         }

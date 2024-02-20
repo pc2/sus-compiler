@@ -192,6 +192,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
         }
     }
+    fn extract_integer_from_generative<'v, IntT : TryFrom<&'v BigInt>>(&'v self, idx : FlatID) -> Option<IntT> {
+        let val = self.get_generation_value(idx)?;
+        let span = self.flattened.instructions[idx].extract_wire().span;
+        self.extract_integer_from_value(val, span)
+    }
+
     fn concretize_type(&self, typ : &Type, span : Span) -> Option<ConcreteType> {
         match typ {
             Type::Error | Type::Unknown => unreachable!("Bad types should be caught in flattening: {}", typ.to_string(&self.linker.types)),
@@ -200,11 +206,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
             Type::Array(arr_box) => {
                 let (arr_content_typ, arr_size_wire) = arr_box.deref();
-                let inner_typ = self.concretize_type(arr_content_typ, span)?;
-                let size_val = &self.generation_state[*arr_size_wire];
-                let cv = size_val.extract_generation_value();
-                let arr_usize = self.extract_integer_from_value(cv, span)?;
-                Some(ConcreteType::Array(Box::new((inner_typ, arr_usize))))
+                let inner_typ = self.concretize_type(arr_content_typ, span);
+                let arr_size = self.extract_integer_from_generative(*arr_size_wire);
+                Some(ConcreteType::Array(Box::new((inner_typ?, arr_size?))))
             }
         }
     }
@@ -215,7 +219,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         for pe in to_path {
             match pe {
-                ConnectionWritePathElement::ArrayIdx{idx, idx_span} => {
+                ConnectionWritePathElement::ArrayIdx{idx, bracket_span:_} => {
                     match &self.generation_state[*idx] {
                         SubModuleOrWire::SubModule(_) => unreachable!(),
                         SubModuleOrWire::Unnasigned => unreachable!(),
@@ -224,8 +228,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         
                             new_path.push(ConnectToPathElem::MuxArrayWrite{idx_wire : *idx_wire});
                         }
-                        SubModuleOrWire::CompileTimeValue(v) => {
-                            let idx = self.extract_integer_from_value(v, *idx_span)?;
+                        SubModuleOrWire::CompileTimeValue(_) => {
+                            let idx = self.extract_integer_from_generative(*idx)?;
                             new_path.push(ConnectToPathElem::ConstArrayWrite{idx});
                         }
                     }
@@ -257,9 +261,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         result.reserve(conn_path.len());
         for p in conn_path {
             match p {
-                ConnectionWritePathElement::ArrayIdx{idx, idx_span} => {
-                    let idx_val = self.get_generation_value(*idx)?;
-                    let idx_val = self.extract_integer_from_value::<usize>(idx_val, *idx_span)?;
+                ConnectionWritePathElement::ArrayIdx{idx, bracket_span:_} => {
+                    let idx_val = self.extract_integer_from_generative(*idx)?;
                     result.push(ConnectionWritePathElementComputed::ArrayIdx(idx_val))
                 }
             }
@@ -321,9 +324,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
             &WireSource::ArrayAccess{arr, arr_idx} => {
                 let Value::Array(arr_val) = self.get_generation_value(arr)? else {return None};
-                let arr_idx_val = self.get_generation_value(arr_idx)?;
                 let arr_idx_wire = self.flattened.instructions[arr_idx].extract_wire();
-                let idx : usize = self.extract_integer_from_value(arr_idx_val, arr_idx_wire.span)?;
+                let idx : usize = self.extract_integer_from_generative(arr_idx)?;
                 if let Some(item) = arr_val.get(idx) {
                     item.clone()
                 } else {
@@ -378,9 +380,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     SubModuleOrWire::Wire(w) => {
                         RealWireDataSource::ArrayAccess{arr, arr_idx: *w}
                     }
-                    SubModuleOrWire::CompileTimeValue(v) => {
-                        let arr_idx_wire = self.flattened.instructions[arr_idx].extract_wire();
-                        let arr_idx = self.extract_integer_from_value(v, arr_idx_wire.span)?;
+                    SubModuleOrWire::CompileTimeValue(_) => {
+                        let arr_idx = self.extract_integer_from_generative(arr_idx)?;
                         RealWireDataSource::ConstArrayAccess{arr, arr_idx}
                     }
                 }
@@ -438,7 +439,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         };
                         let absolute_latency = if let Some(spec) = &wire_decl.latency_specifier {
                             if wire_decl.is_declared_in_this_module {
-                                self.extract_integer_from_value(self.get_generation_value(*spec)?, self.flattened.instructions[*spec].extract_wire().span)?
+                                self.extract_integer_from_generative(*spec)?
                             } else {
                                 CALCULATE_LATENCY_LATER
                             }
@@ -447,8 +448,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         };
                         let wire_id = self.wires.alloc(RealWire{name: wire_decl.name.clone(), typ, original_wire, source, absolute_latency, needed_until : CALCULATE_LATENCY_LATER});
                         if let Some(lat_spec_flat) = wire_decl.latency_specifier {
-                            let val = self.get_generation_value(lat_spec_flat)?;
-                            let specified_absolute_latency : i64 = self.extract_integer_from_value(val, self.flattened.instructions[lat_spec_flat].extract_wire().span)?;
+                            let specified_absolute_latency : i64 = self.extract_integer_from_generative(lat_spec_flat)?;
                             self.specified_latencies.push((wire_id, specified_absolute_latency));
                         }
                         SubModuleOrWire::Wire(wire_id)

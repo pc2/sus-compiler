@@ -576,7 +576,7 @@ mod tests {
 
         let should_be_err = solve_latencies_infer_ports(&fanins, Vec::new());
 
-        let Err(LatencyCountingError::NetPositiveLatencyCycle{conflict_path, net_roundtrip_latency}) = should_be_err else {unreachable!()};
+        let Err(LatencyCountingError::NetPositiveLatencyCycle{conflict_path:_, net_roundtrip_latency}) = should_be_err else {unreachable!()};
         assert_eq!(net_roundtrip_latency, 1);
     }
 }

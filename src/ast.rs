@@ -6,7 +6,7 @@ use std::fmt::Display;
 
 
 // Token span. Indices are INCLUSIVE
-#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+#[derive(Clone,Copy,Debug,PartialEq,Eq,Hash)]
 pub struct Span(pub usize, pub usize);
 
 impl Span {
@@ -61,6 +61,20 @@ impl Span {
             None
         }
     }
+    pub fn difference_left(outer : Span, inner : Span) -> Span {
+        assert!(outer.0 <= inner.0);
+        assert!(outer.1 >= inner.1);
+
+        Span(outer.0, inner.0 - 1) // temporary, because right now spans are still inclusive. 
+        // Span(outer.0, inner.0)
+    }
+    pub fn difference_right(outer : Span, inner : Span) -> Span {
+        assert!(outer.0 <= inner.0);
+        assert!(outer.1 >= inner.1);
+
+        Span(inner.1 + 1, outer.1) // temporary, because right now spans are still inclusive. 
+        // Span(inner.1, outer.1)
+    }
 }
 
 impl IntoIterator for Span {
@@ -70,6 +84,19 @@ impl IntoIterator for Span {
 
     fn into_iter(self) -> Self::IntoIter {
         Range{start : self.0, end : self.1 + 1}.into_iter()
+    }
+}
+
+#[derive(Clone,Copy,Debug,PartialEq,Eq,Hash)]
+pub struct BracketSpan(Span);
+
+impl BracketSpan {
+    pub fn from_outer(span : Span) -> Self {Self(span)}
+    pub fn inner_span(&self) -> Span {
+        Span(self.0.0 + 1, self.0.1 - 1)
+    }
+    pub fn outer_span(&self) -> Span {
+        self.0
     }
 }
 
@@ -139,7 +166,7 @@ pub enum Expression {
     Constant(Value),
     UnaryOp(Box<(Operator, usize/*Operator token */, SpanExpression)>),
     BinOp(Box<(SpanExpression, Operator, usize/*Operator token */, SpanExpression)>),
-    Array(Box<(SpanExpression, SpanExpression, Span/*Brackets */)>), // first[second]
+    Array(Box<(SpanExpression, SpanExpression, BracketSpan)>), // first[second]
     FuncCall(Vec<SpanExpression>) // first(second, third, ...)
 }
 

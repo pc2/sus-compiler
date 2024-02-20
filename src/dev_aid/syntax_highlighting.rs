@@ -93,10 +93,14 @@ fn pretty_print(file_text : &str, tokens : &TokenizeResult, ide_infos : &[IDETok
 
 fn add_ide_bracket_depths_recursive<'a>(result : &mut [IDEToken], current_depth : usize, token_hierarchy : &[TokenTreeNode]) {
     for tok in token_hierarchy {
-        if let TokenTreeNode::Block(_, sub_block, Span(left, right)) = tok {
-            result[*left].typ = IDETokenType::OpenBracket(current_depth);
+        if let TokenTreeNode::Block(_, sub_block, span) = tok {
+            let inner_span = span.inner_span();
+            let outer_span = span.outer_span();
+            let left_bracket_span = Span::difference_left(outer_span, inner_span);
+            let right_bracket_span = Span::difference_right(outer_span, inner_span);
+            result[left_bracket_span.assert_is_single_token()].typ = IDETokenType::OpenBracket(current_depth);
             add_ide_bracket_depths_recursive(result, current_depth+1, sub_block);
-            result[*right].typ = IDETokenType::CloseBracket(current_depth);
+            result[right_bracket_span.assert_is_single_token()].typ = IDETokenType::CloseBracket(current_depth);
         }
     }
 }
@@ -139,7 +143,7 @@ fn walk_name_color(all_objects : &[NameElem], linker : &Linker, result : &mut [I
                         Instruction::Write(conn) => {
                             let decl = module.flattened.instructions[conn.to.root].extract_wire_declaration();
                             if !decl.is_declared_in_this_module {continue;} // Virtual wires don't appear in this program text
-                            result[conn.to.span.0].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
+                            result[conn.to.root_span.assert_is_single_token()].typ = IDETokenType::Identifier(IDEIdentifierType::Value(decl.identifier_type));
                         }
                         Instruction::SubModule(sm) => {
                             set_span_name_color(sm.module_name_span, IDEIdentifierType::Interface, result);

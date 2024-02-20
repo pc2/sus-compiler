@@ -4,7 +4,7 @@ pub mod name_context;
 use std::{ops::Deref, iter::zip};
 
 use crate::{
-    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{AssignableExpressionModifiers, CodeBlock, Expression, Identifier, IdentifierType, InterfacePorts, LeftExpression, Module, Operator, SignalDeclaration, Span, SpanExpression, SpanTypeExpression, Statement, TypeExpression}, errors::{error_info, ErrorCollector, ErrorInfo}, linker::{ConstantUUID, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker}, tokenizer::TOKEN_IDENTIFIER, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE}, value::Value
+    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{AssignableExpressionModifiers, BracketSpan, CodeBlock, Expression, Identifier, IdentifierType, InterfacePorts, LeftExpression, Module, Operator, SignalDeclaration, Span, SpanExpression, SpanTypeExpression, Statement, TypeExpression}, errors::{error_info, ErrorCollector, ErrorInfo}, linker::{ConstantUUID, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker}, tokenizer::TOKEN_IDENTIFIER, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE}, value::Value
 };
 
 use self::name_context::LocalVariableContext;
@@ -18,7 +18,7 @@ pub type FlatIDRange = UUIDRange<FlatIDMarker>;
 
 #[derive(Debug)]
 pub enum ConnectionWritePathElement {
-    ArrayIdx{idx : FlatID, idx_span : Span},
+    ArrayIdx{idx : FlatID, bracket_span : BracketSpan},
     //StructField(FieldID)
 }
 #[derive(Debug)]
@@ -30,6 +30,7 @@ pub enum ConnectionWritePathElementComputed {
 #[derive(Debug)]
 pub struct ConnectionWrite {
     pub root : FlatID,
+    pub root_span : Span,
     pub path : Vec<ConnectionWritePathElement>,
     pub span : Span,
     pub is_declared_in_this_module : bool
@@ -366,7 +367,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
         for (field, arg_expr) in zip(inputs, args) {
             let arg_read_side = self.flatten_expr(arg_expr);
             let func_input_port = &submodule_local_wires.ports[field];
-            self.instructions.alloc(Instruction::Write(Write{write_type : WriteType::Connection{num_regs : 0, regs_span : None}, from: arg_read_side, to: ConnectionWrite{root : *func_input_port, path : Vec::new(), span : *name_expr_span, is_declared_in_this_module : self.is_declared_in_this_module}}));
+            self.instructions.alloc(Instruction::Write(Write{write_type : WriteType::Connection{num_regs : 0, regs_span : None}, from: arg_read_side, to: ConnectionWrite{root : *func_input_port, root_span : arg_expr.1, path : Vec::new(), span : *name_expr_span, is_declared_in_this_module : self.is_declared_in_this_module}}));
         }
 
         Some((md, submodule_local_wires))
@@ -439,18 +440,18 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
             Expression::Named(local_idx) => {
                 let root = self.resolve_identifier(local_idx).expect_local("assignments")?;
 
-                Some(ConnectionWrite{root, path : Vec::new(), span, is_declared_in_this_module : self.is_declared_in_this_module})
+                Some(ConnectionWrite{root, root_span : span, path : Vec::new(), span, is_declared_in_this_module : self.is_declared_in_this_module})
             }
             Expression::Array(arr_box) => {
-                let (arr, idx_expr, _bracket_span) = arr_box.deref();
+                let (arr, idx_expr, bracket_span) = arr_box.deref();
                 let flattened_arr_expr_opt = self.flatten_assignable_expr(&arr.0, arr.1);
                 
                 let idx = self.flatten_expr(idx_expr);
 
                 let mut flattened_arr_expr = flattened_arr_expr_opt?; // only unpack the subexpr after flattening the idx, so we catch all errors
 
-                flattened_arr_expr.path.push(ConnectionWritePathElement::ArrayIdx{idx, idx_span : idx_expr.1});
-
+                flattened_arr_expr.path.push(ConnectionWritePathElement::ArrayIdx{idx, bracket_span : *bracket_span});
+                flattened_arr_expr.span = Span::new_overarching(flattened_arr_expr.span, bracket_span.outer_span());
                 Some(flattened_arr_expr)
             }
             Expression::Constant(_) => {self.errors.error_basic(span, "Cannot assign to constant"); None},
@@ -466,7 +467,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
             }
             LeftExpression::Declaration(decl) => {
                 let root = self.flatten_declaration::<true>(decl, false, !gets_assigned);
-                Some(ConnectionWrite{root, path: Vec::new(), span, is_declared_in_this_module: true})
+                Some(ConnectionWrite{root, root_span : Span::new_single_token(decl.name_token), path: Vec::new(), span, is_declared_in_this_module: true})
             }
         }
     }
@@ -590,11 +591,11 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
         let mut write_to_type = Some(&conn_root.typ);
         for p in &to.path {
             match p {
-                &ConnectionWritePathElement::ArrayIdx{idx, idx_span} => {
+                &ConnectionWritePathElement::ArrayIdx{idx, bracket_span} => {
                     let idx_wire = self.instructions[idx].extract_wire();
                     self.typecheck_wire_is_of_type(idx_wire, &INT_TYPE, "array index");
                     if let Some(wr) = write_to_type {
-                        write_to_type = typecheck_is_array_indexer(wr, idx_span, self.type_list_for_naming, &self.errors);
+                        write_to_type = typecheck_is_array_indexer(wr, bracket_span.outer_span(), self.type_list_for_naming, &self.errors);
                     }
                 }
             }
