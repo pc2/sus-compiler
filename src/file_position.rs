@@ -1,4 +1,4 @@
-use std::ops::{Index, Range};
+use std::{fmt::Display, ops::{Index, Range}};
 
 // Token span. Indices are INCLUSIVE
 #[derive(Clone,Copy,Debug,PartialEq,Eq,Hash)]
@@ -78,6 +78,12 @@ impl IntoIterator for Span {
 
     fn into_iter(self) -> Self::IntoIter {
         Range{start : self.0, end : self.1 + 1}.into_iter()
+    }
+}
+
+impl Display for Span {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}..{}", self.0, self.1))
     }
 }
 

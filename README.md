@@ -29,6 +29,7 @@ The main goals of the language are roughly listed below:
 
 ## Tasks
 ### Major Milestones
+- [x] Arbitrary pipelined full flow
 - [ ] Arbitrary single-clock full flow
 - [ ] Arbitrary FPGA hardware full flow
 - [x] Generative Code

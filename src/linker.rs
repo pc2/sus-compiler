@@ -418,7 +418,6 @@ impl Linker {
                                 Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
                             };
                         }
-                        break;
                     }
                 }
                 NameElem::Type(_) => {

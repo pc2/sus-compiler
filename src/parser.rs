@@ -677,7 +677,7 @@ impl<'file> ASTParserContext<'file> {
 
         let code = self.parse_code_block(block_tokens, block_span);
 
-        let span = Span::new_extend_before(declaration_start_idx, token_stream.remaining_span);
+        let span = Span::new_extend_before(declaration_start_idx, block_span.outer_span());
         
         let link_info = LinkInfo{
             file : self.errors.file,
