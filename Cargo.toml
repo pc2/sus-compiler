@@ -8,7 +8,7 @@ repository = "https://github.com/pc2/sus-compiler"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-console = "0.15.7" # for terminal colors
+# console = "0.15.7" # for terminal colors
 # chumsky = "0.9.2"
 ariadne = {path = "ariadne"} # for nice errors
 num = "*"

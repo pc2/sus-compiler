@@ -7,10 +7,10 @@ use lsp_server::{Connection, Message, Response};
 use lsp_types::notification::Notification;
 
 use crate::{
-    arena_alloc::ArenaVector, ast::{IdentifierType, Module}, dev_aid::syntax_highlighting::create_token_ide_info, errors::{CompileError, ErrorCollector, ErrorLevel}, file_position::{CharLine, FileText, Span}, flattening::FlatID, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse
+    arena_alloc::ArenaVector, ast::{IdentifierType, Module}, errors::{CompileError, ErrorCollector, ErrorLevel}, file_position::{CharLine, FileText, Span}, flattening::FlatID, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse, walk_name_color
 };
 
-use super::syntax_highlighting::{IDETokenType, IDEIdentifierType, IDEToken};
+use super::syntax_highlighting::IDEIdentifierType;
 
 struct LoadedFileCache {
     linker : Linker,
@@ -124,33 +124,24 @@ pub fn lsp_main(port : u16, debug : bool) -> Result<(), Box<dyn Error + Sync + S
     Ok(())
 }
 
-fn get_semantic_token_type_from_ide_token(tok : &IDEToken) -> u32 {
-    match &tok.typ {
-        IDETokenType::Comment => 0,
-        IDETokenType::Keyword => 1,
-        IDETokenType::Operator => 2,
-        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Input)) => 4,
-        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Output)) => 4,
-        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 3,
-        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Local)) => 3,
-        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Generative)) => 3,
-        IDETokenType::Identifier(IDEIdentifierType::Constant) => 9, // make it 'OPERATOR'?
-        IDETokenType::Identifier(IDEIdentifierType::Unknown) => 2, // make it 'OPERATOR'?
-        IDETokenType::Identifier(IDEIdentifierType::Interface) => 7, // FUNCTION
-        IDETokenType::Identifier(IDEIdentifierType::Type) => 5, // All others are 'TYPE'
-        IDETokenType::Number => 6,
-        IDETokenType::Invalid => 2, // make it 'OPERATOR'?
-        IDETokenType::InvalidBracket => 2, // make it 'OPERATOR'?
-        IDETokenType::OpenBracket(_) => 2,
-        IDETokenType::CloseBracket(_) => 2,
+fn get_semantic_token_type_from_ide_token(tok : IDEIdentifierType) -> u32 {
+    match tok {
+        IDEIdentifierType::Value(IdentifierType::Input) => 4,
+        IDEIdentifierType::Value(IdentifierType::Output) => 4,
+        IDEIdentifierType::Value(IdentifierType::State) => 3,
+        IDEIdentifierType::Value(IdentifierType::Local) => 3,
+        IDEIdentifierType::Value(IdentifierType::Generative) => 3,
+        IDEIdentifierType::Constant => 9, // make it 'OPERATOR'?
+        IDEIdentifierType::Interface => 7, // FUNCTION
+        IDEIdentifierType::Type => 5, // All others are 'TYPE'
     }
 }
 
 // Produces a bitset with 'modifier bits'
-fn get_modifiers_for_token(tok : &IDEToken) -> u32 {
-    match &tok.typ {
-        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::State)) => 1, // repurpose ASYNC for "State"
-        IDETokenType::Identifier(IDEIdentifierType::Value(IdentifierType::Generative)) => 8, // repurpose READONLY
+fn get_modifiers_for_token(tok : IDEIdentifierType) -> u32 {
+    match tok {
+        IDEIdentifierType::Value(IdentifierType::State) => 1, // repurpose ASYNC for "State"
+        IDEIdentifierType::Value(IdentifierType::Generative) => 8, // repurpose READONLY
         _other => 0
     }
 }
@@ -168,15 +159,15 @@ fn to_position_range(range : std::ops::Range<CharLine>) -> lsp_types::Range {
     lsp_types::Range{start : to_position(range.start), end : to_position(range.end)}
 }
 
-fn convert_to_semantic_tokens(file_data : &FileData, ide_tokens : &mut[(IDEToken, Span)]) -> Vec<SemanticToken> {
+fn convert_to_semantic_tokens(file_data : &FileData, ide_tokens : &mut[(IDEIdentifierType, Span)]) -> Vec<SemanticToken> {
     ide_tokens.sort_by(|a, b| a.1.cmp(&b.1));
     
     let mut cursor = Position {line : 0, character : 0};
     let mut semantic_tokens = Vec::with_capacity(file_data.tokens.len());
 
     for (ide_kind, span) in ide_tokens.iter() {
-        let typ = get_semantic_token_type_from_ide_token(ide_kind);
-        let mod_bits = get_modifiers_for_token(ide_kind);
+        let typ = get_semantic_token_type_from_ide_token(*ide_kind);
+        let mod_bits = get_modifiers_for_token(*ide_kind);
 
         let tok_range = file_data.file_text.get_span_linechar_range(*span);
         let start_pos = to_position(tok_range.start);
@@ -206,11 +197,7 @@ fn convert_to_semantic_tokens(file_data : &FileData, ide_tokens : &mut[(IDEToken
 }
 
 fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> Vec<SemanticToken> {
-    let ide_tokens = create_token_ide_info(&file_data, linker);
-
-    let mut ide_tokens : Vec<(IDEToken, Span)> = ide_tokens.iter().enumerate().map(|(idx, tok_typ)| (*tok_typ, Span::new_single_token(idx))).collect();
-
-    
+    let mut ide_tokens = walk_name_color(&file_data.associated_values, linker);
 
     convert_to_semantic_tokens(file_data, &mut ide_tokens)
 }

@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 //#![allow(dead_code)]
 
 mod util;
@@ -141,11 +142,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     let (linker, mut paths_arena) = compile_all(file_paths);
     print_all_errors(&linker, &mut paths_arena);
-    for (id, (path, _)) in &paths_arena {
-        println!("\n\n[{}]: ", path.to_string_lossy());
-        syntax_highlight_file(&linker, id, &settings);
-    }
-
+    
     // #[cfg(feature = "codegen")]
     if let Some(module_name) = codegen {
         //let gen_ctx = codegen::GenerationContext::new();

@@ -7,10 +7,9 @@ use crate::util::const_str_position_in_tuples;
 
 pub type TokenTypeIdx = u8;
 
-pub const ALL_KEYWORDS : [(&'static str, u8); 18] = [
+pub const ALL_KEYWORDS : [(&'static str, u8); 17] = [
     ("template", 0),
     ("module", 0),
-    ("pipeline", 0),
     ("interface", 0),
     ("timeline", 0),
     ("assume", 0),
