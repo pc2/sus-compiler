@@ -168,19 +168,21 @@ fn to_position_range(range : std::ops::Range<CharLine>) -> lsp_types::Range {
     lsp_types::Range{start : to_position(range.start), end : to_position(range.end)}
 }
 
-fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> Vec<SemanticToken> {
-    let ide_tokens = create_token_ide_info(&file_data, linker);
-
+fn convert_to_semantic_tokens(file_data : &FileData, ide_tokens : &mut[(IDEToken, Span)]) -> Vec<SemanticToken> {
+    ide_tokens.sort_by(|a, b| a.1.cmp(&b.1));
+    
     let mut cursor = Position {line : 0, character : 0};
     let mut semantic_tokens = Vec::with_capacity(file_data.tokens.len());
 
-    for (tok_idx, ide_tok) in ide_tokens.iter().enumerate() {
-        let typ = get_semantic_token_type_from_ide_token(ide_tok);
-        let mod_bits = get_modifiers_for_token(ide_tok);
+    for (ide_kind, span) in ide_tokens.iter() {
+        let typ = get_semantic_token_type_from_ide_token(ide_kind);
+        let mod_bits = get_modifiers_for_token(ide_kind);
 
-        let tok_range = file_data.file_text.get_token_linechar_range(tok_idx);
+        let tok_range = file_data.file_text.get_span_linechar_range(*span);
         let start_pos = to_position(tok_range.start);
         let end_pos = to_position(tok_range.end);
+
+        assert!(end_pos.line == start_pos.line);
 
         let delta_line = start_pos.line - cursor.line;
 
@@ -201,6 +203,16 @@ fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> Vec<SemanticT
     }
 
     semantic_tokens
+}
+
+fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> Vec<SemanticToken> {
+    let ide_tokens = create_token_ide_info(&file_data, linker);
+
+    let mut ide_tokens : Vec<(IDEToken, Span)> = ide_tokens.iter().enumerate().map(|(idx, tok_typ)| (*tok_typ, Span::new_single_token(idx))).collect();
+
+    
+
+    convert_to_semantic_tokens(file_data, &mut ide_tokens)
 }
 
 use lsp_types::Diagnostic;
