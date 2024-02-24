@@ -236,7 +236,7 @@ pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<(PathBuf, 
         
         println!("{:?}", full_parse.ast);
 
-        paths_arena.insert(uuid, (file_path, Source::from(&full_parse.file_text.file_text)));
+        paths_arena.insert(uuid, (file_path, Source::from(full_parse.file_text.file_text.clone())));
         linker.add_reserved_file(uuid, full_parse);
     }
 
@@ -290,7 +290,9 @@ pub fn pretty_print_error<AriadneCache : Cache<FileUUID>>(error : &CompileError,
     report.finish().eprint(file_cache).unwrap();
 }
 
-impl Cache<FileUUID> for ArenaVector<(PathBuf, Source), FileUUIDMarker> {
+impl Cache<FileUUID> for ArenaVector<(PathBuf, Source<String>), FileUUIDMarker> {
+    type Storage = String;
+
     fn fetch(&mut self, id: &FileUUID) -> Result<&Source, Box<dyn std::fmt::Debug + '_>> {
         Ok(&self[*id].1)
     }
