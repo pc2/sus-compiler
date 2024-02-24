@@ -266,7 +266,7 @@ impl<'file> ASTParserContext<'file> {
     }
 
     fn make_declaration(&mut self, type_expr : SpanTypeExpression, name : TokenContent, identifier_type : IdentifierType, latency_expr : Option<SpanExpression>) -> SignalDeclaration {
-        SignalDeclaration{typ : type_expr, name_token : name.tok_idx, name : self.file_text[name.text.clone()].into(), identifier_type, latency_expr}
+        SignalDeclaration{typ : type_expr, name_span : Span::new_single_token(name.tok_idx), identifier_type, latency_expr}
     }
 
     fn parse_identifier(&mut self, start_token_idx : usize, token_stream : &mut TokenStream) -> Span {

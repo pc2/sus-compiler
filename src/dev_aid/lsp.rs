@@ -382,7 +382,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                     LocationInfo::WireRef(md, decl_id) => {
                         let uri = file_cache.uris[md.link_info.file].clone();
                         let decl = md.flattened.instructions[decl_id].extract_wire_declaration();
-                        let range = to_position_range(file_cache.linker.files[md.link_info.file].file_text.get_token_linechar_range(decl.name_token));
+                        let range = to_position_range(file_cache.linker.files[md.link_info.file].file_text.get_span_linechar_range(decl.name_span));
                         GotoDefinitionResponse::Scalar(Location{uri, range})
                     }
                     LocationInfo::Temporary(_, _, _) => {

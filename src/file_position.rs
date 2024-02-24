@@ -5,6 +5,7 @@ use std::{fmt::Display, ops::{Index, Range}};
 pub struct Span(usize, usize);
 
 impl Span {
+    /// Only really used for having a span with the maximum size. 
     pub const MAX_POSSIBLE_SPAN : Span = Span(0, usize::MAX);
 
     pub fn to_range<T : Clone>(&self, tokens : &[Range<T>]) -> Range<T> {

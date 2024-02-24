@@ -47,7 +47,7 @@ pub fn walk_name_color(all_objects : &[NameElem], linker : &Linker) -> Vec<(IDEI
                             decl.typ_expr.for_each_located_type(&mut |_, span| {
                                 result.push((IDEIdentifierType::Type, span));
                             });
-                            result.push((IDEIdentifierType::Value(decl.identifier_type), Span::new_single_token(decl.name_token)));
+                            result.push((IDEIdentifierType::Value(decl.identifier_type), decl.name_span));
                         }
                         Instruction::Write(conn) => {
                             let decl = module.flattened.instructions[conn.to.root].extract_wire_declaration();

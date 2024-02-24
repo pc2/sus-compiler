@@ -88,7 +88,7 @@ pub struct Declaration {
     pub typ_expr : WrittenType,
     pub typ : Type,
     pub is_declared_in_this_module : bool,
-    pub name_token : usize,
+    pub name_span : Span,
     pub name : Box<str>,
     pub read_only : bool,
     // If the program text already covers the write, then lsp stuff on this declaration shouldn't use it. 
@@ -99,7 +99,7 @@ pub struct Declaration {
 
 impl Declaration {
     pub fn make_declared_here(&self, file : FileUUID) -> ErrorInfo {
-        error_info(Span::new_extend_to_include_token(self.typ_expr.get_span(), self.name_token), file, "Declared here")
+        error_info(Span::new_overarching(self.typ_expr.get_span(), self.name_span), file, "Declared here")
     }
 }
 
@@ -176,7 +176,7 @@ impl Instruction {
     pub fn get_location_of_module_part(&self) -> Option<Span> {
         match self {
             Instruction::SubModule(sm) => sm.is_declared_in_this_module.then_some(sm.module_name_span),
-            Instruction::Declaration(decl) => decl.is_declared_in_this_module.then_some(Span::new_single_token(decl.name_token)),
+            Instruction::Declaration(decl) => decl.is_declared_in_this_module.then_some(decl.name_span),
             Instruction::Wire(w) => w.is_declared_in_this_module.then_some(w.span),
             Instruction::Write(conn) => conn.to.is_declared_in_this_module.then_some(conn.to.span),
             Instruction::IfStatement(_) | Instruction::ForStatement(_) => None
@@ -236,7 +236,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
             match resolved.name_elem {
                 Some(NameElem::Module(id)) if ALLOW_MODULES => {
                     let md = &self.linker.get_module(id);
-                    return self.alloc_module_interface(decl.name.clone(), md, id, decl.typ.1)
+                    return self.alloc_module_interface(self.linker.file.file_text[decl.name_span].to_owned().into_boxed_str(), md, id, decl.typ.1)
                 }
                 Some(NameElem::Type(id)) => {
                     WrittenType::Named(decl.typ.1, id)
@@ -260,6 +260,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
         };
 
         let typ_expr_span = typ_expr.get_span();
+        let name = &self.linker.file.file_text[decl.name_span];
         let inst_id = self.instructions.alloc(Instruction::Declaration(Declaration{
             typ : typ_expr.to_type(),
             typ_expr,
@@ -267,13 +268,13 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
             read_only,
             is_free_standing_decl,
             identifier_type : decl.identifier_type,
-            name : decl.name.clone(),
-            name_token : decl.name_token,
+            name : name.to_owned().into_boxed_str(),
+            name_span : decl.name_span,
             latency_specifier
         }));
 
-        if let Err(conflict) = self.local_variable_context.add_declaration(&decl.name, inst_id) {
-            self.errors.error_with_info(Span::new_extend_to_include_token(typ_expr_span, decl.name_token), "This declaration conflicts with a previous declaration in the same scope", vec![self.instructions[conflict].extract_wire_declaration().make_declared_here(self.errors.file)])
+        if let Err(conflict) = self.local_variable_context.add_declaration(name, inst_id) {
+            self.errors.error_with_info(Span::new_overarching(typ_expr_span, decl.name_span), "This declaration conflicts with a previous declaration in the same scope", vec![self.instructions[conflict].extract_wire_declaration().make_declared_here(self.errors.file)])
         }
 
         inst_id
@@ -467,7 +468,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
             }
             LeftExpression::Declaration(decl) => {
                 let root = self.flatten_declaration::<true>(decl, false, !gets_assigned);
-                Some(ConnectionWrite{root, root_span : Span::new_single_token(decl.name_token), path: Vec::new(), span, is_declared_in_this_module: true})
+                Some(ConnectionWrite{root, root_span : decl.name_span, path: Vec::new(), span, is_declared_in_this_module: true})
             }
         }
     }
@@ -857,7 +858,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
             if !is_instance_used_map[id] {
                 if let Instruction::Declaration(decl) = inst {
                     if decl.is_declared_in_this_module {
-                        self.errors.warn_basic(Span::new_single_token(decl.name_token), "Unused Variable: This variable does not affect the output ports of this module");
+                        self.errors.warn_basic(decl.name_span, "Unused Variable: This variable does not affect the output ports of this module");
                     }
                 }
             }

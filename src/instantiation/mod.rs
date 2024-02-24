@@ -635,7 +635,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
                         for port in bad_ports {
                             let port_decl = self.flattened.instructions[self.wires[WireID::from_hidden_value(port.0)].original_wire].extract_wire_declaration();
-                            self.errors.error_basic(Span::new_single_token(port_decl.name_token), format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
+                            self.errors.error_basic(port_decl.name_span, format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
                         }
                     }
                     LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path } => {

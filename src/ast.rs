@@ -41,9 +41,8 @@ pub type SpanTypeExpression = (TypeExpression, Span);
 
 #[derive(Debug)]
 pub struct SignalDeclaration {
-    pub name_token : usize,
+    pub name_span : Span,
     pub typ : SpanTypeExpression,
-    pub name : Box<str>,
     pub identifier_type : IdentifierType,
     pub latency_expr : Option<SpanExpression>
 }
