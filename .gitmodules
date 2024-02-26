@@ -3,4 +3,4 @@
 	url = https://github.com/pc2/tree-sitter-sus.git
 [submodule "ariadne"]
 	path = ariadne
-	url = git@github.com:VonTum/ariadne.git
+	url = ./ariadne
