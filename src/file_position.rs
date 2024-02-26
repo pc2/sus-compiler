@@ -44,18 +44,6 @@ impl Span {
     pub fn size(&self) -> usize {
         self.1 - self.0
     }
-    #[track_caller]
-    pub fn assert_is_single_token(&self) -> usize {
-        assert!(self.1 == self.0, "Span is not singleton! {}..{}", self.0, self.1);
-        self.0
-    }
-    pub fn is_single_token(&self) -> Option<usize> {
-        if self.0 == self.1 {
-            Some(self.0)
-        } else {
-            None
-        }
-    }
     pub fn difference_left(outer : Span, inner : Span) -> Span {
         assert!(outer.0 <= inner.0);
         assert!(outer.1 >= inner.1);
@@ -70,15 +58,20 @@ impl Span {
         Span(inner.1 + 1, outer.1) // temporary, because right now spans are still inclusive. 
         // Span(inner.1, outer.1)
     }
+    pub fn into_single_char_span(self) -> SingleCharSpan {
+        // todo assert(self.1 == self.0+1)
+        SingleCharSpan{char_token: self.0}
+    }
 }
 
-impl IntoIterator for Span {
-    type Item = usize;
-
-    type IntoIter = <std::ops::Range<usize> as IntoIterator>::IntoIter;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Range{start : self.0, end : self.1 + 1}.into_iter()
+impl PartialOrd for Span {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+impl Ord for Span {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
     }
 }
 
@@ -101,14 +94,14 @@ impl BracketSpan {
     }
 }
 
-impl PartialOrd for Span {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0.partial_cmp(&other.0)
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SingleCharSpan {
+    pub char_token : usize
 }
-impl Ord for Span {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.cmp(&other.0)
+
+impl Into<Span> for SingleCharSpan {
+    fn into(self) -> Span {
+        Span(self.char_token, self.char_token)
     }
 }
 

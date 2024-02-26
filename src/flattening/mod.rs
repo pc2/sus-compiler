@@ -4,7 +4,13 @@ pub mod name_context;
 use std::{ops::Deref, iter::zip};
 
 use crate::{
-    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{AssignableExpressionModifiers, CodeBlock, Expression, Identifier, IdentifierType, InterfacePorts, LeftExpression, Module, Operator, SignalDeclaration, SpanExpression, SpanTypeExpression, Statement, TypeExpression}, errors::{error_info, ErrorCollector, ErrorInfo}, file_position::{BracketSpan, Span}, linker::{ConstantUUID, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker}, tokenizer::TOKEN_IDENTIFIER, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE}, value::Value
+    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID},
+    ast::{AssignableExpressionModifiers, CodeBlock, Expression, Identifier, IdentifierType, InterfacePorts, LeftExpression, Module, Operator, SignalDeclaration, SpanExpression, SpanTypeExpression, Statement, TypeExpression},
+    errors::{error_info, ErrorCollector, ErrorInfo},
+    file_position::{BracketSpan, Span},
+    linker::{ConstantUUID, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker},
+    typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE},
+    value::Value
 };
 
 use self::name_context::LocalVariableContext;
@@ -281,11 +287,9 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
     }
     fn resolve_identifier(&self, identifier : &Identifier) -> LocalOrGlobal {
         // Possibly local
-        if let Some(single_tok_idx) = identifier.span.is_single_token() {
-            assert!(self.linker.file.tokens[single_tok_idx] == TOKEN_IDENTIFIER);
-            if let Some(decl_id) = self.local_variable_context.get_declaration_for(&self.linker.file.file_text[Span::new_single_token(single_tok_idx)]) {
-                return LocalOrGlobal::Local(decl_id);
-            }
+        let name_text = &self.linker.file.file_text[identifier.span];
+        if let Some(decl_id) = self.local_variable_context.get_declaration_for(name_text) {
+            return LocalOrGlobal::Local(decl_id);
         }
         // Global identifier
         LocalOrGlobal::Global(self.linker.resolve_global(identifier.span, &self.errors))

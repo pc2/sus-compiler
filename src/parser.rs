@@ -1,7 +1,7 @@
 
 use num::BigInt;
 
-use crate::{ast::*, errors::*, file_position::{BracketSpan, FileText, Span}, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID, tokenizer::*, value::Value};
+use crate::{ast::*, errors::*, file_position::{BracketSpan, FileText, SingleCharSpan, Span}, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID, tokenizer::*, value::Value};
 
 use std::{iter::Peekable, ops::Range, str::FromStr};
 use core::slice::Iter;
@@ -33,21 +33,21 @@ impl TokenTreeNode {
 }
 
 
-fn error_unclosed_bracket(open_pos : usize, open_typ : TokenTypeIdx, close_before_pos : usize, errors : &ErrorCollector) {
+fn error_unclosed_bracket(open_pos : SingleCharSpan, open_typ : TokenTypeIdx, close_before_pos : SingleCharSpan, errors : &ErrorCollector) {
     let open_name = get_token_type_name(open_typ);
     let reason = format!("Unclosed bracket {open_name}");
     let file_name = errors.file.clone();
-    errors.error_with_info(Span::new_single_token(open_pos), reason, vec![error_info(Span::new_single_token(close_before_pos), file_name, "must be closed before this")])
+    errors.error_with_info(open_pos.into(), reason, vec![error_info(close_before_pos.into(), file_name, "must be closed before this")])
 }
-fn error_unopened_bracket(close_pos : usize, close_typ : TokenTypeIdx, open_after_pos : usize, errors : &ErrorCollector) {
+fn error_unopened_bracket(close_pos : SingleCharSpan, close_typ : TokenTypeIdx, open_after_pos : SingleCharSpan, errors : &ErrorCollector) {
     let close_name = get_token_type_name(close_typ);
     let reason = format!("Unopened bracket. Closing bracket {close_name} found but was not opened.");
     let file_name = errors.file.clone();
-    errors.error_with_info(Span::new_single_token(close_pos), reason, vec![error_info(Span::new_single_token(open_after_pos), file_name, "must be opened in scope after this")])
+    errors.error_with_info(close_pos.into(), reason, vec![error_info(open_after_pos.into(), file_name, "must be opened in scope after this")])
 }
 struct TokenHierarchyStackElem {
     open_bracket : TokenTypeIdx, 
-    open_bracket_pos : usize,
+    open_bracket_span : SingleCharSpan,
     parent : Vec<TokenTreeNode>
 }
 
@@ -61,29 +61,31 @@ pub fn to_token_hierarchy(token_types : &[TokenTypeIdx], file_text : &FileText, 
         }
         match is_bracket(tok_typ) {
             IsBracket::Open => {
-                stack.push(TokenHierarchyStackElem{open_bracket : tok_typ, open_bracket_pos : tok_idx, parent : cur_token_slab});
+                let open_bracket_span = Span::new_single_token(tok_idx).into_single_char_span();
+                stack.push(TokenHierarchyStackElem{open_bracket : tok_typ, open_bracket_span, parent : cur_token_slab});
                 cur_token_slab = Vec::new();
             },
             IsBracket::Close => {
+                let close_bracket_span = Span::new_single_token(tok_idx).into_single_char_span();
                 loop { // Loop for bracket stack unrolling, for correct code only runs once
                     if let Some(cur_block) = stack.pop() {
                         if closes(cur_block.open_bracket, tok_typ) { // All is well. This bracket was closed properly. Happy path!
                             let mut parent_cur_token_slab = cur_block.parent;
-                            parent_cur_token_slab.push(TokenTreeNode::Block(cur_block.open_bracket, cur_token_slab, BracketSpan::from_outer(Span::new_across_tokens(cur_block.open_bracket_pos, tok_idx))));
+                            parent_cur_token_slab.push(TokenTreeNode::Block(cur_block.open_bracket, cur_token_slab, BracketSpan::from_outer(Span::new_overarching(cur_block.open_bracket_span.into(), close_bracket_span.into()))));
                             cur_token_slab = parent_cur_token_slab;
                             break;
                         } else {
                             if !stack.iter().any(|prev_bracket| closes(prev_bracket.open_bracket, tok_typ)) { // Any bracket in the stack closes this?
-                                error_unopened_bracket(tok_idx, tok_typ, cur_block.open_bracket_pos, errors);
+                                error_unopened_bracket(close_bracket_span, tok_typ, cur_block.open_bracket_span, errors);
                                 stack.push(cur_block); // Push the previous bracket back onto bracket stack, as we disregarded erroneous closing bracket
                                 break;
                             } else {
-                                error_unclosed_bracket(cur_block.open_bracket_pos, token_types[cur_block.open_bracket_pos], tok_idx, errors);
+                                error_unclosed_bracket(cur_block.open_bracket_span, cur_block.open_bracket, close_bracket_span, errors);
                             }
                         }
                     } else {
                         // Too many close brackets
-                        errors.error_basic(Span::new_single_token(tok_idx), "A close bracket had no corresponding opening bracket.");
+                        errors.error_basic(close_bracket_span.into(), "A close bracket had no corresponding opening bracket.");
                         break;
                     }
                 }
@@ -95,7 +97,7 @@ pub fn to_token_hierarchy(token_types : &[TokenTypeIdx], file_text : &FileText, 
     }
 
     while let Some(unclosed) = stack.pop() {
-        errors.error_basic(Span::new_single_token(unclosed.open_bracket_pos), "Bracket was not closed before EOF")
+        errors.error_basic(unclosed.open_bracket_span.into(), "Bracket was not closed before EOF")
     }
 
     cur_token_slab
