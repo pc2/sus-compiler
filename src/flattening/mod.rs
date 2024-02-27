@@ -513,7 +513,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
                             let excess_results_span = Span::new_overarching(to[num_func_outputs].span, *func_span).dont_include_last_token();
                             self.errors.error_with_info(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
                         } else {
-                            let too_few_targets_pos = if let Some(eq) = eq_sign_position {Span::new_single_token(*eq)} else {func_name_span};
+                            let too_few_targets_pos = if let Some(eq) = eq_sign_position {eq.into()} else {func_name_span};
                             self.errors.error_with_info(too_few_targets_pos, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
                         }
                     }

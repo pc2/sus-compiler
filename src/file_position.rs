@@ -105,6 +105,12 @@ impl Into<Span> for SingleCharSpan {
     }
 }
 
+impl Into<Span> for &SingleCharSpan {
+    fn into(self) -> Span {
+        Span(self.char_token, self.char_token)
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct CharLine {
     pub line : usize,

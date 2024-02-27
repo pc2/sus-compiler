@@ -1,6 +1,6 @@
 
 
-use crate::{errors::ErrorCollector, file_position::{BracketSpan, Span}, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID, tokenizer::{get_token_type_name, TokenTypeIdx}, value::Value};
+use crate::{errors::ErrorCollector, file_position::{BracketSpan, SingleCharSpan, Span}, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID, tokenizer::{get_token_type_name, TokenTypeIdx}, value::Value};
 use core::ops::Range;
 use std::fmt::Display;
 
@@ -67,14 +67,14 @@ pub struct Identifier {
 pub enum Expression {
     Named(Identifier),
     Constant(Value),
-    UnaryOp(Box<(Operator, usize/*Operator token */, SpanExpression)>),
-    BinOp(Box<(SpanExpression, Operator, usize/*Operator token */, SpanExpression)>),
+    UnaryOp(Box<(Operator, Span/*Operator token */, SpanExpression)>),
+    BinOp(Box<(SpanExpression, Operator, Span/*Operator token */, SpanExpression)>),
     Array(Box<(SpanExpression, SpanExpression, BracketSpan)>), // first[second]
     FuncCall(Vec<SpanExpression>) // first(second, third, ...)
 }
 
 impl Expression {
-    pub fn new_binop(left : SpanExpression, op : Operator, op_pos : usize/*Operator token */, right : SpanExpression) -> SpanExpression {
+    pub fn new_binop(left : SpanExpression, op : Operator, op_pos : Span/*Operator token */, right : SpanExpression) -> SpanExpression {
         let span = Span::new_overarching(left.1, right.1);
         (Expression::BinOp(Box::new((left, op, op_pos, right))), span)
     }
@@ -91,7 +91,7 @@ pub enum LeftExpression {
 #[derive(Debug)]
 pub enum AssignableExpressionModifiers {
     LatencyAdding{num_regs : i64, regs_span : Span},
-    Initial{initial_token : usize},
+    Initial{initial_token : Span},
     NoModifiers
 }
 
@@ -110,7 +110,7 @@ pub struct RangeExpression {
 
 #[derive(Debug)]
 pub enum Statement {
-    Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<usize>, expr : Option<SpanExpression>}, // num_regs v = expr;
+    Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<SingleCharSpan>, expr : Option<SpanExpression>}, // num_regs v = expr;
     If{condition : SpanExpression, then : CodeBlock, els : Option<CodeBlock>},
     For{var : SignalDeclaration, range : RangeExpression, code : CodeBlock},
     Block(CodeBlock)
