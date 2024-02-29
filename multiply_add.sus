@@ -1,5 +1,4 @@
 
-
 module multiply : int a, int b -> int r {
 	r = a * b;
 }
@@ -508,8 +507,14 @@ module bad_cycle2 : int a -> int r {
 	r = test;
 }
 
-module module_taking_a_lot_of_time : int data_in'0 -> int data_out'300 {
+module module_taking_a_lot_of_time : int data_in'0 -> int data_out'200 {
 	data_out = data_in;
+}
+
+
+
+/*extern*/ module offset_latency : int i'0 -> int o'-5 {
+
 }
 
 

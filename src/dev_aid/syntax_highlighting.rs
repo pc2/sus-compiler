@@ -1,7 +1,7 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{arena_alloc::ArenaVector, ast::*, errors::{CompileError, ErrorLevel}, file_position::{FileText, Span}, flattening::{Instruction, WireSource}, linker::{FileUUID, FileUUIDMarker, Linker, NameElem}, parser::*};
+use crate::{arena_alloc::ArenaVector, ast::*, errors::{CompileError, ErrorLevel}, file_position::Span, flattening::{Instruction, WireSource}, linker::{FileUUID, FileUUIDMarker, Linker, NameElem}, parser::*};
 
 use ariadne::*;
 
@@ -70,33 +70,6 @@ pub fn walk_name_color(all_objects : &[NameElem], linker : &Linker) -> Vec<(IDEI
     result
 }
 
-// Outputs character_offsets.len() == tokens.len() + 1 to include EOF token
-fn generate_character_offsets(file_text : &FileText) -> Vec<Range<usize>> {
-    let mut character_offsets : Vec<Range<usize>> = Vec::new();
-    character_offsets.reserve(file_text.num_tokens());
-    
-    let mut cur_char = 0;
-    let mut whitespace_start = 0;
-    for tok_idx in 0..file_text.num_tokens() {
-        let tok_range = file_text.get_token_range(tok_idx);
-
-        // whitespace
-        cur_char += file_text.file_text[whitespace_start..tok_range.start].chars().count();
-        let token_start_char = cur_char;
-        
-        // actual text
-        cur_char += file_text.file_text[tok_range.clone()].chars().count();
-        character_offsets.push(token_start_char..cur_char);
-        whitespace_start = tok_range.end;
-    }
-
-    // Final char offset for EOF
-    let num_chars_in_file = cur_char + file_text.file_text[whitespace_start..].chars().count();
-    character_offsets.push(cur_char..num_chars_in_file);
-
-    character_offsets
-}
-
 pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<(PathBuf, Source), FileUUIDMarker>) {
     let mut linker = Linker::new();
     let mut paths_arena : ArenaVector<(PathBuf, Source), FileUUIDMarker> = ArenaVector::new();
@@ -123,21 +96,8 @@ pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<(PathBuf, 
     (linker, paths_arena)
 }
 
-
-struct CustomSpan {
-    file : FileUUID,
-    span : Range<usize>
-}
-impl ariadne::Span for CustomSpan {
-    type SourceId = FileUUID;
-
-    fn source(&self) -> &FileUUID { &self.file }
-    fn start(&self) -> usize { self.span.start }
-    fn end(&self) -> usize { self.span.end }
-}
-
 // Requires that character_ranges.len() == tokens.len() + 1 to include EOF token
-pub fn pretty_print_error<AriadneCache : Cache<FileUUID>>(error : &CompileError, file : FileUUID, character_ranges : &[Range<usize>], file_cache : &mut AriadneCache) {
+pub fn pretty_print_error<AriadneCache : Cache<FileUUID>>(error : &CompileError, file : FileUUID, linker : &Linker, file_cache : &mut AriadneCache) {
     // Generate & choose some colours for each of our elements
     let (err_color, report_kind) = match error.level {
         ErrorLevel::Error => (Color::Red, ReportKind::Error),
@@ -145,21 +105,24 @@ pub fn pretty_print_error<AriadneCache : Cache<FileUUID>>(error : &CompileError,
     };
     let info_color = Color::Blue;
 
-    let error_span = error.position.to_range(character_ranges);
+    let error_span = linker.files[file].file_text.get_span_range(error.position);
 
-    let mut report: ReportBuilder<'_, CustomSpan> = Report::build(report_kind, file, error_span.start);
+    let config = 
+        Config::default()
+        .with_index_type(IndexType::Byte);
+    let mut report: ReportBuilder<'_, (FileUUID, Range<usize>)> = Report::build(report_kind, file, error_span.start).with_config(config);
     report = report
         .with_message(&error.reason)
         .with_label(
-            Label::new(CustomSpan{file : file, span : error_span})
+            Label::new((file, error_span))
                 .with_message(&error.reason)
                 .with_color(err_color)
         );
 
     for info in &error.infos {
-        let info_span = info.position.to_range(character_ranges);
+        let info_span = linker.files[info.file].file_text.get_span_range(info.position);
         report = report.with_label(
-            Label::new(CustomSpan{file : info.file, span : info_span})
+            Label::new((info.file, info_span))
                 .with_message(&info.info)
                 .with_color(info_color)
         )
@@ -182,12 +145,10 @@ impl Cache<FileUUID> for ArenaVector<(PathBuf, Source<String>), FileUUIDMarker> 
 
 pub fn print_all_errors(linker : &Linker, paths_arena : &mut ArenaVector<(PathBuf, Source), FileUUIDMarker>) {
     for (file_uuid, f) in &linker.files {
-        let token_offsets = generate_character_offsets(&f.file_text);
-
         let errors = linker.get_all_errors_in_file(file_uuid);
 
         for err in errors.get().0 {
-            pretty_print_error(&err, f.parsing_errors.file, &token_offsets, paths_arena);
+            pretty_print_error(&err, f.parsing_errors.file, linker, paths_arena);
         }
     }
 }

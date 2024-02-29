@@ -21,10 +21,10 @@ tree-sitter-sus = {path = "tree-sitter-sus"}
 # calyx-opt = {version = "0.6.1", optional = true}
 # calyx-backend = {version = "0.6.1", optional = true}
 
-# moore-circt = {version = "0.14.0", optional = true, path = "/home/lennart/Desktop/moore/src/circt"}
-# moore-circt-sys = {version = "0.14.0", optional = true, path = "/home/lennart/Desktop/moore/src/circt-sys"}
-moore-circt = {version = "0.14.0", optional = true}
-moore-circt-sys = {version = "0.14.0", optional = true}
+moore-circt = {version = "0.14.0", optional = true, path = "/home/lennart/Desktop/moore/src/circt"}
+moore-circt-sys = {version = "0.14.0", optional = true, path = "/home/lennart/Desktop/moore/src/circt-sys"}
+# moore-circt = {version = "0.14.0", optional = true}
+# moore-circt-sys = {version = "0.14.0", optional = true}
 
 #lsp
 lsp-server = {version = "0.7.1", optional = true}

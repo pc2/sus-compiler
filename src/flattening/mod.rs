@@ -329,7 +329,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
         }))
     }
     // Returns the module, full interface, and the output range for the function call syntax
-    fn desugar_func_call(&mut self, func_and_args : &[SpanExpression], func_call_span : Span) -> Option<(&Module, InterfacePorts<FlatID>)> {
+    fn desugar_func_call(&mut self, func_and_args : &[SpanExpression], func_call_span : BracketSpan) -> Option<(&Module, InterfacePorts<FlatID>)> {
         let (name_expr, name_expr_span) = &func_and_args[0]; // Function name is always there
         let Expression::Named(name) = name_expr else {
             self.errors.error_basic(*name_expr_span, "Function call name must be a simple identifier");
@@ -359,13 +359,13 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
             let module_info = vec![error_info(md.link_info.span, md.link_info.file, "Interface defined here")];
             if arg_count > expected_arg_count {
                 // Too many args, complain about excess args at the end
-                let excess_args_span = Span::new_overarching(args[expected_arg_count].1, func_call_span).dont_include_last_token();
+                let excess_args_span = Span::new_overarching(args[expected_arg_count].1, func_call_span.inner_span());
                 self.errors.error_with_info(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."), module_info);
                 // Shorten args to still get proper type checking for smaller arg array
                 args = &args[..expected_arg_count];
             } else {
                 // Too few args, mention missing argument names
-                self.errors.error_with_info(func_call_span.only_last_token(), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."), module_info);
+                self.errors.error_with_info(func_call_span.close_bracket().into(), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."), module_info);
             }
         }
 
@@ -414,7 +414,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
                 WireSource::ArrayAccess{arr, arr_idx}
             }
             Expression::FuncCall(func_and_args) => {
-                if let Some((md, interface_wires)) = self.desugar_func_call(func_and_args, *expr_span) {
+                if let Some((md, interface_wires)) = self.desugar_func_call(func_and_args, BracketSpan::from_outer(*expr_span)) {
                     let output_range = interface_wires.func_call_syntax_outputs();
 
                     if output_range.len() != 1 {
@@ -500,7 +500,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
         for (stmt, stmt_span) in &code.statements {
             match stmt {
                 Statement::Assign{to, expr : Some((Expression::FuncCall(func_and_args), func_span)), eq_sign_position} => {
-                    let Some((md, interface)) = self.desugar_func_call(&func_and_args, *func_span) else {continue};
+                    let Some((md, interface)) = self.desugar_func_call(&func_and_args, BracketSpan::from_outer(*func_span)) else {continue};
                     let output_range = interface.func_call_syntax_outputs();
                     let outputs = &interface.ports[output_range];
 
@@ -510,7 +510,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
                     if num_targets != num_func_outputs {
                         let info = vec![error_info(md.link_info.span, md.link_info.file, "Module Defined here")];
                         if num_targets > num_func_outputs {
-                            let excess_results_span = Span::new_overarching(to[num_func_outputs].span, *func_span).dont_include_last_token();
+                            let excess_results_span = Span::new_overarching(to[num_func_outputs].span, to.last().unwrap().span);
                             self.errors.error_with_info(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
                         } else {
                             let too_few_targets_pos = if let Some(eq) = eq_sign_position {eq.into()} else {func_name_span};

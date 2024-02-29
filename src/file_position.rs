@@ -8,11 +8,6 @@ impl Span {
     /// Only really used for having a span with the maximum size. 
     pub const MAX_POSSIBLE_SPAN : Span = Span(0, usize::MAX);
 
-    pub fn to_range<T : Clone>(&self, tokens : &[Range<T>]) -> Range<T> {
-        let min = tokens[self.0].start.clone();
-        let max = tokens[self.1].end.clone();
-        min..max
-    }
     pub fn new_overarching(left : Span, right : Span) -> Span {
         assert!(left.0 <= right.0);
         assert!(left.1 <= right.1);
@@ -20,22 +15,6 @@ impl Span {
     }
     pub fn new_single_token(tok_idx : usize) -> Span {
         Span(tok_idx, tok_idx)
-    }
-    pub fn new_extend_to_include_token(left : Span, tok_idx : usize) -> Span {
-        Span::new_overarching(left, Span::new_single_token(tok_idx))
-    }
-    pub fn dont_include_last_token(self) -> Span {
-        self
-    }
-    pub fn only_last_token(self) -> Span {
-        Span(self.1, self.1)
-    }
-    pub fn new_extend_before(tok_idx : usize, right : Span) -> Span {
-        Span::new_overarching(Span::new_single_token(tok_idx), right)
-    }
-    pub fn new_across_tokens(start_tok : usize, end_tok : usize) -> Span {
-        assert!(start_tok <= end_tok);
-        Span(start_tok, end_tok)
     }
     pub fn contains_token(&self, token_idx : usize) -> bool {
         token_idx >= self.0 && token_idx <= self.1
@@ -91,6 +70,12 @@ impl BracketSpan {
     }
     pub fn outer_span(&self) -> Span {
         self.0
+    }
+    pub fn open_bracket(&self) -> SingleCharSpan {
+        SingleCharSpan{char_token : self.0.0}
+    }
+    pub fn close_bracket(&self) -> SingleCharSpan {
+        SingleCharSpan{char_token : self.0.1}
     }
 }
 
@@ -159,12 +144,6 @@ impl FileText {
     
     pub fn num_tokens(&self) -> usize {
         (self.token_boundaries.len() - 2) / 2
-    }
-    pub fn get_token_range(&self, token_idx : usize) -> Range<usize> {
-        self.token_boundaries[token_idx*2+1]..self.token_boundaries[token_idx*2+2]
-    }
-    pub fn get_token_linechar_range(&self, token_idx : usize) -> Range<CharLine> {
-        self.token_boundaries_as_char_lines[token_idx*2+1]..self.token_boundaries_as_char_lines[token_idx*2+2]
     }
     pub fn get_span_range(&self, span : Span) -> Range<usize> {
         self.token_boundaries[span.0*2+1]..self.token_boundaries[span.1*2+2]
