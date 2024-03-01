@@ -73,13 +73,11 @@ pub const ALL_SYMBOLS : [(&'static str, u8); 35] = [
 pub const TOKEN_IDENTIFIER : TokenTypeIdx = (ALL_KEYWORDS.len() + ALL_SYMBOLS.len()) as TokenTypeIdx;
 pub const TOKEN_NUMBER : TokenTypeIdx = TOKEN_IDENTIFIER + 1;
 pub const TOKEN_COMMENT : TokenTypeIdx = TOKEN_IDENTIFIER + 2;
-pub const TOKEN_INVALID : TokenTypeIdx = TOKEN_IDENTIFIER + 3;
 
-pub const MISC_TOKENS : [&'static str; (TOKEN_INVALID - TOKEN_IDENTIFIER + 1) as usize] = [
+pub const MISC_TOKENS : [&'static str; (TOKEN_COMMENT - TOKEN_IDENTIFIER + 1) as usize] = [
     "IDENTIFIER",
     "NUMBER",
-    "COMMENT",
-    "INVALID"
+    "COMMENT"
 ];
 
 pub const fn kw(name : &str) -> TokenTypeIdx {
@@ -204,32 +202,23 @@ impl<'iter> Iterator for FileIter<'iter> {
 
 struct TokenGatherer {
     token_types : Vec<TokenTypeIdx>,
-    // List of all boundaries. Starts with 0, in whitespace mode, and then alternatingly switch to being a token, switch to being whitespace, back and forth
-    // The span of token i is given by token_boundaries[i*2+1..i*2+2]
-    // Ends at the end of the file, with a final whitespace block
-    token_boundaries : Vec<usize>
+    token_spans : Vec<Span>
 }
 impl TokenGatherer {
     fn new() -> Self {
-        TokenGatherer{token_types : Vec::new(), token_boundaries : vec![0]}
+        TokenGatherer{token_types : Vec::new(), token_spans : Vec::new()}
     }
     // Result can be used for error reporting
     fn push(&mut self, typ : TokenTypeIdx, rng : Range<usize>) {
         self.token_types.push(typ);
-        self.token_boundaries.push(rng.start);
-        self.token_boundaries.push(rng.end);
+        self.token_spans.push(Span::new_from_byte_range(rng));
     }
     fn push_invalid<S : Into<String>>(&mut self, rng : Range<usize>, errors : &ErrorCollector, motivation : S) {
-        errors.error_basic(Span::new_single_token(self.token_types.len()), motivation);
-        self.push(TOKEN_INVALID, rng);
-    }
-    fn finalize(mut self, file_text : &str) -> (Vec<TokenTypeIdx>, Vec<usize>) {
-        self.token_boundaries.push(file_text.len());
-        (self.token_types, self.token_boundaries)
+        errors.error_basic(Span::new_from_byte_range(rng), motivation);
     }
 }
 
-pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> (Vec<TokenTypeIdx>, Vec<usize>) {
+pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> (Vec<TokenTypeIdx>, Vec<Span>) {
     let mut result = TokenGatherer::new();
     let mut file_char_iter = FileIter::new(file_text);
     
@@ -317,6 +306,5 @@ pub fn tokenize<'txt>(file_text : &'txt str, errors : &ErrorCollector) -> (Vec<T
         }
     }
 
-    result.token_boundaries.push(file_text.len());
-    result.finalize(file_text)
+    (result.token_types, result.token_spans)
 }

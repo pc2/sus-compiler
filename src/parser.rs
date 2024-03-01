@@ -45,13 +45,12 @@ struct TokenHierarchyStackElem {
     parent : Vec<TokenTreeNode>
 }
 
-pub fn to_token_hierarchy(token_types : &[TokenTypeIdx], errors : &ErrorCollector) -> Vec<TokenTreeNode> {
+pub fn to_token_hierarchy(token_types : &[TokenTypeIdx], token_spans : &[Span], errors : &ErrorCollector) -> Vec<TokenTreeNode> {
     let mut cur_token_slab : Vec<TokenTreeNode> = Vec::new();
     let mut stack : Vec<TokenHierarchyStackElem> = Vec::new(); // Type of opening bracket, token position, Token Subtree
 
-    for (idx, &tok_typ) in token_types.iter().enumerate() {
-        let span = Span::new_single_token(idx);
-        if tok_typ == TOKEN_COMMENT || tok_typ == TOKEN_INVALID { // At this stage the comments are filtered out
+    for (&tok_typ, &span) in std::iter::zip(token_types.iter(), token_spans.iter()) {
+        if tok_typ == TOKEN_COMMENT { // At this stage the comments are filtered out
             continue;
         }
         match is_bracket(tok_typ) {
@@ -722,11 +721,11 @@ pub struct FullParseResult {
 pub fn perform_full_semantic_parse<'txt>(file_text : String, file : FileUUID) -> FullParseResult {
     let errors = ErrorCollector::new(file);
 
-    let (tokens, token_boundaries) = tokenize(&file_text, &errors);
+    let (tokens, token_spans) = tokenize(&file_text, &errors);
 
-    let file_text = FileText::new(file_text, token_boundaries);
+    let file_text = FileText::new(file_text);
     
-    let token_hierarchy = to_token_hierarchy(&tokens, &errors);
+    let token_hierarchy = to_token_hierarchy(&tokens, &token_spans, &errors);
 
     let ast = parse(&token_hierarchy, &file_text, file_text.whole_file_span(), errors);
 

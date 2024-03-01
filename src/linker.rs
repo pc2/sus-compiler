@@ -376,14 +376,14 @@ impl Linker {
         md.instantiations.instantiate(&md.link_info.name, &md.flattened, self)
     }
 
-    pub fn get_info_about_source_location<'linker>(&'linker self, token_idx : usize, file : FileUUID) -> Option<(LocationInfo<'linker>, Span)> {
-        let mut location_builder = LocationInfoBuilder::new(token_idx);
+    pub fn get_info_about_source_location<'linker>(&'linker self, position : usize, file : FileUUID) -> Option<(LocationInfo<'linker>, Span)> {
+        let mut location_builder = LocationInfoBuilder::new(position);
         
         for global in &self.files[file].associated_values {
             match *global {
                 NameElem::Module(md_id) => {
                     let md = &self.modules[md_id];
-                    if md.link_info.span.contains_token(token_idx) {
+                    if md.link_info.span.contains_pos(position) {
                         location_builder.update(md.link_info.name_span, LocationInfo::Global(NameElem::Module(md_id)));
                         for (id, inst) in &md.flattened.instructions {
                             match inst {
@@ -391,7 +391,7 @@ impl Linker {
                                     location_builder.update(sm.module_name_span, LocationInfo::Global(NameElem::Module(sm.module_uuid)));
                                 }
                                 Instruction::Declaration(decl) => {
-                                    match decl.typ_expr.get_deepest_selected(token_idx) {
+                                    match decl.typ_expr.get_deepest_selected(position) {
                                         Some(WrittenType::Named(span, name_id)) => {
                                             location_builder.update(*span, LocationInfo::Global(NameElem::Type(*name_id)));
                                         }
@@ -400,7 +400,7 @@ impl Linker {
                                         }
                                         None => {}
                                     }
-                                    if decl.is_free_standing_decl && decl.name_span.contains_token(token_idx) {
+                                    if decl.is_free_standing_decl && decl.name_span.contains_pos(position) {
                                         location_builder.update(decl.name_span, LocationInfo::WireRef(md, id));
                                     }
                                 }
@@ -447,7 +447,7 @@ pub enum LocationInfo<'linker> {
 struct LocationInfoBuilder<'linker> {
     best_instruction : Option<LocationInfo<'linker>>,
     best_span : Span,
-    token_idx : usize
+    position : usize
 }
 
 impl<'linker> LocationInfoBuilder<'linker> {
@@ -455,11 +455,11 @@ impl<'linker> LocationInfoBuilder<'linker> {
         Self{
             best_instruction : None,
             best_span : Span::MAX_POSSIBLE_SPAN,
-            token_idx
+            position: token_idx
         }
     }
     fn update(&mut self, span : Span, info : LocationInfo<'linker>) {
-        if span.contains_token(self.token_idx) && span.size() <= self.best_span.size() {
+        if span.contains_pos(self.position) && span.size() <= self.best_span.size() {
             //assert!(span.size() < self.best_span.size());
             // May not be the case. Do prioritize later ones, as they tend to be nested
             self.best_span = span;

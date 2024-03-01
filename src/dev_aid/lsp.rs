@@ -260,9 +260,9 @@ fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::T
     
     let file_data = &file_cache.linker.files[uuid];
 
-    let token_idx = file_data.file_text.get_token_on_or_left_of(from_position(text_pos.position));
+    let byte_pos = file_data.file_text.linecol_to_byte(from_position(text_pos.position));
 
-    let (info, span) = file_cache.linker.get_info_about_source_location(token_idx, uuid)?;
+    let (info, span) = file_cache.linker.get_info_about_source_location(byte_pos, uuid)?;
     //let span = Span::new_single_token(token_idx);
 
     let char_line_range = file_data.file_text.get_span_linecol_range(span);

@@ -28,14 +28,14 @@ impl WrittenType {
         }
     }
 
-    pub fn get_deepest_selected(&self, token_idx : usize) -> Option<&WrittenType> {
+    pub fn get_deepest_selected(&self, position : usize) -> Option<&WrittenType> {
         let span = self.get_span();
-        if span.contains_token(token_idx) {
+        if span.contains_pos(position) {
             match self {
                 WrittenType::Error(_span) | WrittenType::Named(_span, _) => {}
                 WrittenType::Array(_span, arr_box) => {
                     let (arr_typ, _idx) = arr_box.deref();
-                    let sub = arr_typ.get_deepest_selected(token_idx);
+                    let sub = arr_typ.get_deepest_selected(position);
                     if sub.is_some() {
                         return sub;
                     }
