@@ -97,18 +97,18 @@ impl Into<Span> for &SingleCharSpan {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct CharLine {
+pub struct LineCol {
     pub line : usize,
-    pub character : usize
+    pub col : usize
 }
-impl PartialOrd for CharLine {
+impl PartialOrd for LineCol {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
-impl Ord for CharLine {
+impl Ord for LineCol {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.line.cmp(&other.line).then(self.character.cmp(&other.character))
+        self.line.cmp(&other.line).then(self.col.cmp(&other.col))
     }
 }
 
@@ -119,27 +119,38 @@ pub struct FileText {
     // The span of token i is given by token_boundaries[i*2+1..i*2+2]
     // Ends at the end of the file, with a final whitespace block
     token_boundaries : Vec<usize>,
-    token_boundaries_as_char_lines : Vec<CharLine>
+    token_boundaries_as_char_lines : Vec<LineCol>,
+    lines_start_at : Vec<usize>
 }
 
 impl FileText {
     pub fn new(file_text : String, token_boundaries : Vec<usize>) -> Self {
-        let mut cur_position = CharLine{line: 0, character: 0};
+        let mut cur_position = LineCol{line: 0, col: 0};
         let mut start = 0;
         let token_boundaries_as_char_lines = token_boundaries.iter().map(|part_end| {
             for c in file_text[start..*part_end].chars() {
                 if c == '\n' {
                     cur_position.line += 1;
-                    cur_position.character = 0;
+                    cur_position.col = 0;
                 } else {
-                    cur_position.character += 1;
+                    cur_position.col += 1;
                 }
             }
             start = *part_end;
             cur_position
         }).collect();
 
-        FileText{file_text, token_boundaries, token_boundaries_as_char_lines}
+        let mut lines_start_at = Vec::new();
+
+        lines_start_at.push(0);
+        for (idx, c) in file_text.char_indices() {
+            if c == '\n' {
+                lines_start_at.push(idx + 1);
+            }
+        }
+        lines_start_at.push(file_text.len());
+
+        FileText{file_text, token_boundaries, token_boundaries_as_char_lines, lines_start_at}
     }
     
     pub fn num_tokens(&self) -> usize {
@@ -148,11 +159,35 @@ impl FileText {
     pub fn get_span_range(&self, span : Span) -> Range<usize> {
         self.token_boundaries[span.0*2+1]..self.token_boundaries[span.1*2+2]
     }
-    pub fn get_span_linechar_range(&self, span : Span) -> Range<CharLine> {
+    pub fn get_span_linecol_range(&self, span : Span) -> Range<LineCol> {
         self.token_boundaries_as_char_lines[span.0*2+1]..self.token_boundaries_as_char_lines[span.1*2+2]
     }
 
-    pub fn get_token_on_or_left_of(&self, char_line : CharLine) -> usize {
+    pub fn byte_to_linecol(&self, byte_pos : usize) -> LineCol {
+        assert!(byte_pos < self.file_text.len());
+        let line = match self.lines_start_at.binary_search(&byte_pos) {
+            Ok(exact_newline) => exact_newline,
+            Err(after_newline) => after_newline
+        };
+        let text_before = &self.file_text[self.lines_start_at[line]..byte_pos];
+
+        LineCol{line, col : text_before.chars().count()}
+    }
+    pub fn linecol_to_byte(&self, linecol : LineCol) -> usize {
+        let line_start = self.lines_start_at[linecol.line];
+        let line_text = &self.file_text[line_start..self.lines_start_at[linecol.line+1]];
+
+        let mut cols_left = linecol.col;
+        for (byte, _) in line_text.char_indices() {
+            if cols_left == 0 {
+                return line_start + byte;
+            }
+            cols_left -= 1;
+        }
+        unreachable!()
+    }
+
+    pub fn get_token_on_or_left_of(&self, char_line : LineCol) -> usize {
         match self.token_boundaries_as_char_lines.binary_search(&char_line) {
             Ok(idx) | Err(idx) => {
                 assert!(idx >= 1);

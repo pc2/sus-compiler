@@ -7,7 +7,7 @@ use lsp_server::{Connection, Message, Response};
 use lsp_types::notification::Notification;
 
 use crate::{
-    arena_alloc::ArenaVector, ast::{IdentifierType, Module}, errors::{CompileError, ErrorCollector, ErrorLevel}, file_position::{CharLine, FileText, Span}, flattening::FlatID, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse, walk_name_color
+    arena_alloc::ArenaVector, ast::{IdentifierType, Module}, errors::{CompileError, ErrorCollector, ErrorLevel}, file_position::{LineCol, FileText, Span}, flattening::FlatID, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse, walk_name_color
 };
 
 use super::syntax_highlighting::IDEIdentifierType;
@@ -146,16 +146,16 @@ fn get_modifiers_for_token(tok : IDEIdentifierType) -> u32 {
     }
 }
 
-fn from_position(pos : lsp_types::Position) -> CharLine {
-    CharLine{line : pos.line as usize, character : pos.character as usize}
+fn from_position(pos : lsp_types::Position) -> LineCol {
+    LineCol{line : pos.line as usize, col : pos.character as usize}
 }
-fn from_position_range(range : lsp_types::Range) -> std::ops::Range<CharLine> {
+fn from_position_range(range : lsp_types::Range) -> std::ops::Range<LineCol> {
     std::ops::Range{start : from_position(range.start), end : from_position(range.end)}
 }
-fn to_position(char_line : CharLine) -> lsp_types::Position {
-    lsp_types::Position{line : char_line.line as u32, character : char_line.character as u32}
+fn to_position(char_line : LineCol) -> lsp_types::Position {
+    lsp_types::Position{line : char_line.line as u32, character : char_line.col as u32}
 }
-fn to_position_range(range : std::ops::Range<CharLine>) -> lsp_types::Range {
+fn to_position_range(range : std::ops::Range<LineCol>) -> lsp_types::Range {
     lsp_types::Range{start : to_position(range.start), end : to_position(range.end)}
 }
 
@@ -169,7 +169,7 @@ fn convert_to_semantic_tokens(file_data : &FileData, ide_tokens : &mut[(IDEIdent
         let typ = get_semantic_token_type_from_ide_token(*ide_kind);
         let mod_bits = get_modifiers_for_token(*ide_kind);
 
-        let tok_range = file_data.file_text.get_span_linechar_range(*span);
+        let tok_range = file_data.file_text.get_span_linecol_range(*span);
         let start_pos = to_position(tok_range.start);
         let end_pos = to_position(tok_range.end);
 
@@ -205,10 +205,10 @@ fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> Vec<SemanticT
 use lsp_types::Diagnostic;
 
 fn cvt_span_to_lsp_range(ch_sp : Span, file_text : &FileText) -> lsp_types::Range {
-    let rng = file_text.get_span_linechar_range(ch_sp);
+    let rng = file_text.get_span_linecol_range(ch_sp);
     Range {
-        start: Position{character : rng.start.character as u32, line : rng.start.line as u32},
-        end: Position{character : rng.end.character as u32, line : rng.end.line as u32}
+        start: to_position(rng.start),
+        end: to_position(rng.end)
     }
 }
 
@@ -265,7 +265,7 @@ fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::T
     let (info, span) = file_cache.linker.get_info_about_source_location(token_idx, uuid)?;
     //let span = Span::new_single_token(token_idx);
 
-    let char_line_range = file_data.file_text.get_span_linechar_range(span);
+    let char_line_range = file_data.file_text.get_span_linecol_range(span);
     Some((info, to_position_range(char_line_range)))
 }
 
@@ -382,7 +382,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                     LocationInfo::WireRef(md, decl_id) => {
                         let uri = file_cache.uris[md.link_info.file].clone();
                         let decl = md.flattened.instructions[decl_id].extract_wire_declaration();
-                        let range = to_position_range(file_cache.linker.files[md.link_info.file].file_text.get_span_linechar_range(decl.name_span));
+                        let range = to_position_range(file_cache.linker.files[md.link_info.file].file_text.get_span_linecol_range(decl.name_span));
                         GotoDefinitionResponse::Scalar(Location{uri, range})
                     }
                     LocationInfo::Temporary(_, _, _) => {
@@ -394,7 +394,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                     LocationInfo::Global(id) => {
                         if let Some(link_info) = file_cache.linker.get_link_info(id) {
                             let uri = file_cache.uris[link_info.file].clone();
-                            let range = to_position_range(file_cache.linker.files[link_info.file].file_text.get_span_linechar_range(link_info.name_span));
+                            let range = to_position_range(file_cache.linker.files[link_info.file].file_text.get_span_linecol_range(link_info.name_span));
                             GotoDefinitionResponse::Scalar(Location{uri, range})
                         } else {
                             GotoDefinitionResponse::Array(Vec::new())
