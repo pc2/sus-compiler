@@ -21,8 +21,8 @@ tree-sitter-sus = {path = "tree-sitter-sus"}
 # calyx-opt = {version = "0.6.1", optional = true}
 # calyx-backend = {version = "0.6.1", optional = true}
 
-moore-circt = {version = "0.14.0", optional = true, path = "/home/lennart/Desktop/moore/src/circt"}
-moore-circt-sys = {version = "0.14.0", optional = true, path = "/home/lennart/Desktop/moore/src/circt-sys"}
+# moore-circt = {version = "0.14.0", optional = true, path = "/home/lennart/Desktop/moore/src/circt"}
+# moore-circt-sys = {version = "0.14.0", optional = true, path = "/home/lennart/Desktop/moore/src/circt-sys"}
 # moore-circt = {version = "0.14.0", optional = true}
 # moore-circt-sys = {version = "0.14.0", optional = true}
 
@@ -35,4 +35,4 @@ serde = {version = "1.0.156", optional = true}
 [features]
 lsp = ["lsp-server", "lsp-types", "serde_json", "serde"]
 # codegen = ["calyx-ir", "calyx-opt", "calyx-backend"]
-codegen = ["moore-circt-sys", "moore-circt"]
+# codegen = ["moore-circt-sys", "moore-circt"]

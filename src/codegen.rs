@@ -3,7 +3,7 @@ use std::{ops::Deref, io};
 use crate::{linker::Linker, flattening::{FlattenedModule, FlatID}, ast::{Module, Span}, arena_alloc::ListAllocator, instantiation::InstantiatedModule};
 
 
-use moore_circt::{hw, comb, mlir::{self, Owned, builder, OperationExt, SingleBlockOp}, mlir::{Context, OwnedContext, DialectHandle, Builder, Value, Type}};
+/*use moore_circt::{hw, comb, mlir::{self, Owned, builder, OperationExt, SingleBlockOp}, mlir::{Context, OwnedContext, DialectHandle, Builder, Value, Type}};
 use num::bigint::BigInt;
 
 
@@ -49,7 +49,7 @@ impl GenerationContext {
         module.print(io::stdout().lock(), true);
     }
 }
-
+*/
 /*
 use calyx_ir::*;
 
