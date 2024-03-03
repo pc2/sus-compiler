@@ -44,7 +44,7 @@ pub struct ConnectionWrite {
 
 #[derive(Debug)]
 pub enum WriteType {
-    Connection{num_regs : i64, regs_span : Option<Span>},
+    Connection{num_regs : i64, regs_span : Span},
     Initial
 }
 
@@ -372,7 +372,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
         for (field, arg_expr) in zip(inputs, args) {
             let arg_read_side = self.flatten_expr(arg_expr);
             let func_input_port = &submodule_local_wires.ports[field];
-            self.instructions.alloc(Instruction::Write(Write{write_type : WriteType::Connection{num_regs : 0, regs_span : None}, from: arg_read_side, to: ConnectionWrite{root : *func_input_port, root_span : arg_expr.1, path : Vec::new(), span : *name_expr_span, is_declared_in_this_module : self.is_declared_in_this_module}}));
+            self.instructions.alloc(Instruction::Write(Write{write_type : WriteType::Connection{num_regs : 0, regs_span : Span::INVALID_SPAN}, from: arg_read_side, to: ConnectionWrite{root : *func_input_port, root_span : arg_expr.1, path : Vec::new(), span : *name_expr_span, is_declared_in_this_module : self.is_declared_in_this_module}}));
         }
 
         Some((md, submodule_local_wires))
@@ -479,9 +479,9 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
 
     fn flatten_assignment_modifiers(&mut self, modifiers : &AssignableExpressionModifiers) -> WriteType {
         match modifiers {
-            &AssignableExpressionModifiers::LatencyAdding{num_regs, regs_span} => WriteType::Connection{num_regs, regs_span : Some(regs_span)},
+            &AssignableExpressionModifiers::LatencyAdding{num_regs, regs_span} => WriteType::Connection{num_regs, regs_span},
             AssignableExpressionModifiers::Initial{initial_token : _} => WriteType::Initial,
-            AssignableExpressionModifiers::NoModifiers => WriteType::Connection{num_regs : 0, regs_span : None},
+            AssignableExpressionModifiers::NoModifiers => WriteType::Connection{num_regs : 0, regs_span : Span::INVALID_SPAN},
         }
     }
     fn flatten_code(&mut self, code : &'l CodeBlock) {

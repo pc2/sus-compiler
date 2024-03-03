@@ -91,10 +91,10 @@ The main goals of the language are roughly listed below:
 - [x] Hover type information
 - [x] Go to definition
 - [x] File Creation/Deletion/Rename
-- [ ] Show last generation value
+- [x] Show last generation value
 - [ ] Find all references
 - [ ] Highlighting
-- [ ] Code completion
+- [x] Code completion
 - [ ] Per-Line Resource Utilization Reporting
 
 ### Code Generation

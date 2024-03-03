@@ -7,6 +7,7 @@ pub struct Span(usize, usize);
 impl Span {
     /// Only really used for having a span with the maximum size. 
     pub const MAX_POSSIBLE_SPAN : Span = Span(0, usize::MAX);
+    pub const INVALID_SPAN : Span = Span(usize::MAX, usize::MAX);
 
     pub fn new_from_byte_range(rng : Range<usize>) -> Span {
         assert!(rng.end >= rng.start);
@@ -130,7 +131,6 @@ impl FileText {
                 lines_start_at.push(idx + 1);
             }
         }
-        //lines_start_at.push(file_text.len());
 
         FileText{file_text, lines_start_at}
     }

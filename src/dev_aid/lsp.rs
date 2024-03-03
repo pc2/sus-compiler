@@ -7,7 +7,7 @@ use lsp_server::{Connection, Message, Response};
 use lsp_types::notification::Notification;
 
 use crate::{
-    arena_alloc::ArenaVector, ast::{IdentifierType, Module}, errors::{CompileError, ErrorCollector, ErrorLevel}, file_position::{LineCol, FileText, Span}, flattening::FlatID, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse, walk_name_color
+    arena_alloc::ArenaVector, ast::{IdentifierType, Module}, errors::{CompileError, ErrorCollector, ErrorLevel}, file_position::{FileText, LineCol, Span}, flattening::{FlatID, Instruction}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse, walk_name_color
 };
 
 use super::syntax_highlighting::IDEIdentifierType;
@@ -103,6 +103,7 @@ pub fn lsp_main(port : u16, debug : bool) -> Result<(), Box<dyn Error + Sync + S
             range: Some(false), // Don't support ranges yet
             full: Some(SemanticTokensFullOptions::Bool(true)), // TODO: Support delta updating for faster syntax highlighting, just do whole file for now
         })),
+        completion_provider : Some(CompletionOptions{resolve_provider : Some(true), ..Default::default()}),
         /*workspace: Some(WorkspaceClientCapabilities{
             did_change_watched_files : Some(DidChangeWatchedFilesClientCapabilities{
 
@@ -329,6 +330,31 @@ fn gather_hover_infos(md: &Module, id: FlatID, is_generative : bool, file_cache:
     });
 }
 
+fn gather_completions(linker : &Linker, file_id : FileUUID, position : usize) -> Vec<CompletionItem> {
+    let mut result = Vec::new();
+
+    use crate::linker::Linkable;
+    for (_, m) in &linker.modules {
+        result.push(CompletionItem{label : m.link_info.name.to_string(), kind : Some(CompletionItemKind::FUNCTION), ..Default::default()});
+
+        if m.link_info.file == file_id && m.link_info.span.contains_pos(position) {
+            for (_id, v) in &m.flattened.instructions {
+                if let Instruction::Declaration(d) = v {
+                    result.push(CompletionItem{label : d.name.to_string(), kind : Some(CompletionItemKind::VARIABLE), ..Default::default()});
+                }
+            }
+        }
+    }
+    for (_, c) in &linker.constants {
+        result.push(CompletionItem{label : c.get_name().to_string(), kind : Some(CompletionItemKind::CONSTANT), ..Default::default()});
+    }
+    for (_, t) in &linker.types {
+        result.push(CompletionItem{label : t.get_name().to_string(), kind : Some(CompletionItemKind::STRUCT), ..Default::default()});
+    }
+
+    result
+}
+
 fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut LoadedFileCache, debug : bool) -> Result<serde_json::Value, serde_json::Error> {
     match method {
         request::HoverRequest::METHOD => {
@@ -424,6 +450,18 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
 
             todo!()
         }*/
+        request::Completion::METHOD => {
+            let params : CompletionParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
+            println!("Completion");
+
+            let uuid = file_cache.ensure_contains_file(&params.text_document_position.text_document.uri);
+            
+            let file_data = &file_cache.linker.files[uuid];
+
+            let position = file_data.file_text.linecol_to_byte(from_position(params.text_document_position.position));
+
+            serde_json::to_value(&CompletionResponse::Array(gather_completions(&file_cache.linker, uuid, position)))
+        }
         req => {
             println!("Other request: {req:?}");
             Ok(serde_json::Value::Null)

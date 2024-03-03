@@ -619,7 +619,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                                     if num_regs >= 1 {
                                         did_place_error = true;
                                         let this_register_plural = if num_regs == 1 {"This register is"} else {"These registers are"};
-                                        self.errors.error_basic(regs_span.unwrap(), format!("{this_register_plural}{rest_of_message}"));
+                                        self.errors.error_basic(regs_span, format!("{this_register_plural}{rest_of_message}"));
                                     }
                                 }
                                 WriteType::Initial => {unreachable!("Initial assignment can only be from compile-time constant. Cannot be part of latency loop. ")}
