@@ -261,7 +261,7 @@ fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::T
     
     let file_data = &file_cache.linker.files[uuid];
 
-    let byte_pos = file_data.file_text.linecol_to_byte(from_position(text_pos.position));
+    let byte_pos = file_data.file_text.linecol_to_byte_clamp(from_position(text_pos.position));
 
     let (info, span) = file_cache.linker.get_info_about_source_location(byte_pos, uuid)?;
     //let span = Span::new_single_token(token_idx);
@@ -458,7 +458,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
             
             let file_data = &file_cache.linker.files[uuid];
 
-            let position = file_data.file_text.linecol_to_byte(from_position(params.text_document_position.position));
+            let position = file_data.file_text.linecol_to_byte_clamp(from_position(params.text_document_position.position));
 
             serde_json::to_value(&CompletionResponse::Array(gather_completions(&file_cache.linker, uuid, position)))
         }

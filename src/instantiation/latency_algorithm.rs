@@ -213,6 +213,10 @@ fn extract_solution<'d>(mut latencies : Vec<i64>, fanins : &'d ListOfLists<FanIn
 
 pub fn solve_latencies<'d>(fanins : &'d ListOfLists<FanInOut>, fanouts : &'d ListOfLists<FanInOut>, inputs : &'d [usize], outputs : &'d [usize], mut specified_latencies : Vec<SpecifiedLatency>) -> Result<Vec<i64>, LatencyCountingError> {
     assert!(fanins.len() == fanouts.len());
+    if fanins.len() == 0 {
+        return Ok(Vec::new());
+    }
+
     let mut input_side = LatencySolverSide::new(fanouts, inputs);
     let mut output_side = LatencySolverSide::new(fanins, outputs);
 

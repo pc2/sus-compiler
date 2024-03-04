@@ -703,9 +703,9 @@ impl<'file> ASTParserContext<'file> {
 
 
 
-pub fn parse<'nums, 'g, 'file>(token_hierarchy : &Vec<TokenTreeNode>, file_text : &'file FileText, whole_file_span : Span, errors : ErrorCollector) -> ASTRoot {
+pub fn parse<'nums, 'g, 'file>(token_hierarchy : &Vec<TokenTreeNode>, file_text : &'file FileText, errors : ErrorCollector) -> ASTRoot {
     let context = ASTParserContext{errors, file_text};
-    let mut token_stream = TokenStream::new(&token_hierarchy, whole_file_span);
+    let mut token_stream = TokenStream::new(&token_hierarchy, file_text.whole_file_span());
     context.parse_ast(&mut token_stream)
 }
 
@@ -727,7 +727,7 @@ pub fn perform_full_semantic_parse<'txt>(file_text : String, file : FileUUID) ->
     
     let token_hierarchy = to_token_hierarchy(&tokens, &token_spans, &errors);
 
-    let ast = parse(&token_hierarchy, &file_text, file_text.whole_file_span(), errors);
+    let ast = parse(&token_hierarchy, &file_text, errors);
 
     FullParseResult{
         file_text,
