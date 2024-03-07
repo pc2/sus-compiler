@@ -2,7 +2,7 @@
 
 A module can have one or more interfaces, each of which consists of multiple input and output ports. 
 
-Interfaces form the only method by which one can cross latency and clock domains. Each interface has with it it's associated hardware, that operates within the same clock and latency counting domain. Wires which belong to the same latency counting group should be placed in the same interface. 
+Interfaces form the only method by which one can cross latency and clock domains. Each interface has with it its associated hardware, that operates within the same clock and latency counting domain. Wires which belong to the same latency counting group should be placed in the same interface. 
 
 The code in one interface can read wires from other interfaces, provided the proper clock domain crossing method is used, in case of a clock domain crossing. Writes however, can naturally only be done by the interface that owns that wire. 
 

@@ -94,12 +94,12 @@ On the edges are noted the minimum latency offsets in black. These are given. Th
 Sadly, while it appears reasonable to think it's possible to assign a determinable latency. Observe this contrived example:
 
 ```Verilog
-// timeline is omitted here, not important
-module NonDeterminable : int a, int b -> int x, int y {
+module NonDeterminableLatency : int a, int b -> int x, int y {
     reg int a_d = a;
-    reg int t = a_d + b;
-    reg reg reg int a_ddd = a;
-    x = t + a_ddd;
+    int t = a_d + b;
+    reg reg reg int a_dd = a;
+	reg int t_d = t;
+    x = t_d + a_dd;
     y = t;
 }
 ```
@@ -113,8 +113,20 @@ One may think the solution would simply be to prefer inputs over outputs or some
 
 To this problem I only really see three options:
 - Still perform full latency computation when compiling each module separately. In the case of non-determinable latency assignment, reject the code and require the programmer to add explicit latency annotations. The benefit is better encapsulation, the programmer requires only the module itself to know what latencies are. The downside is of course less flexible modules. Though is this flexibility _really_ needed?
-- Infer absolute latencies on the inputs and outputs of submodules using templates which can be inferred. This would be really handy to allow latency information to flow back into the templating system, thus allowing a FIFO that alters its almostFull threshold based on its input latency. Of course, this makes absolute latency information flow from top-down instead of bottom up, so now getting the latency information back from the module would be impossible. The issue is that templates can't be instantiated partially. Either the submodule takes all of its port latencies from the calling module, or it determines its latencies itself. 
-- Perform latency computation at integration level, we don't define the absolute latencies on the ports of a module, unless the programmer explicitly does so. For simlpicity, this requires that every single module instantiation now compiles to its own Verilog module though, which is less than ideal for debugging. 
+~~- Infer absolute latencies on the inputs and outputs of submodules using templates which can be inferred. This would be really handy to allow latency information to flow back into the templating system, thus allowing a FIFO that alters its almostFull threshold based on its input latency. Of course, this makes absolute latency information flow from top-down instead of bottom up, so now getting the latency information back from the module would be impossible. The issue is that templates can't be instantiated partially. Either the submodule takes all of its port latencies from the calling module, or it determines its latencies itself. ~~
+~~- Perform latency computation at integration level, we don't define the absolute latencies on the ports of a module, unless the programmer explicitly does so. For simlpicity, this requires that every single module instantiation now compiles to its own Verilog module though, which is less than ideal for debugging. ~~
+
+Simply solve the above module by explicitly specifying latencies to the two inputs:
+```Verilog
+module NonDeterminableLatency : int a'0, int b'1 -> int x, int y {
+    reg int a_d = a;
+    int t = a_d + b;
+    reg reg reg int a_dd = a;
+	reg int t_d = t;
+    x = t_d + a_dd;
+    y = t;
+}
+```
 
 ### Latency Graph Cycles are the key
 So assigning absolute latencies is difficult, and no good solution can be found in isolated cases. Perhaps another approach would work better. 
