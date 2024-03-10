@@ -3,7 +3,7 @@ use num::BigInt;
 
 use crate::{ast::*, errors::*, file_position::{BracketSpan, FileText, SingleCharSpan, Span}, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID, tokenizer::*, value::Value};
 
-use std::{iter::Peekable, str::FromStr};
+use std::{cell::Cell, iter::Peekable, str::FromStr};
 use core::slice::Iter;
 
 pub enum TokenTreeNode {
@@ -715,10 +715,11 @@ pub struct FullParseResult {
     pub file_text : FileText,
     pub tokens : Vec<TokenTypeIdx>,
     pub token_hierarchy : Vec<TokenTreeNode>,
-    pub ast : ASTRoot
+    pub ast : ASTRoot,
+    pub tree : tree_sitter::Tree
 }
 
-pub fn perform_full_semantic_parse<'txt>(file_text : String, file : FileUUID) -> FullParseResult {
+pub fn perform_full_semantic_parse(file_text : String, file : FileUUID) -> FullParseResult {
     let errors = ErrorCollector::new(file);
 
     let (tokens, token_spans) = tokenize(&file_text, &errors);
@@ -729,10 +730,33 @@ pub fn perform_full_semantic_parse<'txt>(file_text : String, file : FileUUID) ->
 
     let ast = parse(&token_hierarchy, &file_text, errors);
 
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(tree_sitter_sus::language()).unwrap();
+
     FullParseResult{
+        tree : parser.parse(&file_text.file_text, None).unwrap(),
         file_text,
         tokens,
         token_hierarchy,
         ast,
     }
 }
+
+pub struct SusTreeSitterSingleton {
+    pub language : tree_sitter::Language,
+    pub module_node : u16,
+    pub module_name_field : u16,
+}
+
+impl SusTreeSitterSingleton {
+    pub fn new() -> Self {
+        let language = tree_sitter_sus::language();
+        SusTreeSitterSingleton {
+            module_node : language.id_for_node_kind("module", true),
+            module_name_field : language.field_id_for_name("name").unwrap(),
+            language,
+        }
+    }
+}
+
+//pub static TREE_SITTER_SUS : Cell<Option<SusTreeSitterSingleton>> = Cell::new(None);

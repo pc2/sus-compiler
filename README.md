@@ -49,6 +49,7 @@ The main goals of the language are roughly listed below:
 - [x] Can Parse Blur2 filter
 - [x] If Statements
 - [x] Latency Specifiers
+- [ ] Access module inputs / outputs through field names
 - [ ] Array Slices
 - [ ] Bound Specifiers
 - [ ] Structs
@@ -99,7 +100,6 @@ The main goals of the language are roughly listed below:
 
 ### Code Generation
 - [x] Expression Flattening
-- [ ] State Machine Generation
 - [x] Can Generate Verilog for Multiply-Add pipeline
 - [x] Can Generate Verilog for Blur2 filter
 - [ ] Can Generate Verilog for FIFO
@@ -135,7 +135,7 @@ pipeline multiply_add : i32 a, i32 b, i32 c -> i32 result {
   reg result = tmp2 + a;
 }
 ```
-Pipeline stages are denoted by adding the 'reg' keyword to statements. Either at the statement level, or to add registers within expressions. This example would then compile to the following Verilog code:
+Pipeline stages are denoted by adding the 'reg' keyword to statements. Either at the statement level, or to add registers within expressions. This example could[^1] compile to the following Verilog code:
 ```Verilog
 module multiply_add(
   input[31:0] a,

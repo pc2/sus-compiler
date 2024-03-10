@@ -1,5 +1,7 @@
 use std::{collections::{HashMap, HashSet}, rc::Rc, cell::RefCell};
 
+use tree_sitter::TreeCursor;
+
 use crate::{arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, ast::{LinkInfo, Module}, errors::{error_info, ErrorCollector}, file_position::{FileText, Span}, flattening::{FlatID, FlattenedModule, Instruction, WireInstance, WireSource}, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode}, tokenizer::TokenTypeIdx, typing::{Type, WrittenType}, util::{const_str_position, const_str_position_in_tuples}, value::Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -122,7 +124,8 @@ pub struct FileData {
     pub tokens : Vec<TokenTypeIdx>,
     pub token_hierarchy : Vec<TokenTreeNode>,
     pub parsing_errors : ErrorCollector,
-    pub associated_values : Vec<NameElem>
+    pub associated_values : Vec<NameElem>,
+    pub tree : tree_sitter::Tree
 }
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
@@ -330,13 +333,38 @@ impl Linker {
     
     pub fn add_reserved_file(&mut self, file : FileUUID, parse_result : FullParseResult) {
         let mut associated_values = Vec::new();
+        
+        let sus = crate::parser::SusTreeSitterSingleton::new();
+
+        {
+            let root_node = parse_result.tree.root_node();
+            
+            let mut tmp_cursor = root_node.walk();
+            for node in root_node.children(&mut tmp_cursor) {
+                if node.kind_id() == sus.module_node {
+                    let name_child = node.child_by_field_id(sus.module_name_field).unwrap();
+                    println!("MODULE DECL: {}", &parse_result.file_text.file_text[name_child.byte_range()])
+                } else {
+                    parse_result.ast.errors.error_basic(Span::from(node.byte_range()), "Only module declarations are allowed at the top level of a file!");
+                    continue;
+                }
+            }
+        }
+
         for md in parse_result.ast.modules {
             let module_name = md.link_info.name.clone();
             let new_module_uuid = NameElem::Module(self.modules.alloc(md));
             associated_values.push(new_module_uuid);
             self.add_name(module_name, new_module_uuid);
         }
-        self.files.alloc_reservation(file, FileData { file_text : parse_result.file_text, tokens: parse_result.tokens, token_hierarchy: parse_result.token_hierarchy, parsing_errors : parse_result.ast.errors, associated_values});
+        self.files.alloc_reservation(file, FileData{
+            file_text : parse_result.file_text,
+            tree: parse_result.tree,
+            tokens: parse_result.tokens,
+            token_hierarchy: parse_result.token_hierarchy,
+            parsing_errors : parse_result.ast.errors,
+            associated_values
+        });
     }
 
     pub fn relink(&mut self, file : FileUUID, parse_result : FullParseResult) {

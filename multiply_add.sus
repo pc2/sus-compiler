@@ -217,16 +217,14 @@ module multiply_add :
 	reg total = tmp + c;
 }
 
-module fibonnaci : bool next -> int num {
+module fibonnaci : -> int num {
 	state int current = 1;
 	state int current_prev = 0;
 
-	if next {
-		num = current + current_prev;
-		current_prev = current;
-		current = num;
-		reg int delay_current = current;
-	}
+	num = current + current_prev;
+	current_prev = current;
+	current = num;
+	reg int delay_current = current;
 }
 
 //timeline (v, true -> /) .. (v, false -> v)*
@@ -345,8 +343,12 @@ module generative : int i -> int o, int o2 {
 }
 
 module add_stuff_to_indices : int[10] values -> int[10] added_values {
+	int[5] arr;
 	for int i in 0..10 {
-		added_values[i] = values[i] + i;
+		int t = values[i];
+		added_values[i] = t + i;
+
+		int tt = arr[i] + values[0];
 	}
 }
 
@@ -479,7 +481,7 @@ module determinable_because_no_input_output_ports : int a -> int x {
 }
 
 // This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible. 
-module conflicting_latency_declarations : int a'1 -> int x'2 {
+module conflicting_latency_declarations : int a'0 -> int x'1 {
 	reg int nio = a;
 	reg x = nio;
 }

@@ -211,10 +211,10 @@ impl TokenGatherer {
     // Result can be used for error reporting
     fn push(&mut self, typ : TokenTypeIdx, rng : Range<usize>) {
         self.token_types.push(typ);
-        self.token_spans.push(Span::new_from_byte_range(rng));
+        self.token_spans.push(Span::from(rng));
     }
     fn push_invalid<S : Into<String>>(&mut self, rng : Range<usize>, errors : &ErrorCollector, motivation : S) {
-        errors.error_basic(Span::new_from_byte_range(rng), motivation);
+        errors.error_basic(Span::from(rng), motivation);
     }
 }
 

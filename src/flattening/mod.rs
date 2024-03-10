@@ -4,13 +4,7 @@ pub mod name_context;
 use std::{ops::Deref, iter::zip};
 
 use crate::{
-    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID},
-    ast::{AssignableExpressionModifiers, CodeBlock, Expression, Identifier, IdentifierType, InterfacePorts, LeftExpression, Module, Operator, SignalDeclaration, SpanExpression, SpanTypeExpression, Statement, TypeExpression},
-    errors::{error_info, ErrorCollector, ErrorInfo},
-    file_position::{BracketSpan, Span},
-    linker::{ConstantUUID, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker},
-    typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE},
-    value::Value
+    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{AssignableExpressionModifiers, CodeBlock, Expression, Identifier, IdentifierType, InterfacePorts, LeftExpression, Module, Operator, SignalDeclaration, SpanExpression, SpanTypeExpression, Statement, TypeExpression}, errors::{error_info, ErrorCollector, ErrorInfo}, file_position::{BracketSpan, Span}, linker::{ConstantUUID, FileData, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker}, parser::SusTreeSitterSingleton, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE}, value::Value
 };
 
 use self::name_context::LocalVariableContext;
@@ -216,6 +210,8 @@ struct FlatteningContext<'prev, 'inst, 'l, 'runtime> {
     linker : &'runtime GlobalResolver<'l>,
     pub type_list_for_naming : &'l ArenaAllocator<NamedType, TypeUUIDMarker>,
     module : &'l Module,
+
+    sus : SusTreeSitterSingleton,
 }
 
 impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
@@ -314,6 +310,7 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
             type_list_for_naming: self.type_list_for_naming,
             local_variable_context : LocalVariableContext::new_initial(),
             module,
+            sus : SusTreeSitterSingleton::new(),
         };
         
         let interface_ports = nested_context.initialize_interface::<true>();
@@ -492,7 +489,8 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
             local_variable_context: self.local_variable_context.extend(),
             linker: self.linker,
             type_list_for_naming: self.type_list_for_naming,
-            module: self.module
+            module: self.module,
+            sus : SusTreeSitterSingleton::new(),
         };
         inner_context.flatten_code_keep_context(code);
     }
@@ -581,6 +579,10 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
                 }
             }
         }
+    }
+
+    fn flatten_tree_sitter(&mut self, module_node : &tree_sitter::Node<'_>) {
+
     }
 
     /*
@@ -913,10 +915,14 @@ impl FlattenedModule {
             local_variable_context : LocalVariableContext::new_initial(),
             type_list_for_naming : &linker.types,
             module,
+            sus : SusTreeSitterSingleton::new(),
         };
 
         let interface_ports = context.initialize_interface::<false>();
+
         
+
+        //context.flatten_tree_sitter()
         context.flatten_code(&module.code);
         context.typecheck();
         context.generative_check();

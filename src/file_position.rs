@@ -4,16 +4,19 @@ use std::{fmt::Display, ops::{Index, Range}};
 #[derive(Clone,Copy,Debug,PartialEq,Eq,Hash)]
 pub struct Span(usize, usize);
 
+impl From<Range<usize>> for Span {
+    #[track_caller]
+    fn from(value: Range<usize>) -> Self {
+        assert!(value.end >= value.start);
+        Span(value.start, value.end)
+    }
+}
+
 impl Span {
     /// Only really used for having a span with the maximum size. 
     pub const MAX_POSSIBLE_SPAN : Span = Span(0, usize::MAX);
     pub const INVALID_SPAN : Span = Span(usize::MAX, usize::MAX);
 
-    #[track_caller]
-    pub fn new_from_byte_range(rng : Range<usize>) -> Span {
-        assert!(rng.end >= rng.start);
-        Span(rng.start, rng.end)
-    }
     pub fn into_range(&self) -> Range<usize> {
         self.0..self.1
     }
