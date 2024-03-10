@@ -22,20 +22,20 @@ module.exports = grammar({
     name: 'sus',
 
     rules: {
-        // TODO: add the actual grammar rules
         source_file: $ => repeat($.module),
 
         module: $ => seq(
             'module',
             field('name', $.identifier),
-            ':',
+            optional(seq(':',
             field('inputs', sepSeq($.declaration, ',')),
-            '->',
-            field('outputs', sepSeq($.declaration, ',')),
-            $.block
+            optional(seq('->',
+            field('outputs', sepSeq($.declaration, ','))))))
         ),
         identifier: $ => /[\p{L}_][\p{L}_\d]*/,
         number: $ => /\d[\d_]*/,
+
+        word: $=> $.identifier,
 
         global_identifier: $ => prec.left(PREC.namespace_path, seq(
             optional('::'),
@@ -73,7 +73,7 @@ module.exports = grammar({
 
         unary_op: $ => prec(PREC.unary, seq(
             choice('+', '-', '*', '!', '|', '&', '^'),
-            $._expression
+            field('right', $._expression)
         )),
 
         binary_op: $ => {
@@ -87,23 +87,23 @@ module.exports = grammar({
             ];
 
             return choice(...TABLE.map(([precedence, operator]) => prec.left(precedence, seq(
-                $._expression,
+                field('left', $._expression),
                 operator,
-                $._expression
+                field('right', $._expression)
             ))));
         },
 
         array_op: $ => seq(
-            $._expression,
+            field('arr', $._expression),
             '[',
-            $._expression,
+            field('arr_idx', $._expression),
             ']'
         ),
 
         func_call: $ => seq(
-            $._maybe_global_identifier,
+            field('module_name', $._maybe_global_identifier),
             '(',
-            sepSeq($._expression, ','),
+            sepSeq(field('argument', $._expression), ','),
             ')'
         ),
 
@@ -118,9 +118,9 @@ module.exports = grammar({
         ),
 
         range: $ => seq(
-            $._expression,
-            '..',
-            $._expression
+            field('from', $._expression),
+            ':',
+            field('to', $._expression),
         ),
         
         block: $ => seq(
@@ -140,16 +140,16 @@ module.exports = grammar({
             )
         ), ','),
         decl_assign_statement: $ => seq(
-            $._assign_left_side,
+            field('assign_to', $._assign_left_side),
             '=',
-            $._expression
+            field('assign_value', $._expression),
         ),
         decl_statement: $ => $.declaration,
         expression_statement: $ => $._expression,
 
         if_statement: $ => seq(
             'if',
-            $._expression,
+            field('condition', $._assign_left_side),
             $.block,
             optional(seq(
                 'else',
@@ -174,19 +174,15 @@ module.exports = grammar({
             $.if_statement,
             $.for_statement
         ),
-
-
-        single_line_comment: $ => /\/\/[^\n]*\n/,
-        multi_line_comment: $ => /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\//,
     },
 
     conflicts: $ => [
-        [$._maybe_global_identifier, $._type]
+        [$._maybe_global_identifier, $._type] // Just because LR(1) is too weak to resolve 'ident[] a' vs 'type_name[]'. Tree sitter resolves this itself with more expensive GLR. NOT a precedence relation. 
     ],
 
     extras: $ => [
         /\s+/,
-        $.single_line_comment,
-        $.multi_line_comment
+        /\/\/[^\n]*\n/, // Single line comment
+        /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\// // Multi line comment
     ]
 });
