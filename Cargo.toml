@@ -16,6 +16,7 @@ num = "*"
 # Tree sitter
 tree-sitter = "0.20.10"
 tree-sitter-sus = {path = "tree-sitter-sus"}
+static_init = "1.0.3"
 
 # calyx-ir = {version = "0.6.1", optional = true}
 # calyx-opt = {version = "0.6.1", optional = true}

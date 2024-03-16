@@ -3,8 +3,17 @@ pub mod name_context;
 
 use std::{ops::Deref, iter::zip};
 
+use tree_sitter::{Node, TreeCursor};
+
 use crate::{
-    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{AssignableExpressionModifiers, CodeBlock, Expression, Identifier, IdentifierType, InterfacePorts, LeftExpression, Module, Operator, SignalDeclaration, SpanExpression, SpanTypeExpression, Statement, TypeExpression}, errors::{error_info, ErrorCollector, ErrorInfo}, file_position::{BracketSpan, Span}, linker::{ConstantUUID, FileData, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker}, parser::SusTreeSitterSingleton, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE}, value::Value
+    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID},
+    ast::{AssignableExpressionModifiers, CodeBlock, Expression, Identifier, IdentifierType, InterfacePorts, LeftExpression, Module, Operator, SignalDeclaration, SpanExpression, SpanTypeExpression, Statement, TypeExpression},
+    errors::{error_info, ErrorCollector, ErrorInfo},
+    file_position::{BracketSpan, Span},
+    linker::{ConstantUUID, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker},
+    parser::SUS,
+    typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE},
+    value::Value
 };
 
 use self::name_context::LocalVariableContext;
@@ -201,20 +210,19 @@ impl<'l, 'e> LocalOrGlobal<'l, 'e> {
     }
 }
 
-struct FlatteningContext<'prev, 'inst, 'l, 'runtime> {
-    instructions : &'inst mut FlatAlloc<Instruction, FlatIDMarker>,
-    errors : &'runtime ErrorCollector,
+struct FlatteningContext<'l> {
+    instructions : FlatAlloc<Instruction, FlatIDMarker>,
+    errors : ErrorCollector,
     is_declared_in_this_module : bool,
+    cursor : TreeCursor<'l>,
 
-    local_variable_context : LocalVariableContext<'prev, 'l, FlatID>,
-    linker : &'runtime GlobalResolver<'l>,
-    pub type_list_for_naming : &'l ArenaAllocator<NamedType, TypeUUIDMarker>,
-    module : &'l Module,
-
-    sus : SusTreeSitterSingleton,
+    local_variable_context : LocalVariableContext<'l, FlatID>,
+    linker : GlobalResolver<'l>,
+    type_list_for_naming : &'l ArenaAllocator<NamedType, TypeUUIDMarker>,
+    module : &'l Module
 }
 
-impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
+impl<'l> FlatteningContext<'l> {
     fn map_to_type(&mut self, type_expr : &SpanTypeExpression) -> WrittenType {
         match &type_expr.0 {
             TypeExpression::Named => {
@@ -300,23 +308,27 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
         InterfacePorts{ports, outputs_start : self.module.interface.outputs_start}
     }
     fn alloc_module_interface(&mut self, name : Box<str>, module : &Module, module_uuid : ModuleUUID, typ_span : Span) -> FlatID {
-        let unused_errors = ErrorCollector::new(module.link_info.file); // Temporary ErrorCollector, unused
         let local_linker = self.linker.new_sublinker(module.link_info.file);
+        let module_range = module.link_info.span.into_range();
+        let mut cursor = local_linker.file.tree.walk();
+        let _ = cursor.goto_first_child_for_byte(module_range.start).unwrap();
+
         let mut nested_context = FlatteningContext {
-            instructions: self.instructions,
-            errors: &unused_errors,
+            instructions: std::mem::replace(&mut self.instructions, FlatAlloc::new()),
+            errors: ErrorCollector::new(module.link_info.file), // Temporary ErrorCollector, unused
             is_declared_in_this_module: false,
-            linker: &local_linker,
+            linker: local_linker,
             type_list_for_naming: self.type_list_for_naming,
             local_variable_context : LocalVariableContext::new_initial(),
             module,
-            sus : SusTreeSitterSingleton::new(),
+            cursor
         };
         
         let interface_ports = nested_context.initialize_interface::<true>();
         
-        self.linker.reabsorb_sublinker(local_linker);
+        self.linker.reabsorb_sublinker(nested_context.linker);
 
+        self.instructions = nested_context.instructions;
         self.instructions.alloc(Instruction::SubModule(SubModuleInstance{
             name,
             module_uuid,
@@ -482,17 +494,11 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
         }
     }
     fn flatten_code(&mut self, code : &'l CodeBlock) {
-        let mut inner_context = FlatteningContext{
-            instructions: self.instructions,
-            errors: self.errors,
-            is_declared_in_this_module: self.is_declared_in_this_module,
-            local_variable_context: self.local_variable_context.extend(),
-            linker: self.linker,
-            type_list_for_naming: self.type_list_for_naming,
-            module: self.module,
-            sus : SusTreeSitterSingleton::new(),
-        };
-        inner_context.flatten_code_keep_context(code);
+        let save = self.local_variable_context.new_frame();
+
+        self.flatten_code_keep_context(code);
+
+        self.local_variable_context.pop_frame(save);
     }
     fn flatten_code_keep_context(&mut self, code : &'l CodeBlock) {
         for (stmt, stmt_span) in &code.statements {
@@ -581,9 +587,126 @@ impl<'prev, 'inst, 'l, 'runtime> FlatteningContext<'prev, 'inst, 'l, 'runtime> {
         }
     }
 
-    fn flatten_tree_sitter(&mut self, module_node : &tree_sitter::Node<'_>) {
-
+    /*fn flatten_code_tree(&mut self, node : Node) {
+        assert_eq!(node.kind_id(), SUS.block_kind, "Was {} instead", node.kind());
+        
+        let mut inner_context = FlatteningContext{
+            instructions: self.instructions,
+            errors: self.errors,
+            is_declared_in_this_module: self.is_declared_in_this_module,
+            local_variable_context: self.local_variable_context.extend(),
+            linker: self.linker,
+            type_list_for_naming: self.type_list_for_naming,
+            module: self.module
+        };
+        inner_context.flatten_code_keep_context_tree(node);
     }
+    fn flatten_code_keep_context_tree(&mut self, node : Node) {
+        assert_eq!(node.kind_id(), SUS.block_kind, "Was {} instead", node.kind());
+        let mut cursor = node.walk();
+        
+        for (stmt, stmt_span) in node.children_by_field_id(field_id, cursor) {
+            match stmt {
+                Statement::Assign{to, expr : Some((Expression::FuncCall(func_and_args), func_span)), eq_sign_position} => {
+                    let Some((md, interface)) = self.desugar_func_call(&func_and_args, BracketSpan::from_outer(*func_span)) else {continue};
+                    let output_range = interface.func_call_syntax_outputs();
+                    let outputs = &interface.ports[output_range];
+
+                    let func_name_span = func_and_args[0].1;
+                    let num_func_outputs = outputs.len();
+                    let num_targets = to.len();
+                    if num_targets != num_func_outputs {
+                        let info = vec![error_info(md.link_info.span, md.link_info.file, "Module Defined here")];
+                        if num_targets > num_func_outputs {
+                            let excess_results_span = Span::new_overarching(to[num_func_outputs].span, to.last().unwrap().span);
+                            self.errors.error_with_info(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
+                        } else {
+                            let too_few_targets_pos = if let Some(eq) = eq_sign_position {eq.into()} else {func_name_span};
+                            self.errors.error_with_info(too_few_targets_pos, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
+                        }
+                    }
+
+                    for (field, to_i) in zip(outputs, to) {                        
+                        let module_port_wire_decl = self.instructions[*field].extract_wire_declaration();
+                        let module_port_proxy = self.instructions.alloc(Instruction::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : *func_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::WireRead(*field)}));
+                        let Some(write_side) = self.flatten_left_expr(&to_i.expr, to_i.span, true) else {continue};
+
+                        let write_type = self.flatten_assignment_modifiers(&to_i.modifiers);
+                        self.instructions.alloc(Instruction::Write(Write{write_type, from: module_port_proxy, to: write_side}));
+                    }
+                },
+                Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
+                    let read_side = non_func_expr.as_ref().map(|some_expr| self.flatten_expr(some_expr));
+                    if to.len() == 1 {
+                        let t = &to[0];
+                        let Some(write_side) = self.flatten_left_expr(&t.expr, t.span, non_func_expr.is_some()) else {continue};
+                        let write_type = self.flatten_assignment_modifiers(&t.modifiers);
+                        if let Some(read_side) = read_side {
+                            self.instructions.alloc(Instruction::Write(Write{write_type, from: read_side, to: write_side}));
+                        }
+                    } else {
+                        self.errors.error_basic(*stmt_span, format!("Non-function assignments must only output exactly 1 instead of {}", to.len()));
+                    }
+                },
+                Statement::Block(inner_code) => {
+                    self.flatten_code(inner_code);
+                },
+                Statement::If{condition : condition_expr, then, els} => {
+                    let condition = self.flatten_expr(condition_expr);
+
+                    let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement{condition, then_start : UUID::PLACEHOLDER, then_end_else_start : UUID::PLACEHOLDER, else_end : UUID::PLACEHOLDER}));
+                    let then_start = self.instructions.get_next_alloc_id();
+
+                    self.flatten_code(then);
+                    let then_end_else_start = self.instructions.get_next_alloc_id();
+                    if let Some(e) = els {
+                        self.flatten_code(e);
+                    }
+                    let else_end = self.instructions.get_next_alloc_id();
+
+                    let Instruction::IfStatement(if_stmt) = &mut self.instructions[if_id] else {unreachable!()};
+                    if_stmt.then_start = then_start;
+                    if_stmt.then_end_else_start = then_end_else_start;
+                    if_stmt.else_end = else_end;
+                }
+                Statement::For{var, range, code} => {
+                    let loop_var_decl = self.flatten_declaration::<false>(var, true, true);
+
+                    let start = self.flatten_expr(&range.from);
+                    let end = self.flatten_expr(&range.to);
+                    
+                    let for_id = self.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER)}));
+
+                    let code_start = self.instructions.get_next_alloc_id();
+
+                    self.flatten_code(code);
+                    
+                    let code_end = self.instructions.get_next_alloc_id();
+
+                    let Instruction::ForStatement(for_stmt) = &mut self.instructions[for_id] else {unreachable!()};
+
+                    for_stmt.loop_body = UUIDRange(code_start, code_end);
+                }
+            }
+        }
+    }*/
+
+    fn flatten_interface_ports_tree(&mut self) {
+        
+    }
+
+    fn flatten_module_tree(&mut self) {
+        let module_node = self.cursor.node();
+        assert_eq!(module_node.kind_id(), SUS.module_kind, "{}", module_node.kind());
+        println!("TREE SITTER module!");
+        let interface = module_node.child_by_field_id(SUS.interface_ports_field);
+        let code = module_node.child_by_field_id(SUS.block_field).unwrap();
+        
+        self.flatten_interface_ports_tree();
+        //self.flatten_code_tree(code);
+    }
+
+    
 
     /*
         ==== Typechecking ====
@@ -904,25 +1027,35 @@ impl FlattenedModule {
     It is template-preserving
     */
     pub fn flatten(linker : &Linker, module : &Module) -> FlattenedModule {
-        let mut instructions = FlatAlloc::new();
         let global_resolver = GlobalResolver::new(linker, module.link_info.file);
-        let errors = ErrorCollector::new(module.link_info.file);
+        
+        let byte_rng = module.link_info.span.into_range();
+
+        // The given span should correspond perfectly to this, so impossible we don't find the node. 
+        let mut cursor = global_resolver.file.tree.walk();
+        cursor.goto_first_child_for_byte(byte_rng.start);
+        //let module_subtree = global_resolver.file.tree.root_node().named_descendant_for_byte_range(byte_rng.start, byte_rng.end).unwrap();
+        let module_subtree = cursor.node();
+
         let mut context = FlatteningContext{
-            instructions: &mut instructions,
-            errors: &errors,
+            instructions : FlatAlloc::new(),
+            errors : ErrorCollector::new(module.link_info.file),
             is_declared_in_this_module : true,
-            linker : &global_resolver,
+            linker : global_resolver,
             local_variable_context : LocalVariableContext::new_initial(),
             type_list_for_naming : &linker.types,
             module,
-            sus : SusTreeSitterSingleton::new(),
+            cursor
         };
+
+        // Temporary, switch to iterating over nodes in file itself when needed. 
+        if module_subtree.kind_id() == SUS.module_kind {
+            context.flatten_module_tree();
+        }
 
         let interface_ports = context.initialize_interface::<false>();
 
-        
 
-        //context.flatten_tree_sitter()
         context.flatten_code(&module.code);
         context.typecheck();
         context.generative_check();
@@ -930,8 +1063,8 @@ impl FlattenedModule {
 
         FlattenedModule {
             resolved_globals : context.linker.extract_resolved_globals(),
-            errors,
-            instructions,
+            errors : context.errors,
+            instructions : context.instructions,
             interface_ports,
         }
     }

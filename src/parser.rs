@@ -1,9 +1,10 @@
 
 use num::BigInt;
+use static_init::dynamic;
 
 use crate::{ast::*, errors::*, file_position::{BracketSpan, FileText, SingleCharSpan, Span}, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID, tokenizer::*, value::Value};
 
-use std::{cell::Cell, iter::Peekable, str::FromStr};
+use std::{iter::Peekable, str::FromStr};
 use core::slice::Iter;
 
 pub enum TokenTreeNode {
@@ -731,7 +732,7 @@ pub fn perform_full_semantic_parse(file_text : String, file : FileUUID) -> FullP
     let ast = parse(&token_hierarchy, &file_text, errors);
 
     let mut parser = tree_sitter::Parser::new();
-    parser.set_language(tree_sitter_sus::language()).unwrap();
+    parser.set_language(SUS.language).unwrap();
 
     FullParseResult{
         tree : parser.parse(&file_text.file_text, None).unwrap(),
@@ -744,19 +745,108 @@ pub fn perform_full_semantic_parse(file_text : String, file : FileUUID) -> FullP
 
 pub struct SusTreeSitterSingleton {
     pub language : tree_sitter::Language,
-    pub module_node : u16,
-    pub module_name_field : u16,
+
+    pub error_kind : u16,
+    pub module_kind : u16,
+    pub interface_ports_kind : u16,
+    pub identifier_kind : u16,
+    pub number_kind : u16,
+    pub global_identifier_kind : u16,
+    pub array_type_kind : u16,
+    pub declaration_kind : u16,
+    pub unary_op_kind : u16,
+    pub binary_op_kind : u16,
+    pub array_op_kind : u16,
+    pub func_call_kind : u16,
+    pub range_kind : u16,
+    pub block_kind : u16,
+    pub decl_assign_statement_kind : u16,
+    pub decl_statement_kind : u16,
+    pub expression_statement_kind : u16,
+    pub if_statement_kind : u16,
+    pub for_statement_kind : u16,
+
+    pub name_field : u16,
+    pub module_inputs_field : u16,
+    pub module_outputs_field : u16,
+    pub block_field : u16,
+    pub interface_ports_field : u16,
+    pub array_element_type_field : u16,
+    pub array_size_field : u16,
+    pub type_field : u16,
+    pub latency_spec_field : u16,
+    pub declaration_modifiers_field : u16,
+    pub left_field : u16,
+    pub right_field : u16,
+    pub operator_field : u16,
+    pub arr_field : u16,
+    pub arr_idx_field : u16,
+    pub func_arguments_field : u16,
+    pub from_field : u16,
+    pub to_field : u16,
+    pub assign_to_field : u16,
+    pub assign_value_field : u16,
+    pub condition_field : u16,
+    pub then_block_field : u16,
+    pub else_block_field : u16,
+    pub for_decl_field : u16,
+    pub for_range_field : u16
 }
 
 impl SusTreeSitterSingleton {
     pub fn new() -> Self {
         let language = tree_sitter_sus::language();
         SusTreeSitterSingleton {
-            module_node : language.id_for_node_kind("module", true),
-            module_name_field : language.field_id_for_name("name").unwrap(),
+            error_kind : language.id_for_node_kind("ERROR", false),
+            module_kind : language.id_for_node_kind("module", true),
+            interface_ports_kind : language.id_for_node_kind("interface_ports", true),
+            identifier_kind : language.id_for_node_kind("identifier", true),
+            number_kind : language.id_for_node_kind("number", true),
+            global_identifier_kind : language.id_for_node_kind("global_identifier", true),
+            array_type_kind : language.id_for_node_kind("array_type", true),
+            declaration_kind : language.id_for_node_kind("declaration", true),
+            unary_op_kind : language.id_for_node_kind("unary_op", true),
+            binary_op_kind : language.id_for_node_kind("binary_op", true),
+            array_op_kind : language.id_for_node_kind("array_op", true),
+            func_call_kind : language.id_for_node_kind("func_call", true),
+            range_kind : language.id_for_node_kind("range", true),
+            block_kind : language.id_for_node_kind("block", true),
+            decl_assign_statement_kind : language.id_for_node_kind("decl_assign_statement", true),
+            decl_statement_kind : language.id_for_node_kind("decl_statement", true),
+            expression_statement_kind : language.id_for_node_kind("expression_statement", true),
+            if_statement_kind : language.id_for_node_kind("if_statement", true),
+            for_statement_kind : language.id_for_node_kind("for_statement", true),
+
+            name_field : language.field_id_for_name("name").unwrap(),
+            module_inputs_field : language.field_id_for_name("inputs").unwrap(),
+            module_outputs_field : language.field_id_for_name("outputs").unwrap(),
+            block_field : language.field_id_for_name("block").unwrap(),
+            interface_ports_field : language.field_id_for_name("interface_ports").unwrap(),
+            array_element_type_field : language.field_id_for_name("array_element_type").unwrap(),
+            array_size_field : language.field_id_for_name("array_size").unwrap(),
+            type_field : language.field_id_for_name("type").unwrap(),
+            latency_spec_field : language.field_id_for_name("latency_spec").unwrap(),
+            declaration_modifiers_field : language.field_id_for_name("declaration_modifiers").unwrap(),
+            left_field : language.field_id_for_name("left").unwrap(),
+            right_field : language.field_id_for_name("right").unwrap(),
+            operator_field : language.field_id_for_name("operator").unwrap(),
+            arr_field : language.field_id_for_name("arr").unwrap(),
+            arr_idx_field : language.field_id_for_name("arr_idx").unwrap(),
+            func_arguments_field : language.field_id_for_name("func_arguments").unwrap(),
+            from_field : language.field_id_for_name("from").unwrap(),
+            to_field : language.field_id_for_name("to").unwrap(),
+            assign_to_field : language.field_id_for_name("assign_to").unwrap(),
+            assign_value_field : language.field_id_for_name("assign_value").unwrap(),
+            condition_field : language.field_id_for_name("condition").unwrap(),
+            then_block_field : language.field_id_for_name("then_block").unwrap(),
+            else_block_field : language.field_id_for_name("else_block").unwrap(),
+            for_decl_field : language.field_id_for_name("for_decl").unwrap(),
+            for_range_field : language.field_id_for_name("for_range").unwrap(),
+                    
             language,
         }
     }
 }
 
-//pub static TREE_SITTER_SUS : Cell<Option<SusTreeSitterSingleton>> = Cell::new(None);
+#[dynamic]
+pub static SUS : SusTreeSitterSingleton = SusTreeSitterSingleton::new();

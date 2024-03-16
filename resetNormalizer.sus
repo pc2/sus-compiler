@@ -1,9 +1,9 @@
 
-module hello_from_the_other_side : int[3] a -> int result {
+/*module hello_from_the_other_side : int[3] a -> int result {
 	result = a[2];
 	int x = a[0] + a[1] + a[2];
-}
+}*/
 
-module m {
-
+module a {
+	+ 3;
 }
