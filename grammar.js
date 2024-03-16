@@ -24,13 +24,19 @@ module.exports = grammar({
     rules: {
         source_file: $ => repeat($.module),
 
+        interface_ports : $ => seq(
+            ':',
+            field('inputs', sepSeq($.declaration, ',')),
+            optional(seq(
+                '->',
+                field('outputs', sepSeq($.declaration, ','))
+            ))
+        ),
         module: $ => seq(
             'module',
             field('name', $.identifier),
-            optional(seq(':',
-            field('inputs', sepSeq($.declaration, ',')),
-            optional(seq('->',
-            field('outputs', sepSeq($.declaration, ','))))))
+            optional(field('interface_ports', $.interface_ports)),
+            field('block', $.block)
         ),
         identifier: $ => /[\p{L}_][\p{L}_\d]*/,
         number: $ => /\d[\d_]*/,
@@ -48,9 +54,9 @@ module.exports = grammar({
         ),
         
         array_type: $ => seq(
-            $._type,
+            field('array_element_type', $._type),
             '[',
-            $._expression,
+            field('array_size', $._expression),
             ']'
         ),
         _type: $ => choice(
@@ -59,10 +65,10 @@ module.exports = grammar({
         ),
 
         declaration: $ => seq(
-            optional(choice(
+            optional(field('declaration_modifiers', choice(
                 'state',
                 'gen'
-            )),
+            ))),
             field('type', $._type),
             field('name', $.identifier),
             optional(seq(
@@ -72,7 +78,7 @@ module.exports = grammar({
         ),
 
         unary_op: $ => prec(PREC.unary, seq(
-            choice('+', '-', '*', '!', '|', '&', '^'),
+            field('operator', choice('+', '-', '*', '!', '|', '&', '^')),
             field('right', $._expression)
         )),
 
@@ -88,7 +94,7 @@ module.exports = grammar({
 
             return choice(...TABLE.map(([precedence, operator]) => prec.left(precedence, seq(
                 field('left', $._expression),
-                operator,
+                field('operator', operator),
                 field('right', $._expression)
             ))));
         },
@@ -101,9 +107,9 @@ module.exports = grammar({
         ),
 
         func_call: $ => seq(
-            field('module_name', $._maybe_global_identifier),
+            field('name', $._maybe_global_identifier),
             '(',
-            sepSeq(field('argument', $._expression), ','),
+            field('func_arguments', sepSeq($._expression, ',')),
             ')'
         ),
 
@@ -150,21 +156,21 @@ module.exports = grammar({
         if_statement: $ => seq(
             'if',
             field('condition', $._assign_left_side),
-            $.block,
+            field('then_block', $.block),
             optional(seq(
                 'else',
-                choice(
+                field('else_block', choice(
                     $.block,
                     $.if_statement
-                )
+                ))
             ))
         ),
         for_statement: $ => seq(
             'for',
-            $.declaration,
+            field('for_decl', $.declaration),
             'in',
-            $.range,
-            $.block
+            field('for_range', $.range),
+            field('block', $.block)
         ),
         _statement: $ => choice(
             $.block,
