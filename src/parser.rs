@@ -1,10 +1,11 @@
 
 use num::BigInt;
 use static_init::dynamic;
+use tree_sitter::Tree;
 
 use crate::{ast::*, errors::*, file_position::{BracketSpan, FileText, SingleCharSpan, Span}, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID, tokenizer::*, value::Value};
 
-use std::{iter::Peekable, str::FromStr};
+use std::{iter::Peekable, num::NonZeroU16, str::FromStr};
 use core::slice::Iter;
 
 pub enum TokenTreeNode {
@@ -732,16 +733,63 @@ pub fn perform_full_semantic_parse(file_text : String, file : FileUUID) -> FullP
     let ast = parse(&token_hierarchy, &file_text, errors);
 
     let mut parser = tree_sitter::Parser::new();
-    parser.set_language(SUS.language).unwrap();
+    parser.set_language(&SUS.language).unwrap();
+
+    let tree = parser.parse(&file_text.file_text, None).unwrap();
+
+    report_all_tree_errors(&tree, &ast.errors);
 
     FullParseResult{
-        tree : parser.parse(&file_text.file_text, None).unwrap(),
+        tree,
         file_text,
         tokens,
         token_hierarchy,
         ast,
     }
 }
+
+
+
+
+fn report_all_tree_errors(tree : &Tree, errors : &ErrorCollector) {
+    let mut cursor = tree.walk();
+    loop {
+        let depth_str = "  ".repeat(cursor.depth() as usize);
+        let cursor_node = cursor.node().kind();
+        let cursor_span = Span::from(cursor.node().byte_range());
+        println!("{depth_str}{cursor_node}: {cursor_span}");
+        let n = cursor.node();
+        if n.is_error() || n.is_missing() {
+            let node_name = n.kind();
+            let span = Span::from(n.byte_range());
+            let field_name = cursor.field_name();
+
+            let of_name = if let Some(field) = field_name {
+                format!("in the field '{field}' of type '{node_name}'")
+            } else {
+                format!("in a node of type '{node_name}'")
+            };
+            let (error_type, parent_node) = if n.is_missing() {
+                ("missing field", n.parent().unwrap().parent().unwrap()) // Weird workaround because MISSING nodes can't properly parent?
+            } else {
+                ("syntax error", n.parent().unwrap())
+            };
+            let parent_node_name = parent_node.kind();
+            let parent_info = error_info(Span::from(parent_node.byte_range()), errors.file, format!("Parent node '{parent_node_name}'"));
+            errors.error_with_info(span, format!("While parsing '{parent_node_name}', parser found a {error_type} {of_name}"), vec![parent_info]);
+        } else {
+            if cursor.goto_first_child() {
+                continue;
+            }
+        }
+        while !cursor.goto_next_sibling() {
+            if !cursor.goto_parent() {
+                return;
+            }
+        }
+    }
+}
+
 
 pub struct SusTreeSitterSingleton {
     pub language : tree_sitter::Language,
@@ -766,35 +814,35 @@ pub struct SusTreeSitterSingleton {
     pub if_statement_kind : u16,
     pub for_statement_kind : u16,
 
-    pub name_field : u16,
-    pub module_inputs_field : u16,
-    pub module_outputs_field : u16,
-    pub block_field : u16,
-    pub interface_ports_field : u16,
-    pub array_element_type_field : u16,
-    pub array_size_field : u16,
-    pub type_field : u16,
-    pub latency_spec_field : u16,
-    pub declaration_modifiers_field : u16,
-    pub left_field : u16,
-    pub right_field : u16,
-    pub operator_field : u16,
-    pub arr_field : u16,
-    pub arr_idx_field : u16,
-    pub func_arguments_field : u16,
-    pub from_field : u16,
-    pub to_field : u16,
-    pub assign_to_field : u16,
-    pub assign_value_field : u16,
-    pub condition_field : u16,
-    pub then_block_field : u16,
-    pub else_block_field : u16,
-    pub for_decl_field : u16,
-    pub for_range_field : u16
+    pub name_field : NonZeroU16,
+    pub module_inputs_field : NonZeroU16,
+    pub module_outputs_field : NonZeroU16,
+    pub block_field : NonZeroU16,
+    pub interface_ports_field : NonZeroU16,
+    pub array_element_type_field : NonZeroU16,
+    pub array_size_field : NonZeroU16,
+    pub type_field : NonZeroU16,
+    pub latency_spec_field : NonZeroU16,
+    pub declaration_modifiers_field : NonZeroU16,
+    pub left_field : NonZeroU16,
+    pub right_field : NonZeroU16,
+    pub operator_field : NonZeroU16,
+    pub arr_field : NonZeroU16,
+    pub arr_idx_field : NonZeroU16,
+    pub func_arguments_field : NonZeroU16,
+    pub from_field : NonZeroU16,
+    pub to_field : NonZeroU16,
+    pub assign_to_field : NonZeroU16,
+    pub assign_value_field : NonZeroU16,
+    pub condition_field : NonZeroU16,
+    pub then_block_field : NonZeroU16,
+    pub else_block_field : NonZeroU16,
+    pub for_decl_field : NonZeroU16,
+    pub for_range_field : NonZeroU16
 }
 
 impl SusTreeSitterSingleton {
-    pub fn new() -> Self {
+    fn new() -> Self {
         let language = tree_sitter_sus::language();
         SusTreeSitterSingleton {
             error_kind : language.id_for_node_kind("ERROR", false),

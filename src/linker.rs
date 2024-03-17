@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, rc::Rc, cell::RefCell};
 
-use crate::{arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, ast::{LinkInfo, Module}, errors::{error_info, ErrorCollector}, file_position::{FileText, Span}, flattening::{FlatID, FlattenedModule, Instruction, WireInstance, WireSource}, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode}, tokenizer::TokenTypeIdx, typing::{Type, WrittenType}, util::{const_str_position, const_str_position_in_tuples}, value::Value};
+use crate::{arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, ast::{LinkInfo, Module}, errors::{error_info, ErrorCollector}, file_position::{FileText, Span}, flattening::{FlatID, FlattenedModule, Instruction, WireInstance, WireSource}, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode, SUS}, tokenizer::TokenTypeIdx, typing::{Type, WrittenType}, util::{const_str_position, const_str_position_in_tuples}, value::Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModuleUUIDMarker;
@@ -332,15 +332,13 @@ impl Linker {
     pub fn add_reserved_file(&mut self, file : FileUUID, parse_result : FullParseResult) {
         let mut associated_values = Vec::new();
         
-        let sus = crate::parser::SusTreeSitterSingleton::new();
-
         {
             let root_node = parse_result.tree.root_node();
             
             let mut tmp_cursor = root_node.walk();
             for node in root_node.children(&mut tmp_cursor) {
-                if node.kind_id() == sus.module_kind {
-                    let name_child = node.child_by_field_id(sus.name_field).unwrap();
+                if node.kind_id() == SUS.module_kind {
+                    let name_child = node.child_by_field_id(SUS.name_field.into()).unwrap();
                     println!("MODULE DECL: {}", &parse_result.file_text.file_text[name_child.byte_range()])
                 } else {
                     parse_result.ast.errors.error_basic(Span::from(node.byte_range()), "Only module declarations are allowed at the top level of a file!");

@@ -1,7 +1,7 @@
 
 pub mod name_context;
 
-use std::{ops::Deref, iter::zip};
+use std::{iter::zip, num::NonZeroU16, ops::Deref};
 
 use tree_sitter::{Node, TreeCursor};
 
@@ -695,12 +695,34 @@ impl<'l> FlatteningContext<'l> {
         
     }
 
+    /// If field is found, cursor is now at field position
+    /// 
+    /// If field is not found, cursor remains in place
+    fn goto_field(&mut self, field_id : NonZeroU16) -> bool {
+        let mut shift_count = 0;
+
+        loop {
+            if self.cursor.field_id() == Some(field_id) {
+                return true;
+            }
+            if !self.cursor.goto_next_sibling() {
+                break;
+            }
+            shift_count += 1;
+        }
+        // Recover from error. Shift back until at starting node
+        for _ in 0..shift_count {
+            self.cursor.goto_previous_sibling();
+        }
+        false
+    }
+
     fn flatten_module_tree(&mut self) {
         let module_node = self.cursor.node();
         assert_eq!(module_node.kind_id(), SUS.module_kind, "{}", module_node.kind());
         println!("TREE SITTER module!");
-        let interface = module_node.child_by_field_id(SUS.interface_ports_field);
-        let code = module_node.child_by_field_id(SUS.block_field).unwrap();
+        //let interface = module_node.child_by_field_id(SUS.interface_ports_field);
+        //let code = module_node.child_by_field_id(SUS.block_field).unwrap();
         
         self.flatten_interface_ports_tree();
         //self.flatten_code_tree(code);

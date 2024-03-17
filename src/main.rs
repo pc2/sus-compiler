@@ -36,6 +36,8 @@ use codegen_fallback::gen_verilog_code;
 use dev_aid::syntax_highlighting::*;
 use linker::{Linker, ModuleUUID};
 
+use crate::parser::SUS;
+
 fn codegen_to_file(linker : &Linker, id : ModuleUUID, md : &Module) -> Option<()> {
     let Some(inst) = linker.instantiate(id) else {
         println!("Module {} instantiation encountered errors.", md.link_info.name);
@@ -54,30 +56,37 @@ fn codegen_to_file(linker : &Linker, id : ModuleUUID, md : &Module) -> Option<()
     Some(())
 }
 
-fn test_tree_sitter(path : &Path) {
+fn test_tree_sitter(path : &Path, make_dot : bool) {
     let code = read_to_string(path).unwrap();
     let mut parser = tree_sitter::Parser::new();
-    parser.set_language(tree_sitter_sus::language()).expect("Error loading sus grammar");
+    parser.set_language(&SUS.language).expect("Error loading sus grammar");
     let tree = parser.parse(code, None).unwrap();
 
-    let mut dot_cmd = std::process::Command::new("dot");
-    dot_cmd.arg("-Tsvg");
-    dot_cmd.arg("-Gcharset=latin1");
-    dot_cmd.stdin(Stdio::piped());
-    dot_cmd.stdout(Stdio::piped());
-    let dot_proc = dot_cmd.spawn().unwrap();
-    tree.print_dot_graph(dot_proc.stdin.as_ref().unwrap());
-    let out = dot_proc.wait_with_output().unwrap();
-    let mut out_file = File::create(format!("{}.svg", path.file_stem().unwrap().to_str().unwrap())).unwrap();
-    out_file.write(&out.stdout).unwrap();
+    if make_dot {
+        let mut dot_cmd = std::process::Command::new("dot");
+        dot_cmd.arg("-Tsvg");
+        dot_cmd.arg("-Gcharset=latin1");
+        dot_cmd.stdin(Stdio::piped());
+        dot_cmd.stdout(Stdio::piped());
+        let dot_proc = dot_cmd.spawn().unwrap();
+        tree.print_dot_graph(dot_proc.stdin.as_ref().unwrap());
+        let out = dot_proc.wait_with_output().unwrap();
+        let mut out_file = File::create(format!("{}.svg", path.file_stem().unwrap().to_str().unwrap())).unwrap();
+        out_file.write(&out.stdout).unwrap();
+    }
     
-    /*
     let root = tree.root_node();
     let mut cursor = root.walk();
-    for c in root.children(&mut cursor) {
+    cursor.goto_first_child();
+    /*for c in root.children(&mut cursor) {
         println!("{c:?}");
-    }
-    println!("{root:?}");*/
+    }*/
+    //cursor.reset(cursor.node());
+    println!("First goto child {}", cursor.goto_first_child());
+    println!("First goto parent {}", cursor.goto_parent());
+    println!("Second goto parent {}", cursor.goto_parent());
+    println!("Third goto parent {}", cursor.goto_parent());
+    println!("{root:?}");
 }
 
 
@@ -91,6 +100,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let mut codegen = None;
     let mut codegen_all = false;
     let mut test_sus_sitter = false;
+    let mut make_dot = false;
     let mut settings = SyntaxHighlightSettings{
         show_tokens : false
     };
@@ -115,6 +125,9 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
             "--tree" => {
                 test_sus_sitter = true;
             }
+            "--dot" => {
+                make_dot = true;
+            }
             other => {
                 file_paths.push(PathBuf::from(other));
             }
@@ -135,7 +148,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     if test_sus_sitter {
         for path in &file_paths {
-            test_tree_sitter(&path);
+            test_tree_sitter(&path, make_dot);
         }
         return Ok(())
     }
