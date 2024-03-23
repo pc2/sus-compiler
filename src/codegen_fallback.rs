@@ -1,6 +1,6 @@
 use std::{iter::zip, ops::Deref};
 
-use crate::{ast::Module, flattening::Instruction, instantiation::{ConnectToPathElem, InstantiatedModule, RealWire, RealWireDataSource, WireID}, linker::{get_builtin_type, TypeUUID}, tokenizer::get_token_type_name, typing::ConcreteType};
+use crate::{ast::Module, flattening::Instruction, instantiation::{ConnectToPathElem, InstantiatedModule, RealWire, RealWireDataSource, WireID}, linker::{get_builtin_type, TypeUUID}, typing::ConcreteType};
 
 fn get_type_name_size(id : TypeUUID) -> u64 {
     if id == get_builtin_type("int") {
@@ -130,10 +130,10 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
 
             match &w.source {
                 RealWireDataSource::UnaryOp { op, right } => {
-                    writeln!(self.program_text, " = {}{};", get_token_type_name(op.op_typ), self.wire_name(*right, w.absolute_latency))?;
+                    writeln!(self.program_text, " = {}{};", op.op_text(), self.wire_name(*right, w.absolute_latency))?;
                 }
                 RealWireDataSource::BinaryOp { op, left, right } => {
-                    writeln!(self.program_text, " = {} {} {};", self.wire_name(*left, w.absolute_latency), get_token_type_name(op.op_typ), self.wire_name(*right, w.absolute_latency))?;
+                    writeln!(self.program_text, " = {} {} {};", self.wire_name(*left, w.absolute_latency), op.op_text(), self.wire_name(*right, w.absolute_latency))?;
                 }
                 RealWireDataSource::ArrayAccess { arr, arr_idx } => {
                     writeln!(self.program_text, " = {}[{}];", self.wire_name(*arr, w.absolute_latency), self.wire_name(*arr_idx, w.absolute_latency))?;

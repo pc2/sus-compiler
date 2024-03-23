@@ -1,19 +1,13 @@
 
 pub mod name_context;
 
-use std::{iter::zip, num::NonZeroU16, ops::Deref};
+use std::{iter::zip, num::NonZeroU16, ops::Deref, path::Display, str::FromStr};
 
-use tree_sitter::{Node, TreeCursor};
+use num::BigInt;
+use tree_sitter::TreeCursor;
 
 use crate::{
-    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID},
-    ast::{AssignableExpressionModifiers, CodeBlock, Expression, Identifier, IdentifierType, InterfacePorts, LeftExpression, Module, Operator, SignalDeclaration, SpanExpression, SpanTypeExpression, Statement, TypeExpression},
-    errors::{error_info, ErrorCollector, ErrorInfo},
-    file_position::{BracketSpan, Span},
-    linker::{ConstantUUID, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker},
-    parser::SUS,
-    typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE},
-    value::Value
+    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{AssignableExpressionModifiers, CodeBlock, Expression, IdentifierType, InterfacePorts, LeftExpression, Module, Operator, SignalDeclaration, SpanExpression, SpanTypeExpression, Statement, TypeExpression}, errors::{error_info, ErrorCollector, ErrorInfo}, file_position::{BracketSpan, Span}, linker::{ConstantUUID, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker}, parser::SUS, tokenizer::kw, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE}, value::Value
 };
 
 use self::name_context::LocalVariableContext;
@@ -58,11 +52,120 @@ pub struct Write {
     pub to : ConnectionWrite
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnaryOperator {
+    And,
+    Or,
+    Xor,
+    Not,
+    Sum,
+    Product,
+    Negate,
+}
+impl UnaryOperator {
+    pub fn from_text(op_text : &str) -> Self {
+        match op_text {
+            "+" => UnaryOperator::Sum,
+            "*" => UnaryOperator::Product,
+            "-" => UnaryOperator::Negate,
+            "&" => UnaryOperator::And,
+            "|" => UnaryOperator::Or,
+            "^" => UnaryOperator::Xor,
+            "!" => UnaryOperator::Not,
+            _ => unreachable!()
+        }
+    }
+    pub fn op_text(&self) -> &'static str {
+        match self {
+            UnaryOperator::And => "&",
+            UnaryOperator::Or => "|",
+            UnaryOperator::Xor => "^",
+            UnaryOperator::Not => "!",
+            UnaryOperator::Sum => "+",
+            UnaryOperator::Product => "*",
+            UnaryOperator::Negate => "-",
+        }
+    }
+}
+impl core::fmt::Display for UnaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.op_text())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinaryOperator {
+    And,
+    Or,
+    Xor,
+    Add,
+    ShiftLeft,
+    ShiftRight,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
+    Equals,
+    NotEquals,
+    Greater,
+    GreaterEq,
+    Lesser,
+    LesserEq
+}
+impl BinaryOperator {
+    pub fn from_text(op_text : &str) -> Self {
+        match op_text {
+            "&" => BinaryOperator::And,
+            "|" => BinaryOperator::Or,
+            "^" => BinaryOperator::Xor,
+            "<<" => BinaryOperator::ShiftLeft,
+            ">>" => BinaryOperator::ShiftRight,
+            "+" => BinaryOperator::Add,
+            "-" => BinaryOperator::Subtract,
+            "*" => BinaryOperator::Multiply,
+            "/" => BinaryOperator::Divide,
+            "%" => BinaryOperator::Modulo,
+            "==" => BinaryOperator::Equals,
+            "!=" => BinaryOperator::NotEquals,
+            ">" => BinaryOperator::Greater,
+            ">=" => BinaryOperator::GreaterEq,
+            "<" => BinaryOperator::Lesser,
+            "<=" => BinaryOperator::LesserEq,
+            _ => unreachable!()
+        }
+    }
+    pub fn op_text(&self) -> &'static str {
+        match self {
+            BinaryOperator::And => "&",
+            BinaryOperator::Or => "|",
+            BinaryOperator::Xor => "^",
+            BinaryOperator::ShiftLeft => "<<",
+            BinaryOperator::ShiftRight => ">>",
+            BinaryOperator::Add => "+",
+            BinaryOperator::Subtract => "-",
+            BinaryOperator::Multiply => "*",
+            BinaryOperator::Divide => "/",
+            BinaryOperator::Modulo => "%",
+            BinaryOperator::Equals => "==",
+            BinaryOperator::NotEquals => "!=",
+            BinaryOperator::Greater => ">",
+            BinaryOperator::GreaterEq => ">=",
+            BinaryOperator::Lesser => "<",
+            BinaryOperator::LesserEq => "<=",
+        }
+    }
+}
+impl core::fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.op_text())
+    }
+}
+
 #[derive(Debug)]
 pub enum WireSource {
     WireRead(FlatID), // Used to add a span to the reference of a wire. 
-    UnaryOp{op : Operator, right : FlatID},
-    BinaryOp{op : Operator, left : FlatID, right : FlatID},
+    UnaryOp{op : UnaryOperator, right : FlatID},
+    BinaryOp{op : BinaryOperator, left : FlatID, right : FlatID},
     ArrayAccess{arr : FlatID, arr_idx : FlatID},
     Constant(Value),
     NamedConstant(ConstantUUID),
@@ -289,14 +392,14 @@ impl<'l> FlatteningContext<'l> {
 
         inst_id
     }
-    fn resolve_identifier(&self, identifier : &Identifier) -> LocalOrGlobal {
+    fn resolve_identifier(&self, identifier_span : Span) -> LocalOrGlobal {
         // Possibly local
-        let name_text = &self.linker.file.file_text[identifier.span];
+        let name_text = &self.linker.file.file_text[identifier_span];
         if let Some(decl_id) = self.local_variable_context.get_declaration_for(name_text) {
             return LocalOrGlobal::Local(decl_id);
         }
         // Global identifier
-        LocalOrGlobal::Global(self.linker.resolve_global(identifier.span, &self.errors))
+        LocalOrGlobal::Global(self.linker.resolve_global(identifier_span, &self.errors))
     }
     fn initialize_interface<const IS_SUBMODULE : bool>(&mut self) -> InterfacePorts<FlatID> {
         let ports : Box<[FlatID]> = self.module.interface.ports.iter().enumerate().map(|(idx, port_decl)|{
@@ -344,7 +447,7 @@ impl<'l> FlatteningContext<'l> {
             self.errors.error_basic(*name_expr_span, "Function call name must be a simple identifier");
             return None;
         };
-        let func_instantiation_id = match self.resolve_identifier(name) {
+        let func_instantiation_id = match self.resolve_identifier(name.span) {
             LocalOrGlobal::Local(id) => id,
             LocalOrGlobal::Global(global) => {
                 let module_id = global.expect_module()?;
@@ -389,7 +492,7 @@ impl<'l> FlatteningContext<'l> {
     fn flatten_expr(&mut self, (expr, expr_span) : &SpanExpression) -> FlatID {
         let source = match expr {
             Expression::Named(name) => {
-                match self.resolve_identifier(name) {
+                match self.resolve_identifier(name.span) {
                     LocalOrGlobal::Local(id) => {
                         WireSource::WireRead(id)
                     }
@@ -406,15 +509,45 @@ impl<'l> FlatteningContext<'l> {
                 WireSource::Constant(cst.clone())
             }
             Expression::UnaryOp(op_box) => {
-                let (op, _op_pos, operate_on) = op_box.deref();
+                let (op_tok, _op_pos, operate_on) = op_box.deref();
                 let right = self.flatten_expr(operate_on);
-                WireSource::UnaryOp{op : *op, right}
+                let op = match op_tok.op_typ {
+                    t if t == kw("+") => UnaryOperator::Sum,
+                    t if t == kw("*") => UnaryOperator::Product,
+                    t if t == kw("-") => UnaryOperator::Negate,
+                    t if t == kw("&") => UnaryOperator::And,
+                    t if t == kw("|") => UnaryOperator::Or,
+                    t if t == kw("^") => UnaryOperator::Xor,
+                    t if t == kw("!") => UnaryOperator::Not,
+                    _ => unreachable!()
+                };
+                WireSource::UnaryOp{op, right}
             }
             Expression::BinOp(binop_box) => {
                 let (left_expr, op, _op_pos, right_expr) = binop_box.deref();
                 let left = self.flatten_expr(left_expr);
                 let right = self.flatten_expr(right_expr);
-                WireSource::BinaryOp{op : *op, left, right}
+                
+                let op = match op.op_typ {
+                    t if t == kw("&") => BinaryOperator::And,
+                    t if t == kw("|") => BinaryOperator::Or,
+                    t if t == kw("^") => BinaryOperator::Xor,
+                    t if t == kw("<<") => BinaryOperator::ShiftLeft,
+                    t if t == kw(">>") => BinaryOperator::ShiftRight,
+                    t if t == kw("+") => BinaryOperator::Add,
+                    t if t == kw("-") => BinaryOperator::Subtract,
+                    t if t == kw("*") => BinaryOperator::Multiply,
+                    t if t == kw("/") => BinaryOperator::Divide,
+                    t if t == kw("%") => BinaryOperator::Modulo,
+                    t if t == kw("==") => BinaryOperator::Equals,
+                    t if t == kw("!=") => BinaryOperator::NotEquals,
+                    t if t == kw(">") => BinaryOperator::Greater,
+                    t if t == kw(">=") => BinaryOperator::GreaterEq,
+                    t if t == kw("<") => BinaryOperator::Lesser,
+                    t if t == kw("<=") => BinaryOperator::LesserEq,
+                    _ => unreachable!()
+                };
+                WireSource::BinaryOp{op, left, right}
             }
             Expression::Array(arr_box) => {
                 let (left, right, _bracket_span) = arr_box.deref();
@@ -452,7 +585,7 @@ impl<'l> FlatteningContext<'l> {
     fn flatten_assignable_expr(&mut self, expr : &Expression, span : Span) -> Option<ConnectionWrite> {
         match expr {
             Expression::Named(local_idx) => {
-                let root = self.resolve_identifier(local_idx).expect_local("assignments")?;
+                let root = self.resolve_identifier(local_idx.span).expect_local("assignments")?;
 
                 Some(ConnectionWrite{root, root_span : span, path : Vec::new(), span, is_declared_in_this_module : self.is_declared_in_this_module})
             }
@@ -587,118 +720,189 @@ impl<'l> FlatteningContext<'l> {
         }
     }
 
-    /*fn flatten_code_tree(&mut self, node : Node) {
-        assert_eq!(node.kind_id(), SUS.block_kind, "Was {} instead", node.kind());
+    fn flatten_expr_tree(&mut self) -> FlatID {
+        let node = self.cursor.node();
+        let expr_span : Span = node.byte_range().into();
+        let kind = node.kind_id();
         
-        let mut inner_context = FlatteningContext{
-            instructions: self.instructions,
-            errors: self.errors,
-            is_declared_in_this_module: self.is_declared_in_this_module,
-            local_variable_context: self.local_variable_context.extend(),
-            linker: self.linker,
-            type_list_for_naming: self.type_list_for_naming,
-            module: self.module
-        };
-        inner_context.flatten_code_keep_context_tree(node);
-    }
-    fn flatten_code_keep_context_tree(&mut self, node : Node) {
-        assert_eq!(node.kind_id(), SUS.block_kind, "Was {} instead", node.kind());
-        let mut cursor = node.walk();
-        
-        for (stmt, stmt_span) in node.children_by_field_id(field_id, cursor) {
-            match stmt {
-                Statement::Assign{to, expr : Some((Expression::FuncCall(func_and_args), func_span)), eq_sign_position} => {
-                    let Some((md, interface)) = self.desugar_func_call(&func_and_args, BracketSpan::from_outer(*func_span)) else {continue};
-                    let output_range = interface.func_call_syntax_outputs();
-                    let outputs = &interface.ports[output_range];
-
-                    let func_name_span = func_and_args[0].1;
-                    let num_func_outputs = outputs.len();
-                    let num_targets = to.len();
-                    if num_targets != num_func_outputs {
-                        let info = vec![error_info(md.link_info.span, md.link_info.file, "Module Defined here")];
-                        if num_targets > num_func_outputs {
-                            let excess_results_span = Span::new_overarching(to[num_func_outputs].span, to.last().unwrap().span);
-                            self.errors.error_with_info(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
-                        } else {
-                            let too_few_targets_pos = if let Some(eq) = eq_sign_position {eq.into()} else {func_name_span};
-                            self.errors.error_with_info(too_few_targets_pos, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
-                        }
-                    }
-
-                    for (field, to_i) in zip(outputs, to) {                        
-                        let module_port_wire_decl = self.instructions[*field].extract_wire_declaration();
-                        let module_port_proxy = self.instructions.alloc(Instruction::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : *func_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::WireRead(*field)}));
-                        let Some(write_side) = self.flatten_left_expr(&to_i.expr, to_i.span, true) else {continue};
-
-                        let write_type = self.flatten_assignment_modifiers(&to_i.modifiers);
-                        self.instructions.alloc(Instruction::Write(Write{write_type, from: module_port_proxy, to: write_side}));
-                    }
-                },
-                Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
-                    let read_side = non_func_expr.as_ref().map(|some_expr| self.flatten_expr(some_expr));
-                    if to.len() == 1 {
-                        let t = &to[0];
-                        let Some(write_side) = self.flatten_left_expr(&t.expr, t.span, non_func_expr.is_some()) else {continue};
-                        let write_type = self.flatten_assignment_modifiers(&t.modifiers);
-                        if let Some(read_side) = read_side {
-                            self.instructions.alloc(Instruction::Write(Write{write_type, from: read_side, to: write_side}));
-                        }
-                    } else {
-                        self.errors.error_basic(*stmt_span, format!("Non-function assignments must only output exactly 1 instead of {}", to.len()));
-                    }
-                },
-                Statement::Block(inner_code) => {
-                    self.flatten_code(inner_code);
-                },
-                Statement::If{condition : condition_expr, then, els} => {
-                    let condition = self.flatten_expr(condition_expr);
-
-                    let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement{condition, then_start : UUID::PLACEHOLDER, then_end_else_start : UUID::PLACEHOLDER, else_end : UUID::PLACEHOLDER}));
-                    let then_start = self.instructions.get_next_alloc_id();
-
-                    self.flatten_code(then);
-                    let then_end_else_start = self.instructions.get_next_alloc_id();
-                    if let Some(e) = els {
-                        self.flatten_code(e);
-                    }
-                    let else_end = self.instructions.get_next_alloc_id();
-
-                    let Instruction::IfStatement(if_stmt) = &mut self.instructions[if_id] else {unreachable!()};
-                    if_stmt.then_start = then_start;
-                    if_stmt.then_end_else_start = then_end_else_start;
-                    if_stmt.else_end = else_end;
+        let source = if kind == SUS.identifier_kind {
+            match self.resolve_identifier(expr_span) {
+                LocalOrGlobal::Local(id) => {
+                    WireSource::WireRead(id)
                 }
-                Statement::For{var, range, code} => {
-                    let loop_var_decl = self.flatten_declaration::<false>(var, true, true);
-
-                    let start = self.flatten_expr(&range.from);
-                    let end = self.flatten_expr(&range.to);
-                    
-                    let for_id = self.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER)}));
-
-                    let code_start = self.instructions.get_next_alloc_id();
-
-                    self.flatten_code(code);
-                    
-                    let code_end = self.instructions.get_next_alloc_id();
-
-                    let Instruction::ForStatement(for_stmt) = &mut self.instructions[for_id] else {unreachable!()};
-
-                    for_stmt.loop_body = UUIDRange(code_start, code_end);
+                LocalOrGlobal::Global(global) => {
+                    if let Some(cst) = global.expect_constant() {
+                        WireSource::NamedConstant(cst)
+                    } else {
+                        WireSource::Constant(Value::Error)
+                    }
                 }
             }
+        } else if kind == SUS.number_kind {
+            let text = &self.linker.file.file_text[expr_span];
+            WireSource::Constant(Value::Integer(BigInt::from_str(text).unwrap()))
+        } else if kind == SUS.unary_op_kind {
+            self.cursor.goto_first_child();
+            self.goto_field(SUS.operator_field);
+            let op_text = &self.linker.file.file_text[self.cursor.node().byte_range().into()];
+            let op = UnaryOperator::from_text(op_text);
+            
+            self.goto_field(SUS.right_field);
+            let right = self.flatten_expr_tree();
+
+            WireSource::UnaryOp{op, right}
+        } else if kind == SUS.binary_op_kind {
+            self.goto_field(SUS.left_field);
+            let left = self.flatten_expr_tree();
+            self.goto_field(SUS.operator_field);
+            let op_text = &self.linker.file.file_text[self.cursor.node().byte_range().into()];
+            let op = BinaryOperator::from_text(op_text);
+            self.goto_field(SUS.right_field);
+            let right = self.flatten_expr_tree();
+
+            WireSource::BinaryOp{op, left, right}
+        } else if kind == SUS.array_op_kind {
+            self.goto_field(SUS.arr_field);
+            let arr = self.flatten_expr_tree();
+            self.goto_field(SUS.arr_idx_field);
+            let arr_idx = self.flatten_expr_tree();
+            WireSource::ArrayAccess{arr, arr_idx}
+        } else if kind == SUS.func_call_kind {
+            //todo!()
+            //Expression::FuncCall(func_and_args) => {
+            /*if let Some((md, interface_wires)) = self.desugar_func_call(func_and_args, BracketSpan::from_outer(*expr_span)) {
+                let output_range = interface_wires.func_call_syntax_outputs();
+
+                if output_range.len() != 1 {
+                    let info = error_info(md.link_info.span, md.link_info.file, "Module Defined here");
+                    self.errors.error_with_info(*expr_span, "A function called in this context may only return one result. Split this function call into a separate line instead.", vec![info]);
+                }
+
+                if output_range.len() >= 1 {
+                    return interface_wires.ports[output_range.start];
+                }
+            }*/
+            // Function desugaring or using threw an error
+            WireSource::Constant(Value::Error)
+        } else {
+            unreachable!("Don't know yet, ERROR node? Other node? ")
+        };
+
+        let wire_instance = WireInstance{
+            typ : Type::Unknown,
+            is_compiletime : IS_GEN_UNINIT,
+            span: expr_span,
+            source,
+            is_declared_in_this_module : self.is_declared_in_this_module
+        };
+        self.instructions.alloc(Instruction::Wire(wire_instance))
+    }
+
+    fn flatten_code_tree(&mut self) {
+        let old_frame = self.local_variable_context.new_frame();
+        
+        self.flatten_code_keep_context_tree();
+
+        self.local_variable_context.pop_frame(old_frame);
+    }
+    fn flatten_code_keep_context_tree(&mut self) {
+        if !self.try_go_down(SUS.block_kind) {return;}
+        
+        loop {
+            let cur_node = self.cursor.node();
+
+            let kind = cur_node.kind_id();
+            if kind == SUS.decl_assign_statement_kind {
+                //todo!();
+                //Statement::Assign{to, expr : Some((Expression::FuncCall(func_and_args), func_span)), eq_sign_position} => {
+                /*let Some((md, interface)) = self.desugar_func_call(&func_and_args, BracketSpan::from_outer(*func_span)) else {continue};
+                let output_range = interface.func_call_syntax_outputs();
+                let outputs = &interface.ports[output_range];
+
+                let func_name_span = func_and_args[0].1;
+                let num_func_outputs = outputs.len();
+                let num_targets = to.len();
+                if num_targets != num_func_outputs {
+                    let info = vec![error_info(md.link_info.span, md.link_info.file, "Module Defined here")];
+                    if num_targets > num_func_outputs {
+                        let excess_results_span = Span::new_overarching(to[num_func_outputs].span, to.last().unwrap().span);
+                        self.errors.error_with_info(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
+                    } else {
+                        let too_few_targets_pos = if let Some(eq) = eq_sign_position {eq.into()} else {func_name_span};
+                        self.errors.error_with_info(too_few_targets_pos, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
+                    }
+                }
+
+                for (field, to_i) in zip(outputs, to) {                        
+                    let module_port_wire_decl = self.instructions[*field].extract_wire_declaration();
+                    let module_port_proxy = self.instructions.alloc(Instruction::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : *func_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::WireRead(*field)}));
+                    let Some(write_side) = self.flatten_left_expr(&to_i.expr, to_i.span, true) else {continue};
+
+                    let write_type = self.flatten_assignment_modifiers(&to_i.modifiers);
+                    self.instructions.alloc(Instruction::Write(Write{write_type, from: module_port_proxy, to: write_side}));
+                }*/
+            } else if kind == SUS.decl_assign_statement_kind {
+            //Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
+                /*let read_side = non_func_expr.as_ref().map(|some_expr| self.flatten_expr(some_expr));
+                if to.len() == 1 {
+                    let t = &to[0];
+                    let Some(write_side) = self.flatten_left_expr(&t.expr, t.span, non_func_expr.is_some()) else {continue};
+                    let write_type = self.flatten_assignment_modifiers(&t.modifiers);
+                    if let Some(read_side) = read_side {
+                        self.instructions.alloc(Instruction::Write(Write{write_type, from: read_side, to: write_side}));
+                    }
+                } else {
+                    self.errors.error_basic(*stmt_span, format!("Non-function assignments must only output exactly 1 instead of {}", to.len()));
+                }*/
+            } else if kind == SUS.block_kind {
+            //Statement::Block(inner_code) => {
+                self.flatten_code_tree();
+            } else if kind == SUS.if_statement_kind {
+            //Statement::If{condition : condition_expr, then, els} => {
+                /*let condition = self.flatten_expr(condition_expr);
+
+                let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement{condition, then_start : UUID::PLACEHOLDER, then_end_else_start : UUID::PLACEHOLDER, else_end : UUID::PLACEHOLDER}));
+                let then_start = self.instructions.get_next_alloc_id();
+
+                self.flatten_code(then);
+                let then_end_else_start = self.instructions.get_next_alloc_id();
+                if let Some(e) = els {
+                    self.flatten_code(e);
+                }
+                let else_end = self.instructions.get_next_alloc_id();
+
+                let Instruction::IfStatement(if_stmt) = &mut self.instructions[if_id] else {unreachable!()};
+                if_stmt.then_start = then_start;
+                if_stmt.then_end_else_start = then_end_else_start;
+                if_stmt.else_end = else_end;*/
+            } else if kind == SUS.for_statement_kind {
+            //Statement::For{var, range, code} => {
+                /*let loop_var_decl = self.flatten_declaration::<false>(var, true, true);
+
+                let start = self.flatten_expr(&range.from);
+                let end = self.flatten_expr(&range.to);
+                
+                let for_id = self.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER)}));
+
+                let code_start = self.instructions.get_next_alloc_id();
+
+                self.flatten_code(code);
+                
+                let code_end = self.instructions.get_next_alloc_id();
+
+                let Instruction::ForStatement(for_stmt) = &mut self.instructions[for_id] else {unreachable!()};
+
+                for_stmt.loop_body = UUIDRange(code_start, code_end);*/
+            }
         }
-    }*/
+    }
 
     fn flatten_interface_ports_tree(&mut self) {
         
     }
 
-    /// If field is found, cursor is now at field position
-    /// 
-    /// If field is not found, cursor remains in place
-    fn goto_field(&mut self, field_id : NonZeroU16) -> bool {
+    #[must_use]
+    fn goto_optional_field(&mut self, field_id : NonZeroU16) -> bool {
         let mut shift_count = 0;
 
         loop {
@@ -717,15 +921,46 @@ impl<'l> FlatteningContext<'l> {
         false
     }
 
+    /// If field is found, cursor is now at field position
+    /// 
+    /// If field is not found, cursor remains in place
+    fn goto_field(&mut self, field_id : NonZeroU16) {
+        let v = self.goto_optional_field(field_id);
+        assert!(v);
+    }
+
+    fn go_down(&mut self, kind : u16) {
+        let node = self.cursor.node();
+        assert_eq!(node.kind_id(), kind, "Was {} instead", node.kind());
+
+        let r = self.cursor.goto_first_child();
+        assert!(r);
+    }
+
+    /// Returns true if successful
+    fn try_go_down(&mut self, kind : u16) -> bool {
+        let node = self.cursor.node();
+        assert_eq!(node.kind_id(), kind, "Was {} instead", node.kind());
+
+        self.cursor.goto_first_child()
+    }
+
+    fn go_up(&mut self) {
+        let r = self.cursor.goto_parent();
+        assert!(r);
+    }
+
     fn flatten_module_tree(&mut self) {
-        let module_node = self.cursor.node();
-        assert_eq!(module_node.kind_id(), SUS.module_kind, "{}", module_node.kind());
+        self.go_down(SUS.module_kind);
+
         println!("TREE SITTER module!");
-        //let interface = module_node.child_by_field_id(SUS.interface_ports_field);
-        //let code = module_node.child_by_field_id(SUS.block_field).unwrap();
-        
-        self.flatten_interface_ports_tree();
-        //self.flatten_code_tree(code);
+        if self.goto_optional_field(SUS.interface_ports_field) {
+            self.flatten_interface_ports_tree();
+        }
+        self.goto_field(SUS.block_field);
+        self.flatten_code_tree();
+
+        self.go_up();
     }
 
     

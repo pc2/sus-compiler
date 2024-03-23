@@ -2,7 +2,7 @@ use std::{cell::RefCell, cmp::max, iter::zip, ops::Deref, rc::Rc};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{IdentifierType, InterfacePorts, Operator}, errors::ErrorCollector, file_position::Span, flattening::{ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instruction, WireInstance, WireSource, Write, WriteType}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, list_of_lists::ListOfLists, tokenizer::kw, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{compute_binary_op, compute_unary_op, Value}};
+use crate::{arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{IdentifierType, InterfacePorts}, errors::ErrorCollector, file_position::Span, flattening::{BinaryOperator, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instruction, UnaryOperator, WireInstance, WireSource, Write, WriteType}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, list_of_lists::ListOfLists, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{compute_binary_op, compute_unary_op, Value}};
 
 use self::latency_algorithm::SpecifiedLatency;
 
@@ -57,8 +57,8 @@ impl MultiplexerSource {
 pub enum RealWireDataSource {
     ReadOnly,
     Multiplexer{is_state : Option<Value>, sources : Vec<MultiplexerSource>},
-    UnaryOp{op : Operator, right : WireID},
-    BinaryOp{op : Operator, left : WireID, right : WireID},
+    UnaryOp{op : UnaryOperator, right : WireID},
+    BinaryOp{op : BinaryOperator, left : WireID, right : WireID},
     ArrayAccess{arr : WireID, arr_idx : WireID},
     ConstArrayAccess{arr : WireID, arr_idx : u64},
     Constant{value : Value}
@@ -365,12 +365,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
             &WireSource::UnaryOp{op, right} => {
                 let right = self.get_wire_or_constant_as_wire(right)?;
-                RealWireDataSource::UnaryOp{op: op, right}
+                RealWireDataSource::UnaryOp{op, right}
             }
             &WireSource::BinaryOp{op, left, right} => {
                 let left = self.get_wire_or_constant_as_wire(left)?;
                 let right = self.get_wire_or_constant_as_wire(right)?;
-                RealWireDataSource::BinaryOp{op: op, left, right}
+                RealWireDataSource::BinaryOp{op, left, right}
             }
             &WireSource::ArrayAccess{arr, arr_idx} => {
                 let arr = self.get_wire_or_constant_as_wire(arr)?;
@@ -400,7 +400,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 name : self.get_unique_name(),
                 original_wire,
                 source : RealWireDataSource::BinaryOp{
-                    op: Operator{op_typ : kw("&")},
+                    op: BinaryOperator::And,
                     left : condition,
                     right : additional_condition
                 },
@@ -492,7 +492,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                                 name : self.get_unique_name(),
                                 original_wire,
                                 source : RealWireDataSource::UnaryOp{
-                                    op : Operator{op_typ : kw("!")},
+                                    op : UnaryOperator::Not,
                                     right : condition_wire
                                 },
                                 absolute_latency : CALCULATE_LATENCY_LATER, needed_until : CALCULATE_LATENCY_LATER

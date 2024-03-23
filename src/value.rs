@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use num::BigInt;
 
-use crate::{typing::{Type, ConcreteType, BOOL_TYPE, INT_TYPE, INT_CONCRETE_TYPE, BOOL_CONCRETE_TYPE}, ast::Operator, tokenizer::kw};
+use crate::{flattening::{BinaryOperator, UnaryOperator}, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, BOOL_TYPE, INT_CONCRETE_TYPE, INT_TYPE}};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum Value {
@@ -91,59 +91,57 @@ impl Value {
     }
 }
 
-pub fn compute_unary_op(op : Operator, v : &Value) -> Value {
+pub fn compute_unary_op(op : UnaryOperator, v : &Value) -> Value {
     if *v == Value::Error {
         return Value::Error
     }
-    match op.op_typ {
-        typ if typ == kw("|") => {
+    match op {
+        UnaryOperator::Or => {
             todo!("Array Values")
         }
-        typ if typ == kw("&") => {
+        UnaryOperator::And => {
             todo!("Array Values")
         }
-        typ if typ == kw("^") => {
+        UnaryOperator::Xor => {
             todo!("Array Values")
         }
-        typ if typ == kw("-") => {
-            let Value::Integer(v) = v else {panic!()};
-            Value::Integer(-v)
-        }
-        typ if typ == kw("+") => {
-            todo!("Array Values")
-        }
-        typ if typ == kw("*") => {
-            todo!("Array Values")
-        }
-        typ if typ == kw("!") => {
+        UnaryOperator::Not => {
             let Value::Bool(b) = v else {panic!()};
             Value::Bool(!*b)
         }
-        _other => unreachable!()
+        UnaryOperator::Sum => {
+            todo!("Array Values")
+        }
+        UnaryOperator::Product => {
+            todo!("Array Values")
+        }
+        UnaryOperator::Negate => {
+            let Value::Integer(v) = v else {panic!()};
+            Value::Integer(-v)
+        }
     }
 }
 
-pub fn compute_binary_op(left : &Value, op : Operator, right : &Value) -> Value {
+pub fn compute_binary_op(left : &Value, op : BinaryOperator, right : &Value) -> Value {
     if *left == Value::Error || *right == Value::Error {
         return Value::Error
     }
-    match op.op_typ {
-        typ if typ == kw("<=") => Value::Bool(left.extract_integer() <= right.extract_integer()),
-        typ if typ == kw(">=") => Value::Bool(left.extract_integer() >= right.extract_integer()),
-        typ if typ == kw("<")  => Value::Bool(left.extract_integer() < right.extract_integer()),
-        typ if typ == kw(">")  => Value::Bool(left.extract_integer() > right.extract_integer()),
-        typ if typ == kw("==") => Value::Bool(left == right),
-        typ if typ == kw("!=") => Value::Bool(left != right),
-        typ if typ == kw("<<") => todo!(), // Still a bit iffy about shift operator inclusion
-        typ if typ == kw(">>") => todo!(),
-        typ if typ == kw("+")  => Value::Integer(left.extract_integer() + right.extract_integer()),
-        typ if typ == kw("-")  => Value::Integer(left.extract_integer() - right.extract_integer()),
-        typ if typ == kw("*")  => Value::Integer(left.extract_integer() * right.extract_integer()),
-        typ if typ == kw("/")  => Value::Integer(left.extract_integer() / right.extract_integer()),
-        typ if typ == kw("%")  => Value::Integer(left.extract_integer() % right.extract_integer()),
-        typ if typ == kw("&")  => Value::Bool(left.extract_bool() & right.extract_bool()),
-        typ if typ == kw("|")  => Value::Bool(left.extract_bool() & right.extract_bool()),
-        typ if typ == kw("^")  => Value::Bool(left.extract_bool() & right.extract_bool()),
-        _other => unreachable!()
+    match op {
+        BinaryOperator::Equals => Value::Bool(left == right),
+        BinaryOperator::NotEquals => Value::Bool(left != right),
+        BinaryOperator::GreaterEq => Value::Bool(left.extract_integer() >= right.extract_integer()),
+        BinaryOperator::Greater => Value::Bool(left.extract_integer() > right.extract_integer()),
+        BinaryOperator::LesserEq => Value::Bool(left.extract_integer() <= right.extract_integer()),
+        BinaryOperator::Lesser => Value::Bool(left.extract_integer() < right.extract_integer()),
+        BinaryOperator::Add => Value::Integer(left.extract_integer() + right.extract_integer()),
+        BinaryOperator::Subtract => Value::Integer(left.extract_integer() - right.extract_integer()),
+        BinaryOperator::Multiply => Value::Integer(left.extract_integer() * right.extract_integer()),
+        BinaryOperator::Divide => Value::Integer(left.extract_integer() / right.extract_integer()),
+        BinaryOperator::Modulo => Value::Integer(left.extract_integer() % right.extract_integer()),
+        BinaryOperator::And => Value::Bool(left.extract_bool() & right.extract_bool()),
+        BinaryOperator::Or => Value::Bool(left.extract_bool() & right.extract_bool()),
+        BinaryOperator::Xor => Value::Bool(left.extract_bool() & right.extract_bool()),
+        BinaryOperator::ShiftLeft => todo!(), // Still a bit iffy about shift operator inclusion
+        BinaryOperator::ShiftRight => todo!()
     }
 }

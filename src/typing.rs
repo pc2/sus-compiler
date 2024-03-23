@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{arena_alloc::ArenaAllocator, ast::Operator, errors::ErrorCollector, file_position::Span, flattening::FlatID, linker::{get_builtin_type, Linkable, Linker, NamedType, TypeUUID, TypeUUIDMarker}, tokenizer::kw, value::Value};
+use crate::{arena_alloc::ArenaAllocator, errors::ErrorCollector, file_position::Span, flattening::{BinaryOperator, FlatID, UnaryOperator}, linker::{get_builtin_type, Linkable, Linker, NamedType, TypeUUID, TypeUUIDMarker}, value::Value};
 
 // These are 
 #[derive(Debug, Clone)]
@@ -113,20 +113,20 @@ pub const INT_TYPE : Type = Type::Named(get_builtin_type("int"));
 pub const BOOL_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("bool"));
 pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("int"));
 
-pub fn typecheck_unary_operator(op : Operator, input_typ : &Type, span : Span, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) -> Type {
-    if op.op_typ == kw("!") {
+pub fn typecheck_unary_operator(op : UnaryOperator, input_typ : &Type, span : Span, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) -> Type {
+    if op == UnaryOperator::Not {
         typecheck(input_typ, span, &BOOL_TYPE, "! input", linker_types, errors);
         BOOL_TYPE
-    } else if op.op_typ == kw("-") {
+    } else if op == UnaryOperator::Negate {
         typecheck(input_typ, span, &INT_TYPE, "- input", linker_types, errors);
         INT_TYPE
     } else {
-        let gather_type = match op.op_typ {
-            x if x == kw("&") => BOOL_TYPE,
-            x if x == kw("|") => BOOL_TYPE,
-            x if x == kw("^") => BOOL_TYPE,
-            x if x == kw("+") => INT_TYPE,
-            x if x == kw("*") => INT_TYPE,
+        let gather_type = match op {
+            UnaryOperator::And => BOOL_TYPE,
+            UnaryOperator::Or => BOOL_TYPE,
+            UnaryOperator::Xor => BOOL_TYPE,
+            UnaryOperator::Sum => INT_TYPE,
+            UnaryOperator::Product => INT_TYPE,
             _ => unreachable!()
         };
         if let Some(arr_content_typ) = typecheck_is_array_indexer(input_typ, span, linker_types, errors) {
@@ -135,22 +135,22 @@ pub fn typecheck_unary_operator(op : Operator, input_typ : &Type, span : Span, l
         gather_type
     }
 }
-pub fn get_binary_operator_types(op : Operator) -> ((Type, Type), Type) {
-    match op.op_typ {
-        x if x == kw("&") => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
-        x if x == kw("|") => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
-        x if x == kw("^") => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
-        x if x == kw("+") => ((INT_TYPE, INT_TYPE), INT_TYPE),
-        x if x == kw("-") => ((INT_TYPE, INT_TYPE), INT_TYPE),
-        x if x == kw("*") => ((INT_TYPE, INT_TYPE), INT_TYPE),
-        x if x == kw("/") => ((INT_TYPE, INT_TYPE), INT_TYPE),
-        x if x == kw("%") => ((INT_TYPE, INT_TYPE), INT_TYPE),
-        x if x == kw("==") => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
-        x if x == kw("!=") => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
-        x if x == kw(">=") => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
-        x if x == kw("<=") => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
-        x if x == kw(">") => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
-        x if x == kw("<") => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
+pub fn get_binary_operator_types(op : BinaryOperator) -> ((Type, Type), Type) {
+    match op {
+        BinaryOperator::And => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
+        BinaryOperator::Or => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
+        BinaryOperator::Xor => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
+        BinaryOperator::Add => ((INT_TYPE, INT_TYPE), INT_TYPE),
+        BinaryOperator::Subtract => ((INT_TYPE, INT_TYPE), INT_TYPE),
+        BinaryOperator::Multiply => ((INT_TYPE, INT_TYPE), INT_TYPE),
+        BinaryOperator::Divide => ((INT_TYPE, INT_TYPE), INT_TYPE),
+        BinaryOperator::Modulo => ((INT_TYPE, INT_TYPE), INT_TYPE),
+        BinaryOperator::Equals => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
+        BinaryOperator::NotEquals => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
+        BinaryOperator::GreaterEq => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
+        BinaryOperator::Greater => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
+        BinaryOperator::LesserEq => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
+        BinaryOperator::Lesser => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
         _ => unreachable!()
     }
 }
