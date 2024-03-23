@@ -109,7 +109,13 @@ module.exports = grammar({
         func_call: $ => seq(
             field('name', $._maybe_global_identifier),
             '(',
-            field('func_arguments', sepSeq($._expression, ',')),
+            sepSeq(field('argument', $._expression), ','),
+            ')'
+        ),
+
+        parenthesis_expression: $ => seq(
+            '(',
+            field('right', $._expression),
             ')'
         ),
 
@@ -117,7 +123,7 @@ module.exports = grammar({
             $._maybe_global_identifier,
             $.array_op,
             $.number,
-            seq('(', $._expression, ')'),
+            $.parenthesis_expression,
             $.unary_op,
             $.binary_op,
             $.func_call
