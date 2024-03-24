@@ -1,6 +1,6 @@
-[submodule "tree-sitter-sus"]
+[submodule "tree-sitter-sus/"]
 	path = tree-sitter-sus
 	url = https://github.com/pc2/tree-sitter-sus.git
-[submodule "ariadne"]
+[submodule "ariadne/"]
 	path = ariadne
-	url = https://github.com/VonTum/ariadne.git
+	url = https://github.com/zesterer/ariadne.git
