@@ -54,15 +54,18 @@ module.exports = grammar({
         ),
         
         array_type: $ => seq(
-            field('array_element_type', $._type),
-            '[',
-            field('array_size', $._expression),
-            ']'
+            field('arr', $._type),
+            field('arr_idx', $.array_bracket_expression)
         ),
         _type: $ => choice(
             $.global_identifier,
             $.array_type
         ),
+
+        latency_specifier : $ => seq(seq(
+            '\'',
+            field('content', $._expression)
+        )),
 
         declaration: $ => seq(
             optional(field('declaration_modifiers', choice(
@@ -71,10 +74,7 @@ module.exports = grammar({
             ))),
             field('type', $._type),
             field('name', $.identifier),
-            optional(seq(
-                '\'',
-                field('latency_spec', $._expression)
-            ))
+            optional(field('latency_specifier', $.latency_specifier))
         ),
 
         unary_op: $ => prec(PREC.unary, seq(
@@ -101,9 +101,7 @@ module.exports = grammar({
 
         array_op: $ => seq(
             field('arr', $._expression),
-            '[',
-            field('arr_idx', $._expression),
-            ']'
+            field('arr_idx', $.array_bracket_expression)
         ),
 
         func_call: $ => seq(
@@ -115,8 +113,14 @@ module.exports = grammar({
 
         parenthesis_expression: $ => seq(
             '(',
-            field('right', $._expression),
+            field('content', $._expression),
             ')'
+        ),
+
+        array_bracket_expression: $ => seq(
+            '[',
+            field('content', $._expression),
+            ']'
         ),
 
         _expression: $ => choice(

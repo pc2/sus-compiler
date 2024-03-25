@@ -233,27 +233,19 @@
       "members": [
         {
           "type": "FIELD",
-          "name": "array_element_type",
+          "name": "arr",
           "content": {
             "type": "SYMBOL",
             "name": "_type"
           }
         },
         {
-          "type": "STRING",
-          "value": "["
-        },
-        {
           "type": "FIELD",
-          "name": "array_size",
+          "name": "arr_idx",
           "content": {
             "type": "SYMBOL",
-            "name": "_expression"
+            "name": "array_bracket_expression"
           }
-        },
-        {
-          "type": "STRING",
-          "value": "]"
         }
       ]
     },
@@ -267,6 +259,28 @@
         {
           "type": "SYMBOL",
           "name": "array_type"
+        }
+      ]
+    },
+    "latency_specifier": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "'"
+            },
+            {
+              "type": "FIELD",
+              "name": "content",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_expression"
+              }
+            }
+          ]
         }
       ]
     },
@@ -318,21 +332,12 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "STRING",
-                  "value": "'"
-                },
-                {
-                  "type": "FIELD",
-                  "name": "latency_spec",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "_expression"
-                  }
-                }
-              ]
+              "type": "FIELD",
+              "name": "latency_specifier",
+              "content": {
+                "type": "SYMBOL",
+                "name": "latency_specifier"
+              }
             },
             {
               "type": "BLANK"
@@ -657,20 +662,12 @@
           }
         },
         {
-          "type": "STRING",
-          "value": "["
-        },
-        {
           "type": "FIELD",
           "name": "arr_idx",
           "content": {
             "type": "SYMBOL",
-            "name": "_expression"
+            "name": "array_bracket_expression"
           }
-        },
-        {
-          "type": "STRING",
-          "value": "]"
         }
       ]
     },
@@ -745,7 +742,7 @@
         },
         {
           "type": "FIELD",
-          "name": "right",
+          "name": "content",
           "content": {
             "type": "SYMBOL",
             "name": "_expression"
@@ -754,6 +751,27 @@
         {
           "type": "STRING",
           "value": ")"
+        }
+      ]
+    },
+    "array_bracket_expression": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "["
+        },
+        {
+          "type": "FIELD",
+          "name": "content",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_expression"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "]"
         }
       ]
     },
