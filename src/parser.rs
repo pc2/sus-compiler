@@ -757,7 +757,11 @@ fn report_all_tree_errors(tree : &Tree, errors : &ErrorCollector) {
         let depth_str = "  ".repeat(cursor.depth() as usize);
         let cursor_node = cursor.node().kind();
         let cursor_span = Span::from(cursor.node().byte_range());
-        println!("{depth_str}{cursor_node}: {cursor_span}");
+        if let Some(field_name) = cursor.field_name() {
+            println!("{depth_str} {field_name}: {cursor_node} [{cursor_span}]");
+        } else {
+            println!("{depth_str} {cursor_node} [{cursor_span}]");
+        }
         let n = cursor.node();
         if n.is_error() || n.is_missing() {
             let node_name = n.kind();
@@ -802,11 +806,13 @@ pub struct SusTreeSitterSingleton {
     pub global_identifier_kind : u16,
     pub array_type_kind : u16,
     pub declaration_kind : u16,
+    pub latency_specifier_kind : u16,
     pub unary_op_kind : u16,
     pub binary_op_kind : u16,
     pub array_op_kind : u16,
     pub func_call_kind : u16,
     pub parenthesis_expression_kind : u16,
+    pub array_bracket_expression_kind : u16,
     pub range_kind : u16,
     pub block_kind : u16,
     pub decl_assign_statement_kind : u16,
@@ -815,18 +821,22 @@ pub struct SusTreeSitterSingleton {
     pub if_statement_kind : u16,
     pub for_statement_kind : u16,
 
+    pub gen_kw : u16,
+    pub state_kw : u16,
+    pub reg_kw : u16,
+    pub initial_kw : u16,
+
     pub name_field : NonZeroU16,
     pub module_inputs_field : NonZeroU16,
     pub module_outputs_field : NonZeroU16,
     pub block_field : NonZeroU16,
     pub interface_ports_field : NonZeroU16,
-    pub array_element_type_field : NonZeroU16,
-    pub array_size_field : NonZeroU16,
     pub type_field : NonZeroU16,
-    pub latency_spec_field : NonZeroU16,
+    pub latency_specifier_field : NonZeroU16,
     pub declaration_modifiers_field : NonZeroU16,
     pub left_field : NonZeroU16,
     pub right_field : NonZeroU16,
+    pub content_field : NonZeroU16,
     pub operator_field : NonZeroU16,
     pub arr_field : NonZeroU16,
     pub arr_idx_field : NonZeroU16,
@@ -854,11 +864,13 @@ impl SusTreeSitterSingleton {
             global_identifier_kind : language.id_for_node_kind("global_identifier", true),
             array_type_kind : language.id_for_node_kind("array_type", true),
             declaration_kind : language.id_for_node_kind("declaration", true),
+            latency_specifier_kind : language.id_for_node_kind("latency_specifier", true),
             unary_op_kind : language.id_for_node_kind("unary_op", true),
             binary_op_kind : language.id_for_node_kind("binary_op", true),
             array_op_kind : language.id_for_node_kind("array_op", true),
             func_call_kind : language.id_for_node_kind("func_call", true),
             parenthesis_expression_kind : language.id_for_node_kind("parenthesis_expression", true),
+            array_bracket_expression_kind : language.id_for_node_kind("array_bracket_expression", true),
             range_kind : language.id_for_node_kind("range", true),
             block_kind : language.id_for_node_kind("block", true),
             decl_assign_statement_kind : language.id_for_node_kind("decl_assign_statement", true),
@@ -867,21 +879,25 @@ impl SusTreeSitterSingleton {
             if_statement_kind : language.id_for_node_kind("if_statement", true),
             for_statement_kind : language.id_for_node_kind("for_statement", true),
 
+            gen_kw : language.id_for_node_kind("gen", false),
+            state_kw : language.id_for_node_kind("state", false),
+            reg_kw : language.id_for_node_kind("reg", false),
+            initial_kw : language.id_for_node_kind("initial", false),
+
             name_field : language.field_id_for_name("name").unwrap(),
             module_inputs_field : language.field_id_for_name("inputs").unwrap(),
             module_outputs_field : language.field_id_for_name("outputs").unwrap(),
             block_field : language.field_id_for_name("block").unwrap(),
             interface_ports_field : language.field_id_for_name("interface_ports").unwrap(),
-            array_element_type_field : language.field_id_for_name("array_element_type").unwrap(),
-            array_size_field : language.field_id_for_name("array_size").unwrap(),
             type_field : language.field_id_for_name("type").unwrap(),
-            latency_spec_field : language.field_id_for_name("latency_spec").unwrap(),
+            latency_specifier_field : language.field_id_for_name("latency_specifier").unwrap(),
             declaration_modifiers_field : language.field_id_for_name("declaration_modifiers").unwrap(),
             left_field : language.field_id_for_name("left").unwrap(),
             right_field : language.field_id_for_name("right").unwrap(),
             operator_field : language.field_id_for_name("operator").unwrap(),
             arr_field : language.field_id_for_name("arr").unwrap(),
             arr_idx_field : language.field_id_for_name("arr_idx").unwrap(),
+            content_field : language.field_id_for_name("content").unwrap(),
             argument_field : language.field_id_for_name("argument").unwrap(),
             from_field : language.field_id_for_name("from").unwrap(),
             to_field : language.field_id_for_name("to").unwrap(),

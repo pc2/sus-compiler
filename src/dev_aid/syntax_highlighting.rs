@@ -97,13 +97,16 @@ pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<(PathBuf, 
 }
 
 // Requires that character_ranges.len() == tokens.len() + 1 to include EOF token
-pub fn pretty_print_error<AriadneCache : Cache<FileUUID>>(error : &CompileError, file : FileUUID, file_cache : &mut AriadneCache) {
+pub fn pretty_print_error<AriadneCache : Cache<FileUUID>>(error : &CompileError, file : FileUUID, linker : &Linker, file_cache : &mut AriadneCache) {
     // Generate & choose some colours for each of our elements
     let (err_color, report_kind) = match error.level {
         ErrorLevel::Error => (Color::Red, ReportKind::Error),
         ErrorLevel::Warning => (Color::Yellow, ReportKind::Warning),
     };
     let info_color = Color::Blue;
+
+    // Assert that span is in file
+    let _ = &linker.files[file].file_text[error.position];
 
     let error_span = error.position.into_range();
 
@@ -121,6 +124,8 @@ pub fn pretty_print_error<AriadneCache : Cache<FileUUID>>(error : &CompileError,
 
     for info in &error.infos {
         let info_span = info.position.into_range();
+        // Assert that span is in file
+        let _ = &linker.files[info.file].file_text[info.position];
         report = report.with_label(
             Label::new((info.file, info_span))
                 .with_message(&info.info)
@@ -148,7 +153,7 @@ pub fn print_all_errors(linker : &Linker, paths_arena : &mut ArenaVector<(PathBu
         let errors = linker.get_all_errors_in_file(file_uuid);
 
         for err in errors.get().0 {
-            pretty_print_error(&err, f.parsing_errors.file, paths_arena);
+            pretty_print_error(&err, f.parsing_errors.file, linker, paths_arena);
         }
     }
 }
