@@ -109,6 +109,9 @@ The main goals of the language are roughly listed below:
 - [ ] Basic testbench
 - [ ] "Visualization"
 
+## Architecture
+![Architecture of the SUS Compiler](philosophy/images/susArchitecture.png)
+
 ## Features
 
 ### Streams
