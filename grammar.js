@@ -26,10 +26,10 @@ module.exports = grammar({
 
         interface_ports : $ => seq(
             ':',
-            field('inputs', sepSeq($.declaration, ',')),
+            field('inputs', $.assign_left_side),
             optional(seq(
                 '->',
-                field('outputs', sepSeq($.declaration, ','))
+                field('outputs', $.assign_left_side)
             ))
         ),
         module: $ => seq(
@@ -145,7 +145,7 @@ module.exports = grammar({
             '}'
         ),
         
-        _assign_left_side: $ => sepSeq1(seq(
+        assign_left_side: $ => sepSeq1(field('assign_to', seq(
             choice(
                 repeat('reg'),
                 'initial'
@@ -154,18 +154,16 @@ module.exports = grammar({
                 $._expression,
                 $.declaration
             )
-        ), ','),
+        )), ','),
         decl_assign_statement: $ => seq(
-            field('assign_to', $._assign_left_side),
+            field('assign_left', $.assign_left_side),
             '=',
-            field('assign_value', $._expression),
+            field('assign_value', $._expression)
         ),
-        decl_statement: $ => $.declaration,
-        expression_statement: $ => $._expression,
 
         if_statement: $ => seq(
             'if',
-            field('condition', $._assign_left_side),
+            field('condition', $._expression),
             field('then_block', $.block),
             optional(seq(
                 'else',
@@ -185,8 +183,10 @@ module.exports = grammar({
         _statement: $ => choice(
             $.block,
             seq($.decl_assign_statement, ';'),
-            seq($.decl_statement, ';'),
-            seq($.expression_statement, ';'),
+
+            // Decls only should only allow a single declaration, and cannot contain expressions, 
+            // but we allow some tolerance in the grammar here, so we can generate better errors after. 
+            seq($.assign_left_side, ';'),
             $.if_statement,
             $.for_statement
         ),

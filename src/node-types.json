@@ -128,6 +128,62 @@
     }
   },
   {
+    "type": "assign_left_side",
+    "named": true,
+    "fields": {
+      "assign_to": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "array_op",
+            "named": true
+          },
+          {
+            "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "declaration",
+            "named": true
+          },
+          {
+            "type": "func_call",
+            "named": true
+          },
+          {
+            "type": "global_identifier",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "initial",
+            "named": false
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "reg",
+            "named": false
+          },
+          {
+            "type": "unary_op",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "binary_op",
     "named": true,
     "fields": {
@@ -280,19 +336,15 @@
       "required": false,
       "types": [
         {
+          "type": "assign_left_side",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
         {
           "type": "decl_assign_statement",
-          "named": true
-        },
-        {
-          "type": "decl_statement",
-          "named": true
-        },
-        {
-          "type": "expression_statement",
           "named": true
         },
         {
@@ -310,56 +362,12 @@
     "type": "decl_assign_statement",
     "named": true,
     "fields": {
-      "assign_to": {
-        "multiple": true,
+      "assign_left": {
+        "multiple": false,
         "required": true,
         "types": [
           {
-            "type": ",",
-            "named": false
-          },
-          {
-            "type": "array_op",
-            "named": true
-          },
-          {
-            "type": "binary_op",
-            "named": true
-          },
-          {
-            "type": "declaration",
-            "named": true
-          },
-          {
-            "type": "func_call",
-            "named": true
-          },
-          {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
-            "type": "identifier",
-            "named": true
-          },
-          {
-            "type": "initial",
-            "named": false
-          },
-          {
-            "type": "number",
-            "named": true
-          },
-          {
-            "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "reg",
-            "named": false
-          },
-          {
-            "type": "unary_op",
+            "type": "assign_left_side",
             "named": true
           }
         ]
@@ -402,21 +410,6 @@
           }
         ]
       }
-    }
-  },
-  {
-    "type": "decl_statement",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "declaration",
-          "named": true
-        }
-      ]
     }
   },
   {
@@ -471,49 +464,6 @@
           }
         ]
       }
-    }
-  },
-  {
-    "type": "expression_statement",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "array_op",
-          "named": true
-        },
-        {
-          "type": "binary_op",
-          "named": true
-        },
-        {
-          "type": "func_call",
-          "named": true
-        },
-        {
-          "type": "global_identifier",
-          "named": true
-        },
-        {
-          "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "number",
-          "named": true
-        },
-        {
-          "type": "parenthesis_expression",
-          "named": true
-        },
-        {
-          "type": "unary_op",
-          "named": true
-        }
-      ]
     }
   },
   {
@@ -630,23 +580,15 @@
     "named": true,
     "fields": {
       "condition": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": ",",
-            "named": false
-          },
           {
             "type": "array_op",
             "named": true
           },
           {
             "type": "binary_op",
-            "named": true
-          },
-          {
-            "type": "declaration",
             "named": true
           },
           {
@@ -662,20 +604,12 @@
             "named": true
           },
           {
-            "type": "initial",
-            "named": false
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
             "named": true
-          },
-          {
-            "type": "reg",
-            "named": false
           },
           {
             "type": "unary_op",
@@ -714,29 +648,21 @@
     "named": true,
     "fields": {
       "inputs": {
-        "multiple": true,
-        "required": false,
+        "multiple": false,
+        "required": true,
         "types": [
           {
-            "type": ",",
-            "named": false
-          },
-          {
-            "type": "declaration",
+            "type": "assign_left_side",
             "named": true
           }
         ]
       },
       "outputs": {
-        "multiple": true,
+        "multiple": false,
         "required": false,
         "types": [
           {
-            "type": ",",
-            "named": false
-          },
-          {
-            "type": "declaration",
+            "type": "assign_left_side",
             "named": true
           }
         ]
