@@ -813,7 +813,7 @@ impl InstantiationList {
                 specified_latencies : Vec::new(),
                 flattened : &flattened,
                 linker : linker,
-                errors : ErrorCollector::new(flattened.errors.file)
+                errors : flattened.errors.new_for_same_file()
             };
 
             let interface = context.instantiate_full();

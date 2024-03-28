@@ -425,7 +425,7 @@ impl<'l> FlatteningContext<'l> {
 
         let mut nested_context = FlatteningContext {
             instructions: std::mem::replace(&mut self.instructions, FlatAlloc::new()),
-            errors: ErrorCollector::new(module.link_info.file), // Temporary ErrorCollector, unused
+            errors: ErrorCollector::new(module.link_info.file, local_linker.file.file_text.len()), // Temporary ErrorCollector, unused
             is_declared_in_this_module: false,
             linker: local_linker,
             type_list_for_naming: self.type_list_for_naming,
@@ -1021,7 +1021,9 @@ impl<'l> FlatteningContext<'l> {
                 }*/
             } else if kind == SUS.decl_assign_statement_kind {
             //Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
-                /*let read_side = non_func_expr.as_ref().map(|some_expr| self.flatten_expr(some_expr));
+                self.cursor.goto_first_child();
+                
+                /*let read_side = self.flatten_expr_tree();
                 if to.len() == 1 {
                     let t = &to[0];
                     let Some(write_side) = self.flatten_left_expr(&t.expr, t.span, non_func_expr.is_some()) else {continue};
@@ -1031,7 +1033,8 @@ impl<'l> FlatteningContext<'l> {
                     }
                 } else {
                     self.errors.error_basic(*stmt_span, format!("Non-function assignments must only output exactly 1 instead of {}", to.len()));
-                }*/
+                }
+                self.go_up();*/
             } else if kind == SUS.block_kind {
             //Statement::Block(inner_code) => {
                 self.flatten_code_tree();
@@ -1075,6 +1078,10 @@ impl<'l> FlatteningContext<'l> {
             if !self.cursor.goto_next_sibling() {break;}
         }
         self.go_up();
+    }
+
+    fn flatten_assignment_left_side(&mut self) -> Vec<FlatID> {
+        todo!()
     }
 
     fn flatten_interface_ports_tree(&mut self) {
@@ -1448,10 +1455,10 @@ pub struct FlattenedModule {
 }
 
 impl FlattenedModule {
-    pub fn empty(file : FileUUID) -> FlattenedModule {
+    pub fn empty(errors : ErrorCollector) -> FlattenedModule {
         FlattenedModule {
             instructions : FlatAlloc::new(),
-            errors : ErrorCollector::new(file),
+            errors,
             interface_ports : InterfacePorts::empty(),
             resolved_globals : ResolvedGlobals::new()
         }
@@ -1476,7 +1483,7 @@ impl FlattenedModule {
 
         let mut context = FlatteningContext{
             instructions : FlatAlloc::new(),
-            errors : ErrorCollector::new(module.link_info.file),
+            errors : ErrorCollector::new(module.link_info.file, global_resolver.file.file_text.len()),
             is_declared_in_this_module : true,
             linker : global_resolver,
             local_variable_context : LocalVariableContext::new_initial(),

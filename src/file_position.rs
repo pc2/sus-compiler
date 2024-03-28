@@ -186,6 +186,10 @@ impl FileText {
     pub fn is_span_valid(&self, span : Span) -> bool {
         span.1 <= self.file_text.len()
     }
+
+    pub fn len(&self) -> usize {
+        self.file_text.len()
+    }
 }
 
 impl Index<Span> for FileText {

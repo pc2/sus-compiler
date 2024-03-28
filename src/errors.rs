@@ -56,29 +56,49 @@ pub struct ErrorCollector {
     errors : RefCell<Vec<CompileError>>,
     pub did_error : Cell<bool>,
     pub file : FileUUID,
+    file_len : usize, // Only used for debugging, to see no invalid errors are produced
 }
 
 impl ErrorCollector {
-    pub fn new(file : FileUUID) -> Self {
-        Self{errors : RefCell::new(Vec::new()), file, did_error : Cell::new(false)}
+    pub fn new(file : FileUUID, file_len : usize) -> Self {
+        Self{errors : RefCell::new(Vec::new()), file, file_len, did_error : Cell::new(false)}
+    }
+
+    pub fn new_for_same_file(&self) -> Self {
+        Self{errors : RefCell::new(Vec::new()), file : self.file, file_len : self.file_len, did_error : self.did_error.clone()}
+    }
+
+    fn assert_span_good(&self, span : Span) {
+        let rng = span.into_range();
+        assert!(rng.end <= self.file_len); // Don't need to verify start, since Span already enforces start <= end
+    }
+    fn push_diagnostic(&self, diagnostic : CompileError) {
+        self.assert_span_good(diagnostic.position);
+        for info in &diagnostic.infos {
+            // Can only verify for diagnostics within this file, but that should be good enough to catch bugs
+            if info.file == self.file {
+                self.assert_span_good(info.position);
+            }
+        }
+        self.errors.borrow_mut().push(diagnostic);
     }
 
     pub fn error_basic<S : Into<String>>(&self, position : Span, reason : S) {
-        self.errors.borrow_mut().push(CompileError{position, reason : reason.into(), infos : Vec::new(), level : ErrorLevel::Error});
+        self.push_diagnostic(CompileError{position, reason : reason.into(), infos : Vec::new(), level : ErrorLevel::Error});
         self.did_error.set(true);
     }
     
     pub fn error_with_info<S : Into<String>>(&self, position : Span, reason : S, infos : Vec<ErrorInfo>) {
-        self.errors.borrow_mut().push(CompileError{position, reason : reason.into(), infos : infos, level : ErrorLevel::Error});
+        self.push_diagnostic(CompileError{position, reason : reason.into(), infos : infos, level : ErrorLevel::Error});
         self.did_error.set(true);
     }
     
     pub fn warn_basic<S : Into<String>>(&self, position : Span, reason : S) {
-        self.errors.borrow_mut().push(CompileError{position, reason : reason.into(), infos : Vec::new(), level : ErrorLevel::Warning});
+        self.push_diagnostic(CompileError{position, reason : reason.into(), infos : Vec::new(), level : ErrorLevel::Warning});
     }
     
     pub fn warn_with_info<S : Into<String>>(&self, position : Span, reason : S, infos : Vec<ErrorInfo>) {
-        self.errors.borrow_mut().push(CompileError{position, reason : reason.into(), infos : infos, level : ErrorLevel::Warning});
+        self.push_diagnostic(CompileError{position, reason : reason.into(), infos : infos, level : ErrorLevel::Warning});
     }
 
     pub fn get(self) -> (Vec<CompileError>, FileUUID) {
@@ -87,6 +107,7 @@ impl ErrorCollector {
 
     pub fn ingest(&self, source : &Self) {
         assert!(self.file == source.file);
+        assert!(self.file_len == source.file_len);
         self.errors.borrow_mut().extend_from_slice(&source.errors.borrow());
     }
 }
