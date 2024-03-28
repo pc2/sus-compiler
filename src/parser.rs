@@ -680,7 +680,7 @@ impl<'file> ASTParserContext<'file> {
             span
         };
 
-        Some(Module{interface, code, link_info, flattened : FlattenedModule::empty(self.errors.file), instantiations : InstantiationList::new()})
+        Some(Module{interface, code, link_info, flattened : FlattenedModule::empty(self.errors.new_for_same_file()), instantiations : InstantiationList::new()})
     }
 
     fn parse_ast(mut self, outer_token_iter : &mut TokenStream) -> ASTRoot {
@@ -722,7 +722,7 @@ pub struct FullParseResult {
 }
 
 pub fn perform_full_semantic_parse(file_text : String, file : FileUUID) -> FullParseResult {
-    let errors = ErrorCollector::new(file);
+    let errors = ErrorCollector::new(file, file_text.len());
 
     let (tokens, token_spans) = tokenize(&file_text, &errors);
 
@@ -798,7 +798,6 @@ fn report_all_tree_errors(tree : &Tree, errors : &ErrorCollector) {
 pub struct SusTreeSitterSingleton {
     pub language : tree_sitter::Language,
 
-    pub error_kind : u16,
     pub module_kind : u16,
     pub interface_ports_kind : u16,
     pub identifier_kind : u16,
@@ -816,8 +815,7 @@ pub struct SusTreeSitterSingleton {
     pub range_kind : u16,
     pub block_kind : u16,
     pub decl_assign_statement_kind : u16,
-    pub decl_statement_kind : u16,
-    pub expression_statement_kind : u16,
+    pub assign_left_side_kind : u16,
     pub if_statement_kind : u16,
     pub for_statement_kind : u16,
 
@@ -855,59 +853,70 @@ pub struct SusTreeSitterSingleton {
 impl SusTreeSitterSingleton {
     fn new() -> Self {
         let language = tree_sitter_sus::language();
+        let node_kind = |name : &str| -> u16 {
+            let v = language.id_for_node_kind(name, true);
+            assert!(v != 0, "{name}");
+            v
+        };
+        let keyword_kind = |name : &str| -> u16 {
+            let v = language.id_for_node_kind(name, false);
+            assert!(v != 0, "{name}");
+            v
+        };
+        let field = |name : &str| -> NonZeroU16 {
+            language.field_id_for_name(name).expect(name)
+        };
         SusTreeSitterSingleton {
-            error_kind : language.id_for_node_kind("ERROR", false),
-            module_kind : language.id_for_node_kind("module", true),
-            interface_ports_kind : language.id_for_node_kind("interface_ports", true),
-            identifier_kind : language.id_for_node_kind("identifier", true),
-            number_kind : language.id_for_node_kind("number", true),
-            global_identifier_kind : language.id_for_node_kind("global_identifier", true),
-            array_type_kind : language.id_for_node_kind("array_type", true),
-            declaration_kind : language.id_for_node_kind("declaration", true),
-            latency_specifier_kind : language.id_for_node_kind("latency_specifier", true),
-            unary_op_kind : language.id_for_node_kind("unary_op", true),
-            binary_op_kind : language.id_for_node_kind("binary_op", true),
-            array_op_kind : language.id_for_node_kind("array_op", true),
-            func_call_kind : language.id_for_node_kind("func_call", true),
-            parenthesis_expression_kind : language.id_for_node_kind("parenthesis_expression", true),
-            array_bracket_expression_kind : language.id_for_node_kind("array_bracket_expression", true),
-            range_kind : language.id_for_node_kind("range", true),
-            block_kind : language.id_for_node_kind("block", true),
-            decl_assign_statement_kind : language.id_for_node_kind("decl_assign_statement", true),
-            decl_statement_kind : language.id_for_node_kind("decl_statement", true),
-            expression_statement_kind : language.id_for_node_kind("expression_statement", true),
-            if_statement_kind : language.id_for_node_kind("if_statement", true),
-            for_statement_kind : language.id_for_node_kind("for_statement", true),
+            module_kind : node_kind("module"),
+            interface_ports_kind : node_kind("interface_ports"),
+            identifier_kind : node_kind("identifier"),
+            number_kind : node_kind("number"),
+            global_identifier_kind : node_kind("global_identifier"),
+            array_type_kind : node_kind("array_type"),
+            declaration_kind : node_kind("declaration"),
+            latency_specifier_kind : node_kind("latency_specifier"),
+            unary_op_kind : node_kind("unary_op"),
+            binary_op_kind : node_kind("binary_op"),
+            array_op_kind : node_kind("array_op"),
+            func_call_kind : node_kind("func_call"),
+            parenthesis_expression_kind : node_kind("parenthesis_expression"),
+            array_bracket_expression_kind : node_kind("array_bracket_expression"),
+            range_kind : node_kind("range"),
+            block_kind : node_kind("block"),
+            decl_assign_statement_kind : node_kind("decl_assign_statement"),
+            assign_left_side_kind : node_kind("assign_left_side"),
+            if_statement_kind : node_kind("if_statement"),
+            for_statement_kind : node_kind("for_statement"),
 
-            gen_kw : language.id_for_node_kind("gen", false),
-            state_kw : language.id_for_node_kind("state", false),
-            reg_kw : language.id_for_node_kind("reg", false),
-            initial_kw : language.id_for_node_kind("initial", false),
+            gen_kw : keyword_kind("gen"),
+            state_kw : keyword_kind("state"),
+            reg_kw : keyword_kind("reg"),
+            initial_kw : keyword_kind("initial"),
 
-            name_field : language.field_id_for_name("name").unwrap(),
-            module_inputs_field : language.field_id_for_name("inputs").unwrap(),
-            module_outputs_field : language.field_id_for_name("outputs").unwrap(),
-            block_field : language.field_id_for_name("block").unwrap(),
-            interface_ports_field : language.field_id_for_name("interface_ports").unwrap(),
-            type_field : language.field_id_for_name("type").unwrap(),
-            latency_specifier_field : language.field_id_for_name("latency_specifier").unwrap(),
-            declaration_modifiers_field : language.field_id_for_name("declaration_modifiers").unwrap(),
-            left_field : language.field_id_for_name("left").unwrap(),
-            right_field : language.field_id_for_name("right").unwrap(),
-            operator_field : language.field_id_for_name("operator").unwrap(),
-            arr_field : language.field_id_for_name("arr").unwrap(),
-            arr_idx_field : language.field_id_for_name("arr_idx").unwrap(),
-            content_field : language.field_id_for_name("content").unwrap(),
-            argument_field : language.field_id_for_name("argument").unwrap(),
-            from_field : language.field_id_for_name("from").unwrap(),
-            to_field : language.field_id_for_name("to").unwrap(),
-            assign_to_field : language.field_id_for_name("assign_to").unwrap(),
-            assign_value_field : language.field_id_for_name("assign_value").unwrap(),
-            condition_field : language.field_id_for_name("condition").unwrap(),
-            then_block_field : language.field_id_for_name("then_block").unwrap(),
-            else_block_field : language.field_id_for_name("else_block").unwrap(),
-            for_decl_field : language.field_id_for_name("for_decl").unwrap(),
-            for_range_field : language.field_id_for_name("for_range").unwrap(),
+            name_field : field("name"),
+            module_inputs_field : field("inputs"),
+            module_outputs_field : field("outputs"),
+            block_field : field("block"),
+            interface_ports_field : field("interface_ports"),
+            type_field : field("type"),
+            latency_specifier_field : field("latency_specifier"),
+            declaration_modifiers_field : field("declaration_modifiers"),
+            left_field : field("left"),
+            right_field : field("right"),
+            operator_field : field("operator"),
+            arr_field : field("arr"),
+            arr_idx_field : field("arr_idx"),
+            content_field : field("content"),
+            argument_field : field("argument"),
+            from_field : field("from"),
+            to_field : field("to"),
+            assign_to_field : field("assign_to"),
+            assign_value_field : field("assign_value"),
+            condition_field : field("condition"),
+            then_block_field : field("then_block"),
+            else_block_field : field("else_block"),
+            for_decl_field : field("for_decl"),
+            for_range_field : field("for_range"),
                     
             language,
         }
