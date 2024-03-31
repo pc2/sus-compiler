@@ -1,7 +1,7 @@
 
 use num::BigInt;
 use static_init::dynamic;
-use tree_sitter::Tree;
+use tree_sitter::{Tree, TreeCursor};
 
 use crate::{ast::*, errors::*, file_position::{BracketSpan, FileText, SingleCharSpan, Span}, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID, tokenizer::*, value::Value};
 
@@ -737,7 +737,7 @@ pub fn perform_full_semantic_parse(file_text : String, file : FileUUID) -> FullP
 
     let tree = parser.parse(&file_text.file_text, None).unwrap();
 
-    report_all_tree_errors(&tree, &ast.errors);
+    report_all_tree_errors(&file_text, &tree, &ast.errors);
 
     FullParseResult{
         tree,
@@ -751,20 +751,19 @@ pub fn perform_full_semantic_parse(file_text : String, file : FileUUID) -> FullP
 
 
 
-fn report_all_tree_errors(tree : &Tree, errors : &ErrorCollector) {
+fn report_all_tree_errors(file_text : &FileText, tree : &Tree, errors : &ErrorCollector) {
     let mut cursor = tree.walk();
     loop {
-        let depth_str = "  ".repeat(cursor.depth() as usize);
-        let cursor_node = cursor.node().kind();
-        let cursor_span = Span::from(cursor.node().byte_range());
-        if let Some(field_name) = cursor.field_name() {
-            println!("{depth_str} {field_name}: {cursor_node} [{cursor_span}]");
-        } else {
-            println!("{depth_str} {cursor_node} [{cursor_span}]");
-        }
+        let indent = "  ".repeat(cursor.depth() as usize);
         let n = cursor.node();
+        let cursor_span = Span::from(n.byte_range());
+        let node_name = if n.kind_id() == SUS.identifier_kind {format!("\"{}\"", &file_text[cursor_span])} else {n.kind().to_owned()};
+        if let Some(field_name) = cursor.field_name() {
+            println!("{indent} {field_name}: {node_name} [{cursor_span}]");
+        } else {
+            println!("{indent} {node_name} [{cursor_span}]");
+        }
         if n.is_error() || n.is_missing() {
-            let node_name = n.kind();
             let span = Span::from(n.byte_range());
             let field_name = cursor.field_name();
 
@@ -828,6 +827,7 @@ pub struct SusTreeSitterSingleton {
     pub module_inputs_field : NonZeroU16,
     pub module_outputs_field : NonZeroU16,
     pub block_field : NonZeroU16,
+    pub block_statement_field : NonZeroU16,
     pub interface_ports_field : NonZeroU16,
     pub type_field : NonZeroU16,
     pub latency_specifier_field : NonZeroU16,
@@ -897,6 +897,7 @@ impl SusTreeSitterSingleton {
             module_inputs_field : field("inputs"),
             module_outputs_field : field("outputs"),
             block_field : field("block"),
+            block_statement_field : field("block_statement"),
             interface_ports_field : field("interface_ports"),
             type_field : field("type"),
             latency_specifier_field : field("latency_specifier"),
@@ -925,3 +926,128 @@ impl SusTreeSitterSingleton {
 
 #[dynamic]
 pub static SUS : SusTreeSitterSingleton = SusTreeSitterSingleton::new();
+
+pub struct Cursor<'t> {
+    cursor : TreeCursor<'t>
+}
+
+impl<'t> Cursor<'t> {
+    #[track_caller]
+    pub fn new_for_node(tree : &'t tree_sitter::Tree, span : Span, kind : u16) -> Self {
+        let mut cursor = tree.walk();
+        let _ = cursor.goto_first_child_for_byte(span.into_range().start).unwrap();
+        let start_node = cursor.node();
+        assert!(start_node.kind_id() == kind);
+        assert!(start_node.byte_range() == span.into_range());
+
+        Self{cursor}
+
+    }
+
+    pub fn node(&self) -> (u16, Span) {
+        let node = self.cursor.node();
+        (node.kind_id(), node.byte_range().into())
+    }
+
+    pub fn kind(&self) -> u16 {
+        let node = self.cursor.node();
+        node.kind_id()
+    }
+
+    pub fn span(&self) -> Span {
+        let node = self.cursor.node();
+        node.byte_range().into()
+    }
+
+    /// If field is found, cursor is now at field position
+    /// 
+    /// If field is not found, cursor remains in place
+    pub fn optional_field<OT, F : FnOnce(&mut Self) -> OT>(&mut self, field_id : NonZeroU16, func : F) -> Option<OT> {
+        loop {
+            if let Some(found) = self.cursor.field_id() {
+                if found == field_id {
+                    let result = func(self);
+                    self.cursor.goto_next_sibling();
+                    return Some(result);
+                } else {
+                    return None; // Field found, but it's not this one. Stop here, because we've passed the possibly optional field
+                }
+            } else {
+                if !self.cursor.goto_next_sibling() {
+                    return None;
+                }
+            }
+        }
+    }
+
+    #[track_caller]
+    pub fn field<OT, F : FnOnce(&mut Self) -> OT>(&mut self, field_id : NonZeroU16, func : F) -> OT {
+        loop {
+            if let Some(found) = self.cursor.field_id() {
+                if found == field_id {
+                    let result = func(self);
+                    self.cursor.goto_next_sibling();
+                    return result;
+                } else {
+                    panic!("Did not find required field '{}', found field '{}' instead!", SUS.language.field_name_for_id(field_id.into()).unwrap(), SUS.language.field_name_for_id(found.into()).unwrap());
+                }
+            } else {
+                if !self.cursor.goto_next_sibling() {
+                    panic!("Reached the end of child nodes without finding field '{}'", SUS.language.field_name_for_id(field_id.into()).unwrap())
+                }
+            }
+        }
+    }
+
+    #[track_caller]
+    pub fn field_span(&mut self, field_id : NonZeroU16) -> Span {
+        self.field(field_id, |cursor| cursor.span())
+    }
+
+    #[track_caller]
+    pub fn go_down<OT, F : FnOnce(&mut Self) -> OT>(&mut self, kind : u16, func : F) -> OT {
+        let node = self.cursor.node();
+        assert_eq!(node.kind_id(), kind, "Was {} instead", node.kind());
+
+        self.go_down_no_check(func)
+    }
+
+    pub fn go_down_no_check<OT, F : FnOnce(&mut Self) -> OT>(&mut self, func : F) -> OT {
+        let r = self.cursor.goto_first_child();
+        assert!(r);
+        let result = func(self);
+        let r = self.cursor.goto_parent();
+        assert!(r);
+
+        result
+    }
+
+    pub fn repeat_fields<F : FnMut(&mut Self)>(&mut self, kind : u16, field_id : NonZeroU16, mut func : F) {
+        self.go_down(kind, |self2| {
+            loop {
+                if self2.cursor.field_id() == Some(field_id) {
+                    func(self2);
+                }
+
+                if !self2.cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+        });
+    }
+
+    pub fn for_each_contained<F : FnMut(&mut Self, u16, Span)>(&mut self, kind : u16, mut func : F) {
+        self.go_down(kind, |self2| {
+            loop {
+                let node = self2.cursor.node();
+                if !node.is_error() {
+                    func(self2, node.kind_id(), node.byte_range().into());
+                }
+
+                if !self2.cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+        });
+    }
+}

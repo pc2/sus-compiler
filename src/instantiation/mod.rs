@@ -270,7 +270,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         Some(result)
     }
     fn process_connection(&mut self, conn : &Write, original_connection : FlatID, condition : Option<WireID>) -> Option<()> {
-        match conn.write_type {
+        match conn.to.write_type {
             WriteType::Connection{num_regs, regs_span : _} => {
                 match &self.generation_state[conn.to.root] {
                     SubModuleOrWire::SubModule(_) => unreachable!(),
@@ -614,7 +614,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         
                         let mut did_place_error = false;
                         for wr in &unique_write_instructions {
-                            match wr.write_type {
+                            match wr.to.write_type {
                                 WriteType::Connection { num_regs, regs_span } => {
                                     if num_regs >= 1 {
                                         did_place_error = true;

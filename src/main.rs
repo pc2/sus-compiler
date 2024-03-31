@@ -141,7 +141,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     if file_paths.len() == 0 {
         // Quick debugging
         file_paths.push(PathBuf::from("resetNormalizer.sus"));
-        file_paths.push(PathBuf::from("multiply_add.sus"));
+        //file_paths.push(PathBuf::from("multiply_add.sus"));
         codegen_all = true;
         //codegen = Some("first_bit_idx_6".to_owned());
     }
