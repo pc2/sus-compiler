@@ -785,8 +785,12 @@
         {
           "type": "REPEAT",
           "content": {
-            "type": "SYMBOL",
-            "name": "_statement"
+            "type": "FIELD",
+            "name": "block_statement",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_statement"
+            }
           }
         },
         {

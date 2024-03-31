@@ -141,7 +141,7 @@ module.exports = grammar({
         
         block: $ => seq(
             '{',
-            repeat($._statement),
+            repeat(field('block_statement', $._statement)),
             '}'
         ),
         
