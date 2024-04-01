@@ -148,18 +148,6 @@
         "type": "SEQ",
         "members": [
           {
-            "type": "CHOICE",
-            "members": [
-              {
-                "type": "STRING",
-                "value": "::"
-              },
-              {
-                "type": "BLANK"
-              }
-            ]
-          },
-          {
             "type": "SEQ",
             "members": [
               {
@@ -194,27 +182,6 @@
           }
         ]
       }
-    },
-    "_maybe_global_identifier": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "PREC",
-          "value": 1,
-          "content": {
-            "type": "SYMBOL",
-            "name": "identifier"
-          }
-        },
-        {
-          "type": "PREC",
-          "value": 0,
-          "content": {
-            "type": "SYMBOL",
-            "name": "global_identifier"
-          }
-        }
-      ]
     },
     "array_type": {
       "type": "SEQ",
@@ -667,7 +634,7 @@
           "name": "name",
           "content": {
             "type": "SYMBOL",
-            "name": "_maybe_global_identifier"
+            "name": "global_identifier"
           }
         },
         {
@@ -781,7 +748,7 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "_maybe_global_identifier"
+          "name": "global_identifier"
         },
         {
           "type": "SYMBOL",
@@ -862,24 +829,32 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "FIELD",
-          "name": "write_modifiers",
-          "content": {
-            "type": "CHOICE",
-            "members": [
-              {
-                "type": "REPEAT",
-                "content": {
-                  "type": "STRING",
-                  "value": "reg"
-                }
-              },
-              {
-                "type": "STRING",
-                "value": "initial"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "write_modifiers",
+              "content": {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "REPEAT1",
+                    "content": {
+                      "type": "STRING",
+                      "value": "reg"
+                    }
+                  },
+                  {
+                    "type": "STRING",
+                    "value": "initial"
+                  }
+                ]
               }
-            ]
-          }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         },
         {
           "type": "FIELD",
@@ -1114,7 +1089,7 @@
   ],
   "conflicts": [
     [
-      "_maybe_global_identifier",
+      "_expression",
       "_type"
     ]
   ],

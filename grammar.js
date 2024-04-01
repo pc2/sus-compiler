@@ -44,15 +44,10 @@ module.exports = grammar({
         number: $ => /\d[\d_]*/,
 
         global_identifier: $ => prec.left(PREC.namespace_path, seq(
-            optional('::'),
+            //optional('::'),
             sepSeq1(field('item', $.identifier), '::')
         )),
 
-        _maybe_global_identifier: $ => choice(
-            prec(1, $.identifier),
-            prec(0, $.global_identifier)
-        ),
-        
         array_type: $ => seq(
             field('arr', $._type),
             field('arr_idx', $.array_bracket_expression)
@@ -105,7 +100,7 @@ module.exports = grammar({
         ),
 
         func_call: $ => seq(
-            field('name', $._maybe_global_identifier),
+            field('name', $.global_identifier),
             field('arguments', $.parenthesis_expression_list)
         ),
         
@@ -128,7 +123,7 @@ module.exports = grammar({
         ),
 
         _expression: $ => choice(
-            $._maybe_global_identifier,
+            $.global_identifier,
             $.array_op,
             $.number,
             $.parenthesis_expression,
@@ -150,10 +145,10 @@ module.exports = grammar({
         ),
         
         assign_to: $ => seq(
-            field('write_modifiers', choice(
-                repeat('reg'),
+            optional(field('write_modifiers', choice(
+                repeat1('reg'),
                 'initial'
-            )),
+            ))),
             field('expr_or_decl', choice(
                 $._expression,
                 $.declaration
@@ -202,7 +197,7 @@ module.exports = grammar({
     },
 
     conflicts: $ => [
-        [$._maybe_global_identifier, $._type] // Just because LR(1) is too weak to resolve 'ident[] a' vs 'type_name[]'. Tree sitter resolves this itself with more expensive GLR. NOT a precedence relation. 
+        [$._expression, $._type] // Just because LR(1) is too weak to resolve 'ident[] a' vs 'type_name[]'. Tree sitter resolves this itself with more expensive GLR. NOT a precedence relation. 
     ],
 
     word: $=> $.identifier,
