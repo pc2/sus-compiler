@@ -43,13 +43,13 @@ pub struct ConnectionWrite {
     pub path : Vec<ConnectionWritePathElement>,
     pub span : Span,
     pub is_declared_in_this_module : bool,
-    pub write_type : WriteType
+    pub write_modifiers : WriteModifiers
 }
 
 #[derive(Debug)]
-pub enum WriteType {
+pub enum WriteModifiers {
     Connection{num_regs : i64, regs_span : Span},
-    Initial
+    Initial{initial_kw_span : Span}
 }
 
 #[derive(Debug)]
@@ -210,7 +210,7 @@ pub struct Declaration {
     pub name : Box<str>,
     pub read_only : bool,
     // If the program text already covers the write, then lsp stuff on this declaration shouldn't use it. 
-    pub is_free_standing_decl : bool,
+    pub declaration_itself_is_not_written_to : bool,
     pub identifier_type : IdentifierType,
     pub latency_specifier : Option<FlatID>
 }
@@ -355,7 +355,7 @@ impl<'l> FlatteningContext<'l> {
             }
         }
     }
-    fn flatten_declaration<const ALLOW_MODULES : bool>(&mut self, decl : &'l SignalDeclaration, read_only : bool, is_free_standing_decl : bool) -> FlatID {
+    fn flatten_declaration<const ALLOW_MODULES : bool>(&mut self, decl : &'l SignalDeclaration, read_only : bool, declaration_itself_is_not_written_to : bool) -> FlatID {
         let typ_expr = if let TypeExpression::Named = &decl.typ.0 {
             let resolved = self.linker.resolve_global(decl.typ.1, &self.errors);
             match resolved.name_elem {
@@ -391,7 +391,7 @@ impl<'l> FlatteningContext<'l> {
             typ_expr,
             is_declared_in_this_module : self.is_declared_in_this_module,
             read_only,
-            is_free_standing_decl,
+            declaration_itself_is_not_written_to,
             identifier_type : decl.identifier_type,
             name : name.to_owned().into_boxed_str(),
             name_span : decl.name_span,
@@ -424,7 +424,6 @@ impl<'l> FlatteningContext<'l> {
     }
     fn alloc_module_interface(&mut self, name : Box<str>, module : &Module, module_uuid : ModuleUUID, typ_span : Span) -> FlatID {
         let local_linker = self.linker.new_sublinker(module.link_info.file);
-        let mut cursor = Cursor::new_for_node(&local_linker.file.tree, module.link_info.span, SUS.module_kind);
 
         let mut nested_context = FlatteningContext {
             instructions: std::mem::replace(&mut self.instructions, FlatAlloc::new()),
@@ -493,7 +492,7 @@ impl<'l> FlatteningContext<'l> {
         for (field, arg_expr) in zip(inputs, args) {
             let arg_read_side = self.flatten_expr(arg_expr);
             let func_input_port = &submodule_local_wires.ports[field];
-            self.instructions.alloc(Instruction::Write(Write{from: arg_read_side, to: ConnectionWrite{root : *func_input_port, root_span : arg_expr.1, path : Vec::new(), span : *name_expr_span, is_declared_in_this_module : self.is_declared_in_this_module, write_type : WriteType::Connection{num_regs : 0, regs_span : Span::INVALID_SPAN}}}));
+            self.instructions.alloc(Instruction::Write(Write{from: arg_read_side, to: ConnectionWrite{root : *func_input_port, root_span : arg_expr.1, path : Vec::new(), span : *name_expr_span, is_declared_in_this_module : self.is_declared_in_this_module, write_modifiers : WriteModifiers::Connection{num_regs : 0, regs_span : Span::INVALID_SPAN}}}));
         }
 
         Some((md, submodule_local_wires))
@@ -591,16 +590,16 @@ impl<'l> FlatteningContext<'l> {
         };
         self.instructions.alloc(Instruction::Wire(wire_instance))
     }
-    fn flatten_assignable_expr(&mut self, expr : &Expression, span : Span, write_type : WriteType) -> Option<ConnectionWrite> {
+    fn flatten_assignable_expr(&mut self, expr : &Expression, span : Span, write_modifiers : WriteModifiers) -> Option<ConnectionWrite> {
         match expr {
             Expression::Named(local_idx) => {
                 let root = self.resolve_identifier(local_idx.span).expect_local("assignments")?;
 
-                Some(ConnectionWrite{root, root_span : span, path : Vec::new(), span, is_declared_in_this_module : self.is_declared_in_this_module, write_type})
+                Some(ConnectionWrite{root, root_span : span, path : Vec::new(), span, is_declared_in_this_module : self.is_declared_in_this_module, write_modifiers})
             }
             Expression::Array(arr_box) => {
                 let (arr, idx_expr, bracket_span) = arr_box.deref();
-                let flattened_arr_expr_opt = self.flatten_assignable_expr(&arr.0, arr.1, write_type);
+                let flattened_arr_expr_opt = self.flatten_assignable_expr(&arr.0, arr.1, write_modifiers);
                 
                 let idx = self.flatten_expr(idx_expr);
 
@@ -617,23 +616,23 @@ impl<'l> FlatteningContext<'l> {
         }
     }
     fn flatten_left_expr(&mut self, left : &'l AssignableExpressionWithModifiers, gets_assigned : bool) -> Option<ConnectionWrite> {
-        let write_type = self.flatten_assignment_modifiers(&left.modifiers);
+        let write_modifiers = self.flatten_assignment_modifiers(&left.modifiers);
         match &left.expr {
             LeftExpression::Assignable(assignable) => {
-                self.flatten_assignable_expr(assignable, left.span, write_type)
+                self.flatten_assignable_expr(assignable, left.span, write_modifiers)
             }
             LeftExpression::Declaration(decl) => {
                 let root = self.flatten_declaration::<true>(decl, false, !gets_assigned);
-                Some(ConnectionWrite{root, root_span : decl.name_span, path: Vec::new(), span : left.span, is_declared_in_this_module: true, write_type})
+                Some(ConnectionWrite{root, root_span : decl.name_span, path: Vec::new(), span : left.span, is_declared_in_this_module: true, write_modifiers})
             }
         }
     }
 
-    fn flatten_assignment_modifiers(&mut self, modifiers : &AssignableExpressionModifiers) -> WriteType {
+    fn flatten_assignment_modifiers(&mut self, modifiers : &AssignableExpressionModifiers) -> WriteModifiers {
         match modifiers {
-            &AssignableExpressionModifiers::LatencyAdding{num_regs, regs_span} => WriteType::Connection{num_regs, regs_span},
-            AssignableExpressionModifiers::Initial{initial_token : _} => WriteType::Initial,
-            AssignableExpressionModifiers::NoModifiers => WriteType::Connection{num_regs : 0, regs_span : Span::INVALID_SPAN},
+            &AssignableExpressionModifiers::LatencyAdding{num_regs, regs_span} => WriteModifiers::Connection{num_regs, regs_span},
+            AssignableExpressionModifiers::Initial{initial_token} => WriteModifiers::Initial{initial_kw_span : *initial_token},
+            AssignableExpressionModifiers::NoModifiers => WriteModifiers::Connection{num_regs : 0, regs_span : Span::INVALID_SPAN},
         }
     }
     fn flatten_code(&mut self, code : &'l CodeBlock) {
@@ -771,28 +770,35 @@ impl<'l> FlatteningContext<'l> {
         } else {unreachable!()}
     }
 
-    fn flatten_declaration_tree<const ALLOW_MODULES : bool>(&mut self, read_only : bool, is_free_standing_decl : bool, cursor : &mut Cursor<'l>) -> FlatID {
+    fn flatten_declaration_tree<const ALLOW_MODULES : bool>(&mut self, fallback_identifier_type : IdentifierType, declaration_itself_is_not_written_to : bool, cursor : &mut Cursor<'l>) -> FlatID {
+        let read_only = fallback_identifier_type == IdentifierType::Input;
+        
         cursor.go_down(SUS.declaration_kind, |cursor| {
             let identifier_type = cursor.optional_field(SUS.declaration_modifiers_field, |cursor| {
-                let decl_info_node_kind = cursor.kind();
-                if decl_info_node_kind == SUS.state_kw {
+                let (modifier_kind, modifier_span) = cursor.node();
+
+                if fallback_identifier_type != IdentifierType::Local {
+                    self.errors.error_basic(modifier_span, "Inputs and outputs of a module cannot be decorated with 'state' or 'gen'");
+                    return fallback_identifier_type;
+                }
+
+                if modifier_kind == SUS.state_kw {
                     IdentifierType::State
-                } else if decl_info_node_kind == SUS.gen_kw {
+                } else if modifier_kind == SUS.gen_kw {
                     IdentifierType::Generative
                 } else {
                     unreachable!()
                 }
-            }).unwrap_or(IdentifierType::Local);
+            }).unwrap_or(fallback_identifier_type);
     
             let typ_or_module_expr = cursor.field(SUS.type_field, |cursor| self.flatten_module_or_type_tree::<ALLOW_MODULES>(cursor));
             
             let name_span = cursor.field_span(SUS.name_field);
     
             let span_latency_specifier = cursor.optional_field(SUS.latency_specifier_field, |cursor| {
-                let span = cursor.span();
-                let spec_field = cursor.go_down(SUS.latency_specifier_kind, |cursor| cursor.field(SUS.content_field, |cursor| self.flatten_expr_tree(cursor)));
-                (spec_field, span)
-            });
+                cursor.go_down_content(SUS.latency_specifier_kind, 
+                    |cursor, latency_specifier_span| (self.flatten_expr_tree(cursor), latency_specifier_span)
+            )});
             // Parsing components done
 
             let typ_expr = match typ_or_module_expr {
@@ -816,7 +822,7 @@ impl<'l> FlatteningContext<'l> {
                 typ_expr,
                 is_declared_in_this_module : self.is_declared_in_this_module,
                 read_only,
-                is_free_standing_decl,
+                declaration_itself_is_not_written_to,
                 identifier_type,
                 name : name.to_owned().into_boxed_str(),
                 name_span,
@@ -832,11 +838,9 @@ impl<'l> FlatteningContext<'l> {
     }
 
     fn flatten_array_bracket_tree(&mut self, cursor : &mut Cursor<'l>) -> (FlatID, BracketSpan) {
-        let bracket_span = BracketSpan::from_outer(cursor.span());
-
-        let flat_id = cursor.go_down(SUS.array_bracket_expression_kind, |cursor| cursor.field(SUS.content_field, |cursor| self.flatten_expr_tree(cursor)));
-
-        (flat_id, bracket_span)
+        cursor.go_down_content(SUS.array_bracket_expression_kind, 
+            |cursor, outer_bracket_span| (self.flatten_expr_tree(cursor), BracketSpan::from_outer(outer_bracket_span))
+        )
     }
 
     fn flatten_expr_tree(&mut self, cursor : &mut Cursor<'l>) -> FlatID {
@@ -914,15 +918,15 @@ impl<'l> FlatteningContext<'l> {
         };
         self.instructions.alloc(Instruction::Wire(wire_instance))
     }
-    fn flatten_assignable_expr_tree(&mut self, write_type : WriteType, cursor : &mut Cursor<'l>) -> Option<ConnectionWrite> {
+    fn flatten_assignable_expr_tree(&mut self, write_modifiers : WriteModifiers, cursor : &mut Cursor<'l>) -> Option<ConnectionWrite> {
         let (kind, span) = cursor.node();
         if kind == SUS.identifier_kind {
             let root = self.resolve_identifier(span).expect_local("assignments")?;
 
-            Some(ConnectionWrite{root, root_span : span, path : Vec::new(), span, is_declared_in_this_module : self.is_declared_in_this_module, write_type})
+            Some(ConnectionWrite{root, root_span : span, path : Vec::new(), span, is_declared_in_this_module : self.is_declared_in_this_module, write_modifiers})
         } else if kind == SUS.array_op_kind {
             cursor.go_down_no_check(|cursor| {
-                let flattened_arr_expr_opt = cursor.field(SUS.arr_field, |cursor| self.flatten_assignable_expr_tree(write_type, cursor));
+                let flattened_arr_expr_opt = cursor.field(SUS.arr_field, |cursor| self.flatten_assignable_expr_tree(write_modifiers, cursor));
                 
                 let (idx, bracket_span) = cursor.field(SUS.arr_idx_field, |cursor| self.flatten_array_bracket_tree(cursor));
                 
@@ -948,7 +952,8 @@ impl<'l> FlatteningContext<'l> {
         self.local_variable_context.pop_frame(old_frame);
     }
     fn flatten_code_keep_context_tree(&mut self, cursor : &mut Cursor<'l>) {
-        cursor.for_each_contained(SUS.block_kind, |cursor, kind, statement_span| {
+        cursor.list(SUS.block_kind, |cursor| {
+            let kind = cursor.kind();
             if kind == SUS.decl_assign_statement_kind {
                 //todo!();
                 //Statement::Assign{to, expr : Some((Expression::FuncCall(func_and_args), func_span)), eq_sign_position} => {
@@ -975,19 +980,18 @@ impl<'l> FlatteningContext<'l> {
                     let module_port_proxy = self.instructions.alloc(Instruction::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : *func_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::WireRead(*field)}));
                     let Some(write_side) = self.flatten_left_expr(&to_i.expr, to_i.span, true) else {continue};
 
-                    let write_type = self.flatten_assignment_modifiers(&to_i.modifiers);
-                    self.instructions.alloc(Instruction::Write(Write{write_type, from: module_port_proxy, to: write_side}));
+                    let write_modifiers = self.flatten_assignment_modifiers(&to_i.modifiers);
+                    self.instructions.alloc(Instruction::Write(Write{write_modifiers, from: module_port_proxy, to: write_side}));
                 }*/
             } else if kind == SUS.decl_assign_statement_kind {
-            //Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
                 cursor.go_down_no_check(|cursor| {
-                    let to = cursor.field(SUS.assign_to_field, |cursor| self.flatten_assignment_left_side_tree(cursor));
+                    let to = cursor.field(SUS.assign_left_field, |cursor| self.flatten_assignment_left_side_tree(cursor));
                     
                     cursor.field(SUS.assign_value_field, |cursor| {
                         let (node_kind, span) = cursor.node();
                         
                         if node_kind == SUS.func_call_kind {
-                            
+                            todo!("Function calls")
                         } else {
                             let read_side = self.flatten_expr_tree(cursor);
                             
@@ -1001,7 +1005,6 @@ impl<'l> FlatteningContext<'l> {
                     });
                 });
             } else if kind == SUS.block_kind {
-            //Statement::Block(inner_code) => {
                 self.flatten_code_tree(cursor);
             } else if kind == SUS.if_statement_kind {
             //Statement::If{condition : condition_expr, then, els} => {
@@ -1043,63 +1046,77 @@ impl<'l> FlatteningContext<'l> {
         });
     }
 
-    fn flatten_assignment_left_side_tree(&mut self, cursor : &mut Cursor<'l>) -> Vec<ConnectionWrite> {
-        let mut result = Vec::new();
-
-        /*if !self.try_go_down(SUS.assign_left_side_kind) {return result};
-
-        loop {
-            let node = cursor.node();
-            let kind = node.kind_id();
-            let span = node.byte_range().into();
-        //fn flatten_left_expr(&mut self, left : &'l LeftExpression, span : Span, gets_assigned : bool) -> Option<ConnectionWrite> {
-            let write_side = if kind == SUS.declaration_kind {
-                let root = self.flatten_declaration_tree::<false>(false, true);
-                let flat_root_decl = self.instructions[root].extract_wire_declaration();
-                Some(ConnectionWrite{root, root_span : flat_root_decl.name_span, path: Vec::new(), span, is_declared_in_this_module: true})
-            } else { // It's _expression
-                self.flatten_assignable_expr_tree()
-            };
-            if let Some(ws) = write_side {
-                result.push(ws);
+    fn flatten_write_modifiers(&self, cursor : &mut Cursor<'l>) -> WriteModifiers {
+        cursor.field(SUS.write_modifiers_field, |cursor| {
+            let initial_kw = cursor.optional_keyword(SUS.initial_kw);
+            let mut num_regs = 0;
+            let mut total_reg_span = None;
+            while let Some(reg_span) = cursor.optional_keyword(SUS.reg_kw) {
+                num_regs+=1;
+                if let Some(rs) = &mut total_reg_span {
+                    *rs = Span::new_overarching(*rs, reg_span);
+                } else {
+                    total_reg_span = Some(reg_span);
+                }
             }
-
-            if !cursor.goto_next_sibling() {break}
-        }
-
-        cursor.go_up();*/
-
-        result
+            
+            if let Some(initial_kw_span) = initial_kw {
+                WriteModifiers::Initial{initial_kw_span}
+            } else {
+                let regs_span = if let Some(span) = total_reg_span {span} else {cursor.span().empty_span_at_front()};
+                WriteModifiers::Connection{num_regs, regs_span}
+            }
+        })
     }
 
-    fn flatten_assignment_left_side_just_declarations_tree<const ALLOW_MODULES_AND_EXPRESSIONS : bool>(&mut self, cursor : &mut Cursor<'l>) -> Vec<FlatID> {
-        let mut result = Vec::new();
+    /// Three cases:
+    /// - In module ports:
+    ///     No modules, No write modifiers, No expressions
+    /// - Standalone declarations:
+    ///     Yes modules, No write modifiers, Yes expressions (-> single expressions)
+    /// - Left side of assignment:
+    ///     No modules, Yes write modifiers, Only assignable expressions
+    fn flatten_assignment_left_side_tree(&mut self, cursor : &mut Cursor<'l>) -> Vec<ConnectionWrite> {
+        cursor.collect_list(SUS.assign_left_side_kind, |cursor| {
+            cursor.go_down(SUS.assign_to_kind, |cursor| {
+                let write_modifiers = self.flatten_write_modifiers(cursor);
+                
+                cursor.field(SUS.expr_or_decl_field, |cursor| {
+                    let (kind, span) = cursor.node();
+    
+                    if kind == SUS.declaration_kind {
+                        let root = self.flatten_declaration_tree::<false>(IdentifierType::Local, true, cursor);
+                        let flat_root_decl = self.instructions[root].extract_wire_declaration();
+                        Some(ConnectionWrite{root, root_span : flat_root_decl.name_span, path: Vec::new(), span, is_declared_in_this_module: true, write_modifiers})
+                    } else { // It's _expression
+                        self.flatten_assignable_expr_tree(write_modifiers, cursor)
+                    }
+                })
+            })
+        })
+    }
 
-        cursor.repeat_fields(SUS.assign_left_side_kind, SUS.assign_to_field, |cursor| {
-            let (kind, span) = cursor.node();
-            //fn flatten_left_expr(&mut self, left : &'l LeftExpression, span : Span, gets_assigned : bool) -> Option<ConnectionWrite> {
-            let write_side = if kind == SUS.declaration_kind {
-                result.push(self.flatten_declaration_tree::<ALLOW_MODULES_AND_EXPRESSIONS>(false, true, cursor))
-            } else { // It's _expression
-                let _ = self.flatten_expr_tree(cursor); // Should return nothing
-                if !ALLOW_MODULES_AND_EXPRESSIONS {
-                    self.errors.error_basic(span, "Only declarations are permitted in this context. ")
-                }
-            };
-        });
-
-        result
+    fn flatten_declaration_list_tree(&mut self, is_input : bool, cursor : &mut Cursor<'l>) {
+        cursor.list(SUS.declaration_list_kind, |cursor| {
+            let identifier_type = if is_input {IdentifierType::Input} else {IdentifierType::Output};
+            self.flatten_declaration_tree::<false>(identifier_type, true, cursor);
+        })
     }
 
     fn flatten_interface_ports_tree(&mut self, cursor : &mut Cursor<'l>) {
-        
+        cursor.go_down(SUS.interface_ports_kind, |cursor| {
+            cursor.optional_field(SUS.inputs_field, |cursor| self.flatten_declaration_list_tree(true, cursor));
+            cursor.optional_field(SUS.outputs_field, |cursor| self.flatten_declaration_list_tree(false, cursor));
+        });
     }
 
     fn flatten_module_tree(&mut self, cursor : &mut Cursor<'l>) {
         cursor.go_down(SUS.module_kind, |cursor| {
-            println!("TREE SITTER module!");
             let name_span = cursor.field_span(SUS.name_field);
-            let interface_found = cursor.optional_field(SUS.interface_ports_field, |cursor| self.flatten_interface_ports_tree(cursor));
+            let module_name = &self.linker.file.file_text[name_span];
+            println!("TREE SITTER module! {module_name}");
+            // Interface is allocated in self
+            let _interface_found = cursor.optional_field(SUS.interface_ports_field, |cursor| self.flatten_interface_ports_tree(cursor));
             cursor.field(SUS.block_field, |cursor| self.flatten_code_tree(cursor));
         });
     }
@@ -1282,8 +1299,8 @@ impl<'l> FlatteningContext<'l> {
                     }
 
                     let from_wire = self.instructions[conn.from].extract_wire();
-                    match conn.to.write_type {
-                        WriteType::Connection{num_regs : _, regs_span : _} => {
+                    match conn.to.write_modifiers {
+                        WriteModifiers::Connection{num_regs : _, regs_span : _} => {
                             if decl.identifier_type.is_generative() {
                                 // Check that whatever's written to this declaration is also generative
                                 self.must_be_compiletime_with_info(from_wire, "Assignments to generative variables", || vec![decl.make_declared_here(self.errors.file)]);
@@ -1301,9 +1318,9 @@ impl<'l> FlatteningContext<'l> {
                                 }
                             }
                         }
-                        WriteType::Initial => {
+                        WriteModifiers::Initial{initial_kw_span} => {
                             if decl.identifier_type != IdentifierType::State {
-                                self.errors.error_with_info(conn.to.span, "Initial values can only be given to state registers!", vec![decl.make_declared_here(self.errors.file)])
+                                self.errors.error_with_info(initial_kw_span, "Initial values can only be given to state registers!", vec![decl.make_declared_here(self.errors.file)])
                             }
                             self.must_be_compiletime(from_wire, "initial value assignment")
                         }

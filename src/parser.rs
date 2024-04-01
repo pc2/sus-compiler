@@ -804,6 +804,7 @@ pub struct SusTreeSitterSingleton {
     pub global_identifier_kind : u16,
     pub array_type_kind : u16,
     pub declaration_kind : u16,
+    pub declaration_list_kind : u16,
     pub latency_specifier_kind : u16,
     pub unary_op_kind : u16,
     pub binary_op_kind : u16,
@@ -815,6 +816,7 @@ pub struct SusTreeSitterSingleton {
     pub block_kind : u16,
     pub decl_assign_statement_kind : u16,
     pub assign_left_side_kind : u16,
+    pub assign_to_kind : u16,
     pub if_statement_kind : u16,
     pub for_statement_kind : u16,
 
@@ -824,30 +826,33 @@ pub struct SusTreeSitterSingleton {
     pub initial_kw : u16,
 
     pub name_field : NonZeroU16,
-    pub module_inputs_field : NonZeroU16,
-    pub module_outputs_field : NonZeroU16,
+    pub inputs_field : NonZeroU16,
+    pub outputs_field : NonZeroU16,
     pub block_field : NonZeroU16,
-    pub block_statement_field : NonZeroU16,
     pub interface_ports_field : NonZeroU16,
     pub type_field : NonZeroU16,
     pub latency_specifier_field : NonZeroU16,
     pub declaration_modifiers_field : NonZeroU16,
     pub left_field : NonZeroU16,
     pub right_field : NonZeroU16,
-    pub content_field : NonZeroU16,
     pub operator_field : NonZeroU16,
     pub arr_field : NonZeroU16,
     pub arr_idx_field : NonZeroU16,
-    pub argument_field : NonZeroU16,
+    pub arguments_field : NonZeroU16,
     pub from_field : NonZeroU16,
+    pub write_modifiers_field : NonZeroU16,
     pub to_field : NonZeroU16,
-    pub assign_to_field : NonZeroU16,
+    pub expr_or_decl_field : NonZeroU16,
+    pub assign_left_field : NonZeroU16,
     pub assign_value_field : NonZeroU16,
     pub condition_field : NonZeroU16,
     pub then_block_field : NonZeroU16,
     pub else_block_field : NonZeroU16,
     pub for_decl_field : NonZeroU16,
-    pub for_range_field : NonZeroU16
+    pub for_range_field : NonZeroU16,
+
+    pub content_field : NonZeroU16,
+    pub item_field : NonZeroU16
 }
 
 impl SusTreeSitterSingleton {
@@ -874,6 +879,7 @@ impl SusTreeSitterSingleton {
             global_identifier_kind : node_kind("global_identifier"),
             array_type_kind : node_kind("array_type"),
             declaration_kind : node_kind("declaration"),
+            declaration_list_kind : node_kind("declaration_list"),
             latency_specifier_kind : node_kind("latency_specifier"),
             unary_op_kind : node_kind("unary_op"),
             binary_op_kind : node_kind("binary_op"),
@@ -885,6 +891,7 @@ impl SusTreeSitterSingleton {
             block_kind : node_kind("block"),
             decl_assign_statement_kind : node_kind("decl_assign_statement"),
             assign_left_side_kind : node_kind("assign_left_side"),
+            assign_to_kind : node_kind("assign_to"),
             if_statement_kind : node_kind("if_statement"),
             for_statement_kind : node_kind("for_statement"),
 
@@ -894,10 +901,9 @@ impl SusTreeSitterSingleton {
             initial_kw : keyword_kind("initial"),
 
             name_field : field("name"),
-            module_inputs_field : field("inputs"),
-            module_outputs_field : field("outputs"),
+            inputs_field : field("inputs"),
+            outputs_field : field("outputs"),
             block_field : field("block"),
-            block_statement_field : field("block_statement"),
             interface_ports_field : field("interface_ports"),
             type_field : field("type"),
             latency_specifier_field : field("latency_specifier"),
@@ -907,17 +913,21 @@ impl SusTreeSitterSingleton {
             operator_field : field("operator"),
             arr_field : field("arr"),
             arr_idx_field : field("arr_idx"),
-            content_field : field("content"),
-            argument_field : field("argument"),
+            arguments_field : field("arguments"),
             from_field : field("from"),
             to_field : field("to"),
-            assign_to_field : field("assign_to"),
+            write_modifiers_field : field("write_modifiers"),
+            expr_or_decl_field : field("expr_or_decl"),
+            assign_left_field : field("assign_left"),
             assign_value_field : field("assign_value"),
             condition_field : field("condition"),
             then_block_field : field("then_block"),
             else_block_field : field("else_block"),
             for_decl_field : field("for_decl"),
             for_range_field : field("for_range"),
+
+            content_field : field("content"),
+            item_field : field("item"),
                     
             language,
         }
@@ -959,9 +969,11 @@ impl<'t> Cursor<'t> {
         node.byte_range().into()
     }
 
-    /// If field is found, cursor is now at field position
+    /// The cursor advances to the next field, regardless if it is the requested field. If the found field is the requested field, the function is called. 
     /// 
-    /// If field is not found, cursor remains in place
+    /// If no more fields are available, the cursor lands at the end of the siblings, and None is returned
+    /// 
+    /// If the found field is incorrect, None is returned
     pub fn optional_field<OT, F : FnOnce(&mut Self) -> OT>(&mut self, field_id : NonZeroU16, func : F) -> Option<OT> {
         loop {
             if let Some(found) = self.cursor.field_id() {
@@ -980,6 +992,23 @@ impl<'t> Cursor<'t> {
         }
     }
 
+    /// Pops off the keyword if it is found
+    pub fn optional_keyword(&mut self, keyword_id : u16) -> Option<Span> {
+        let node = self.cursor.node();
+        let kind = node.kind_id();
+
+        if kind == keyword_id {
+            let span = node.byte_range().into();
+            self.cursor.goto_next_sibling();
+            Some(span)
+        } else {
+            None
+        }
+    }
+
+    /// The cursor advances to the next field and calls the given function. 
+    /// 
+    /// Panics if the next field doesn't exist or is not the requested field
     #[track_caller]
     pub fn field<OT, F : FnOnce(&mut Self) -> OT>(&mut self, field_id : NonZeroU16, func : F) -> OT {
         loop {
@@ -1022,10 +1051,13 @@ impl<'t> Cursor<'t> {
         result
     }
 
-    pub fn repeat_fields<F : FnMut(&mut Self)>(&mut self, kind : u16, field_id : NonZeroU16, mut func : F) {
+    // Some specialized functions for SUS Language
+
+    /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
+    pub fn list<F : FnMut(&mut Self)>(&mut self, kind : u16, mut func : F) {
         self.go_down(kind, |self2| {
             loop {
-                if self2.cursor.field_id() == Some(field_id) {
+                if self2.cursor.field_id() == Some(SUS.item_field) {
                     func(self2);
                 }
 
@@ -1036,18 +1068,26 @@ impl<'t> Cursor<'t> {
         });
     }
 
-    pub fn for_each_contained<F : FnMut(&mut Self, u16, Span)>(&mut self, kind : u16, mut func : F) {
-        self.go_down(kind, |self2| {
-            loop {
-                let node = self2.cursor.node();
-                if !node.is_error() {
-                    func(self2, node.kind_id(), node.byte_range().into());
-                }
+    /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
+    /// 
+    /// The function given should return Option<OT>, and from the valid outputs this function constructs a output list
+    pub fn collect_list<OT, F : FnMut(&mut Self) -> Option<OT>>(&mut self, kind : u16, mut func : F) -> Vec<OT> {
+        let mut result = Vec::new();
 
-                if !self2.cursor.goto_next_sibling() {
-                    break;
-                }
+        self.list(kind, |cursor| {
+            if let Some(item) = func(cursor) {
+                result.push(item);
             }
         });
+
+        result
     }
+
+    /// Goes down the current node, checks it's kind, and then selects the 'content' field. Useful for constructs like seq('[', field('content', $.expr), ']')
+    pub fn go_down_content<OT, F : FnOnce(&mut Self, Span) -> OT>(&mut self, top_kind : u16, func : F) -> OT {
+        let outer_span = self.span();
+        self.go_down(top_kind, |self2| {
+            self2.field(SUS.content_field, |self3| func(self3, outer_span))
+        })
+    } 
 }

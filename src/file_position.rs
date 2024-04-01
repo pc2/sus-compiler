@@ -52,6 +52,10 @@ impl Span {
         assert!(self.1 == self.0+1);
         SingleCharSpan{char_idx: self.0}
     }
+
+    pub fn empty_span_at_front(self) -> Span {
+        Span(self.0, self.0)
+    }
 }
 
 impl PartialOrd for Span {

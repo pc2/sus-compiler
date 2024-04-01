@@ -424,7 +424,7 @@ impl Linker {
                                         }
                                         None => {}
                                     }
-                                    if decl.is_free_standing_decl && decl.name_span.contains_pos(position) {
+                                    if decl.declaration_itself_is_not_written_to && decl.name_span.contains_pos(position) {
                                         location_builder.update(decl.name_span, LocationInfo::WireRef(md, id));
                                     }
                                 }

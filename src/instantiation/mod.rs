@@ -2,7 +2,7 @@ use std::{cell::RefCell, cmp::max, iter::zip, ops::Deref, rc::Rc};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{IdentifierType, InterfacePorts}, errors::ErrorCollector, file_position::Span, flattening::{BinaryOperator, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instruction, UnaryOperator, WireInstance, WireSource, Write, WriteType}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, list_of_lists::ListOfLists, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{compute_binary_op, compute_unary_op, Value}};
+use crate::{arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, ast::{IdentifierType, InterfacePorts}, errors::ErrorCollector, file_position::Span, flattening::{BinaryOperator, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instruction, UnaryOperator, WireInstance, WireSource, Write, WriteModifiers}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, list_of_lists::ListOfLists, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{compute_binary_op, compute_unary_op, Value}};
 
 use self::latency_algorithm::SpecifiedLatency;
 
@@ -270,8 +270,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         Some(result)
     }
     fn process_connection(&mut self, conn : &Write, original_connection : FlatID, condition : Option<WireID>) -> Option<()> {
-        match conn.to.write_type {
-            WriteType::Connection{num_regs, regs_span : _} => {
+        match conn.to.write_modifiers {
+            WriteModifiers::Connection{num_regs, regs_span : _} => {
                 match &self.generation_state[conn.to.root] {
                     SubModuleOrWire::SubModule(_) => unreachable!(),
                     SubModuleOrWire::Unnasigned => unreachable!(),
@@ -297,7 +297,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     }
                 };
             }
-            WriteType::Initial => {
+            WriteModifiers::Initial{initial_kw_span : _} => {
                 let found_v = self.get_generation_value(conn.from)?.clone();
                 let cvt_path = self.convert_connection_path_to_known_values(&conn.to.path)?;
                 // Hack to get around the borrow rules here
@@ -614,15 +614,15 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         
                         let mut did_place_error = false;
                         for wr in &unique_write_instructions {
-                            match wr.to.write_type {
-                                WriteType::Connection { num_regs, regs_span } => {
+                            match wr.to.write_modifiers {
+                                WriteModifiers::Connection { num_regs, regs_span } => {
                                     if num_regs >= 1 {
                                         did_place_error = true;
                                         let this_register_plural = if num_regs == 1 {"This register is"} else {"These registers are"};
                                         self.errors.error_basic(regs_span, format!("{this_register_plural}{rest_of_message}"));
                                     }
                                 }
-                                WriteType::Initial => {unreachable!("Initial assignment can only be from compile-time constant. Cannot be part of latency loop. ")}
+                                WriteModifiers::Initial{initial_kw_span : _} => {unreachable!("Initial assignment can only be from compile-time constant. Cannot be part of latency loop. ")}
                             }
                         }
                         // Fallback if no register annotations used
