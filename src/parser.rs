@@ -749,25 +749,28 @@ pub fn perform_full_semantic_parse(file_text : String, file : FileUUID) -> FullP
 }
 
 
-
+fn print_current_node_indented(file_text : &FileText, cursor : &TreeCursor) -> String {
+    let indent = "  ".repeat(cursor.depth() as usize);
+    let n = cursor.node();
+    let cursor_span = Span::from(n.byte_range());
+    let node_name = if n.kind_id() == SUS.identifier_kind {format!("\"{}\"", &file_text[cursor_span])} else {n.kind().to_owned()};
+    if let Some(field_name) = cursor.field_name() {
+        println!("{indent} {field_name}: {node_name} [{cursor_span}]");
+    } else {
+        println!("{indent} {node_name} [{cursor_span}]");
+    }
+    node_name
+}
 
 fn report_all_tree_errors(file_text : &FileText, tree : &Tree, errors : &ErrorCollector) {
     let mut cursor = tree.walk();
     loop {
-        let indent = "  ".repeat(cursor.depth() as usize);
         let n = cursor.node();
-        let cursor_span = Span::from(n.byte_range());
-        let node_name = if n.kind_id() == SUS.identifier_kind {format!("\"{}\"", &file_text[cursor_span])} else {n.kind().to_owned()};
-        if let Some(field_name) = cursor.field_name() {
-            println!("{indent} {field_name}: {node_name} [{cursor_span}]");
-        } else {
-            println!("{indent} {node_name} [{cursor_span}]");
-        }
         if n.is_error() || n.is_missing() {
             let span = Span::from(n.byte_range());
-            let field_name = cursor.field_name();
+            let node_name = print_current_node_indented(file_text, &cursor);
 
-            let of_name = if let Some(field) = field_name {
+            let of_name = if let Some(field) = cursor.field_name() {
                 format!("in the field '{field}' of type '{node_name}'")
             } else {
                 format!("in a node of type '{node_name}'")
@@ -954,7 +957,7 @@ impl<'t> Cursor<'t> {
 
     }
 
-    pub fn node(&self) -> (u16, Span) {
+    pub fn kind_span(&self) -> (u16, Span) {
         let node = self.cursor.node();
         (node.kind_id(), node.byte_range().into())
     }
@@ -967,6 +970,18 @@ impl<'t> Cursor<'t> {
     pub fn span(&self) -> Span {
         let node = self.cursor.node();
         node.byte_range().into()
+    }
+
+    #[track_caller]
+    pub fn unreachable(&mut self, file_text : &FileText) -> ! {
+        let this_node_kind = self.cursor.node().kind();
+        let this_node_span = self.span();
+        println!("Stack:");
+        loop {
+            print_current_node_indented(file_text, &self.cursor);
+            if !self.cursor.goto_parent() {break;}
+        }
+        panic!("Could not match the current node: {this_node_kind}, {this_node_span}");
     }
 
     /// The cursor advances to the next field, regardless if it is the requested field. If the found field is the requested field, the function is called. 
@@ -1026,6 +1041,10 @@ impl<'t> Cursor<'t> {
                 }
             }
         }
+    }
+
+    pub fn optional_field_span(&mut self, field_id : NonZeroU16) -> Option<Span> {
+        self.optional_field(field_id, |cursor| cursor.span())
     }
 
     #[track_caller]

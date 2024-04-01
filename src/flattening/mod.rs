@@ -738,7 +738,7 @@ impl<'l> FlatteningContext<'l> {
     }
     
     fn flatten_type_tree(&mut self, cursor : &mut Cursor<'l>) -> WrittenType {
-        let (kind, span) = cursor.node();
+        let (kind, span) = cursor.kind_span();
         if kind == SUS.global_identifier_kind {
             if let Some(typ_id) = &self.linker.resolve_global(span, &self.errors).expect_type() {
                 WrittenType::Named(span, *typ_id)
@@ -747,11 +747,11 @@ impl<'l> FlatteningContext<'l> {
             }
         } else if kind == SUS.array_type_kind {
             self.flatten_array_type_tree(span, cursor)
-        } else {unreachable!()}
+        } else {cursor.unreachable(&self.linker.file.file_text)}
     }
 
     fn flatten_module_or_type_tree<const ALLOW_MODULES : bool>(&mut self, cursor : &mut Cursor<'l>) -> ModuleOrWrittenType {
-        let (kind, span) = cursor.node();
+        let (kind, span) = cursor.kind_span();
         // Only difference is that 
         if kind == SUS.global_identifier_kind {
             let found_global = self.linker.resolve_global(span, &self.errors);
@@ -767,7 +767,7 @@ impl<'l> FlatteningContext<'l> {
             }
         } else if kind == SUS.array_type_kind {
             ModuleOrWrittenType::WrittenType(self.flatten_array_type_tree(span, cursor))
-        } else {unreachable!()}
+        } else {cursor.unreachable(&self.linker.file.file_text)}
     }
 
     fn flatten_declaration_tree<const ALLOW_MODULES : bool>(&mut self, fallback_identifier_type : IdentifierType, declaration_itself_is_not_written_to : bool, cursor : &mut Cursor<'l>) -> FlatID {
@@ -775,7 +775,7 @@ impl<'l> FlatteningContext<'l> {
         
         cursor.go_down(SUS.declaration_kind, |cursor| {
             let identifier_type = cursor.optional_field(SUS.declaration_modifiers_field, |cursor| {
-                let (modifier_kind, modifier_span) = cursor.node();
+                let (modifier_kind, modifier_span) = cursor.kind_span();
 
                 if fallback_identifier_type != IdentifierType::Local {
                     self.errors.error_basic(modifier_span, "Inputs and outputs of a module cannot be decorated with 'state' or 'gen'");
@@ -787,7 +787,7 @@ impl<'l> FlatteningContext<'l> {
                 } else if modifier_kind == SUS.gen_kw {
                     IdentifierType::Generative
                 } else {
-                    unreachable!()
+                    cursor.unreachable(&self.linker.file.file_text)
                 }
             }).unwrap_or(fallback_identifier_type);
     
@@ -844,9 +844,10 @@ impl<'l> FlatteningContext<'l> {
     }
 
     fn flatten_expr_tree(&mut self, cursor : &mut Cursor<'l>) -> FlatID {
-        let (kind, expr_span) = cursor.node();
+        let (kind, expr_span) = cursor.kind_span();
         
-        let source = if kind == SUS.identifier_kind {
+        let source = if kind == SUS.global_identifier_kind {
+            // TODO add namespacing
             match self.resolve_identifier(expr_span) {
                 LocalOrGlobal::Local(id) => {
                     WireSource::WireRead(id)
@@ -906,7 +907,7 @@ impl<'l> FlatteningContext<'l> {
             // Function desugaring or using threw an error
             WireSource::Constant(Value::Error)
         } else {
-            unreachable!("Don't know yet, ERROR node? Other node? ")
+            cursor.unreachable(&self.linker.file.file_text)
         };
 
         let wire_instance = WireInstance{
@@ -919,7 +920,7 @@ impl<'l> FlatteningContext<'l> {
         self.instructions.alloc(Instruction::Wire(wire_instance))
     }
     fn flatten_assignable_expr_tree(&mut self, write_modifiers : WriteModifiers, cursor : &mut Cursor<'l>) -> Option<ConnectionWrite> {
-        let (kind, span) = cursor.node();
+        let (kind, span) = cursor.kind_span();
         if kind == SUS.identifier_kind {
             let root = self.resolve_identifier(span).expect_local("assignments")?;
 
@@ -941,7 +942,8 @@ impl<'l> FlatteningContext<'l> {
         } else if kind == SUS.unary_op_kind {self.errors.error_basic(span, "Cannot assign to the result of an operator"); None
         } else if kind == SUS.binary_op_kind {self.errors.error_basic(span, "Cannot assign to the result of an operator"); None
         } else if kind == SUS.func_call_kind {self.errors.error_basic(span, "Cannot assign to submodule call"); None
-        } else {unreachable!()}
+        } else if kind == SUS.global_identifier_kind {self.errors.error_basic(span, "Cannot assign to global"); None
+        } else {cursor.unreachable(&self.linker.file.file_text)}
     }
 
     fn flatten_code_tree(&mut self, cursor : &mut Cursor<'l>) {
@@ -954,44 +956,46 @@ impl<'l> FlatteningContext<'l> {
     fn flatten_code_keep_context_tree(&mut self, cursor : &mut Cursor<'l>) {
         cursor.list(SUS.block_kind, |cursor| {
             let kind = cursor.kind();
-            if kind == SUS.decl_assign_statement_kind {
-                //todo!();
-                //Statement::Assign{to, expr : Some((Expression::FuncCall(func_and_args), func_span)), eq_sign_position} => {
-                /*let Some((md, interface)) = self.desugar_func_call(&func_and_args, BracketSpan::from_outer(*func_span)) else {continue};
-                let output_range = interface.func_call_syntax_outputs();
-                let outputs = &interface.ports[output_range];
-
-                let func_name_span = func_and_args[0].1;
-                let num_func_outputs = outputs.len();
-                let num_targets = to.len();
-                if num_targets != num_func_outputs {
-                    let info = vec![error_info(md.link_info.span, md.link_info.file, "Module Defined here")];
-                    if num_targets > num_func_outputs {
-                        let excess_results_span = Span::new_overarching(to[num_func_outputs].span, to.last().unwrap().span);
-                        self.errors.error_with_info(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
-                    } else {
-                        let too_few_targets_pos = if let Some(eq) = eq_sign_position {eq.into()} else {func_name_span};
-                        self.errors.error_with_info(too_few_targets_pos, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
-                    }
-                }
-
-                for (field, to_i) in zip(outputs, to) {                        
-                    let module_port_wire_decl = self.instructions[*field].extract_wire_declaration();
-                    let module_port_proxy = self.instructions.alloc(Instruction::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : *func_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::WireRead(*field)}));
-                    let Some(write_side) = self.flatten_left_expr(&to_i.expr, to_i.span, true) else {continue};
-
-                    let write_modifiers = self.flatten_assignment_modifiers(&to_i.modifiers);
-                    self.instructions.alloc(Instruction::Write(Write{write_modifiers, from: module_port_proxy, to: write_side}));
-                }*/
+            if kind == SUS.assign_left_side_kind {
+                self.flatten_standalone_decls_tree(cursor);
             } else if kind == SUS.decl_assign_statement_kind {
                 cursor.go_down_no_check(|cursor| {
                     let to = cursor.field(SUS.assign_left_field, |cursor| self.flatten_assignment_left_side_tree(cursor));
                     
                     cursor.field(SUS.assign_value_field, |cursor| {
-                        let (node_kind, span) = cursor.node();
+                        let (node_kind, span) = cursor.kind_span();
                         
                         if node_kind == SUS.func_call_kind {
                             todo!("Function calls")
+
+                            //Statement::Assign{to, expr : Some((Expression::FuncCall(func_and_args), func_span)), eq_sign_position} => {
+                            /*let Some((md, interface)) = self.desugar_func_call(&func_and_args, BracketSpan::from_outer(*func_span)) else {continue};
+                            let output_range = interface.func_call_syntax_outputs();
+                            let outputs = &interface.ports[output_range];
+
+                            let func_name_span = func_and_args[0].1;
+                            let num_func_outputs = outputs.len();
+                            let num_targets = to.len();
+                            if num_targets != num_func_outputs {
+                                let info = vec![error_info(md.link_info.span, md.link_info.file, "Module Defined here")];
+                                if num_targets > num_func_outputs {
+                                    let excess_results_span = Span::new_overarching(to[num_func_outputs].span, to.last().unwrap().span);
+                                    self.errors.error_with_info(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
+                                } else {
+                                    let too_few_targets_pos = if let Some(eq) = eq_sign_position {eq.into()} else {func_name_span};
+                                    self.errors.error_with_info(too_few_targets_pos, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
+                                }
+                            }
+
+                            for (field, to_i) in zip(outputs, to) {                        
+                                let module_port_wire_decl = self.instructions[*field].extract_wire_declaration();
+                                let module_port_proxy = self.instructions.alloc(Instruction::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : *func_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::WireRead(*field)}));
+                                let Some(write_side) = self.flatten_left_expr(&to_i.expr, to_i.span, true) else {continue};
+
+                                let write_modifiers = self.flatten_assignment_modifiers(&to_i.modifiers);
+                                self.instructions.alloc(Instruction::Write(Write{write_modifiers, from: module_port_proxy, to: write_side}));
+                            }*/
+                        
                         } else {
                             let read_side = self.flatten_expr_tree(cursor);
                             
@@ -1020,7 +1024,7 @@ impl<'l> FlatteningContext<'l> {
                 }
                 let else_end = self.instructions.get_next_alloc_id();
 
-                let Instruction::IfStatement(if_stmt) = &mut self.instructions[if_id] else {unreachable!()};
+                let Instruction::IfStatement(if_stmt) = &mut self.instructions[if_id] else {cursor.unreachable(&self.linker.file.file_text)};
                 if_stmt.then_start = then_start;
                 if_stmt.then_end_else_start = then_end_else_start;
                 if_stmt.else_end = else_end;*/
@@ -1039,50 +1043,41 @@ impl<'l> FlatteningContext<'l> {
                 
                 let code_end = self.instructions.get_next_alloc_id();
 
-                let Instruction::ForStatement(for_stmt) = &mut self.instructions[for_id] else {unreachable!()};
+                let Instruction::ForStatement(for_stmt) = &mut self.instructions[for_id] else {cursor.unreachable(&self.linker.file.file_text)};
 
                 for_stmt.loop_body = UUIDRange(code_start, code_end);*/
             }
         });
     }
 
-    fn flatten_write_modifiers(&self, cursor : &mut Cursor<'l>) -> WriteModifiers {
-        cursor.field(SUS.write_modifiers_field, |cursor| {
-            let initial_kw = cursor.optional_keyword(SUS.initial_kw);
-            let mut num_regs = 0;
-            let mut total_reg_span = None;
-            while let Some(reg_span) = cursor.optional_keyword(SUS.reg_kw) {
-                num_regs+=1;
-                if let Some(rs) = &mut total_reg_span {
-                    *rs = Span::new_overarching(*rs, reg_span);
-                } else {
-                    total_reg_span = Some(reg_span);
-                }
-            }
-            
-            if let Some(initial_kw_span) = initial_kw {
+    fn flatten_write_modifiers_tree(&self, cursor : &mut Cursor<'l>) -> WriteModifiers {
+        cursor.optional_field(SUS.write_modifiers_field, |cursor| {
+            if let Some(initial_kw_span) = cursor.optional_keyword(SUS.initial_kw) {
                 WriteModifiers::Initial{initial_kw_span}
             } else {
-                let regs_span = if let Some(span) = total_reg_span {span} else {cursor.span().empty_span_at_front()};
+                let mut num_regs = 1;
+                let mut regs_span = cursor.optional_keyword(SUS.reg_kw).unwrap(); // If not initial, then it's reg
+                while let Some(span) = cursor.optional_keyword(SUS.reg_kw) {
+                    num_regs += 1;
+                    regs_span = Span::new_overarching(regs_span, span);
+                }
+                
                 WriteModifiers::Connection{num_regs, regs_span}
             }
-        })
+        }).unwrap_or(WriteModifiers::Connection { num_regs: 0, regs_span: cursor.span().empty_span_at_front() })
     }
 
-    /// Three cases:
-    /// - In module ports:
-    ///     No modules, No write modifiers, No expressions
-    /// - Standalone declarations:
-    ///     Yes modules, No write modifiers, Yes expressions (-> single expressions)
+    /// See [Self::flatten_standalone_decls_tree][]
+    /// Two cases:
     /// - Left side of assignment:
     ///     No modules, Yes write modifiers, Only assignable expressions
     fn flatten_assignment_left_side_tree(&mut self, cursor : &mut Cursor<'l>) -> Vec<ConnectionWrite> {
         cursor.collect_list(SUS.assign_left_side_kind, |cursor| {
             cursor.go_down(SUS.assign_to_kind, |cursor| {
-                let write_modifiers = self.flatten_write_modifiers(cursor);
+                let write_modifiers = self.flatten_write_modifiers_tree(cursor);
                 
                 cursor.field(SUS.expr_or_decl_field, |cursor| {
-                    let (kind, span) = cursor.node();
+                    let (kind, span) = cursor.kind_span();
     
                     if kind == SUS.declaration_kind {
                         let root = self.flatten_declaration_tree::<false>(IdentifierType::Local, true, cursor);
@@ -1093,6 +1088,35 @@ impl<'l> FlatteningContext<'l> {
                     }
                 })
             })
+        })
+    }
+
+    /// See [Self::flatten_assignment_left_side_tree][]
+    /// - Standalone declarations:
+    ///     Yes modules, No write modifiers, Yes expressions (-> single expressions)
+    fn flatten_standalone_decls_tree(&mut self, cursor : &mut Cursor<'l>) {
+        let mut is_first_item = true;
+        cursor.list(SUS.assign_left_side_kind, |cursor| {
+            cursor.go_down(SUS.assign_to_kind, |cursor| {
+                if !is_first_item {
+                    self.errors.warn_basic(cursor.span(), "Standalone declarations and expressions should be on their own line. ");
+                }
+                is_first_item = false;
+
+                if let Some(span) = cursor.optional_field_span(SUS.write_modifiers_field) {
+                    self.errors.error_basic(span, "No write modifiers are allowed on non-assigned to declarations or expressions");
+                }
+                
+                cursor.field(SUS.expr_or_decl_field, |cursor| {
+                    let kind = cursor.kind();
+    
+                    if kind == SUS.declaration_kind {
+                        let _ = self.flatten_declaration_tree::<true>(IdentifierType::Local, true, cursor);
+                    } else { // It's _expression
+                        let _ = self.flatten_expr_tree(cursor);
+                    }
+                })
+            });
         })
     }
 
