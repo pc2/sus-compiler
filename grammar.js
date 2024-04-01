@@ -26,12 +26,14 @@ module.exports = grammar({
 
         interface_ports : $ => seq(
             ':',
-            field('inputs', $.assign_left_side),
+            optional(field('inputs', $.declaration_list)),
             optional(seq(
                 '->',
-                field('outputs', $.assign_left_side)
+                field('outputs', $.declaration_list)
             ))
         ),
+        declaration_list : $ => sepSeq1(field('item', $.declaration), ','),
+
         module: $ => seq(
             'module',
             field('name', $.identifier),
@@ -43,7 +45,7 @@ module.exports = grammar({
 
         global_identifier: $ => prec.left(PREC.namespace_path, seq(
             optional('::'),
-            sepSeq1($.identifier, '::')
+            sepSeq1(field('item', $.identifier), '::')
         )),
 
         _maybe_global_identifier: $ => choice(
@@ -104,8 +106,12 @@ module.exports = grammar({
 
         func_call: $ => seq(
             field('name', $._maybe_global_identifier),
+            field('arguments', $.parenthesis_expression_list)
+        ),
+        
+        parenthesis_expression_list: $ => seq(
             '(',
-            sepSeq(field('argument', $._expression), ','),
+            sepSeq(field('item', $._expression), ','),
             ')'
         ),
 
@@ -139,20 +145,25 @@ module.exports = grammar({
         
         block: $ => seq(
             '{',
-            repeat(field('block_statement', $._statement)),
+            repeat(field('item', $._statement)),
             '}'
         ),
         
-        assign_left_side: $ => sepSeq1(field('assign_to', seq(
-            choice(
+        assign_to: $ => seq(
+            field('write_modifiers', choice(
                 repeat('reg'),
                 'initial'
-            ),
-            choice(
+            )),
+            field('expr_or_decl', choice(
                 $._expression,
                 $.declaration
-            )
-        )), ','),
+            ))
+        ),
+        assign_left_side: $ => sepSeq1(
+            field('item', $.assign_to),
+            ','
+        ),
+
         decl_assign_statement: $ => seq(
             field('assign_left', $.assign_left_side),
             '=',

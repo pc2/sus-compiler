@@ -131,8 +131,24 @@
     "type": "assign_left_side",
     "named": true,
     "fields": {
-      "assign_to": {
+      "item": {
         "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "assign_to",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "assign_to",
+    "named": true,
+    "fields": {
+      "expr_or_decl": {
+        "multiple": false,
         "required": true,
         "types": [
           {
@@ -160,10 +176,6 @@
             "named": true
           },
           {
-            "type": "initial",
-            "named": false
-          },
-          {
             "type": "number",
             "named": true
           },
@@ -172,12 +184,22 @@
             "named": true
           },
           {
-            "type": "reg",
+            "type": "unary_op",
+            "named": true
+          }
+        ]
+      },
+      "write_modifiers": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "initial",
             "named": false
           },
           {
-            "type": "unary_op",
-            "named": true
+            "type": "reg",
+            "named": false
           }
         ]
       }
@@ -331,7 +353,7 @@
     "type": "block",
     "named": true,
     "fields": {
-      "block_statement": {
+      "item": {
         "multiple": true,
         "required": false,
         "types": [
@@ -472,6 +494,22 @@
     }
   },
   {
+    "type": "declaration_list",
+    "named": true,
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "declaration",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "for_statement",
     "named": true,
     "fields": {
@@ -511,40 +549,12 @@
     "type": "func_call",
     "named": true,
     "fields": {
-      "argument": {
-        "multiple": true,
-        "required": false,
+      "arguments": {
+        "multiple": false,
+        "required": true,
         "types": [
           {
-            "type": "array_op",
-            "named": true
-          },
-          {
-            "type": "binary_op",
-            "named": true
-          },
-          {
-            "type": "func_call",
-            "named": true
-          },
-          {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
-            "type": "identifier",
-            "named": true
-          },
-          {
-            "type": "number",
-            "named": true
-          },
-          {
-            "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "unary_op",
+            "type": "parenthesis_expression_list",
             "named": true
           }
         ]
@@ -568,16 +578,17 @@
   {
     "type": "global_identifier",
     "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "identifier",
-          "named": true
-        }
-      ]
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -654,10 +665,10 @@
     "fields": {
       "inputs": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
-            "type": "assign_left_side",
+            "type": "declaration_list",
             "named": true
           }
         ]
@@ -667,7 +678,7 @@
         "required": false,
         "types": [
           {
-            "type": "assign_left_side",
+            "type": "declaration_list",
             "named": true
           }
         ]
@@ -761,6 +772,50 @@
       "content": {
         "multiple": false,
         "required": true,
+        "types": [
+          {
+            "type": "array_op",
+            "named": true
+          },
+          {
+            "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "func_call",
+            "named": true
+          },
+          {
+            "type": "global_identifier",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "unary_op",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "parenthesis_expression_list",
+    "named": true,
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": false,
         "types": [
           {
             "type": "array_op",
