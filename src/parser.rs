@@ -815,7 +815,6 @@ pub struct SusTreeSitterSingleton {
     pub func_call_kind : u16,
     pub parenthesis_expression_kind : u16,
     pub array_bracket_expression_kind : u16,
-    pub range_kind : u16,
     pub block_kind : u16,
     pub decl_assign_statement_kind : u16,
     pub assign_left_side_kind : u16,
@@ -852,7 +851,6 @@ pub struct SusTreeSitterSingleton {
     pub then_block_field : NonZeroU16,
     pub else_block_field : NonZeroU16,
     pub for_decl_field : NonZeroU16,
-    pub for_range_field : NonZeroU16,
 
     pub content_field : NonZeroU16,
     pub item_field : NonZeroU16
@@ -890,7 +888,6 @@ impl SusTreeSitterSingleton {
             func_call_kind : node_kind("func_call"),
             parenthesis_expression_kind : node_kind("parenthesis_expression"),
             array_bracket_expression_kind : node_kind("array_bracket_expression"),
-            range_kind : node_kind("range"),
             block_kind : node_kind("block"),
             decl_assign_statement_kind : node_kind("decl_assign_statement"),
             assign_left_side_kind : node_kind("assign_left_side"),
@@ -927,7 +924,6 @@ impl SusTreeSitterSingleton {
             then_block_field : field("then_block"),
             else_block_field : field("else_block"),
             for_decl_field : field("for_decl"),
-            for_range_field : field("for_range"),
 
             content_field : field("content"),
             item_field : field("item"),
@@ -941,20 +937,20 @@ impl SusTreeSitterSingleton {
 pub static SUS : SusTreeSitterSingleton = SusTreeSitterSingleton::new();
 
 pub struct Cursor<'t> {
-    cursor : TreeCursor<'t>
+    cursor : TreeCursor<'t>,
+    file_text : &'t FileText
 }
 
 impl<'t> Cursor<'t> {
     #[track_caller]
-    pub fn new_for_node(tree : &'t tree_sitter::Tree, span : Span, kind : u16) -> Self {
+    pub fn new_for_node(tree : &'t Tree, file_text : &'t FileText, span : Span, kind : u16) -> Self {
         let mut cursor = tree.walk();
         let _ = cursor.goto_first_child_for_byte(span.into_range().start).unwrap();
         let start_node = cursor.node();
         assert!(start_node.kind_id() == kind);
         assert!(start_node.byte_range() == span.into_range());
 
-        Self{cursor}
-
+        Self{cursor, file_text}
     }
 
     pub fn kind_span(&self) -> (u16, Span) {
@@ -973,15 +969,21 @@ impl<'t> Cursor<'t> {
     }
 
     #[track_caller]
-    pub fn unreachable(&mut self, file_text : &FileText) -> ! {
+    pub fn print_stack(&mut self) {
         let this_node_kind = self.cursor.node().kind();
         let this_node_span = self.span();
         println!("Stack:");
         loop {
-            print_current_node_indented(file_text, &self.cursor);
+            print_current_node_indented(self.file_text, &self.cursor);
             if !self.cursor.goto_parent() {break;}
         }
-        panic!("Could not match the current node: {this_node_kind}, {this_node_span}");
+        println!("Current node: {this_node_kind}, {this_node_span}");
+    }
+
+    #[track_caller]
+    pub fn could_not_match(&mut self) -> ! {
+        self.print_stack();
+        panic!();
     }
 
     /// The cursor advances to the next field, regardless if it is the requested field. If the found field is the requested field, the function is called. 
@@ -1033,10 +1035,12 @@ impl<'t> Cursor<'t> {
                     self.cursor.goto_next_sibling();
                     return result;
                 } else {
+                    self.print_stack();
                     panic!("Did not find required field '{}', found field '{}' instead!", SUS.language.field_name_for_id(field_id.into()).unwrap(), SUS.language.field_name_for_id(found.into()).unwrap());
                 }
             } else {
                 if !self.cursor.goto_next_sibling() {
+                    self.print_stack();
                     panic!("Reached the end of child nodes without finding field '{}'", SUS.language.field_name_for_id(field_id.into()).unwrap())
                 }
             }
@@ -1055,7 +1059,10 @@ impl<'t> Cursor<'t> {
     #[track_caller]
     pub fn go_down<OT, F : FnOnce(&mut Self) -> OT>(&mut self, kind : u16, func : F) -> OT {
         let node = self.cursor.node();
-        assert_eq!(node.kind_id(), kind, "Was {} instead", node.kind());
+        if node.kind_id() != kind {
+            self.print_stack();
+            panic!("Expected {}, Was {} instead", SUS.language.node_kind_for_id(kind).unwrap(), node.kind());
+        }
 
         self.go_down_no_check(func)
     }
@@ -1073,6 +1080,7 @@ impl<'t> Cursor<'t> {
     // Some specialized functions for SUS Language
 
     /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
+    #[track_caller]
     pub fn list<F : FnMut(&mut Self)>(&mut self, kind : u16, mut func : F) {
         self.go_down(kind, |self2| {
             loop {
@@ -1090,6 +1098,7 @@ impl<'t> Cursor<'t> {
     /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
     /// 
     /// The function given should return Option<OT>, and from the valid outputs this function constructs a output list
+    #[track_caller]
     pub fn collect_list<OT, F : FnMut(&mut Self) -> Option<OT>>(&mut self, kind : u16, mut func : F) -> Vec<OT> {
         let mut result = Vec::new();
 
@@ -1103,6 +1112,7 @@ impl<'t> Cursor<'t> {
     }
 
     /// Goes down the current node, checks it's kind, and then selects the 'content' field. Useful for constructs like seq('[', field('content', $.expr), ']')
+    #[track_caller]
     pub fn go_down_content<OT, F : FnOnce(&mut Self, Span) -> OT>(&mut self, top_kind : u16, func : F) -> OT {
         let outer_span = self.span();
         self.go_down(top_kind, |self2| {

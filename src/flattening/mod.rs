@@ -747,7 +747,7 @@ impl<'l> FlatteningContext<'l> {
             }
         } else if kind == SUS.array_type_kind {
             self.flatten_array_type_tree(span, cursor)
-        } else {cursor.unreachable(&self.linker.file.file_text)}
+        } else {cursor.could_not_match()}
     }
 
     fn flatten_module_or_type_tree<const ALLOW_MODULES : bool>(&mut self, cursor : &mut Cursor<'l>) -> ModuleOrWrittenType {
@@ -767,17 +767,17 @@ impl<'l> FlatteningContext<'l> {
             }
         } else if kind == SUS.array_type_kind {
             ModuleOrWrittenType::WrittenType(self.flatten_array_type_tree(span, cursor))
-        } else {cursor.unreachable(&self.linker.file.file_text)}
+        } else {cursor.could_not_match()}
     }
 
-    fn flatten_declaration_tree<const ALLOW_MODULES : bool>(&mut self, fallback_identifier_type : IdentifierType, declaration_itself_is_not_written_to : bool, cursor : &mut Cursor<'l>) -> FlatID {
+    fn flatten_declaration_tree<const ALLOW_MODULES : bool, const ALLOW_MODIFIERS : bool>(&mut self, fallback_identifier_type : IdentifierType, declaration_itself_is_not_written_to : bool, cursor : &mut Cursor<'l>) -> FlatID {
         let read_only = fallback_identifier_type == IdentifierType::Input;
         
         cursor.go_down(SUS.declaration_kind, |cursor| {
             let identifier_type = cursor.optional_field(SUS.declaration_modifiers_field, |cursor| {
                 let (modifier_kind, modifier_span) = cursor.kind_span();
 
-                if fallback_identifier_type != IdentifierType::Local {
+                if !ALLOW_MODIFIERS {
                     self.errors.error_basic(modifier_span, "Inputs and outputs of a module cannot be decorated with 'state' or 'gen'");
                     return fallback_identifier_type;
                 }
@@ -787,7 +787,7 @@ impl<'l> FlatteningContext<'l> {
                 } else if modifier_kind == SUS.gen_kw {
                     IdentifierType::Generative
                 } else {
-                    cursor.unreachable(&self.linker.file.file_text)
+                    cursor.could_not_match()
                 }
             }).unwrap_or(fallback_identifier_type);
     
@@ -907,7 +907,7 @@ impl<'l> FlatteningContext<'l> {
             // Function desugaring or using threw an error
             WireSource::Constant(Value::Error)
         } else {
-            cursor.unreachable(&self.linker.file.file_text)
+            cursor.could_not_match()
         };
 
         let wire_instance = WireInstance{
@@ -943,7 +943,32 @@ impl<'l> FlatteningContext<'l> {
         } else if kind == SUS.binary_op_kind {self.errors.error_basic(span, "Cannot assign to the result of an operator"); None
         } else if kind == SUS.func_call_kind {self.errors.error_basic(span, "Cannot assign to submodule call"); None
         } else if kind == SUS.global_identifier_kind {self.errors.error_basic(span, "Cannot assign to global"); None
-        } else {cursor.unreachable(&self.linker.file.file_text)}
+        } else {cursor.could_not_match()}
+    }
+
+    fn flatten_if_statement(&mut self, cursor : &mut Cursor<'l>) {
+        cursor.go_down(SUS.if_statement_kind, |cursor| {
+            let condition = cursor.field(SUS.condition_field, |cursor| self.flatten_expr_tree(cursor));
+            
+            let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement{condition, then_start : UUID::PLACEHOLDER, then_end_else_start : UUID::PLACEHOLDER, else_end : UUID::PLACEHOLDER}));
+            let then_start = self.instructions.get_next_alloc_id();
+            
+            cursor.field(SUS.then_block_field, |cursor| self.flatten_code_tree(cursor));
+            let then_end_else_start = self.instructions.get_next_alloc_id();
+            cursor.optional_field(SUS.else_block_field, |cursor| {
+                if cursor.kind() == SUS.if_statement_kind {
+                    self.flatten_if_statement(cursor); // Chained if statements
+                } else {
+                    self.flatten_code_tree(cursor)
+                }
+            });
+            let else_end = self.instructions.get_next_alloc_id();
+            
+            let Instruction::IfStatement(if_stmt) = &mut self.instructions[if_id] else {unreachable!()};
+            if_stmt.then_start = then_start;
+            if_stmt.then_end_else_start = then_end_else_start;
+            if_stmt.else_end = else_end;
+        })
     }
 
     fn flatten_code_tree(&mut self, cursor : &mut Cursor<'l>) {
@@ -1011,41 +1036,26 @@ impl<'l> FlatteningContext<'l> {
             } else if kind == SUS.block_kind {
                 self.flatten_code_tree(cursor);
             } else if kind == SUS.if_statement_kind {
-            //Statement::If{condition : condition_expr, then, els} => {
-                /*let condition = self.flatten_expr(condition_expr);
-
-                let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement{condition, then_start : UUID::PLACEHOLDER, then_end_else_start : UUID::PLACEHOLDER, else_end : UUID::PLACEHOLDER}));
-                let then_start = self.instructions.get_next_alloc_id();
-
-                self.flatten_code(then);
-                let then_end_else_start = self.instructions.get_next_alloc_id();
-                if let Some(e) = els {
-                    self.flatten_code(e);
-                }
-                let else_end = self.instructions.get_next_alloc_id();
-
-                let Instruction::IfStatement(if_stmt) = &mut self.instructions[if_id] else {cursor.unreachable(&self.linker.file.file_text)};
-                if_stmt.then_start = then_start;
-                if_stmt.then_end_else_start = then_end_else_start;
-                if_stmt.else_end = else_end;*/
+                self.flatten_if_statement(cursor);
             } else if kind == SUS.for_statement_kind {
-            //Statement::For{var, range, code} => {
-                /*let loop_var_decl = self.flatten_declaration::<false>(var, true, true);
+                cursor.go_down_no_check(|cursor| {
+                    let loop_var_decl = cursor.field(SUS.for_decl_field, |cursor| self.flatten_declaration_tree::<false, false>(IdentifierType::Local, true, cursor));
 
-                let start = self.flatten_expr(&range.from);
-                let end = self.flatten_expr(&range.to);
-                
-                let for_id = self.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER)}));
+                    let start = cursor.field(SUS.from_field, |cursor| self.flatten_expr_tree(cursor));
+                    let end = cursor.field(SUS.to_field, |cursor| self.flatten_expr_tree(cursor));
+                    
+                    let for_id = self.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER)}));
 
-                let code_start = self.instructions.get_next_alloc_id();
+                    let code_start = self.instructions.get_next_alloc_id();
 
-                self.flatten_code(code);
-                
-                let code_end = self.instructions.get_next_alloc_id();
+                    cursor.field(SUS.block_field, |cursor| self.flatten_code_tree(cursor));
+                    
+                    let code_end = self.instructions.get_next_alloc_id();
 
-                let Instruction::ForStatement(for_stmt) = &mut self.instructions[for_id] else {cursor.unreachable(&self.linker.file.file_text)};
+                    let Instruction::ForStatement(for_stmt) = &mut self.instructions[for_id] else {unreachable!()};
 
-                for_stmt.loop_body = UUIDRange(code_start, code_end);*/
+                    for_stmt.loop_body = UUIDRange(code_start, code_end);
+                })
             }
         });
     }
@@ -1080,7 +1090,7 @@ impl<'l> FlatteningContext<'l> {
                     let (kind, span) = cursor.kind_span();
     
                     if kind == SUS.declaration_kind {
-                        let root = self.flatten_declaration_tree::<false>(IdentifierType::Local, true, cursor);
+                        let root = self.flatten_declaration_tree::<false, true>(IdentifierType::Local, true, cursor);
                         let flat_root_decl = self.instructions[root].extract_wire_declaration();
                         Some(ConnectionWrite{root, root_span : flat_root_decl.name_span, path: Vec::new(), span, is_declared_in_this_module: true, write_modifiers})
                     } else { // It's _expression
@@ -1111,7 +1121,7 @@ impl<'l> FlatteningContext<'l> {
                     let kind = cursor.kind();
     
                     if kind == SUS.declaration_kind {
-                        let _ = self.flatten_declaration_tree::<true>(IdentifierType::Local, true, cursor);
+                        let _ = self.flatten_declaration_tree::<true, true>(IdentifierType::Local, true, cursor);
                     } else { // It's _expression
                         let _ = self.flatten_expr_tree(cursor);
                     }
@@ -1123,7 +1133,7 @@ impl<'l> FlatteningContext<'l> {
     fn flatten_declaration_list_tree(&mut self, is_input : bool, cursor : &mut Cursor<'l>) {
         cursor.list(SUS.declaration_list_kind, |cursor| {
             let identifier_type = if is_input {IdentifierType::Input} else {IdentifierType::Output};
-            self.flatten_declaration_tree::<false>(identifier_type, true, cursor);
+            self.flatten_declaration_tree::<false, false>(identifier_type, true, cursor);
         })
     }
 
@@ -1467,7 +1477,7 @@ impl FlattenedModule {
         let global_resolver = GlobalResolver::new(linker, module.link_info.file);
         
         // The given span should correspond perfectly to this, so impossible we don't find the node. 
-        let mut cursor = Cursor::new_for_node(&global_resolver.file.tree, module.link_info.span, SUS.module_kind);
+        let mut cursor = Cursor::new_for_node(&global_resolver.file.tree, &global_resolver.file.file_text, module.link_info.span, SUS.module_kind);
 
         let mut context = FlatteningContext{
             instructions : FlatAlloc::new(),
