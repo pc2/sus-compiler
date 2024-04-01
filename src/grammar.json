@@ -776,31 +776,6 @@
         }
       ]
     },
-    "range": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "FIELD",
-          "name": "from",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_expression"
-          }
-        },
-        {
-          "type": "STRING",
-          "value": ":"
-        },
-        {
-          "type": "FIELD",
-          "name": "to",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_expression"
-          }
-        }
-      ]
-    },
     "block": {
       "type": "SEQ",
       "members": [
@@ -1013,10 +988,22 @@
         },
         {
           "type": "FIELD",
-          "name": "for_range",
+          "name": "from",
           "content": {
             "type": "SYMBOL",
-            "name": "range"
+            "name": "_expression"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": ":"
+        },
+        {
+          "type": "FIELD",
+          "name": "to",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_expression"
           }
         },
         {

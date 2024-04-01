@@ -132,12 +132,6 @@ module.exports = grammar({
             $.func_call
         ),
 
-        range: $ => seq(
-            field('from', $._expression),
-            ':',
-            field('to', $._expression),
-        ),
-        
         block: $ => seq(
             '{',
             repeat(field('item', $._statement)),
@@ -181,7 +175,9 @@ module.exports = grammar({
             'for',
             field('for_decl', $.declaration),
             'in',
-            field('for_range', $.range),
+            field('from', $._expression),
+            ':',
+            field('to', $._expression),
             field('block', $.block)
         ),
         _statement: $ => choice(

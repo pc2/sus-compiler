@@ -509,12 +509,70 @@
           }
         ]
       },
-      "for_range": {
+      "from": {
         "multiple": false,
         "required": true,
         "types": [
           {
-            "type": "range",
+            "type": "array_op",
+            "named": true
+          },
+          {
+            "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "func_call",
+            "named": true
+          },
+          {
+            "type": "global_identifier",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "unary_op",
+            "named": true
+          }
+        ]
+      },
+      "to": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "array_op",
+            "named": true
+          },
+          {
+            "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "func_call",
+            "named": true
+          },
+          {
+            "type": "global_identifier",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "unary_op",
             "named": true
           }
         ]
@@ -776,80 +834,6 @@
       "item": {
         "multiple": true,
         "required": false,
-        "types": [
-          {
-            "type": "array_op",
-            "named": true
-          },
-          {
-            "type": "binary_op",
-            "named": true
-          },
-          {
-            "type": "func_call",
-            "named": true
-          },
-          {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
-            "type": "number",
-            "named": true
-          },
-          {
-            "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "unary_op",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
-    "type": "range",
-    "named": true,
-    "fields": {
-      "from": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "array_op",
-            "named": true
-          },
-          {
-            "type": "binary_op",
-            "named": true
-          },
-          {
-            "type": "func_call",
-            "named": true
-          },
-          {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
-            "type": "number",
-            "named": true
-          },
-          {
-            "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "unary_op",
-            "named": true
-          }
-        ]
-      },
-      "to": {
-        "multiple": false,
-        "required": true,
         "types": [
           {
             "type": "array_op",
