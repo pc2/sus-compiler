@@ -41,8 +41,6 @@ module.exports = grammar({
         identifier: $ => /[\p{L}_][\p{L}_\d]*/,
         number: $ => /\d[\d_]*/,
 
-        word: $=> $.identifier,
-
         global_identifier: $ => prec.left(PREC.namespace_path, seq(
             optional('::'),
             sepSeq1($.identifier, '::')
@@ -195,6 +193,8 @@ module.exports = grammar({
     conflicts: $ => [
         [$._maybe_global_identifier, $._type] // Just because LR(1) is too weak to resolve 'ident[] a' vs 'type_name[]'. Tree sitter resolves this itself with more expensive GLR. NOT a precedence relation. 
     ],
+
+    word: $=> $.identifier,
 
     extras: $ => [
         /\s+/,

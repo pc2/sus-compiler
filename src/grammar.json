@@ -1,5 +1,6 @@
 {
   "name": "sus",
+  "word": "identifier",
   "rules": {
     "source_file": {
       "type": "REPEAT",
@@ -98,10 +99,6 @@
     "number": {
       "type": "PATTERN",
       "value": "\\d[\\d_]*"
-    },
-    "word": {
-      "type": "SYMBOL",
-      "name": "identifier"
     },
     "global_identifier": {
       "type": "PREC_LEFT",
