@@ -16,11 +16,8 @@ pub enum LatencyCountingError {
 
 fn invert_lc_error(err : LatencyCountingError) -> LatencyCountingError {
     match err {
-        LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path:_} => {
+        LatencyCountingError::ConflictingSpecifiedLatencies{conflict_path:_} => {
             unreachable!("LatencyCountingError::ConflictingSpecifiedLatencies should not appear in backwards exploration, because port conflicts should have been found in the forward pass already");
-            // conflict_path.reverse();
-            // for c in &mut conflict_path {c.latency = -c.latency;}
-            // LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path, path_latency }
         }
         LatencyCountingError::NetPositiveLatencyCycle { mut conflict_path, net_roundtrip_latency } => {
             conflict_path.reverse();
@@ -70,6 +67,7 @@ fn count_latency<'d>(is_latency_pinned : &mut [bool], absolute_latency : &mut [i
             let to_node_min_latency = absolute_latency[top.node_idx] + delta_latency;
             if to_node_min_latency > absolute_latency[other] {
                 if is_latency_pinned[other] {
+                    assert!(absolute_latency[other] != i64::MIN);
                     // Positive latency cycle error detected!
                     return Err(if let Some(conflict_begin) = stack.iter().position(|elem| elem.node_idx == other) {
                         let conflict_path = stack[conflict_begin..].iter().map(|elem| SpecifiedLatency{wire : elem.node_idx, latency : absolute_latency[elem.node_idx]}).collect();
@@ -175,6 +173,10 @@ impl<'d> LatencySolverSide<'d> {
         let mut something_found = false;
 
         for port in &mut self.sources {
+            // Add the new known nodes to precomputed_seed_nodes, fixes bug where it would crash when an output was then used as an input for another output. See input_used_further & output_used_further
+            self.precomputed_seed_nodes[port.wire] = port.absolute_latency;
+        }
+        for port in &mut self.sources {
             if port.absolute_latency == i64::MIN {continue} // Can't start the algorithm from an unsolved port
             if port.already_covered {continue} // Only ever explore from a given port once
             port.already_covered = true;
@@ -185,7 +187,6 @@ impl<'d> LatencySolverSide<'d> {
             assert!(temporary_buffer[port.wire] == i64::MIN || temporary_buffer[port.wire] == port.absolute_latency);
             //assert!(self.is_latency_pinned[*output] == false);
             is_latency_pinned[port.wire] = true;
-            temporary_buffer[port.wire] = port.absolute_latency;
             count_latency(is_latency_pinned, temporary_buffer, &self.fanouts, port.wire, stack)?;
             is_latency_pinned[port.wire] = true;
             
@@ -582,6 +583,38 @@ mod tests {
 
         let Err(LatencyCountingError::NetPositiveLatencyCycle{conflict_path:_, net_roundtrip_latency}) = should_be_err else {unreachable!()};
         assert_eq!(net_roundtrip_latency, 1);
+    }
+    
+    #[test]
+    fn input_used_further() {
+        let fanins : [&[FanInOut]; 4] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 1)],
+            /*2*/&[mk_fan(1, 1)],
+            /*3*/&[mk_fan(2, 1)],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+        let fanouts = convert_fanin_to_fanout(&fanins);
+
+        let latencies = solve_latencies(&fanins, &fanouts, &[0, 1], &[3], Vec::new()).unwrap();
+
+        assert_eq!(latencies, &[0, 1, 2, 3]); 
+    }
+    
+    #[test]
+    fn output_used_further() {
+        let fanins : [&[FanInOut]; 4] = [
+            /*0*/&[],
+            /*1*/&[mk_fan(0, 1)],
+            /*2*/&[mk_fan(1, 1)],
+            /*3*/&[mk_fan(2, 1)],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+        let fanouts = convert_fanin_to_fanout(&fanins);
+
+        let latencies = solve_latencies(&fanins, &fanouts, &[0], &[2, 3], Vec::new()).unwrap();
+
+        assert_eq!(latencies, &[0, 1, 2, 3]); 
     }
 }
 
