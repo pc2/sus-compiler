@@ -1,13 +1,74 @@
-a {}
-/*module hello_from_the_other_side : int[3] a -> int result {
-	result = a[2];
-	int x = a[0] + a[1] + a[2];
-}*/
 
-module a {
-	a = ;
-	a = ;
-	a = ;
+module a : int a {
+	int x, int y, z = 5;
+	int x, int y, z;
+}
 
-	{
+
+module parallel_mul_add_reg : int a, int b -> int p, int q {
+    reg int a2 = a * a;
+	reg int a3 = a * a2 + 3;
+	reg p = a * a3;
+
+	reg int b2 = b + b;
+	reg int b3 = b + b2;
+	reg q = b + b3;
+
+	// UTF-8 Characters support
+	Lööwe 老虎;
+
+	
+}
+
+module packer : bool[256] data , bool valid -> bool[64] o {
+    state bool[192] save = data[64:256];
+	state int part;
+	initial part = 3;
+	if valid {
+		part = 0;
+		o = data[0:64];
+	} else {
+		o = save[part*64 - 64:part*64];
+		if part < 3 {
+			part = part + 1;
+		}
+	}
+}
+
+
+module add_stuff_to_indices : int[10] values -> int[10] added_values {
+	int[5] arr;
+
+	for int i in 0..10 {
+		int t = values[i];
+		added_values[i] = t + i;
+	}
+	
+}
+
+
+//timeline (bs -> /, true) | (bs -> v, false)
+module first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros {
+
+	if bits[0] {
+		first = 0;
+		all_zeros = false;
+	} else if bits[1] {
+		first = 1;
+		all_zeros = false;
+	} else if bits[2] {
+		first = 2;
+		all_zeros = false;
+	} else if bits[3] {
+		first = 3;
+		all_zeros = false;
+	} else if bits[4] {
+		first = 4;
+		all_zeros = false;
+	} else if bits[5] {
+		first = 5;
+		all_zeros = false;
+	} else {
+		all_zeros = true;
+	}
 }

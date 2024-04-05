@@ -205,17 +205,38 @@ module b: HandShake hs -> {
 }
 
 
+module example_md : 
+	int[4] factors,
+	int add_to ->
+	int product, 
+	int total {
+
+	reg int mul0 = factors[0] * factors[1];
+	reg int mul1 = factors[2] * factors[3];
+
+	reg product = mul0 * mul1;
+	reg total = product + add_to;
+}
+
 
 // (a*b) + c
 module multiply_add : 
-	int a,
-	int b,
-	int c
+	int a, int b, int c
 	-> int total {
 
 	reg int tmp = a * b;
-	reg total = tmp + c;
+	total = tmp + c;
 }
+
+
+module pow17 : int i -> int o {
+	    int i2  = i * i;
+	reg int i4  = i2 * i2;
+	    int i8  = i4 * i4;
+	reg int i16 = i8 * i8;
+	        o   = i16 * i;
+}
+
 
 module fibonnaci : -> int num {
 	state int current = 1;
@@ -224,7 +245,6 @@ module fibonnaci : -> int num {
 	num = current + current_prev;
 	current_prev = current;
 	current = num;
-	reg int delay_current = current;
 }
 
 //timeline (v, true -> /) .. (v, false -> v)*
@@ -496,8 +516,9 @@ module bad_cycle : int a -> int r {
 	r = new_test;
 }
 
-module module_taking_time : int data_in'0 -> int data_out'3 {
-	data_out = data_in;
+module module_taking_time : 
+	int i'0 -> int o'5 {
+	o = i;
 }
 
 module bad_cycle2 : int a -> int r {
