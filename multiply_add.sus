@@ -123,42 +123,6 @@ module multiply_add_old : i32 a, i32 b, i32 c -> i32 result, double double_resul
 	reg double_result = cvt_to_double(result);
 }
 
-/*timeline (a -> /) .. (a -> r)*
-module blur : i32'0 a -> i32'1 result {
-	state int prev = a;
-	#
-	loop {
-		result = @@@@@@(a + prev) / 2; // pipeline stage
-		prev = a;
-		#   // timeline step
-	}
-}*/
-
-timeline (a -> /) .. (a -> r)*
-module my_complex_operation : i32'0 a -> i32'9 result {
-	state prev'0 = a;
-	state tmp2'6;
-	#
-	loop {
-		tmp2 = @@@@@@(a + prev) / 2; // pipeline stage
-		result = @@@(prev + tmp2);
-		prev = a;
-		#   // timeline step
-	}
-}
-
-timeline (a -> /)* .. (/ -> r)
-module seq_adder : i32 a -> i32 result {
-	state int sum = a;
-	#
-	loop {
-		sum = sum + a;
-		#
-	}
-	result = sum;
-}
-
-
 module exists : hello a -> int result {
 
 }
@@ -451,6 +415,8 @@ module permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[12
 	stored_valid_permutes = stored_valid_permutes & permutes_to_keep;
 
 	permuted_out = permute(stored_mbf, current_permutation_idx);
+
+	//aaaaa();
 }
 
 

@@ -20,7 +20,7 @@ module parallel_mul_add_reg : int a, int b -> int p, int q {
 	
 }
 
-module packer : bool[256] data , bool valid -> bool[64] o {
+module packer : bool[256] data, bool valid -> bool[64] o {
     state bool[192] save = data[64:256];
 	state int part;
 	initial part = 3;

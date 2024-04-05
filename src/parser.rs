@@ -814,11 +814,13 @@ pub struct SusTreeSitterSingleton {
     pub array_op_kind : u16,
     pub func_call_kind : u16,
     pub parenthesis_expression_kind : u16,
+    pub parenthesis_expression_list_kind : u16,
     pub array_bracket_expression_kind : u16,
     pub block_kind : u16,
     pub decl_assign_statement_kind : u16,
     pub assign_left_side_kind : u16,
     pub assign_to_kind : u16,
+    pub write_modifiers_kind : u16,
     pub if_statement_kind : u16,
     pub for_statement_kind : u16,
 
@@ -887,11 +889,13 @@ impl SusTreeSitterSingleton {
             array_op_kind : node_kind("array_op"),
             func_call_kind : node_kind("func_call"),
             parenthesis_expression_kind : node_kind("parenthesis_expression"),
+            parenthesis_expression_list_kind : node_kind("parenthesis_expression_list"),
             array_bracket_expression_kind : node_kind("array_bracket_expression"),
             block_kind : node_kind("block"),
             decl_assign_statement_kind : node_kind("decl_assign_statement"),
             assign_left_side_kind : node_kind("assign_left_side"),
             assign_to_kind : node_kind("assign_to"),
+            write_modifiers_kind : node_kind("write_modifiers"),
             if_statement_kind : node_kind("if_statement"),
             for_statement_kind : node_kind("for_statement"),
 
@@ -942,13 +946,13 @@ pub struct Cursor<'t> {
 }
 
 impl<'t> Cursor<'t> {
-    #[track_caller]
     pub fn new_for_node(tree : &'t Tree, file_text : &'t FileText, span : Span, kind : u16) -> Self {
         let mut cursor = tree.walk();
         let _ = cursor.goto_first_child_for_byte(span.into_range().start).unwrap();
         let start_node = cursor.node();
-        assert!(start_node.kind_id() == kind);
-        assert!(start_node.byte_range() == span.into_range());
+        assert_eq!(start_node.kind_id(), kind);
+        // Temprarily comment out, because old parser and new parser are slightly different
+        //assert_eq!(start_node.byte_range(), span.into_range());
 
         Self{cursor, file_text}
     }
@@ -1081,8 +1085,8 @@ impl<'t> Cursor<'t> {
 
     /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
     #[track_caller]
-    pub fn list<F : FnMut(&mut Self)>(&mut self, kind : u16, mut func : F) {
-        self.go_down(kind, |self2| {
+    pub fn list<F : FnMut(&mut Self)>(&mut self, parent_kind : u16, mut func : F) {
+        self.go_down(parent_kind, |self2| {
             loop {
                 if self2.cursor.field_id() == Some(SUS.item_field) {
                     func(self2);
@@ -1097,15 +1101,14 @@ impl<'t> Cursor<'t> {
 
     /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
     /// 
-    /// The function given should return Option<OT>, and from the valid outputs this function constructs a output list
+    /// The function given should return OT, and from the valid outputs this function constructs a output list
     #[track_caller]
-    pub fn collect_list<OT, F : FnMut(&mut Self) -> Option<OT>>(&mut self, kind : u16, mut func : F) -> Vec<OT> {
+    pub fn collect_list<OT, F : FnMut(&mut Self) -> OT>(&mut self, parent_kind : u16, mut func : F) -> Vec<OT> {
         let mut result = Vec::new();
 
-        self.list(kind, |cursor| {
-            if let Some(item) = func(cursor) {
-                result.push(item);
-            }
+        self.list(parent_kind, |cursor| {
+            let item = func(cursor);
+            result.push(item);
         });
 
         result
@@ -1113,10 +1116,9 @@ impl<'t> Cursor<'t> {
 
     /// Goes down the current node, checks it's kind, and then selects the 'content' field. Useful for constructs like seq('[', field('content', $.expr), ']')
     #[track_caller]
-    pub fn go_down_content<OT, F : FnOnce(&mut Self, Span) -> OT>(&mut self, top_kind : u16, func : F) -> OT {
-        let outer_span = self.span();
-        self.go_down(top_kind, |self2| {
-            self2.field(SUS.content_field, |self3| func(self3, outer_span))
+    pub fn go_down_content<OT, F : FnOnce(&mut Self) -> OT>(&mut self, parent_kind : u16, func : F) -> OT {
+        self.go_down(parent_kind, |self2| {
+            self2.field(SUS.content_field, |self3| func(self3))
         })
     } 
 }

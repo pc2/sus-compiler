@@ -1,0 +1,5 @@
+
+module myMod : int a -> int o {
+	int x = a;
+    o = x;
+}

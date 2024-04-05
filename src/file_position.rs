@@ -41,6 +41,13 @@ impl Span {
         Span(outer.0, inner.0)
     }
     #[track_caller]
+    pub fn shrunk_front(outer : Span, inner : Span) -> Span {
+        assert!(outer.0 <= inner.0);
+        assert!(outer.1 >= inner.1);
+
+        Span(inner.0, outer.1)
+    }
+    #[track_caller]
     pub fn difference_right(outer : Span, inner : Span) -> Span {
         assert!(outer.0 <= inner.0);
         assert!(outer.1 >= inner.1);
