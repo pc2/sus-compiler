@@ -15,7 +15,8 @@ const PREC = {
     additive: 6,
     multiplicative: 7,
     unary: 8,
-    namespace_path : 9
+    array_index : 9,
+    namespace_path : 10
 }
 
 module.exports = grammar({
@@ -94,10 +95,10 @@ module.exports = grammar({
             ))));
         },
 
-        array_op: $ => seq(
+        array_op: $ => prec(PREC.array_index, seq(
             field('arr', $._expression),
             field('arr_idx', $.array_bracket_expression)
-        ),
+        )),
 
         func_call: $ => seq(
             field('name', $.global_identifier),
@@ -138,11 +139,13 @@ module.exports = grammar({
             '}'
         ),
         
+        write_modifiers: $ => choice(
+            repeat1(field('item', 'reg')),
+            field('item', 'initial')
+        ),
+
         assign_to: $ => seq(
-            optional(field('write_modifiers', choice(
-                repeat1('reg'),
-                'initial'
-            ))),
+            optional(field('write_modifiers', $.write_modifiers)),
             field('expr_or_decl', choice(
                 $._expression,
                 $.declaration
@@ -176,7 +179,7 @@ module.exports = grammar({
             field('for_decl', $.declaration),
             'in',
             field('from', $._expression),
-            ':',
+            '..',
             field('to', $._expression),
             field('block', $.block)
         ),

@@ -143,7 +143,7 @@
     },
     "global_identifier": {
       "type": "PREC_LEFT",
-      "value": 9,
+      "value": 10,
       "content": {
         "type": "SEQ",
         "members": [
@@ -606,25 +606,29 @@
       ]
     },
     "array_op": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "FIELD",
-          "name": "arr",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_expression"
+      "type": "PREC",
+      "value": 9,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "arr",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_expression"
+            }
+          },
+          {
+            "type": "FIELD",
+            "name": "arr_idx",
+            "content": {
+              "type": "SYMBOL",
+              "name": "array_bracket_expression"
+            }
           }
-        },
-        {
-          "type": "FIELD",
-          "name": "arr_idx",
-          "content": {
-            "type": "SYMBOL",
-            "name": "array_bracket_expression"
-          }
-        }
-      ]
+        ]
+      }
     },
     "func_call": {
       "type": "SEQ",
@@ -800,6 +804,30 @@
         }
       ]
     },
+    "write_modifiers": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "REPEAT1",
+          "content": {
+            "type": "FIELD",
+            "name": "item",
+            "content": {
+              "type": "STRING",
+              "value": "reg"
+            }
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "item",
+          "content": {
+            "type": "STRING",
+            "value": "initial"
+          }
+        }
+      ]
+    },
     "assign_to": {
       "type": "SEQ",
       "members": [
@@ -810,20 +838,8 @@
               "type": "FIELD",
               "name": "write_modifiers",
               "content": {
-                "type": "CHOICE",
-                "members": [
-                  {
-                    "type": "REPEAT1",
-                    "content": {
-                      "type": "STRING",
-                      "value": "reg"
-                    }
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "initial"
-                  }
-                ]
+                "type": "SYMBOL",
+                "name": "write_modifiers"
               }
             },
             {
@@ -996,7 +1012,7 @@
         },
         {
           "type": "STRING",
-          "value": ":"
+          "value": ".."
         },
         {
           "type": "FIELD",

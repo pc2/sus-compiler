@@ -178,16 +178,12 @@
         ]
       },
       "write_modifiers": {
-        "multiple": true,
+        "multiple": false,
         "required": false,
         "types": [
           {
-            "type": "initial",
-            "named": false
-          },
-          {
-            "type": "reg",
-            "named": false
+            "type": "write_modifiers",
+            "named": true
           }
         ]
       }
@@ -957,6 +953,26 @@
     }
   },
   {
+    "type": "write_modifiers",
+    "named": true,
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "initial",
+            "named": false
+          },
+          {
+            "type": "reg",
+            "named": false
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "!",
     "named": false
   },
@@ -1002,6 +1018,10 @@
   },
   {
     "type": "->",
+    "named": false
+  },
+  {
+    "type": "..",
     "named": false
   },
   {
