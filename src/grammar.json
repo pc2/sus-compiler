@@ -135,14 +135,14 @@
     },
     "identifier": {
       "type": "PATTERN",
-      "value": "[\\p{L}_][\\p{L}_\\d]*"
+      "value": "[\\p{Alphabetic}_][\\p{Alphabetic}_\\p{Decimal_Number}]*"
     },
     "number": {
       "type": "PATTERN",
       "value": "\\d[\\d_]*"
     },
     "global_identifier": {
-      "type": "PREC_LEFT",
+      "type": "PREC",
       "value": 10,
       "content": {
         "type": "SEQ",
@@ -631,25 +631,29 @@
       }
     },
     "func_call": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "FIELD",
-          "name": "name",
-          "content": {
-            "type": "SYMBOL",
-            "name": "global_identifier"
+      "type": "PREC",
+      "value": 9,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "name",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_expression"
+            }
+          },
+          {
+            "type": "FIELD",
+            "name": "arguments",
+            "content": {
+              "type": "SYMBOL",
+              "name": "parenthesis_expression_list"
+            }
           }
-        },
-        {
-          "type": "FIELD",
-          "name": "arguments",
-          "content": {
-            "type": "SYMBOL",
-            "name": "parenthesis_expression_list"
-          }
-        }
-      ]
+        ]
+      }
     },
     "parenthesis_expression_list": {
       "type": "SEQ",

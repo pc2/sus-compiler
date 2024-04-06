@@ -15,7 +15,7 @@ const PREC = {
     additive: 6,
     multiplicative: 7,
     unary: 8,
-    array_index : 9,
+    array_or_func_call : 9,
     namespace_path : 10
 }
 
@@ -41,10 +41,10 @@ module.exports = grammar({
             optional(field('interface_ports', $.interface_ports)),
             field('block', $.block)
         ),
-        identifier: $ => /[\p{L}_][\p{L}_\d]*/,
+        identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
         number: $ => /\d[\d_]*/,
 
-        global_identifier: $ => prec.left(PREC.namespace_path, seq(
+        global_identifier: $ => prec(PREC.namespace_path, seq(
             //optional('::'),
             sepSeq1(field('item', $.identifier), '::')
         )),
@@ -95,15 +95,15 @@ module.exports = grammar({
             ))));
         },
 
-        array_op: $ => prec(PREC.array_index, seq(
+        array_op: $ => prec(PREC.array_or_func_call, seq(
             field('arr', $._expression),
             field('arr_idx', $.array_bracket_expression)
         )),
 
-        func_call: $ => seq(
-            field('name', $.global_identifier),
+        func_call: $ => prec(PREC.array_or_func_call, seq(
+            field('name', $._expression),
             field('arguments', $.parenthesis_expression_list)
-        ),
+        )),
         
         parenthesis_expression_list: $ => seq(
             '(',
