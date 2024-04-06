@@ -766,9 +766,9 @@ fn report_all_tree_errors(file_text : &FileText, tree : &Tree, errors : &ErrorCo
     let mut cursor = tree.walk();
     loop {
         let n = cursor.node();
+        let span = Span::from(n.byte_range());
+        let node_name = print_current_node_indented(file_text, &cursor);
         if n.is_error() || n.is_missing() {
-            let span = Span::from(n.byte_range());
-            let node_name = print_current_node_indented(file_text, &cursor);
 
             let of_name = if let Some(field) = cursor.field_name() {
                 format!("in the field '{field}' of type '{node_name}'")

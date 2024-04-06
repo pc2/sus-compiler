@@ -771,8 +771,6 @@ impl<'l> FlatteningContext<'l> {
     }
 
     fn flatten_declaration_tree<const ALLOW_MODULES : bool, const ALLOW_MODIFIERS : bool>(&mut self, fallback_identifier_type : IdentifierType, declaration_itself_is_not_written_to : bool, cursor : &mut Cursor<'l>) -> FlatID {
-        let read_only = fallback_identifier_type == IdentifierType::Input;
-        
         cursor.go_down(SUS.declaration_kind, |cursor| {
             let identifier_type = cursor.optional_field(SUS.declaration_modifiers_field, |cursor| {
                 let (modifier_kind, modifier_span) = cursor.kind_span();
@@ -811,7 +809,7 @@ impl<'l> FlatteningContext<'l> {
                         self.errors.error_basic(span, "Cannot add latency specifier to module instances");
                     }
                     let md = self.linker.get_module(md_id);
-                    return self.alloc_module_interface(self.linker.file.file_text[name_span].to_owned().into_boxed_str(), md, md_id, span)
+                    return self.alloc_module_interface_tree(self.linker.file.file_text[name_span].to_owned().into_boxed_str(), md, md_id, span)
                 }
             };
 
@@ -821,7 +819,7 @@ impl<'l> FlatteningContext<'l> {
                 typ : typ_expr.to_type(),
                 typ_expr,
                 is_declared_in_this_module : self.is_declared_in_this_module,
-                read_only,
+                read_only : fallback_identifier_type == IdentifierType::Input,
                 declaration_itself_is_not_written_to,
                 identifier_type,
                 name : name.to_owned().into_boxed_str(),
@@ -894,28 +892,33 @@ impl<'l> FlatteningContext<'l> {
 
     /// Produces a new [SubModuleInstance] if a global was passed, or a reference to the existing instance if it's referenced by name
     fn get_module_by_global_identifier_tree(&mut self, cursor : &mut Cursor<'l>) -> Option<FlatID> {
-        cursor.go_down(SUS.global_identifier_kind, |cursor| {
-            let span = cursor.span();
-            match self.resolve_identifier(span) {
-                LocalOrGlobal::Local(id) => {
-                    if let Instruction::SubModule(_) = &self.instructions[id] {
-                        Some(id)
-                    } else {
-                        let decl = self.instructions[id].extract_wire_declaration();
-                        self.errors.error_with_info(span, "Function call syntax is only possible on modules", vec![decl.make_declared_here(self.errors.file)]);
-                        None
+        let (kind, span) = cursor.kind_span();
+        if kind == SUS.global_identifier_kind {
+            cursor.go_down(SUS.global_identifier_kind, |cursor| {
+                match self.resolve_identifier(span) {
+                    LocalOrGlobal::Local(id) => {
+                        if let Instruction::SubModule(_) = &self.instructions[id] {
+                            Some(id)
+                        } else {
+                            let decl = self.instructions[id].extract_wire_declaration();
+                            self.errors.error_with_info(span, "Function call syntax is only possible on modules", vec![decl.make_declared_here(self.errors.file)]);
+                            None
+                        }
+                    }
+                    LocalOrGlobal::Global(global) => {
+                        if let Some(module_id) = global.expect_module() {
+                            let md = &self.linker.get_module(module_id);
+                            Some(self.alloc_module_interface_tree(md.link_info.name.clone(), md, module_id, span))
+                        } else {
+                            None
+                        }
                     }
                 }
-                LocalOrGlobal::Global(global) => {
-                    if let Some(module_id) = global.expect_module() {
-                        let md = &self.linker.get_module(module_id);
-                        Some(self.alloc_module_interface_tree(md.link_info.name.clone(), md, module_id, span))
-                    } else {
-                        None
-                    }
-                }
-            }
-        })
+            })
+        } else {
+            self.errors.error_basic(span, "Module name may not be an expression");
+            None
+        }
     }
 
     fn flatten_expr_tree(&mut self, cursor : &mut Cursor<'l>) -> FlatID {
@@ -1021,7 +1024,7 @@ impl<'l> FlatteningContext<'l> {
         } else {cursor.could_not_match()}
     }
 
-    fn flatten_if_statement(&mut self, cursor : &mut Cursor<'l>) {
+    fn flatten_if_statement_tree(&mut self, cursor : &mut Cursor<'l>) {
         cursor.go_down(SUS.if_statement_kind, |cursor| {
             let condition = cursor.field(SUS.condition_field, |cursor| self.flatten_expr_tree(cursor));
             
@@ -1032,7 +1035,7 @@ impl<'l> FlatteningContext<'l> {
             let then_end_else_start = self.instructions.get_next_alloc_id();
             cursor.optional_field(SUS.else_block_field, |cursor| {
                 if cursor.kind() == SUS.if_statement_kind {
-                    self.flatten_if_statement(cursor); // Chained if statements
+                    self.flatten_if_statement_tree(cursor); // Chained if statements
                 } else {
                     self.flatten_code_tree(cursor)
                 }
@@ -1047,9 +1050,8 @@ impl<'l> FlatteningContext<'l> {
     }
 
     fn flatten_assign_function_call(&mut self, to : Vec<Result<ConnectionWrite, Span>>, cursor : &mut Cursor<'l>) {
-    //Statement::Assign{to, expr : Some((Expression::FuncCall(func_and_args), func_span)), eq_sign_position} => {
         let func_call_span = cursor.span();
-        let mut to_iter = if let Some((module_name_span, md, interface)) = self.desugar_func_call_tree(cursor) {
+        let to_iter = if let Some((module_name_span, md, interface)) = self.desugar_func_call_tree(cursor) {
             let output_range = interface.func_call_syntax_outputs();
             let outputs = &interface.ports[output_range];
 
@@ -1129,7 +1131,7 @@ impl<'l> FlatteningContext<'l> {
             } else if kind == SUS.block_kind {
                 self.flatten_code_tree(cursor);
             } else if kind == SUS.if_statement_kind {
-                self.flatten_if_statement(cursor);
+                self.flatten_if_statement_tree(cursor);
             } else if kind == SUS.for_statement_kind {
                 cursor.go_down_no_check(|cursor| {
                     let loop_var_decl = cursor.field(SUS.for_decl_field, |cursor| self.flatten_declaration_tree::<false, false>(IdentifierType::Generative, true, cursor));
@@ -1229,25 +1231,29 @@ impl<'l> FlatteningContext<'l> {
         })
     }
 
-    fn flatten_declaration_list_tree(&mut self, is_input : bool, ports : &mut Vec<FlatID>, cursor : &mut Cursor<'l>) {
+    fn flatten_declaration_list_tree(&mut self, identifier_type : IdentifierType, ports : &mut Vec<FlatID>, cursor : &mut Cursor<'l>) {
         cursor.list(SUS.declaration_list_kind, |cursor| {
-            let identifier_type = if is_input {IdentifierType::Input} else {IdentifierType::Output};
             ports.push(self.flatten_declaration_tree::<false, false>(identifier_type, true, cursor));
         });
     }
 
-    fn flatten_interface_ports_tree(&mut self, cursor : &mut Cursor<'l>) -> InterfacePorts<FlatID> {
+    fn flatten_interface_ports_tree<const IS_SUBMODULE : bool>(&mut self, cursor : &mut Cursor<'l>) -> InterfacePorts<FlatID> {
         cursor.optional_field(SUS.interface_ports_field, |cursor| {
             cursor.go_down(SUS.interface_ports_kind, |cursor| {
                 let mut ports = Vec::new();
-                let inputs = cursor.optional_field(SUS.inputs_field, |cursor| self.flatten_declaration_list_tree(true, &mut ports, cursor));
+                cursor.optional_field(SUS.inputs_field, |cursor| {
+                    let identifier_type = if IS_SUBMODULE {IdentifierType::Local} else {IdentifierType::Input};
+                    self.flatten_declaration_list_tree(identifier_type, &mut ports, cursor)
+                });
                 let outputs_start = ports.len();
-                let outputs = cursor.optional_field(SUS.outputs_field, |cursor| self.flatten_declaration_list_tree(false, &mut ports, cursor));
+                cursor.optional_field(SUS.outputs_field, |cursor| {
+                    let identifier_type = if IS_SUBMODULE {IdentifierType::Local} else {IdentifierType::Output};
+                    self.flatten_declaration_list_tree(identifier_type, &mut ports, cursor)
+                });
                 InterfacePorts{ outputs_start, ports: ports.into_boxed_slice() }
             })
         }).unwrap_or(InterfacePorts::empty())
     }
-
 
     fn alloc_module_interface_tree(&mut self, name : Box<str>, module : &Module, module_uuid : ModuleUUID, typ_span : Span) -> FlatID {
         let local_linker = self.linker.new_sublinker(module.link_info.file);
@@ -1262,7 +1268,12 @@ impl<'l> FlatteningContext<'l> {
             module
         };
         
-        let interface_ports = nested_context.initialize_interface::<true>();
+        let mut nested_cursor = Cursor::new_for_node(&nested_context.linker.file.tree, &nested_context.linker.file.file_text, module.link_info.span, SUS.module_kind);
+
+        let interface_ports = nested_cursor.go_down(SUS.module_kind, |nested_cursor| {
+            nested_cursor.field(SUS.name_field, |_| {}); // Get past name field
+            nested_context.flatten_interface_ports_tree::<true>(nested_cursor)
+        });
         
         self.linker.reabsorb_sublinker(nested_context.linker);
 
@@ -1282,7 +1293,7 @@ impl<'l> FlatteningContext<'l> {
             let module_name = &self.linker.file.file_text[name_span];
             println!("TREE SITTER module! {module_name}");
             // Interface is allocated in self
-            let interface_found = self.flatten_interface_ports_tree(cursor);
+            let interface_found = self.flatten_interface_ports_tree::<false>(cursor);
             cursor.field(SUS.block_field, |cursor| self.flatten_code_tree(cursor));
             interface_found
         })

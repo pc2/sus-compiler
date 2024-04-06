@@ -1,5 +1,5 @@
 cd tree-sitter-sus
 tree-sitter generate &&
-tree-sitter parse ../resetNormalizer.sus
+tree-sitter parse ../tinyTestFile.sus
 cd ..
 

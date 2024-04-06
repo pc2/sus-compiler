@@ -1,5 +1,10 @@
 
-module myMod : int a -> int o {
-	int x = a;
-    o = x;
+
+module submodule : int a, int b -> int r {
+	r = a * b;
+}
+
+module contains_submodule_submodule : int a, int b, int c -> int r {
+    int tmp = submodule(a, b);
+	reg r = tmp + c;
 }

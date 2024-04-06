@@ -3,7 +3,7 @@ module multiply : int a, int b -> int r {
 	r = a * b;
 }
 
-module multiply_add2 : int a, int b, int c -> int r {
+module contains_submodule : int a, int b, int c -> int r {
     int tmp = multiply(a, b);
 	reg r = tmp + c;
 }
@@ -416,7 +416,7 @@ module permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[12
 
 	permuted_out = permute(stored_mbf, current_permutation_idx);
 
-	//aaaaa();
+	aaaaa();
 }
 
 
@@ -517,13 +517,13 @@ module good_cycle : int a -> int r {
 	r = new_test;
 }
 
-module input_only : int i -> {
+module input_only : int i {
 	state int loop;
 	initial loop = 0;
 	loop = loop + i;
 }
 
-module multiple_inputs_only : int i, int i2 -> {
+module multiple_inputs_only : int i, int i2 {
 	state int loop;
 	initial loop = 0;
 	loop = loop + i + i2;
