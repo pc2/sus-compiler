@@ -40,6 +40,7 @@ pub struct ErrorCollector {
     file_len : usize, // Only used for debugging, to see no invalid errors are produced
 }
 
+#[allow(dead_code)]
 impl ErrorCollector {
     pub fn new(file : FileUUID, file_len : usize) -> Self {
         Self{errors : RefCell::new(Vec::new()), file, file_len, did_error : Cell::new(false)}

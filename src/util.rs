@@ -31,6 +31,7 @@ pub const fn const_str_position(v : &str, list : &[&str]) -> Option<usize> {
     None
 }
 
+#[allow(dead_code)]
 pub const fn const_str_position_in_tuples<T>(v : &str, list : &[(&str, T)]) -> Option<usize> {
     let mut i : usize = 0;
 

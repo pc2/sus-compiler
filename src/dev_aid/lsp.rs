@@ -7,7 +7,7 @@ use lsp_server::{Connection, Message, Response};
 use lsp_types::notification::Notification;
 
 use crate::{
-    arena_alloc::ArenaVector, ast::{IdentifierType, Module}, errors::{CompileError, ErrorCollector, ErrorLevel}, file_position::{FileText, LineCol, Span}, flattening::{FlatID, Instruction}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse, walk_name_color
+    arena_alloc::ArenaVector, errors::{CompileError, ErrorCollector, ErrorLevel}, file_position::{FileText, LineCol, Span}, flattening::{FlatID, Instruction, IdentifierType, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse, walk_name_color
 };
 
 use super::syntax_highlighting::IDEIdentifierType;
@@ -150,6 +150,7 @@ fn get_modifiers_for_token(tok : IDEIdentifierType) -> u32 {
 fn from_position(pos : lsp_types::Position) -> LineCol {
     LineCol{line : pos.line as usize, col : pos.character as usize}
 }
+#[allow(dead_code)]
 fn from_position_range(range : lsp_types::Range) -> std::ops::Range<LineCol> {
     std::ops::Range{start : from_position(range.start), end : from_position(range.end)}
 }
@@ -253,7 +254,7 @@ fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, main_f
     Ok(())
 }
 
-fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::TextDocumentPositionParams) -> Option<(LocationInfo<'l>, lsp_types::Range)> {
+fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::TextDocumentPositionParams) -> Option<(&'l FileData, LocationInfo<'l>, lsp_types::Range)> {
     let uuid = file_cache.find_uri(&text_pos.text_document.uri).unwrap();
     
     let file_data = &file_cache.linker.files[uuid];
@@ -264,7 +265,7 @@ fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::T
     //let span = Span::new_single_token(token_idx);
 
     let char_line_range = file_data.file_text.get_span_linecol_range(span);
-    Some((info, to_position_range(char_line_range)))
+    Some((file_data, info, to_position_range(char_line_range)))
 }
 
 fn push_all_errors(connection: &Connection, file_cache : &LoadedFileCache) -> Result<(), Box<dyn Error + Sync + Send>> {
@@ -357,9 +358,9 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
         request::HoverRequest::METHOD => {
             let params : HoverParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("HoverRequest");
-
+            
             file_cache.ensure_contains_file(&params.text_document_position_params.text_document.uri);
-            serde_json::to_value(&if let Some((info, range)) = get_hover_info(&file_cache, &params.text_document_position_params) {
+            serde_json::to_value(&if let Some((file_data, info, range)) = get_hover_info(&file_cache, &params.text_document_position_params) {
                 let mut hover_list : Vec<MarkedString> = Vec::new();
                 if debug {
                     hover_list.push(MarkedString::String(format!("{info:?}")))
@@ -371,6 +372,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                             let name_str = &decl.name;
 
                             let identifier_type_keyword = decl.identifier_type.get_keyword();
+                            hover_list.push(MarkedString::String(decl.documentation.to_string(&file_data.file_text)));
                             hover_list.push(MarkedString::String(format!("{identifier_type_keyword} {typ_str} {name_str}")));
 
                             gather_hover_infos(md, decl_id, decl.identifier_type.is_generative(), file_cache, &mut hover_list);
@@ -386,6 +388,9 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                             hover_list.push(MarkedString::String(typ.to_type().to_string(&file_cache.linker.types)));
                         }
                         LocationInfo::Global(global) => {
+                            if let Some(link_info) = file_cache.linker.get_link_info(global) {
+                                hover_list.push(MarkedString::String(link_info.documentation.to_string(&file_data.file_text)));
+                            }
                             hover_list.push(MarkedString::String(file_cache.linker.get_full_name(global)));
                         }
                     };
@@ -400,7 +405,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
             println!("GotoDefinition");
 
             file_cache.ensure_contains_file(&params.text_document_position_params.text_document.uri);
-            serde_json::to_value(&if let Some((info, _range)) = get_hover_info(&file_cache, &params.text_document_position_params) {
+            serde_json::to_value(&if let Some((_file_data, info, _range)) = get_hover_info(&file_cache, &params.text_document_position_params) {
                 match info {
                     LocationInfo::WireRef(md, decl_id) => {
                         let uri = file_cache.uris[md.link_info.file].clone();
@@ -441,6 +446,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
         /*request::DocumentHighlightRequest::METHOD => {
             let params : DocumentHighlightParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
 
+            file_cache.ensure_contains_file(&params.text_document_position_params.text_document.uri);
             if let Some((hover_info, span)) = get_hover_info(file_cache, &params.text_document_position_params) {
                 
             }

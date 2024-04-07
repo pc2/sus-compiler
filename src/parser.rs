@@ -109,6 +109,9 @@ pub struct SusTreeSitterSingleton {
     pub if_statement_kind : u16,
     pub for_statement_kind : u16,
 
+    pub single_line_comment_kind : u16,
+    pub multi_line_comment_kind : u16,
+
     pub gen_kw : u16,
     pub state_kw : u16,
     pub reg_kw : u16,
@@ -185,6 +188,9 @@ impl SusTreeSitterSingleton {
             if_statement_kind : node_kind("if_statement"),
             for_statement_kind : node_kind("for_statement"),
 
+            single_line_comment_kind : node_kind("single_line_comment"),
+            multi_line_comment_kind : node_kind("multi_line_comment"),
+
             gen_kw : keyword_kind("gen"),
             state_kw : keyword_kind("state"),
             reg_kw : keyword_kind("reg"),
@@ -226,14 +232,35 @@ impl SusTreeSitterSingleton {
 #[dynamic]
 pub static SUS : SusTreeSitterSingleton = SusTreeSitterSingleton::new();
 
+#[derive(Debug, Clone)]
+pub struct Documentation {
+    gathered : Box<[Span]>
+}
+
+impl Documentation {
+    pub fn to_string(&self, file_text : &FileText) -> String {
+        let mut total_length = self.gathered.len().saturating_sub(1);
+        for s in self.gathered.iter() {
+            total_length += s.size();
+        }
+        let mut result = String::with_capacity(total_length);
+        for s in self.gathered.iter() {
+            result.push_str(&file_text[*s]);
+            result.push('\n');
+        }
+        result
+    }
+}
+
 pub struct Cursor<'t> {
     cursor : TreeCursor<'t>,
-    file_text : &'t FileText
+    file_text : &'t FileText,
+    gathered_comments : Vec<Span>
 }
 
 impl<'t> Cursor<'t> {
     pub fn new_at_root(tree : &'t Tree, file_text : &'t FileText) -> Self {
-        Self{cursor : tree.walk(), file_text}
+        Self{cursor : tree.walk(), file_text, gathered_comments : Vec::new()}
     }
 
     pub fn new_for_node(tree : &'t Tree, file_text : &'t FileText, span : Span, kind : u16) -> Self {
@@ -241,10 +268,9 @@ impl<'t> Cursor<'t> {
         let _ = cursor.goto_first_child_for_byte(span.into_range().start).unwrap();
         let start_node = cursor.node();
         assert_eq!(start_node.kind_id(), kind);
-        // Temprarily comment out, because old parser and new parser are slightly different
         assert_eq!(start_node.byte_range(), span.into_range());
 
-        Self{cursor, file_text}
+        Self{cursor, file_text, gathered_comments : Vec::new()}
     }
 
     pub fn kind_span(&self) -> (u16, Span) {
@@ -296,6 +322,7 @@ impl<'t> Cursor<'t> {
                     return None; // Field found, but it's not this one. Stop here, because we've passed the possibly optional field
                 }
             } else {
+                self.maybe_add_comment();
                 if !self.cursor.goto_next_sibling() {
                     return None;
                 }
@@ -319,6 +346,7 @@ impl<'t> Cursor<'t> {
                     panic!("Did not find required field '{}', found field '{}' instead!", SUS.language.field_name_for_id(field_id.into()).unwrap(), SUS.language.field_name_for_id(found.into()).unwrap());
                 }
             } else {
+                self.maybe_add_comment();
                 if !self.cursor.goto_next_sibling() {
                     self.print_stack();
                     panic!("Reached the end of child nodes without finding field '{}'", SUS.language.field_name_for_id(field_id.into()).unwrap())
@@ -327,12 +355,33 @@ impl<'t> Cursor<'t> {
         }
     }
 
-    pub fn optional_field_span(&mut self, field_id : NonZeroU16) -> Option<Span> {
-        self.optional_field(field_id, |cursor| cursor.span())
+    pub fn optional_field_span(&mut self, field_id : NonZeroU16, expected_kind : u16) -> Option<Span> {
+        self.optional_field(field_id, |cursor| {
+            let (kind, span) = cursor.kind_span();
+            if kind != expected_kind {
+                cursor.print_stack();
+                panic!("Expected {}, Was {} instead", SUS.language.node_kind_for_id(expected_kind).unwrap(), cursor.kind());
+            }
+            assert!(kind == expected_kind);
+            span
+        })
     }
 
     #[track_caller]
-    pub fn field_span(&mut self, field_id : NonZeroU16) -> Span {
+    pub fn field_span(&mut self, field_id : NonZeroU16, expected_kind : u16) -> Span {
+        self.field(field_id, |cursor| {
+            let (kind, span) = cursor.kind_span();
+            if kind != expected_kind {
+                cursor.print_stack();
+                panic!("Expected {}, Was {} instead", SUS.language.node_kind_for_id(expected_kind).unwrap(), cursor.kind());
+            }
+            assert!(kind == expected_kind);
+            span
+        })
+    }
+
+    #[track_caller]
+    pub fn field_span_no_check(&mut self, field_id : NonZeroU16) -> Span {
         self.field(field_id, |cursor| cursor.span())
     }
 
@@ -362,13 +411,19 @@ impl<'t> Cursor<'t> {
     /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
     #[track_caller]
     pub fn list<F : FnMut(&mut Self)>(&mut self, parent_kind : u16, mut func : F) {
-        self.go_down(parent_kind, |self2| {
+        self.go_down(parent_kind, |cursor| {
             loop {
-                if self2.cursor.field_id() == Some(SUS.item_field) {
-                    func(self2);
+                if let Some(found) = cursor.cursor.field_id() {
+                    if found == SUS.item_field {
+                        func(cursor);
+                    } else {
+                        cursor.print_stack();
+                        panic!("List did not only contain 'item' fields, found field '{}' instead!", SUS.language.field_name_for_id(found.into()).unwrap());
+                    }
+                } else {
+                    cursor.maybe_add_comment();
                 }
-
-                if !self2.cursor.goto_next_sibling() {
+                if !cursor.cursor.goto_next_sibling() {
                     break;
                 }
             }
@@ -396,5 +451,30 @@ impl<'t> Cursor<'t> {
         self.go_down(parent_kind, |self2| {
             self2.field(SUS.content_field, |self3| func(self3))
         })
-    } 
+    }
+
+    // Comment gathering
+    
+    fn maybe_add_comment(&mut self) {
+        let node = self.cursor.node();
+        let kind = node.kind_id();
+
+        if kind == SUS.single_line_comment_kind || kind == SUS.multi_line_comment_kind {
+            let mut range = node.byte_range();
+            range.start += 2; // skip '/*' or '//'
+            if kind == SUS.multi_line_comment_kind {
+                range.end -= 2; // skip '*/'
+            }
+            self.gathered_comments.push(Span::from(range));
+        }
+    }
+
+    pub fn extract_gathered_comments(&mut self) -> Documentation {
+        let gathered = self.gathered_comments.clone().into_boxed_slice();
+        self.gathered_comments.clear();
+        Documentation{gathered}
+    }
+    pub fn clear_gathered_comments(&mut self) {
+        self.gathered_comments.clear()
+    }
 }

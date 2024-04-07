@@ -507,10 +507,11 @@ module module_taking_a_lot_of_time : int data_in'0 -> int data_out'200 {
 }
 
 
+
 module good_cycle : int a -> int r {
 	state int test;
 	initial test = 0;
-
+	
 	int new_test = test + a;
 	test = new_test;
 

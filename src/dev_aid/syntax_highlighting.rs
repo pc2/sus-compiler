@@ -1,7 +1,7 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{arena_alloc::ArenaVector, ast::*, errors::{CompileError, ErrorLevel}, file_position::Span, flattening::{Instruction, WireSource}, linker::{FileUUID, FileUUIDMarker, Linker, NameElem}, parser::*};
+use crate::{arena_alloc::ArenaVector, errors::{CompileError, ErrorLevel}, file_position::Span, flattening::{IdentifierType, Instruction, WireSource}, linker::{FileUUID, FileUUIDMarker, Linker, NameElem}, parser::*};
 
 use ariadne::*;
 

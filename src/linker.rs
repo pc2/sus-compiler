@@ -2,12 +2,11 @@ use std::{collections::{HashMap, HashSet}, rc::Rc, cell::RefCell};
 
 use crate::{
     arena_alloc::{ArenaAllocator, UUIDMarker, UUID},
-    ast::{LinkInfo, Module},
     errors::{error_info, ErrorCollector},
     file_position::{FileText, Span},
-    flattening::{FlatID, FlattenedModule, Instruction, WireInstance, WireSource},
+    flattening::{FlatID, FlattenedModule, Instruction, Module, WireInstance, WireSource},
     instantiation::{InstantiatedModule, InstantiationList},
-    parser::{Cursor, FullParseResult, SUS},
+    parser::{Cursor, Documentation, FullParseResult, SUS},
     typing::{Type, WrittenType},
     util::{const_str_position, const_str_position_in_tuples},
     value::Value
@@ -52,11 +51,27 @@ pub const fn get_builtin_type(name : &'static str) -> TypeUUID {
     }
 }
 
+#[allow(dead_code)]
 pub const fn get_builtin_constant(name : &'static str) -> ConstantUUID {
     if let Some(is_constant) = const_str_position_in_tuples(name, &BUILTIN_CONSTANTS) {
         ConstantUUID::from_hidden_value(is_constant)
     } else {
         unreachable!()
+    }
+}
+
+#[derive(Debug)]
+pub struct LinkInfo {
+    pub file : FileUUID,
+    pub name : Box<str>,
+    pub name_span : Span,
+    pub span : Span,
+    pub documentation : Documentation
+}
+
+impl LinkInfo {
+    pub fn get_full_name(&self) -> String {
+        format!("::{}", self.name)
     }
 }
 
@@ -183,10 +198,12 @@ impl Linker {
         let NamespaceElement::Global(NameElem::Module(id)) = self.global_namespace.get(name)? else {return None};
         Some(*id)
     }
+    #[allow(dead_code)]
     pub fn get_type_id(&self, name : &str) -> Option<TypeUUID> {
         let NamespaceElement::Global(NameElem::Type(id)) = self.global_namespace.get(name)? else {return None};
         Some(*id)
     }
+    #[allow(dead_code)]
     pub fn get_constant_id(&self, name : &str) -> Option<ConstantUUID> {
         let NamespaceElement::Global(NameElem::Constant(id)) = self.global_namespace.get(name)? else {return None};
         Some(*id)
@@ -327,6 +344,7 @@ impl Linker {
         });
     }
 
+    #[allow(dead_code)]
     pub fn remove_files(&mut self, files : &[FileUUID]) {
         self.remove_file_datas(files);
         for uuid in files {
@@ -346,9 +364,10 @@ impl Linker {
             walker.list(SUS.source_file_kind, |cursor| {
                 let (kind, span) = cursor.kind_span();
                 assert!(kind == SUS.module_kind);
-                let name_span = cursor.go_down_no_check(|cursor| {cursor.field_span(SUS.name_field)});
+                let name_span = cursor.go_down_no_check(|cursor| {cursor.field_span(SUS.name_field, SUS.identifier_kind)});
                 let md = Module{
                     link_info: LinkInfo {
+                        documentation: cursor.extract_gathered_comments(),
                         file,
                         name: parse_result.file_text[name_span].to_owned().into_boxed_str(),
                         name_span,
@@ -591,6 +610,7 @@ impl<'linker> GlobalResolver<'linker> {
     pub fn get_constant(&self, index: ConstantUUID) -> &'linker NamedConstant {
         &self.linker.constants[index]
     }
+    #[allow(dead_code)]
     pub fn get_type(&self, index: TypeUUID) -> &'linker NamedType {
         &self.linker.types[index]
     }

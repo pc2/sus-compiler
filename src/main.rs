@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
-//#![allow(dead_code)]
+
+#![cfg_attr(not(all(feature = "lsp")), allow(dead_code, unused_assignments, unused_variables))]
 
 mod util;
 mod block_vector;
@@ -9,7 +10,6 @@ mod list_of_lists;
 mod file_position;
 mod parser;
 mod errors;
-mod ast;
 mod value;
 mod flattening;
 mod instantiation;
@@ -30,7 +30,7 @@ use std::error::Error;
 use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use ast::Module;
+use flattening::Module;
 use codegen_fallback::gen_verilog_code;
 use dev_aid::syntax_highlighting::*;
 use linker::{Linker, ModuleUUID};
@@ -96,6 +96,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     let mut file_paths : Vec<PathBuf> = Vec::new();
     let mut is_lsp = None;
+    let mut lsp_port = 25000;
     let mut codegen = None;
     let mut codegen_all = false;
     let mut test_sus_sitter = false;
@@ -105,37 +106,53 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     };
     
     while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "--lsp" => {
-                is_lsp = Some(false);
+        if arg.starts_with("-") {
+            if let Some((name, value)) = arg.split_once("=") {
+                match name {
+                    "--socket" => {
+                        lsp_port = u16::from_str_radix(value, 10).unwrap();
+                    }
+                    other => panic!("Unknown option {other}"),
+                }
+            } else {
+                match arg.as_str() {
+                    "--lsp" => {
+                        is_lsp = Some(false);
+                    }
+                    "--lsp-debug" => {
+                        is_lsp = Some(true);
+                    }
+                    "--codegen" => {
+                        codegen = Some(args.next().expect("Expected a module name after --codegen"));
+                    }
+                    "--codegen-all" => {
+                        codegen_all = true;
+                    }
+                    "--tokens" => {
+                        settings.show_tokens = true;
+                    }
+                    "--tree" => {
+                        test_sus_sitter = true;
+                    }
+                    "--dot" => {
+                        make_dot = true;
+                    }
+                    other => {
+                        panic!("Unknown option {other}");
+                    }
+                }
             }
-            "--lsp-debug" => {
-                is_lsp = Some(true);
-            }
-            "--codegen" => {
-                codegen = Some(args.next().expect("Expected a module name after --codegen"));
-            }
-            "--codegen-all" => {
-                codegen_all = true;
-            }
-            "--tokens" => {
-                settings.show_tokens = true;
-            }
-            "--tree" => {
-                test_sus_sitter = true;
-            }
-            "--dot" => {
-                make_dot = true;
-            }
-            other => {
-                file_paths.push(PathBuf::from(other));
-            }
+        } else {
+            file_paths.push(PathBuf::from(arg));
         }
     }
     
-    #[cfg(feature = "lsp")]
     if let Some(debug) = is_lsp {
-        return dev_aid::lsp::lsp_main(25000, debug);
+        #[cfg(feature = "lsp")]
+        return dev_aid::lsp::lsp_main(lsp_port, debug);
+
+        #[cfg(not(feature = "lsp"))]
+        panic!("LSP not enabled!")
     }
     if file_paths.len() == 0 {
         // Quick debugging

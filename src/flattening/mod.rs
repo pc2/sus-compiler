@@ -5,17 +5,104 @@ use std::{iter::zip, str::FromStr};
 
 use num::BigInt;
 use crate::{
-    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID},
-    ast::{IdentifierType, InterfacePorts, Module},
-    errors::{error_info, ErrorCollector, ErrorInfo},
-    file_position::{BracketSpan, Span},
-    linker::{ConstantUUID, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker},
-    parser::{SUS, Cursor},
-    typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE},
-    value::Value
+    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::{error_info, ErrorCollector, ErrorInfo}, file_position::{BracketSpan, Span}, instantiation::InstantiationList, linker::{ConstantUUID, FileUUID, GlobalResolver, LinkInfo, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker}, parser::{Cursor, Documentation, SUS}, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE}, value::Value
 };
 
 use self::name_context::LocalVariableContext;
+
+
+
+use core::ops::Range;
+
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
+pub enum IdentifierType {
+    Input,
+    Output,
+    Local,
+    State,
+    Generative
+}
+
+impl IdentifierType {
+    pub fn get_keyword(&self) -> &'static str {
+        match self {
+            IdentifierType::Input => "input",
+            IdentifierType::Output => "output",
+            IdentifierType::Local => "",
+            IdentifierType::State => "state",
+            IdentifierType::Generative => "gen",
+        }
+    }
+    pub fn is_generative(&self) -> bool {
+        *self == IdentifierType::Generative
+    }
+    pub fn is_port(&self) -> bool {
+        *self == IdentifierType::Input || *self == IdentifierType::Output
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct InterfacePorts<ID : Clone + Copy> {
+    pub outputs_start : usize,
+    pub ports : Box<[ID]>
+}
+
+impl<ID : Clone + Copy> InterfacePorts<ID> {
+    pub fn empty() -> Self {
+        InterfacePorts{outputs_start : 0, ports : Box::new([])}
+    }
+
+    // Todo, just treat all inputs and outputs as function call interface
+    pub fn func_call_syntax_inputs(&self) -> Range<usize> {
+        0..self.outputs_start
+    }
+    pub fn func_call_syntax_outputs(&self) -> Range<usize> {
+        self.outputs_start..self.ports.len()
+    }
+    pub fn inputs(&self) -> &[ID] {
+        &self.ports[..self.outputs_start]
+    }
+    pub fn outputs(&self) -> &[ID] {
+        &self.ports[self.outputs_start..]
+    }
+
+    pub fn map<OtherID : Clone + Copy, MapFn : FnMut(ID, /*is_input : */bool) -> OtherID>(&self, f : &mut MapFn) -> InterfacePorts<OtherID> {
+        InterfacePorts{
+            ports : self.ports.iter().enumerate().map(|(idx, v)| f(*v, idx < self.outputs_start)).collect(),
+            outputs_start : self.outputs_start
+        }
+    }
+    pub fn iter(&self) -> impl Iterator<Item = (ID, /*is_input : */bool)> + '_ {
+        self.ports.iter().enumerate().map(|(idx, v)| (*v, idx < self.outputs_start))
+    }
+}
+
+#[derive(Debug)]
+pub struct Module {
+    pub link_info : LinkInfo,
+
+    pub flattened : FlattenedModule,
+
+    pub instantiations : InstantiationList
+}
+
+impl Module {
+    #[allow(dead_code)]
+    pub fn print_flattened_module(&self) {
+        println!("[[{}]]:", self.link_info.name);
+        println!("Interface:");
+        for (port, is_input) in self.flattened.interface_ports.iter() {
+            let port_direction = if is_input {"input"} else {"output"};
+            let port_name = &self.flattened.instructions[port].extract_wire_declaration().name;
+            println!("    {port_direction} {port_name} -> {:?}", port);
+        }
+        println!("Instantiations:");
+        for (id, inst) in &self.flattened.instructions {
+            println!("    {:?}: {:?}", id, inst);
+        }
+    }
+}
+
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
 pub struct FlatIDMarker;
@@ -211,7 +298,8 @@ pub struct Declaration {
     // If the program text already covers the write, then lsp stuff on this declaration shouldn't use it. 
     pub declaration_itself_is_not_written_to : bool,
     pub identifier_type : IdentifierType,
-    pub latency_specifier : Option<FlatID>
+    pub latency_specifier : Option<FlatID>,
+    pub documentation : Documentation
 }
 
 impl Declaration {
@@ -410,7 +498,7 @@ impl<'l> FlatteningContext<'l> {
     
             let typ_or_module_expr = cursor.field(SUS.type_field, |cursor| self.flatten_module_or_type_tree::<ALLOW_MODULES>(cursor));
             
-            let name_span = cursor.field_span(SUS.name_field);
+            let name_span = cursor.field_span(SUS.name_field, SUS.identifier_kind);
     
             let span_latency_specifier = cursor.optional_field(SUS.latency_specifier_field, |cursor| {
                 cursor.go_down_content(SUS.latency_specifier_kind, 
@@ -434,6 +522,8 @@ impl<'l> FlatteningContext<'l> {
 
             let typ_expr_span = typ_expr.get_span();
             let name = &self.linker.file.file_text[name_span];
+            let documentation = cursor.extract_gathered_comments();
+
             let inst_id = self.instructions.alloc(Instruction::Declaration(Declaration{
                 typ : typ_expr.to_type(),
                 typ_expr,
@@ -443,7 +533,8 @@ impl<'l> FlatteningContext<'l> {
                 identifier_type,
                 name : name.to_owned().into_boxed_str(),
                 name_span,
-                latency_specifier : span_latency_specifier.map(|(ls, _)| ls)
+                latency_specifier : span_latency_specifier.map(|(ls, _)| ls),
+                documentation
             }));
 
             if let Err(conflict) = self.local_variable_context.add_declaration(name, inst_id) {
@@ -460,9 +551,10 @@ impl<'l> FlatteningContext<'l> {
         )
     }
 
-    fn desugar_func_call_tree(&mut self, cursor : &mut Cursor<'l>) -> Option<(Span, &Module, InterfacePorts<FlatID>)> {
+    fn desugar_func_call_tree(&mut self, cursor : &mut Cursor<'l>) -> Option<(&Module, InterfacePorts<FlatID>)> {
+        let whole_function_span = cursor.span();
         cursor.go_down(SUS.func_call_kind, |cursor| {
-            let (module_name_span, instantiation_flat_id) = cursor.field(SUS.name_field, |cursor| {(cursor.span(), self.get_module_by_global_identifier_tree(cursor))});
+            let instantiation_flat_id = cursor.field(SUS.name_field, |cursor| self.get_module_by_global_identifier_tree(cursor));
 
             let (arguments_span, arguments) = cursor.field(SUS.arguments_field, |cursor| {
                 (BracketSpan::from_outer(cursor.span()),
@@ -502,10 +594,10 @@ impl<'l> FlatteningContext<'l> {
             for (field, arg_read_side) in zip(inputs, args) {
                 let arg_wire = self.instructions[*arg_read_side].extract_wire();
                 let func_input_port = &submodule_local_wires.ports[field];
-                self.instructions.alloc(Instruction::Write(Write{from: *arg_read_side, to: ConnectionWrite{root : *func_input_port, root_span : module_name_span, path : Vec::new(), span : arg_wire.span, is_declared_in_this_module : self.is_declared_in_this_module, write_modifiers : WriteModifiers::Connection{num_regs : 0, regs_span : arg_wire.span.empty_span_at_front()}}}));
+                self.instructions.alloc(Instruction::Write(Write{from: *arg_read_side, to: ConnectionWrite{root : *func_input_port, root_span : whole_function_span, path : Vec::new(), span : arg_wire.span, is_declared_in_this_module : self.is_declared_in_this_module, write_modifiers : WriteModifiers::Connection{num_regs : 0, regs_span : arg_wire.span.empty_span_at_front()}}}));
             }
 
-            Some((module_name_span, md, submodule_local_wires))
+            Some((md, submodule_local_wires))
         })
     }
 
@@ -513,7 +605,7 @@ impl<'l> FlatteningContext<'l> {
     fn get_module_by_global_identifier_tree(&mut self, cursor : &mut Cursor<'l>) -> Option<FlatID> {
         let (kind, span) = cursor.kind_span();
         if kind == SUS.global_identifier_kind {
-            cursor.go_down(SUS.global_identifier_kind, |cursor| {
+            cursor.go_down(SUS.global_identifier_kind, |_cursor| {
                 match self.resolve_identifier(span) {
                     LocalOrGlobal::Local(id) => {
                         if let Instruction::SubModule(_) = &self.instructions[id] {
@@ -562,7 +654,7 @@ impl<'l> FlatteningContext<'l> {
             WireSource::Constant(Value::Integer(BigInt::from_str(text).unwrap()))
         } else if kind == SUS.unary_op_kind {
             cursor.go_down_no_check(|cursor| {
-                let op_text = &self.linker.file.file_text[cursor.field_span(SUS.operator_field)];
+                let op_text = &self.linker.file.file_text[cursor.field_span_no_check(SUS.operator_field)];
                 let op = UnaryOperator::from_text(op_text);
                 
                 let right = cursor.field(SUS.right_field, |cursor| self.flatten_expr_tree(cursor));
@@ -572,7 +664,7 @@ impl<'l> FlatteningContext<'l> {
         } else if kind == SUS.binary_op_kind {
             cursor.go_down_no_check(|cursor| {
                 let left = cursor.field(SUS.left_field, |cursor| self.flatten_expr_tree(cursor));
-                let op_text = &self.linker.file.file_text[cursor.field_span(SUS.operator_field)];
+                let op_text = &self.linker.file.file_text[cursor.field_span_no_check(SUS.operator_field)];
                 let op = BinaryOperator::from_text(op_text);
                 let right = cursor.field(SUS.right_field, |cursor| self.flatten_expr_tree(cursor));
 
@@ -587,7 +679,7 @@ impl<'l> FlatteningContext<'l> {
                 WireSource::ArrayAccess{arr, arr_idx, bracket_span}
             })
         } else if kind == SUS.func_call_kind {
-            if let Some((_module_name_span, md, interface_wires)) = self.desugar_func_call_tree(cursor) {
+            if let Some((md, interface_wires)) = self.desugar_func_call_tree(cursor) {
                 let output_range = interface_wires.func_call_syntax_outputs();
 
                 if output_range.len() != 1 {
@@ -670,7 +762,7 @@ impl<'l> FlatteningContext<'l> {
 
     fn flatten_assign_function_call(&mut self, to : Vec<Result<ConnectionWrite, Span>>, cursor : &mut Cursor<'l>) {
         let func_call_span = cursor.span();
-        let to_iter = if let Some((module_name_span, md, interface)) = self.desugar_func_call_tree(cursor) {
+        let to_iter = if let Some((md, interface)) = self.desugar_func_call_tree(cursor) {
             let output_range = interface.func_call_syntax_outputs();
             let outputs = &interface.ports[output_range];
 
@@ -689,7 +781,7 @@ impl<'l> FlatteningContext<'l> {
                     let excess_results_span = Span::new_overarching(get_span(&to[num_func_outputs]), get_span(to.last().unwrap()));
                     self.errors.error_with_info(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
                 } else {
-                    self.errors.error_with_info(module_name_span, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
+                    self.errors.error_with_info(func_call_span, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
                 }
             }
 
@@ -722,6 +814,7 @@ impl<'l> FlatteningContext<'l> {
         self.local_variable_context.pop_frame(old_frame);
     }
     fn flatten_code_keep_context_tree(&mut self, cursor : &mut Cursor<'l>) {
+        cursor.clear_gathered_comments(); // Clear comments at the start of a block
         cursor.list(SUS.block_kind, |cursor| {
             let kind = cursor.kind();
             if kind == SUS.assign_left_side_kind {
@@ -771,6 +864,7 @@ impl<'l> FlatteningContext<'l> {
                     for_stmt.loop_body = UUIDRange(code_start, code_end);
                 })
             }
+            cursor.clear_gathered_comments(); // Clear comments after every statement, so comments don't bleed over
         });
     }
 
@@ -833,17 +927,22 @@ impl<'l> FlatteningContext<'l> {
                 }
                 is_first_item = false;
 
-                if let Some(span) = cursor.optional_field_span(SUS.write_modifiers_field) {
+                if let Some(span) = cursor.optional_field_span(SUS.write_modifiers_field, SUS.write_modifiers_kind) {
                     self.errors.error_basic(span, "No write modifiers are allowed on non-assigned to declarations or expressions");
                 }
                 
                 cursor.field(SUS.expr_or_decl_field, |cursor| {
-                    let kind = cursor.kind();
+                    let (kind, span) = cursor.kind_span();
     
                     if kind == SUS.declaration_kind {
                         let _ = self.flatten_declaration_tree::<true, true>(IdentifierType::Local, true, cursor);
                     } else { // It's _expression
-                        let _ = self.flatten_expr_tree(cursor);
+                        if kind == SUS.func_call_kind {
+                            self.flatten_assign_function_call(Vec::new(), cursor);
+                        } else {
+                            self.errors.warn_basic(span, "The result of this operation is not used");
+                            let _ = self.flatten_expr_tree(cursor);
+                        }
                     }
                 })
             });
@@ -907,7 +1006,7 @@ impl<'l> FlatteningContext<'l> {
 
     fn flatten_module_tree(&mut self, cursor : &mut Cursor<'l>) -> InterfacePorts<FlatID> {
         cursor.go_down(SUS.module_kind, |cursor| {
-            let name_span = cursor.field_span(SUS.name_field);
+            let name_span = cursor.field_span(SUS.name_field, SUS.identifier_kind);
             let module_name = &self.linker.file.file_text[name_span];
             println!("TREE SITTER module! {module_name}");
             // Interface is allocated in self
