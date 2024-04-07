@@ -1082,6 +1082,14 @@
           "name": "for_statement"
         }
       ]
+    },
+    "single_line_comment": {
+      "type": "PATTERN",
+      "value": "\\/\\/[^\\n]*"
+    },
+    "multi_line_comment": {
+      "type": "PATTERN",
+      "value": "\\/\\*[^\\*]*\\*+([^\\/\\*][^\\*]*\\*+)*\\/"
     }
   },
   "extras": [
@@ -1090,12 +1098,12 @@
       "value": "\\s+"
     },
     {
-      "type": "PATTERN",
-      "value": "\\/\\/[^\\n]*\\n"
+      "type": "SYMBOL",
+      "name": "single_line_comment"
     },
     {
-      "type": "PATTERN",
-      "value": "\\/\\*[^\\*]*\\*+([^\\/\\*][^\\*]*\\*+)*\\/"
+      "type": "SYMBOL",
+      "name": "multi_line_comment"
     }
   ],
   "conflicts": [

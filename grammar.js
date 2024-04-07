@@ -193,6 +193,9 @@ module.exports = grammar({
             $.if_statement,
             $.for_statement
         ),
+
+        single_line_comment : $ => /\/\/[^\n]*/,
+        multi_line_comment : $ => /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\//,
     },
 
     conflicts: $ => [
@@ -203,7 +206,7 @@ module.exports = grammar({
 
     extras: $ => [
         /\s+/,
-        /\/\/[^\n]*\n/, // Single line comment
-        /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\// // Multi line comment
+        $.single_line_comment,
+        $.multi_line_comment
     ]
 });

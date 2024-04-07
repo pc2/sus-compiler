@@ -1134,12 +1134,20 @@
     "named": false
   },
   {
+    "type": "multi_line_comment",
+    "named": true
+  },
+  {
     "type": "number",
     "named": true
   },
   {
     "type": "reg",
     "named": false
+  },
+  {
+    "type": "single_line_comment",
+    "named": true
   },
   {
     "type": "state",
