@@ -1,17 +1,16 @@
 
 pub mod name_context;
 
-use std::{iter::zip, ops::Deref, str::FromStr};
+use std::{iter::zip, str::FromStr};
 
 use num::BigInt;
 use crate::{
     arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID},
-    ast::{AssignableExpressionModifiers, AssignableExpressionWithModifiers, CodeBlock, Expression, IdentifierType, InterfacePorts, LeftExpression, Module, SignalDeclaration, SpanExpression, SpanTypeExpression, Statement, TypeExpression},
+    ast::{IdentifierType, InterfacePorts, Module},
     errors::{error_info, ErrorCollector, ErrorInfo},
     file_position::{BracketSpan, Span},
     linker::{ConstantUUID, FileUUID, GlobalResolver, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker},
     parser::{SUS, Cursor},
-    tokenizer::kw,
     typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE},
     value::Value
 };
@@ -333,77 +332,10 @@ struct FlatteningContext<'l> {
 
     local_variable_context : LocalVariableContext<'l, FlatID>,
     linker : GlobalResolver<'l>,
-    type_list_for_naming : &'l ArenaAllocator<NamedType, TypeUUIDMarker>,
-    module : &'l Module
+    type_list_for_naming : &'l ArenaAllocator<NamedType, TypeUUIDMarker>
 }
 
 impl<'l> FlatteningContext<'l> {
-    fn map_to_type(&mut self, type_expr : &SpanTypeExpression) -> WrittenType {
-        match &type_expr.0 {
-            TypeExpression::Named => {
-                if let Some(typ_id) = &self.linker.resolve_global(type_expr.1, &self.errors).expect_type() {
-                    WrittenType::Named(type_expr.1, *typ_id)
-                } else {
-                    WrittenType::Error(type_expr.1)
-                }
-            }
-            TypeExpression::Array(b) => {
-                let (array_type_expr, array_size_expr) = b.deref();
-                let array_element_type = self.map_to_type(&array_type_expr);
-                let array_size_wire_id = self.flatten_expr(array_size_expr);
-                WrittenType::Array(type_expr.1, Box::new((array_element_type, array_size_wire_id)))
-            }
-        }
-    }
-    fn flatten_declaration<const ALLOW_MODULES : bool>(&mut self, decl : &'l SignalDeclaration, read_only : bool, declaration_itself_is_not_written_to : bool) -> FlatID {
-        let typ_expr = if let TypeExpression::Named = &decl.typ.0 {
-            let resolved = self.linker.resolve_global(decl.typ.1, &self.errors);
-            match resolved.name_elem {
-                Some(NameElem::Module(id)) if ALLOW_MODULES => {
-                    let md = &self.linker.get_module(id);
-                    return self.alloc_module_interface(self.linker.file.file_text[decl.name_span].to_owned().into_boxed_str(), md, id, decl.typ.1)
-                }
-                Some(NameElem::Type(id)) => {
-                    WrittenType::Named(decl.typ.1, id)
-                }
-                Some(_global_module_or_type) => {
-                    let accepted = if ALLOW_MODULES {"Type or Module"} else {"Type"};
-                    resolved.not_expected_global_error(accepted);
-                    WrittenType::Error(decl.typ.1)
-                }
-                None => WrittenType::Error(decl.typ.1)
-            }
-        } else {
-            self.map_to_type(&decl.typ)
-        };
-
-        let latency_specifier = if let Some(lat_expr) = &decl.latency_expr {
-            let latency_spec = self.flatten_expr(lat_expr);
-            Some(latency_spec)
-        } else {
-            None
-        };
-
-        let typ_expr_span = typ_expr.get_span();
-        let name = &self.linker.file.file_text[decl.name_span];
-        let inst_id = self.instructions.alloc(Instruction::Declaration(Declaration{
-            typ : typ_expr.to_type(),
-            typ_expr,
-            is_declared_in_this_module : self.is_declared_in_this_module,
-            read_only,
-            declaration_itself_is_not_written_to,
-            identifier_type : decl.identifier_type,
-            name : name.to_owned().into_boxed_str(),
-            name_span : decl.name_span,
-            latency_specifier
-        }));
-
-        if let Err(conflict) = self.local_variable_context.add_declaration(name, inst_id) {
-            self.errors.error_with_info(Span::new_overarching(typ_expr_span, decl.name_span), "This declaration conflicts with a previous declaration in the same scope", vec![self.instructions[conflict].extract_wire_declaration().make_declared_here(self.errors.file)])
-        }
-
-        inst_id
-    }
     fn resolve_identifier(&self, identifier_span : Span) -> LocalOrGlobal {
         // Possibly local
         let name_text = &self.linker.file.file_text[identifier_span];
@@ -412,319 +344,6 @@ impl<'l> FlatteningContext<'l> {
         }
         // Global identifier
         LocalOrGlobal::Global(self.linker.resolve_global(identifier_span, &self.errors))
-    }
-    fn initialize_interface<const IS_SUBMODULE : bool>(&mut self) -> InterfacePorts<FlatID> {
-        let ports : Box<[FlatID]> = self.module.interface.ports.iter().enumerate().map(|(idx, port_decl)|{
-            let is_input = idx < self.module.interface.outputs_start;
-            let read_only = is_input ^ IS_SUBMODULE;
-
-            self.flatten_declaration::<false>(port_decl, read_only, true)
-        }).collect();
-        InterfacePorts{ports, outputs_start : self.module.interface.outputs_start}
-    }
-    fn alloc_module_interface(&mut self, name : Box<str>, module : &Module, module_uuid : ModuleUUID, typ_span : Span) -> FlatID {
-        let local_linker = self.linker.new_sublinker(module.link_info.file);
-
-        let mut nested_context = FlatteningContext {
-            instructions: std::mem::replace(&mut self.instructions, FlatAlloc::new()),
-            errors: ErrorCollector::new(module.link_info.file, local_linker.file.file_text.len()), // Temporary ErrorCollector, unused
-            is_declared_in_this_module: false,
-            linker: local_linker,
-            type_list_for_naming: self.type_list_for_naming,
-            local_variable_context : LocalVariableContext::new_initial(),
-            module
-        };
-        
-        let interface_ports = nested_context.initialize_interface::<true>();
-        
-        self.linker.reabsorb_sublinker(nested_context.linker);
-
-        self.instructions = nested_context.instructions;
-        self.instructions.alloc(Instruction::SubModule(SubModuleInstance{
-            name,
-            module_uuid,
-            is_declared_in_this_module : self.is_declared_in_this_module,
-            module_name_span: typ_span,
-            interface_ports
-        }))
-    }
-    // Returns the module, full interface, and the output range for the function call syntax
-    fn desugar_func_call(&mut self, func_and_args : &[SpanExpression], func_call_span : BracketSpan) -> Option<(&Module, InterfacePorts<FlatID>)> {
-        let (name_expr, name_expr_span) = &func_and_args[0]; // Function name is always there
-        let Expression::Named(name) = name_expr else {
-            self.errors.error_basic(*name_expr_span, "Function call name must be a simple identifier");
-            return None;
-        };
-        let func_instantiation_id = match self.resolve_identifier(name.span) {
-            LocalOrGlobal::Local(id) => id,
-            LocalOrGlobal::Global(global) => {
-                let module_id = global.expect_module()?;
-                let md = &self.linker.get_module(module_id);
-                self.alloc_module_interface(md.link_info.name.clone(), md, module_id, *name_expr_span)
-            }
-        };
-
-        let func_instantiation = &self.instructions[func_instantiation_id].extract_submodule();
-        let md = &self.linker.get_module(func_instantiation.module_uuid);
-
-        let submodule_local_wires = func_instantiation.interface_ports.clone();
-        
-        let inputs = submodule_local_wires.func_call_syntax_inputs();
-
-        let mut args = &func_and_args[1..];
-
-        let arg_count = args.len();
-        let expected_arg_count = inputs.len();
-        if arg_count != expected_arg_count {
-            let module_info = vec![error_info(md.link_info.span, md.link_info.file, "Interface defined here")];
-            if arg_count > expected_arg_count {
-                // Too many args, complain about excess args at the end
-                let excess_args_span = Span::new_overarching(args[expected_arg_count].1, func_call_span.inner_span());
-                self.errors.error_with_info(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."), module_info);
-                // Shorten args to still get proper type checking for smaller arg array
-                args = &args[..expected_arg_count];
-            } else {
-                // Too few args, mention missing argument names
-                self.errors.error_with_info(func_call_span.close_bracket().into(), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."), module_info);
-            }
-        }
-
-        for (field, arg_expr) in zip(inputs, args) {
-            let arg_read_side = self.flatten_expr(arg_expr);
-            let func_input_port = &submodule_local_wires.ports[field];
-            self.instructions.alloc(Instruction::Write(Write{from: arg_read_side, to: ConnectionWrite{root : *func_input_port, root_span : arg_expr.1, path : Vec::new(), span : *name_expr_span, is_declared_in_this_module : self.is_declared_in_this_module, write_modifiers : WriteModifiers::Connection{num_regs : 0, regs_span : Span::INVALID_SPAN}}}));
-        }
-
-        Some((md, submodule_local_wires))
-    }
-    fn flatten_expr(&mut self, (expr, expr_span) : &SpanExpression) -> FlatID {
-        let source = match expr {
-            Expression::Named(name) => {
-                match self.resolve_identifier(name.span) {
-                    LocalOrGlobal::Local(id) => {
-                        WireSource::WireRead(id)
-                    }
-                    LocalOrGlobal::Global(global) => {
-                        if let Some(cst) = global.expect_constant() {
-                            WireSource::NamedConstant(cst)
-                        } else {
-                            WireSource::Constant(Value::Error)
-                        }
-                    }
-                }
-            }
-            Expression::Constant(cst) => {
-                WireSource::Constant(cst.clone())
-            }
-            Expression::UnaryOp(op_box) => {
-                let (op_tok, _op_pos, operate_on) = op_box.deref();
-                let right = self.flatten_expr(operate_on);
-                let op = match op_tok.op_typ {
-                    t if t == kw("+") => UnaryOperator::Sum,
-                    t if t == kw("*") => UnaryOperator::Product,
-                    t if t == kw("-") => UnaryOperator::Negate,
-                    t if t == kw("&") => UnaryOperator::And,
-                    t if t == kw("|") => UnaryOperator::Or,
-                    t if t == kw("^") => UnaryOperator::Xor,
-                    t if t == kw("!") => UnaryOperator::Not,
-                    _ => unreachable!()
-                };
-                WireSource::UnaryOp{op, right}
-            }
-            Expression::BinOp(binop_box) => {
-                let (left_expr, op, _op_pos, right_expr) = binop_box.deref();
-                let left = self.flatten_expr(left_expr);
-                let right = self.flatten_expr(right_expr);
-                
-                let op = match op.op_typ {
-                    t if t == kw("&") => BinaryOperator::And,
-                    t if t == kw("|") => BinaryOperator::Or,
-                    t if t == kw("^") => BinaryOperator::Xor,
-                    t if t == kw("<<") => BinaryOperator::ShiftLeft,
-                    t if t == kw(">>") => BinaryOperator::ShiftRight,
-                    t if t == kw("+") => BinaryOperator::Add,
-                    t if t == kw("-") => BinaryOperator::Subtract,
-                    t if t == kw("*") => BinaryOperator::Multiply,
-                    t if t == kw("/") => BinaryOperator::Divide,
-                    t if t == kw("%") => BinaryOperator::Modulo,
-                    t if t == kw("==") => BinaryOperator::Equals,
-                    t if t == kw("!=") => BinaryOperator::NotEquals,
-                    t if t == kw(">") => BinaryOperator::Greater,
-                    t if t == kw(">=") => BinaryOperator::GreaterEq,
-                    t if t == kw("<") => BinaryOperator::Lesser,
-                    t if t == kw("<=") => BinaryOperator::LesserEq,
-                    _ => unreachable!()
-                };
-                WireSource::BinaryOp{op, left, right}
-            }
-            Expression::Array(arr_box) => {
-                let (left, right, _bracket_span) = arr_box.deref();
-                let arr = self.flatten_expr(left);
-                let arr_idx = self.flatten_expr(right);
-                WireSource::ArrayAccess{arr, arr_idx}
-            }
-            Expression::FuncCall(func_and_args) => {
-                if let Some((md, interface_wires)) = self.desugar_func_call(func_and_args, BracketSpan::from_outer(*expr_span)) {
-                    let output_range = interface_wires.func_call_syntax_outputs();
-
-                    if output_range.len() != 1 {
-                        let info = error_info(md.link_info.span, md.link_info.file, "Module Defined here");
-                        self.errors.error_with_info(*expr_span, "A function called in this context may only return one result. Split this function call into a separate line instead.", vec![info]);
-                    }
-
-                    if output_range.len() >= 1 {
-                        return interface_wires.ports[output_range.start];
-                    }
-                }
-                // Function desugaring or using threw an error
-                WireSource::Constant(Value::Error)
-            }
-        };
-
-        let wire_instance = WireInstance{
-            typ : Type::Unknown,
-            is_compiletime : IS_GEN_UNINIT,
-            span : *expr_span,
-            source,
-            is_declared_in_this_module : self.is_declared_in_this_module
-        };
-        self.instructions.alloc(Instruction::Wire(wire_instance))
-    }
-    fn flatten_assignable_expr(&mut self, expr : &Expression, span : Span, write_modifiers : WriteModifiers) -> Option<ConnectionWrite> {
-        match expr {
-            Expression::Named(local_idx) => {
-                let root = self.resolve_identifier(local_idx.span).expect_local("assignments")?;
-
-                Some(ConnectionWrite{root, root_span : span, path : Vec::new(), span, is_declared_in_this_module : self.is_declared_in_this_module, write_modifiers})
-            }
-            Expression::Array(arr_box) => {
-                let (arr, idx_expr, bracket_span) = arr_box.deref();
-                let flattened_arr_expr_opt = self.flatten_assignable_expr(&arr.0, arr.1, write_modifiers);
-                
-                let idx = self.flatten_expr(idx_expr);
-
-                let mut flattened_arr_expr = flattened_arr_expr_opt?; // only unpack the subexpr after flattening the idx, so we catch all errors
-
-                flattened_arr_expr.path.push(ConnectionWritePathElement::ArrayIdx{idx, bracket_span : *bracket_span});
-                flattened_arr_expr.span = Span::new_overarching(flattened_arr_expr.span, bracket_span.outer_span());
-                Some(flattened_arr_expr)
-            }
-            Expression::Constant(_) => {self.errors.error_basic(span, "Cannot assign to constant"); None},
-            Expression::UnaryOp(_) => {self.errors.error_basic(span, "Cannot assign to the result of an operator"); None},
-            Expression::BinOp(_) => {self.errors.error_basic(span, "Cannot assign to the result of an operator"); None},
-            Expression::FuncCall(_) => {self.errors.error_basic(span, "Cannot assign to submodule call"); None},
-        }
-    }
-    fn flatten_left_expr(&mut self, left : &'l AssignableExpressionWithModifiers, gets_assigned : bool) -> Option<ConnectionWrite> {
-        let write_modifiers = self.flatten_assignment_modifiers(&left.modifiers);
-        match &left.expr {
-            LeftExpression::Assignable(assignable) => {
-                self.flatten_assignable_expr(assignable, left.span, write_modifiers)
-            }
-            LeftExpression::Declaration(decl) => {
-                let root = self.flatten_declaration::<true>(decl, false, !gets_assigned);
-                Some(ConnectionWrite{root, root_span : decl.name_span, path: Vec::new(), span : left.span, is_declared_in_this_module: true, write_modifiers})
-            }
-        }
-    }
-
-    fn flatten_assignment_modifiers(&mut self, modifiers : &AssignableExpressionModifiers) -> WriteModifiers {
-        match modifiers {
-            &AssignableExpressionModifiers::LatencyAdding{num_regs, regs_span} => WriteModifiers::Connection{num_regs, regs_span},
-            AssignableExpressionModifiers::Initial{initial_token} => WriteModifiers::Initial{initial_kw_span : *initial_token},
-            AssignableExpressionModifiers::NoModifiers => WriteModifiers::Connection{num_regs : 0, regs_span : Span::INVALID_SPAN},
-        }
-    }
-    fn flatten_code(&mut self, code : &'l CodeBlock) {
-        let save = self.local_variable_context.new_frame();
-
-        self.flatten_code_keep_context(code);
-
-        self.local_variable_context.pop_frame(save);
-    }
-    fn flatten_code_keep_context(&mut self, code : &'l CodeBlock) {
-        for (stmt, stmt_span) in &code.statements {
-            match stmt {
-                Statement::Assign{to, expr : Some((Expression::FuncCall(func_and_args), func_span)), eq_sign_position} => {
-                    let Some((md, interface)) = self.desugar_func_call(&func_and_args, BracketSpan::from_outer(*func_span)) else {continue};
-                    let output_range = interface.func_call_syntax_outputs();
-                    let outputs = &interface.ports[output_range];
-
-                    let func_name_span = func_and_args[0].1;
-                    let num_func_outputs = outputs.len();
-                    let num_targets = to.len();
-                    if num_targets != num_func_outputs {
-                        let info = vec![error_info(md.link_info.span, md.link_info.file, "Module Defined here")];
-                        if num_targets > num_func_outputs {
-                            let excess_results_span = Span::new_overarching(to[num_func_outputs].span, to.last().unwrap().span);
-                            self.errors.error_with_info(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
-                        } else {
-                            let too_few_targets_pos = if let Some(eq) = eq_sign_position {eq.into()} else {func_name_span};
-                            self.errors.error_with_info(too_few_targets_pos, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
-                        }
-                    }
-
-                    for (field, to_i) in zip(outputs, to) {                        
-                        let module_port_wire_decl = self.instructions[*field].extract_wire_declaration();
-                        let module_port_proxy = self.instructions.alloc(Instruction::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : *func_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::WireRead(*field)}));
-                        let Some(write_side) = self.flatten_left_expr(to_i, true) else {continue};
-
-                        self.instructions.alloc(Instruction::Write(Write{from: module_port_proxy, to: write_side}));
-                    }
-                },
-                Statement::Assign{to, expr : non_func_expr, eq_sign_position : _} => {
-                    let read_side = non_func_expr.as_ref().map(|some_expr| self.flatten_expr(some_expr));
-                    if to.len() == 1 {
-                        let t = &to[0];
-                        let Some(write_side) = self.flatten_left_expr(t, non_func_expr.is_some()) else {continue};
-                        if let Some(read_side) = read_side {
-                            self.instructions.alloc(Instruction::Write(Write{from: read_side, to: write_side}));
-                        }
-                    } else {
-                        self.errors.error_basic(*stmt_span, format!("Non-function assignments must only output exactly 1 instead of {}", to.len()));
-                    }
-                },
-                Statement::Block(inner_code) => {
-                    self.flatten_code(inner_code);
-                },
-                Statement::If{condition : condition_expr, then, els} => {
-                    let condition = self.flatten_expr(condition_expr);
-
-                    let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement{condition, then_start : UUID::PLACEHOLDER, then_end_else_start : UUID::PLACEHOLDER, else_end : UUID::PLACEHOLDER}));
-                    let then_start = self.instructions.get_next_alloc_id();
-
-                    self.flatten_code(then);
-                    let then_end_else_start = self.instructions.get_next_alloc_id();
-                    if let Some(e) = els {
-                        self.flatten_code(e);
-                    }
-                    let else_end = self.instructions.get_next_alloc_id();
-
-                    let Instruction::IfStatement(if_stmt) = &mut self.instructions[if_id] else {unreachable!()};
-                    if_stmt.then_start = then_start;
-                    if_stmt.then_end_else_start = then_end_else_start;
-                    if_stmt.else_end = else_end;
-                }
-                Statement::For{var, range, code} => {
-                    let loop_var_decl = self.flatten_declaration::<false>(var, true, true);
-
-                    let start = self.flatten_expr(&range.from);
-                    let end = self.flatten_expr(&range.to);
-                    
-                    let for_id = self.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER)}));
-
-                    let code_start = self.instructions.get_next_alloc_id();
-
-                    self.flatten_code(code);
-                    
-                    let code_end = self.instructions.get_next_alloc_id();
-
-                    let Instruction::ForStatement(for_stmt) = &mut self.instructions[for_id] else {unreachable!()};
-
-                    for_stmt.loop_body = UUIDRange(code_start, code_end);
-                }
-            }
-        }
     }
 
     fn flatten_array_type_tree(&mut self, span : Span, cursor : &mut Cursor<'l>) -> WrittenType {
@@ -1264,8 +883,7 @@ impl<'l> FlatteningContext<'l> {
             is_declared_in_this_module: false,
             linker: local_linker,
             type_list_for_naming: self.type_list_for_naming,
-            local_variable_context : LocalVariableContext::new_initial(),
-            module
+            local_variable_context : LocalVariableContext::new_initial()
         };
         
         let mut nested_cursor = Cursor::new_for_node(&nested_context.linker.file.tree, &nested_context.linker.file.file_text, module.link_info.span, SUS.module_kind);
@@ -1629,8 +1247,7 @@ impl FlattenedModule {
             is_declared_in_this_module : true,
             linker : global_resolver,
             local_variable_context : LocalVariableContext::new_initial(),
-            type_list_for_naming : &linker.types,
-            module
+            type_list_for_naming : &linker.types
         };
 
         // Temporary, switch to iterating over nodes in file itself when needed. 

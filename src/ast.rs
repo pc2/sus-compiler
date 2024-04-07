@@ -1,8 +1,7 @@
 
 
-use crate::{errors::ErrorCollector, file_position::{BracketSpan, SingleCharSpan, Span}, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID, tokenizer::{get_token_type_name, TokenTypeIdx}, value::Value};
+use crate::{errors::ErrorCollector, file_position::Span, flattening::FlattenedModule, instantiation::InstantiationList, linker::FileUUID};
 use core::ops::Range;
-use std::fmt::Display;
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum IdentifierType {
@@ -32,96 +31,6 @@ impl IdentifierType {
 }
 
 #[derive(Debug)]
-pub enum TypeExpression {
-    Named, // SpanTypeExpression Span gives name
-    Array(Box<(SpanTypeExpression, SpanExpression)>)
-}
-
-pub type SpanTypeExpression = (TypeExpression, Span);
-
-#[derive(Debug)]
-pub struct SignalDeclaration {
-    pub name_span : Span,
-    pub typ : SpanTypeExpression,
-    pub identifier_type : IdentifierType,
-    pub latency_expr : Option<SpanExpression>
-}
-
-#[derive(Debug,Clone,Copy)]
-pub struct Operator {
-    pub op_typ : TokenTypeIdx
-}
-
-impl Display for Operator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(get_token_type_name(self.op_typ))
-    }
-}
-
-#[derive(Debug)]
-pub struct Identifier {
-    pub span : Span
-}
-
-#[derive(Debug)]
-pub enum Expression {
-    Named(Identifier),
-    Constant(Value),
-    UnaryOp(Box<(Operator, Span/*Operator token */, SpanExpression)>),
-    BinOp(Box<(SpanExpression, Operator, Span/*Operator token */, SpanExpression)>),
-    Array(Box<(SpanExpression, SpanExpression, BracketSpan)>), // first[second]
-    FuncCall(Vec<SpanExpression>) // first(second, third, ...)
-}
-
-impl Expression {
-    pub fn new_binop(left : SpanExpression, op : Operator, op_pos : Span/*Operator token */, right : SpanExpression) -> SpanExpression {
-        let span = Span::new_overarching(left.1, right.1);
-        (Expression::BinOp(Box::new((left, op, op_pos, right))), span)
-    }
-}
-pub type SpanExpression = (Expression, Span);
-pub type SpanStatement = (Statement, Span);
-
-#[derive(Debug)]
-pub enum LeftExpression {
-    Assignable(Expression),
-    Declaration(SignalDeclaration)
-}
-
-#[derive(Debug)]
-pub enum AssignableExpressionModifiers {
-    LatencyAdding{num_regs : i64, regs_span : Span},
-    Initial{initial_token : Span},
-    NoModifiers
-}
-
-#[derive(Debug)]
-pub struct AssignableExpressionWithModifiers {
-    pub expr : LeftExpression,
-    pub span : Span,
-    pub modifiers : AssignableExpressionModifiers
-}
-
-#[derive(Debug)]
-pub struct RangeExpression {
-    pub from : SpanExpression,
-    pub to : SpanExpression
-}
-
-#[derive(Debug)]
-pub enum Statement {
-    Assign{to : Vec<AssignableExpressionWithModifiers>, eq_sign_position : Option<SingleCharSpan>, expr : Option<SpanExpression>}, // num_regs v = expr;
-    If{condition : SpanExpression, then : CodeBlock, els : Option<CodeBlock>},
-    For{var : SignalDeclaration, range : RangeExpression, code : CodeBlock},
-    Block(CodeBlock)
-}
-
-#[derive(Debug)]
-pub struct CodeBlock {
-    pub statements : Vec<SpanStatement>
-}
-
-#[derive(Debug)]
 pub struct LinkInfo {
     pub file : FileUUID,
     pub name : Box<str>,
@@ -134,14 +43,6 @@ impl LinkInfo {
         format!("::{}", self.name)
     }
 }
-
-
-#[derive(Debug)]
-pub struct ParsedInterface {
-    pub ports : Vec<SignalDeclaration>,
-    pub outputs_start : usize
-}
-
 
 #[derive(Debug, Clone)]
 pub struct InterfacePorts<ID : Clone + Copy> {
@@ -182,9 +83,6 @@ impl<ID : Clone + Copy> InterfacePorts<ID> {
 #[derive(Debug)]
 pub struct Module {
     pub link_info : LinkInfo,
-
-    pub interface : ParsedInterface,
-    pub code : CodeBlock,
 
     pub flattened : FlattenedModule,
 

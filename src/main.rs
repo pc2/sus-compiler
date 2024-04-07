@@ -7,7 +7,6 @@ mod arena_alloc;
 mod list_of_lists;
 
 mod file_position;
-mod tokenizer;
 mod parser;
 mod errors;
 mod ast;

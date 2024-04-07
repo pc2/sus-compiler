@@ -84,8 +84,6 @@ pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<(PathBuf, 
         };
         
         let full_parse = perform_full_semantic_parse(file_text, uuid);
-        
-        println!("{:?}", full_parse.ast);
 
         paths_arena.insert(uuid, (file_path, Source::from(full_parse.file_text.file_text.clone())));
         linker.add_reserved_file(uuid, full_parse);

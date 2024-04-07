@@ -4,8 +4,6 @@ use std::cell::{RefCell, Cell};
 
 use crate::{linker::FileUUID, file_position::Span};
 
-use crate::tokenizer::{TokenTypeIdx, get_token_type_name};
-
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ErrorLevel {
     Error,
@@ -29,23 +27,6 @@ pub struct CompileError {
 
 pub fn error_info<S : Into<String>>(position : Span, file : FileUUID, reason : S) -> ErrorInfo {
     ErrorInfo{position, file, info : reason.into()}
-}
-
-pub fn join_expected_list(expected : &[TokenTypeIdx]) -> String {
-    use std::fmt::Write;
-    
-    assert!(!expected.is_empty());
-    let mut result = String::new();
-    for exp in expected.get(..expected.len() - 1).unwrap() {
-        let tok_typ_name = get_token_type_name(*exp);
-        writeln!(&mut result, "'{tok_typ_name}',").unwrap();
-    }
-    if expected.len() >= 2 {
-        result += " or ";
-    }
-    let tok_typ_name = get_token_type_name(expected[expected.len() - 1]);
-    writeln!(&mut result, "'{tok_typ_name}'").unwrap();
-    result
 }
 
 // Class that collects and manages errors and warnings

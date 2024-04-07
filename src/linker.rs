@@ -1,6 +1,17 @@
 use std::{collections::{HashMap, HashSet}, rc::Rc, cell::RefCell};
 
-use crate::{arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, ast::{LinkInfo, Module}, errors::{error_info, ErrorCollector}, file_position::{FileText, Span}, flattening::{FlatID, FlattenedModule, Instruction, WireInstance, WireSource}, instantiation::InstantiatedModule, parser::{FullParseResult, TokenTreeNode, SUS}, tokenizer::TokenTypeIdx, typing::{Type, WrittenType}, util::{const_str_position, const_str_position_in_tuples}, value::Value};
+use crate::{
+    arena_alloc::{ArenaAllocator, UUIDMarker, UUID},
+    ast::{LinkInfo, Module},
+    errors::{error_info, ErrorCollector},
+    file_position::{FileText, Span},
+    flattening::{FlatID, FlattenedModule, Instruction, WireInstance, WireSource},
+    instantiation::{InstantiatedModule, InstantiationList},
+    parser::{Cursor, FullParseResult, SUS},
+    typing::{Type, WrittenType},
+    util::{const_str_position, const_str_position_in_tuples},
+    value::Value
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModuleUUIDMarker;
@@ -119,8 +130,6 @@ impl Linkable for NamedType {
 
 pub struct FileData {
     pub file_text : FileText,
-    pub tokens : Vec<TokenTypeIdx>,
-    pub token_hierarchy : Vec<TokenTreeNode>,
     pub parsing_errors : ErrorCollector,
     pub associated_values : Vec<NameElem>,
     pub tree : tree_sitter::Tree
@@ -333,32 +342,32 @@ impl Linker {
         let mut associated_values = Vec::new();
         
         {
-            let root_node = parse_result.tree.root_node();
-            
-            let mut tmp_cursor = root_node.walk();
-            for node in root_node.children(&mut tmp_cursor) {
-                if node.kind_id() == SUS.module_kind {
-                    let name_child = node.child_by_field_id(SUS.name_field.into()).unwrap();
-                    println!("MODULE DECL: {}", &parse_result.file_text.file_text[name_child.byte_range()])
-                } else {
-                    parse_result.ast.errors.error_basic(Span::from(node.byte_range()), "Only module declarations are allowed at the top level of a file!");
-                    continue;
-                }
-            }
+            let mut walker = Cursor::new_at_root(&parse_result.tree, &parse_result.file_text);
+            walker.list(SUS.source_file_kind, |cursor| {
+                let (kind, span) = cursor.kind_span();
+                assert!(kind == SUS.module_kind);
+                let name_span = cursor.go_down_no_check(|cursor| {cursor.field_span(SUS.name_field)});
+                let md = Module{
+                    link_info: LinkInfo {
+                        file,
+                        name: parse_result.file_text[name_span].to_owned().into_boxed_str(),
+                        name_span,
+                        span
+                    },
+                    flattened: FlattenedModule::empty(ErrorCollector::new(file, parse_result.file_text.len())),
+                    instantiations: InstantiationList::new()
+                };
+                let module_name = md.link_info.name.clone();
+                let new_module_uuid = NameElem::Module(self.modules.alloc(md));
+                associated_values.push(new_module_uuid);
+                self.add_name(module_name, new_module_uuid);
+            });
         }
-
-        for md in parse_result.ast.modules {
-            let module_name = md.link_info.name.clone();
-            let new_module_uuid = NameElem::Module(self.modules.alloc(md));
-            associated_values.push(new_module_uuid);
-            self.add_name(module_name, new_module_uuid);
-        }
+        
         self.files.alloc_reservation(file, FileData{
             file_text : parse_result.file_text,
             tree: parse_result.tree,
-            tokens: parse_result.tokens,
-            token_hierarchy: parse_result.token_hierarchy,
-            parsing_errors : parse_result.ast.errors,
+            parsing_errors : parse_result.errors,
             associated_values
         });
     }

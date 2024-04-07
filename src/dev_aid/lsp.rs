@@ -164,9 +164,8 @@ fn convert_to_semantic_tokens(file_data : &FileData, ide_tokens : &mut[(IDEIdent
     ide_tokens.sort_by(|a, b| a.1.cmp(&b.1));
     
     let mut cursor = Position {line : 0, character : 0};
-    let mut semantic_tokens = Vec::with_capacity(file_data.tokens.len());
 
-    for (ide_kind, span) in ide_tokens.iter() {
+    ide_tokens.into_iter().map(|(ide_kind, span)| {
         let typ = get_semantic_token_type_from_ide_token(*ide_kind);
         let mod_bits = get_modifiers_for_token(*ide_kind);
 
@@ -185,16 +184,14 @@ fn convert_to_semantic_tokens(file_data : &FileData, ide_tokens : &mut[(IDEIdent
         let delta_col = start_pos.character - cursor.character;
         cursor = start_pos;
 
-        semantic_tokens.push(SemanticToken{
+        SemanticToken{
             delta_line: delta_line,
             delta_start: delta_col,
             length: end_pos.character - start_pos.character,
             token_type: typ,
             token_modifiers_bitset: mod_bits,
-        });
-    }
-
-    semantic_tokens
+        }
+    }).collect()
 }
 
 fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> Vec<SemanticToken> {
