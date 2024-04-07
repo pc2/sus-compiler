@@ -23,7 +23,7 @@ module.exports = grammar({
     name: 'sus',
 
     rules: {
-        source_file: $ => repeat($.module),
+        source_file: $ => repeat(field('item', $.module)),
 
         interface_ports : $ => seq(
             ':',

@@ -5,8 +5,12 @@
     "source_file": {
       "type": "REPEAT",
       "content": {
-        "type": "SYMBOL",
-        "name": "module"
+        "type": "FIELD",
+        "name": "item",
+        "content": {
+          "type": "SYMBOL",
+          "name": "module"
+        }
       }
     },
     "interface_ports": {

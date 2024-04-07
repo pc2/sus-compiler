@@ -890,16 +890,17 @@
   {
     "type": "source_file",
     "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "module",
-          "named": true
-        }
-      ]
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "module",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
