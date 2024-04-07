@@ -35,7 +35,7 @@ pub fn walk_name_color(all_objects : &[NameElem], linker : &Linker) -> Vec<(IDEI
                                 }
                                 WireSource::UnaryOp { op:_, right:_ } => {}
                                 WireSource::BinaryOp { op:_, left:_, right:_ } => {}
-                                WireSource::ArrayAccess { arr:_, arr_idx:_ } => {}
+                                WireSource::ArrayAccess { arr:_, arr_idx:_, bracket_span:_ } => {}
                                 WireSource::Constant(_) => {}
                                 WireSource::NamedConstant(_name) => {
                                     result.push((IDEIdentifierType::Constant, w.span));

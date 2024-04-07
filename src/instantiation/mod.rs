@@ -322,7 +322,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let right_val = self.get_generation_value(right)?;
                 compute_binary_op(left_val, op, right_val)
             }
-            &WireSource::ArrayAccess{arr, arr_idx} => {
+            &WireSource::ArrayAccess{arr, arr_idx, bracket_span:_} => {
                 let Value::Array(arr_val) = self.get_generation_value(arr)? else {return None};
                 let arr_idx_wire = self.flattened.instructions[arr_idx].extract_wire();
                 let idx : usize = self.extract_integer_from_generative(arr_idx)?;
@@ -372,7 +372,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let right = self.get_wire_or_constant_as_wire(right)?;
                 RealWireDataSource::BinaryOp{op, left, right}
             }
-            &WireSource::ArrayAccess{arr, arr_idx} => {
+            &WireSource::ArrayAccess{arr, arr_idx, bracket_span:_} => {
                 let arr = self.get_wire_or_constant_as_wire(arr)?;
                 match &self.generation_state[arr_idx] {
                     SubModuleOrWire::SubModule(_) => unreachable!(),

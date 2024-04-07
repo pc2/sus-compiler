@@ -171,7 +171,7 @@ pub enum WireSource {
     WireRead(FlatID), // Used to add a span to the reference of a wire. 
     UnaryOp{op : UnaryOperator, right : FlatID},
     BinaryOp{op : BinaryOperator, left : FlatID, right : FlatID},
-    ArrayAccess{arr : FlatID, arr_idx : FlatID},
+    ArrayAccess{arr : FlatID, arr_idx : FlatID, bracket_span : BracketSpan},
     Constant(Value),
     NamedConstant(ConstantUUID),
 }
@@ -182,7 +182,7 @@ impl WireSource {
             &WireSource::WireRead(from_wire) => {func(from_wire)}
             &WireSource::UnaryOp { op:_, right } => {func(right)}
             &WireSource::BinaryOp { op:_, left, right } => {func(left); func(right)}
-            &WireSource::ArrayAccess { arr, arr_idx } => {func(arr); func(arr_idx)}
+            &WireSource::ArrayAccess { arr, arr_idx, bracket_span:_ } => {func(arr); func(arr_idx)}
             WireSource::Constant(_) => {}
             WireSource::NamedConstant(_) => {}
         }
@@ -352,7 +352,7 @@ impl<'l> FlatteningContext<'l> {
             
             let (array_size_wire_id, bracket_span) = cursor.field(SUS.arr_idx_field, |cursor| self.flatten_array_bracket_tree(cursor));
             
-            WrittenType::Array(span, Box::new((array_element_type, array_size_wire_id)))
+            WrittenType::Array(span, Box::new((array_element_type, array_size_wire_id, bracket_span)))
         })
     }
     
@@ -495,7 +495,7 @@ impl<'l> FlatteningContext<'l> {
                     args = &args[..expected_arg_count];
                 } else {
                     // Too few args, mention missing argument names
-                    self.errors.error_with_info(arguments_span.close_bracket().into(), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."), module_info);
+                    self.errors.error_with_info(arguments_span.close_bracket(), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."), module_info);
                 }
             }
 
@@ -584,7 +584,7 @@ impl<'l> FlatteningContext<'l> {
                 
                 let (arr_idx, bracket_span) = cursor.field(SUS.arr_idx_field, |cursor| self.flatten_array_bracket_tree(cursor));
                 
-                WireSource::ArrayAccess{arr, arr_idx}
+                WireSource::ArrayAccess{arr, arr_idx, bracket_span}
             })
         } else if kind == SUS.func_call_kind {
             if let Some((_module_name_span, md, interface_wires)) = self.desugar_func_call_tree(cursor) {
@@ -991,7 +991,7 @@ impl<'l> FlatteningContext<'l> {
                             self.typecheck_wire_is_of_type(right_wire, &input_right_type, &format!("{op} right"));
                             output_type
                         }
-                        &WireSource::ArrayAccess{arr, arr_idx} => {
+                        &WireSource::ArrayAccess{arr, arr_idx, bracket_span:_} => {
                             let arr_wire = self.instructions[arr].extract_wire();
                             let arr_idx_wire = self.instructions[arr_idx].extract_wire();
                 

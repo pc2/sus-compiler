@@ -1,13 +1,13 @@
 use std::ops::Deref;
 
-use crate::{arena_alloc::ArenaAllocator, errors::ErrorCollector, file_position::Span, flattening::{BinaryOperator, FlatID, UnaryOperator}, linker::{get_builtin_type, Linkable, Linker, NamedType, TypeUUID, TypeUUIDMarker}, value::Value};
+use crate::{arena_alloc::ArenaAllocator, errors::ErrorCollector, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, FlatID, UnaryOperator}, linker::{get_builtin_type, Linkable, Linker, NamedType, TypeUUID, TypeUUIDMarker}, value::Value};
 
 // These are 
 #[derive(Debug, Clone)]
 pub enum WrittenType {
     Error(Span),
     Named(Span, TypeUUID),
-    Array(Span, Box<(WrittenType, FlatID)>)
+    Array(Span, Box<(WrittenType, FlatID, BracketSpan)>)
 }
 
 impl WrittenType {
@@ -16,7 +16,7 @@ impl WrittenType {
             WrittenType::Error(span) => {f(None, *span)}
             WrittenType::Named(span, id) => {f(Some(*id), *span)}
             WrittenType::Array(_span, arr_box) => {
-                let (arr, _idx) = arr_box.deref();
+                let (arr, _idx, _br_span) = arr_box.deref();
                 arr.for_each_located_type(f);
             }
         }
@@ -34,7 +34,7 @@ impl WrittenType {
             match self {
                 WrittenType::Error(_span) | WrittenType::Named(_span, _) => {}
                 WrittenType::Array(_span, arr_box) => {
-                    let (arr_typ, _idx) = arr_box.deref();
+                    let (arr_typ, _idx, _br_span) = arr_box.deref();
                     let sub = arr_typ.get_deepest_selected(position);
                     if sub.is_some() {
                         return sub;
@@ -52,7 +52,7 @@ impl WrittenType {
             WrittenType::Error(_) => Type::Error,
             WrittenType::Named(_, id) => Type::Named(*id),
             WrittenType::Array(_, arr_box) => {
-                let (elem_typ, arr_idx) = arr_box.deref();
+                let (elem_typ, arr_idx, _br_span) = arr_box.deref();
                 Type::Array(Box::new((elem_typ.to_type(), *arr_idx)))
             }
         }

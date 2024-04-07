@@ -15,7 +15,6 @@ impl From<Range<usize>> for Span {
 impl Span {
     /// Only really used for having a span with the maximum size. 
     pub const MAX_POSSIBLE_SPAN : Span = Span(0, usize::MAX);
-    pub const INVALID_SPAN : Span = Span(usize::MAX, usize::MAX);
 
     pub fn into_range(&self) -> Range<usize> {
         self.0..self.1
@@ -33,33 +32,6 @@ impl Span {
     pub fn size(&self) -> usize {
         self.1 - self.0
     }
-    #[track_caller]
-    pub fn difference_left(outer : Span, inner : Span) -> Span {
-        assert!(outer.0 <= inner.0);
-        assert!(outer.1 >= inner.1);
-
-        Span(outer.0, inner.0)
-    }
-    #[track_caller]
-    pub fn shrunk_front(outer : Span, inner : Span) -> Span {
-        assert!(outer.0 <= inner.0);
-        assert!(outer.1 >= inner.1);
-
-        Span(inner.0, outer.1)
-    }
-    #[track_caller]
-    pub fn difference_right(outer : Span, inner : Span) -> Span {
-        assert!(outer.0 <= inner.0);
-        assert!(outer.1 >= inner.1);
-
-        Span(inner.1, outer.1)
-    }
-    #[track_caller]
-    pub fn into_single_char_span(self) -> SingleCharSpan {
-        assert!(self.1 == self.0+1);
-        SingleCharSpan{char_idx: self.0}
-    }
-
     pub fn empty_span_at_front(self) -> Span {
         Span(self.0, self.0)
     }
@@ -93,28 +65,11 @@ impl BracketSpan {
     pub fn outer_span(&self) -> Span {
         self.0
     }
-    pub fn open_bracket(&self) -> SingleCharSpan {
-        SingleCharSpan{char_idx : self.0.0}
+    pub fn open_bracket(&self) -> Span {
+        Span(self.0.0, self.0.0+1)
     }
-    pub fn close_bracket(&self) -> SingleCharSpan {
-        SingleCharSpan{char_idx : self.0.1 - 1}
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SingleCharSpan {
-    pub char_idx : usize
-}
-
-impl Into<Span> for SingleCharSpan {
-    fn into(self) -> Span {
-        Span(self.char_idx, self.char_idx+1)
-    }
-}
-
-impl Into<Span> for &SingleCharSpan {
-    fn into(self) -> Span {
-        Span(self.char_idx, self.char_idx+1)
+    pub fn close_bracket(&self) -> Span {
+        Span(self.0.1 - 1, self.0.1)
     }
 }
 
