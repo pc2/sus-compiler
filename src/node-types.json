@@ -334,10 +334,6 @@
         "required": false,
         "types": [
           {
-            "type": ";",
-            "named": false
-          },
-          {
             "type": "assign_left_side",
             "named": true
           },
@@ -1059,10 +1055,6 @@
   },
   {
     "type": "::",
-    "named": false
-  },
-  {
-    "type": ";",
     "named": false
   },
   {

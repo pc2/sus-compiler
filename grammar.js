@@ -7,6 +7,20 @@ function sepSeq(rule, sepChar) {
   return optional(sepSeq1(rule, sepChar))
 }
 
+function newlineSepSeq($, rule) {
+    return seq(
+        optional($._at_least_one_newline),
+        optional(seq(
+            field('item', rule),
+            repeat(seq(
+                $._at_least_one_newline,
+                field('item', rule)
+            )),
+            optional($._at_least_one_newline)
+        ))
+    )
+}
+
 const PREC = {
     compare : 2,
     and: 3,
@@ -23,7 +37,7 @@ module.exports = grammar({
     name: 'sus',
 
     rules: {
-        source_file: $ => repeat(field('item', $.module)),
+        source_file: $ => newlineSepSeq($, $.module),
 
         interface_ports : $ => seq(
             ':',
@@ -133,9 +147,20 @@ module.exports = grammar({
             $.func_call
         ),
 
+        _at_least_one_newline: $ => repeat1(/\n/), // For things that must be separated by at least one newline (whitespace after is to optimize gobbling up any extra newlines)
+        
         block: $ => seq(
             '{',
-            repeat(field('item', $._statement)),
+            newlineSepSeq($, choice(
+                $.block,
+                $.decl_assign_statement,
+    
+                // Decls only should only allow a single declaration, and cannot contain expressions, 
+                // but we allow some tolerance in the grammar here, so we can generate better errors after. 
+                $.assign_left_side,
+                $.if_statement,
+                $.for_statement
+            )),
             '}'
         ),
         
@@ -183,16 +208,6 @@ module.exports = grammar({
             field('to', $._expression),
             field('block', $.block)
         ),
-        _statement: $ => choice(
-            $.block,
-            seq($.decl_assign_statement, ';'),
-
-            // Decls only should only allow a single declaration, and cannot contain expressions, 
-            // but we allow some tolerance in the grammar here, so we can generate better errors after. 
-            seq($.assign_left_side, ';'),
-            $.if_statement,
-            $.for_statement
-        ),
 
         single_line_comment : $ => /\/\/[^\n]*/,
         multi_line_comment : $ => /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\//,
@@ -205,7 +220,7 @@ module.exports = grammar({
     word: $=> $.identifier,
 
     extras: $ => [
-        /\s+/,
+        /[ \t\r]+/, // Non newline whitespace
         $.single_line_comment,
         $.multi_line_comment
     ]
