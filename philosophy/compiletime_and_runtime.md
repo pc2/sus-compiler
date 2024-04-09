@@ -24,7 +24,7 @@ An initial thought to distinguish the two was to just check for constant-ness of
 Proposal: Require `mux` keyword for any runtime array index which should infer to a multiplexer. 
 
 Examples: 
-- `a[5] = 1;` constant index write
-- `a[mux b] = 1;` multiplexed write
-- `x = a[5];` constant index read
-- `x = a[mux b];` multiplexed index write
+- `a[5] = 1` constant index write
+- `a[mux b] = 1` multiplexed write
+- `x = a[5]` constant index read
+- `x = a[mux b]` multiplexed index write

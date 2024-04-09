@@ -63,7 +63,7 @@ pub const fn get_builtin_constant(name : &'static str) -> ConstantUUID {
 #[derive(Debug)]
 pub struct LinkInfo {
     pub file : FileUUID,
-    pub name : Box<str>,
+    pub name : String,
     pub name_span : Span,
     pub span : Span,
     pub documentation : Documentation
@@ -167,7 +167,7 @@ pub struct Linker {
     pub types : ArenaAllocator<NamedType, TypeUUIDMarker>,
     pub modules : ArenaAllocator<Module, ModuleUUIDMarker>,
     pub constants : ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
-    global_namespace : HashMap<Box<str>, NamespaceElement>,
+    global_namespace : HashMap<String, NamespaceElement>,
     pub files : ArenaAllocator<FileData, FileUUIDMarker>
 }
 
@@ -209,7 +209,7 @@ impl Linker {
         Some(*id)
     }
 
-    fn add_name(&mut self, name: Box<str>, new_obj_id: NameElem) {
+    fn add_name(&mut self, name: String, new_obj_id: NameElem) {
         match self.global_namespace.entry(name) {
             std::collections::hash_map::Entry::Occupied(mut occ) => {
                 let new_val = match occ.get_mut() {
@@ -369,7 +369,7 @@ impl Linker {
                     link_info: LinkInfo {
                         documentation: cursor.extract_gathered_comments(),
                         file,
-                        name: parse_result.file_text[name_span].to_owned().into_boxed_str(),
+                        name: parse_result.file_text[name_span].to_owned(),
                         name_span,
                         span
                     },

@@ -29,6 +29,7 @@ The main goals of the language are roughly listed below:
 
 ## Tasks
 ### Major Milestones
+- [x] Tree Sitter as parsing frontend
 - [x] Arbitrary pipelined full flow
 - [ ] Arbitrary single-clock full flow
 - [ ] Arbitrary FPGA hardware full flow
@@ -36,7 +37,7 @@ The main goals of the language are roughly listed below:
 - [ ] Templates
 - [ ] Type Templates
 
-### Parsing
+### Language Features
 - [x] Basic Tokenizer
 - [x] Basic Syntax Error Reporting
 - [x] Syntax error reporting with infos
@@ -49,6 +50,7 @@ The main goals of the language are roughly listed below:
 - [x] Can Parse Blur2 filter
 - [x] If Statements
 - [x] Latency Specifiers
+- [x] Get rid of semicolons
 - [ ] Access module inputs / outputs through field names
 - [ ] Array Slices
 - [ ] Bound Specifiers
@@ -64,7 +66,9 @@ The main goals of the language are roughly listed below:
 ### Linking and Name Resolution
 - [x] Single File Name Resolution
 - [x] Multi File Name Resolution
+- [ ] Incremental Parsing
 - [ ] Incremental Compilation
+- [ ] Multi-Threaded Parsing
 - [ ] Multi-Threaded Compilation
 
 ### Safety
@@ -90,6 +94,7 @@ The main goals of the language are roughly listed below:
 - [x] Syntax Highlighting
 - [x] Error and Warning Reporting
 - [x] Hover type information
+- [x] Hover documentation
 - [x] Go to definition
 - [x] File Creation/Deletion/Rename
 - [x] Show last generation value
@@ -133,9 +138,9 @@ I consider 'static pipelining' to be a solved problem. The one thing we can stil
 An example of such static pipeline can be shown as follows: 
 ```
 pipeline multiply_add : i32 a, i32 b, i32 c -> i32 result {
-  reg i32 tmp = a * b;
-  i32 tmp2 = tmp + c;
-  reg result = tmp2 + a;
+  reg i32 tmp = a * b
+  i32 tmp2 = tmp + c
+  reg result = tmp2 + a
 }
 ```
 Pipeline stages are denoted by adding the 'reg' keyword to statements. Either at the statement level, or to add registers within expressions. This example could[^1] compile to the following Verilog code:
@@ -178,14 +183,14 @@ Below is an example of a 2-wide blur filter. Its interface is described in the f
 ```
 timeline (a, true -> /) | (a, false -> /) .. (a, false -> r)* .. (a, true -> r)
 module blur : int a, bool done -> int result {
-	state bool working = false; // Initial value, not a real assignment
-	state int prev;
+	state bool working = false // Initial value, not a real assignment
+	state int prev
 
 	if working {
-		reg result = prev + a; // Add a pipeline stage for shits and giggles
+		reg result = prev + a // Add a pipeline stage for shits and giggles
 	}
-	prev = a;
-	working = !done;
+	prev = a
+	working = !done
 }
 ```
 

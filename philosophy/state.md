@@ -17,15 +17,15 @@ Generating the whole state machine is a combinatorial endeavour however, and a t
 ```Verilog
 timeline (X, false -> /)* .. (X, true -> T)
 module Accumulator : int term, bool done -> int total {
-    state int tot := 0; // Initial value, not a real assignment
+    state int tot := 0 // Initial value, not a real assignment
 
-    int new_tot = tot + term;
+    int new_tot = tot + term
     if done {
-        total = new_tot;
-        tot = 0;
-        finish; // packet is hereby finished. 
+        total = new_tot
+        tot = 0
+        finish // packet is hereby finished. 
     } else {
-        tot = new_tot;
+        tot = new_tot
     }
 }
 ```
@@ -70,25 +70,25 @@ The previous example was quite simple though, with the code's active state machi
 ```Verilog
 timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
 module Unpack4<T> : T[4] packed -> T out_stream {
-    state int st := 0; // Initial value, not a real assignment
-    state T[3] stored_packed;
+    state int st := 0 // Initial value, not a real assignment
+    state T[3] stored_packed
 
     if st == 0 {
-        out_stream = packed[0];
-        stored_packed[0] = packed[1]; // Shorthand notation is possible here "stored_packed[0:2] = packed[1:3];"
-        stored_packed[1] = packed[2];
-        stored_packed[2] = packed[3];
-        st = 1;
+        out_stream = packed[0]
+        stored_packed[0] = packed[1] // Shorthand notation is possible here "stored_packed[0:2] = packed[1:3]"
+        stored_packed[1] = packed[2]
+        stored_packed[2] = packed[3]
+        st = 1
     } else if st == 1 {
-        out_stream = stored_packed[0];
-        st = 2;
+        out_stream = stored_packed[0]
+        st = 2
     } else if st == 2 {
-        out_stream = stored_packed[1];
-        st = 3;
+        out_stream = stored_packed[1]
+        st = 3
     } else if st == 3 {
-        out_stream = stored_packed[2];
-        st = 0;
-        finish; // packet is hereby finished. 
+        out_stream = stored_packed[2]
+        st = 0
+        finish // packet is hereby finished. 
     }
 }
 ```

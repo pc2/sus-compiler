@@ -293,7 +293,7 @@ pub struct Declaration {
     pub typ : Type,
     pub is_declared_in_this_module : bool,
     pub name_span : Span,
-    pub name : Box<str>,
+    pub name : String,
     pub read_only : bool,
     // If the program text already covers the write, then lsp stuff on this declaration shouldn't use it. 
     pub declaration_itself_is_not_written_to : bool,
@@ -311,7 +311,7 @@ impl Declaration {
 #[derive(Debug)]
 pub struct SubModuleInstance {
     pub module_uuid : ModuleUUID,
-    pub name : Box<str>,
+    pub name : String,
     pub module_name_span : Span,
     pub is_declared_in_this_module : bool,
     pub interface_ports : InterfacePorts<FlatID>
@@ -516,7 +516,7 @@ impl<'l> FlatteningContext<'l> {
                         self.errors.error_basic(span, "Cannot add latency specifier to module instances");
                     }
                     let md = self.linker.get_module(md_id);
-                    return self.alloc_module_interface_tree(self.linker.file.file_text[name_span].to_owned().into_boxed_str(), md, md_id, span)
+                    return self.alloc_module_interface_tree(self.linker.file.file_text[name_span].to_owned(), md, md_id, span)
                 }
             };
 
@@ -531,7 +531,7 @@ impl<'l> FlatteningContext<'l> {
                 read_only : fallback_identifier_type == IdentifierType::Input,
                 declaration_itself_is_not_written_to,
                 identifier_type,
-                name : name.to_owned().into_boxed_str(),
+                name : name.to_owned(),
                 name_span,
                 latency_specifier : span_latency_specifier.map(|(ls, _)| ls),
                 documentation
@@ -973,7 +973,7 @@ impl<'l> FlatteningContext<'l> {
         }).unwrap_or(InterfacePorts::empty())
     }
 
-    fn alloc_module_interface_tree(&mut self, name : Box<str>, module : &Module, module_uuid : ModuleUUID, typ_span : Span) -> FlatID {
+    fn alloc_module_interface_tree(&mut self, name : String, module : &Module, module_uuid : ModuleUUID, typ_span : Span) -> FlatID {
         let local_linker = self.linker.new_sublinker(module.link_info.file);
 
         let mut nested_context = FlatteningContext {
@@ -1306,7 +1306,7 @@ impl<'l> FlatteningContext<'l> {
 #[derive(Debug)]
 pub struct FlattenedInterfacePort {
     pub wire_id : FlatID,
-    pub port_name : Box<str>,
+    pub port_name : String,
     pub span : Span
 }
 

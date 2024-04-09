@@ -13,11 +13,11 @@ module example_md :
 	int product, 
 	int total {
 
-	reg int mul0 = factors[0] * factors[1];
-	reg int mul1 = factors[2] * factors[3];
+	reg int mul0 = factors[0] * factors[1]
+	reg int mul1 = factors[2] * factors[3]
 
-	reg product = mul0 * mul1;
-	reg total = product + add_to;
+	reg product = mul0 * mul1
+	reg total = product + add_to
 }
 ```
 ![Latency Counting Example](images/latencyCountingExample.png)
@@ -25,11 +25,11 @@ module example_md :
 #### Automatic insertion of registers
 ```Verilog
 module pow17 : int i -> int o {
-	    int i2  = i * i;
-	reg int i4  = i2 * i2;
-	    int i8  = i4 * i4;
-	reg int i16 = i8 * i8;
-	        o   = i16 * i;
+	    int i2  = i * i
+	reg int i4  = i2 * i2
+	    int i8  = i4 * i4
+	reg int i16 = i8 * i8
+	        o   = i16 * i
 }
 ```
 ![Registers can be inserted](images/insertRegisters.png)
@@ -38,7 +38,7 @@ module pow17 : int i -> int o {
 ```Verilog
 module module_taking_time : 
 	int i'0 -> int o'5 {
-	o = i;
+	o = i
 }
 ```
 ![Latency Specifiers](images/latencySpecifiers.png)
@@ -101,15 +101,15 @@ Example:
 ```Verilog
 // timeline is omitted here, not important
 module Accumulator : int term, bool done -> int total_out {
-    state int total;
+    state int total
 
-    int new_total = total + term;
+    int new_total = total + term
 
     if done {
-        reg total_out = new_total;
-        total = 0;
+        reg total_out = new_total
+        total = 0
     } else {
-        total = new_total;
+        total = new_total
     }
 }
 ```
@@ -126,12 +126,12 @@ Sadly, while it appears reasonable to think it's possible to assign a determinab
 
 ```Verilog
 module NonDeterminableLatency : int a, int b -> int x, int y {
-    reg int a_d = a;
-    int t = a_d + b;
-    reg reg reg int a_dd = a;
-    reg int t_d = t;
-    x = t_d + a_dd;
-    y = t;
+    reg int a_d = a
+    int t = a_d + b
+    reg reg reg int a_dd = a
+    reg int t_d = t
+    x = t_d + a_dd
+    y = t
 }
 ```
 
@@ -150,12 +150,12 @@ To this problem I only really see three options:
 Simply solve the above module by explicitly specifying latencies to the two inputs:
 ```Verilog
 module LatencySpecified : int a'0, int b'1 -> int x, int y {
-    reg int a_d = a;
-    int t = a_d + b;
-    reg reg reg int a_dd = a;
-    reg int t_d = t;
-    x = t_d + a_dd;
-    y = t;
+    reg int a_d = a
+    int t = a_d + b
+    reg reg reg int a_dd = a
+    reg int t_d = t
+    x = t_d + a_dd
+    y = t
 }
 ```
 

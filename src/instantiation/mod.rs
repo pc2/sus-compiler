@@ -100,7 +100,7 @@ pub struct RealWire {
     pub source : RealWireDataSource,
     pub original_wire : FlatID,
     pub typ : ConcreteType,
-    pub name : Box<str>,
+    pub name : String,
     // Before latency counting, non i64::MIN values specify specified latency
     pub absolute_latency : i64,
     pub needed_until : i64 // If needed only the same cycle it is generated, then this is absolue_latency.
@@ -111,12 +111,12 @@ pub struct SubModule {
     pub original_flat : FlatID,
     pub instance : Rc<InstantiatedModule>,
     pub wires : InterfacePorts<WireID>,
-    pub name : Box<str>
+    pub name : String
 }
 
 #[derive(Debug)]
 pub struct InstantiatedModule {
-    pub name : Box<str>, // Unique name involving all template arguments
+    pub name : String, // Unique name involving all template arguments
     pub interface : InterfacePorts<WireID>, // Interface is only valid if all wires of the interface were valid
     pub wires : FlatAlloc<RealWire, WireIDMarker>,
     pub submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
@@ -340,8 +340,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
         })
     }
-    fn get_unique_name(&self) -> Box<str> {
-        format!("_{}", self.wires.get_next_alloc_id().get_hidden_value()).into_boxed_str()
+    fn get_unique_name(&self) -> String {
+        format!("_{}", self.wires.get_next_alloc_id().get_hidden_value())
     }
     fn get_wire_or_constant_as_wire(&mut self, flat_id : FlatID) -> Option<WireID> {
         match &self.generation_state[flat_id] {
@@ -818,7 +818,7 @@ impl InstantiationList {
 
             let interface = context.instantiate_full();
             let result = Rc::new(InstantiatedModule{
-                name : name.to_owned().into_boxed_str(),
+                name : name.to_owned(),
                 wires : context.wires,
                 submodules : context.submodules,
                 interface : interface.unwrap_or(InterfacePorts::empty()), // Empty value. Invalid interface can't get accessed from result of this method, as that should have produced an error

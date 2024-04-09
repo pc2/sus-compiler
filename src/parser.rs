@@ -265,10 +265,20 @@ impl<'t> Cursor<'t> {
 
     pub fn new_for_node(tree : &'t Tree, file_text : &'t FileText, span : Span, kind : u16) -> Self {
         let mut cursor = tree.walk();
-        let _ = cursor.goto_first_child_for_byte(span.into_range().start).unwrap();
+        assert!(cursor.goto_first_child());
+
+        let span_range = span.into_range();
+        loop {
+            let node = cursor.node();
+            if node.byte_range() == span_range {break}
+            assert!(cursor.goto_next_sibling());
+        }
+        //cursor.goto_parent();
+        // https://github.com/tree-sitter/tree-sitter/issues/3270
+        //let _ = cursor.goto_first_child_for_byte(span_range.start).unwrap();
         let start_node = cursor.node();
         assert_eq!(start_node.kind_id(), kind);
-        assert_eq!(start_node.byte_range(), span.into_range());
+        assert_eq!(start_node.byte_range(), span_range);
 
         Self{cursor, file_text, gathered_comments : Vec::new()}
     }
