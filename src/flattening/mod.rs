@@ -6,7 +6,14 @@ use std::{iter::zip, str::FromStr};
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 use crate::{
-    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::{error_info, ErrorCollector, ErrorInfo}, file_position::{BracketSpan, Span}, instantiation::InstantiationList, linker::{ConstantUUID, FileUUID, GlobalResolver, LinkInfo, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker}, parser::{Cursor, Documentation}, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE}, value::Value
+    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID},
+    errors::{error_info, ErrorCollector, ErrorInfo},
+    file_position::{BracketSpan, Span},
+    instantiation::InstantiationList,
+    linker::{ConstantUUID, FileUUID, GlobalResolver, LinkInfo, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker},
+    parser::{Cursor, Documentation},
+    typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE},
+    value::Value
 };
 
 use self::name_context::LocalVariableContext;
@@ -156,15 +163,15 @@ pub enum UnaryOperator {
     Negate,
 }
 impl UnaryOperator {
-    pub fn from_text(op_text : &str) -> Self {
-        match op_text {
-            "+" => UnaryOperator::Sum,
-            "*" => UnaryOperator::Product,
-            "-" => UnaryOperator::Negate,
-            "&" => UnaryOperator::And,
-            "|" => UnaryOperator::Or,
-            "^" => UnaryOperator::Xor,
-            "!" => UnaryOperator::Not,
+    pub fn from_kind_id(kind_id : u16) -> Self {
+        match kind_id {
+            kw!("+") => UnaryOperator::Sum,
+            kw!("*") => UnaryOperator::Product,
+            kw!("-") => UnaryOperator::Negate,
+            kw!("&") => UnaryOperator::And,
+            kw!("|") => UnaryOperator::Or,
+            kw!("^") => UnaryOperator::Xor,
+            kw!("!") => UnaryOperator::Not,
             _ => unreachable!()
         }
     }
@@ -192,8 +199,8 @@ pub enum BinaryOperator {
     Or,
     Xor,
     Add,
-    ShiftLeft,
-    ShiftRight,
+    //ShiftLeft,
+    //ShiftRight,
     Subtract,
     Multiply,
     Divide,
@@ -206,24 +213,24 @@ pub enum BinaryOperator {
     LesserEq
 }
 impl BinaryOperator {
-    pub fn from_text(op_text : &str) -> Self {
-        match op_text {
-            "&" => BinaryOperator::And,
-            "|" => BinaryOperator::Or,
-            "^" => BinaryOperator::Xor,
-            "<<" => BinaryOperator::ShiftLeft,
-            ">>" => BinaryOperator::ShiftRight,
-            "+" => BinaryOperator::Add,
-            "-" => BinaryOperator::Subtract,
-            "*" => BinaryOperator::Multiply,
-            "/" => BinaryOperator::Divide,
-            "%" => BinaryOperator::Modulo,
-            "==" => BinaryOperator::Equals,
-            "!=" => BinaryOperator::NotEquals,
-            ">" => BinaryOperator::Greater,
-            ">=" => BinaryOperator::GreaterEq,
-            "<" => BinaryOperator::Lesser,
-            "<=" => BinaryOperator::LesserEq,
+    pub fn from_kind_id(kind_id : u16) -> Self {
+        match kind_id {
+            kw!("&") => BinaryOperator::And,
+            kw!("|") => BinaryOperator::Or,
+            kw!("^") => BinaryOperator::Xor,
+            //kw!("<<") => BinaryOperator::ShiftLeft,
+            //kw!(">>") => BinaryOperator::ShiftRight,
+            kw!("+") => BinaryOperator::Add,
+            kw!("-") => BinaryOperator::Subtract,
+            kw!("*") => BinaryOperator::Multiply,
+            kw!("/") => BinaryOperator::Divide,
+            kw!("%") => BinaryOperator::Modulo,
+            kw!("==") => BinaryOperator::Equals,
+            kw!("!=") => BinaryOperator::NotEquals,
+            kw!(">") => BinaryOperator::Greater,
+            kw!(">=") => BinaryOperator::GreaterEq,
+            kw!("<") => BinaryOperator::Lesser,
+            kw!("<=") => BinaryOperator::LesserEq,
             _ => unreachable!()
         }
     }
@@ -232,8 +239,8 @@ impl BinaryOperator {
             BinaryOperator::And => "&",
             BinaryOperator::Or => "|",
             BinaryOperator::Xor => "^",
-            BinaryOperator::ShiftLeft => "<<",
-            BinaryOperator::ShiftRight => ">>",
+            //BinaryOperator::ShiftLeft => "<<",
+            //BinaryOperator::ShiftRight => ">>",
             BinaryOperator::Add => "+",
             BinaryOperator::Subtract => "-",
             BinaryOperator::Multiply => "*",
@@ -659,8 +666,7 @@ impl<'l> FlatteningContext<'l> {
         } else if kind == kind!("unary_op") {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("operator"));
-                let op_text = &self.linker.file.file_text[cursor.span()];
-                let op = UnaryOperator::from_text(op_text);
+                let op = UnaryOperator::from_kind_id(cursor.kind());
                 
                 cursor.field(field!("right"));
                 let right = self.flatten_expr_tree(cursor);
@@ -673,8 +679,7 @@ impl<'l> FlatteningContext<'l> {
                 let left = self.flatten_expr_tree(cursor);
 
                 cursor.field(field!("operator"));
-                let op_text = &self.linker.file.file_text[cursor.span()];
-                let op = BinaryOperator::from_text(op_text);
+                let op = BinaryOperator::from_kind_id(cursor.kind());
 
                 cursor.field(field!("right"));
                 let right = self.flatten_expr_tree(cursor);

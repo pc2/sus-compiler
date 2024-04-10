@@ -7,6 +7,9 @@ repository = "https://github.com/pc2/sus-compiler"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+members = ["sus_proc_macro"]
+
 [dependencies]
 # console = "0.15.7" # for terminal colors
 # chumsky = "0.9.2"

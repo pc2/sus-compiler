@@ -151,7 +151,6 @@ pub fn get_binary_operator_types(op : BinaryOperator) -> ((Type, Type), Type) {
         BinaryOperator::Greater => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
         BinaryOperator::LesserEq => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
         BinaryOperator::Lesser => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
-        _ => unreachable!()
     }
 }
 

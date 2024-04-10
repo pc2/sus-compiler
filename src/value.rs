@@ -141,7 +141,7 @@ pub fn compute_binary_op(left : &Value, op : BinaryOperator, right : &Value) -> 
         BinaryOperator::And => Value::Bool(left.extract_bool() & right.extract_bool()),
         BinaryOperator::Or => Value::Bool(left.extract_bool() & right.extract_bool()),
         BinaryOperator::Xor => Value::Bool(left.extract_bool() & right.extract_bool()),
-        BinaryOperator::ShiftLeft => todo!(), // Still a bit iffy about shift operator inclusion
-        BinaryOperator::ShiftRight => todo!()
+        //BinaryOperator::ShiftLeft => todo!(), // Still a bit iffy about shift operator inclusion
+        //BinaryOperator::ShiftRight => todo!()
     }
 }
