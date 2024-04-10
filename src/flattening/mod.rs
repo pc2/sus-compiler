@@ -302,8 +302,11 @@ pub struct Declaration {
     pub is_declared_in_this_module : bool,
     pub name_span : Span,
     pub name : String,
+    /// Variables are read_only when they may not be controlled by the current block of code. 
+    /// This is for example, the inputs of the current module, or the outputs of nested modules. 
+    /// But could also be the iterator of a for loop. 
     pub read_only : bool,
-    // If the program text already covers the write, then lsp stuff on this declaration shouldn't use it. 
+    /// If the program text already covers the write, then lsp stuff on this declaration shouldn't use it. 
     pub declaration_itself_is_not_written_to : bool,
     pub identifier_type : IdentifierType,
     pub latency_specifier : Option<FlatID>,
@@ -442,19 +445,19 @@ impl<'l> FlatteningContext<'l> {
         LocalOrGlobal::Global(self.linker.resolve_global(identifier_span, &self.errors))
     }
 
-    fn flatten_array_type_tree(&mut self, span : Span, cursor : &mut Cursor<'l>) -> WrittenType {
+    fn flatten_array_type(&mut self, span : Span, cursor : &mut Cursor<'l>) -> WrittenType {
         cursor.go_down(kind!("array_type"), |cursor| {
             cursor.field(field!("arr"));
-            let array_element_type = self.flatten_type_tree(cursor);
+            let array_element_type = self.flatten_type(cursor);
 
             cursor.field(field!("arr_idx"));
-            let (array_size_wire_id, bracket_span) = self.flatten_array_bracket_tree(cursor);
+            let (array_size_wire_id, bracket_span) = self.flatten_array_bracket(cursor);
             
             WrittenType::Array(span, Box::new((array_element_type, array_size_wire_id, bracket_span)))
         })
     }
     
-    fn flatten_type_tree(&mut self, cursor : &mut Cursor<'l>) -> WrittenType {
+    fn flatten_type(&mut self, cursor : &mut Cursor<'l>) -> WrittenType {
         let (kind, span) = cursor.kind_span();
         if kind == kind!("global_identifier") {
             if let Some(typ_id) = &self.linker.resolve_global(span, &self.errors).expect_type() {
@@ -463,11 +466,11 @@ impl<'l> FlatteningContext<'l> {
                 WrittenType::Error(span)
             }
         } else if kind == kind!("array_type") {
-            self.flatten_array_type_tree(span, cursor)
+            self.flatten_array_type(span, cursor)
         } else {cursor.could_not_match()}
     }
 
-    fn flatten_module_or_type_tree<const ALLOW_MODULES : bool>(&mut self, cursor : &mut Cursor<'l>) -> ModuleOrWrittenType {
+    fn flatten_module_or_type<const ALLOW_MODULES : bool>(&mut self, cursor : &mut Cursor<'l>) -> ModuleOrWrittenType {
         let (kind, span) = cursor.kind_span();
         // Only difference is that 
         if kind == kind!("global_identifier") {
@@ -483,11 +486,11 @@ impl<'l> FlatteningContext<'l> {
                 None => ModuleOrWrittenType::WrittenType(WrittenType::Error(span)) // Non existent global already covered by Linker
             }
         } else if kind == kind!("array_type") {
-            ModuleOrWrittenType::WrittenType(self.flatten_array_type_tree(span, cursor))
+            ModuleOrWrittenType::WrittenType(self.flatten_array_type(span, cursor))
         } else {cursor.could_not_match()}
     }
 
-    fn flatten_declaration_tree<const ALLOW_MODULES : bool, const ALLOW_MODIFIERS : bool>(&mut self, fallback_identifier_type : IdentifierType, declaration_itself_is_not_written_to : bool, cursor : &mut Cursor<'l>) -> FlatID {
+    fn flatten_declaration<const ALLOW_MODULES : bool, const ALLOW_MODIFIERS : bool>(&mut self, fallback_identifier_type : IdentifierType, read_only : bool, declaration_itself_is_not_written_to : bool, cursor : &mut Cursor<'l>) -> FlatID {
         cursor.go_down(kind!("declaration"), |cursor| {
             let identifier_type = if cursor.optional_field(field!("declaration_modifiers")) {
                 let (modifier_kind, modifier_span) = cursor.kind_span();
@@ -507,13 +510,13 @@ impl<'l> FlatteningContext<'l> {
             } else {fallback_identifier_type};
             
             cursor.field(field!("type"));
-            let typ_or_module_expr = self.flatten_module_or_type_tree::<ALLOW_MODULES>(cursor);
+            let typ_or_module_expr = self.flatten_module_or_type::<ALLOW_MODULES>(cursor);
             
             let name_span = cursor.field_span(field!("name"), kind!("identifier"));
     
             let span_latency_specifier = if cursor.optional_field(field!("latency_specifier")) {
                 cursor.go_down_content(kind!("latency_specifier"), 
-                    |cursor| Some((self.flatten_expr_tree(cursor), cursor.span()))
+                    |cursor| Some((self.flatten_expr(cursor), cursor.span()))
             )} else {None};
             // Parsing components done
 
@@ -527,7 +530,7 @@ impl<'l> FlatteningContext<'l> {
                         self.errors.error_basic(span, "Cannot add latency specifier to module instances");
                     }
                     let md = self.linker.get_module(md_id);
-                    return self.alloc_module_interface_tree(self.linker.file.file_text[name_span].to_owned(), md, md_id, span)
+                    return self.alloc_module_interface(self.linker.file.file_text[name_span].to_owned(), md, md_id, span)
                 }
             };
 
@@ -539,7 +542,7 @@ impl<'l> FlatteningContext<'l> {
                 typ : typ_expr.to_type(),
                 typ_expr,
                 is_declared_in_this_module : self.is_declared_in_this_module,
-                read_only : fallback_identifier_type == IdentifierType::Input,
+                read_only,
                 declaration_itself_is_not_written_to,
                 identifier_type,
                 name : name.to_owned(),
@@ -556,22 +559,22 @@ impl<'l> FlatteningContext<'l> {
         })
     }
 
-    fn flatten_array_bracket_tree(&mut self, cursor : &mut Cursor<'l>) -> (FlatID, BracketSpan) {
+    fn flatten_array_bracket(&mut self, cursor : &mut Cursor<'l>) -> (FlatID, BracketSpan) {
         cursor.go_down_content(kind!("array_bracket_expression"), 
-            |cursor| (self.flatten_expr_tree(cursor), BracketSpan::from_outer(cursor.span()))
+            |cursor| (self.flatten_expr(cursor), BracketSpan::from_outer(cursor.span()))
         )
     }
 
-    fn desugar_func_call_tree(&mut self, cursor : &mut Cursor<'l>) -> Option<(&Module, InterfacePorts<FlatID>)> {
+    fn desugar_func_call(&mut self, cursor : &mut Cursor<'l>) -> Option<(&Module, InterfacePorts<FlatID>)> {
         let whole_function_span = cursor.span();
         cursor.go_down(kind!("func_call"), |cursor| {
             cursor.field(field!("name"));
-            let instantiation_flat_id = self.get_module_by_global_identifier_tree(cursor);
+            let instantiation_flat_id = self.get_module_by_global_identifier(cursor);
 
             cursor.field(field!("arguments"));
             let arguments_span = BracketSpan::from_outer(cursor.span());
             let arguments = cursor.collect_list(kind!("parenthesis_expression_list"), |cursor| {
-                self.flatten_expr_tree(cursor)
+                self.flatten_expr(cursor)
             });
 
             let func_instantiation = self.instructions[instantiation_flat_id?].extract_submodule();
@@ -613,7 +616,7 @@ impl<'l> FlatteningContext<'l> {
     }
 
     /// Produces a new [SubModuleInstance] if a global was passed, or a reference to the existing instance if it's referenced by name
-    fn get_module_by_global_identifier_tree(&mut self, cursor : &mut Cursor<'l>) -> Option<FlatID> {
+    fn get_module_by_global_identifier(&mut self, cursor : &mut Cursor<'l>) -> Option<FlatID> {
         let (kind, span) = cursor.kind_span();
         if kind == kind!("global_identifier") {
             cursor.go_down(kind!("global_identifier"), |_cursor| {
@@ -630,7 +633,7 @@ impl<'l> FlatteningContext<'l> {
                     LocalOrGlobal::Global(global) => {
                         if let Some(module_id) = global.expect_module() {
                             let md = &self.linker.get_module(module_id);
-                            Some(self.alloc_module_interface_tree(md.link_info.name.clone(), md, module_id, span))
+                            Some(self.alloc_module_interface(md.link_info.name.clone(), md, module_id, span))
                         } else {
                             None
                         }
@@ -643,7 +646,7 @@ impl<'l> FlatteningContext<'l> {
         }
     }
 
-    fn flatten_expr_tree(&mut self, cursor : &mut Cursor<'l>) -> FlatID {
+    fn flatten_expr(&mut self, cursor : &mut Cursor<'l>) -> FlatID {
         let (kind, expr_span) = cursor.kind_span();
         
         let source = if kind == kind!("global_identifier") {
@@ -669,35 +672,35 @@ impl<'l> FlatteningContext<'l> {
                 let op = UnaryOperator::from_kind_id(cursor.kind());
                 
                 cursor.field(field!("right"));
-                let right = self.flatten_expr_tree(cursor);
+                let right = self.flatten_expr(cursor);
 
                 WireSource::UnaryOp{op, right}
             })
         } else if kind == kind!("binary_op") {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("left"));
-                let left = self.flatten_expr_tree(cursor);
+                let left = self.flatten_expr(cursor);
 
                 cursor.field(field!("operator"));
                 let op = BinaryOperator::from_kind_id(cursor.kind());
 
                 cursor.field(field!("right"));
-                let right = self.flatten_expr_tree(cursor);
+                let right = self.flatten_expr(cursor);
 
                 WireSource::BinaryOp{op, left, right}
             })
         } else if kind == kind!("array_op") {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("arr"));
-                let arr = self.flatten_expr_tree(cursor);
+                let arr = self.flatten_expr(cursor);
                 
                 cursor.field(field!("arr_idx"));
-                let (arr_idx, bracket_span) = self.flatten_array_bracket_tree(cursor);
+                let (arr_idx, bracket_span) = self.flatten_array_bracket(cursor);
                 
                 WireSource::ArrayAccess{arr, arr_idx, bracket_span}
             })
         } else if kind == kind!("func_call") {
-            if let Some((md, interface_wires)) = self.desugar_func_call_tree(cursor) {
+            if let Some((md, interface_wires)) = self.desugar_func_call(cursor) {
                 let output_range = interface_wires.func_call_syntax_outputs();
 
                 if output_range.len() != 1 {
@@ -712,7 +715,7 @@ impl<'l> FlatteningContext<'l> {
             // Function desugaring or using threw an error
             WireSource::Constant(Value::Error)
         } else if kind == kind!("parenthesis_expression") {
-            return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| self.flatten_expr_tree(cursor));
+            return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| self.flatten_expr(cursor));
         } else {
             cursor.could_not_match()
         };
@@ -726,7 +729,7 @@ impl<'l> FlatteningContext<'l> {
         };
         self.instructions.alloc(Instruction::Wire(wire_instance))
     }
-    fn flatten_assignable_expr_tree(&mut self, write_modifiers : WriteModifiers, cursor : &mut Cursor<'l>) -> Option<ConnectionWrite> {
+    fn flatten_assignable_expr(&mut self, write_modifiers : WriteModifiers, cursor : &mut Cursor<'l>) -> Option<ConnectionWrite> {
         let (kind, span) = cursor.kind_span();
         if kind == kind!("global_identifier") {
             let root = self.resolve_identifier(span).expect_local("assignments")?;
@@ -735,10 +738,10 @@ impl<'l> FlatteningContext<'l> {
         } else if kind == kind!("array_op") {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("arr"));
-                let flattened_arr_expr_opt = self.flatten_assignable_expr_tree(write_modifiers, cursor);
+                let flattened_arr_expr_opt = self.flatten_assignable_expr(write_modifiers, cursor);
                 
                 cursor.field(field!("arr_idx"));
-                let (idx, bracket_span) = self.flatten_array_bracket_tree(cursor);
+                let (idx, bracket_span) = self.flatten_array_bracket(cursor);
                 
                 let mut flattened_arr_expr = flattened_arr_expr_opt?; // only unpack the subexpr after flattening the idx, so we catch all errors
                 
@@ -755,23 +758,23 @@ impl<'l> FlatteningContext<'l> {
         } else {cursor.could_not_match()}
     }
 
-    fn flatten_if_statement_tree(&mut self, cursor : &mut Cursor<'l>) {
+    fn flatten_if_statement(&mut self, cursor : &mut Cursor<'l>) {
         cursor.go_down(kind!("if_statement"), |cursor| {
             cursor.field(field!("condition"));
-            let condition = self.flatten_expr_tree(cursor);
+            let condition = self.flatten_expr(cursor);
             
             let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement{condition, then_start : UUID::PLACEHOLDER, then_end_else_start : UUID::PLACEHOLDER, else_end : UUID::PLACEHOLDER}));
             let then_start = self.instructions.get_next_alloc_id();
             
             cursor.field(field!("then_block"));
-            self.flatten_code_tree(cursor);
+            self.flatten_code(cursor);
 
             let then_end_else_start = self.instructions.get_next_alloc_id();
             if cursor.optional_field(field!("else_block")) {
                 if cursor.kind() == kind!("if_statement") {
-                    self.flatten_if_statement_tree(cursor); // Chained if statements
+                    self.flatten_if_statement(cursor); // Chained if statements
                 } else {
-                    self.flatten_code_tree(cursor)
+                    self.flatten_code(cursor)
                 }
             };
             let else_end = self.instructions.get_next_alloc_id();
@@ -785,7 +788,7 @@ impl<'l> FlatteningContext<'l> {
 
     fn flatten_assign_function_call(&mut self, to : Vec<Result<ConnectionWrite, Span>>, cursor : &mut Cursor<'l>) {
         let func_call_span = cursor.span();
-        let to_iter = if let Some((md, interface)) = self.desugar_func_call_tree(cursor) {
+        let to_iter = if let Some((md, interface)) = self.desugar_func_call(cursor) {
             let output_range = interface.func_call_syntax_outputs();
             let outputs = &interface.ports[output_range];
 
@@ -809,7 +812,7 @@ impl<'l> FlatteningContext<'l> {
             }
 
             let mut to_iter = to.into_iter();
-            for field in outputs {                        
+            for field in outputs {
                 let module_port_wire_decl = self.instructions[*field].extract_wire_declaration();
                 let module_port_proxy = self.instructions.alloc(Instruction::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : func_call_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::WireRead(*field)}));
                 
@@ -829,23 +832,23 @@ impl<'l> FlatteningContext<'l> {
         }
     }
 
-    fn flatten_code_tree(&mut self, cursor : &mut Cursor<'l>) {
+    fn flatten_code(&mut self, cursor : &mut Cursor<'l>) {
         let old_frame = self.local_variable_context.new_frame();
         
-        self.flatten_code_keep_context_tree(cursor);
+        self.flatten_code_keep_context(cursor);
 
         self.local_variable_context.pop_frame(old_frame);
     }
-    fn flatten_code_keep_context_tree(&mut self, cursor : &mut Cursor<'l>) {
+    fn flatten_code_keep_context(&mut self, cursor : &mut Cursor<'l>) {
         cursor.clear_gathered_comments(); // Clear comments at the start of a block
         cursor.list(kind!("block"), |cursor| {
             let kind = cursor.kind();
             if kind == kind!("assign_left_side") {
-                self.flatten_standalone_decls_tree(cursor);
+                self.flatten_standalone_decls(cursor);
             } else if kind == kind!("decl_assign_statement") {
                 cursor.go_down_no_check(|cursor| {
                     cursor.field(field!("assign_left"));
-                    let to = self.flatten_assignment_left_side_tree(cursor);
+                    let to = self.flatten_assignment_left_side(cursor);
                     
                     cursor.field(field!("assign_value"));
 
@@ -854,7 +857,7 @@ impl<'l> FlatteningContext<'l> {
                     if node_kind == kind!("func_call") {
                         self.flatten_assign_function_call(to, cursor);
                     } else {
-                        let read_side = self.flatten_expr_tree(cursor);
+                        let read_side = self.flatten_expr(cursor);
                         
                         if to.len() != 1 {
                             self.errors.error_basic(span, format!("Non-function assignments must output exactly 1 output instead of {}", to.len()));
@@ -865,26 +868,26 @@ impl<'l> FlatteningContext<'l> {
                     }
                 });
             } else if kind == kind!("block") {
-                self.flatten_code_tree(cursor);
+                self.flatten_code(cursor);
             } else if kind == kind!("if_statement") {
-                self.flatten_if_statement_tree(cursor);
+                self.flatten_if_statement(cursor);
             } else if kind == kind!("for_statement") {
                 cursor.go_down_no_check(|cursor| {
                     cursor.field(field!("for_decl"));
-                    let loop_var_decl = self.flatten_declaration_tree::<false, false>(IdentifierType::Generative, true, cursor);
+                    let loop_var_decl = self.flatten_declaration::<false, false>(IdentifierType::Generative, true, true, cursor);
 
                     cursor.field(field!("from"));
-                    let start = self.flatten_expr_tree(cursor);
+                    let start = self.flatten_expr(cursor);
 
                     cursor.field(field!("to"));
-                    let end = self.flatten_expr_tree(cursor);
+                    let end = self.flatten_expr(cursor);
                     
                     let for_id = self.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER)}));
 
                     let code_start = self.instructions.get_next_alloc_id();
 
                     cursor.field(field!("block"));
-                    self.flatten_code_tree(cursor);
+                    self.flatten_code(cursor);
                     
                     let code_end = self.instructions.get_next_alloc_id();
 
@@ -897,7 +900,7 @@ impl<'l> FlatteningContext<'l> {
         });
     }
 
-    fn flatten_write_modifiers_tree(&self, cursor : &mut Cursor<'l>) -> WriteModifiers {
+    fn flatten_write_modifiers(&self, cursor : &mut Cursor<'l>) -> WriteModifiers {
         if cursor.optional_field(field!("write_modifiers")) {
             let modifiers_span = cursor.span();
             let mut initial_count = 0;
@@ -922,38 +925,38 @@ impl<'l> FlatteningContext<'l> {
         }
     }
 
-    /// See [Self::flatten_standalone_decls_tree][]
+    /// See [Self::flatten_standalone_decls][]
     /// Two cases:
     /// - Left side of assignment:
     ///     No modules, Yes write modifiers, Only assignable expressions
-    fn flatten_assignment_left_side_tree(&mut self, cursor : &mut Cursor<'l>) -> Vec<Result<ConnectionWrite, Span>> {
+    fn flatten_assignment_left_side(&mut self, cursor : &mut Cursor<'l>) -> Vec<Result<ConnectionWrite, Span>> {
         cursor.collect_list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
-                let write_modifiers = self.flatten_write_modifiers_tree(cursor);
+                let write_modifiers = self.flatten_write_modifiers(cursor);
                 
                 cursor.field(field!("expr_or_decl"));
                 let (kind, span) = cursor.kind_span();
 
                 if kind == kind!("declaration") {
-                    let root = self.flatten_declaration_tree::<false, true>(IdentifierType::Local, true, cursor);
+                    let root = self.flatten_declaration::<false, true>(IdentifierType::Local, false, true, cursor);
                     let flat_root_decl = self.instructions[root].extract_wire_declaration();
                     Ok(ConnectionWrite{root, root_span : flat_root_decl.name_span, path: Vec::new(), span, is_declared_in_this_module: true, write_modifiers})
                 } else { // It's _expression
-                    self.flatten_assignable_expr_tree(write_modifiers, cursor).ok_or(span)
+                    self.flatten_assignable_expr(write_modifiers, cursor).ok_or(span)
                 }
             })
         })
     }
 
-    /// See [Self::flatten_assignment_left_side_tree][]
+    /// See [Self::flatten_assignment_left_side][]
     /// - Standalone declarations:
     ///     Yes modules, No write modifiers, Yes expressions (-> single expressions)
-    fn flatten_standalone_decls_tree(&mut self, cursor : &mut Cursor<'l>) {
+    fn flatten_standalone_decls(&mut self, cursor : &mut Cursor<'l>) {
         let mut is_first_item = true;
         cursor.list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
                 if !is_first_item {
-                    self.errors.warn_basic(cursor.span(), "Standalone declarations and expressions should be on their own line. ");
+                    self.errors.warn_basic(cursor.span(), "Standalone declarations and expressions should be on their own line.");
                 }
                 is_first_item = false;
 
@@ -965,44 +968,46 @@ impl<'l> FlatteningContext<'l> {
                 let (kind, span) = cursor.kind_span();
 
                 if kind == kind!("declaration") {
-                    let _ = self.flatten_declaration_tree::<true, true>(IdentifierType::Local, true, cursor);
+                    let _ = self.flatten_declaration::<true, true>(IdentifierType::Local, false, true, cursor);
                 } else { // It's _expression
                     if kind == kind!("func_call") {
                         self.flatten_assign_function_call(Vec::new(), cursor);
                     } else {
                         self.errors.warn_basic(span, "The result of this operation is not used");
-                        let _ = self.flatten_expr_tree(cursor);
+                        let _ = self.flatten_expr(cursor);
                     }
                 }
             });
         })
     }
 
-    fn flatten_declaration_list_tree(&mut self, identifier_type : IdentifierType, ports : &mut Vec<FlatID>, cursor : &mut Cursor<'l>) {
+    fn flatten_declaration_list(&mut self, identifier_type : IdentifierType, read_only : bool, ports : &mut Vec<FlatID>, cursor : &mut Cursor<'l>) {
         cursor.list(kind!("declaration_list"), |cursor| {
-            ports.push(self.flatten_declaration_tree::<false, false>(identifier_type, true, cursor));
+            ports.push(self.flatten_declaration::<false, false>(identifier_type, read_only, true, cursor));
         });
     }
 
-    fn flatten_interface_ports_tree<const IS_SUBMODULE : bool>(&mut self, cursor : &mut Cursor<'l>) -> InterfacePorts<FlatID> {
+    fn flatten_interface_ports<const IS_SUBMODULE : bool>(&mut self, cursor : &mut Cursor<'l>) -> InterfacePorts<FlatID> {
         if cursor.optional_field(field!("interface_ports")) {
             cursor.go_down(kind!("interface_ports"), |cursor| {
                 let mut ports = Vec::new();
                 if cursor.optional_field(field!("inputs")) {
                     let identifier_type = if IS_SUBMODULE {IdentifierType::Local} else {IdentifierType::Input};
-                    self.flatten_declaration_list_tree(identifier_type, &mut ports, cursor)
+                    // Read only on inputs and outputs is obviously flipped for submodules, since we're looking at the other side of the in/outputs. 
+                    self.flatten_declaration_list(identifier_type, !IS_SUBMODULE, &mut ports, cursor)
                 }
                 let outputs_start = ports.len();
                 if cursor.optional_field(field!("outputs")) {
                     let identifier_type = if IS_SUBMODULE {IdentifierType::Local} else {IdentifierType::Output};
-                    self.flatten_declaration_list_tree(identifier_type, &mut ports, cursor)
+                    // Read only on inputs and outputs is obviously flipped for submodules, since we're looking at the other side of the in/outputs. 
+                    self.flatten_declaration_list(identifier_type, IS_SUBMODULE, &mut ports, cursor)
                 }
                 InterfacePorts{ outputs_start, ports: ports.into_boxed_slice() }
             })
         } else {InterfacePorts::empty()}
     }
 
-    fn alloc_module_interface_tree(&mut self, name : String, module : &Module, module_uuid : ModuleUUID, typ_span : Span) -> FlatID {
+    fn alloc_module_interface(&mut self, name : String, module : &Module, module_uuid : ModuleUUID, typ_span : Span) -> FlatID {
         let local_linker = self.linker.new_sublinker(module.link_info.file);
 
         let mut nested_context = FlatteningContext {
@@ -1018,7 +1023,7 @@ impl<'l> FlatteningContext<'l> {
 
         let interface_ports = nested_cursor.go_down(kind!("module"), |nested_cursor| {
             nested_cursor.field(field!("name")); // Get past name field
-            nested_context.flatten_interface_ports_tree::<true>(nested_cursor)
+            nested_context.flatten_interface_ports::<true>(nested_cursor)
         });
         
         self.linker.reabsorb_sublinker(nested_context.linker);
@@ -1033,15 +1038,15 @@ impl<'l> FlatteningContext<'l> {
         }))
     }
 
-    fn flatten_module_tree(&mut self, cursor : &mut Cursor<'l>) -> InterfacePorts<FlatID> {
+    fn flatten_module(&mut self, cursor : &mut Cursor<'l>) -> InterfacePorts<FlatID> {
         cursor.go_down(kind!("module"), |cursor| {
             let name_span = cursor.field_span(field!("name"), kind!("identifier"));
             let module_name = &self.linker.file.file_text[name_span];
             println!("TREE SITTER module! {module_name}");
             // Interface is allocated in self
-            let interface_found = self.flatten_interface_ports_tree::<false>(cursor);
+            let interface_found = self.flatten_interface_ports::<false>(cursor);
             cursor.field(field!("block"));
-            self.flatten_code_tree(cursor);
+            self.flatten_code(cursor);
             interface_found
         })
     }
@@ -1380,7 +1385,7 @@ impl FlattenedModule {
         };
 
         // Temporary, switch to iterating over nodes in file itself when needed. 
-        let interface_ports = context.flatten_module_tree(&mut cursor);
+        let interface_ports = context.flatten_module(&mut cursor);
 
         //let interface_ports = context.initialize_interface::<false>();
 

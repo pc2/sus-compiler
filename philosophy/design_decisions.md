@@ -10,6 +10,10 @@ always have proper names to point to.
 
 In other words: Why `int x = 5` instead of `let x : int = 5`?
 
+There's two reasons for this:
+- In hardware design, the types of wires should always be visible. Especially with SUS' "you-get-what-you-see" philosophy, the type of a variable tells you how many wires it is comprised of. This has real impacts on the considerations designers make when designing hardware. 
+- Hardware types tend to be simple, therefore small, and therefore it's not a huge cost to force the programmer to write them out, always. 
+
 ### Why bounded integers instead of bitvectors?
 
 ### Why use tree-sitter as the compiler frontend? 
