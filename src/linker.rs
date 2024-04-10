@@ -1,12 +1,14 @@
 use std::{collections::{HashMap, HashSet}, rc::Rc, cell::RefCell};
 
+use sus_proc_macro::{field, kind};
+
 use crate::{
     arena_alloc::{ArenaAllocator, UUIDMarker, UUID},
     errors::{error_info, ErrorCollector},
     file_position::{FileText, Span},
     flattening::{FlatID, FlattenedModule, Instruction, Module, WireInstance, WireSource},
     instantiation::{InstantiatedModule, InstantiationList},
-    parser::{Cursor, Documentation, FullParseResult, SUS},
+    parser::{Cursor, Documentation, FullParseResult},
     typing::{Type, WrittenType},
     util::{const_str_position, const_str_position_in_tuples},
     value::Value
@@ -361,10 +363,10 @@ impl Linker {
         
         {
             let mut walker = Cursor::new_at_root(&parse_result.tree, &parse_result.file_text);
-            walker.list(SUS.source_file_kind, |cursor| {
+            walker.list(kind!("source_file"), |cursor| {
                 let (kind, span) = cursor.kind_span();
-                assert!(kind == SUS.module_kind);
-                let name_span = cursor.go_down_no_check(|cursor| cursor.field_span(SUS.name_field, SUS.identifier_kind));
+                assert!(kind == kind!("module"));
+                let name_span = cursor.go_down_no_check(|cursor| cursor.field_span(field!("name"), kind!("identifier")));
                 let md = Module{
                     link_info: LinkInfo {
                         documentation: cursor.extract_gathered_comments(),

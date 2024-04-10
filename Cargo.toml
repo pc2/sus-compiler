@@ -13,10 +13,11 @@ repository = "https://github.com/pc2/sus-compiler"
 ariadne = {path = "ariadne"} # for nice errors
 num = "*"
 
+sus_proc_macro = {path = "sus_proc_macro"}
+
 # Tree sitter
 tree-sitter = "~0.22.2"
 tree-sitter-sus = {path = "tree-sitter-sus"}
-static_init = "1.0.3"
 
 # calyx-ir = {version = "0.6.1", optional = true}
 # calyx-opt = {version = "0.6.1", optional = true}
