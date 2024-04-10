@@ -255,12 +255,13 @@ impl Documentation {
 pub struct Cursor<'t> {
     cursor : TreeCursor<'t>,
     file_text : &'t FileText,
-    gathered_comments : Vec<Span>
+    gathered_comments : Vec<Span>,
+    current_field_was_already_consumed : bool,
 }
 
 impl<'t> Cursor<'t> {
     pub fn new_at_root(tree : &'t Tree, file_text : &'t FileText) -> Self {
-        Self{cursor : tree.walk(), file_text, gathered_comments : Vec::new()}
+        Self{cursor : tree.walk(), file_text, gathered_comments : Vec::new(), current_field_was_already_consumed : false}
     }
 
     pub fn new_for_node(tree : &'t Tree, file_text : &'t FileText, span : Span, kind : u16) -> Self {
@@ -274,13 +275,13 @@ impl<'t> Cursor<'t> {
             assert!(cursor.goto_next_sibling());
         }
         //cursor.goto_parent();
-        // https://github.com/tree-sitter/tree-sitter/issues/3270
+        // Broken due to https://github.com/tree-sitter/tree-sitter/issues/3270
         //let _ = cursor.goto_first_child_for_byte(span_range.start).unwrap();
         let start_node = cursor.node();
         assert_eq!(start_node.kind_id(), kind);
         assert_eq!(start_node.byte_range(), span_range);
 
-        Self{cursor, file_text, gathered_comments : Vec::new()}
+        Self{cursor, file_text, gathered_comments : Vec::new(), current_field_was_already_consumed : false}
     }
 
     pub fn kind_span(&self) -> (u16, Span) {
@@ -321,20 +322,29 @@ impl<'t> Cursor<'t> {
     /// If no more fields are available, the cursor lands at the end of the siblings, and None is returned
     /// 
     /// If the found field is incorrect, None is returned
-    pub fn optional_field<OT, F : FnOnce(&mut Self) -> OT>(&mut self, field_id : NonZeroU16, func : F) -> Option<OT> {
+    #[must_use]
+    pub fn optional_field(&mut self, field_id : NonZeroU16) -> bool {
+        // If a previous call to field already found this field, then we must immediately skip it. 
+        if self.current_field_was_already_consumed {
+            if !self.cursor.goto_next_sibling() {
+                self.current_field_was_already_consumed = false;
+                return false;
+            }
+        }
         loop {
             if let Some(found) = self.cursor.field_id() {
                 if found == field_id {
-                    let result = func(self);
-                    self.cursor.goto_next_sibling();
-                    return Some(result);
+                    self.current_field_was_already_consumed = true;
+                    return true;
                 } else {
-                    return None; // Field found, but it's not this one. Stop here, because we've passed the possibly optional field
+                    self.current_field_was_already_consumed = false;
+                    return false; // Field found, but it's not this one. Stop here, because we've passed the possibly optional field
                 }
             } else {
                 self.maybe_add_comment();
                 if !self.cursor.goto_next_sibling() {
-                    return None;
+                    self.current_field_was_already_consumed = false;
+                    return false;
                 }
             }
         }
@@ -344,74 +354,69 @@ impl<'t> Cursor<'t> {
     /// 
     /// Panics if the next field doesn't exist or is not the requested field
     #[track_caller]
-    pub fn field<OT, F : FnOnce(&mut Self) -> OT>(&mut self, field_id : NonZeroU16, func : F) -> OT {
-        loop {
-            if let Some(found) = self.cursor.field_id() {
-                if found == field_id {
-                    let result = func(self);
-                    self.cursor.goto_next_sibling();
-                    return result;
-                } else {
-                    self.print_stack();
-                    panic!("Did not find required field '{}', found field '{}' instead!", SUS.language.field_name_for_id(field_id.into()).unwrap(), SUS.language.field_name_for_id(found.into()).unwrap());
-                }
-            } else {
-                self.maybe_add_comment();
-                if !self.cursor.goto_next_sibling() {
-                    self.print_stack();
-                    panic!("Reached the end of child nodes without finding field '{}'", SUS.language.field_name_for_id(field_id.into()).unwrap())
-                }
-            }
+    pub fn field(&mut self, field_id : NonZeroU16) {
+        if !self.optional_field(field_id) {
+            self.print_stack();
+            panic!("Did not find required field '{}'", SUS.language.field_name_for_id(field_id.into()).unwrap());
         }
     }
 
+    #[track_caller]
+    fn get_span_check_kind(&mut self, expected_kind : u16) -> Span {
+        let node = self.cursor.node();
+        let kind = node.kind_id();
+        let span = node.byte_range().into();
+        if kind != expected_kind {
+            self.print_stack();
+            panic!("Expected {}, Was {} instead", SUS.language.node_kind_for_id(expected_kind).unwrap(), node.kind());
+        }
+        span
+    }
+
+    #[track_caller]
+    fn assert_is_kind(&mut self, expected_kind : u16) {
+        let node = self.cursor.node();
+        let kind = node.kind_id();
+        if kind != expected_kind {
+            self.print_stack();
+            panic!("Expected {}, Was {} instead", SUS.language.node_kind_for_id(expected_kind).unwrap(), node.kind());
+        }
+    }
+
+    #[track_caller]
     pub fn optional_field_span(&mut self, field_id : NonZeroU16, expected_kind : u16) -> Option<Span> {
-        self.optional_field(field_id, |cursor| {
-            let (kind, span) = cursor.kind_span();
-            if kind != expected_kind {
-                cursor.print_stack();
-                panic!("Expected {}, Was {} instead", SUS.language.node_kind_for_id(expected_kind).unwrap(), cursor.kind());
-            }
-            assert!(kind == expected_kind);
-            span
-        })
+        if self.optional_field(field_id) {
+            Some(self.get_span_check_kind(expected_kind))
+        } else {
+            None
+        }
     }
 
     #[track_caller]
     pub fn field_span(&mut self, field_id : NonZeroU16, expected_kind : u16) -> Span {
-        self.field(field_id, |cursor| {
-            let (kind, span) = cursor.kind_span();
-            if kind != expected_kind {
-                cursor.print_stack();
-                panic!("Expected {}, Was {} instead", SUS.language.node_kind_for_id(expected_kind).unwrap(), cursor.kind());
-            }
-            assert!(kind == expected_kind);
-            span
-        })
-    }
+        self.field(field_id);
 
-    #[track_caller]
-    pub fn field_span_no_check(&mut self, field_id : NonZeroU16) -> Span {
-        self.field(field_id, |cursor| cursor.span())
+        self.get_span_check_kind(expected_kind)
     }
 
     #[track_caller]
     pub fn go_down<OT, F : FnOnce(&mut Self) -> OT>(&mut self, kind : u16, func : F) -> OT {
-        let node = self.cursor.node();
-        if node.kind_id() != kind {
-            self.print_stack();
-            panic!("Expected {}, Was {} instead", SUS.language.node_kind_for_id(kind).unwrap(), node.kind());
-        }
+        self.assert_is_kind(kind);
 
         self.go_down_no_check(func)
     }
 
     pub fn go_down_no_check<OT, F : FnOnce(&mut Self) -> OT>(&mut self, func : F) -> OT {
-        let r = self.cursor.goto_first_child();
-        assert!(r);
+        if !self.cursor.goto_first_child() {
+            self.print_stack();
+            panic!("Could not go down this node!");
+        }
+        self.current_field_was_already_consumed = false;
         let result = func(self);
         let r = self.cursor.goto_parent();
         assert!(r);
+
+        self.current_field_was_already_consumed = true;
 
         result
     }
@@ -459,7 +464,8 @@ impl<'t> Cursor<'t> {
     #[track_caller]
     pub fn go_down_content<OT, F : FnOnce(&mut Self) -> OT>(&mut self, parent_kind : u16, func : F) -> OT {
         self.go_down(parent_kind, |self2| {
-            self2.field(SUS.content_field, |self3| func(self3))
+            self2.field(SUS.content_field);
+            func(self2)
         })
     }
 

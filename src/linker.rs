@@ -364,7 +364,7 @@ impl Linker {
             walker.list(SUS.source_file_kind, |cursor| {
                 let (kind, span) = cursor.kind_span();
                 assert!(kind == SUS.module_kind);
-                let name_span = cursor.go_down_no_check(|cursor| {cursor.field_span(SUS.name_field, SUS.identifier_kind)});
+                let name_span = cursor.go_down_no_check(|cursor| cursor.field_span(SUS.name_field, SUS.identifier_kind));
                 let md = Module{
                     link_info: LinkInfo {
                         documentation: cursor.extract_gathered_comments(),
