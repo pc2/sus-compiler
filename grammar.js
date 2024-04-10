@@ -9,14 +9,14 @@ function sepSeq(rule, sepChar) {
 
 function newlineSepSeq($, rule) {
     return seq(
-        optional($._at_least_one_newline),
+        optional($._linebreak),
         optional(seq(
             field('item', rule),
             repeat(seq(
-                $._at_least_one_newline,
+                $._linebreak,
                 field('item', rule)
             )),
-            optional($._at_least_one_newline)
+            optional($._linebreak)
         ))
     )
 }
@@ -39,15 +39,22 @@ module.exports = grammar({
     rules: {
         source_file: $ => newlineSepSeq($, $.module),
 
+        _comma: $ => seq(
+            ',',
+            optional($._linebreak)
+        ),
+        
         interface_ports : $ => seq(
             ':',
+            optional($._linebreak),
             optional(field('inputs', $.declaration_list)),
             optional(seq(
                 '->',
+                optional($._linebreak),
                 field('outputs', $.declaration_list)
             ))
         ),
-        declaration_list : $ => sepSeq1(field('item', $.declaration), ','),
+        declaration_list : $ => sepSeq1(field('item', $.declaration), $._comma),
 
         module: $ => seq(
             'module',
@@ -121,7 +128,7 @@ module.exports = grammar({
         
         parenthesis_expression_list: $ => seq(
             '(',
-            sepSeq(field('item', $._expression), ','),
+            sepSeq(field('item', $._expression), $._comma),
             ')'
         ),
 
@@ -147,7 +154,7 @@ module.exports = grammar({
             $.func_call
         ),
 
-        _at_least_one_newline: $ => repeat1(/\n/), // For things that must be separated by at least one newline (whitespace after is to optimize gobbling up any extra newlines)
+        _linebreak: $ => repeat1(/\n/), // For things that must be separated by at least one newline (whitespace after is to optimize gobbling up any extra newlines)
         
         block: $ => seq(
             '{',
@@ -178,7 +185,7 @@ module.exports = grammar({
         ),
         assign_left_side: $ => sepSeq1(
             field('item', $.assign_to),
-            ','
+            $._comma
         ),
 
         decl_assign_statement: $ => seq(

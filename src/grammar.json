@@ -10,7 +10,7 @@
           "members": [
             {
               "type": "SYMBOL",
-              "name": "_at_least_one_newline"
+              "name": "_linebreak"
             },
             {
               "type": "BLANK"
@@ -38,7 +38,7 @@
                     "members": [
                       {
                         "type": "SYMBOL",
-                        "name": "_at_least_one_newline"
+                        "name": "_linebreak"
                       },
                       {
                         "type": "FIELD",
@@ -56,7 +56,7 @@
                   "members": [
                     {
                       "type": "SYMBOL",
-                      "name": "_at_least_one_newline"
+                      "name": "_linebreak"
                     },
                     {
                       "type": "BLANK"
@@ -72,12 +72,45 @@
         }
       ]
     },
+    "_comma": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": ","
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_linebreak"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
     "interface_ports": {
       "type": "SEQ",
       "members": [
         {
           "type": "STRING",
           "value": ":"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_linebreak"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         },
         {
           "type": "CHOICE",
@@ -104,6 +137,18 @@
                 {
                   "type": "STRING",
                   "value": "->"
+                },
+                {
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "SYMBOL",
+                      "name": "_linebreak"
+                    },
+                    {
+                      "type": "BLANK"
+                    }
+                  ]
                 },
                 {
                   "type": "FIELD",
@@ -139,8 +184,8 @@
             "type": "SEQ",
             "members": [
               {
-                "type": "STRING",
-                "value": ","
+                "type": "SYMBOL",
+                "name": "_comma"
               },
               {
                 "type": "FIELD",
@@ -745,8 +790,8 @@
                     "type": "SEQ",
                     "members": [
                       {
-                        "type": "STRING",
-                        "value": ","
+                        "type": "SYMBOL",
+                        "name": "_comma"
                       },
                       {
                         "type": "FIELD",
@@ -847,7 +892,7 @@
         }
       ]
     },
-    "_at_least_one_newline": {
+    "_linebreak": {
       "type": "REPEAT1",
       "content": {
         "type": "PATTERN",
@@ -869,7 +914,7 @@
               "members": [
                 {
                   "type": "SYMBOL",
-                  "name": "_at_least_one_newline"
+                  "name": "_linebreak"
                 },
                 {
                   "type": "BLANK"
@@ -918,7 +963,7 @@
                         "members": [
                           {
                             "type": "SYMBOL",
-                            "name": "_at_least_one_newline"
+                            "name": "_linebreak"
                           },
                           {
                             "type": "FIELD",
@@ -957,7 +1002,7 @@
                       "members": [
                         {
                           "type": "SYMBOL",
-                          "name": "_at_least_one_newline"
+                          "name": "_linebreak"
                         },
                         {
                           "type": "BLANK"
@@ -1058,8 +1103,8 @@
             "type": "SEQ",
             "members": [
               {
-                "type": "STRING",
-                "value": ","
+                "type": "SYMBOL",
+                "name": "_comma"
               },
               {
                 "type": "FIELD",
