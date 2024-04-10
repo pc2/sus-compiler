@@ -186,8 +186,8 @@ module example_md :
 
 // (a*b) + c
 module multiply_add : 
-	int a, int b, int c
-	-> int total {
+	int a, int b, int c -> 
+	int total {
 
 	reg int tmp = a * b
 	total = tmp + c
@@ -212,11 +212,10 @@ module fibonnaci : -> int num {
 	current = num
 }
 
-//timeline (v, true -> /) .. (v, false -> v)*
 module blur2 : 
 	int data,
-	bool first
-	-> int blurred {
+	bool first -> 
+	int blurred {
 	
 	state int prev
 
@@ -319,9 +318,7 @@ module generative : int i -> int o, int o2 {
 
 	gen bool test = true
 
-	if test {
-		
-	}
+	if test {i = 5}
 
 	o = a[i]
 	o2 = a[a[0]]
@@ -433,7 +430,7 @@ module disjoint_ports : int a, int b, int c -> int result {
 
 module undeteriminable_input_latency : int a, int b -> int x, int y {
 	reg int a_d = a
-    int t = a_d + b
+	int t = a_d + b
     reg reg reg int a_dd = a
 	reg int t_d = t
     x = t_d + a_dd
