@@ -93,6 +93,35 @@
         }
       ]
     },
+    "_interface_ports_output": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "->"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_linebreak"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "FIELD",
+          "name": "outputs",
+          "content": {
+            "type": "SYMBOL",
+            "name": "declaration_list"
+          }
+        }
+      ]
+    },
     "interface_ports": {
       "type": "SEQ",
       "members": [
@@ -116,52 +145,33 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "FIELD",
-              "name": "inputs",
-              "content": {
-                "type": "SYMBOL",
-                "name": "declaration_list"
-              }
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
               "type": "SEQ",
               "members": [
                 {
-                  "type": "STRING",
-                  "value": "->"
+                  "type": "FIELD",
+                  "name": "inputs",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "declaration_list"
+                  }
                 },
                 {
                   "type": "CHOICE",
                   "members": [
                     {
                       "type": "SYMBOL",
-                      "name": "_linebreak"
+                      "name": "_interface_ports_output"
                     },
                     {
                       "type": "BLANK"
                     }
                   ]
-                },
-                {
-                  "type": "FIELD",
-                  "name": "outputs",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "declaration_list"
-                  }
                 }
               ]
             },
             {
-              "type": "BLANK"
+              "type": "SYMBOL",
+              "name": "_interface_ports_output"
             }
           ]
         }
@@ -238,6 +248,81 @@
             "type": "SYMBOL",
             "name": "block"
           }
+        }
+      ]
+    },
+    "interface_statement": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "interface"
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "interface_ports",
+              "content": {
+                "type": "SYMBOL",
+                "name": "interface_ports"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "cross_statement": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "cross"
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "item",
+              "content": {
+                "type": "SYMBOL",
+                "name": "assign_to"
+              }
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "_comma"
+                  },
+                  {
+                    "type": "FIELD",
+                    "name": "item",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "assign_to"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -763,6 +848,35 @@
         ]
       }
     },
+    "field_access": {
+      "type": "PREC",
+      "value": 9,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "left",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_expression"
+            }
+          },
+          {
+            "type": "STRING",
+            "value": "."
+          },
+          {
+            "type": "FIELD",
+            "name": "name",
+            "content": {
+              "type": "SYMBOL",
+              "name": "identifier"
+            }
+          }
+        ]
+      }
+    },
     "parenthesis_expression_list": {
       "type": "SEQ",
       "members": [
@@ -889,14 +1003,18 @@
         {
           "type": "SYMBOL",
           "name": "func_call"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "field_access"
         }
       ]
     },
     "_linebreak": {
       "type": "REPEAT1",
       "content": {
-        "type": "PATTERN",
-        "value": "\\n"
+        "type": "STRING",
+        "value": "\n"
       }
     },
     "block": {
@@ -952,6 +1070,14 @@
                           {
                             "type": "SYMBOL",
                             "name": "for_statement"
+                          },
+                          {
+                            "type": "SYMBOL",
+                            "name": "interface_statement"
+                          },
+                          {
+                            "type": "SYMBOL",
+                            "name": "cross_statement"
                           }
                         ]
                       }
@@ -990,6 +1116,14 @@
                                 {
                                   "type": "SYMBOL",
                                   "name": "for_statement"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "interface_statement"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "cross_statement"
                                 }
                               ]
                             }

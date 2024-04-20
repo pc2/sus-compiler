@@ -5,8 +5,8 @@ version = "0.0.1"
 keywords = ["incremental", "parsing", "sus"]
 categories = ["parsing", "text-editors"]
 repository = "https://github.com/tree-sitter/tree-sitter-sus"
-edition = "2018"
-license = "MIT"
+edition = "2021"
+license = "GPL-3.0-or-later"
 
 build = "bindings/rust/build.rs"
 include = [

@@ -16,6 +16,10 @@
             "named": true
           },
           {
+            "type": "field_access",
+            "named": true
+          },
+          {
             "type": "func_call",
             "named": true
           },
@@ -53,6 +57,10 @@
           },
           {
             "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
             "named": true
           },
           {
@@ -156,6 +164,10 @@
             "named": true
           },
           {
+            "type": "field_access",
+            "named": true
+          },
+          {
             "type": "func_call",
             "named": true
           },
@@ -203,6 +215,10 @@
           },
           {
             "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
             "named": true
           },
           {
@@ -302,6 +318,10 @@
             "named": true
           },
           {
+            "type": "field_access",
+            "named": true
+          },
+          {
             "type": "func_call",
             "named": true
           },
@@ -342,6 +362,10 @@
             "named": true
           },
           {
+            "type": "cross_statement",
+            "named": true
+          },
+          {
             "type": "decl_assign_statement",
             "named": true
           },
@@ -351,6 +375,26 @@
           },
           {
             "type": "if_statement",
+            "named": true
+          },
+          {
+            "type": "interface_statement",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "cross_statement",
+    "named": true,
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "assign_to",
             "named": true
           }
         ]
@@ -381,6 +425,10 @@
           },
           {
             "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
             "named": true
           },
           {
@@ -478,6 +526,60 @@
     }
   },
   {
+    "type": "field_access",
+    "named": true,
+    "fields": {
+      "left": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "array_op",
+            "named": true
+          },
+          {
+            "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
+            "named": true
+          },
+          {
+            "type": "func_call",
+            "named": true
+          },
+          {
+            "type": "global_identifier",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "unary_op",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "for_statement",
     "named": true,
     "fields": {
@@ -514,6 +616,10 @@
             "named": true
           },
           {
+            "type": "field_access",
+            "named": true
+          },
+          {
             "type": "func_call",
             "named": true
           },
@@ -545,6 +651,10 @@
           },
           {
             "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
             "named": true
           },
           {
@@ -595,6 +705,10 @@
           },
           {
             "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
             "named": true
           },
           {
@@ -651,6 +765,10 @@
           },
           {
             "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
             "named": true
           },
           {
@@ -728,6 +846,32 @@
     }
   },
   {
+    "type": "interface_statement",
+    "named": true,
+    "fields": {
+      "interface_ports": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "interface_ports",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "latency_specifier",
     "named": true,
     "fields": {
@@ -741,6 +885,10 @@
           },
           {
             "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
             "named": true
           },
           {
@@ -820,6 +968,10 @@
             "named": true
           },
           {
+            "type": "field_access",
+            "named": true
+          },
+          {
             "type": "func_call",
             "named": true
           },
@@ -857,6 +1009,10 @@
           },
           {
             "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
             "named": true
           },
           {
@@ -950,6 +1106,10 @@
             "named": true
           },
           {
+            "type": "field_access",
+            "named": true
+          },
+          {
             "type": "func_call",
             "named": true
           },
@@ -992,6 +1152,10 @@
         ]
       }
     }
+  },
+  {
+    "type": "\n",
+    "named": false
   },
   {
     "type": "!",
@@ -1039,6 +1203,10 @@
   },
   {
     "type": "->",
+    "named": false
+  },
+  {
+    "type": ".",
     "named": false
   },
   {
@@ -1094,6 +1262,10 @@
     "named": false
   },
   {
+    "type": "cross",
+    "named": false
+  },
+  {
     "type": "else",
     "named": false
   },
@@ -1119,6 +1291,10 @@
   },
   {
     "type": "initial",
+    "named": false
+  },
+  {
+    "type": "interface",
     "named": false
   },
   {

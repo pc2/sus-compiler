@@ -29,7 +29,7 @@ const PREC = {
     additive: 6,
     multiplicative: 7,
     unary: 8,
-    array_or_func_call : 9,
+    postscript_op : 9,
     namespace_path : 10
 }
 
@@ -44,17 +44,27 @@ module.exports = grammar({
             optional($._linebreak)
         ),
         
-        interface_ports : $ => seq(
+        _interface_ports_output: $ => seq(
+            '->',
+            optional($._linebreak),
+            field('outputs', $.declaration_list)
+        ),
+        interface_ports: $ => seq(
             ':',
             optional($._linebreak),
-            optional(field('inputs', $.declaration_list)),
-            optional(seq(
-                '->',
-                optional($._linebreak),
-                field('outputs', $.declaration_list)
-            ))
+            choice(
+                seq(
+                    field('inputs', $.declaration_list),
+                    optional($._interface_ports_output)
+                ),
+                $._interface_ports_output
+            ),
         ),
-        declaration_list : $ => sepSeq1(field('item', $.declaration), $._comma),
+
+        declaration_list: $ => sepSeq1(
+            field('item', $.declaration),
+            $._comma
+        ),
 
         module: $ => seq(
             'module',
@@ -62,6 +72,22 @@ module.exports = grammar({
             optional(field('interface_ports', $.interface_ports)),
             field('block', $.block)
         ),
+
+        interface_statement: $ => seq(
+            'interface',
+            field('name', $.identifier),
+            optional(field('interface_ports', $.interface_ports))
+            //field('block', $.block)
+        ),
+
+        cross_statement: $ => seq(
+            'cross',
+            sepSeq1(
+                field('item', $.assign_to),
+                $._comma
+            ),
+        ),
+
         identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
         number: $ => /\d[\d_]*/,
 
@@ -79,7 +105,7 @@ module.exports = grammar({
             $.array_type
         ),
 
-        latency_specifier : $ => seq(seq(
+        latency_specifier: $ => seq(seq(
             '\'',
             field('content', $._expression)
         )),
@@ -116,14 +142,20 @@ module.exports = grammar({
             ))));
         },
 
-        array_op: $ => prec(PREC.array_or_func_call, seq(
+        array_op: $ => prec(PREC.postscript_op, seq(
             field('arr', $._expression),
             field('arr_idx', $.array_bracket_expression)
         )),
 
-        func_call: $ => prec(PREC.array_or_func_call, seq(
+        func_call: $ => prec(PREC.postscript_op, seq(
             field('name', $._expression),
             field('arguments', $.parenthesis_expression_list)
+        )),
+
+        field_access: $ => prec(PREC.postscript_op, seq(
+            field('left', $._expression),
+            '.',
+            field('name', $.identifier)
         )),
         
         parenthesis_expression_list: $ => seq(
@@ -151,10 +183,11 @@ module.exports = grammar({
             $.parenthesis_expression,
             $.unary_op,
             $.binary_op,
-            $.func_call
+            $.func_call,
+            $.field_access
         ),
 
-        _linebreak: $ => repeat1(/\n/), // For things that must be separated by at least one newline (whitespace after is to optimize gobbling up any extra newlines)
+        _linebreak: $ => repeat1('\n'), // For things that must be separated by at least one newline (whitespace after is to optimize gobbling up any extra newlines)
         
         block: $ => seq(
             '{',
@@ -166,7 +199,9 @@ module.exports = grammar({
                 // but we allow some tolerance in the grammar here, so we can generate better errors after. 
                 $.assign_left_side,
                 $.if_statement,
-                $.for_statement
+                $.for_statement,
+                $.interface_statement,
+                $.cross_statement
             )),
             '}'
         ),
@@ -216,8 +251,8 @@ module.exports = grammar({
             field('block', $.block)
         ),
 
-        single_line_comment : $ => /\/\/[^\n]*/,
-        multi_line_comment : $ => /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\//,
+        single_line_comment: $ => /\/\/[^\n]*/,
+        multi_line_comment: $ => /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\//,
     },
 
     conflicts: $ => [
