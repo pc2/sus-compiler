@@ -24,18 +24,21 @@ mod typing;
 mod dev_aid;
 mod linker;
 
+mod compiler_top;
+
 use std::io::Write;
 use std::{env, ops::Deref};
 use std::error::Error;
 use std::fs::File;
 use std::path::PathBuf;
+use compiler_top::instantiate;
 use flattening::Module;
 use codegen_fallback::gen_verilog_code;
 use dev_aid::syntax_highlighting::*;
 use linker::{Linker, ModuleUUID};
 
 fn codegen_to_file(linker : &Linker, id : ModuleUUID, md : &Module) -> Option<()> {
-    let Some(inst) = linker.instantiate(id) else {
+    let Some(inst) = instantiate(linker, id) else {
         println!("Module {} instantiation encountered errors.", md.link_info.name);
 
         return None;

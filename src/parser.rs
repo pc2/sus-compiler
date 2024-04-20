@@ -1,43 +1,21 @@
 
-use sus_proc_macro::{field, kind};
+use sus_proc_macro::{field, kind, kw};
 use tree_sitter::{Tree, TreeCursor};
 
-use crate::{errors::*, file_position::{FileText, Span}, linker::FileUUID};
+use crate::{errors::*, file_position::{FileText, Span}};
 
 use std::num::NonZeroU16;
-
-
-pub struct FullParseResult {
-    pub file_text : FileText,
-    pub errors : ErrorCollector,
-    pub tree : tree_sitter::Tree
-}
-
-pub fn perform_full_semantic_parse(file_text : String, file : FileUUID) -> FullParseResult {
-    let file_text = FileText::new(file_text);
-    
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&tree_sitter_sus::language()).unwrap();
-
-    let tree = parser.parse(&file_text.file_text, None).unwrap();
-
-    let errors = ErrorCollector::new(file, file_text.len());
-
-    report_all_tree_errors(&file_text, &tree, &errors);
-
-    FullParseResult{
-        tree,
-        file_text,
-        errors
-    }
-}
 
 
 fn print_current_node_indented(file_text : &FileText, cursor : &TreeCursor) -> String {
     let indent = "  ".repeat(cursor.depth() as usize);
     let n = cursor.node();
     let cursor_span = Span::from(n.byte_range());
-    let node_name = if n.kind_id() == kind!("identifier") {format!("\"{}\"", &file_text[cursor_span])} else {n.kind().to_owned()};
+    let node_name = if n.kind_id() == kind!("identifier") {
+        format!("\"{}\"", &file_text[cursor_span])
+    } else {
+        n.kind().to_owned()
+    };
     if let Some(field_name) = cursor.field_name() {
         println!("{indent} {field_name}: {node_name} [{cursor_span}]");
     } else {
@@ -46,7 +24,7 @@ fn print_current_node_indented(file_text : &FileText, cursor : &TreeCursor) -> S
     node_name
 }
 
-fn report_all_tree_errors(file_text : &FileText, tree : &Tree, errors : &ErrorCollector) {
+pub fn report_all_tree_errors(file_text : &FileText, tree : &Tree, errors : &ErrorCollector) {
     let mut cursor = tree.walk();
     loop {
         let n = cursor.node();

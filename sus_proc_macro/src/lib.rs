@@ -9,7 +9,6 @@ use syn::{parse_macro_input, LitStr};
 pub fn kind(token_stream : TokenStream) -> TokenStream {
     let string_literal : LitStr = parse_macro_input!(token_stream);
     
-    // Get the string value and calculate its length
     let requested_kind = string_literal.value();
 
     let language = tree_sitter_sus::language();
@@ -31,7 +30,6 @@ pub fn kind(token_stream : TokenStream) -> TokenStream {
 pub fn kw(token_stream : TokenStream) -> TokenStream {
     let string_literal : LitStr = parse_macro_input!(token_stream);
     
-    // Get the string value and calculate its length
     let requested_keyword = string_literal.value();
 
     let language = tree_sitter_sus::language();
@@ -53,7 +51,6 @@ pub fn kw(token_stream : TokenStream) -> TokenStream {
 pub fn field(token_stream : TokenStream) -> TokenStream {
     let string_literal : LitStr = parse_macro_input!(token_stream);
     
-    // Get the string value and calculate its length
     let requested_keyword = string_literal.value();
 
     let language = tree_sitter_sus::language();

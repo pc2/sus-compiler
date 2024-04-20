@@ -1,15 +1,14 @@
-use std::{collections::{HashMap, HashSet}, rc::Rc, cell::RefCell};
+use std::{collections::{HashMap, HashSet}, cell::RefCell};
 
-use sus_proc_macro::{field, kind};
+use tree_sitter::Tree;
 
 use crate::{
     arena_alloc::{ArenaAllocator, UUIDMarker, UUID},
     errors::{error_info, ErrorCollector},
     file_position::{FileText, Span},
-    flattening::{FlatID, FlattenedModule, Instruction, Module, WireInstance, WireSource},
-    instantiation::{InstantiatedModule, InstantiationList},
-    parser::{Cursor, Documentation, FullParseResult},
-    typing::{Type, WrittenType},
+    flattening::Module,
+    parser::Documentation,
+    typing::Type,
     util::{const_str_position, const_str_position_in_tuples},
     value::Value
 };
@@ -169,31 +168,36 @@ pub struct Linker {
     pub types : ArenaAllocator<NamedType, TypeUUIDMarker>,
     pub modules : ArenaAllocator<Module, ModuleUUIDMarker>,
     pub constants : ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
-    global_namespace : HashMap<String, NamespaceElement>,
-    pub files : ArenaAllocator<FileData, FileUUIDMarker>
+    pub files : ArenaAllocator<FileData, FileUUIDMarker>,
+    global_namespace : HashMap<String, NamespaceElement>
 }
 
 impl Linker {
     pub fn new() -> Linker {
-        // Add builtins
-        let mut types = ArenaAllocator::new();
-        let modules = ArenaAllocator::new();
-        let mut constants = ArenaAllocator::new();
-        let files = ArenaAllocator::new();
-        let mut global_namespace = HashMap::new();
-        
-        for name in BUILTIN_TYPES {
-            let id = types.alloc(NamedType::Builtin(name));
-            let already_exisits = global_namespace.insert(name.into(), NamespaceElement::Global(NameElem::Type(id)));
+        let mut result = Linker{
+            types : ArenaAllocator::new(),
+            modules : ArenaAllocator::new(),
+            constants : ArenaAllocator::new(),
+            files : ArenaAllocator::new(),
+            global_namespace : HashMap::new()
+        };
+
+        fn add_known_unique_name(result : &mut Linker, name : String, new_obj_id : NameElem) {
+            let already_exisits = result.global_namespace.insert(name.into(), NamespaceElement::Global(new_obj_id));
             assert!(already_exisits.is_none());
+        }
+        
+        // Add builtins
+        for name in BUILTIN_TYPES {
+            let id = result.types.alloc(NamedType::Builtin(name));
+            add_known_unique_name(&mut result, name.into(), NameElem::Type(id));
         }
         for (name, val) in BUILTIN_CONSTANTS {
-            let id = constants.alloc(NamedConstant::Builtin{name, typ : val.get_type_of_constant(), val});
-            let already_exisits = global_namespace.insert(name.into(), NamespaceElement::Global(NameElem::Constant(id)));
-            assert!(already_exisits.is_none());
+            let id = result.constants.alloc(NamedConstant::Builtin{name, typ : val.get_type_of_constant(), val});
+            add_known_unique_name(&mut result, name.into(), NameElem::Constant(id));
         }
 
-        Linker{types, modules, constants, files, global_namespace}
+        result
     }
 
     pub fn get_module_id(&self, name : &str) -> Option<ModuleUUID> {
@@ -211,27 +215,6 @@ impl Linker {
         Some(*id)
     }
 
-    fn add_name(&mut self, name: String, new_obj_id: NameElem) {
-        match self.global_namespace.entry(name) {
-            std::collections::hash_map::Entry::Occupied(mut occ) => {
-                let new_val = match occ.get_mut() {
-                    NamespaceElement::Global(g) => {
-                        Box::new([*g, new_obj_id])
-                    }
-                    NamespaceElement::Colission(coll) => {
-                        let mut vec = std::mem::replace(coll, Box::new([])).into_vec();
-                        vec.reserve(1); // Make sure to only allocate one extra element
-                        vec.push(new_obj_id);
-                        vec.into_boxed_slice()
-                    }
-                };
-                occ.insert(NamespaceElement::Colission(new_val));
-            },
-            std::collections::hash_map::Entry::Vacant(vac) => {
-                vac.insert(NamespaceElement::Global(new_obj_id));
-            },
-        }
-    }
     pub fn get_link_info(&self, global : NameElem) -> Option<&LinkInfo> {
         match global {
             NameElem::Module(md_id) => Some(&self.modules[md_id].link_info),
@@ -313,20 +296,19 @@ impl Linker {
         errors
     }
 
-    pub fn remove_file_datas(&mut self, files : &[FileUUID]) {
+    pub fn remove_everything_in_file(&mut self, file_uuid : FileUUID) -> &mut FileData {
         // For quick lookup if a reference disappears
         let mut to_remove_set = HashSet::new();
 
-        // Remove the files and their referenced values
-        for file in files {
-            for v in &self.files[*file].associated_values {
-                let was_new_item_in_set = to_remove_set.insert(v);
-                assert!(was_new_item_in_set);
-                match *v {
-                    NameElem::Module(id) => {self.modules.free(id);}
-                    NameElem::Type(id) => {self.types.free(id);}
-                    NameElem::Constant(id) => {self.constants.free(id);}
-                }
+        let file_data = &mut self.files[file_uuid];
+        // Remove referenced data in file
+        for v in file_data.associated_values.drain(..) {
+            let was_new_item_in_set = to_remove_set.insert(v);
+            assert!(was_new_item_in_set);
+            match v {
+                NameElem::Module(id) => {self.modules.free(id);}
+                NameElem::Type(id) => {self.types.free(id);}
+                NameElem::Constant(id) => {self.constants.free(id);}
             }
         }
 
@@ -344,181 +326,74 @@ impl Linker {
                 }
             }
         });
+
+        file_data
     }
 
     #[allow(dead_code)]
-    pub fn remove_files(&mut self, files : &[FileUUID]) {
-        self.remove_file_datas(files);
-        for uuid in files {
-            self.files.free(*uuid);
+    pub fn remove_file(&mut self, file_uuid : FileUUID) {
+        self.remove_everything_in_file(file_uuid);
+        self.files.free(file_uuid);
+    }
+
+    pub fn get_file_builder(&mut self, file_id : FileUUID) -> FileBuilder<'_> {
+        let file_data = &mut self.files[file_id];
+        FileBuilder{
+            file_id,
+            tree: &file_data.tree,
+            file_text: &file_data.file_text,
+            associated_values: &mut file_data.associated_values,
+            global_namespace: &mut self.global_namespace,
+            types: &mut self.types,
+            modules: &mut self.modules,
+            constants: &mut self.constants
         }
     }
+}
 
-    pub fn reserve_file(&mut self) -> FileUUID {
-        self.files.reserve()
-    }
-    
-    pub fn add_reserved_file(&mut self, file : FileUUID, parse_result : FullParseResult) {
-        let mut associated_values = Vec::new();
-        
-        {
-            let mut walker = Cursor::new_at_root(&parse_result.tree, &parse_result.file_text);
-            walker.list(kind!("source_file"), |cursor| {
-                let (kind, span) = cursor.kind_span();
-                assert!(kind == kind!("module"));
-                let name_span = cursor.go_down_no_check(|cursor| cursor.field_span(field!("name"), kind!("identifier")));
-                let md = Module{
-                    link_info: LinkInfo {
-                        documentation: cursor.extract_gathered_comments(),
-                        file,
-                        name: parse_result.file_text[name_span].to_owned(),
-                        name_span,
-                        span
-                    },
-                    flattened: FlattenedModule::empty(ErrorCollector::new(file, parse_result.file_text.len())),
-                    instantiations: InstantiationList::new()
-                };
-                let module_name = md.link_info.name.clone();
-                let new_module_uuid = NameElem::Module(self.modules.alloc(md));
-                associated_values.push(new_module_uuid);
-                self.add_name(module_name, new_module_uuid);
-            });
-        }
-        
-        self.files.alloc_reservation(file, FileData{
-            file_text : parse_result.file_text,
-            tree: parse_result.tree,
-            parsing_errors : parse_result.errors,
-            associated_values
-        });
-    }
 
-    pub fn relink(&mut self, file : FileUUID, parse_result : FullParseResult) {
-        self.remove_file_datas(&[file]);
-        self.files.revert_to_reservation(file);
-        self.add_reserved_file(file, parse_result);
-    }
 
-    pub fn recompile_all(&mut self) {
-        // Flatten all modules
-        let id_vec : Vec<ModuleUUID> = self.modules.iter().map(|(id, _)| id).collect();
-        for id in id_vec {
-            let md = &self.modules[id];// Have to get them like this, so we don't have a mutable borrow on self.modules across the loop
-            println!("Flattening {}", md.link_info.name);
+pub struct FileBuilder<'linker> {
+    pub file_id : FileUUID,
+    pub tree : &'linker Tree,
+    pub file_text : &'linker FileText, 
+    associated_values : &'linker mut Vec<NameElem>,
+    global_namespace : &'linker mut HashMap<String, NamespaceElement>,
+    #[allow(dead_code)]
+    types : &'linker mut ArenaAllocator<NamedType, TypeUUIDMarker>,
+    modules : &'linker mut ArenaAllocator<Module, ModuleUUIDMarker>,
+    #[allow(dead_code)]
+    constants : &'linker mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>
+}
 
-            let flattened = FlattenedModule::flatten(&self, md);
-            println!("Typechecking {}", &md.link_info.name);
-
-            let md = &mut self.modules[id]; // Convert to mutable ptr
-            md.flattened = flattened;
-            md.instantiations.clear_instances();
-        }
-
-        // Can't merge these loops, because instantiation can only be done once all modules have been type checked
-        for (id, _md) in &self.modules {
-            //md.print_flattened_module();
-            // Already instantiate any modules without parameters
-            // Currently this is all modules
-            let _inst = self.instantiate(id);
-        }
-    }
-
-    pub fn instantiate(&self, module_id : ModuleUUID) -> Option<Rc<InstantiatedModule>> {
-        let md = &self.modules[module_id];
-        println!("Instantiating {}", md.link_info.name);
-
-        md.instantiations.instantiate(&md.link_info.name, &md.flattened, self)
-    }
-
-    pub fn get_info_about_source_location<'linker>(&'linker self, position : usize, file : FileUUID) -> Option<(LocationInfo<'linker>, Span)> {
-        let mut location_builder = LocationInfoBuilder::new(position);
-        
-        for global in &self.files[file].associated_values {
-            match *global {
-                NameElem::Module(md_id) => {
-                    let md = &self.modules[md_id];
-                    if md.link_info.span.contains_pos(position) {
-                        location_builder.update(md.link_info.name_span, LocationInfo::Global(NameElem::Module(md_id)));
-                        for (id, inst) in &md.flattened.instructions {
-                            match inst {
-                                Instruction::SubModule(sm) => {
-                                    location_builder.update(sm.module_name_span, LocationInfo::Global(NameElem::Module(sm.module_uuid)));
-                                }
-                                Instruction::Declaration(decl) => {
-                                    match decl.typ_expr.get_deepest_selected(position) {
-                                        Some(WrittenType::Named(span, name_id)) => {
-                                            location_builder.update(*span, LocationInfo::Global(NameElem::Type(*name_id)));
-                                        }
-                                        Some(typ) => {
-                                            location_builder.update(typ.get_span(), LocationInfo::Type(typ));
-                                        }
-                                        None => {}
-                                    }
-                                    if decl.declaration_itself_is_not_written_to && decl.name_span.contains_pos(position) {
-                                        location_builder.update(decl.name_span, LocationInfo::WireRef(md, id));
-                                    }
-                                }
-                                Instruction::Wire(wire) => {
-                                    let loc_info = if let WireSource::WireRead(decl_id) = &wire.source {
-                                        LocationInfo::WireRef(md, *decl_id)
-                                    } else {
-                                        LocationInfo::Temporary(md, id, wire)
-                                    };
-                                    location_builder.update(wire.span, loc_info);
-                                }
-                                Instruction::Write(write) => {
-                                    location_builder.update(write.to.root_span, LocationInfo::WireRef(md, write.to.root));
-                                }
-                                Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
-                            };
-                        }
+impl<'linker> FileBuilder<'linker> {
+    fn add_name(&mut self, name : String, new_obj_id : NameElem) {
+        match self.global_namespace.entry(name) {
+            std::collections::hash_map::Entry::Occupied(mut occ) => {
+                let new_val = match occ.get_mut() {
+                    NamespaceElement::Global(g) => {
+                        Box::new([*g, new_obj_id])
                     }
-                }
-                NameElem::Type(_) => {
-                    todo!()
-                }
-                NameElem::Constant(_) => {
-                    todo!()
-                }
-            }
-        }
-        if let Some(instr) = location_builder.best_instruction {
-            Some((instr, location_builder.best_span))
-        } else {
-            None
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum LocationInfo<'linker> {
-    WireRef(&'linker Module, FlatID),
-    Temporary(&'linker Module, FlatID, &'linker WireInstance),
-    Type(&'linker WrittenType),
-    Global(NameElem)
-}
-
-struct LocationInfoBuilder<'linker> {
-    best_instruction : Option<LocationInfo<'linker>>,
-    best_span : Span,
-    position : usize
-}
-
-impl<'linker> LocationInfoBuilder<'linker> {
-    fn new(token_idx : usize) -> Self {
-        Self{
-            best_instruction : None,
-            best_span : Span::MAX_POSSIBLE_SPAN,
-            position: token_idx
+                    NamespaceElement::Colission(coll) => {
+                        let mut vec = std::mem::replace(coll, Box::new([])).into_vec();
+                        vec.reserve(1); // Make sure to only allocate one extra element
+                        vec.push(new_obj_id);
+                        vec.into_boxed_slice()
+                    }
+                };
+                occ.insert(NamespaceElement::Colission(new_val));
+            },
+            std::collections::hash_map::Entry::Vacant(vac) => {
+                vac.insert(NamespaceElement::Global(new_obj_id));
+            },
         }
     }
-    fn update(&mut self, span : Span, info : LocationInfo<'linker>) {
-        if span.contains_pos(self.position) && span.size() <= self.best_span.size() {
-            //assert!(span.size() < self.best_span.size());
-            // May not be the case. Do prioritize later ones, as they tend to be nested
-            self.best_span = span;
-            self.best_instruction = Some(info);
-        }
+
+    pub fn add_module(&mut self, md : Module) {
+        let module_name = md.link_info.name.clone();
+        let new_module_uuid = NameElem::Module(self.modules.alloc(md));
+        self.associated_values.push(new_module_uuid);
+        self.add_name(module_name, new_module_uuid);
     }
 }
 

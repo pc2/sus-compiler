@@ -2,7 +2,7 @@ use std::{cell::RefCell, cmp::max, iter::zip, ops::Deref, rc::Rc};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::Span, flattening::{IdentifierType, InterfacePorts, BinaryOperator, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, Instruction, UnaryOperator, WireInstance, WireSource, Write, WriteModifiers}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, list_of_lists::ListOfLists, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{compute_binary_op, compute_unary_op, Value}};
+use crate::{arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, compiler_top::instantiate, errors::ErrorCollector, file_position::Span, flattening::{BinaryOperator, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, IdentifierType, Instruction, InterfacePorts, UnaryOperator, WireInstance, WireSource, Write, WriteModifiers}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, list_of_lists::ListOfLists, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{compute_binary_op, compute_unary_op, Value}};
 
 use self::latency_algorithm::SpecifiedLatency;
 
@@ -414,7 +414,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         while let Some(original_wire) = instruction_range.next() {
             let instance_to_add : SubModuleOrWire = match &self.flattened.instructions[original_wire] {
                 Instruction::SubModule(submodule) => {
-                    let Some(instance) = self.linker.instantiate(submodule.module_uuid) else {return None}; // Avoid error from submodule
+                    let Some(instance) = instantiate(&self.linker, submodule.module_uuid) else {return None}; // Avoid error from submodule
                     let interface_real_wires = submodule.interface_ports.map(&mut |port, _is_input| {
                         self.generation_state[port].extract_wire()
                     });

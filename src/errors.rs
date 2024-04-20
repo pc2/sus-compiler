@@ -45,6 +45,10 @@ impl ErrorCollector {
     pub fn new(file : FileUUID, file_len : usize) -> Self {
         Self{errors : RefCell::new(Vec::new()), file, file_len, did_error : Cell::new(false)}
     }
+    pub fn reset(&mut self, file_len : usize) {
+        self.file_len = file_len;
+        self.errors.get_mut().clear();
+    }
 
     pub fn new_for_same_file(&self) -> Self {
         Self{errors : RefCell::new(Vec::new()), file : self.file, file_len : self.file_len, did_error : self.did_error.clone()}

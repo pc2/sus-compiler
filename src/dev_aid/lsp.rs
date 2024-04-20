@@ -7,7 +7,15 @@ use lsp_server::{Connection, Message, Response};
 use lsp_types::notification::Notification;
 
 use crate::{
-    arena_alloc::ArenaVector, errors::{CompileError, ErrorCollector, ErrorLevel}, file_position::{FileText, LineCol, Span}, flattening::{FlatID, Instruction, IdentifierType, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, LocationInfo}, parser::perform_full_semantic_parse, walk_name_color
+    arena_alloc::ArenaVector,
+    compiler_top::{add_file, recompile_all, update_file},
+    errors::{CompileError, ErrorCollector, ErrorLevel},
+    file_position::{FileText, LineCol, Span},
+    flattening::{FlatID, IdentifierType, Instruction, Module, WireInstance, WireSource},
+    instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER},
+    linker::{FileData, FileUUID, FileUUIDMarker, Linker, NameElem},
+    typing::WrittenType,
+    walk_name_color
 };
 
 use super::syntax_highlighting::IDEIdentifierType;
@@ -27,29 +35,22 @@ impl LoadedFileCache {
             .map(|(uuid, _uri_found)| uuid)
     }
     fn update_text(&mut self, uri : Url, new_file_text : String) {
-        let found_opt = self.find_uri(&uri);
-        let found_opt_was_none = found_opt.is_none();
-        let file_uuid : FileUUID = found_opt.unwrap_or_else(|| self.linker.reserve_file());
-        let full_parse = perform_full_semantic_parse(new_file_text, file_uuid);
-        
-        if found_opt_was_none {
-            self.linker.add_reserved_file(file_uuid, full_parse);
-            self.uris.insert(file_uuid, uri.clone());
+        if let Some(found_file_uuid) = self.find_uri(&uri) {
+            update_file(new_file_text, found_file_uuid, &mut self.linker);
         } else {
-            self.linker.relink(file_uuid, full_parse);
+            let file_uuid = add_file(new_file_text, &mut self.linker);
+            self.uris.insert(file_uuid, uri.clone());
         }
-        self.linker.recompile_all();
+
+        recompile_all(&mut self.linker);
     }
     fn ensure_contains_file(&mut self, uri : &Url) -> FileUUID {
         if let Some(found) = self.find_uri(uri) {
             found
         } else {
-            let file_uuid = self.linker.reserve_file();
             let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
-            let full_parse = perform_full_semantic_parse(file_text, file_uuid);
-            self.linker.add_reserved_file(file_uuid, full_parse);
-            self.uris.insert(file_uuid, uri.clone());
-            self.linker.recompile_all();
+            let file_uuid = add_file(file_text, &mut self.linker);
+            recompile_all(&mut self.linker);
             file_uuid
         }
     }
@@ -223,8 +224,10 @@ fn convert_diagnostic(err : CompileError, main_file_text : &FileText, linker : &
     let mut related_info = Vec::new();
     for info in err.infos {
         let info_file_text = &linker.files[info.file].file_text;
-        assert!(info_file_text.is_span_valid(info.position), "bad info: {}; in err: {}", info.info, err.reason);
-        let info_pos = cvt_span_to_lsp_range(info.position, info_file_text);
+        let file_name = uris[info.file].to_string();
+        let info_span = info.position;
+        assert!(info_file_text.is_span_valid(info_span), "bad info in {file_name}:\n{}; in err: {}.\nSpan is {info_span}, but file length is {}", info.info, err.reason, info_file_text.len());
+        let info_pos = cvt_span_to_lsp_range(info_span, info_file_text);
         let location = Location{uri : uris[info.file].clone(), range : info_pos};
         related_info.push(DiagnosticRelatedInformation { location, message: info.info });
     }
@@ -254,6 +257,99 @@ fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, main_f
     Ok(())
 }
 
+
+#[derive(Clone, Copy, Debug)]
+enum LocationInfo<'linker> {
+    WireRef(&'linker Module, FlatID),
+    Temporary(&'linker Module, FlatID, &'linker WireInstance),
+    Type(&'linker WrittenType),
+    Global(NameElem)
+}
+
+struct LocationInfoBuilder<'linker> {
+    best_instruction : Option<LocationInfo<'linker>>,
+    best_span : Span,
+    position : usize
+}
+
+impl<'linker> LocationInfoBuilder<'linker> {
+    fn new(token_idx : usize) -> Self {
+        Self{
+            best_instruction : None,
+            best_span : Span::MAX_POSSIBLE_SPAN,
+            position: token_idx
+        }
+    }
+    fn update(&mut self, span : Span, info : LocationInfo<'linker>) {
+        if span.contains_pos(self.position) && span.size() <= self.best_span.size() {
+            //assert!(span.size() < self.best_span.size());
+            // May not be the case. Do prioritize later ones, as they tend to be nested
+            self.best_span = span;
+            self.best_instruction = Some(info);
+        }
+    }
+}
+
+    
+fn get_info_about_source_location<'linker>(linker : &'linker Linker, position : usize, file : FileUUID) -> Option<(LocationInfo<'linker>, Span)> {
+    let mut location_builder = LocationInfoBuilder::new(position);
+    
+    for global in &linker.files[file].associated_values {
+        match *global {
+            NameElem::Module(md_id) => {
+                let md = &linker.modules[md_id];
+                if md.link_info.span.contains_pos(position) {
+                    location_builder.update(md.link_info.name_span, LocationInfo::Global(NameElem::Module(md_id)));
+                    for (id, inst) in &md.flattened.instructions {
+                        match inst {
+                            Instruction::SubModule(sm) => {
+                                location_builder.update(sm.module_name_span, LocationInfo::Global(NameElem::Module(sm.module_uuid)));
+                            }
+                            Instruction::Declaration(decl) => {
+                                match decl.typ_expr.get_deepest_selected(position) {
+                                    Some(WrittenType::Named(span, name_id)) => {
+                                        location_builder.update(*span, LocationInfo::Global(NameElem::Type(*name_id)));
+                                    }
+                                    Some(typ) => {
+                                        location_builder.update(typ.get_span(), LocationInfo::Type(typ));
+                                    }
+                                    None => {}
+                                }
+                                if decl.declaration_itself_is_not_written_to && decl.name_span.contains_pos(position) {
+                                    location_builder.update(decl.name_span, LocationInfo::WireRef(md, id));
+                                }
+                            }
+                            Instruction::Wire(wire) => {
+                                let loc_info = if let WireSource::WireRead(decl_id) = &wire.source {
+                                    LocationInfo::WireRef(md, *decl_id)
+                                } else {
+                                    LocationInfo::Temporary(md, id, wire)
+                                };
+                                location_builder.update(wire.span, loc_info);
+                            }
+                            Instruction::Write(write) => {
+                                location_builder.update(write.to.root_span, LocationInfo::WireRef(md, write.to.root));
+                            }
+                            Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
+                        };
+                    }
+                }
+            }
+            NameElem::Type(_) => {
+                todo!()
+            }
+            NameElem::Constant(_) => {
+                todo!()
+            }
+        }
+    }
+    if let Some(instr) = location_builder.best_instruction {
+        Some((instr, location_builder.best_span))
+    } else {
+        None
+    }
+}
+
 fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::TextDocumentPositionParams) -> Option<(&'l FileData, LocationInfo<'l>, lsp_types::Range)> {
     let uuid = file_cache.find_uri(&text_pos.text_document.uri).unwrap();
     
@@ -261,7 +357,7 @@ fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::T
 
     let byte_pos = file_data.file_text.linecol_to_byte_clamp(from_position(text_pos.position));
 
-    let (info, span) = file_cache.linker.get_info_about_source_location(byte_pos, uuid)?;
+    let (info, span) = get_info_about_source_location(&file_cache.linker, byte_pos, uuid)?;
     //let span = Span::new_single_token(token_idx);
 
     let char_line_range = file_data.file_text.get_span_linecol_range(span);
@@ -289,17 +385,15 @@ fn initialize_all_files(init_params : &InitializeParams) -> LoadedFileCache {
             for file in std::fs::read_dir(path).unwrap() {
                 let file_path = file.unwrap().path();
                 if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
-                    let file_uuid = linker.reserve_file();
                     let file_text = std::fs::read_to_string(&file_path).unwrap();
-                    let full_parse = perform_full_semantic_parse(file_text, file_uuid);
-                    linker.add_reserved_file(file_uuid, full_parse);
+                    let file_uuid = add_file(file_text, &mut linker);
                     uris.insert(file_uuid, Url::from_file_path(&file_path).unwrap());
                 }
             }
         }
     }
     let mut result = LoadedFileCache::new(linker, uris);
-    result.linker.recompile_all();
+    recompile_all(&mut result.linker);
     result
 }
 
@@ -477,7 +571,12 @@ fn handle_notification(connection: &Connection, notification : lsp_server::Notif
         notification::DidChangeTextDocument::METHOD => {
             println!("DidChangeTextDocument");
             let params : DidChangeTextDocumentParams = serde_json::from_value(notification.params).expect("JSON Encoding Error while parsing params");
-            file_cache.update_text(params.text_document.uri, params.content_changes.into_iter().next().unwrap().text);
+            
+            let mut content_change_iter = params.content_changes.into_iter();
+            let only_change = content_change_iter.next().unwrap();
+            assert!(content_change_iter.next().is_none());
+            assert!(only_change.range.is_none());
+            file_cache.update_text(params.text_document.uri, only_change.text);
 
             push_all_errors(connection, &file_cache)?;
         }

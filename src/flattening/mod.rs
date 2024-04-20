@@ -1,5 +1,6 @@
 
 pub mod name_context;
+pub mod initialization;
 
 use std::{iter::zip, str::FromStr};
 
@@ -717,7 +718,7 @@ impl<'l> FlatteningContext<'l> {
         } else if kind == kind!("parenthesis_expression") {
             return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| self.flatten_expr(cursor));
         } else {
-            cursor.could_not_match()
+            cursor.could_not_match();
         };
 
         let wire_instance = WireInstance{

@@ -1,10 +1,16 @@
 
 use std::{ops::Range, path::PathBuf};
 
-use crate::{arena_alloc::ArenaVector, errors::{CompileError, ErrorLevel}, file_position::Span, flattening::{IdentifierType, Instruction, WireSource}, linker::{FileUUID, FileUUIDMarker, Linker, NameElem}, parser::*};
+use crate::{
+    arena_alloc::ArenaVector,
+    compiler_top::{add_file, recompile_all},
+    errors::{CompileError, ErrorLevel},
+    file_position::Span,
+    flattening::{IdentifierType, Instruction, WireSource},
+    linker::{FileUUID, FileUUIDMarker, Linker, NameElem}
+};
 
 use ariadne::*;
-
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum IDEIdentifierType {
@@ -74,7 +80,6 @@ pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<(PathBuf, 
     let mut linker = Linker::new();
     let mut paths_arena : ArenaVector<(PathBuf, Source), FileUUIDMarker> = ArenaVector::new();
     for file_path in file_paths {
-        let uuid = linker.reserve_file();
         let file_text = match std::fs::read_to_string(&file_path) {
             Ok(file_text) => file_text,
             Err(reason) => {
@@ -83,13 +88,13 @@ pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<(PathBuf, 
             }
         };
         
-        let full_parse = perform_full_semantic_parse(file_text, uuid);
+        let source = Source::from(file_text.clone());
+        let uuid = add_file(file_text, &mut linker);
 
-        paths_arena.insert(uuid, (file_path, Source::from(full_parse.file_text.file_text.clone())));
-        linker.add_reserved_file(uuid, full_parse);
+        paths_arena.insert(uuid, (file_path, source));
     }
 
-    linker.recompile_all();
+    recompile_all(&mut linker);
     
     (linker, paths_arena)
 }
