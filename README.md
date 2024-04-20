@@ -86,7 +86,8 @@ The main goals of the language are roughly listed below:
 - [x] Latency for output-only modules
 - [x] Latency Counting is invariant across arbitrary algorithm starting nodes
 - [x] Integrate into Verilog generation
-- [ ] Latency rebasing
+- [ ] Latency cuts
+- [ ] Latency Offset
 - [ ] Latency Cuts & Latency Counting for "disjoint Input-Output blocks"
 
 ### LSP

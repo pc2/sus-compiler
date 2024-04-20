@@ -40,9 +40,11 @@ In hardware however, modules are persistent. They are continuously receiving inp
 
 A big factor in SUS' design is the incredibly tight design loop for the programmer. The LSP is an integral part of the experience SUS aims to deliver. 
 
-### How to allow optional ports on module, determined by compile-time parameters?
+In fact, an important litmus test for new language features is how they affect the LSP for the compiler. For instance function/module overloading is a bad feature, because it reduces the LSPs ability to provide documentation on hover and completions in template contexts. 
 
 ### How to ensure good LSP suggestions, even in the context of templates?
+
+### How to allow optional ports on module, determined by compile-time parameters?
 
 ### How should multi-clock designs be represented?
 
