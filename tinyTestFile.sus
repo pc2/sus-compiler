@@ -1,7 +1,14 @@
 
+module submodule_fifo : int i -> int o {
+	o = i
+}
+
 module fifo {
 	interface a
 
+	submodule_fifo sf
 
+	sf.i = 4
+	
 }
 

@@ -169,7 +169,6 @@ module b: HandShake hs -> {
 	}
 }
 
-
 module example_md : 
 	int[4] factors,
 	int add_to ->
@@ -368,6 +367,7 @@ module first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros {
 
 }
 
+
 module multiply_add_with_latencies : int a'0, int b'0, int c'0 -> int r'0 {
     int tmp'1 = multiply(a, b)
 	reg r = tmp + c
@@ -479,7 +479,7 @@ module bad_cycle : int a -> int r {
 
 	r = new_test
 }
-
+module test {}
 module module_taking_time : 
 	int i'0 -> int o'5 {
 	o = i
@@ -497,7 +497,6 @@ module bad_cycle2 : int a -> int r {
 module module_taking_a_lot_of_time : int data_in'0 -> int data_out'200 {
 	data_out = data_in
 }
-
 
 
 /*extern*/ module offset_latency : int i'0 -> int o'-5 {
@@ -542,3 +541,28 @@ module multiple_outputs_only : -> int o, int o2 {
 	reg o = loop
 	reg reg o2 = loop
 }
+
+
+// Test submodule comment
+module submodule : int a, int b -> int r {
+	r = a * b
+}
+
+// module doing nothing
+module doNothing {}
+
+/*
+Multiline
+
+comment
+
+# Test Title
+
+*/
+module contains_submodule_submodule : int a, int b, int c -> int r {
+	// Temp val
+    int tmp = submodule(a, b)
+	doNothing()
+	reg r = tmp + c
+}
+

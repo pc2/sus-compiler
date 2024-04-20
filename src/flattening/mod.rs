@@ -717,6 +717,17 @@ impl<'l> FlatteningContext<'l> {
             WireSource::Constant(Value::Error)
         } else if kind == kind!("parenthesis_expression") {
             return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| self.flatten_expr(cursor));
+        } else if kind == kind!("field_access") {
+            cursor.go_down_no_check(|cursor| {
+                cursor.field(field!("left"));
+                if let Some(instr_id) = self.get_module_by_global_identifier(cursor) {
+                    let submodule = self.instructions[instr_id].extract_submodule();
+
+                    //submodule.module_uuid
+                }
+            });
+            println!("TODO: Field access");
+            WireSource::Constant(Value::Error)
         } else {
             cursor.could_not_match();
         };
@@ -750,6 +761,20 @@ impl<'l> FlatteningContext<'l> {
                 flattened_arr_expr.span = Span::new_overarching(flattened_arr_expr.span, bracket_span.outer_span());
                 
                 Some(flattened_arr_expr)
+            })
+        } else if kind == kind!("field_access") {
+            cursor.go_down_no_check(|cursor| {
+                cursor.field(field!("left"));
+                let flattened_arr_expr_opt = self.flatten_assignable_expr(write_modifiers, cursor);
+                
+                cursor.field(field!("name"));
+                //let (idx, bracket_span) = self.flatten_array_bracket(cursor);
+                
+                //let mut flattened_arr_expr = flattened_arr_expr_opt?; // only unpack the subexpr after flattening the idx, so we catch all errors
+                
+                println!("TODO: Field access in assign");
+
+                return None
             })
         } else if kind == kind!("number") {self.errors.error_basic(span, "Cannot assign to constant"); None
         } else if kind == kind!("unary_op") {self.errors.error_basic(span, "Cannot assign to the result of an operator"); None
@@ -896,6 +921,12 @@ impl<'l> FlatteningContext<'l> {
 
                     for_stmt.loop_body = UUIDRange(code_start, code_end);
                 })
+            } else if kind == kind!("interface_statement") {
+                println!("TODO: Interface Statement");
+            } else if kind == kind!("cross_statement") {
+                println!("TODO: Cross Statement");
+            } else {
+                cursor.could_not_match()
             }
             cursor.clear_gathered_comments(); // Clear comments after every statement, so comments don't bleed over
         });

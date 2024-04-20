@@ -3,6 +3,7 @@ name = "sus_compiler"
 version = "0.0.1"
 authors = ["VonTum <lennart.vanhirtum@gmail.com>"]
 edition = "2021"
+license = "GPL-3.0-or-later"
 repository = "https://github.com/pc2/sus-compiler"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

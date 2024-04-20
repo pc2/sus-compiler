@@ -13,6 +13,8 @@ fn print_current_node_indented(file_text : &FileText, cursor : &TreeCursor) -> S
     let cursor_span = Span::from(n.byte_range());
     let node_name = if n.kind_id() == kind!("identifier") {
         format!("\"{}\"", &file_text[cursor_span])
+    } else if n.kind_id() == kw!("\n") {
+        "\\n".to_owned()
     } else {
         n.kind().to_owned()
     };
