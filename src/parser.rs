@@ -2,62 +2,32 @@
 use sus_proc_macro::{field, kind, kw};
 use tree_sitter::{Tree, TreeCursor};
 
-use crate::{errors::*, file_position::{FileText, Span}};
+use crate::{errors::{error_info, ErrorCollector}, file_position::{FileText, Span}};
 
 use std::num::NonZeroU16;
 
+pub fn get_readable_node_name(file_text : &FileText, kind : u16, span : Span) -> &str {
+    if kind == kind!("identifier") {
+        &file_text[span]
+    } else if kind == kw!("\n") {
+        "\\n"
+    } else {
+        tree_sitter_sus::language().node_kind_for_id(kind).unwrap()
+    }
+}
 
-fn print_current_node_indented(file_text : &FileText, cursor : &TreeCursor) -> String {
+fn print_current_node_indented<'ft>(file_text : &'ft FileText, cursor : &TreeCursor) -> &'ft str {
     let indent = "  ".repeat(cursor.depth() as usize);
     let n = cursor.node();
+    let kind = n.kind_id();
     let cursor_span = Span::from(n.byte_range());
-    let node_name = if n.kind_id() == kind!("identifier") {
-        format!("\"{}\"", &file_text[cursor_span])
-    } else if n.kind_id() == kw!("\n") {
-        "\\n".to_owned()
-    } else {
-        n.kind().to_owned()
-    };
+    let node_name = get_readable_node_name(file_text, kind, cursor_span);
     if let Some(field_name) = cursor.field_name() {
         println!("{indent} {field_name}: {node_name} [{cursor_span}]");
     } else {
         println!("{indent} {node_name} [{cursor_span}]");
     }
     node_name
-}
-
-pub fn report_all_tree_errors(file_text : &FileText, tree : &Tree, errors : &ErrorCollector) {
-    let mut cursor = tree.walk();
-    loop {
-        let n = cursor.node();
-        let span = Span::from(n.byte_range());
-        let node_name = print_current_node_indented(file_text, &cursor);
-        if n.is_error() || n.is_missing() {
-
-            let of_name = if let Some(field) = cursor.field_name() {
-                format!("in the field '{field}' of type '{node_name}'")
-            } else {
-                format!("in a node of type '{node_name}'")
-            };
-            let (error_type, parent_node) = if n.is_missing() {
-                ("missing field", n.parent().unwrap().parent().unwrap()) // Weird workaround because MISSING nodes can't properly parent?
-            } else {
-                ("syntax error", n.parent().unwrap())
-            };
-            let parent_node_name = parent_node.kind();
-            let parent_info = error_info(Span::from(parent_node.byte_range()), errors.file, format!("Parent node '{parent_node_name}'"));
-            errors.error_with_info(span, format!("While parsing '{parent_node_name}', parser found a {error_type} {of_name}"), vec![parent_info]);
-        } else {
-            if cursor.goto_first_child() {
-                continue;
-            }
-        }
-        while !cursor.goto_next_sibling() {
-            if !cursor.goto_parent() {
-                return;
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -320,5 +290,76 @@ impl<'t> Cursor<'t> {
     }
     pub fn clear_gathered_comments(&mut self) {
         self.gathered_comments.clear()
+    }
+
+
+    // Error reporting
+
+    pub fn push_potential_node_error(&mut self, errors : &ErrorCollector) -> bool {
+        let node = self.cursor.node();
+        let is_error = node.is_error() || node.is_missing();
+        if is_error {
+            let node_name = node.kind();
+            let span = Span::from(node.byte_range());
+            let of_name = if let Some(field) = self.cursor.field_name() {
+                format!("in the field '{field}' of type '{node_name}'")
+            } else {
+                format!("in a node of type '{node_name}'")
+            };
+            let (error_type, parent_node) = if node.is_missing() {
+                ("missing field", node.parent().unwrap().parent().unwrap()) // Weird workaround because MISSING nodes can't properly parent?
+            } else {
+                ("syntax error", node.parent().unwrap())
+            };
+            let parent_node_name = parent_node.kind();
+            let parent_info = error_info(Span::from(parent_node.byte_range()), errors.file, format!("Parent node '{parent_node_name}'"));
+            errors.error_with_info(span, format!("While parsing '{parent_node_name}', parser found a {error_type} {of_name}"), vec![parent_info]);
+        }
+        is_error
+    }
+
+    pub fn report_all_decendant_errors(&mut self, errors : &ErrorCollector) {
+        let mut depth = 0;
+        assert!(self.cursor.goto_first_child());
+        loop {
+            if !self.push_potential_node_error(errors) {
+                if self.cursor.goto_first_child() {
+                    depth += 1;
+                    continue;
+                }
+            }
+            while !self.cursor.goto_next_sibling() {
+                assert!(self.cursor.goto_parent());
+                if depth == 0 {
+                    return;
+                } else {
+                    depth -= 1;
+                }
+            }
+        }
+    }
+
+
+    /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
+    #[track_caller]
+    pub fn list_and_report_errors<F : FnMut(&mut Self)>(&mut self, parent_kind : u16, errors : &ErrorCollector, mut func : F) {
+        self.go_down(parent_kind, |cursor| {
+            loop {
+                cursor.push_potential_node_error(errors);
+                if let Some(found) = cursor.cursor.field_id() {
+                    if found == field!("item") {
+                        func(cursor);
+                    } else {
+                        cursor.print_stack();
+                        panic!("List did not only contain 'item' fields, found field '{}' instead!", tree_sitter_sus::language().field_name_for_id(found.into()).unwrap());
+                    }
+                } else {
+                    cursor.maybe_add_comment();
+                }
+                if !cursor.cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+        });
     }
 }

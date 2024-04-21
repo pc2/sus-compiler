@@ -50,7 +50,11 @@ impl ErrorCollector {
         self.errors.get_mut().clear();
     }
 
-    pub fn new_for_same_file(&self) -> Self {
+    pub fn new_for_same_file_clean_did_error(&self) -> Self {
+        Self{errors : RefCell::new(Vec::new()), file : self.file, file_len : self.file_len, did_error : Cell::new(false)}
+    }
+
+    pub fn new_for_same_file_inherit_did_error(&self) -> Self {
         Self{errors : RefCell::new(Vec::new()), file : self.file, file_len : self.file_len, did_error : self.did_error.clone()}
     }
 

@@ -17,7 +17,7 @@ use crate::{
     value::Value
 };
 
-use self::name_context::LocalVariableContext;
+use self::{initialization::ModulePorts, name_context::LocalVariableContext};
 
 
 
@@ -89,6 +89,10 @@ impl<ID : Clone + Copy> InterfacePorts<ID> {
 #[derive(Debug)]
 pub struct Module {
     pub link_info : LinkInfo,
+
+    pub parsing_errors : ErrorCollector,
+
+    pub module_ports : ModulePorts,
 
     pub flattened : FlattenedModule,
 

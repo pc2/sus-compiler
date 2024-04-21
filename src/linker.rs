@@ -280,6 +280,7 @@ impl Linker {
             match v {
                 NameElem::Module(md_id) => {
                     let md = &self.modules[*md_id];
+                    errors.ingest(&md.parsing_errors);
                     errors.ingest(&md.flattened.errors);
                     md.instantiations.collect_errors(errors);
                 }
@@ -342,6 +343,7 @@ impl Linker {
             file_id,
             tree: &file_data.tree,
             file_text: &file_data.file_text,
+            other_parsing_errors : &file_data.parsing_errors,
             associated_values: &mut file_data.associated_values,
             global_namespace: &mut self.global_namespace,
             types: &mut self.types,
@@ -357,6 +359,7 @@ pub struct FileBuilder<'linker> {
     pub file_id : FileUUID,
     pub tree : &'linker Tree,
     pub file_text : &'linker FileText, 
+    pub other_parsing_errors : &'linker ErrorCollector,
     associated_values : &'linker mut Vec<NameElem>,
     global_namespace : &'linker mut HashMap<String, NamespaceElement>,
     #[allow(dead_code)]

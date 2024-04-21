@@ -38,6 +38,12 @@ pub struct UUIDRange<IndexMarker : UUIDMarker>(pub UUID<IndexMarker>, pub UUID<I
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UUIDRangeIter<IndexMarker : UUIDMarker>(UUID<IndexMarker>, UUID<IndexMarker>);
 
+impl<IndexMarker : UUIDMarker> UUIDRange<IndexMarker> {
+    pub fn empty() -> Self {
+        UUIDRange(UUID(0, PhantomData), UUID(0, PhantomData))
+    }
+}
+
 impl<IndexMarker : UUIDMarker> Iterator for UUIDRange<IndexMarker> {
     type Item = UUID<IndexMarker>;
 
@@ -407,6 +413,9 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
     }
     pub fn iter_mut<'a>(&'a mut self) -> FlatAllocIterMut<'a, T, IndexMarker> {
         self.into_iter()
+    }
+    pub fn range_since(&self, id : UUID<IndexMarker>) -> UUIDRange<IndexMarker> {
+        UUIDRange(id, UUID(self.data.len(), PhantomData))
     }
 }
 

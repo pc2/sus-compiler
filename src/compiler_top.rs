@@ -7,8 +7,7 @@ use crate::{
     file_position::FileText,
     flattening::{initialization::gather_initial_file_data, FlattenedModule},
     instantiation::InstantiatedModule,
-    linker::{FileData, FileUUID, Linker, ModuleUUID},
-    parser::report_all_tree_errors
+    linker::{FileData, FileUUID, Linker, ModuleUUID}
 };
 
 pub fn add_file(text : String, linker : &mut Linker) -> FileUUID {
@@ -23,10 +22,6 @@ pub fn add_file(text : String, linker : &mut Linker) -> FileUUID {
         tree,
         associated_values : Vec::new()
     });
-
-    let file_data = &linker.files[file_id];
-
-    report_all_tree_errors(&file_data.file_text, &file_data.tree, &file_data.parsing_errors);
 
     let mut builder = linker.get_file_builder(file_id);
     gather_initial_file_data(&mut builder);
@@ -44,8 +39,6 @@ pub fn update_file(text : String, file_id : FileUUID, linker : &mut Linker) {
     file_data.parsing_errors.reset(text.len());
     file_data.file_text = FileText::new(text);
     file_data.tree = tree;
-
-    report_all_tree_errors(&file_data.file_text, &file_data.tree, &file_data.parsing_errors);
 
     let mut builder = linker.get_file_builder(file_id);
     gather_initial_file_data(&mut builder);
