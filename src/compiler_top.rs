@@ -5,7 +5,7 @@ use tree_sitter::Parser;
 use crate::{
     errors::ErrorCollector,
     file_position::FileText,
-    flattening::{initialization::gather_initial_file_data, FlattenedModule},
+    flattening::{initialization::gather_initial_file_data, typechecking::typecheck_all_modules, FlattenedModule},
     instantiation::InstantiatedModule,
     linker::{FileData, FileUUID, Linker, ModuleUUID}
 };
@@ -52,12 +52,13 @@ pub fn recompile_all(linker : &mut Linker) {
         println!("Flattening {}", md.link_info.name);
 
         let flattened = FlattenedModule::flatten(&linker, md);
-        println!("Typechecking {}", &md.link_info.name);
 
         let md = &mut linker.modules[id]; // Convert to mutable ptr
         md.flattened = flattened;
         md.instantiations.clear_instances();
     }
+
+    typecheck_all_modules(linker);
 
     // Can't merge these loops, because instantiation can only be done once all modules have been type checked
     for (id, _md) in &linker.modules {

@@ -34,10 +34,10 @@ pub struct Port {
 
 #[derive(Debug)]
 pub struct Interface {
+    pub ports_for_this_interface : PortIDRange,
     pub func_call_inputs : PortIDRange,
     pub func_call_outputs : PortIDRange
 }
-
 
 #[derive(Debug)]
 pub struct ModulePorts {
@@ -46,6 +46,8 @@ pub struct ModulePorts {
 }
 
 impl ModulePorts {
+    const MAIN_INTERFACE_ID : InterfaceID = InterfaceID::from_hidden_value(0);
+
     /// Get a port by the given name. Returns None if it does not exist
     pub fn get_port_by_name(&self, name : &str) -> Option<PortID> {
         for (id, data) in &self.ports {
@@ -81,21 +83,21 @@ pub fn gather_initial_file_data(builder : &mut FileBuilder) {
                     let mut ports = FlatAlloc::new();
                     let mut interfaces = FlatAlloc::new();
 
-                    let main_interface = interfaces.get_next_alloc_id();
-                    
                     let mut func_call_inputs = PortIDRange::empty();
                     let mut func_call_outputs = PortIDRange::empty();
 
+                    let ports_start_at = ports.get_next_alloc_id();
+
                     if cursor.optional_field(field!("interface_ports")) {
                         if cursor.optional_field(field!("inputs")) {
-                            func_call_inputs = gather_decl_names_in_list(IdentifierType::Input, main_interface, &mut ports, cursor, builder.file_text);
+                            func_call_inputs = gather_decl_names_in_list(IdentifierType::Input, ModulePorts::MAIN_INTERFACE_ID, &mut ports, cursor, builder.file_text);
                         }
                         if cursor.optional_field(field!("outputs")) {
-                            func_call_outputs = gather_decl_names_in_list(IdentifierType::Output, main_interface, &mut ports, cursor, builder.file_text);
+                            func_call_outputs = gather_decl_names_in_list(IdentifierType::Output, ModulePorts::MAIN_INTERFACE_ID, &mut ports, cursor, builder.file_text);
                         }
                     }
 
-                    interfaces.alloc(Interface{func_call_inputs, func_call_outputs});
+                    interfaces.alloc(Interface{func_call_inputs, func_call_outputs, ports_for_this_interface : ports.range_since(ports_start_at)});
 
                     let md = Module{
                         link_info: LinkInfo {

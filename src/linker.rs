@@ -487,6 +487,7 @@ impl<'linker> GlobalResolver<'linker> {
     pub fn get_module(&self, index: ModuleUUID) -> &'linker Module {
         &self.linker.modules[index]
     }
+    #[allow(dead_code)]
     pub fn get_constant(&self, index: ConstantUUID) -> &'linker NamedConstant {
         &self.linker.constants[index]
     }
