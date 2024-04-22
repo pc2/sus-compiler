@@ -1,14 +1,16 @@
-use crate::linker::ConstantUUIDMarker;
+use crate::linker::{ConstantUUIDMarker, ModuleUUIDMarker};
 
 use super::*;
 
 
 pub fn typecheck_all_modules(linker : &mut Linker) {
+    let linker_modules : *const ArenaAllocator<Module, ModuleUUIDMarker> = &linker.modules;
     for (_id, module) in &mut linker.modules {
         println!("Typechecking {}", &module.link_info.name);
         let mut context = TypeCheckingContext{
             instructions : &mut module.flattened.instructions,
             errors : &module.flattened.errors,
+            linker_modules,
             linker_types : &linker.types,
             linker_constants : &linker.constants
         };
@@ -24,6 +26,12 @@ struct TypeCheckingContext<'l, 'instr> {
     instructions : &'instr mut FlatAlloc<Instruction, FlatIDMarker>,
     errors : &'instr ErrorCollector,
 
+    /// A constant ptr to all modules. Accessing it requires an unsafe dereference. 
+    /// 
+    /// The Typechecking code cannot modify any of the fields it reads from other modules. 
+    /// 
+    /// It can only modify the fields it sets itself. These fields are [WireInstance::typ] and [WireInstance::is_compiletime]
+    linker_modules : *const ArenaAllocator<Module, ModuleUUIDMarker>,
     linker_types : &'l ArenaAllocator<NamedType, TypeUUIDMarker>,
     linker_constants : &'l ArenaAllocator<NamedConstant, ConstantUUIDMarker>
 }

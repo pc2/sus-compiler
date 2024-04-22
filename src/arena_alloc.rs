@@ -390,6 +390,9 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
     pub fn new() -> Self {
         Self{data : Vec::new(), _ph : PhantomData}
     }
+    pub fn with_capacity(cap : usize) -> Self {
+        Self{data : Vec::with_capacity(cap), _ph : PhantomData}
+    }
     pub fn get_next_alloc_id(&self) -> UUID<IndexMarker> {
         let uuid = self.data.len();
         UUID(uuid, PhantomData)

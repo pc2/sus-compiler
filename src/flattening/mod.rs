@@ -18,7 +18,7 @@ use crate::{
     value::Value
 };
 
-use self::{initialization::ModulePorts, name_context::LocalVariableContext};
+use self::{initialization::{ModulePorts, PortIDMarker}, name_context::LocalVariableContext};
 
 
 
@@ -128,11 +128,12 @@ pub type FlatIDRange = UUIDRange<FlatIDMarker>;
 #[derive(Debug)]
 pub enum ConnectionWritePathElement {
     ArrayIdx{idx : FlatID, bracket_span : BracketSpan},
-    //StructField(FieldID)
+    //ModulePort{id : PortID, name_span : Span}
 }
 #[derive(Debug)]
 pub enum ConnectionWritePathElementComputed {
-    ArrayIdx(usize)
+    ArrayIdx(usize),
+    //ModulePort(PortID)
 }
 
 // These are assignable connections
@@ -432,6 +433,7 @@ impl<'l, 'e> LocalOrGlobal<'l, 'e> {
 
 struct FlatteningContext<'l> {
     instructions : FlatAlloc<Instruction, FlatIDMarker>,
+    port_map : FlatAlloc<FlatID, PortIDMarker>,
     errors : ErrorCollector,
     is_declared_in_this_module : bool,
 
@@ -1019,7 +1021,9 @@ impl<'l> FlatteningContext<'l> {
 
     fn flatten_declaration_list(&mut self, identifier_type : IdentifierType, read_only : bool, ports : &mut Vec<FlatID>, cursor : &mut Cursor<'l>) {
         cursor.list(kind!("declaration_list"), |cursor| {
-            ports.push(self.flatten_declaration::<false, false>(identifier_type, read_only, true, cursor));
+            let id = self.flatten_declaration::<false, false>(identifier_type, read_only, true, cursor);
+            ports.push(id);
+            self.port_map.alloc(id);
         });
     }
 
@@ -1048,6 +1052,7 @@ impl<'l> FlatteningContext<'l> {
 
         let mut nested_context = FlatteningContext {
             instructions: std::mem::replace(&mut self.instructions, FlatAlloc::new()),
+            port_map: FlatAlloc::new(),
             errors: ErrorCollector::new(module.link_info.file, local_linker.file.file_text.len()), // Temporary ErrorCollector, unused
             is_declared_in_this_module: false,
             linker: local_linker,
@@ -1099,7 +1104,8 @@ pub struct FlattenedModule {
     pub instructions : FlatAlloc<Instruction, FlatIDMarker>,
     pub errors : ErrorCollector,
     pub interface_ports : InterfacePorts<FlatID>,
-    pub resolved_globals : ResolvedGlobals
+    pub resolved_globals : ResolvedGlobals,
+    pub port_map : FlatAlloc<FlatID, PortIDMarker>
 }
 
 impl FlattenedModule {
@@ -1108,7 +1114,8 @@ impl FlattenedModule {
             instructions : FlatAlloc::new(),
             errors,
             interface_ports : InterfacePorts::empty(),
-            resolved_globals : ResolvedGlobals::new()
+            resolved_globals : ResolvedGlobals::new(),
+            port_map : FlatAlloc::new()
         }
     }
     
@@ -1126,11 +1133,19 @@ impl FlattenedModule {
 
         let mut context = FlatteningContext{
             instructions : FlatAlloc::new(),
+            port_map : FlatAlloc::with_capacity(module.module_ports.ports.len()),
             errors : ErrorCollector::new(module.link_info.file, global_resolver.file.file_text.len()),
             is_declared_in_this_module : true,
             linker : global_resolver,
             local_variable_context : LocalVariableContext::new_initial()
         };
+
+        // Make sure that the gathered ports 
+        assert_eq!(module.module_ports.ports.len(), context.port_map.len());
+        for ((_, port), (_, id)) in zip(&module.module_ports.ports, &context.port_map) {
+            let name_span = context.instructions[*id].extract_wire_declaration().name_span;
+            assert_eq!(port.name_span, name_span);
+        }
 
         // Temporary, switch to iterating over nodes in file itself when needed. 
         let interface_ports = context.flatten_module(&mut cursor);
@@ -1140,6 +1155,7 @@ impl FlattenedModule {
             errors : context.errors,
             instructions : context.instructions,
             interface_ports,
+            port_map : context.port_map
         }
     }
 }
