@@ -40,7 +40,7 @@ impl<'l, 'instr> TypeCheckingContext<'l, 'instr> {
     /*
         ==== Typechecking ====
     */
-    fn typecheck_wire_is_of_type(&self, wire : &WireInstance, expected : &Type, context : &str) {
+    fn typecheck_wire_is_of_type(&self, wire : &WireInstance, expected : &AbstractType, context : &str) {
         typecheck(&wire.typ, wire.span, expected, context, self.linker_types, &self.errors);
     }
 
@@ -79,7 +79,7 @@ impl<'l, 'instr> TypeCheckingContext<'l, 'instr> {
                         self.typecheck_wire_is_of_type(latency_spec_wire, &INT_TYPE, "latency specifier");
                     }
 
-                    decl.typ.for_each_generative_input(&mut |param_id| {
+                    decl.typ_expr.for_each_generative_input(&mut |param_id| {
                         self.typecheck_wire_is_of_type(self.instructions[param_id].extract_wire(), &INT_TYPE, "Array size");
                     });
                 }
@@ -119,7 +119,7 @@ impl<'l, 'instr> TypeCheckingContext<'l, 'instr> {
                             if let Some(typ) = typecheck_is_array_indexer(&arr_wire.typ, arr_wire.span, self.linker_types, &self.errors) {
                                 typ.clone()
                             } else {
-                                Type::Error
+                                AbstractType::Error
                             }
                         }
                         WireSource::Constant(value) => {
@@ -127,7 +127,7 @@ impl<'l, 'instr> TypeCheckingContext<'l, 'instr> {
                         }
                         &WireSource::NamedConstant(id) => {
                             let NamedConstant::Builtin{name:_, typ, val:_} = &self.linker_constants[id];
-                            typ.clone()
+                            typ.into()
                         }
                     };
                     let Instruction::Wire(w) = &mut self.instructions[elem_id] else {unreachable!()};
@@ -185,7 +185,7 @@ impl<'l, 'instr> TypeCheckingContext<'l, 'instr> {
                         self.must_be_compiletime(self.instructions[latency_specifier].extract_wire(), "Latency specifier");
                     }
 
-                    decl.typ.for_each_generative_input(&mut |param_id| {
+                    decl.typ_expr.for_each_generative_input(&mut |param_id| {
                         self.must_be_compiletime(self.instructions[param_id].extract_wire(), "Array size");
                     });
                 }
@@ -274,7 +274,7 @@ impl<'l, 'instr> TypeCheckingContext<'l, 'instr> {
                     }
                 }
                 Instruction::Declaration(decl) => {
-                    decl.typ.for_each_generative_input(&mut |id| instance_fanins[inst_id].push(id));
+                    decl.typ_expr.for_each_generative_input(&mut |id| instance_fanins[inst_id].push(id));
                 }
                 Instruction::Wire(wire) => {
                     wire.source.for_each_input_wire(&mut |id| instance_fanins[inst_id].push(id));

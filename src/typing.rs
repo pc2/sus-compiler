@@ -47,73 +47,86 @@ impl WrittenType {
         }
     }
 
-    pub fn to_type(&self) -> Type {
+    pub fn to_type(&self) -> AbstractType {
         match self {
-            WrittenType::Error(_) => Type::Error,
-            WrittenType::Named(_, id) => Type::Named(*id),
+            WrittenType::Error(_) => AbstractType::Error,
+            WrittenType::Named(_, id) => AbstractType::Named(*id),
             WrittenType::Array(_, arr_box) => {
-                let (elem_typ, arr_idx, _br_span) = arr_box.deref();
-                Type::Array(Box::new((elem_typ.to_type(), *arr_idx)))
+                let (elem_typ, _arr_idx, _br_span) = arr_box.deref();
+                AbstractType::Array(Box::new(elem_typ.to_type()))
             }
         }
     }
-}
 
-// Types contain everything that cannot be expressed at runtime
-#[derive(Debug, Clone)]
-pub enum Type {
-    Error,
-    Unknown,
-    Named(TypeUUID),
-    /*Contains a wireID pointing to a constant expression for the array size, 
-    but doesn't actually take size into account for type checking as that would
-    make type checking too difficult. Instead delay until proper instantiation
-    to check array sizes, as then we have concrete numbers*/
-    Array(Box<(Type, FlatID)>)
-}
-
-impl Type {
-    pub fn to_string(&self, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>) -> String {
-        match self {
-            Type::Error => {
-                "{error}".to_owned()
-            }
-            Type::Unknown => {
-                "{unknown}".to_owned()
-            }
-            Type::Named(id) => {
-                linker_types[*id].get_full_name()
-            }
-            Type::Array(sub) => sub.deref().0.to_string(linker_types) + "[]",
-        }
-    }
     pub fn for_each_generative_input<F : FnMut(FlatID)>(&self, f : &mut F) {
         match self {
-            Type::Error | Type::Unknown | Type::Named(_) => {}
-            Type::Array(arr_box) => {
+            WrittenType::Error(_) | WrittenType::Named(_, _) => {}
+            WrittenType::Array(_span, arr_box) => {
                 f(arr_box.deref().1)
             }
         }
     }
+
+    pub fn to_string(&self, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>) -> String {
+        match self {
+            WrittenType::Error(_) => {
+                "{error}".to_owned()
+            }
+            WrittenType::Named(_, id) => {
+                linker_types[*id].get_full_name()
+            }
+            WrittenType::Array(_, sub) => sub.deref().0.to_string(linker_types) + "[]",
+        }
+    }
+}
+
+/// This contains only the information that can be easily type-checked. 
+/// 
+/// Its most important components are the names and structure of types. 
+/// 
+/// What isn't included are the parameters of types. So Array Sizes for example. 
+#[derive(Debug, Clone)]
+pub enum AbstractType {
+    Error,
+    Unknown,
+    Named(TypeUUID),
+    Array(Box<AbstractType>)
+}
+
+impl AbstractType {
+    pub fn to_string(&self, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>) -> String {
+        match self {
+            AbstractType::Error => {
+                "{error}".to_owned()
+            }
+            AbstractType::Unknown => {
+                "{unknown}".to_owned()
+            }
+            AbstractType::Named(id) => {
+                linker_types[*id].get_full_name()
+            }
+            AbstractType::Array(sub) => sub.deref().to_string(linker_types) + "[]",
+        }
+    }
     pub fn contains_error_or_unknown<const CHECK_ERROR : bool, const CHECK_UNKNOWN : bool>(&self) -> bool {
         match self {
-            Type::Error => CHECK_ERROR,
-            Type::Unknown => CHECK_UNKNOWN,
-            Type::Named(_id) => false,
-            Type::Array(arr_box) => {
-                arr_box.deref().0.contains_error_or_unknown::<CHECK_ERROR, CHECK_UNKNOWN>()
+            AbstractType::Error => CHECK_ERROR,
+            AbstractType::Unknown => CHECK_UNKNOWN,
+            AbstractType::Named(_id) => false,
+            AbstractType::Array(arr_box) => {
+                arr_box.deref().contains_error_or_unknown::<CHECK_ERROR, CHECK_UNKNOWN>()
             }
         }
     }
 }
 
 
-pub const BOOL_TYPE : Type = Type::Named(get_builtin_type("bool"));
-pub const INT_TYPE : Type = Type::Named(get_builtin_type("int"));
+pub const BOOL_TYPE : AbstractType = AbstractType::Named(get_builtin_type("bool"));
+pub const INT_TYPE : AbstractType = AbstractType::Named(get_builtin_type("int"));
 pub const BOOL_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("bool"));
 pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("int"));
 
-pub fn typecheck_unary_operator(op : UnaryOperator, input_typ : &Type, span : Span, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) -> Type {
+pub fn typecheck_unary_operator(op : UnaryOperator, input_typ : &AbstractType, span : Span, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) -> AbstractType {
     if op == UnaryOperator::Not {
         typecheck(input_typ, span, &BOOL_TYPE, "! input", linker_types, errors);
         BOOL_TYPE
@@ -135,7 +148,7 @@ pub fn typecheck_unary_operator(op : UnaryOperator, input_typ : &Type, span : Sp
         gather_type
     }
 }
-pub fn get_binary_operator_types(op : BinaryOperator) -> ((Type, Type), Type) {
+pub fn get_binary_operator_types(op : BinaryOperator) -> ((AbstractType, AbstractType), AbstractType) {
     match op {
         BinaryOperator::And => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
         BinaryOperator::Or => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
@@ -154,18 +167,68 @@ pub fn get_binary_operator_types(op : BinaryOperator) -> ((Type, Type), Type) {
     }
 }
 
-fn type_compare(expected : &Type, found : &Type) -> bool {
-    match (expected, found) {
-        (Type::Named(exp), Type::Named(fnd)) => exp == fnd,
-        (Type::Array(exp), Type::Array(fnd)) => {
-            type_compare(&exp.deref().0, &fnd.deref().0)
+/// Panics on Type Errors that should have been caught by [UnparametrizedType]
+/// 
+/// TODO Add checks for array sizes being equal etc. 
+pub fn typecheck_concrete_unary_operator(op : UnaryOperator, input_typ : &ConcreteType, _span : Span, _linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, _errors : &ErrorCollector) -> ConcreteType {
+    let gather_type = match op {
+        UnaryOperator::Not => {
+            assert_eq!(*input_typ, BOOL_CONCRETE_TYPE);
+            return BOOL_CONCRETE_TYPE
         }
-        (Type::Error, _) | (_, Type::Error) => true, // Just assume correct, because the other side has an error
-        (Type::Unknown, _) | (_, Type::Unknown) => todo!("Type Unification"),
+        UnaryOperator::Negate => {
+            assert_eq!(*input_typ, INT_CONCRETE_TYPE);
+            return INT_CONCRETE_TYPE
+        }
+        UnaryOperator::And => BOOL_CONCRETE_TYPE,
+        UnaryOperator::Or => BOOL_CONCRETE_TYPE,
+        UnaryOperator::Xor => BOOL_CONCRETE_TYPE,
+        UnaryOperator::Sum => INT_CONCRETE_TYPE,
+        UnaryOperator::Product => INT_CONCRETE_TYPE
+    };
+    assert_eq!(input_typ.down_array(), &gather_type);
+    gather_type
+}
+/// Panics on Type Errors that should have been caught by [UnparametrizedType]
+/// 
+/// TODO Add checks for array sizes being equal etc. 
+pub fn typecheck_concrete_binary_operator(op : BinaryOperator, left_typ : &ConcreteType, right_typ : &ConcreteType, _span : Span, _linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, _errors : &ErrorCollector) -> ConcreteType {
+    let ((in_left, in_right), out) = match op {
+        BinaryOperator::And => ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+        BinaryOperator::Or => ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+        BinaryOperator::Xor => ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+        BinaryOperator::Add => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
+        BinaryOperator::Subtract => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
+        BinaryOperator::Multiply => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
+        BinaryOperator::Divide => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
+        BinaryOperator::Modulo => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
+        BinaryOperator::Equals => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+        BinaryOperator::NotEquals => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+        BinaryOperator::GreaterEq => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+        BinaryOperator::Greater => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+        BinaryOperator::LesserEq => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+        BinaryOperator::Lesser => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+    };
+
+    assert_eq!(*left_typ, in_left);
+    assert_eq!(*right_typ, in_right);
+
+    out
+}
+
+
+fn type_compare(expected : &AbstractType, found : &AbstractType) -> bool {
+    match (expected, found) {
+        (AbstractType::Named(exp), AbstractType::Named(fnd)) => exp == fnd,
+        (AbstractType::Array(exp), AbstractType::Array(fnd)) => {
+            type_compare(&exp.deref(), &fnd.deref())
+        }
+        (AbstractType::Error, _) | (_, AbstractType::Error) => true, // Just assume correct, because the other side has an error
+        (AbstractType::Unknown, _) | (_, AbstractType::Unknown) => todo!("Type Unification"),
         _ => false,
     }
 }
-pub fn typecheck(found : &Type, span : Span, expected : &Type, context : &str, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) {
+pub fn typecheck(found : &AbstractType, span : Span, expected : &AbstractType, context : &str, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) {
     if !type_compare(expected, found) {
         let expected_name = expected.to_string(linker_types);
         let found_name = found.to_string(linker_types);
@@ -173,19 +236,35 @@ pub fn typecheck(found : &Type, span : Span, expected : &Type, context : &str, l
         assert!(expected_name != found_name, "{expected_name} != {found_name}");
     }
 }
-pub fn typecheck_is_array_indexer<'a>(arr_type : &'a Type, span : Span, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) -> Option<&'a Type> {
-    let Type::Array(arr_element_type) = arr_type else {
+pub fn typecheck_is_array_indexer<'a>(arr_type : &'a AbstractType, span : Span, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) -> Option<&'a AbstractType> {
+    let AbstractType::Array(arr_element_type) = arr_type else {
         let arr_type_name = arr_type.to_string(linker_types);
         errors.error_basic(span, format!("Typing Error: Attempting to index into this, but it is not of array type, instead found a {arr_type_name}"));
         return None;
     };
-    Some(&arr_element_type.deref().0)
+    Some(&arr_element_type.deref())
 }
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ConcreteType {
     Named(TypeUUID),
     Array(Box<(ConcreteType, u64)>)
+}
+
+impl Into<AbstractType> for &ConcreteType {
+    fn into(self) -> AbstractType {
+        match self {
+            ConcreteType::Named(name) => {
+                AbstractType::Named(*name)
+            }
+            ConcreteType::Array(arr) => {
+
+                let (sub, _sz) = arr.deref();
+                let concrete_sub : AbstractType = sub.into();
+                AbstractType::Array(Box::new(concrete_sub))
+            }
+        }
+    }
 }
 
 impl ConcreteType {
@@ -207,13 +286,18 @@ impl ConcreteType {
     }
     pub fn to_string(&self, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>) -> String {
         match self {
-            ConcreteType::Named(id) => {
-                linker_types[*id].get_full_name()
+            ConcreteType::Named(name) => {
+                linker_types[*name].get_full_name()
             }
-            ConcreteType::Array(sub) => {
-                let (elem_typ, arr_size) = sub.deref();
+            ConcreteType::Array(arr_box) => {
+                let (elem_typ, arr_size) = arr_box.deref();
                 format!("{}[{}]", elem_typ.to_string(linker_types), arr_size)
             }
         }
+    }
+    pub fn down_array(&self) -> &ConcreteType {
+        let ConcreteType::Array(arr_box) = self else {unreachable!()};
+        let (sub, _sz) = arr_box.deref();
+        sub
     }
 }

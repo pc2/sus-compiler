@@ -14,7 +14,7 @@ use crate::{
     instantiation::InstantiationList,
     linker::{ConstantUUID, FileUUID, GlobalResolver, LinkInfo, Linker, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedGlobals, ResolvedNameElem, TypeUUIDMarker},
     parser::{Cursor, Documentation},
-    typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, Type, WrittenType, BOOL_TYPE, INT_TYPE},
+    typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, AbstractType, WrittenType, BOOL_TYPE, INT_TYPE},
     value::Value
 };
 
@@ -295,7 +295,7 @@ const IS_GEN_UNINIT : bool = false;
 
 #[derive(Debug)]
 pub struct WireInstance {
-    pub typ : Type,
+    pub typ : AbstractType,
     pub is_compiletime : bool,
     pub span : Span,
     pub is_declared_in_this_module : bool,
@@ -305,7 +305,7 @@ pub struct WireInstance {
 #[derive(Debug)]
 pub struct Declaration {
     pub typ_expr : WrittenType,
-    pub typ : Type,
+    pub typ : AbstractType,
     pub is_declared_in_this_module : bool,
     pub name_span : Span,
     pub name : String,
@@ -384,7 +384,7 @@ impl Instruction {
         sm
     }
 
-    pub fn for_each_embedded_type<F : FnMut(&Type, Span)>(&self, f : &mut F) {
+    pub fn for_each_embedded_type<F : FnMut(&AbstractType, Span)>(&self, f : &mut F) {
         match self {
             Instruction::SubModule(_) | Instruction::Write(_) | Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
             Instruction::Declaration(decl) => {
@@ -739,7 +739,7 @@ impl<'l> FlatteningContext<'l> {
         };
 
         let wire_instance = WireInstance{
-            typ : Type::Unknown,
+            typ : AbstractType::Unknown,
             is_compiletime : IS_GEN_UNINIT,
             span: expr_span,
             source,
@@ -858,7 +858,7 @@ impl<'l> FlatteningContext<'l> {
         };
         for leftover_to in to_iter {
             if let Ok(to) = leftover_to {
-                let err_id = self.instructions.alloc(Instruction::Wire(WireInstance{typ : Type::Error, is_compiletime : true, span : func_call_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::Constant(Value::Error)}));
+                let err_id = self.instructions.alloc(Instruction::Wire(WireInstance{typ : AbstractType::Error, is_compiletime : true, span : func_call_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::Constant(Value::Error)}));
                 self.instructions.alloc(Instruction::Write(Write{from: err_id, to}));
             }
         }

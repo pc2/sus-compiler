@@ -2,7 +2,18 @@ use std::{cell::RefCell, cmp::max, iter::zip, ops::Deref, rc::Rc};
 
 use num::BigInt;
 
-use crate::{arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, compiler_top::instantiate, errors::ErrorCollector, file_position::Span, flattening::{BinaryOperator, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, IdentifierType, Instruction, InterfacePorts, UnaryOperator, WireInstance, WireSource, Write, WriteModifiers}, instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}, linker::{Linker, NamedConstant}, list_of_lists::ListOfLists, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, value::{compute_binary_op, compute_unary_op, Value}};
+use crate::{
+    arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID},
+    compiler_top::instantiate,
+    errors::ErrorCollector,
+    file_position::Span,
+    flattening::{BinaryOperator, ConnectionWritePathElement, ConnectionWritePathElementComputed, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, IdentifierType, Instruction, InterfacePorts, UnaryOperator, WireInstance, WireSource, Write, WriteModifiers},
+    instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError},
+    linker::{Linker, NamedConstant},
+    list_of_lists::ListOfLists,
+    typing::{typecheck_concrete_binary_operator, typecheck_concrete_unary_operator, ConcreteType, WrittenType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
+    value::{compute_binary_op, compute_unary_op, Value}
+};
 
 use self::latency_algorithm::SpecifiedLatency;
 
@@ -198,15 +209,15 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         self.extract_integer_from_value(val, span)
     }
 
-    fn concretize_type(&self, typ : &Type, span : Span) -> Option<ConcreteType> {
+    fn concretize_type(&self, typ : &WrittenType) -> Option<ConcreteType> {
         match typ {
-            Type::Error | Type::Unknown => unreachable!("Bad types should be caught in flattening: {}", typ.to_string(&self.linker.types)),
-            Type::Named(id) => {
+            WrittenType::Error(_) => unreachable!("Bad types should be caught in flattening: {}", typ.to_string(&self.linker.types)),
+            WrittenType::Named(_, id) => {
                 Some(ConcreteType::Named(*id))
             }
-            Type::Array(arr_box) => {
-                let (arr_content_typ, arr_size_wire) = arr_box.deref();
-                let inner_typ = self.concretize_type(arr_content_typ, span);
+            WrittenType::Array(_, arr_box) => {
+                let (arr_content_typ, arr_size_wire, _bracket_span) = arr_box.deref();
+                let inner_typ = self.concretize_type(arr_content_typ);
                 let arr_size = self.extract_integer_from_generative(*arr_size_wire);
                 Some(ConcreteType::Array(Box::new((inner_typ?, arr_size?))))
             }
@@ -350,8 +361,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             SubModuleOrWire::Wire(w) => Some(*w),
             SubModuleOrWire::CompileTimeValue(v) => {
                 let value = v.clone();
-                let Instruction::Wire(wire) = &self.flattened.instructions[flat_id] else {unreachable!()};
-                let typ = self.concretize_type(&wire.typ, wire.span)?;
+                //let wire = self.flattened.instructions[flat_id].extract_wire();
+                //let typ = self.concretize_type(&wire.typ)?;
+                let typ = v.get_concrete_type_of_constant();
                 let name = self.get_unique_name();
                 Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id, typ, name, absolute_latency : CALCULATE_LATENCY_LATER, needed_until : CALCULATE_LATENCY_LATER}))
             }
@@ -421,7 +433,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, wires : interface_real_wires, name : submodule.name.clone()}))
                 }
                 Instruction::Declaration(wire_decl) => {
-                    let typ = self.concretize_type(&wire_decl.typ, wire_decl.typ_expr.get_span())?;
+                    let typ = self.concretize_type(&wire_decl.typ_expr)?;
                     if wire_decl.identifier_type.is_generative() {
                         let initial_value = typ.get_initial_val(self.linker);
                         assert!(initial_value.is_of_type(&typ));
@@ -455,7 +467,28 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     }
                 }
                 Instruction::Wire(w) => {
-                    let typ = self.concretize_type(&w.typ, w.span)?;
+                    let typ = match &w.source {
+                        &WireSource::WireRead(from) => {
+                            self.concretize_type(&self.flattened.instructions[from].extract_wire_declaration().typ_expr)?
+                        }
+                        &WireSource::UnaryOp { op, right } => {
+                            let right_typ = self.get_current_concrete_type(right);
+                            typecheck_concrete_unary_operator(op, &right_typ, w.span, &self.linker.types, &self.errors)
+                        }
+                        &WireSource::BinaryOp { op, left, right } => {
+                            let left_typ = self.get_current_concrete_type(left);
+                            let right_typ = self.get_current_concrete_type(right);
+                            typecheck_concrete_binary_operator(op, &left_typ, &right_typ, w.span, &self.linker.types, &self.errors)
+                        }
+                        &WireSource::ArrayAccess { arr, arr_idx, bracket_span : _ } => {
+                            let arr_typ = self.get_current_concrete_type(arr);
+                            let arr_idx_typ = self.get_current_concrete_type(arr_idx);
+                            assert_eq!(arr_idx_typ, INT_CONCRETE_TYPE);
+                            arr_typ.down_array().clone()
+                        }
+                        WireSource::Constant(v) => v.get_concrete_type_of_constant(),
+                        &WireSource::NamedConstant(nc) => self.linker.constants[nc].get_concrete_type().clone(),
+                    };
                     if w.is_compiletime {
                         let value_computed = self.compute_compile_time(&w.source)?;
                         assert!(value_computed.is_of_type(&typ));
@@ -533,6 +566,15 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         Some(())
     }
 
+    fn get_current_concrete_type(&self, w: FlatID) -> ConcreteType {
+        match &self.generation_state[w] {
+            SubModuleOrWire::Wire(w_idx) => self.wires[*w_idx].typ.clone(),
+            SubModuleOrWire::CompileTimeValue(cv) => cv.get_concrete_type_of_constant(),
+            SubModuleOrWire::SubModule(_) => unreachable!("Cannot get concrete type of submodule"),
+            SubModuleOrWire::Unnasigned => unreachable!("Concrete type of Unassigned, should have been caught in abstract typecheck?"),
+        }
+    }
+    
     fn make_fanins(&self) -> (ListOfLists<FanInOut>, Vec<SpecifiedLatency>) {
         let mut fanins : ListOfLists<FanInOut> = ListOfLists::new_with_groups_capacity(self.wires.len());
         let mut initial_latencies = Vec::new();

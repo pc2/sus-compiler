@@ -8,7 +8,7 @@ use crate::{
     file_position::{FileText, Span},
     flattening::Module,
     parser::Documentation,
-    typing::Type,
+    typing::ConcreteType,
     util::{const_str_position, const_str_position_in_tuples},
     value::Value
 };
@@ -94,7 +94,15 @@ pub trait Linkable {
 
 #[derive(Debug)]
 pub enum NamedConstant {
-    Builtin{name : &'static str, typ : Type, val : Value}
+    Builtin{name : &'static str, typ : ConcreteType, val : Value}
+}
+
+impl NamedConstant {
+    pub fn get_concrete_type(&self) -> &ConcreteType {
+        match self {
+            NamedConstant::Builtin { name : _, typ, val : _ } => typ
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -193,7 +201,7 @@ impl Linker {
             add_known_unique_name(&mut result, name.into(), NameElem::Type(id));
         }
         for (name, val) in BUILTIN_CONSTANTS {
-            let id = result.constants.alloc(NamedConstant::Builtin{name, typ : val.get_type_of_constant(), val});
+            let id = result.constants.alloc(NamedConstant::Builtin{name, typ : val.get_concrete_type_of_constant(), val});
             add_known_unique_name(&mut result, name.into(), NameElem::Constant(id));
         }
 

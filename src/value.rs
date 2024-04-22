@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use num::BigInt;
 
-use crate::{flattening::{BinaryOperator, UnaryOperator}, typing::{ConcreteType, Type, BOOL_CONCRETE_TYPE, BOOL_TYPE, INT_CONCRETE_TYPE, INT_TYPE}};
+use crate::{flattening::{BinaryOperator, UnaryOperator}, typing::{ConcreteType, AbstractType, BOOL_CONCRETE_TYPE, BOOL_TYPE, INT_CONCRETE_TYPE, INT_TYPE}};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum Value {
@@ -14,7 +14,7 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn get_type_of_constant(&self) -> Type {
+    pub fn get_type_of_constant(&self) -> AbstractType {
         match self {
             Value::Bool(_) => BOOL_TYPE,
             Value::Integer(_) => INT_TYPE,
@@ -27,8 +27,24 @@ impl Value {
                 }
                 Type::Array(Box::new((content_typ, b.len())))*/
             }
-            Value::Unset => Type::Error,
-            Value::Error => Type::Error,
+            Value::Unset => AbstractType::Error,
+            Value::Error => AbstractType::Error,
+        }
+    }
+    pub fn get_concrete_type_of_constant(&self) -> ConcreteType {
+        match self {
+            Value::Bool(_) => BOOL_CONCRETE_TYPE,
+            Value::Integer(_) => INT_CONCRETE_TYPE,
+            Value::Array(_b) => {
+                unreachable!("Can't express arrays as constants (yet?)");
+                /*let content_typ = if let Some(b_first) = b.first() {
+                    b_first.get_type()
+                } else {
+                    Type::Invalid
+                }
+                Type::Array(Box::new((content_typ, b.len())))*/
+            }
+            Value::Unset | Value::Error => unreachable!()
         }
     }
     pub fn is_of_type(&self, typ : &ConcreteType) -> bool {
