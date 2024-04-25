@@ -46,7 +46,7 @@ pub struct ModulePorts {
 }
 
 impl ModulePorts {
-    const MAIN_INTERFACE_ID : InterfaceID = InterfaceID::from_hidden_value(0);
+    pub const MAIN_INTERFACE_ID : InterfaceID = InterfaceID::from_hidden_value(0);
 
     /// Get a port by the given name. Returns None if it does not exist
     pub fn get_port_by_name(&self, name : &str) -> Option<PortID> {

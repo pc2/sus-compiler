@@ -18,11 +18,8 @@ use crate::{
     value::Value
 };
 
-use self::{initialization::{ModulePorts, PortIDMarker}, name_context::LocalVariableContext};
+use self::{initialization::{ModulePorts, PortID, PortIDMarker, PortIDRange}, name_context::LocalVariableContext};
 
-
-
-use core::ops::Range;
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum IdentifierType {
@@ -49,41 +46,13 @@ impl IdentifierType {
     pub fn is_port(&self) -> bool {
         *self == IdentifierType::Input || *self == IdentifierType::Output
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct InterfacePorts<ID : Clone + Copy> {
-    pub outputs_start : usize,
-    pub ports : Box<[ID]>
-}
-
-impl<ID : Clone + Copy> InterfacePorts<ID> {
-    pub fn empty() -> Self {
-        InterfacePorts{outputs_start : 0, ports : Box::new([])}
-    }
-
-    // Todo, just treat all inputs and outputs as function call interface
-    pub fn func_call_syntax_inputs(&self) -> Range<usize> {
-        0..self.outputs_start
-    }
-    pub fn func_call_syntax_outputs(&self) -> Range<usize> {
-        self.outputs_start..self.ports.len()
-    }
-    pub fn inputs(&self) -> &[ID] {
-        &self.ports[..self.outputs_start]
-    }
-    pub fn outputs(&self) -> &[ID] {
-        &self.ports[self.outputs_start..]
-    }
-
-    pub fn map<OtherID : Clone + Copy, MapFn : FnMut(ID, /*is_input : */bool) -> OtherID>(&self, f : &mut MapFn) -> InterfacePorts<OtherID> {
-        InterfacePorts{
-            ports : self.ports.iter().enumerate().map(|(idx, v)| f(*v, idx < self.outputs_start)).collect(),
-            outputs_start : self.outputs_start
+    #[track_caller]
+    pub fn unwrap_is_input(&self) -> bool {
+        match self {
+            IdentifierType::Input => true,
+            IdentifierType::Output => false,
+            _ => unreachable!()
         }
-    }
-    pub fn iter(&self) -> impl Iterator<Item = (ID, /*is_input : */bool)> + '_ {
-        self.ports.iter().enumerate().map(|(idx, v)| (*v, idx < self.outputs_start))
     }
 }
 
@@ -105,9 +74,9 @@ impl Module {
     pub fn print_flattened_module(&self) {
         println!("[[{}]]:", self.link_info.name);
         println!("Interface:");
-        for (port, is_input) in self.flattened.interface_ports.iter() {
-            let port_direction = if is_input {"input"} else {"output"};
-            let port_name = &self.flattened.instructions[port].extract_wire_declaration().name;
+        for (_port_id, port) in &self.module_ports.ports {
+            let port_direction = if port.id_typ == IdentifierType::Input {"input"} else {"output"};
+            let port_name = &port.name;
             println!("    {port_direction} {port_name} -> {:?}", port);
         }
         println!("Instantiations:");
@@ -125,25 +94,46 @@ pub type FlatID = UUID<FlatIDMarker>;
 
 pub type FlatIDRange = UUIDRange<FlatIDMarker>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ConnectionWritePathElement {
     ArrayIdx{idx : FlatID, bracket_span : BracketSpan},
-    //ModulePort{id : PortID, name_span : Span}
 }
-#[derive(Debug)]
-pub enum ConnectionWritePathElementComputed {
-    ArrayIdx(usize),
-    //ModulePort(PortID)
+
+#[derive(Debug, Clone, Copy)]
+pub enum ConnectionWriteRoot {
+    LocalDecl(FlatID),
+    SubModulePort(PortInfo)
+}
+
+impl ConnectionWriteRoot {
+    #[track_caller]
+    pub fn unwrap_decl(&self) -> FlatID {
+        let Self::LocalDecl(decl) = self else {unreachable!()};
+        *decl
+    }
+    #[track_caller]
+    pub fn unwrap_module_port(&self) -> &PortInfo {
+        let Self::SubModulePort(port) = self else {unreachable!()};
+        port
+    }
+}
+
+impl ConnectionWriteRoot {
+    pub fn get_root_flat(&self) -> FlatID {
+        match self {
+            ConnectionWriteRoot::LocalDecl(f) => *f,
+            ConnectionWriteRoot::SubModulePort(port) => port.submodule,
+        }
+    }
 }
 
 // These are assignable connections
 #[derive(Debug)]
 pub struct ConnectionWrite {
-    pub root : FlatID,
+    pub root : ConnectionWriteRoot,
     pub root_span : Span,
     pub path : Vec<ConnectionWritePathElement>,
     pub span : Span,
-    pub is_declared_in_this_module : bool,
     pub write_modifiers : WriteModifiers
 }
 
@@ -268,8 +258,18 @@ impl core::fmt::Display for BinaryOperator {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct PortInfo {
+    pub submodule : FlatID,
+    pub port : PortID,
+    /// Only set if the port is named as an explicit field. If the port name is implicit, such as in the function call syntax, then it is not present. 
+    pub port_name_span : Option<Span>,
+    pub port_identifier_typ : IdentifierType
+}
+
 #[derive(Debug)]
 pub enum WireSource {
+    PortRead(PortInfo),
     WireRead(FlatID), // Used to add a span to the reference of a wire. 
     UnaryOp{op : UnaryOperator, right : FlatID},
     BinaryOp{op : BinaryOperator, left : FlatID, right : FlatID},
@@ -279,12 +279,14 @@ pub enum WireSource {
 }
 
 impl WireSource {
-    pub fn for_each_input_wire<F : FnMut(FlatID)>(&self, func : &mut F) {
+    /// Enumerates all instructions that this instruction depends on. This includes (maybe compiletime) wires, and submodules. 
+    pub fn for_each_dependency<F : FnMut(FlatID)>(&self, func : &mut F) {
         match self {
             &WireSource::WireRead(from_wire) => {func(from_wire)}
             &WireSource::UnaryOp { op:_, right } => {func(right)}
             &WireSource::BinaryOp { op:_, left, right } => {func(left); func(right)}
             &WireSource::ArrayAccess { arr, arr_idx, bracket_span:_ } => {func(arr); func(arr_idx)}
+            WireSource::PortRead(port) => {func(port.submodule)}
             WireSource::Constant(_) => {}
             WireSource::NamedConstant(_) => {}
         }
@@ -298,7 +300,6 @@ pub struct WireInstance {
     pub typ : AbstractType,
     pub is_compiletime : bool,
     pub span : Span,
-    pub is_declared_in_this_module : bool,
     pub source : WireSource
 }
 
@@ -306,7 +307,6 @@ pub struct WireInstance {
 pub struct Declaration {
     pub typ_expr : WrittenType,
     pub typ : AbstractType,
-    pub is_declared_in_this_module : bool,
     pub name_span : Span,
     pub name : String,
     /// Variables are read_only when they may not be controlled by the current block of code. 
@@ -321,8 +321,11 @@ pub struct Declaration {
 }
 
 impl Declaration {
+    pub fn get_span(&self) -> Span {
+        Span::new_overarching(self.typ_expr.get_span(), self.name_span)
+    }
     pub fn make_declared_here(&self, file : FileUUID) -> ErrorInfo {
-        error_info(Span::new_overarching(self.typ_expr.get_span(), self.name_span), file, "Declared here")
+        error_info(self.get_span(), file, "Declared here")
     }
 }
 
@@ -330,9 +333,7 @@ impl Declaration {
 pub struct SubModuleInstance {
     pub module_uuid : ModuleUUID,
     pub name : String,
-    pub module_name_span : Span,
-    pub is_declared_in_this_module : bool,
-    pub interface_ports : InterfacePorts<FlatID>
+    pub module_name_span : Span
 }
 
 #[derive(Debug)]
@@ -364,23 +365,23 @@ pub enum Instruction {
 
 impl Instruction {
     #[track_caller]
-    pub fn extract_wire(&self) -> &WireInstance {
-        let Self::Wire(w) = self else {panic!("extract_wire on not a wire! Found {self:?}")};
+    pub fn unwrap_wire(&self) -> &WireInstance {
+        let Self::Wire(w) = self else {panic!("unwrap_wire on not a wire! Found {self:?}")};
         w
     }
     #[track_caller]
-    pub fn extract_wire_declaration(&self) -> &Declaration {
-        let Self::Declaration(w) = self else {panic!("extract_wire on not a WireDeclaration! Found {self:?}")};
+    pub fn unwrap_wire_declaration(&self) -> &Declaration {
+        let Self::Declaration(w) = self else {panic!("unwrap_wire_declaration on not a WireDeclaration! Found {self:?}")};
         w
     }
     #[track_caller]
-    pub fn extract_submodule(&self) -> &SubModuleInstance {
-        let Self::SubModule(sm) = self else {panic!("extract_wire on not a SubModule! Found {self:?}")};
+    pub fn unwrap_submodule(&self) -> &SubModuleInstance {
+        let Self::SubModule(sm) = self else {panic!("unwrap_submodule on not a SubModule! Found {self:?}")};
         sm
     }
     #[track_caller]
-    pub fn extract_write(&self) -> &Write {
-        let Self::Write(sm) = self else {panic!("extract_write on not a Write! Found {self:?}")};
+    pub fn unwrap_write(&self) -> &Write {
+        let Self::Write(sm) = self else {panic!("unwrap_write on not a Write! Found {self:?}")};
         sm
     }
 
@@ -397,13 +398,13 @@ impl Instruction {
     }
 
     pub fn get_location_of_module_part(&self) -> Option<Span> {
-        match self {
-            Instruction::SubModule(sm) => sm.is_declared_in_this_module.then_some(sm.module_name_span),
-            Instruction::Declaration(decl) => decl.is_declared_in_this_module.then_some(decl.name_span),
-            Instruction::Wire(w) => w.is_declared_in_this_module.then_some(w.span),
-            Instruction::Write(conn) => conn.to.is_declared_in_this_module.then_some(conn.to.span),
-            Instruction::IfStatement(_) | Instruction::ForStatement(_) => None
-        }
+        Some(match self {
+            Instruction::SubModule(sm) => sm.module_name_span,
+            Instruction::Declaration(decl) => decl.name_span,
+            Instruction::Wire(w) => w.span,
+            Instruction::Write(conn) => conn.to.span,
+            Instruction::IfStatement(_) | Instruction::ForStatement(_) => return None
+        })
     }
 }
 
@@ -435,7 +436,6 @@ struct FlatteningContext<'l> {
     instructions : FlatAlloc<Instruction, FlatIDMarker>,
     port_map : FlatAlloc<FlatID, PortIDMarker>,
     errors : ErrorCollector,
-    is_declared_in_this_module : bool,
 
     local_variable_context : LocalVariableContext<'l, FlatID>,
     linker : GlobalResolver<'l>
@@ -531,13 +531,16 @@ impl<'l> FlatteningContext<'l> {
                 ModuleOrWrittenType::WrittenType(typ) => {
                     typ
                 }
-                ModuleOrWrittenType::Module(span, md_id) => {
+                ModuleOrWrittenType::Module(span, module_uuid) => {
                     assert!(ALLOW_MODULES);
                     if let Some((_, span)) = span_latency_specifier {
                         self.errors.error_basic(span, "Cannot add latency specifier to module instances");
                     }
-                    let md = self.linker.get_module(md_id);
-                    return self.alloc_module_interface(self.linker.file.file_text[name_span].to_owned(), md, md_id, span)
+                    return self.instructions.alloc(Instruction::SubModule(SubModuleInstance{
+                        name : self.linker.file.file_text[name_span].to_owned(),
+                        module_uuid,
+                        module_name_span: span
+                    }))
                 }
             };
 
@@ -548,7 +551,6 @@ impl<'l> FlatteningContext<'l> {
             let inst_id = self.instructions.alloc(Instruction::Declaration(Declaration{
                 typ : typ_expr.to_type(),
                 typ_expr,
-                is_declared_in_this_module : self.is_declared_in_this_module,
                 read_only,
                 declaration_itself_is_not_written_to,
                 identifier_type,
@@ -559,7 +561,7 @@ impl<'l> FlatteningContext<'l> {
             }));
 
             if let Err(conflict) = self.local_variable_context.add_declaration(name, inst_id) {
-                self.errors.error_with_info(Span::new_overarching(typ_expr_span, name_span), "This declaration conflicts with a previous declaration in the same scope", vec![self.instructions[conflict].extract_wire_declaration().make_declared_here(self.errors.file)])
+                self.errors.error_with_info(Span::new_overarching(typ_expr_span, name_span), "This declaration conflicts with a previous declaration in the same scope", vec![self.instructions[conflict].unwrap_wire_declaration().make_declared_here(self.errors.file)])
             }
 
             inst_id
@@ -572,11 +574,11 @@ impl<'l> FlatteningContext<'l> {
         )
     }
 
-    fn desugar_func_call(&mut self, cursor : &mut Cursor<'l>) -> Option<(&Module, InterfacePorts<FlatID>)> {
+    fn desugar_func_call(&mut self, cursor : &mut Cursor<'l>) -> Option<(&Module, FlatID, PortIDRange)> {
         let whole_function_span = cursor.span();
         cursor.go_down(kind!("func_call"), |cursor| {
             cursor.field(field!("name"));
-            let instantiation_flat_id = self.get_module_by_global_identifier(cursor);
+            let instantiation_flat_id = self.get_or_alloc_module_by_global_identifier(cursor);
 
             cursor.field(field!("arguments"));
             let arguments_span = BracketSpan::from_outer(cursor.span());
@@ -584,13 +586,13 @@ impl<'l> FlatteningContext<'l> {
                 self.flatten_expr(cursor)
             });
 
-            let func_instantiation = self.instructions[instantiation_flat_id?].extract_submodule();
+            let instantiation_flat_id = instantiation_flat_id?;
+            let func_instantiation = self.instructions[instantiation_flat_id].unwrap_submodule();
 
             let md = self.linker.get_module(func_instantiation.module_uuid);
 
-            let submodule_local_wires = func_instantiation.interface_ports.clone();
-            
-            let inputs = submodule_local_wires.func_call_syntax_inputs();
+            let inputs = md.module_ports.interfaces[ModulePorts::MAIN_INTERFACE_ID].func_call_inputs;
+            let outputs = md.module_ports.interfaces[ModulePorts::MAIN_INTERFACE_ID].func_call_outputs;
 
             let arg_count = arguments.len();
             let expected_arg_count = inputs.len();
@@ -601,7 +603,7 @@ impl<'l> FlatteningContext<'l> {
                 let module_info = vec![error_info(md.link_info.span, md.link_info.file, "Interface defined here")];
                 if arg_count > expected_arg_count {
                     // Too many args, complain about excess args at the end
-                    let excess_args_span = Span::new_overarching(self.instructions[args[expected_arg_count]].extract_wire().span, self.instructions[*args.last().unwrap()].extract_wire().span);
+                    let excess_args_span = Span::new_overarching(self.instructions[args[expected_arg_count]].unwrap_wire().span, self.instructions[*args.last().unwrap()].unwrap_wire().span);
                     
                     self.errors.error_with_info(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."), module_info);
                     // Shorten args to still get proper type checking for smaller arg array
@@ -612,18 +614,23 @@ impl<'l> FlatteningContext<'l> {
                 }
             }
 
-            for (field, arg_read_side) in zip(inputs, args) {
-                let arg_wire = self.instructions[*arg_read_side].extract_wire();
-                let func_input_port = &submodule_local_wires.ports[field];
-                self.instructions.alloc(Instruction::Write(Write{from: *arg_read_side, to: ConnectionWrite{root : *func_input_port, root_span : whole_function_span, path : Vec::new(), span : arg_wire.span, is_declared_in_this_module : self.is_declared_in_this_module, write_modifiers : WriteModifiers::Connection{num_regs : 0, regs_span : arg_wire.span.empty_span_at_front()}}}));
+            for (port_id, arg_read_side) in zip(inputs, args) {
+                let arg_wire = self.instructions[*arg_read_side].unwrap_wire();
+                let root = ConnectionWriteRoot::SubModulePort(PortInfo{
+                    submodule : instantiation_flat_id,
+                    port : port_id,
+                    port_name_span : None, // Not present in function call notation
+                    port_identifier_typ : IdentifierType::Input
+                });
+                self.instructions.alloc(Instruction::Write(Write{from: *arg_read_side, to: ConnectionWrite{root, root_span : whole_function_span, path : Vec::new(), span : arg_wire.span, write_modifiers : WriteModifiers::Connection{num_regs : 0, regs_span : arg_wire.span.empty_span_at_front()}}}));
             }
 
-            Some((md, submodule_local_wires))
+            Some((md, instantiation_flat_id, outputs))
         })
     }
 
     /// Produces a new [SubModuleInstance] if a global was passed, or a reference to the existing instance if it's referenced by name
-    fn get_module_by_global_identifier(&mut self, cursor : &mut Cursor<'l>) -> Option<FlatID> {
+    fn get_or_alloc_module_by_global_identifier(&mut self, cursor : &mut Cursor<'l>) -> Option<FlatID> {
         let (kind, span) = cursor.kind_span();
         if kind == kind!("global_identifier") {
             cursor.go_down(kind!("global_identifier"), |_cursor| {
@@ -632,15 +639,19 @@ impl<'l> FlatteningContext<'l> {
                         if let Instruction::SubModule(_) = &self.instructions[id] {
                             Some(id)
                         } else {
-                            let decl = self.instructions[id].extract_wire_declaration();
+                            let decl = self.instructions[id].unwrap_wire_declaration();
                             self.errors.error_with_info(span, "Function call syntax is only possible on modules", vec![decl.make_declared_here(self.errors.file)]);
                             None
                         }
                     }
                     LocalOrGlobal::Global(global) => {
-                        if let Some(module_id) = global.expect_module() {
-                            let md = &self.linker.get_module(module_id);
-                            Some(self.alloc_module_interface(md.link_info.name.clone(), md, module_id, span))
+                        if let Some(module_uuid) = global.expect_module() {
+                            let md = &self.linker.get_module(module_uuid);
+                            Some(self.instructions.alloc(Instruction::SubModule(SubModuleInstance{
+                                name : md.link_info.name.clone(),
+                                module_uuid,
+                                module_name_span: span
+                            })))
                         } else {
                             None
                         }
@@ -707,27 +718,34 @@ impl<'l> FlatteningContext<'l> {
                 WireSource::ArrayAccess{arr, arr_idx, bracket_span}
             })
         } else if kind == kind!("func_call") {
-            if let Some((md, interface_wires)) = self.desugar_func_call(cursor) {
-                let output_range = interface_wires.func_call_syntax_outputs();
-
-                if output_range.len() != 1 {
+            if let Some((md, submodule, outputs)) = self.desugar_func_call(cursor) {
+                if outputs.len() != 1 {
                     let info = error_info(md.link_info.span, md.link_info.file, "Module Defined here");
                     self.errors.error_with_info(expr_span, "A function called in this context may only return one result. Split this function call into a separate line instead.", vec![info]);
                 }
 
-                if output_range.len() >= 1 {
-                    return interface_wires.ports[output_range.start];
+                if outputs.len() >= 1 {
+                    WireSource::PortRead(PortInfo{
+                        submodule,
+                        port: outputs.0,
+                        port_name_span: None,
+                        port_identifier_typ: IdentifierType::Output,
+                    })
+                } else {
+                    // Function desugaring or using threw an error
+                    WireSource::Constant(Value::Error)
                 }
+            } else {
+                // Function desugaring or using threw an error
+                WireSource::Constant(Value::Error)
             }
-            // Function desugaring or using threw an error
-            WireSource::Constant(Value::Error)
         } else if kind == kind!("parenthesis_expression") {
             return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| self.flatten_expr(cursor));
         } else if kind == kind!("field_access") {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("left"));
-                if let Some(instr_id) = self.get_module_by_global_identifier(cursor) {
-                    let submodule = self.instructions[instr_id].extract_submodule();
+                if let Some(instr_id) = self.get_or_alloc_module_by_global_identifier(cursor) {
+                    let submodule = self.instructions[instr_id].unwrap_submodule();
 
                     //submodule.module_uuid
                 }
@@ -742,8 +760,7 @@ impl<'l> FlatteningContext<'l> {
             typ : AbstractType::Unknown,
             is_compiletime : IS_GEN_UNINIT,
             span: expr_span,
-            source,
-            is_declared_in_this_module : self.is_declared_in_this_module
+            source
         };
         self.instructions.alloc(Instruction::Wire(wire_instance))
     }
@@ -752,7 +769,7 @@ impl<'l> FlatteningContext<'l> {
         if kind == kind!("global_identifier") {
             let root = self.resolve_identifier(span).expect_local("assignments")?;
 
-            Some(ConnectionWrite{root, root_span : span, path : Vec::new(), span, is_declared_in_this_module : self.is_declared_in_this_module, write_modifiers})
+            Some(ConnectionWrite{root : ConnectionWriteRoot::LocalDecl(root), root_span : span, path : Vec::new(), span, write_modifiers})
         } else if kind == kind!("array_op") {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("arr"));
@@ -820,9 +837,7 @@ impl<'l> FlatteningContext<'l> {
 
     fn flatten_assign_function_call(&mut self, to : Vec<Result<ConnectionWrite, Span>>, cursor : &mut Cursor<'l>) {
         let func_call_span = cursor.span();
-        let to_iter = if let Some((md, interface)) = self.desugar_func_call(cursor) {
-            let output_range = interface.func_call_syntax_outputs();
-            let outputs = &interface.ports[output_range];
+        let to_iter = if let Some((md, submodule, outputs)) = self.desugar_func_call(cursor) {
 
             fn get_span(v : &Result<ConnectionWrite, Span>) -> Span {
                 match v {
@@ -844,12 +859,15 @@ impl<'l> FlatteningContext<'l> {
             }
 
             let mut to_iter = to.into_iter();
-            for field in outputs {
-                let module_port_wire_decl = self.instructions[*field].extract_wire_declaration();
-                let module_port_proxy = self.instructions.alloc(Instruction::Wire(WireInstance{typ : module_port_wire_decl.typ.clone(), is_compiletime : IS_GEN_UNINIT, span : func_call_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::WireRead(*field)}));
-                
+            for port in outputs {
                 if let Some(Ok(to)) = to_iter.next() {
-                    self.instructions.alloc(Instruction::Write(Write{from: module_port_proxy, to}));
+                    let from = self.instructions.alloc(Instruction::Wire(WireInstance{typ: AbstractType::Unknown, is_compiletime: false, span: func_call_span, source: WireSource::PortRead(PortInfo{
+                        submodule,
+                        port,
+                        port_name_span: None,
+                        port_identifier_typ: IdentifierType::Output,
+                    })}));
+                    self.instructions.alloc(Instruction::Write(Write{from, to}));
                 }
             }
             to_iter
@@ -858,7 +876,7 @@ impl<'l> FlatteningContext<'l> {
         };
         for leftover_to in to_iter {
             if let Ok(to) = leftover_to {
-                let err_id = self.instructions.alloc(Instruction::Wire(WireInstance{typ : AbstractType::Error, is_compiletime : true, span : func_call_span, is_declared_in_this_module : self.is_declared_in_this_module, source : WireSource::Constant(Value::Error)}));
+                let err_id = self.instructions.alloc(Instruction::Wire(WireInstance{typ : AbstractType::Error, is_compiletime : true, span : func_call_span, source : WireSource::Constant(Value::Error)}));
                 self.instructions.alloc(Instruction::Write(Write{from: err_id, to}));
             }
         }
@@ -977,8 +995,8 @@ impl<'l> FlatteningContext<'l> {
 
                 if kind == kind!("declaration") {
                     let root = self.flatten_declaration::<false, true>(IdentifierType::Local, false, true, cursor);
-                    let flat_root_decl = self.instructions[root].extract_wire_declaration();
-                    Ok(ConnectionWrite{root, root_span : flat_root_decl.name_span, path: Vec::new(), span, is_declared_in_this_module: true, write_modifiers})
+                    let flat_root_decl = self.instructions[root].unwrap_wire_declaration();
+                    Ok(ConnectionWrite{root : ConnectionWriteRoot::LocalDecl(root), root_span : flat_root_decl.name_span, path: Vec::new(), span, write_modifiers})
                 } else { // It's _expression
                     self.flatten_assignable_expr(write_modifiers, cursor).ok_or(span)
                 }
@@ -1019,75 +1037,40 @@ impl<'l> FlatteningContext<'l> {
         })
     }
 
-    fn flatten_declaration_list(&mut self, identifier_type : IdentifierType, read_only : bool, ports : &mut Vec<FlatID>, cursor : &mut Cursor<'l>) {
+    fn flatten_declaration_list(&mut self, identifier_type : IdentifierType, read_only : bool, cursor : &mut Cursor<'l>) {
         cursor.list(kind!("declaration_list"), |cursor| {
             let id = self.flatten_declaration::<false, false>(identifier_type, read_only, true, cursor);
-            ports.push(id);
             self.port_map.alloc(id);
         });
     }
 
-    fn flatten_interface_ports<const IS_SUBMODULE : bool>(&mut self, cursor : &mut Cursor<'l>) -> InterfacePorts<FlatID> {
-        if cursor.optional_field(field!("interface_ports")) {
-            cursor.go_down(kind!("interface_ports"), |cursor| {
-                let mut ports = Vec::new();
-                if cursor.optional_field(field!("inputs")) {
-                    let identifier_type = if IS_SUBMODULE {IdentifierType::Local} else {IdentifierType::Input};
-                    // Read only on inputs and outputs is obviously flipped for submodules, since we're looking at the other side of the in/outputs. 
-                    self.flatten_declaration_list(identifier_type, !IS_SUBMODULE, &mut ports, cursor)
-                }
-                let outputs_start = ports.len();
-                if cursor.optional_field(field!("outputs")) {
-                    let identifier_type = if IS_SUBMODULE {IdentifierType::Local} else {IdentifierType::Output};
-                    // Read only on inputs and outputs is obviously flipped for submodules, since we're looking at the other side of the in/outputs. 
-                    self.flatten_declaration_list(identifier_type, IS_SUBMODULE, &mut ports, cursor)
-                }
-                InterfacePorts{ outputs_start, ports: ports.into_boxed_slice() }
-            })
-        } else {InterfacePorts::empty()}
+    fn flatten_interface_ports<const IS_SUBMODULE : bool>(&mut self, cursor : &mut Cursor<'l>) {
+        cursor.go_down(kind!("interface_ports"), |cursor| {
+            if cursor.optional_field(field!("inputs")) {
+                let identifier_type = if IS_SUBMODULE {IdentifierType::Local} else {IdentifierType::Input};
+                // Read only on inputs and outputs is obviously flipped for submodules, since we're looking at the other side of the in/outputs. 
+                self.flatten_declaration_list(identifier_type, !IS_SUBMODULE, cursor)
+            }
+            if cursor.optional_field(field!("outputs")) {
+                let identifier_type = if IS_SUBMODULE {IdentifierType::Local} else {IdentifierType::Output};
+                // Read only on inputs and outputs is obviously flipped for submodules, since we're looking at the other side of the in/outputs. 
+                self.flatten_declaration_list(identifier_type, IS_SUBMODULE, cursor)
+            }
+        })
     }
 
-    fn alloc_module_interface(&mut self, name : String, module : &Module, module_uuid : ModuleUUID, typ_span : Span) -> FlatID {
-        let local_linker = self.linker.new_sublinker(module.link_info.file);
-
-        let mut nested_context = FlatteningContext {
-            instructions: std::mem::replace(&mut self.instructions, FlatAlloc::new()),
-            port_map: FlatAlloc::new(),
-            errors: ErrorCollector::new(module.link_info.file, local_linker.file.file_text.len()), // Temporary ErrorCollector, unused
-            is_declared_in_this_module: false,
-            linker: local_linker,
-            local_variable_context : LocalVariableContext::new_initial()
-        };
-        
-        let mut nested_cursor = Cursor::new_for_node(&nested_context.linker.file.tree, &nested_context.linker.file.file_text, module.link_info.span, kind!("module"));
-
-        let interface_ports = nested_cursor.go_down(kind!("module"), |nested_cursor| {
-            nested_cursor.field(field!("name")); // Get past name field
-            nested_context.flatten_interface_ports::<true>(nested_cursor)
-        });
-        
-        self.linker.reabsorb_sublinker(nested_context.linker);
-
-        self.instructions = nested_context.instructions;
-        self.instructions.alloc(Instruction::SubModule(SubModuleInstance{
-            name,
-            module_uuid,
-            is_declared_in_this_module : self.is_declared_in_this_module,
-            module_name_span: typ_span,
-            interface_ports
-        }))
-    }
-
-    fn flatten_module(&mut self, cursor : &mut Cursor<'l>) -> InterfacePorts<FlatID> {
+    fn flatten_module(&mut self, cursor : &mut Cursor<'l>) {
         cursor.go_down(kind!("module"), |cursor| {
             let name_span = cursor.field_span(field!("name"), kind!("identifier"));
             let module_name = &self.linker.file.file_text[name_span];
             println!("TREE SITTER module! {module_name}");
             // Interface is allocated in self
-            let interface_found = self.flatten_interface_ports::<false>(cursor);
+            if cursor.optional_field(field!("interface_ports")) {
+                self.flatten_interface_ports::<false>(cursor);
+            }
+            
             cursor.field(field!("block"));
             self.flatten_code(cursor);
-            interface_found
         })
     }
 }
@@ -1103,7 +1086,6 @@ pub struct FlattenedInterfacePort {
 pub struct FlattenedModule {
     pub instructions : FlatAlloc<Instruction, FlatIDMarker>,
     pub errors : ErrorCollector,
-    pub interface_ports : InterfacePorts<FlatID>,
     pub resolved_globals : ResolvedGlobals,
     pub port_map : FlatAlloc<FlatID, PortIDMarker>
 }
@@ -1113,7 +1095,6 @@ impl FlattenedModule {
         FlattenedModule {
             instructions : FlatAlloc::new(),
             errors,
-            interface_ports : InterfacePorts::empty(),
             resolved_globals : ResolvedGlobals::new(),
             port_map : FlatAlloc::new()
         }
@@ -1135,7 +1116,6 @@ impl FlattenedModule {
             instructions : FlatAlloc::new(),
             port_map : FlatAlloc::with_capacity(module.module_ports.ports.len()),
             errors : ErrorCollector::new(module.link_info.file, global_resolver.file.file_text.len()),
-            is_declared_in_this_module : true,
             linker : global_resolver,
             local_variable_context : LocalVariableContext::new_initial()
         };
@@ -1143,19 +1123,24 @@ impl FlattenedModule {
         // Make sure that the gathered ports 
         assert_eq!(module.module_ports.ports.len(), context.port_map.len());
         for ((_, port), (_, id)) in zip(&module.module_ports.ports, &context.port_map) {
-            let name_span = context.instructions[*id].extract_wire_declaration().name_span;
+            let name_span = context.instructions[*id].unwrap_wire_declaration().name_span;
             assert_eq!(port.name_span, name_span);
         }
 
         // Temporary, switch to iterating over nodes in file itself when needed. 
-        let interface_ports = context.flatten_module(&mut cursor);
+        context.flatten_module(&mut cursor);
 
         FlattenedModule {
             resolved_globals : context.linker.extract_resolved_globals(),
             errors : context.errors,
             instructions : context.instructions,
-            interface_ports,
             port_map : context.port_map
         }
+    }
+
+    pub fn get_port_decl(&self, port : PortID) -> &Declaration {
+        let flat_port = self.port_map[port];
+
+        self.instructions[flat_port].unwrap_wire_declaration()
     }
 }

@@ -1,4 +1,4 @@
-use std::{iter::zip, ops::Deref};
+use std::ops::Deref;
 
 use crate::{flattening::{Instruction, Module}, instantiation::{ConnectToPathElem, InstantiatedModule, RealWire, RealWireDataSource, WireID}, linker::{get_builtin_type, TypeUUID}, typing::ConcreteType};
 
@@ -95,16 +95,16 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
         // First output the interface of the module
         writeln!(self.program_text, "module {}(", self.md.link_info.name)?;
         writeln!(self.program_text, "\tinput clk,")?;
-        for (real_port, is_input) in self.instance.interface.iter() {
-            let port_wire = &self.instance.wires[real_port];
-            let input_or_output = if is_input {"input"} else {"output /*mux_wire*/ reg"};
+        for (_id, port) in self.instance.interface_ports.iter() {
+            let port_wire = &self.instance.wires[port.wire];
+            let input_or_output = if port.is_input {"input"} else {"output /*mux_wire*/ reg"};
             let wire_typ = typ_to_verilog_array(&port_wire.typ);
             let wire_name = wire_name_self_latency(port_wire, self.use_latency);
             writeln!(self.program_text, "\t{input_or_output}{wire_typ} {wire_name},")?;
         }
         writeln!(self.program_text, ");\n")?;
-        for (real_port, _is_input) in self.instance.interface.iter() {
-            let port_wire = &self.instance.wires[real_port];
+        for (_id, port) in self.instance.interface_ports.iter() {
+            let port_wire = &self.instance.wires[port.wire];
             self.add_latency_registers(port_wire)?;
         }
 
@@ -166,9 +166,10 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
             let sm_name = &sm.name;
             writeln!(self.program_text, "{sm_instance_name} {sm_name}(")?;
             writeln!(self.program_text, "\t.clk(clk),")?;
-            for (port, wire) in zip(sm.instance.interface.iter(), sm.wires.iter()) {
-                let port_name = wire_name_self_latency(&sm.instance.wires[port.0], self.use_latency);
-                let wire_name = wire_name_self_latency(&self.instance.wires[wire.0], self.use_latency);
+            for (port_id, port) in &sm.port_map {
+                let iport = &sm.instance.interface_ports[port_id];
+                let port_name = wire_name_self_latency(&sm.instance.wires[iport.wire], self.use_latency);
+                let wire_name = wire_name_self_latency(&self.instance.wires[*port], self.use_latency);
                 writeln!(self.program_text, "\t.{port_name}({wire_name}),")?;
             }
             writeln!(self.program_text, ");")?;

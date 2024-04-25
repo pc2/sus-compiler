@@ -73,5 +73,5 @@ pub fn instantiate(linker : &Linker, module_id : ModuleUUID) -> Option<Rc<Instan
     let md = &linker.modules[module_id];
     println!("Instantiating {}", md.link_info.name);
 
-    md.instantiations.instantiate(&md.link_info.name, &md.flattened, linker)
+    md.instantiations.instantiate(&md.link_info.name, md, linker)
 }

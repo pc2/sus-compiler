@@ -11,7 +11,7 @@ use crate::{
     compiler_top::{add_file, recompile_all, update_file},
     errors::{CompileError, ErrorCollector, ErrorLevel},
     file_position::{FileText, LineCol, Span},
-    flattening::{FlatID, IdentifierType, Instruction, Module, WireInstance, WireSource},
+    flattening::{ConnectionWriteRoot, FlatID, IdentifierType, Instruction, Module, WireInstance, WireSource},
     instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER},
     linker::{FileData, FileUUID, FileUUIDMarker, Linker, NameElem},
     typing::WrittenType,
@@ -57,6 +57,8 @@ impl LoadedFileCache {
 }
 
 pub fn lsp_main(port : u16, debug : bool) -> Result<(), Box<dyn Error + Sync + Send>> {
+    std::env::set_var("RUST_BACKTRACE", "1"); // Enable backtrace because I can't set it in Env vars
+    
     println!("starting LSP server");
 
     // Create the transport. Includes the stdio (stdin and stdout) versions but this could
@@ -328,7 +330,16 @@ fn get_info_about_source_location<'linker>(linker : &'linker Linker, position : 
                                 location_builder.update(wire.span, loc_info);
                             }
                             Instruction::Write(write) => {
-                                location_builder.update(write.to.root_span, LocationInfo::WireRef(md, write.to.root));
+                                match write.to.root {
+                                    ConnectionWriteRoot::LocalDecl(decl_id) => {
+                                        location_builder.update(write.to.root_span, LocationInfo::WireRef(md, decl_id));
+                                    }
+                                    ConnectionWriteRoot::SubModulePort(port) => {
+                                        if let Some(span) = port.port_name_span {
+                                            todo!("LSP for named ports");
+                                        }
+                                    }
+                                }
                             }
                             Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
                         };
@@ -461,7 +472,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                 } else {
                     match info {
                         LocationInfo::WireRef(md, decl_id) => {
-                            let decl = md.flattened.instructions[decl_id].extract_wire_declaration();
+                            let decl = md.flattened.instructions[decl_id].unwrap_wire_declaration();
                             let typ_str = decl.typ.to_string(&file_cache.linker.types);
                             let name_str = &decl.name;
 
@@ -503,7 +514,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                 match info {
                     LocationInfo::WireRef(md, decl_id) => {
                         let uri = file_cache.uris[md.link_info.file].clone();
-                        let decl = md.flattened.instructions[decl_id].extract_wire_declaration();
+                        let decl = md.flattened.instructions[decl_id].unwrap_wire_declaration();
                         let range = to_position_range(file_cache.linker.files[md.link_info.file].file_text.get_span_linecol_range(decl.name_span));
                         GotoDefinitionResponse::Scalar(Location{uri, range})
                     }

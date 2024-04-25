@@ -194,10 +194,10 @@ module multiply_add :
 
 
 module pow17 : int i -> int o {
-	    int i2  = i * i
-	reg int i4  = i2 * i2
-	    int i8  = i4 * i4
-	reg int i16 = i8 * i8
+	    int i2  = i   * i
+	reg int i4  = i2  * i2
+	    int i8  = i4  * i4
+	reg int i16 = i8  * i8
 	        o   = i16 * i
 }
 
@@ -242,10 +242,6 @@ module Tree_Multiply : int[4] values -> int total {
 	reg total = a * b
 }
 
-
-
-
-//timeline (X, false -> /)* .. (X, true -> T)
 module Accumulator : int term, bool done -> int total {
     state int tot
 	initial tot = 0
@@ -253,7 +249,7 @@ module Accumulator : int term, bool done -> int total {
     int new_tot = tot + term
     if done {
         reg total = new_tot
-        tot = 0 // Must restore initial conditions
+        tot = 0
     } else {
         tot = new_tot
     }
@@ -479,7 +475,7 @@ module bad_cycle : int a -> int r {
 
 	r = new_test
 }
-module test {}
+
 module module_taking_time : 
 	int i'0 -> int o'5 {
 	o = i

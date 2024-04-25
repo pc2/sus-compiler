@@ -6,7 +6,7 @@ use crate::{
     compiler_top::{add_file, recompile_all},
     errors::{CompileError, ErrorLevel},
     file_position::Span,
-    flattening::{IdentifierType, Instruction, WireSource},
+    flattening::{ConnectionWriteRoot, IdentifierType, Instruction, WireSource},
     linker::{FileUUID, FileUUIDMarker, Linker, NameElem}
 };
 
@@ -35,8 +35,7 @@ pub fn walk_name_color(all_objects : &[NameElem], linker : &Linker) -> Vec<(IDEI
                         Instruction::Wire(w) => {
                             match &w.source {
                                 &WireSource::WireRead(from_wire) => {
-                                    let decl = module.flattened.instructions[from_wire].extract_wire_declaration();
-                                    if !decl.is_declared_in_this_module {continue;} // Virtual wires don't appear in this program text
+                                    let decl = module.flattened.instructions[from_wire].unwrap_wire_declaration();
                                     result.push((IDEIdentifierType::Value(decl.identifier_type), w.span));
                                 }
                                 WireSource::UnaryOp { op:_, right:_ } => {}
@@ -46,19 +45,31 @@ pub fn walk_name_color(all_objects : &[NameElem], linker : &Linker) -> Vec<(IDEI
                                 WireSource::NamedConstant(_name) => {
                                     result.push((IDEIdentifierType::Constant, w.span));
                                 }
+                                WireSource::PortRead(info) => {
+                                    if let Some(port_name_span) = &info.port_name_span {
+                                        result.push((IDEIdentifierType::Value(info.port_identifier_typ), *port_name_span))
+                                    }
+                                }
                             }
                         }
                         Instruction::Declaration(decl) => {
-                            if !decl.is_declared_in_this_module {continue;} // Virtual wires don't appear in this program text
                             decl.typ_expr.for_each_located_type(&mut |_, span| {
                                 result.push((IDEIdentifierType::Type, span));
                             });
                             result.push((IDEIdentifierType::Value(decl.identifier_type), decl.name_span));
                         }
                         Instruction::Write(conn) => {
-                            let decl = module.flattened.instructions[conn.to.root].extract_wire_declaration();
-                            if !decl.is_declared_in_this_module {continue;} // Virtual wires don't appear in this program text
-                            result.push((IDEIdentifierType::Value(decl.identifier_type), conn.to.root_span));
+                            match conn.to.root {
+                                ConnectionWriteRoot::LocalDecl(decl_id) => {
+                                    let decl = module.flattened.instructions[decl_id].unwrap_wire_declaration();
+                                    result.push((IDEIdentifierType::Value(decl.identifier_type), conn.to.root_span));
+                                }
+                                ConnectionWriteRoot::SubModulePort(port) => {
+                                    if let Some(span) = port.port_name_span {
+                                        todo!("Syntax highlight for named ports")
+                                    }
+                                }
+                            }
                         }
                         Instruction::SubModule(sm) => {
                             result.push((IDEIdentifierType::Interface, sm.module_name_span));

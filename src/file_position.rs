@@ -1,5 +1,7 @@
 use std::{fmt::Display, ops::{Index, Range}};
 
+use crate::linker::FileUUID;
+
 // Span is defined as byte-byte idx. Start inclusive, end exclusive
 #[derive(Clone,Copy,Debug,PartialEq,Eq,Hash)]
 pub struct Span(usize, usize);
@@ -89,6 +91,9 @@ impl Ord for LineCol {
         self.line.cmp(&other.line).then(self.col.cmp(&other.col))
     }
 }
+
+
+pub type SpanFile = (Span, FileUUID);
 
 
 pub struct FileText {

@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{arena_alloc::ArenaAllocator, errors::ErrorCollector, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, FlatID, UnaryOperator}, linker::{get_builtin_type, Linkable, Linker, NamedType, TypeUUID, TypeUUIDMarker}, value::Value};
+use crate::{arena_alloc::ArenaAllocator, errors::{error_info, ErrorCollector}, file_position::{BracketSpan, Span, SpanFile}, flattening::{BinaryOperator, FlatID, UnaryOperator}, linker::{get_builtin_type, Linkable, Linker, NamedType, TypeUUID, TypeUUIDMarker}, value::Value};
 
 // These are 
 #[derive(Debug, Clone)]
@@ -128,10 +128,10 @@ pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_typ
 
 pub fn typecheck_unary_operator(op : UnaryOperator, input_typ : &AbstractType, span : Span, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) -> AbstractType {
     if op == UnaryOperator::Not {
-        typecheck(input_typ, span, &BOOL_TYPE, "! input", linker_types, errors);
+        typecheck(input_typ, span, &BOOL_TYPE, "! input", linker_types, None, errors);
         BOOL_TYPE
     } else if op == UnaryOperator::Negate {
-        typecheck(input_typ, span, &INT_TYPE, "- input", linker_types, errors);
+        typecheck(input_typ, span, &INT_TYPE, "- input", linker_types, None, errors);
         INT_TYPE
     } else {
         let gather_type = match op {
@@ -143,7 +143,7 @@ pub fn typecheck_unary_operator(op : UnaryOperator, input_typ : &AbstractType, s
             _ => unreachable!()
         };
         if let Some(arr_content_typ) = typecheck_is_array_indexer(input_typ, span, linker_types, errors) {
-            typecheck(arr_content_typ, span, &gather_type, &format!("{op} input"), linker_types, errors);
+            typecheck(arr_content_typ, span, &gather_type, &format!("{op} input"), linker_types, None, errors);
         }
         gather_type
     }
@@ -228,11 +228,16 @@ fn type_compare(expected : &AbstractType, found : &AbstractType) -> bool {
         _ => false,
     }
 }
-pub fn typecheck(found : &AbstractType, span : Span, expected : &AbstractType, context : &str, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) {
+pub fn typecheck(found : &AbstractType, span : Span, expected : &AbstractType, context : &str, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, declared_here : Option<SpanFile>, errors : &ErrorCollector) {
     if !type_compare(expected, found) {
         let expected_name = expected.to_string(linker_types);
         let found_name = found.to_string(linker_types);
-        errors.error_basic(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
+        let decl_here_info = if let Some(declared_here) = declared_here {
+            vec![error_info(declared_here.0, declared_here.1, "Declared here")]
+        } else {
+            Vec::new()
+        };
+        errors.error_with_info(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"), decl_here_info);
         assert!(expected_name != found_name, "{expected_name} != {found_name}");
     }
 }

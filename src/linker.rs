@@ -440,21 +440,6 @@ impl<'linker> GlobalResolver<'linker> {
         sub_resolved.unwrap()
     }
 
-    pub fn new_sublinker(&self, file_id : FileUUID) -> GlobalResolver<'linker> {
-        let this_resolved = self.extract_resolved_globals();
-        GlobalResolver{
-            linker : self.linker,
-            file : &self.linker.files[file_id],
-            resolved_globals : RefCell::new(Some(this_resolved))
-        }
-    }
-
-    pub fn reabsorb_sublinker(&self, sub : Self) {
-        let sub_resolved = sub.extract_resolved_globals();
-        let old_should_be_none = self.resolved_globals.replace(Some(sub_resolved));
-        assert!(old_should_be_none.is_none());
-    }
-
     pub fn resolve_global<'error_collector>(&self, name_span : Span, errors : &'error_collector ErrorCollector) -> ResolvedNameElem<'linker, 'error_collector> {
         let name = &self.file.file_text[name_span];
 
