@@ -174,8 +174,8 @@ impl<'l, 'instr> TypeCheckingContext<'l, 'instr> {
                             value.get_type_of_constant()
                         }
                         &WireSource::NamedConstant(id) => {
-                            let NamedConstant::Builtin{name:_, typ, val:_} = &self.linker_constants[id];
-                            typ.into()
+                            let NamedConstant::Builtin{name:_, val} = &self.linker_constants[id];
+                            (&val.typ).into()
                         }
                     };
                     let Instruction::Wire(w) = &mut self.instructions[elem_id] else {unreachable!()};

@@ -193,6 +193,10 @@ module multiply_add :
 }
 
 
+module test_pow17 {
+	int a = pow17(2)
+}
+
 module pow17 : int i -> int o {
 	    int i2  = i   * i
 	reg int i4  = i2  * i2
@@ -203,12 +207,13 @@ module pow17 : int i -> int o {
 
 
 module fibonnaci : -> int num {
-	state int current = 1
-	state int current_prev = 0
+	state int cur = 1
+	state int prev = 0
 
-	num = current + current_prev
-	current_prev = current
-	current = num
+	
+	num = cur + prev
+	prev = cur
+	cur = num
 }
 
 module blur2 : 

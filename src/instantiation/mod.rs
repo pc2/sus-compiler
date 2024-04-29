@@ -12,7 +12,7 @@ use crate::{
     linker::{Linker, ModuleUUID, NamedConstant},
     list_of_lists::ListOfLists,
     typing::{typecheck_concrete_binary_operator, typecheck_concrete_unary_operator, ConcreteType, WrittenType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
-    value::{compute_binary_op, compute_unary_op, Value}
+    value::{compute_binary_op, compute_unary_op, TypedValue, Value}
 };
 
 use self::latency_algorithm::SpecifiedLatency;
@@ -154,7 +154,7 @@ pub struct InstantiatedModule {
 pub enum SubModuleOrWire {
     SubModule(SubModuleID),
     Wire(WireID),
-    CompileTimeValue(Value),
+    CompileTimeValue(TypedValue),
     // Variable doesn't exist yet
     Unnasigned
 }
@@ -166,7 +166,7 @@ impl SubModuleOrWire {
         *result
     }
     #[track_caller]
-    pub fn unwrap_generation_value(&self) -> &Value {
+    pub fn unwrap_generation_value(&self) -> &TypedValue {
         let Self::CompileTimeValue(result) = self else {unreachable!("SubModuleOrWire::unwrap_generation_value failed! Is {self:?} instead")};
         result
     }
@@ -177,12 +177,12 @@ impl SubModuleOrWire {
     }
 }
 
-fn write_gen_variable(mut target : &mut Value, conn_path : &[ConnectionWritePathElementComputed], to_write : Value) {
+fn write_gen_variable<'t, 'p>(mut target : &'t mut Value, conn_path : &'p [ConnectionWritePathElementComputed], to_write : Value) {
     for elem in conn_path {
         match elem {
-            ConnectionWritePathElementComputed::ArrayIdx(idx) => {
+            &ConnectionWritePathElementComputed::ArrayIdx(idx) => {
                 let Value::Array(a_box) = target else {unreachable!()};
-                target = &mut a_box[*idx];
+                target = &mut a_box[idx];
             }
         }
     }
@@ -207,9 +207,9 @@ struct InstantiationContext<'fl, 'l> {
 }
 
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
-    fn get_generation_value(&self, v : FlatID) -> Option<&Value> {
+    fn get_generation_value(&self, v : FlatID) -> Option<&TypedValue> {
         if let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] {
-            if let Value::Unset | Value::Error = vv {
+            if let Value::Unset | Value::Error = &vv.value {
                 self.errors.error_basic(self.flattened.instructions[v].unwrap_wire().span, format!("This variable is set but it's {vv:?}!"));
                 None
             } else {
@@ -221,7 +221,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
     }
     fn extract_integer_from_value<'v, IntT : TryFrom<&'v BigInt>>(&self, val : &'v Value, span : Span) -> Option<IntT> {
-        let val = val.extract_integer(); // Typecheck should cover this
+        let val = val.unwrap_integer(); // Typecheck should cover this
         match IntT::try_from(val) {
             Ok(val) => Some(val),
             Err(_) => {
@@ -233,7 +233,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn extract_integer_from_generative<'v, IntT : TryFrom<&'v BigInt>>(&'v self, idx : FlatID) -> Option<IntT> {
         let val = self.get_generation_value(idx)?;
         let span = self.flattened.instructions[idx].unwrap_wire().span;
-        self.extract_integer_from_value(val, span)
+        self.extract_integer_from_value(&val.value, span)
     }
 
     fn concretize_type(&self, typ : &WrittenType) -> Option<ConcreteType> {
@@ -331,7 +331,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                                 let cvt_path = self.convert_connection_path_to_known_values(&conn.to.path)?;
                                 // Hack to get around the borrow rules here
                                 let SubModuleOrWire::CompileTimeValue(v_writable) = &mut self.generation_state[decl_id] else {unreachable!()};
-                                write_gen_variable(v_writable, &cvt_path, found_v);
+                                write_gen_variable(&mut v_writable.value, &cvt_path, found_v.value);
                             }
                         };
                     }
@@ -357,12 +357,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 // Hack to get around the borrow rules here
                 let SubModuleOrWire::Wire(w) = &mut self.generation_state[conn.to.root.unwrap_decl()] else {unreachable!()};
                 let RealWireDataSource::Multiplexer{is_state : Some(initial_value), sources : _} = &mut self.wires[*w].source else {unreachable!()};
-                write_gen_variable(initial_value, &cvt_path, found_v);
+                write_gen_variable(initial_value, &cvt_path, found_v.value);
             }
         }
         Some(())
     }
-    fn compute_compile_time(&self, wire_inst : &WireInstance) -> Option<Value> {
+    fn compute_compile_time(&self, wire_inst : &WireInstance) -> Option<TypedValue> {
         Some(match &wire_inst.source {
             WireSource::PortRead(_) => {
                 self.errors.error_basic(wire_inst.span, "Compile-Time submodules are not yet implemented");
@@ -381,19 +381,15 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 compute_binary_op(left_val, op, right_val)
             }
             &WireSource::ArrayAccess{arr, arr_idx, bracket_span:_} => {
-                let Value::Array(arr_val) = self.get_generation_value(arr)? else {return None};
+                let arr_val = &self.get_generation_value(arr)?;
                 let arr_idx_wire = self.flattened.instructions[arr_idx].unwrap_wire();
                 let idx : usize = self.extract_integer_from_generative(arr_idx)?;
-                if let Some(item) = arr_val.get(idx) {
-                    item.clone()
-                } else {
-                    self.errors.error_basic(arr_idx_wire.span, format!("Compile-Time Array index is out of range: idx: {idx}, array size: {}", arr_val.len()));
-                    return None
-                }
+                let item = arr_val.array_access(idx, arr_idx_wire.span, &self.errors)?;
+                item.clone()
             }
-            WireSource::Constant(value) => value.clone(),
+            WireSource::Constant(value) => TypedValue::from_value(value.clone()),
             WireSource::NamedConstant(id) => {
-                let NamedConstant::Builtin{name:_, typ:_, val} = &self.linker.constants[*id];
+                let NamedConstant::Builtin{name:_, val} = &self.linker.constants[*id];
                 val.clone()
             }
         })
@@ -410,9 +406,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let value = v.clone();
                 //let wire = self.flattened.instructions[flat_id].extract_wire();
                 //let typ = self.concretize_type(&wire.typ)?;
-                let typ = v.get_concrete_type_of_constant();
                 let name = self.get_unique_name();
-                Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value}, original_wire : flat_id, typ, name, absolute_latency : CALCULATE_LATENCY_LATER, needed_until : CALCULATE_LATENCY_LATER}))
+                Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value : value.value}, original_wire : flat_id, typ : value.typ, name, absolute_latency : CALCULATE_LATENCY_LATER, needed_until : CALCULATE_LATENCY_LATER}))
             }
         }
     }
@@ -496,8 +491,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::Declaration(wire_decl) => {
                     let typ = self.concretize_type(&wire_decl.typ_expr)?;
                     if wire_decl.identifier_type.is_generative() {
-                        let initial_value = typ.get_initial_val(self.linker);
-                        assert!(initial_value.is_of_type(&typ));
+                        let initial_value = typ.into_initial_typed_val(self.linker);
                         SubModuleOrWire::CompileTimeValue(initial_value)
                     } else {
                         let source = if wire_decl.read_only {
@@ -544,7 +538,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         &WireSource::ArrayAccess { arr, arr_idx, bracket_span : _ } => {
                             let arr_typ = self.get_current_concrete_type(arr);
                             let arr_idx_typ = self.get_current_concrete_type(arr_idx);
-                            assert_eq!(arr_idx_typ, INT_CONCRETE_TYPE);
+                            assert_eq!(*arr_idx_typ, INT_CONCRETE_TYPE);
                             arr_typ.down_array().clone()
                         }
                         WireSource::Constant(v) => v.get_concrete_type_of_constant(),
@@ -552,7 +546,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     };
                     if w.is_compiletime {
                         let value_computed = self.compute_compile_time(w)?;
-                        assert!(value_computed.is_of_type(&typ));
+                        assert_eq!(value_computed.typ, typ);
                         SubModuleOrWire::CompileTimeValue(value_computed)
                     } else {
                         let wire_found = self.wire_to_real_wire(w, typ, original_wire)?;
@@ -569,7 +563,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     let if_condition_wire = self.flattened.instructions[stm.condition].unwrap_wire();
                     if if_condition_wire.is_compiletime {
                         let condition_val = self.get_generation_value(stm.condition)?;
-                        let run_range = if condition_val.extract_bool() {
+                        let run_range = if condition_val.unwrap_bool() {
                             then_range
                         } else {
                             else_range
@@ -600,8 +594,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 }
                 Instruction::ForStatement(stm) => {
                     // TODO Non integer for loops?
-                    let start_val = self.get_generation_value(stm.start)?.extract_integer().clone();
-                    let end_val = self.get_generation_value(stm.end)?.extract_integer().clone();
+                    let start_val = self.get_generation_value(stm.start)?.unwrap_integer().clone();
+                    let end_val = self.get_generation_value(stm.end)?.unwrap_integer().clone();
                     if start_val > end_val {
                         let start_flat = &self.flattened.instructions[stm.start].unwrap_wire();
                         let end_flat = &self.flattened.instructions[stm.end].unwrap_wire();
@@ -613,7 +607,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
                     while current_val < end_val {
                         let SubModuleOrWire::CompileTimeValue(v) = &mut self.generation_state[stm.loop_var_decl] else {unreachable!()};
-                        *v = Value::Integer(current_val.clone());
+                        *v = TypedValue::make_integer(current_val.clone());
                         current_val += 1;
                         self.instantiate_flattened_module(stm.loop_body, condition);
                     }
@@ -627,10 +621,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         Some(())
     }
 
-    fn get_current_concrete_type(&self, w: FlatID) -> ConcreteType {
+    fn get_current_concrete_type(&self, w: FlatID) -> &ConcreteType {
         match &self.generation_state[w] {
-            SubModuleOrWire::Wire(w_idx) => self.wires[*w_idx].typ.clone(),
-            SubModuleOrWire::CompileTimeValue(cv) => cv.get_concrete_type_of_constant(),
+            SubModuleOrWire::Wire(w_idx) => &self.wires[*w_idx].typ,
+            SubModuleOrWire::CompileTimeValue(cv) => &cv.typ,
             SubModuleOrWire::SubModule(_) => unreachable!("Cannot get concrete type of submodule"),
             SubModuleOrWire::Unnasigned => unreachable!("Concrete type of Unassigned, should have been caught in abstract typecheck?"),
         }

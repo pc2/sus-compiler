@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{arena_alloc::ArenaAllocator, errors::{error_info, ErrorCollector}, file_position::{BracketSpan, Span, SpanFile}, flattening::{BinaryOperator, FlatID, UnaryOperator}, linker::{get_builtin_type, Linkable, Linker, NamedType, TypeUUID, TypeUUIDMarker}, value::Value};
+use crate::{arena_alloc::ArenaAllocator, errors::{error_info, ErrorCollector}, file_position::{BracketSpan, Span, SpanFile}, flattening::{BinaryOperator, FlatID, UnaryOperator}, linker::{get_builtin_type, Linkable, Linker, NamedType, TypeUUID, TypeUUIDMarker}, value::{TypedValue, Value}};
 
 // These are 
 #[derive(Debug, Clone)]
@@ -263,7 +263,6 @@ impl Into<AbstractType> for &ConcreteType {
                 AbstractType::Named(*name)
             }
             ConcreteType::Array(arr) => {
-
                 let (sub, _sz) = arr.deref();
                 let concrete_sub : AbstractType = sub.into();
                 AbstractType::Array(Box::new(concrete_sub))
@@ -273,6 +272,9 @@ impl Into<AbstractType> for &ConcreteType {
 }
 
 impl ConcreteType {
+    pub fn into_initial_typed_val(self, linker : &Linker) -> TypedValue {
+        TypedValue{value : self.get_initial_val(linker), typ : self}
+    }
     pub fn get_initial_val(&self, linker : &Linker) -> Value {
         match self {
             ConcreteType::Named(_name) => {

@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use num::BigInt;
 
-use crate::{flattening::{BinaryOperator, UnaryOperator}, typing::{ConcreteType, AbstractType, BOOL_CONCRETE_TYPE, BOOL_TYPE, INT_CONCRETE_TYPE, INT_TYPE}};
+use crate::{errors::ErrorCollector, file_position::Span, flattening::{BinaryOperator, UnaryOperator}, typing::{AbstractType, ConcreteType, BOOL_CONCRETE_TYPE, BOOL_TYPE, INT_CONCRETE_TYPE, INT_TYPE}};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum Value {
@@ -77,13 +77,13 @@ impl Value {
     }
 
     #[track_caller]
-    pub fn extract_integer(&self) -> &BigInt {
+    pub fn unwrap_integer(&self) -> &BigInt {
         let Self::Integer(i) = self else {panic!("{:?} is not an integer!", self)};
         i
     }
 
     #[track_caller]
-    pub fn extract_bool(&self) -> bool {
+    pub fn unwrap_bool(&self) -> bool {
         let Self::Bool(b) = self else {panic!("{:?} is not a bool!", self)};
         *b
     }
@@ -107,9 +107,10 @@ impl Value {
     }
 }
 
-pub fn compute_unary_op(op : UnaryOperator, v : &Value) -> Value {
-    if *v == Value::Error {
-        return Value::Error
+pub fn compute_unary_op(op : UnaryOperator, v : &TypedValue) -> TypedValue {
+    if v.value == Value::Error {
+        unreachable!("unary op on Value::Error!")
+        //return TypedValue{typ : , value : Value::Error}
     }
     match op {
         UnaryOperator::Or => {
@@ -122,8 +123,9 @@ pub fn compute_unary_op(op : UnaryOperator, v : &Value) -> Value {
             todo!("Array Values")
         }
         UnaryOperator::Not => {
-            let Value::Bool(b) = v else {panic!()};
-            Value::Bool(!*b)
+            assert_eq!(v.typ, BOOL_CONCRETE_TYPE);
+            let Value::Bool(b) = &v.value else {unreachable!("Only not bool supported, should be caught by abstract typecheck")};
+            TypedValue::make_bool(!*b)
         }
         UnaryOperator::Sum => {
             todo!("Array Values")
@@ -132,32 +134,80 @@ pub fn compute_unary_op(op : UnaryOperator, v : &Value) -> Value {
             todo!("Array Values")
         }
         UnaryOperator::Negate => {
-            let Value::Integer(v) = v else {panic!()};
-            Value::Integer(-v)
+            assert_eq!(v.typ, INT_CONCRETE_TYPE);
+            let Value::Integer(v) = &v.value else {panic!()};
+            TypedValue::make_integer(!-v)
         }
     }
 }
 
-pub fn compute_binary_op(left : &Value, op : BinaryOperator, right : &Value) -> Value {
-    if *left == Value::Error || *right == Value::Error {
-        return Value::Error
+pub fn compute_binary_op(left : &TypedValue, op : BinaryOperator, right : &TypedValue) -> TypedValue {
+    if left.value == Value::Error || right.value == Value::Error {
+        unreachable!("binary op on Value::Error!")
+        //return Value::Error
     }
+    let lv = &left.value;
+    let rv = &right.value;
     match op {
-        BinaryOperator::Equals => Value::Bool(left == right),
-        BinaryOperator::NotEquals => Value::Bool(left != right),
-        BinaryOperator::GreaterEq => Value::Bool(left.extract_integer() >= right.extract_integer()),
-        BinaryOperator::Greater => Value::Bool(left.extract_integer() > right.extract_integer()),
-        BinaryOperator::LesserEq => Value::Bool(left.extract_integer() <= right.extract_integer()),
-        BinaryOperator::Lesser => Value::Bool(left.extract_integer() < right.extract_integer()),
-        BinaryOperator::Add => Value::Integer(left.extract_integer() + right.extract_integer()),
-        BinaryOperator::Subtract => Value::Integer(left.extract_integer() - right.extract_integer()),
-        BinaryOperator::Multiply => Value::Integer(left.extract_integer() * right.extract_integer()),
-        BinaryOperator::Divide => Value::Integer(left.extract_integer() / right.extract_integer()),
-        BinaryOperator::Modulo => Value::Integer(left.extract_integer() % right.extract_integer()),
-        BinaryOperator::And => Value::Bool(left.extract_bool() & right.extract_bool()),
-        BinaryOperator::Or => Value::Bool(left.extract_bool() & right.extract_bool()),
-        BinaryOperator::Xor => Value::Bool(left.extract_bool() & right.extract_bool()),
+        BinaryOperator::Equals => TypedValue::make_bool(lv == rv),
+        BinaryOperator::NotEquals => TypedValue::make_bool(lv != rv),
+        BinaryOperator::GreaterEq => TypedValue::make_bool(lv.unwrap_integer() >= rv.unwrap_integer()),
+        BinaryOperator::Greater => TypedValue::make_bool(lv.unwrap_integer() > rv.unwrap_integer()),
+        BinaryOperator::LesserEq => TypedValue::make_bool(lv.unwrap_integer() <= rv.unwrap_integer()),
+        BinaryOperator::Lesser => TypedValue::make_bool(lv.unwrap_integer() < rv.unwrap_integer()),
+        BinaryOperator::Add => TypedValue::make_integer(lv.unwrap_integer() + rv.unwrap_integer()),
+        BinaryOperator::Subtract => TypedValue::make_integer(lv.unwrap_integer() - rv.unwrap_integer()),
+        BinaryOperator::Multiply => TypedValue::make_integer(lv.unwrap_integer() * rv.unwrap_integer()),
+        BinaryOperator::Divide => TypedValue::make_integer(lv.unwrap_integer() / rv.unwrap_integer()),
+        BinaryOperator::Modulo => TypedValue::make_integer(lv.unwrap_integer() % rv.unwrap_integer()),
+        BinaryOperator::And => TypedValue::make_bool(lv.unwrap_bool() & rv.unwrap_bool()),
+        BinaryOperator::Or => TypedValue::make_bool(lv.unwrap_bool() & rv.unwrap_bool()),
+        BinaryOperator::Xor => TypedValue::make_bool(lv.unwrap_bool() & rv.unwrap_bool()),
         //BinaryOperator::ShiftLeft => todo!(), // Still a bit iffy about shift operator inclusion
         //BinaryOperator::ShiftRight => todo!()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TypedValue {
+    pub value : Value,
+    pub typ : ConcreteType
+}
+
+impl TypedValue {
+    pub fn make_bool(b : bool) -> Self {
+        Self{typ : BOOL_CONCRETE_TYPE, value : Value::Bool(b)}
+    }
+    pub fn make_integer(i : BigInt) -> Self {
+        Self{typ : INT_CONCRETE_TYPE, value : Value::Integer(i)}
+    }
+    /// panics if the value can't be typed. 
+    pub fn from_value(value : Value) -> Self {
+        Self{typ : value.get_concrete_type_of_constant(), value}
+    }
+
+    #[track_caller]
+    pub fn unwrap_integer(&self) -> &BigInt {
+        self.value.unwrap_integer()
+    }
+
+    #[track_caller]
+    pub fn unwrap_bool(&self) -> bool {
+        self.value.unwrap_bool()
+    }
+
+    pub fn array_access(&self, idx : usize, span : Span, errors : &ErrorCollector) -> Option<TypedValue> {
+        let typ = self.typ.down_array().clone();
+
+        Some(if let Value::Array(arr) = &self.value {
+            let Some(elem) = arr.get(idx) else {
+                errors.error_basic(span, format!("Compile-Time Array index is out of range: idx: {idx}, array size: {}", arr.len()));
+                return None
+            };
+            TypedValue{typ, value : elem.clone()}
+        } else {
+            assert!(self.value == Value::Error || self.value == Value::Unset);
+            TypedValue{typ, value : Value::Error}
+        })
     }
 }

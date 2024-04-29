@@ -413,7 +413,7 @@ fn gather_hover_infos(md: &Module, id: FlatID, is_generative : bool, file_cache:
         if is_generative {
             let value_str = match &inst.generation_state[id] {
                 SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => unreachable!(),
-                SubModuleOrWire::CompileTimeValue(v) => format!(" = {}", v.to_string()),
+                SubModuleOrWire::CompileTimeValue(v) => format!(" = {}", v.value.to_string()),
                 SubModuleOrWire::Unnasigned => format!("never assigned to"),
             };
             hover_list.push(MarkedString::String(value_str));

@@ -10,7 +10,7 @@ use crate::{
     parser::Documentation,
     typing::ConcreteType,
     util::{const_str_position, const_str_position_in_tuples},
-    value::Value
+    value::{TypedValue, Value}
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -94,13 +94,13 @@ pub trait Linkable {
 
 #[derive(Debug)]
 pub enum NamedConstant {
-    Builtin{name : &'static str, typ : ConcreteType, val : Value}
+    Builtin{name : &'static str, val : TypedValue}
 }
 
 impl NamedConstant {
     pub fn get_concrete_type(&self) -> &ConcreteType {
         match self {
-            NamedConstant::Builtin { name : _, typ, val : _ } => typ
+            NamedConstant::Builtin { name : _, val } => &val.typ
         }
     }
 }
@@ -113,7 +113,7 @@ pub enum NamedType {
 impl Linkable for NamedConstant {
     fn get_name(&self) -> &'static str {
         match self {
-            NamedConstant::Builtin{name, typ:_, val:_} => name
+            NamedConstant::Builtin{name, val:_} => name
         }
     }
     fn get_linking_error_location(&self) -> LinkingErrorLocation {
@@ -121,12 +121,12 @@ impl Linkable for NamedConstant {
     }
     fn get_link_info(&self) -> Option<&LinkInfo> {
         match self {
-            NamedConstant::Builtin{name:_, typ:_, val:_} => None
+            NamedConstant::Builtin{name:_, val:_} => None
         }
     }
     fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo> {
         match self {
-            NamedConstant::Builtin{name:_, typ:_, val:_} => None
+            NamedConstant::Builtin{name:_, val:_} => None
         }
     }
 }
@@ -201,7 +201,7 @@ impl Linker {
             add_known_unique_name(&mut result, name.into(), NameElem::Type(id));
         }
         for (name, val) in BUILTIN_CONSTANTS {
-            let id = result.constants.alloc(NamedConstant::Builtin{name, typ : val.get_concrete_type_of_constant(), val});
+            let id = result.constants.alloc(NamedConstant::Builtin{name, val : TypedValue::from_value(val)});
             add_known_unique_name(&mut result, name.into(), NameElem::Constant(id));
         }
 
