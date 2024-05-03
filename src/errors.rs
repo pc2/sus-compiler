@@ -100,4 +100,11 @@ impl ErrorCollector {
         assert!(self.file_len == source.file_len);
         self.errors.borrow_mut().extend_from_slice(&source.errors.borrow());
     }
+
+    pub fn take(&mut self) -> ErrorCollector {
+        std::mem::replace(self, self.new_for_same_file_clean_did_error())
+    }
+    pub fn is_untouched(&self) -> bool {
+        self.errors.borrow().is_empty()
+    }
 }

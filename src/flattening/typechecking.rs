@@ -9,8 +9,8 @@ pub fn typecheck_all_modules(linker : &mut Linker) {
     for (_id, module) in &mut linker.modules {
         println!("Typechecking {}", &module.link_info.name);
         let mut context = TypeCheckingContext{
-            instructions : &mut module.flattened.instructions,
-            errors : &module.flattened.errors,
+            instructions : &mut module.instructions,
+            errors : &module.link_info.errors,
             linker_modules,
             linker_types : &linker.types,
             linker_constants : &linker.constants
@@ -18,7 +18,7 @@ pub fn typecheck_all_modules(linker : &mut Linker) {
         
         context.typecheck();
         context.generative_check();
-        context.find_unused_variables(&module.module_ports, &module.flattened.port_map);
+        context.find_unused_variables(&module.module_ports);
     }
 }
 
@@ -49,7 +49,7 @@ impl<'l, 'instr> TypeCheckingContext<'l, 'instr> {
         let submodule_id = self.instructions[port.submodule].unwrap_submodule().module_uuid;
         unsafe {
             let module = &(*self.linker_modules)[submodule_id];
-            let decl = module.flattened.get_port_decl(port.port);
+            let decl = module.get_port_decl(port.port);
             (decl.typ_expr.to_type(), (decl.typ_expr.get_span(), module.link_info.file))
         }
     }
@@ -65,7 +65,7 @@ impl<'l, 'instr> TypeCheckingContext<'l, 'instr> {
         let submodule_id = self.instructions[port.submodule].unwrap_submodule().module_uuid;
         unsafe {
             let module = &(*self.linker_modules)[submodule_id];
-            let decl = module.flattened.get_port_decl(port.port);
+            let decl = module.get_port_decl(port.port);
             (decl, module.link_info.file)
         }
     }
@@ -246,9 +246,16 @@ impl<'l, 'instr> TypeCheckingContext<'l, 'instr> {
                         }
                     } else {
                         wire.source.for_each_dependency(&mut |source_id| {
-                            let source_wire = self.instructions[source_id].unwrap_wire();
-                            if !source_wire.is_compiletime {
-                                is_generative = false;
+                            match &self.instructions[source_id] {
+                                Instruction::SubModule(_sm) => {
+                                    is_generative = false; // TODO generative submodules
+                                }
+                                Instruction::Wire(source_wire) => {
+                                    if !source_wire.is_compiletime {
+                                        is_generative = false;
+                                    }
+                                }
+                                _other => unreachable!()
                             }
                         });
                     }
@@ -268,12 +275,18 @@ impl<'l, 'instr> TypeCheckingContext<'l, 'instr> {
     }
 
     fn generative_check_write(&self, conn: &Write, declaration_depths: &mut FlatAlloc<Option<usize>, FlatIDMarker>, runtime_if_stack: &mut Vec<(UUID<FlatIDMarker>, Span)>) {
-        let (decl, file) = match conn.to.root {
-            ConnectionWriteRoot::LocalDecl(decl_id) => (self.instructions[decl_id].unwrap_wire_declaration(), self.errors.file),
-            ConnectionWriteRoot::SubModulePort(port) => self.get_decl_of_module_port(port)
+        let (read_only, decl, file) = match conn.to.root {
+            ConnectionWriteRoot::LocalDecl(decl_id) => {
+                let decl = self.instructions[decl_id].unwrap_wire_declaration();
+                (decl.read_only, decl, self.errors.file)
+            }
+            ConnectionWriteRoot::SubModulePort(port) => {
+                let (decl, file) = self.get_decl_of_module_port(port);
+                (!decl.read_only, decl, file)
+            }
         };
     
-        if decl.read_only {
+        if read_only {
             self.errors.error_with_info(conn.to.span, "Cannot Assign to Read-Only value", vec![decl.make_declared_here(file)]);
         }
     
@@ -309,7 +322,7 @@ impl<'l, 'instr> TypeCheckingContext<'l, 'instr> {
     /* 
         ==== Additional Warnings ====
     */
-    fn find_unused_variables(&self, ports : &ModulePorts, port_map : &FlatAlloc<FlatID, PortIDMarker>) {
+    fn find_unused_variables(&self, ports : &ModulePorts) {
         // Setup Wire Fanouts List for faster processing
         let mut instance_fanins : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.instructions.iter().map(|_| Vec::new()).collect();
 
@@ -343,11 +356,10 @@ impl<'l, 'instr> TypeCheckingContext<'l, 'instr> {
 
         let mut wire_to_explore_queue : Vec<FlatID> = Vec::new();
 
-        for (id, port) in &ports.ports {
+        for (_id, port) in &ports.ports {
             if port.id_typ == IdentifierType::Output {
-                let port_flat_id = port_map[id];
-                is_instance_used_map[port_flat_id] = true;
-                wire_to_explore_queue.push(port_flat_id);
+                is_instance_used_map[port.declaration_instruction] = true;
+                wire_to_explore_queue.push(port.declaration_instruction);
 
             }
         }

@@ -7,7 +7,7 @@ use crate::{
     compiler_top::instantiate,
     errors::ErrorCollector,
     file_position::Span,
-    flattening::{initialization::PortIDMarker, BinaryOperator, ConnectionWritePathElement, ConnectionWriteRoot, FlatID, FlatIDMarker, FlatIDRange, FlattenedModule, IdentifierType, Instruction, Module, UnaryOperator, WireInstance, WireSource, Write, WriteModifiers},
+    flattening::{initialization::PortIDMarker, BinaryOperator, ConnectionWritePathElement, ConnectionWriteRoot, FlatID, FlatIDMarker, FlatIDRange, IdentifierType, Instruction, Module, UnaryOperator, WireInstance, WireSource, Write, WriteModifiers},
     instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError},
     linker::{Linker, ModuleUUID, NamedConstant},
     list_of_lists::ListOfLists,
@@ -201,7 +201,7 @@ struct InstantiationContext<'fl, 'l> {
     specified_latencies : Vec<(WireID, i64)>,
     errors : ErrorCollector,
 
-    flattened : &'fl FlattenedModule,
+    md : &'fl Module,
     module : &'fl Module,
     linker : &'l Linker,
 }
@@ -210,13 +210,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn get_generation_value(&self, v : FlatID) -> Option<&TypedValue> {
         if let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] {
             if let Value::Unset | Value::Error = &vv.value {
-                self.errors.error_basic(self.flattened.instructions[v].unwrap_wire().span, format!("This variable is set but it's {vv:?}!"));
+                self.errors.error_basic(self.md.instructions[v].unwrap_wire().span, format!("This variable is set but it's {vv:?}!"));
                 None
             } else {
                 Some(vv)
             }
         } else {
-            self.errors.error_basic(self.flattened.instructions[v].unwrap_wire().span, "This variable is not set at this point!");
+            self.errors.error_basic(self.md.instructions[v].unwrap_wire().span, "This variable is not set at this point!");
             None
         }
     }
@@ -232,7 +232,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
     fn extract_integer_from_generative<'v, IntT : TryFrom<&'v BigInt>>(&'v self, idx : FlatID) -> Option<IntT> {
         let val = self.get_generation_value(idx)?;
-        let span = self.flattened.instructions[idx].unwrap_wire().span;
+        let span = self.md.instructions[idx].unwrap_wire().span;
         self.extract_integer_from_value(&val.value, span)
     }
 
@@ -279,8 +279,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         let found_typ = &self.wires[from.from].typ;
         if write_to_typ != found_typ {
-            let from_flattened_wire = self.flattened.instructions[self.wires[from.from].original_wire].unwrap_wire();
-            let to_flattened_decl = self.flattened.instructions[self.wires[wire_id].original_wire].unwrap_wire_declaration();
+            let from_flattened_wire = self.md.instructions[self.wires[from.from].original_wire].unwrap_wire();
+            let to_flattened_decl = self.md.instructions[self.wires[wire_id].original_wire].unwrap_wire_declaration();
 
             let found_typ_name = found_typ.to_string(&self.linker.types);
             let write_to_typ_name = write_to_typ.to_string(&self.linker.types);
@@ -382,7 +382,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
             &WireSource::ArrayAccess{arr, arr_idx, bracket_span:_} => {
                 let arr_val = &self.get_generation_value(arr)?;
-                let arr_idx_wire = self.flattened.instructions[arr_idx].unwrap_wire();
+                let arr_idx_wire = self.md.instructions[arr_idx].unwrap_wire();
                 let idx : usize = self.extract_integer_from_generative(arr_idx)?;
                 let item = arr_val.array_access(idx, arr_idx_wire.span, &self.errors)?;
                 item.clone()
@@ -404,7 +404,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             SubModuleOrWire::Wire(w) => Some(*w),
             SubModuleOrWire::CompileTimeValue(v) => {
                 let value = v.clone();
-                //let wire = self.flattened.instructions[flat_id].extract_wire();
+                //let wire = self.instructions[flat_id].extract_wire();
                 //let typ = self.concretize_type(&wire.typ)?;
                 let name = self.get_unique_name();
                 Some(self.wires.alloc(RealWire{source : RealWireDataSource::Constant{value : value.value}, original_wire : flat_id, typ : value.typ, name, absolute_latency : CALCULATE_LATENCY_LATER, needed_until : CALCULATE_LATENCY_LATER}))
@@ -414,7 +414,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn wire_to_real_wire(&mut self, w: &WireInstance, typ : ConcreteType, original_wire : FlatID) -> Option<WireID> {
         let source = match &w.source {
             &WireSource::WireRead(from_wire) => {
-                /*Assert*/ self.flattened.instructions[from_wire].unwrap_wire_declaration(); // WireReads must point to a NamedWire!
+                /*Assert*/ self.md.instructions[from_wire].unwrap_wire_declaration(); // WireReads must point to a NamedWire!
                 return Some(self.generation_state[from_wire].unwrap_wire())
             }
             &WireSource::UnaryOp{op, right} => {
@@ -471,7 +471,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn instantiate_flattened_module(&mut self, flat_range : FlatIDRange, condition : Option<WireID>) -> Option<()> {
         let mut instruction_range = flat_range.into_iter();
         while let Some(original_wire) = instruction_range.next() {
-            let instance_to_add : SubModuleOrWire = match &self.flattened.instructions[original_wire] {
+            let instance_to_add : SubModuleOrWire = match &self.md.instructions[original_wire] {
                 Instruction::SubModule(submodule) => {
                     let Some(instance) = instantiate(&self.linker, submodule.module_uuid) else {return None}; // Avoid error from submodule
 
@@ -520,7 +520,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::Wire(w) => {
                     let typ = match &w.source {
                         &WireSource::WireRead(from) => {
-                            self.concretize_type(&self.flattened.instructions[from].unwrap_wire_declaration().typ_expr)?
+                            self.concretize_type(&self.md.instructions[from].unwrap_wire_declaration().typ_expr)?
                         }
                         &WireSource::PortRead(port) => {
                             let sm = &self.submodules[self.generation_state[port.submodule].unwrap_submodule_instance()];
@@ -560,7 +560,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::IfStatement(stm) => {
                     let then_range = UUIDRange(stm.then_start, stm.then_end_else_start);
                     let else_range = UUIDRange(stm.then_end_else_start, stm.else_end);
-                    let if_condition_wire = self.flattened.instructions[stm.condition].unwrap_wire();
+                    let if_condition_wire = self.md.instructions[stm.condition].unwrap_wire();
                     if if_condition_wire.is_compiletime {
                         let condition_val = self.get_generation_value(stm.condition)?;
                         let run_range = if condition_val.unwrap_bool() {
@@ -597,8 +597,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     let start_val = self.get_generation_value(stm.start)?.unwrap_integer().clone();
                     let end_val = self.get_generation_value(stm.end)?.unwrap_integer().clone();
                     if start_val > end_val {
-                        let start_flat = &self.flattened.instructions[stm.start].unwrap_wire();
-                        let end_flat = &self.flattened.instructions[stm.end].unwrap_wire();
+                        let start_flat = &self.md.instructions[stm.start].unwrap_wire();
+                        let end_flat = &self.md.instructions[stm.end].unwrap_wire();
                         self.errors.error_basic(Span::new_overarching(start_flat.span, end_flat.span), format!("for loop range end is before begin: {start_val}:{end_val}"));
                         return None;
                     }
@@ -679,7 +679,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     
     fn make_instantiated_ports(&self) -> FlatAlloc<InstantiatedPort, PortIDMarker> {
         let result = self.module.module_ports.ports.iter().map(|(port_id, port)| {
-            let port_decl_id = self.module.flattened.port_map[port_id];
+            let port_decl_id = self.module.module_ports.ports[port_id].declaration_instruction;
             let wire_id = self.generation_state[port_decl_id].unwrap_wire();
             let wire = &self.wires[wire_id];
             
@@ -714,7 +714,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 for ((_id, wire), lat) in zip(self.wires.iter_mut(), latencies.iter()) {
                     wire.absolute_latency = *lat;
                     if *lat == CALCULATE_LATENCY_LATER {
-                        if let Some(source_location) = self.flattened.instructions[wire.original_wire].get_location_of_module_part() {
+                        if let Some(source_location) = self.md.instructions[wire.original_wire].get_location_of_module_part() {
                             self.errors.error_basic(source_location, format!("Latency Counting couldn't reach this node"));
                         }
                     }
@@ -730,7 +730,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         let first_write_desired_latency = first_write.to_latency + net_roundtrip_latency;
                         let mut path_message = make_path_info_string(later_writes, first_write.to_latency, &first_write.to_wire.name);
                         write_path_elem_to_string(&mut path_message, &first_write.to_wire.name, first_write_desired_latency, writes_involved.last().unwrap().to_latency);
-                        let unique_write_instructions = filter_unique_write_flats(&writes_involved, &self.flattened.instructions);
+                        let unique_write_instructions = filter_unique_write_flats(&writes_involved, &self.md.instructions);
                         let rest_of_message = format!(" part of a net-positive latency cycle of +{net_roundtrip_latency}\n\n{path_message}\nWhich conflicts with the starting latency");
                         
                         let mut did_place_error = false;
@@ -755,16 +755,16 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     }
                     LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
                         for port in bad_ports {
-                            let port_decl = self.flattened.instructions[self.wires[WireID::from_hidden_value(port.0)].original_wire].unwrap_wire_declaration();
+                            let port_decl = self.md.instructions[self.wires[WireID::from_hidden_value(port.0)].original_wire].unwrap_wire_declaration();
                             self.errors.error_basic(port_decl.name_span, format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
                         }
                     }
                     LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path } => {
                         let start_wire = &self.wires[WireID::from_hidden_value(conflict_path.first().unwrap().wire)];
                         let end_wire = &self.wires[WireID::from_hidden_value(conflict_path.last().unwrap().wire)];
-                        let start_decl = self.flattened.instructions[start_wire.original_wire].unwrap_wire_declaration();
-                        let end_decl = self.flattened.instructions[end_wire.original_wire].unwrap_wire_declaration();
-                        let end_latency_decl = self.flattened.instructions[end_decl.latency_specifier.unwrap()].unwrap_wire();
+                        let start_decl = self.md.instructions[start_wire.original_wire].unwrap_wire_declaration();
+                        let end_decl = self.md.instructions[end_wire.original_wire].unwrap_wire_declaration();
+                        let end_latency_decl = self.md.instructions[end_decl.latency_specifier.unwrap()].unwrap_wire();
                         
 
                         let writes_involved = gather_all_mux_inputs(&self.wires, &conflict_path);
@@ -806,18 +806,18 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     
 
     fn instantiate_full(&mut self) -> Option<FlatAlloc<InstantiatedPort, PortIDMarker>> {
-        if self.flattened.errors.did_error.get() {
+        if self.md.link_info.errors.did_error.get() {
             return None;// Don't instantiate modules that already errored. Otherwise instantiator may crash
         }
 
-        for (_id, inst) in &self.flattened.instructions {
+        for (_id, inst) in &self.md.instructions {
             inst.for_each_embedded_type(&mut |typ,_span| {
                 assert!(!typ.contains_error_or_unknown::<true,true>(), "Types brought into instantiation may not contain 'bad types': {typ:?} in {inst:?}");
             })
         }
         
     
-        self.instantiate_flattened_module(self.flattened.instructions.id_range(), None)?;
+        self.instantiate_flattened_module(self.md.instructions.id_range(), None)?;
         let interface = self.compute_latencies();
         
         if self.errors.did_error.get() {
@@ -845,7 +845,7 @@ fn gather_all_mux_inputs<'w>(wires : &'w FlatAlloc<RealWire, WireIDMarker>, conf
         let RealWireDataSource::Multiplexer { is_state:_, sources } = &to_wire.source else {continue}; // We can only name multiplexers
 
         //let decl_id = to_wire.original_wire;
-        //let Instruction::Declaration(decl) = &self.flattened.instructions[decl_id] else {unreachable!()};
+        //let Instruction::Declaration(decl) = &self.instructions[decl_id] else {unreachable!()};
 
         for s in sources {
             let mut predecessor_found = false;
@@ -916,14 +916,14 @@ impl InstantiationList {
         // Temporary, no template arguments yet
         if cache_borrow.is_empty() {
             let mut context = InstantiationContext{
-                generation_state : module.flattened.instructions.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect(),
+                generation_state : module.instructions.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect(),
                 wires : FlatAlloc::new(),
                 submodules : FlatAlloc::new(),
                 specified_latencies : Vec::new(),
-                flattened : &module.flattened,
+                md : module,
                 module,
                 linker : linker,
-                errors : module.flattened.errors.new_for_same_file_inherit_did_error()
+                errors : module.link_info.errors.new_for_same_file_inherit_did_error()
             };
 
             let interface = context.instantiate_full();

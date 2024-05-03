@@ -1,3 +1,6 @@
+mod resolver;
+pub use resolver::*;
+
 use std::{collections::{HashMap, HashSet}, cell::RefCell};
 
 use tree_sitter::Tree;
@@ -67,7 +70,9 @@ pub struct LinkInfo {
     pub name : String,
     pub name_span : Span,
     pub span : Span,
-    pub documentation : Documentation
+    pub documentation : Documentation,
+    pub errors : ErrorCollector,
+    pub resolved_globals : ResolvedGlobals
 }
 
 impl LinkInfo {
@@ -288,8 +293,7 @@ impl Linker {
             match v {
                 NameElem::Module(md_id) => {
                     let md = &self.modules[*md_id];
-                    errors.ingest(&md.parsing_errors);
-                    errors.ingest(&md.flattened.errors);
+                    errors.ingest(&md.link_info.errors);
                     md.instantiations.collect_errors(errors);
                 }
                 NameElem::Type(_) => {}
@@ -407,132 +411,3 @@ impl<'linker> FileBuilder<'linker> {
         self.add_name(module_name, new_module_uuid);
     }
 }
-
-#[derive(Debug)]
-pub struct ResolvedGlobals {
-    referenced_globals : Vec<NameElem>,
-    all_resolved : bool
-}
-
-impl ResolvedGlobals {
-    pub fn empty() -> ResolvedGlobals {
-        ResolvedGlobals{referenced_globals : Vec::new(), all_resolved : true}
-    }
-}
-
-pub struct GlobalResolver<'linker> {
-    linker : &'linker Linker,
-    pub file : &'linker FileData,
-    resolved_globals : RefCell<ResolvedGlobals>
-}
-
-impl<'linker> GlobalResolver<'linker> {
-    pub fn new(linker : &'linker Linker, file_id : FileUUID) -> GlobalResolver<'linker> {
-        GlobalResolver{
-            linker,
-            file : &linker.files[file_id],
-            resolved_globals : RefCell::new(ResolvedGlobals::empty())
-        }
-    }
-
-    pub fn extract_resolved_globals(self) -> ResolvedGlobals {
-        let sub_resolved = self.resolved_globals.into_inner();
-        sub_resolved
-    }
-
-    pub fn resolve_global<'error_collector>(&self, name_span : Span, errors : &'error_collector ErrorCollector) -> ResolvedNameElem<'linker, 'error_collector> {
-        let name = &self.file.file_text[name_span];
-
-        let mut resolved_globals = self.resolved_globals.borrow_mut();
-        match self.linker.global_namespace.get(name) {
-            Some(NamespaceElement::Global(found)) => {
-                resolved_globals.referenced_globals.push(*found);
-                ResolvedNameElem{name_elem: Some(*found), linker: self.linker, span: name_span, errors}
-            }
-            Some(NamespaceElement::Colission(coll)) => {
-                resolved_globals.all_resolved = false;
-
-                let decl_infos = coll.iter().map(|collider_global| {
-                    let err_loc = self.linker.get_linking_error_location(*collider_global);
-                    if let Some((file, span)) = err_loc.location {
-                        error_info(span, file, format!("{} {} declared here", err_loc.named_type, err_loc.full_name))
-                    } else {
-                        // Kinda hacky, point the 'builtin' back to the declaration location because builtins don't have a location
-                        error_info(name_span, errors.file, format!("{} {}", err_loc.named_type, err_loc.full_name))
-                    }
-                }).collect();
-
-                errors.error_with_info(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."), decl_infos);
-
-                ResolvedNameElem{name_elem: None, linker: self.linker, span: name_span, errors}
-            }
-            None => {
-                resolved_globals.all_resolved = false;
-
-                errors.error_basic(name_span, format!("No Global of the name '{name}' was found. Did you forget to import it?"));
-
-                ResolvedNameElem{name_elem: None, linker: self.linker, span: name_span, errors}
-            }
-        }
-    }
-
-    pub fn get_module(&self, index: ModuleUUID) -> &'linker Module {
-        &self.linker.modules[index]
-    }
-    #[allow(dead_code)]
-    pub fn get_constant(&self, index: ConstantUUID) -> &'linker NamedConstant {
-        &self.linker.constants[index]
-    }
-    #[allow(dead_code)]
-    pub fn get_type(&self, index: TypeUUID) -> &'linker NamedType {
-        &self.linker.types[index]
-    }
-}
-
-pub struct ResolvedNameElem<'l, 'e> {
-    pub name_elem : Option<NameElem>,
-    pub span : Span,
-    linker : &'l Linker,
-    pub errors : &'e ErrorCollector
-}
-
-impl<'l, 'e> ResolvedNameElem<'l, 'e> {
-    pub fn not_expected_global_error(self, expected : &str) {
-        let info = self.linker.get_linking_error_location(self.name_elem.unwrap());
-        let infos = if let Some((file, definition_span)) = info.location {
-            vec![error_info(definition_span, file, "Defined here")]
-        } else {
-            vec![]
-        };
-        let name = &info.full_name;
-        let global_type = info.named_type;
-        self.errors.error_with_info(self.span, format!("{name} is not a {expected}, it is a {global_type} instead!"), infos);
-    }
-    pub fn expect_constant(self) -> Option<ConstantUUID> {
-        if let NameElem::Constant(id) = self.name_elem? {
-            Some(id)
-        } else {
-            self.not_expected_global_error("Constant");
-            None
-        }
-    }
-
-    pub fn expect_type(self) -> Option<TypeUUID> {
-        if let NameElem::Type(id) = self.name_elem? {
-            Some(id)
-        } else {
-            self.not_expected_global_error("Type");
-            None
-        }
-    }
-
-    pub fn expect_module(self) -> Option<ModuleUUID> {
-        if let NameElem::Module(id) = self.name_elem? {
-            Some(id)
-        } else {
-            self.not_expected_global_error("Module");
-            None
-        }
-    }
-}
-

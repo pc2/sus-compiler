@@ -5,7 +5,7 @@ use tree_sitter::Parser;
 use crate::{
     errors::ErrorCollector,
     file_position::FileText,
-    flattening::{initialization::gather_initial_file_data, typechecking::typecheck_all_modules, FlattenedModule},
+    flattening::{flatten, initialization::gather_initial_file_data, typechecking::typecheck_all_modules},
     instantiation::InstantiatedModule,
     linker::{FileData, FileUUID, Linker, ModuleUUID}
 };
@@ -48,13 +48,11 @@ pub fn recompile_all(linker : &mut Linker) {
     // Flatten all modules
     let id_vec : Vec<ModuleUUID> = linker.modules.iter().map(|(id, _)| id).collect();
     for id in id_vec {
-        let md = &linker.modules[id];// Have to get them like this, so we don't have a mutable borrow on self.modules across the loop
-        println!("Flattening {}", md.link_info.name);
-
-        let flattened = FlattenedModule::flatten(&linker, md);
+        //let md = &linker.modules[id];// Have to get them like this, so we don't have a mutable borrow on self.modules across the loop
+        
+        flatten(linker, id);
 
         let md = &mut linker.modules[id]; // Convert to mutable ptr
-        md.flattened = flattened;
         md.instantiations.clear_instances();
     }
 

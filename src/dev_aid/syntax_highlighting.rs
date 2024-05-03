@@ -30,12 +30,12 @@ pub fn walk_name_color(all_objects : &[NameElem], linker : &Linker) -> Vec<(IDEI
         let (ide_typ, link_info) = match obj_uuid {
             NameElem::Module(id) => {
                 let module = &linker.modules[*id];
-                for (_id, item) in &module.flattened.instructions {
+                for (_id, item) in &module.instructions {
                     match item {
                         Instruction::Wire(w) => {
                             match &w.source {
                                 &WireSource::WireRead(from_wire) => {
-                                    let decl = module.flattened.instructions[from_wire].unwrap_wire_declaration();
+                                    let decl = module.instructions[from_wire].unwrap_wire_declaration();
                                     result.push((IDEIdentifierType::Value(decl.identifier_type), w.span));
                                 }
                                 WireSource::UnaryOp { op:_, right:_ } => {}
@@ -61,7 +61,7 @@ pub fn walk_name_color(all_objects : &[NameElem], linker : &Linker) -> Vec<(IDEI
                         Instruction::Write(conn) => {
                             match conn.to.root {
                                 ConnectionWriteRoot::LocalDecl(decl_id) => {
-                                    let decl = module.flattened.instructions[decl_id].unwrap_wire_declaration();
+                                    let decl = module.instructions[decl_id].unwrap_wire_declaration();
                                     result.push((IDEIdentifierType::Value(decl.identifier_type), conn.to.root_span));
                                 }
                                 ConnectionWriteRoot::SubModulePort(port) => {

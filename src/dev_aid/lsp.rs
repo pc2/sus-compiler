@@ -302,7 +302,7 @@ fn get_info_about_source_location<'linker>(linker : &'linker Linker, position : 
                 let md = &linker.modules[md_id];
                 if md.link_info.span.contains_pos(position) {
                     location_builder.update(md.link_info.name_span, LocationInfo::Global(NameElem::Module(md_id)));
-                    for (id, inst) in &md.flattened.instructions {
+                    for (id, inst) in &md.instructions {
                         match inst {
                             Instruction::SubModule(sm) => {
                                 location_builder.update(sm.module_name_span, LocationInfo::Global(NameElem::Module(sm.module_uuid)));
@@ -441,7 +441,7 @@ fn gather_completions(linker : &Linker, file_id : FileUUID, position : usize) ->
         result.push(CompletionItem{label : m.link_info.name.to_string(), kind : Some(CompletionItemKind::FUNCTION), ..Default::default()});
 
         if m.link_info.file == file_id && m.link_info.span.contains_pos(position) {
-            for (_id, v) in &m.flattened.instructions {
+            for (_id, v) in &m.instructions {
                 if let Instruction::Declaration(d) = v {
                     result.push(CompletionItem{label : d.name.to_string(), kind : Some(CompletionItemKind::VARIABLE), ..Default::default()});
                 }
@@ -472,7 +472,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                 } else {
                     match info {
                         LocationInfo::WireRef(md, decl_id) => {
-                            let decl = md.flattened.instructions[decl_id].unwrap_wire_declaration();
+                            let decl = md.instructions[decl_id].unwrap_wire_declaration();
                             let typ_str = decl.typ.to_string(&file_cache.linker.types);
                             let name_str = &decl.name;
 
@@ -514,7 +514,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                 match info {
                     LocationInfo::WireRef(md, decl_id) => {
                         let uri = file_cache.uris[md.link_info.file].clone();
-                        let decl = md.flattened.instructions[decl_id].unwrap_wire_declaration();
+                        let decl = md.instructions[decl_id].unwrap_wire_declaration();
                         let range = to_position_range(file_cache.linker.files[md.link_info.file].file_text.get_span_linecol_range(decl.name_span));
                         GotoDefinitionResponse::Scalar(Location{uri, range})
                     }

@@ -136,6 +136,7 @@ impl<'t> Cursor<'t> {
                     return true;
                 } else {
                     self.current_field_was_already_consumed = false;
+                    //println!("Optional field '{}' not found. Found '{}' instead", tree_sitter_sus::language().field_name_for_id(field_id.get()).unwrap(), tree_sitter_sus::language().field_name_for_id(found.get()).unwrap());
                     return false; // Field found, but it's not this one. Stop here, because we've passed the possibly optional field
                 }
             } else {
