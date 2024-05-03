@@ -64,6 +64,7 @@ The main goals of the language are roughly listed below:
 - [ ] Generator Syntax
 
 ### Linking and Name Resolution
+- [ ] Namespaces
 - [x] Single File Name Resolution
 - [x] Multi File Name Resolution
 - [ ] Incremental Parsing

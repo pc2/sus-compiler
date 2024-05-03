@@ -415,7 +415,7 @@ pub struct ResolvedGlobals {
 }
 
 impl ResolvedGlobals {
-    pub fn new() -> ResolvedGlobals {
+    pub fn empty() -> ResolvedGlobals {
         ResolvedGlobals{referenced_globals : Vec::new(), all_resolved : true}
     }
 }
@@ -423,7 +423,7 @@ impl ResolvedGlobals {
 pub struct GlobalResolver<'linker> {
     linker : &'linker Linker,
     pub file : &'linker FileData,
-    resolved_globals : RefCell<Option<ResolvedGlobals>>
+    resolved_globals : RefCell<ResolvedGlobals>
 }
 
 impl<'linker> GlobalResolver<'linker> {
@@ -431,20 +431,19 @@ impl<'linker> GlobalResolver<'linker> {
         GlobalResolver{
             linker,
             file : &linker.files[file_id],
-            resolved_globals : RefCell::new(Some(ResolvedGlobals::new()))
+            resolved_globals : RefCell::new(ResolvedGlobals::empty())
         }
     }
 
-    pub fn extract_resolved_globals(&self) -> ResolvedGlobals {
-        let sub_resolved = self.resolved_globals.replace(None);
-        sub_resolved.unwrap()
+    pub fn extract_resolved_globals(self) -> ResolvedGlobals {
+        let sub_resolved = self.resolved_globals.into_inner();
+        sub_resolved
     }
 
     pub fn resolve_global<'error_collector>(&self, name_span : Span, errors : &'error_collector ErrorCollector) -> ResolvedNameElem<'linker, 'error_collector> {
         let name = &self.file.file_text[name_span];
 
-        let mut resolved_globals_borrow = self.resolved_globals.borrow_mut();
-        let resolved_globals = resolved_globals_borrow.as_mut().unwrap();
+        let mut resolved_globals = self.resolved_globals.borrow_mut();
         match self.linker.global_namespace.get(name) {
             Some(NamespaceElement::Global(found)) => {
                 resolved_globals.referenced_globals.push(*found);
@@ -489,14 +488,6 @@ impl<'linker> GlobalResolver<'linker> {
         &self.linker.types[index]
     }
 }
-
-impl<'linker> Drop for GlobalResolver<'linker> {
-    fn drop(&mut self) {
-        // resolved_globals must have been consumed
-        assert!(self.resolved_globals.get_mut().is_none());
-    }
-}
-
 
 pub struct ResolvedNameElem<'l, 'e> {
     pub name_elem : Option<NameElem>,

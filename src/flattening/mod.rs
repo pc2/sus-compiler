@@ -56,16 +56,32 @@ impl IdentifierType {
     }
 }
 
+/// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage. 
+/// 
+/// 1. Initialization: initial name resolution and port discovery. The Module objects themselves are constructed. 
+/// 
+/// 2. Flattening: 
+/// 
+///     2.1: Parsing: Parse source code to create instruction list. 
+/// 
+///     2.2: Typecheck: Add typ variables to everything. [Declaration::typ], [WireInstance::typ] and [WireInstance::is_compiletime] are set in this stage. 
+/// 
+/// 3. Instantiation: Actually run generative code and instantiate modules. 
 #[derive(Debug)]
 pub struct Module {
+    /// Created by Stage 1: Initialization
     pub link_info : LinkInfo,
 
-    pub parsing_errors : ErrorCollector,
-
+    /// Created by Stage 1: Initialization
     pub module_ports : ModulePorts,
 
+    /// Gathered from Stage 1-2: Initialization and Flattening
+    pub parsing_errors : ErrorCollector,
+    
+    /// Created in Stage 2: Flattening and Typechecking
     pub flattened : FlattenedModule,
 
+    /// Created in Stage 3: Instantiation
     pub instantiations : InstantiationList
 }
 
@@ -747,6 +763,7 @@ impl<'l> FlatteningContext<'l> {
                 if let Some(instr_id) = self.get_or_alloc_module_by_global_identifier(cursor) {
                     let submodule = self.instructions[instr_id].unwrap_submodule();
 
+                    cursor.field(field!("name"));
                     //submodule.module_uuid
                 }
             });
@@ -1095,7 +1112,7 @@ impl FlattenedModule {
         FlattenedModule {
             instructions : FlatAlloc::new(),
             errors,
-            resolved_globals : ResolvedGlobals::new(),
+            resolved_globals : ResolvedGlobals::empty(),
             port_map : FlatAlloc::new()
         }
     }
