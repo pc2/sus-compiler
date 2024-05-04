@@ -143,26 +143,23 @@ impl<'l> ResolvedName<'l> {
 
 
 
-pub struct ModuleEditContext<'linker> {
+pub struct ModuleEditContext<'md, 'linker> {
     /// The module we are currently editing
-    pub md : &'linker mut Module,
+    pub md : &'md mut Module,
 
     pub file : &'linker FileData,
 
     resolver : UnsafeGlobalResolver
 }
 
-impl<'linker> ModuleEditContext<'linker> {
+impl<'md, 'linker> ModuleEditContext<'md ,'linker> {
     /// See [ModuleEditContext::drop]
-    pub fn new(linker : &'linker mut Linker, module_uuid : ModuleUUID) -> Self {
-        let linker_ptr : *const Linker = linker;
-        let md = &mut linker.modules[module_uuid];
-
+    pub fn new(linker_ptr : *const Linker, file : &'linker FileData, md : &'md mut Module) -> Self {
         Self {
-            file : &linker.files[md.link_info.file],
+            file,
             resolver : UnsafeGlobalResolver {
                 linker : linker_ptr,
-                file_text : &linker.files[md.link_info.file].file_text,
+                file_text : &file.file_text,
                 errors : md.link_info.errors.take(),
                 resolved_globals : RefCell::new(ResolvedGlobals::empty())
             },
@@ -205,7 +202,7 @@ impl<'linker> ModuleEditContext<'linker> {
 }
 
 /// Don't actually need [::core::ops::DerefMut]
-impl<'linker> Deref for ModuleEditContext<'linker> {
+impl<'md, 'linker> Deref for ModuleEditContext<'md, 'linker> {
     type Target = UnsafeGlobalResolver;
 
     fn deref(&self) -> &Self::Target {
@@ -213,7 +210,7 @@ impl<'linker> Deref for ModuleEditContext<'linker> {
     }
 }
 
-impl<'linker> Drop for ModuleEditContext<'linker> {
+impl<'md, 'linker> Drop for ModuleEditContext<'md, 'linker> {
     /// Places errors and resolved globals back in Module's LinkInfo
     /// 
     /// See [ModuleEditContext::new]

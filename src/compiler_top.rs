@@ -5,7 +5,7 @@ use tree_sitter::Parser;
 use crate::{
     errors::ErrorCollector,
     file_position::FileText,
-    flattening::{flatten, initialization::gather_initial_file_data, typechecking::typecheck_all_modules},
+    flattening::{flatten_all_modules, initialization::gather_initial_file_data, typechecking::typecheck_all_modules},
     instantiation::InstantiatedModule,
     linker::{FileData, FileUUID, Linker, ModuleUUID}
 };
@@ -45,20 +45,11 @@ pub fn update_file(text : String, file_id : FileUUID, linker : &mut Linker) {
 }
 
 pub fn recompile_all(linker : &mut Linker) {
-    // Flatten all modules
-    let id_vec : Vec<ModuleUUID> = linker.modules.iter().map(|(id, _)| id).collect();
-    for id in id_vec {
-        //let md = &linker.modules[id];// Have to get them like this, so we don't have a mutable borrow on self.modules across the loop
-        
-        flatten(linker, id);
-
-        let md = &mut linker.modules[id]; // Convert to mutable ptr
-        md.instantiations.clear_instances();
-    }
-
+    flatten_all_modules(linker);
     typecheck_all_modules(linker);
 
-    // Can't merge these loops, because instantiation can only be done once all modules have been type checked
+    // Make an initial instantiation of all modules
+    // Won't be possible once we have template modules
     for (id, _md) in &linker.modules {
         //md.print_flattened_module();
         // Already instantiate any modules without parameters

@@ -160,6 +160,7 @@ impl Linkable for NamedType {
 pub struct FileData {
     pub file_text : FileText,
     pub parsing_errors : ErrorCollector,
+    /// In source file order
     pub associated_values : Vec<NameElem>,
     pub tree : tree_sitter::Tree
 }

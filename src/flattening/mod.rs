@@ -12,7 +12,7 @@ use crate::{
     errors::{error_info, ErrorCollector, ErrorInfo},
     file_position::{BracketSpan, Span},
     instantiation::InstantiationList,
-    linker::{ConstantUUID, FileUUID, LinkInfo, Linker, ModuleEditContext, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedName, TypeUUIDMarker},
+    linker::{ConstantUUID, FileData, FileUUID, LinkInfo, Linker, ModuleEditContext, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedName, TypeUUIDMarker},
     parser::{Cursor, Documentation},
     typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, AbstractType, WrittenType, BOOL_TYPE, INT_TYPE},
     value::Value
@@ -453,28 +453,28 @@ impl<'l> LocalOrGlobal<'l> {
 
 
 
-struct FlatteningContext<'l> {
-    upper_ctx : ModuleEditContext<'l>,
+struct FlatteningContext<'md, 'l> {
+    upper_ctx : ModuleEditContext<'md, 'l>,
     ports_to_visit : UUIDRange<PortIDMarker>,
 
     local_variable_context : LocalVariableContext<'l, FlatID>
 }
 
-impl<'l> Deref for FlatteningContext<'l> {
-    type Target = ModuleEditContext<'l>;
+impl<'md, 'l> Deref for FlatteningContext<'md, 'l> {
+    type Target = ModuleEditContext<'md, 'l>;
 
     fn deref(&self) -> &Self::Target {
         &self.upper_ctx
     }
 }
 
-impl<'l> DerefMut for FlatteningContext<'l> {
+impl<'md, 'l> DerefMut for FlatteningContext<'md, 'l> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.upper_ctx
     }
 }
 
-impl<'l> FlatteningContext<'l> {
+impl<'md, 'l> FlatteningContext<'md, 'l> {
     fn resolve_identifier(&self, identifier_span : Span) -> LocalOrGlobal {
         // Possibly local
         let name_text = &self.file.file_text[identifier_span];
@@ -1135,28 +1135,54 @@ pub struct FlattenedInterfacePort {
     pub span : Span
 }
 
-/*
-This method flattens all given code into a simple set of assignments, operators and submodules. 
-It already does basic type checking and assigns a type to every wire. 
-The Generating Structure of the code is not yet executed. 
-It is template-preserving
-*/
-pub fn flatten(linker : &mut Linker, module_uuid : ModuleUUID) {
-    let upper_ctx = ModuleEditContext::new(linker, module_uuid);
+
+/// This method flattens all given code into a simple set of assignments, operators and submodules. 
+/// It already does basic type checking and assigns a type to every wire. 
+/// The Generating Structure of the code is not yet executed. 
+/// It is template-preserving
+/// 
+/// Separate 'md lifetime for the module. 
+/// For some reason if it has the same lifetime as the linker ('l), 
+/// then the compiler thinks we could store cursor elements in the module, which would be bad? 
+/// Don't fully understand this, but separating the lifetimes makes it work. 
+fn flatten<'md, 'l>(linker : *const Linker, md : &'md mut Module, file_data : &'l FileData, cursor : &mut Cursor<'l>) {
+    let upper_ctx = ModuleEditContext::new(linker, file_data, md);
     println!("Flattening {}", upper_ctx.md.link_info.name);
 
-    let mut context = FlatteningContext{
+    let mut context = FlatteningContext {
         ports_to_visit : upper_ctx.md.module_ports.ports.id_range(),
         upper_ctx,
         local_variable_context : LocalVariableContext::new_initial()
     };
 
-    // The given span should correspond perfectly to this, so impossible we don't find the node. 
-    let mut cursor = Cursor::new_for_node(&context.file.tree, &context.file.file_text, context.md.link_info.span, kind!("module"));
-
-    // Temporary, switch to iterating over nodes in file itself when needed. 
-    context.flatten_module(&mut cursor);
+    context.flatten_module(cursor);
     
     // Make sure all ports have been visited
     assert!(context.ports_to_visit.is_empty());
+}
+
+/// Flattens all modules in the project. 
+/// 
+/// Requires that first, all modules have been initialized. 
+pub fn flatten_all_modules<'l>(linker : &'l mut Linker) {
+    let linker_ptr : *const Linker = linker;
+    let modules : &'l mut ArenaAllocator<_,_> = &mut linker.modules;
+
+    for (_file_id, file) in &linker.files {
+        let mut associated_value_iter = file.associated_values.iter();
+
+        let mut cursor = Cursor::new_at_root(&file.tree, &file.file_text);
+
+        cursor.list(kind!("source_file"), |cursor| {
+            match cursor.kind() {
+                kind!("module") => {
+                    let Some(NameElem::Module(module_uuid)) = associated_value_iter.next() else {unreachable!()};
+
+                    let md : &mut Module = &mut modules[*module_uuid];
+                    flatten(linker_ptr, md, file, cursor);
+                }
+                other => todo!("{}", tree_sitter_sus::language().node_kind_for_id(other).unwrap())
+            }
+        });
+    }
 }
