@@ -1,3 +1,4 @@
+pub mod checkpoint;
 mod resolver;
 pub use resolver::*;
 
@@ -15,6 +16,8 @@ use crate::{
     util::{const_str_position, const_str_position_in_tuples},
     value::{TypedValue, Value}
 };
+
+use self::checkpoint::CheckPoint;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModuleUUIDMarker;
@@ -72,7 +75,10 @@ pub struct LinkInfo {
     pub span : Span,
     pub documentation : Documentation,
     pub errors : ErrorCollector,
-    pub resolved_globals : ResolvedGlobals
+    pub resolved_globals : ResolvedGlobals,
+
+    /// Reset checkpoints. These are to reset errors and resolved_globals 
+    pub after_initial_parse_cp : CheckPoint
 }
 
 impl LinkInfo {

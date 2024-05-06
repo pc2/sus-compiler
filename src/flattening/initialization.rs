@@ -7,7 +7,7 @@ use crate::{
     file_position::{FileText, Span},
     flattening::Module,
     instantiation::InstantiationList,
-    linker::{FileBuilder, LinkInfo, ResolvedGlobals},
+    linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals},
     parser::Cursor
 };
 
@@ -110,6 +110,9 @@ pub fn gather_initial_file_data(builder : &mut FileBuilder) {
 
                     interfaces.alloc(Interface{func_call_inputs, func_call_outputs, ports_for_this_interface : ports.range_since(ports_start_at)});
 
+                    let resolved_globals = ResolvedGlobals::empty();
+                    let after_initial_parse_cp = CheckPoint::checkpoint(&parsing_errors, &resolved_globals);
+
                     let md = Module{
                         link_info: LinkInfo {
                             documentation: cursor.extract_gathered_comments(),
@@ -118,7 +121,8 @@ pub fn gather_initial_file_data(builder : &mut FileBuilder) {
                             name_span,
                             span,
                             errors : parsing_errors,
-                            resolved_globals : ResolvedGlobals::empty()
+                            resolved_globals,
+                            after_initial_parse_cp
                         },
                         instructions : FlatAlloc::new(),
                         module_ports : ModulePorts{

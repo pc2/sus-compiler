@@ -3,6 +3,8 @@
 
 use std::ops::Deref;
 
+use self::checkpoint::ResolvedGlobalsCheckpoint;
+
 use super::*;
 
 
@@ -18,6 +20,13 @@ impl ResolvedGlobals {
     }
     pub fn is_untouched(&self) -> bool {
         self.referenced_globals.is_empty() && self.all_resolved
+    }
+    pub fn reset_to(&mut self, checkpoint : ResolvedGlobalsCheckpoint) {
+        self.referenced_globals.truncate(checkpoint.0);
+        self.all_resolved = checkpoint.1;
+    }
+    pub fn checkpoint(&self) -> ResolvedGlobalsCheckpoint {
+        ResolvedGlobalsCheckpoint(self.referenced_globals.len(), self.all_resolved)
     }
 }
 

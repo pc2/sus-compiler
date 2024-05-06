@@ -2,7 +2,7 @@
 
 use std::cell::{RefCell, Cell};
 
-use crate::{linker::FileUUID, file_position::Span};
+use crate::{file_position::Span, linker::{checkpoint::ErrorCheckpoint, FileUUID}};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ErrorLevel {
@@ -48,6 +48,13 @@ impl ErrorCollector {
     pub fn reset(&mut self, file_len : usize) {
         self.file_len = file_len;
         self.errors.get_mut().clear();
+    }
+    pub fn reset_to(&mut self, checkpoint : ErrorCheckpoint) {
+        self.errors.borrow_mut().truncate(checkpoint.0);
+        self.did_error.set(checkpoint.1);
+    }
+    pub fn checkpoint(&self) -> ErrorCheckpoint {
+        ErrorCheckpoint(self.errors.borrow().len(), self.did_error.get())
     }
 
     pub fn new_for_same_file_clean_did_error(&self) -> Self {

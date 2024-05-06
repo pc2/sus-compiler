@@ -45,6 +45,12 @@ pub fn update_file(text : String, file_id : FileUUID, linker : &mut Linker) {
 }
 
 pub fn recompile_all(linker : &mut Linker) {
+    // First reset all modules back to post-gather_initial_file_data
+    for (_, md) in &mut linker.modules {
+        md.link_info.reset_to(md.link_info.after_initial_parse_cp);
+        md.instantiations.clear_instances()
+    }
+
     flatten_all_modules(linker);
     typecheck_all_modules(linker);
 

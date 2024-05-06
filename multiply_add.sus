@@ -324,13 +324,12 @@ module generative : int i -> int o, int o2 {
 	o2 = a[a[0]]
 }
 
-module add_stuff_to_indices : int[10] values -> int[10] added_values {
-	int[5] arr
+module add_indices_to_array : 
+	int[10] values -> int[10] added_values {
+
 	for int i in 0..10 {
 		int t = values[i]
 		added_values[i] = t + i
-
-		int tt = arr[i] + values[0]
 	}
 }
 
@@ -367,7 +366,6 @@ module first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros {
 	}*/
 
 }
-
 
 module multiply_add_with_latencies : int a'0, int b'0, int c'0 -> int r'0 {
     int tmp'1 = multiply(a, b)
@@ -472,13 +470,13 @@ module conflicting_latency_declarations : int a'0 -> int x'1 {
 }
 
 module bad_cycle : int a -> int r {
-	state int test
-	initial test = 0
+	state int state_reg
+	initial state_reg = 0
 
-	reg int new_test = test + a
-	test = new_test
+	reg int new_value = state_reg + a
+	state_reg = new_value
 
-	r = new_test
+	r = new_value
 }
 
 module module_taking_time : 
@@ -566,4 +564,16 @@ module contains_submodule_submodule : int a, int b, int c -> int r {
 	doNothing()
 	reg r = tmp + c
 }
+
+
+module xor2 : bool x1, bool x2 -> bool y {
+	bool w1 = !x1
+	bool w2 = !x2
+
+	bool w3 = x1 & w2
+	bool w4 = x2 & w1
+
+	y = w3 | w4
+}
+
 
