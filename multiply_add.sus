@@ -473,15 +473,26 @@ module bad_cycle : int a -> int r {
 	state int state_reg
 	initial state_reg = 0
 
-	reg int new_value = state_reg + a
-	state_reg = new_value
+	r = state_reg
 
-	r = new_value
+	reg state_reg = state_reg + a
 }
 
 module module_taking_time : 
 	int i'0 -> int o'5 {
 	o = i
+}
+
+module matrix_vector_mul : 
+	int[30][20] mat, int[20] vec -> int[30] result {
+	
+	for int row in 0..30 {
+		int[20] row_products
+		for int col in 0..20 {
+			row_products[col] = mat[row][col] * vec[col]
+		}
+		result[row] = +row_products
+	}
 }
 
 module bad_cycle2 : int a -> int r {
@@ -566,7 +577,7 @@ module contains_submodule_submodule : int a, int b, int c -> int r {
 }
 
 
-module xor2 : bool x1, bool x2 -> bool y {
+module xor : bool x1, bool x2 -> bool y {
 	bool w1 = !x1
 	bool w2 = !x2
 
@@ -575,5 +586,101 @@ module xor2 : bool x1, bool x2 -> bool y {
 
 	y = w3 | w4
 }
+
+
+
+module fizz_buzz : int v -> int fb {
+	gen int FIZZ = 15
+	gen int BUZZ = 11
+	gen int FIZZ_BUZZ = 1511
+	
+	bool fizz = v % 3 == 0
+	bool buzz = v % 5 == 0
+	
+	if fizz & buzz {
+		fb = FIZZ_BUZZ
+	} else if fizz {
+		fb = FIZZ
+	} else if buzz {
+		fb = BUZZ
+	} else {
+		fb = v
+	}
+}
+
+module fizz_buzz_gen : int v -> int fb {
+	gen int FIZZ = 15
+	gen int BUZZ = 11
+	gen int FIZZ_BUZZ = 1511
+	gen int TABLE_SIZE = 256
+
+	gen int[TABLE_SIZE] lut
+	
+	for int i in 0..TABLE_SIZE {
+		gen bool fizz = i % 3 == 0
+		gen bool buzz = i % 5 == 0
+		
+		gen int tbl_fb
+		if fizz & buzz {
+			tbl_fb = FIZZ_BUZZ
+		} else if fizz {
+			tbl_fb = FIZZ
+		} else if buzz {
+			tbl_fb = BUZZ
+		} else {
+			tbl_fb = i
+		}
+
+		lut[i] = tbl_fb
+	}
+
+	fb = lut[v]
+}
+
+module mbf_dual : bool[128] mbf -> bool[128] dual {
+	for int i in 0..128 {
+		dual[i] = !mbf[127-i]
+	}
+}
+
+
+module monotonize_down : bool[16] mbf -> bool[16] mtDown {
+	bool[16] mbf2
+	bool[16] mbf4
+	bool[16] mbf8
+	
+	for int i in 0..16 {
+		if i % 2 == 0 {
+			mbf2[i] = mbf[i] | mbf[i+1]
+		} else {
+			mbf2[i] = mbf[i]
+		}
+	}
+	
+	for int i in 0..16 {
+		if i % 4 < 2 {
+			mbf4[i] = mbf2[i] | mbf2[i+2]
+		} else {
+			mbf4[i] = mbf2[i]
+		}
+	}
+	
+	for int i in 0..16 {
+		if i % 8 < 4 {
+			mbf8[i] = mbf4[i] | mbf4[i+4]
+		} else {
+			mbf8[i] = mbf4[i]
+		}
+	}
+	
+	for int i in 0..16 {
+		if i % 16 < 8 {
+			mtDown[i] = mbf8[i] | mbf8[i+8]
+		} else {
+			mtDown[i] = mbf8[i]
+		}
+	}
+}
+
 
 
