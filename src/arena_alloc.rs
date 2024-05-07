@@ -119,6 +119,10 @@ impl<T, IndexMarker : UUIDMarker> ArenaAllocator<T, IndexMarker> {
         self.free_slots.push(uuid);
         std::mem::replace(&mut self.data[uuid], None).unwrap()
     }
+    pub fn clear(&mut self) {
+        self.data.clear();
+        self.free_slots.clear();
+    }
     pub fn iter<'a>(&'a self) -> ArenaIterator<'a, T, IndexMarker> {
         self.into_iter()
     }
@@ -410,6 +414,9 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
     }
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
+    }
+    pub fn clear(&mut self) {
+        self.data.clear();
     }
     pub fn iter<'a>(&'a self) -> FlatAllocIter<'a, T, IndexMarker> {
         self.into_iter()

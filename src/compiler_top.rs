@@ -40,8 +40,21 @@ pub fn update_file(text : String, file_id : FileUUID, linker : &mut Linker) {
     file_data.file_text = FileText::new(text);
     file_data.tree = tree;
 
-    let mut builder = linker.get_file_builder(file_id);
-    gather_initial_file_data(&mut builder);
+    // TEMPORARY Fix crash for incremental builds
+    //let mut builder = linker.get_file_builder(file_id);
+    //gather_initial_file_data(&mut builder);
+
+    linker.modules.clear();
+    let mut ids = Vec::new();
+    for (id, f) in &mut linker.files {
+        f.associated_values.clear();
+        ids.push(id);
+    }
+
+    for id in ids {
+        let mut builder = linker.get_file_builder(id);
+        gather_initial_file_data(&mut builder);
+    }
 }
 
 pub fn recompile_all(linker : &mut Linker) {
