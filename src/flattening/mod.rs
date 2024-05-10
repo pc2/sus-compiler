@@ -114,17 +114,17 @@ pub type FlatID = UUID<FlatIDMarker>;
 pub type FlatIDRange = UUIDRange<FlatIDMarker>;
 
 #[derive(Debug, Clone, Copy)]
-pub enum ConnectionWritePathElement {
+pub enum WireReferencePathElement {
     ArrayIdx{idx : FlatID, bracket_span : BracketSpan},
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum ConnectionWriteRoot {
+pub enum WireReferenceRoot {
     LocalDecl(FlatID),
     SubModulePort(PortInfo)
 }
 
-impl ConnectionWriteRoot {
+impl WireReferenceRoot {
     #[track_caller]
     pub fn unwrap_decl(&self) -> FlatID {
         let Self::LocalDecl(decl) = self else {unreachable!()};
@@ -137,23 +137,24 @@ impl ConnectionWriteRoot {
     }
 }
 
-impl ConnectionWriteRoot {
+impl WireReferenceRoot {
     pub fn get_root_flat(&self) -> FlatID {
         match self {
-            ConnectionWriteRoot::LocalDecl(f) => *f,
-            ConnectionWriteRoot::SubModulePort(port) => port.submodule,
+            WireReferenceRoot::LocalDecl(f) => *f,
+            WireReferenceRoot::SubModulePort(port) => port.submodule,
         }
     }
 }
 
-// These are assignable connections
+/// References to wires
+/// 
+/// Example: myModule.port[a][b:c]
 #[derive(Debug)]
-pub struct ConnectionWrite {
-    pub root : ConnectionWriteRoot,
+pub struct WireReference {
+    pub root : WireReferenceRoot,
     pub root_span : Span,
-    pub path : Vec<ConnectionWritePathElement>,
-    pub span : Span,
-    pub write_modifiers : WriteModifiers
+    pub path : Vec<WireReferencePathElement>,
+    pub span : Span
 }
 
 #[derive(Debug)]
@@ -165,7 +166,8 @@ pub enum WriteModifiers {
 #[derive(Debug)]
 pub struct Write {
     pub from : FlatID,
-    pub to : ConnectionWrite
+    pub to : WireReference,
+    pub write_modifiers : WriteModifiers,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -341,7 +343,7 @@ pub struct Declaration {
 
 impl Declaration {
     pub fn get_span(&self) -> Span {
-        Span::new_overarching(self.typ_expr.get_span(), self.name_span)
+        Span::new_overarching(self.typ_expr.get_span(), self.name_span).debug()
     }
     pub fn make_declared_here(&self, file : FileUUID) -> ErrorInfo {
         error_info(self.get_span(), file, "Declared here")
@@ -455,7 +457,9 @@ impl<'l> LocalOrGlobal<'l> {
 
 struct FlatteningContext<'l, 'errs> {
     modules : InternalResolver<'l, 'errs, ModuleUUIDMarker, Module>,
+    #[allow(dead_code)]
     types : Resolver<'l, 'errs, TypeUUIDMarker, NamedType>,
+    #[allow(dead_code)]
     constants : Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
     name_resolver : NameResolver<'l, 'errs>,
     errors : &'errs ErrorCollector,
@@ -657,7 +661,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             for (port_id, arg_read_side) in zip(inputs, args) {
                 let arg_wire = self.working_on.instructions[*arg_read_side].unwrap_wire();
                 let arg_wire_span = arg_wire.span;
-                let root = ConnectionWriteRoot::SubModulePort(PortInfo{
+                let root = WireReferenceRoot::SubModulePort(PortInfo{
                     submodule : instantiation_flat_id,
                     port : port_id,
                     port_name_span : None, // Not present in function call notation
@@ -665,13 +669,13 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 });
                 self.working_on.instructions.alloc(Instruction::Write(Write{
                     from: *arg_read_side,
-                    to: ConnectionWrite{
+                    to: WireReference{
                         root,
                         root_span : whole_function_span,
                         path : Vec::new(),
                         span : arg_wire_span,
-                        write_modifiers : WriteModifiers::Connection{num_regs : 0, regs_span : arg_wire_span.empty_span_at_front()}
-                    }
+                    },
+                    write_modifiers : WriteModifiers::Connection{num_regs : 0, regs_span : arg_wire_span.empty_span_at_front()}
                 }));
             }
 
@@ -713,6 +717,17 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             self.errors.error_basic(span, "Module name may not be an expression");
             None
         }
+    }
+
+    fn get_port(&self, submodule_decl : FlatID, cursor : &mut Cursor) -> Option<PortInfo> {
+        let submodule = self.working_on.instructions[submodule_decl].unwrap_submodule();
+
+        let port_name_span = cursor.field_span(field!("name"), kind!("identifier"));
+        let name = &self.name_resolver.file_text[port_name_span];
+        let submod = &self.modules[submodule.module_uuid];
+
+        let port = submod.module_ports.get_port_by_name(name)?;
+        Some(PortInfo { submodule: submodule_decl, port, port_name_span : Some(port_name_span), port_identifier_typ: submod.module_ports.ports[port].id_typ })
     }
 
     fn flatten_expr(&mut self, cursor : &mut Cursor) -> FlatID {
@@ -817,23 +832,23 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         };
         self.working_on.instructions.alloc(Instruction::Wire(wire_instance))
     }
-    fn flatten_assignable_expr(&mut self, write_modifiers : WriteModifiers, cursor : &mut Cursor) -> Option<ConnectionWrite> {
+    fn flatten_wire_reference(&mut self, cursor : &mut Cursor) -> Option<WireReference> {
         let (kind, span) = cursor.kind_span();
         if kind == kind!("global_identifier") {
             let root = self.resolve_identifier(span).expect_local("assignments")?;
 
-            Some(ConnectionWrite{root : ConnectionWriteRoot::LocalDecl(root), root_span : span, path : Vec::new(), span, write_modifiers})
+            Some(WireReference{root : WireReferenceRoot::LocalDecl(root), root_span : span, path : Vec::new(), span})
         } else if kind == kind!("array_op") {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("arr"));
-                let flattened_arr_expr_opt = self.flatten_assignable_expr(write_modifiers, cursor);
+                let flattened_arr_expr_opt = self.flatten_wire_reference(cursor);
                 
                 cursor.field(field!("arr_idx"));
                 let (idx, bracket_span) = self.flatten_array_bracket(cursor);
                 
                 let mut flattened_arr_expr = flattened_arr_expr_opt?; // only unpack the subexpr after flattening the idx, so we catch all errors
                 
-                flattened_arr_expr.path.push(ConnectionWritePathElement::ArrayIdx{idx, bracket_span});
+                flattened_arr_expr.path.push(WireReferencePathElement::ArrayIdx{idx, bracket_span});
                 flattened_arr_expr.span = Span::new_overarching(flattened_arr_expr.span, bracket_span.outer_span());
                 
                 Some(flattened_arr_expr)
@@ -841,7 +856,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         } else if kind == kind!("field_access") {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("left"));
-                let flattened_arr_expr_opt = self.flatten_assignable_expr(write_modifiers, cursor);
+                let flattened_arr_expr_opt = self.flatten_wire_reference(cursor);
                 
                 cursor.field(field!("name"));
                 //let (idx, bracket_span) = self.flatten_array_bracket(cursor);
@@ -888,15 +903,15 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
 
-    fn flatten_assign_function_call(&mut self, to : Vec<Result<ConnectionWrite, Span>>, cursor : &mut Cursor) {
+    fn flatten_assign_function_call(&mut self, to : Vec<Result<(WireReference, WriteModifiers), Span>>, cursor : &mut Cursor) {
         let func_call_span = cursor.span();
         let to_iter = if let Some((md_id, submodule, outputs)) = self.desugar_func_call(cursor) {
 
-            fn get_span(v : &Result<ConnectionWrite, Span>) -> Span {
+            fn get_span(v : &Result<(WireReference, WriteModifiers), Span>) -> Span {
                 match v {
-                    Ok(wr) => wr.span,
+                    Ok(wr) => wr.0.span,
                     Err(span) => *span,
-                }
+                }.debug()
             }
 
             let num_func_outputs = outputs.len();
@@ -914,14 +929,14 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
             let mut to_iter = to.into_iter();
             for port in outputs {
-                if let Some(Ok(to)) = to_iter.next() {
+                if let Some(Ok((to, write_modifiers))) = to_iter.next() {
                     let from = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{typ: AbstractType::Unknown, is_compiletime: false, span: func_call_span, source: WireSource::PortRead(PortInfo{
                         submodule,
                         port,
                         port_name_span: None,
                         port_identifier_typ: IdentifierType::Output,
                     })}));
-                    self.working_on.instructions.alloc(Instruction::Write(Write{from, to}));
+                    self.working_on.instructions.alloc(Instruction::Write(Write{from, to, write_modifiers}));
                 }
             }
             to_iter
@@ -929,9 +944,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             to.into_iter()
         };
         for leftover_to in to_iter {
-            if let Ok(to) = leftover_to {
+            if let Ok((to, write_modifiers)) = leftover_to {
                 let err_id = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{typ : AbstractType::Error, is_compiletime : true, span : func_call_span, source : WireSource::Constant(Value::Error)}));
-                self.working_on.instructions.alloc(Instruction::Write(Write{from: err_id, to}));
+                self.working_on.instructions.alloc(Instruction::Write(Write{from: err_id, to, write_modifiers}));
             }
         }
     }
@@ -966,8 +981,8 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         if to.len() != 1 {
                             self.errors.error_basic(span, format!("Non-function assignments must output exactly 1 output instead of {}", to.len()));
                         }
-                        if let Some(Ok(to)) = to.into_iter().next() {
-                            self.working_on.instructions.alloc(Instruction::Write(Write{from: read_side, to}));
+                        if let Some(Ok((to, write_modifiers))) = to.into_iter().next() {
+                            self.working_on.instructions.alloc(Instruction::Write(Write{from: read_side, to, write_modifiers}));
                         }
                     }
                 });
@@ -1039,7 +1054,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     /// Two cases:
     /// - Left side of assignment:
     ///     No modules, Yes write modifiers, Only assignable expressions
-    fn flatten_assignment_left_side(&mut self, cursor : &mut Cursor) -> Vec<Result<ConnectionWrite, Span>> {
+    fn flatten_assignment_left_side(&mut self, cursor : &mut Cursor) -> Vec<Result<(WireReference, WriteModifiers), Span>> {
         cursor.collect_list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
                 let write_modifiers = self.flatten_write_modifiers(cursor);
@@ -1050,9 +1065,13 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 if kind == kind!("declaration") {
                     let root = self.flatten_declaration::<false, true>(IdentifierType::Local, false, true, cursor);
                     let flat_root_decl = self.working_on.instructions[root].unwrap_wire_declaration();
-                    Ok(ConnectionWrite{root : ConnectionWriteRoot::LocalDecl(root), root_span : flat_root_decl.name_span, path: Vec::new(), span, write_modifiers})
+                    Ok((WireReference{root : WireReferenceRoot::LocalDecl(root), root_span : flat_root_decl.name_span, path: Vec::new(), span}, write_modifiers))
                 } else { // It's _expression
-                    self.flatten_assignable_expr(write_modifiers, cursor).ok_or(span)
+                    if let Some(wire_ref) = self.flatten_wire_reference(cursor) {
+                        Ok((wire_ref, write_modifiers))
+                    } else {
+                        Err(span)
+                    }
                 }
             })
         })

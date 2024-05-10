@@ -6,7 +6,7 @@ use crate::{
     compiler_top::{add_file, recompile_all},
     errors::{CompileError, ErrorLevel},
     file_position::Span,
-    flattening::{ConnectionWriteRoot, IdentifierType, Instruction, WireSource},
+    flattening::{WireReferenceRoot, IdentifierType, Instruction, WireSource},
     linker::{FileUUID, FileUUIDMarker, Linker, NameElem}
 };
 
@@ -60,11 +60,11 @@ pub fn walk_name_color(all_objects : &[NameElem], linker : &Linker) -> Vec<(IDEI
                         }
                         Instruction::Write(conn) => {
                             match conn.to.root {
-                                ConnectionWriteRoot::LocalDecl(decl_id) => {
+                                WireReferenceRoot::LocalDecl(decl_id) => {
                                     let decl = module.instructions[decl_id].unwrap_wire_declaration();
                                     result.push((IDEIdentifierType::Value(decl.identifier_type), conn.to.root_span));
                                 }
-                                ConnectionWriteRoot::SubModulePort(port) => {
+                                WireReferenceRoot::SubModulePort(port) => {
                                     if let Some(span) = port.port_name_span {
                                         todo!("Syntax highlight for named ports")
                                     }

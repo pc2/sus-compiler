@@ -11,7 +11,7 @@ use crate::{
     compiler_top::{add_file, recompile_all, update_file},
     errors::{CompileError, ErrorCollector, ErrorLevel},
     file_position::{FileText, LineCol, Span},
-    flattening::{ConnectionWriteRoot, FlatID, IdentifierType, Instruction, Module, WireInstance, WireSource},
+    flattening::{WireReferenceRoot, FlatID, IdentifierType, Instruction, Module, WireInstance, WireSource},
     instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER},
     linker::{FileData, FileUUID, FileUUIDMarker, Linker, NameElem},
     typing::WrittenType,
@@ -331,10 +331,10 @@ fn get_info_about_source_location<'linker>(linker : &'linker Linker, position : 
                             }
                             Instruction::Write(write) => {
                                 match write.to.root {
-                                    ConnectionWriteRoot::LocalDecl(decl_id) => {
+                                    WireReferenceRoot::LocalDecl(decl_id) => {
                                         location_builder.update(write.to.root_span, LocationInfo::WireRef(md, decl_id));
                                     }
-                                    ConnectionWriteRoot::SubModulePort(port) => {
+                                    WireReferenceRoot::SubModulePort(port) => {
                                         if let Some(span) = port.port_name_span {
                                             todo!("LSP for named ports");
                                         }

@@ -76,14 +76,14 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         typecheck(&wire.typ, wire.span, expected, context, &self.types, typ_decl_location, &self.errors);
     }
 
-    fn typecheck_connection(&self, to : &ConnectionWrite, from : FlatID) {
+    fn typecheck_connection(&self, to : &WireReference, from : FlatID) {
         // Typecheck digging down into write side
         let (mut write_to_type, declared_here) : (Option<AbstractType>, SpanFile) = match to.root {
-            ConnectionWriteRoot::LocalDecl(id) => {
+            WireReferenceRoot::LocalDecl(id) => {
                 let decl_root = self.working_on.instructions[id].unwrap_wire_declaration();
                 (Some(decl_root.typ.clone()), (decl_root.get_span(), self.errors.file))
             },
-            ConnectionWriteRoot::SubModulePort(port) => {
+            WireReferenceRoot::SubModulePort(port) => {
                 let (expected_typ, port_decl) = self.get_expected_type_of_module_port(port);
 
                 (Some(expected_typ), port_decl)
@@ -92,7 +92,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         };
         for p in &to.path {
             match p {
-                &ConnectionWritePathElement::ArrayIdx{idx, bracket_span} => {
+                &WireReferencePathElement::ArrayIdx{idx, bracket_span} => {
                     let idx_wire = self.working_on.instructions[idx].unwrap_wire();
                     self.typecheck_wire_is_of_type(idx_wire, &INT_TYPE, None, "array index");
                     if let Some(wr) = write_to_type {
@@ -274,11 +274,11 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
     fn generative_check_write(&self, conn: &Write, declaration_depths: &mut FlatAlloc<Option<usize>, FlatIDMarker>, runtime_if_stack: &mut Vec<(UUID<FlatIDMarker>, Span)>) {
         let (read_only, decl, file) = match conn.to.root {
-            ConnectionWriteRoot::LocalDecl(decl_id) => {
+            WireReferenceRoot::LocalDecl(decl_id) => {
                 let decl = self.working_on.instructions[decl_id].unwrap_wire_declaration();
                 (decl.read_only, decl, self.errors.file)
             }
-            ConnectionWriteRoot::SubModulePort(port) => {
+            WireReferenceRoot::SubModulePort(port) => {
                 let (decl, file) = self.get_decl_of_module_port(port);
                 (!decl.read_only, decl, file)
             }
@@ -289,7 +289,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     
         let from_wire = self.working_on.instructions[conn.from].unwrap_wire();
-        match conn.to.write_modifiers {
+        match conn.write_modifiers {
             WriteModifiers::Connection{num_regs : _, regs_span : _} => {
                 if decl.identifier_type.is_generative() {
                     // Check that whatever's written to this declaration is also generative

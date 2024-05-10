@@ -1,7 +1,7 @@
 
 //! This module provides a safe interface to edit both the current module, and access other modules in the linker. 
 
-use std::ops::{Deref, DerefMut, Index};
+use std::ops::Index;
 
 use self::checkpoint::ResolvedGlobalsCheckpoint;
 

@@ -7,7 +7,7 @@ use crate::{
     compiler_top::instantiate,
     errors::ErrorCollector,
     file_position::Span,
-    flattening::{initialization::PortIDMarker, BinaryOperator, ConnectionWritePathElement, ConnectionWriteRoot, FlatID, FlatIDMarker, FlatIDRange, IdentifierType, Instruction, Module, UnaryOperator, WireInstance, WireSource, Write, WriteModifiers},
+    flattening::{initialization::PortIDMarker, BinaryOperator, WireReferencePathElement, WireReferenceRoot, FlatID, FlatIDMarker, FlatIDRange, IdentifierType, Instruction, Module, UnaryOperator, WireInstance, WireSource, Write, WriteModifiers},
     instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError},
     linker::{Linker, ModuleUUID, NamedConstant},
     list_of_lists::ListOfLists,
@@ -248,14 +248,14 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
         }
     }
-    fn process_connection_to_wire(&mut self, to_path : &[ConnectionWritePathElement], from : ConnectFrom, wire_id : WireID) -> Option<()> {
+    fn process_connection_to_wire(&mut self, to_path : &[WireReferencePathElement], from : ConnectFrom, wire_id : WireID) -> Option<()> {
         let mut new_path : Vec<ConnectToPathElem> = Vec::new();
 
         let mut write_to_typ = &self.wires[wire_id].typ;
 
         for pe in to_path {
             match pe {
-                ConnectionWritePathElement::ArrayIdx{idx, bracket_span:_} => {
+                WireReferencePathElement::ArrayIdx{idx, bracket_span:_} => {
                     match &self.generation_state[*idx] {
                         SubModuleOrWire::SubModule(_) => unreachable!(),
                         SubModuleOrWire::Unnasigned => unreachable!(),
@@ -292,12 +292,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         Some(())
     }
-    fn convert_connection_path_to_known_values(&self, conn_path : &[ConnectionWritePathElement]) -> Option<Vec<ConnectionWritePathElementComputed>> {
+    fn convert_connection_path_to_known_values(&self, conn_path : &[WireReferencePathElement]) -> Option<Vec<ConnectionWritePathElementComputed>> {
         let mut result = Vec::new();
         result.reserve(conn_path.len());
         for p in conn_path {
             match p {
-                ConnectionWritePathElement::ArrayIdx{idx, bracket_span:_} => {
+                WireReferencePathElement::ArrayIdx{idx, bracket_span:_} => {
                     let idx_val = self.extract_integer_from_generative(*idx)?;
                     result.push(ConnectionWritePathElementComputed::ArrayIdx(idx_val))
                 }
@@ -306,10 +306,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         Some(result)
     }
     fn process_connection(&mut self, conn : &Write, original_connection : FlatID, condition : Option<WireID>) -> Option<()> {
-        match conn.to.write_modifiers {
+        match conn.write_modifiers {
             WriteModifiers::Connection{num_regs, regs_span : _} => {
                 match conn.to.root {
-                    ConnectionWriteRoot::LocalDecl(decl_id) => {
+                    WireReferenceRoot::LocalDecl(decl_id) => {
                         match &self.generation_state[decl_id] {
                             SubModuleOrWire::SubModule(_) => unreachable!(),
                             SubModuleOrWire::Unnasigned => unreachable!(),
@@ -333,7 +333,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             }
                         };
                     }
-                    ConnectionWriteRoot::SubModulePort(port) => {
+                    WireReferenceRoot::SubModulePort(port) => {
                         let sm = &self.submodules[self.generation_state[port.submodule].unwrap_submodule_instance()];
                         let write_to_wire = sm.port_map[port.port];
 
@@ -733,7 +733,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         
                         let mut did_place_error = false;
                         for wr in &unique_write_instructions {
-                            match wr.to.write_modifiers {
+                            match wr.write_modifiers {
                                 WriteModifiers::Connection { num_regs, regs_span } => {
                                     if num_regs >= 1 {
                                         did_place_error = true;
