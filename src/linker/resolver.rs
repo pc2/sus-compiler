@@ -1,7 +1,7 @@
 
 //! This module provides a safe interface to edit both the current module, and access other modules in the linker. 
 
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut, Index};
 
 use self::checkpoint::ResolvedGlobalsCheckpoint;
 
@@ -18,6 +18,9 @@ impl ResolvedGlobals {
     pub fn empty() -> ResolvedGlobals {
         ResolvedGlobals{referenced_globals : Vec::new(), all_resolved : true}
     }
+    pub fn take(&mut self) -> ResolvedGlobals {
+        std::mem::replace(self, ResolvedGlobals::empty())
+    }
     pub fn is_untouched(&self) -> bool {
         self.referenced_globals.is_empty() && self.all_resolved
     }
@@ -31,25 +34,53 @@ impl ResolvedGlobals {
 }
 
 
-/// SAFETY: [Linker::modules] itself is never modified
-pub struct UnsafeGlobalResolver {
-    linker : *const Linker,
-    file_text : *const FileText,
-    pub errors : ErrorCollector,
-    resolved_globals : RefCell<ResolvedGlobals>
+pub struct Resolver<'linker, 'err_and_globals, IDM : UUIDMarker, T> {
+    arr : &'linker ArenaAllocator<T, IDM>,
+    resolved_globals : &'err_and_globals RefCell<ResolvedGlobals>
 }
 
-impl UnsafeGlobalResolver {
+impl<'linker, 'err_and_globals, IDM : UUIDMarker, T> Index<UUID<IDM>> for Resolver<'linker, 'err_and_globals, IDM, T> where NameElem : From<UUID<IDM>> {
+    type Output = T;
+
+    fn index(&self, index: UUID<IDM>) -> &'linker Self::Output {
+        self.resolved_globals.borrow_mut().referenced_globals.push(NameElem::from(index));
+        &self.arr[index]
+    }
+}
+
+pub struct InternalResolver<'linker, 'err_and_globals, IDM : UUIDMarker, T> {
+    pub working_on : &'linker mut T,
+    arr : *const ArenaAllocator<T, IDM>,
+    resolved_globals : &'err_and_globals RefCell<ResolvedGlobals>
+}
+
+impl<'linker, 'err_and_globals, IDM : UUIDMarker, T> Index<UUID<IDM>> for InternalResolver<'linker, 'err_and_globals, IDM, T> where NameElem : From<UUID<IDM>> {
+    type Output = T;
+
+    fn index<'slf>(&'slf self, index: UUID<IDM>) -> &'slf Self::Output {
+        self.resolved_globals.borrow_mut().referenced_globals.push(NameElem::from(index));
+        unsafe{&(*self.arr)[index]}
+    }
+}
+
+pub struct NameResolver<'linker, 'err_and_globals> {
+    pub file_text : &'linker FileText,
+    pub errors : &'err_and_globals ErrorCollector,
+    linker : *const Linker,
+    resolved_globals : &'err_and_globals RefCell<ResolvedGlobals>
+}
+
+impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
     /// SAFETY: Files are never touched, and as long as this object is managed properly linker will also exist long enough. 
     pub fn resolve_global<'slf>(&'slf self, name_span : Span) -> ResolvedName<'slf> {
-        let name = &unsafe{&*self.file_text}[name_span];
+        let name = &self.file_text[name_span];
         let linker = unsafe{&*self.linker};
 
         let mut resolved_globals = self.resolved_globals.borrow_mut();
         match linker.global_namespace.get(name) {
             Some(NamespaceElement::Global(found)) => {
                 resolved_globals.referenced_globals.push(*found);
-                ResolvedName{name_elem: Some(*found), resolver: self, span: name_span}
+                ResolvedName{name_elem: Some(*found), linker : self.linker, errors: &self.errors, span: name_span}
             }
             Some(NamespaceElement::Colission(coll)) => {
                 resolved_globals.all_resolved = false;
@@ -66,53 +97,30 @@ impl UnsafeGlobalResolver {
 
                 self.errors.error_with_info(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."), decl_infos);
 
-                ResolvedName{name_elem: None, resolver: self, span: name_span}
+                ResolvedName{name_elem: None, linker : self.linker, errors: &self.errors, span: name_span}
             }
             None => {
                 resolved_globals.all_resolved = false;
 
                 self.errors.error_basic(name_span, format!("No Global of the name '{name}' was found. Did you forget to import it?"));
 
-                ResolvedName{name_elem: None, resolver: self, span: name_span}
+                ResolvedName{name_elem: None, linker : self.linker, errors: &self.errors, span: name_span}
             }
         }
     }
-
-    /// SAFETY: User must cast the pointer to a safe reference themselves. 
-    /// 
-    /// That means, if the user has a mutable module, it needs to return a tighter lifetime to prevent module editing. 
-    /// 
-    /// Otherwise this can be 'linker
-    unsafe fn get_module_unsafe(&self, index: ModuleUUID) -> *const Module {
-        &unsafe{&*self.linker}.modules[index]
-    }
-    /// SAFETY: User must cast the pointer to a safe reference themselves. 
-    /// 
-    /// That means, if the user has a mutable type, it needs to return a tighter lifetime to prevent type editing. 
-    /// 
-    /// Otherwise this can be 'linker
-    unsafe fn get_type_unsafe(&self, index: TypeUUID) -> *const NamedType {
-        &unsafe{&*self.linker}.types[index]
-    }
-    /// SAFETY: User must cast the pointer to a safe reference themselves. 
-    /// 
-    /// That means, if the user has a mutable constant, it needs to return a tighter lifetime to prevent constant editing. 
-    /// 
-    /// Otherwise this can be 'linker
-    unsafe fn get_constant_unsafe(&self, index: ConstantUUID) -> *const NamedConstant {
-        &unsafe{&*self.linker}.constants[index]
-    }
 }
 
-pub struct ResolvedName<'l> {
+pub struct ResolvedName<'err_and_globals> {
     pub name_elem : Option<NameElem>,
     pub span : Span,
-    pub resolver : &'l UnsafeGlobalResolver
+    pub errors : &'err_and_globals ErrorCollector,
+    linker : *const Linker
 }
 
-impl<'l> ResolvedName<'l> {
+impl<'err_and_globals> ResolvedName<'err_and_globals> {
     pub fn not_expected_global_error(self, expected : &str) {
-        let info = unsafe{&*self.resolver.linker}.get_linking_error_location(self.name_elem.unwrap());
+        // SAFETY: The allocated linker objects aren't going to change. 
+        let info = unsafe{&*self.linker}.get_linking_error_location(self.name_elem.unwrap());
         let infos = if let Some((file, definition_span)) = info.location {
             vec![error_info(definition_span, file, "Defined here")]
         } else {
@@ -120,7 +128,7 @@ impl<'l> ResolvedName<'l> {
         };
         let name = &info.full_name;
         let global_type = info.named_type;
-        self.resolver.errors.error_with_info(self.span, format!("{name} is not a {expected}, it is a {global_type} instead!"), infos);
+        self.errors.error_with_info(self.span, format!("{name} is not a {expected}, it is a {global_type} instead!"), infos);
     }
     pub fn expect_constant(self) -> Option<ConstantUUID> {
         if let NameElem::Constant(id) = self.name_elem? {
@@ -152,82 +160,42 @@ impl<'l> ResolvedName<'l> {
 
 
 
-pub struct ModuleEditContext<'md, 'linker> {
-    /// The module we are currently editing
-    pub md : &'md mut Module,
+/// pub struct ModuleEditContext<'linker, 'err_and_globals> {
+///     pub modules : InternalResolver<'linker, 'err_and_globals, ModuleUUIDMarker, Module>,
+///     pub types : Resolver<'linker, 'err_and_globals, TypeUUIDMarker, NamedType>,
+///     pub constants : Resolver<'linker, 'err_and_globals, ConstantUUIDMarker, NamedConstant>,
+///     pub name_resolver : NameResolver<'linker, 'err_and_globals>,
+///     pub errors : &'err_and_globals ErrorCollector
+/// }
+pub fn with_module_editing_context<F : for<'linker, 'errs> FnOnce(
+    InternalResolver<'linker, 'errs, ModuleUUIDMarker, Module>,
+    Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>,
+    Resolver<'linker, 'errs, ConstantUUIDMarker, NamedConstant>,
+    NameResolver<'linker, 'errs>
+)>(linker_ptr : *mut Linker, module_uuid : ModuleUUID, f : F) {
+    let linker = unsafe{&mut *linker_ptr};
+    let linker_modules_ptr : *const _ = &linker.modules;
+    let md : &mut Module = &mut linker.modules[module_uuid];
+    let file : &FileData = &linker.files[md.link_info.file];
 
-    pub file : &'linker FileData,
+    // Extract errors and resolved_globals for easier editing
+    let errors_a = md.link_info.errors.take();
+    let resolved_globals_a = RefCell::new(md.link_info.resolved_globals.take());
 
-    resolver : UnsafeGlobalResolver
-}
+    let errors = &errors_a;
+    let resolved_globals = &resolved_globals_a;
 
-impl<'md, 'linker> ModuleEditContext<'md ,'linker> {
-    /// See [ModuleEditContext::drop]
-    pub fn new(linker_ptr : *const Linker, file : &'linker FileData, md : &'md mut Module) -> Self {
-        Self {
-            file,
-            resolver : UnsafeGlobalResolver {
-                linker : linker_ptr,
-                file_text : &file.file_text,
-                errors : md.link_info.errors.take(),
-                resolved_globals : RefCell::new(ResolvedGlobals::empty())
-            },
-            md
-        }
-    }
+    // Use context
+    f(
+        InternalResolver{ working_on: md, arr: linker_modules_ptr, resolved_globals},
+        Resolver{ arr: &linker.types, resolved_globals },
+        Resolver{ arr: &linker.constants, resolved_globals },
+        NameResolver{ file_text: &file.file_text, linker: linker_ptr, errors, resolved_globals }
+    );
 
-    /// Returns the requested module. 
-    /// 
-    /// SAFETY
-    /// 
-    /// We cleverly restrict the lifetime to self's lifetime. 
-    /// 
-    /// This prohibits mutating [Self::md] while holding a reference to another module (or itself)
-    pub fn get_module<'s>(&'s self, module_uuid : ModuleUUID) -> &'s Module {
-        unsafe {
-            &*self.resolver.get_module_unsafe(module_uuid)
-        }
-    }
-
-    /// Returns a type from the requested id
-    /// 
-    /// This module can return a 'linker, since we're only mutating Modules, thus not preventing mutable access to [Self::md]
-    #[allow(dead_code)]
-    pub fn get_type(&self, type_uuid : TypeUUID) -> &'linker NamedType {
-        unsafe {
-            &*self.resolver.get_type_unsafe(type_uuid)
-        }
-    }
-
-    /// Returns a type from the requested id
-    /// 
-    /// This module can return a 'linker, since we're only mutating Modules, thus not preventing mutable access to [Self::md]
-    #[allow(dead_code)]
-    pub fn get_constant(&self, constant_uuid : ConstantUUID) -> &'linker NamedConstant {
-        unsafe {
-            &*self.resolver.get_constant_unsafe(constant_uuid)
-        }
-    }
-}
-
-/// Don't actually need [::core::ops::DerefMut]
-impl<'md, 'linker> Deref for ModuleEditContext<'md, 'linker> {
-    type Target = UnsafeGlobalResolver;
-
-    fn deref(&self) -> &Self::Target {
-        &self.resolver
-    }
-}
-
-impl<'md, 'linker> Drop for ModuleEditContext<'md, 'linker> {
-    /// Places errors and resolved globals back in Module's LinkInfo
-    /// 
-    /// See [ModuleEditContext::new]
-    fn drop(&mut self) {
-        // Make sure nothing has been stored in these in the meantime
-        assert!(self.md.link_info.resolved_globals.is_untouched());
-        assert!(self.md.link_info.errors.is_untouched());
-        self.md.link_info.resolved_globals = self.resolved_globals.replace(ResolvedGlobals::empty());
-        self.md.link_info.errors = self.resolver.errors.take();
-    }
+    // Store errors and resolved_globals back into module
+    assert!(md.link_info.resolved_globals.is_untouched());
+    assert!(md.link_info.errors.is_untouched());
+    md.link_info.resolved_globals = resolved_globals_a.into_inner();
+    md.link_info.errors = errors_a;
 }

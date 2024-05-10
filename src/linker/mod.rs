@@ -19,22 +19,18 @@ use crate::{
 
 use self::checkpoint::CheckPoint;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModuleUUIDMarker;
 impl UUIDMarker for ModuleUUIDMarker {const DISPLAY_NAME : &'static str = "module_";}
 pub type ModuleUUID = UUID<ModuleUUIDMarker>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TypeUUIDMarker;
 impl UUIDMarker for TypeUUIDMarker {const DISPLAY_NAME : &'static str = "type_";}
 pub type TypeUUID = UUID<TypeUUIDMarker>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ConstantUUIDMarker;
 impl UUIDMarker for ConstantUUIDMarker {const DISPLAY_NAME : &'static str = "constant_";}
 pub type ConstantUUID = UUID<ConstantUUIDMarker>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FileUUIDMarker;
 impl UUIDMarker for FileUUIDMarker {const DISPLAY_NAME : &'static str = "file_";}
 pub type FileUUID = UUID<FileUUIDMarker>;
@@ -176,6 +172,24 @@ pub enum NameElem {
     Module(ModuleUUID),
     Type(TypeUUID),
     Constant(ConstantUUID)
+}
+
+impl From<ModuleUUID> for NameElem {
+    fn from(value: ModuleUUID) -> Self {
+        NameElem::Module(value)
+    }
+}
+
+impl From<TypeUUID> for NameElem {
+    fn from(value: TypeUUID) -> Self {
+        NameElem::Type(value)
+    }
+}
+
+impl From<ConstantUUID> for NameElem {
+    fn from(value: ConstantUUID) -> Self {
+        NameElem::Constant(value)
+    }
 }
 
 enum NamespaceElement {

@@ -15,14 +15,12 @@ use super::{FlatID, IdentifierType};
 
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PortIDMarker;
 impl UUIDMarker for PortIDMarker {const DISPLAY_NAME : &'static str = "port_";}
 pub type PortID = UUID<PortIDMarker>;
 
 pub type PortIDRange = UUIDRange<PortIDMarker>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct InterfaceIDMarker;
 impl UUIDMarker for InterfaceIDMarker {const DISPLAY_NAME : &'static str = "port_";}
 pub type InterfaceID = UUID<InterfaceIDMarker>;

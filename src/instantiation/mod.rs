@@ -19,12 +19,10 @@ use self::latency_algorithm::SpecifiedLatency;
 
 pub mod latency_algorithm;
 
-#[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
 pub struct WireIDMarker;
 impl UUIDMarker for WireIDMarker {const DISPLAY_NAME : &'static str = "wire_";}
 pub type WireID = UUID<WireIDMarker>;
 
-#[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
 pub struct SubModuleIDMarker;
 impl UUIDMarker for SubModuleIDMarker {const DISPLAY_NAME : &'static str = "submodule_";}
 pub type SubModuleID = UUID<SubModuleIDMarker>;

@@ -1,19 +1,42 @@
-use std::{ops::{IndexMut, Index}, marker::PhantomData, iter::Enumerate, fmt};
+use std::{
+    ops::{IndexMut, Index},
+    marker::PhantomData,
+    iter::Enumerate,
+    fmt::{Debug, Result, Formatter},
+    hash::{Hash, Hasher}
+};
 
 use crate::block_vector::{BlockVec, BlockVecIterMut, BlockVecIter};
 
 
 // TODO add custom niche for more efficient Options, wait until custom niches are stabilized (https://internals.rust-lang.org/t/nonmaxusize-and-niche-value-optimisation/19661)
 // Maybe use NonZeroUsize (https://doc.rust-lang.org/std/num/struct.NonZeroUsize.html)
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UUID<IndexMarker : UUIDMarker>(usize, PhantomData<IndexMarker>);
+pub struct UUID<IndexMarker>(usize, PhantomData<IndexMarker>);
+
+impl<IndexMarker> Clone for UUID<IndexMarker> {
+    fn clone(&self) -> Self {
+        Self(self.0, PhantomData)
+    }
+}
+impl<IndexMarker> Copy for UUID<IndexMarker> {}
+impl<IndexMarker> PartialEq for UUID<IndexMarker> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+impl<IndexMarker> Eq for UUID<IndexMarker> {}
+impl<IndexMarker> Hash for UUID<IndexMarker> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
 
 pub trait UUIDMarker {
     const DISPLAY_NAME : &'static str;
 }
 
-impl<IndexMarker : UUIDMarker> fmt::Debug for UUID<IndexMarker> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<IndexMarker : UUIDMarker> Debug for UUID<IndexMarker> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.write_str(IndexMarker::DISPLAY_NAME)?;
         self.0.fmt(f)
     }
@@ -32,8 +55,35 @@ impl<IndexMarker : UUIDMarker> UUID<IndexMarker> {
     pub const PLACEHOLDER : Self = UUID(usize::MAX, PhantomData);
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UUIDRange<IndexMarker : UUIDMarker>(pub UUID<IndexMarker>, pub UUID<IndexMarker>);
+pub struct UUIDRange<IndexMarker>(pub UUID<IndexMarker>, pub UUID<IndexMarker>);
+
+impl<IndexMarker : UUIDMarker> Debug for UUIDRange<IndexMarker> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        f.write_str(IndexMarker::DISPLAY_NAME)?;
+        self.0.fmt(f)?;
+        f.write_str("..")?;
+        self.1.fmt(f)
+    }
+}
+
+impl<IndexMarker> Clone for UUIDRange<IndexMarker> {
+    fn clone(&self) -> Self {
+        Self(self.0, self.1)
+    }
+}
+impl<IndexMarker> Copy for UUIDRange<IndexMarker> {}
+impl<IndexMarker> PartialEq for UUIDRange<IndexMarker> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0 && self.1 == other.1
+    }
+}
+impl<IndexMarker> Eq for UUIDRange<IndexMarker> {}
+impl<IndexMarker> Hash for UUIDRange<IndexMarker> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+        self.1.hash(state);
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UUIDRangeIter<IndexMarker : UUIDMarker>(UUID<IndexMarker>, UUID<IndexMarker>);
@@ -384,7 +434,6 @@ impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a mut ListAllocator<T, 
 
 
 
-#[derive(Debug)]
 pub struct FlatAlloc<T, IndexMarker> {
     data : Vec<T>,
     _ph : PhantomData<IndexMarker>
@@ -440,6 +489,12 @@ impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for FlatAlloc<T, Inde
 impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for FlatAlloc<T, IndexMarker> {
     fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
         &mut self.data[uuid]
+    }
+}
+
+impl<T : Debug, IndexMarker> Debug for FlatAlloc<T, IndexMarker> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        f.debug_struct("FlatAlloc").field("data", &self.data).finish()
     }
 }
 

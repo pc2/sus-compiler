@@ -1,5 +1,5 @@
 
-use crate::{file_position::SpanFile, linker::{ConstantUUIDMarker, ModuleUUIDMarker}};
+use crate::{arena_alloc::ArenaAllocator, file_position::SpanFile, linker::{ConstantUUIDMarker, ModuleUUIDMarker}, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, BOOL_TYPE, INT_TYPE}};
 
 use super::*;
 
