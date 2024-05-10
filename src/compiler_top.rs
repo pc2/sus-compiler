@@ -3,11 +3,7 @@ use std::rc::Rc;
 use tree_sitter::Parser;
 
 use crate::{
-    errors::ErrorCollector,
-    file_position::FileText,
-    flattening::{flatten_all_modules, initialization::gather_initial_file_data, typechecking::typecheck_all_modules},
-    instantiation::InstantiatedModule,
-    linker::{FileData, FileUUID, Linker, ModuleUUID}
+    debug::SpanDebugger ,errors::ErrorCollector, file_position::FileText, flattening::{flatten_all_modules, initialization::gather_initial_file_data, typechecking::typecheck_all_modules, Module}, instantiation::InstantiatedModule, linker::{FileData, FileUUID, Linker, ModuleUUID}
 };
 
 pub fn add_file(text : String, linker : &mut Linker) -> FileUUID {
@@ -24,8 +20,9 @@ pub fn add_file(text : String, linker : &mut Linker) -> FileUUID {
     });
 
     let mut builder = linker.get_file_builder(file_id);
-    gather_initial_file_data(&mut builder);
-
+    let mut span_debugger = SpanDebugger::new("gather_initial_file_data in add_file", builder.file_text);
+    gather_initial_file_data(&mut builder);    
+    span_debugger.defuse();
     file_id
 }
 
@@ -40,28 +37,19 @@ pub fn update_file(text : String, file_id : FileUUID, linker : &mut Linker) {
     file_data.file_text = FileText::new(text);
     file_data.tree = tree;
 
-    // TEMPORARY Fix crash for incremental builds
-    //let mut builder = linker.get_file_builder(file_id);
-    //gather_initial_file_data(&mut builder);
-
-    linker.modules.clear();
-    let mut ids = Vec::new();
-    for (id, f) in &mut linker.files {
-        f.associated_values.clear();
-        ids.push(id);
-    }
-
-    for id in ids {
-        let mut builder = linker.get_file_builder(id);
-        gather_initial_file_data(&mut builder);
-    }
+    let mut builder = linker.get_file_builder(file_id);
+    let mut span_debugger = SpanDebugger::new("gather_initial_file_data in update_file (temporary fix)", builder.file_text);
+    gather_initial_file_data(&mut builder);
+    span_debugger.defuse();
 }
 
 pub fn recompile_all(linker : &mut Linker) {
     // First reset all modules back to post-gather_initial_file_data
     for (_, md) in &mut linker.modules {
-        md.link_info.reset_to(md.link_info.after_initial_parse_cp);
-        md.instantiations.clear_instances()
+        let Module { link_info, module_ports:_, instructions, instantiations } = md;
+        link_info.reset_to(link_info.after_initial_parse_cp);
+        instructions.clear();
+        instantiations.clear_instances()
     }
 
     flatten_all_modules(linker);

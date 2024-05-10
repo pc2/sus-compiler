@@ -13,6 +13,7 @@ mod errors;
 mod value;
 mod flattening;
 mod instantiation;
+mod debug;
 
 #[cfg(feature = "codegen")]
 mod codegen;

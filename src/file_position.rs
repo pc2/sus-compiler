@@ -10,32 +10,44 @@ impl From<Range<usize>> for Span {
     #[track_caller]
     fn from(value: Range<usize>) -> Self {
         assert!(value.end >= value.start);
-        Span(value.start, value.end)
+        Span(value.start, value.end).debug()
     }
 }
 
 impl Span {
+    /// Register that we have visited this span. Eases debugging when errors occur
+    pub fn debug(&self) -> Span {
+        crate::debug::add_debug_span(self.0..self.1);
+        *self
+    }
+
     /// Only really used for having a span with the maximum size. 
     pub const MAX_POSSIBLE_SPAN : Span = Span(0, usize::MAX);
 
     pub fn into_range(&self) -> Range<usize> {
+        self.debug();
         self.0..self.1
     }
     #[track_caller]
     pub fn new_overarching(left : Span, right : Span) -> Span {
+        left.debug();
+        right.debug();
         assert!(left.0 <= right.0);
         assert!(left.1 <= right.1);
-        Span(left.0, right.1)
+        Span(left.0, right.1).debug()
     }
     pub fn contains_pos(&self, pos : usize) -> bool {
+        self.debug();
         pos >= self.0 && pos <= self.1
     }
     // Not really a useful quantity. Should only be used comparatively, find which is the nested-most span
     pub fn size(&self) -> usize {
+        self.debug();
         self.1 - self.0
     }
     pub fn empty_span_at_front(self) -> Span {
-        Span(self.0, self.0)
+        self.debug();
+        Span(self.0, self.0).debug()
     }
 }
 
@@ -52,6 +64,7 @@ impl Ord for Span {
 
 impl Display for Span {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.debug();
         f.write_fmt(format_args!("{}..{}", self.0, self.1))
     }
 }
@@ -61,18 +74,22 @@ pub struct BracketSpan(Span);
 
 #[allow(dead_code)]
 impl BracketSpan {
-    pub fn from_outer(span : Span) -> Self {Self(span)}
+    pub fn from_outer(span : Span) -> Self {Self(span.debug())}
     pub fn inner_span(&self) -> Span {
-        Span(self.0.0 + 1, self.0.1 - 1)
+        self.0.debug();
+        Span(self.0.0 + 1, self.0.1 - 1).debug()
     }
     pub fn outer_span(&self) -> Span {
+        self.0.debug();
         self.0
     }
     pub fn open_bracket(&self) -> Span {
-        Span(self.0.0, self.0.0+1)
+        self.0.debug();
+        Span(self.0.0, self.0.0+1).debug()
     }
     pub fn close_bracket(&self) -> Span {
-        Span(self.0.1 - 1, self.0.1)
+        self.0.debug();
+        Span(self.0.1 - 1, self.0.1).debug()
     }
 }
 
@@ -148,15 +165,17 @@ impl FileText {
         line_end
     }
     pub fn get_span_linecol_range(&self, span : Span) -> Range<LineCol> {
+        span.debug();
         self.byte_to_linecol(span.0)..self.byte_to_linecol(span.1)
     }
 
     #[allow(dead_code)]
     pub fn whole_file_span(&self) -> Span {
-        Span(0, self.file_text.len())
+        Span(0, self.file_text.len()).debug()
     }
 
     pub fn is_span_valid(&self, span : Span) -> bool {
+        span.debug();
         span.1 <= self.file_text.len()
     }
 
@@ -169,6 +188,7 @@ impl Index<Span> for FileText {
     type Output = str;
 
     fn index(&self, index: Span) -> &str {
+        index.debug();
         &self.file_text[index.into_range()]
     }
 }

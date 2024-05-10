@@ -7,7 +7,10 @@ use super::*;
 pub fn typecheck_all_modules(linker : &mut Linker) {
     let linker_modules : *const ArenaAllocator<Module, ModuleUUIDMarker> = &linker.modules;
     for (_id, module) in &mut linker.modules {
-        println!("Typechecking {}", &module.link_info.name);
+        let ctx_info_string = format!("Typechecking {}", &module.link_info.name);
+        println!("{ctx_info_string}");
+        let mut span_debugger = SpanDebugger::new(&ctx_info_string, &linker.files[module.link_info.file].file_text);
+
         let mut context = TypeCheckingContext{
             instructions : &mut module.instructions,
             errors : &module.link_info.errors,
@@ -19,6 +22,8 @@ pub fn typecheck_all_modules(linker : &mut Linker) {
         context.typecheck();
         context.generative_check();
         context.find_unused_variables(&module.module_ports);
+
+        span_debugger.defuse();
     }
 }
 

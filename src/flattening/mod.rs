@@ -8,14 +8,7 @@ use std::{iter::zip, ops::{Deref, DerefMut}, str::FromStr};
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 use crate::{
-    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID},
-    errors::{error_info, ErrorCollector, ErrorInfo},
-    file_position::{BracketSpan, Span},
-    instantiation::InstantiationList,
-    linker::{ConstantUUID, FileData, FileUUID, LinkInfo, Linker, ModuleEditContext, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedName, TypeUUIDMarker},
-    parser::{Cursor, Documentation},
-    typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, AbstractType, WrittenType, BOOL_TYPE, INT_TYPE},
-    value::Value
+    arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUIDRange, UUID}, debug::SpanDebugger, errors::{error_info, ErrorCollector, ErrorInfo}, file_position::{BracketSpan, Span}, instantiation::InstantiationList, linker::{ConstantUUID, FileData, FileUUID, LinkInfo, Linker, ModuleEditContext, ModuleUUID, NameElem, NamedConstant, NamedType, ResolvedName, TypeUUIDMarker}, parser::{Cursor, Documentation}, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, AbstractType, WrittenType, BOOL_TYPE, INT_TYPE}, value::Value
 };
 
 use self::{initialization::{ModulePorts, PortID, PortIDMarker, PortIDRange}, name_context::LocalVariableContext};
@@ -1169,6 +1162,7 @@ pub fn flatten_all_modules<'l>(linker : &'l mut Linker) {
     let modules : &'l mut ArenaAllocator<_,_> = &mut linker.modules;
 
     for (_file_id, file) in &linker.files {
+        let mut span_debugger = SpanDebugger::new("flatten_all_modules", &file.file_text);
         let mut associated_value_iter = file.associated_values.iter();
 
         let mut cursor = Cursor::new_at_root(&file.tree, &file.file_text);
@@ -1184,5 +1178,6 @@ pub fn flatten_all_modules<'l>(linker : &'l mut Linker) {
                 other => todo!("{}", tree_sitter_sus::language().node_kind_for_id(other).unwrap())
             }
         });
+        span_debugger.defuse();
     }
 }

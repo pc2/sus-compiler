@@ -110,7 +110,6 @@ pub fn compile_all(file_paths : Vec<PathBuf>) -> (Linker, ArenaVector<(PathBuf, 
     (linker, paths_arena)
 }
 
-// Requires that character_ranges.len() == tokens.len() + 1 to include EOF token
 pub fn pretty_print_error<AriadneCache : Cache<FileUUID>>(error : &CompileError, file : FileUUID, linker : &Linker, file_cache : &mut AriadneCache) {
     // Generate & choose some colours for each of our elements
     let (err_color, report_kind) = match error.level {
@@ -171,3 +170,32 @@ pub fn print_all_errors(linker : &Linker, paths_arena : &mut ArenaVector<(PathBu
         }
     }
 }
+
+
+pub fn pretty_print_spans_in_reverse_order(file_text : String, spans : Vec<Range<usize>>) {
+    let text_len = file_text.len();
+    let mut source = Source::from(file_text);
+
+    for span in spans.into_iter().rev() {
+        // If span not in file, just don't print it. This happens. 
+        if span.end > text_len {
+            println!("Span {span:?} certainly does not correspond to this file. ");
+            return;
+        }
+    
+        let config = 
+            Config::default()
+            .with_index_type(IndexType::Byte)
+            .with_color(false); // Disable color because LSP output doesn't support it
+    
+        let mut report: ReportBuilder<'_, Range<usize>> = Report::build(ReportKind::Advice, (), span.start).with_config(config);
+        report = report
+            .with_label(
+                Label::new(span)
+                    .with_color(Color::Blue)
+            );
+    
+        report.finish().print(&mut source).unwrap();
+    }
+}
+
