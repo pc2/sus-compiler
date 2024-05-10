@@ -1,6 +1,6 @@
-use std::ops::Deref;
+use std::ops::{Deref, Index};
 
-use crate::{arena_alloc::ArenaAllocator, errors::{error_info, ErrorCollector}, file_position::{BracketSpan, Span, SpanFile}, flattening::{BinaryOperator, FlatID, UnaryOperator}, linker::{get_builtin_type, Linkable, Linker, NamedType, TypeUUID, TypeUUIDMarker}, value::{TypedValue, Value}};
+use crate::{errors::{error_info, ErrorCollector}, file_position::{BracketSpan, Span, SpanFile}, flattening::{BinaryOperator, FlatID, UnaryOperator}, linker::{get_builtin_type, Linkable, Linker, NamedType, TypeUUID}, value::{TypedValue, Value}};
 
 // These are 
 #[derive(Debug, Clone)]
@@ -67,7 +67,7 @@ impl WrittenType {
         }
     }
 
-    pub fn to_string(&self, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>) -> String {
+    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec) -> String {
         match self {
             WrittenType::Error(_) => {
                 "{error}".to_owned()
@@ -94,7 +94,7 @@ pub enum AbstractType {
 }
 
 impl AbstractType {
-    pub fn to_string(&self, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>) -> String {
+    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec) -> String {
         match self {
             AbstractType::Error => {
                 "{error}".to_owned()
@@ -126,7 +126,7 @@ pub const INT_TYPE : AbstractType = AbstractType::Named(get_builtin_type("int"))
 pub const BOOL_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("bool"));
 pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("int"));
 
-pub fn typecheck_unary_operator(op : UnaryOperator, input_typ : &AbstractType, span : Span, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) -> AbstractType {
+pub fn typecheck_unary_operator<TypVec : Index<TypeUUID, Output = NamedType>>(op : UnaryOperator, input_typ : &AbstractType, span : Span, linker_types : &TypVec, errors : &ErrorCollector) -> AbstractType {
     if op == UnaryOperator::Not {
         typecheck(input_typ, span, &BOOL_TYPE, "! input", linker_types, None, errors);
         BOOL_TYPE
@@ -170,7 +170,7 @@ pub fn get_binary_operator_types(op : BinaryOperator) -> ((AbstractType, Abstrac
 /// Panics on Type Errors that should have been caught by [UnparametrizedType]
 /// 
 /// TODO Add checks for array sizes being equal etc. 
-pub fn typecheck_concrete_unary_operator(op : UnaryOperator, input_typ : &ConcreteType, _span : Span, _linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, _errors : &ErrorCollector) -> ConcreteType {
+pub fn typecheck_concrete_unary_operator<TypVec : Index<TypeUUID, Output = NamedType>>(op : UnaryOperator, input_typ : &ConcreteType, _span : Span, _linker_types : &TypVec, _errors : &ErrorCollector) -> ConcreteType {
     let gather_type = match op {
         UnaryOperator::Not => {
             assert_eq!(*input_typ, BOOL_CONCRETE_TYPE);
@@ -192,7 +192,7 @@ pub fn typecheck_concrete_unary_operator(op : UnaryOperator, input_typ : &Concre
 /// Panics on Type Errors that should have been caught by [UnparametrizedType]
 /// 
 /// TODO Add checks for array sizes being equal etc. 
-pub fn typecheck_concrete_binary_operator(op : BinaryOperator, left_typ : &ConcreteType, right_typ : &ConcreteType, _span : Span, _linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, _errors : &ErrorCollector) -> ConcreteType {
+pub fn typecheck_concrete_binary_operator<TypVec : Index<TypeUUID, Output = NamedType>>(op : BinaryOperator, left_typ : &ConcreteType, right_typ : &ConcreteType, _span : Span, _linker_types : &TypVec, _errors : &ErrorCollector) -> ConcreteType {
     let ((in_left, in_right), out) = match op {
         BinaryOperator::And => ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
         BinaryOperator::Or => ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
@@ -228,7 +228,7 @@ fn type_compare(expected : &AbstractType, found : &AbstractType) -> bool {
         _ => false,
     }
 }
-pub fn typecheck(found : &AbstractType, span : Span, expected : &AbstractType, context : &str, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, declared_here : Option<SpanFile>, errors : &ErrorCollector) {
+pub fn typecheck<TypVec : Index<TypeUUID, Output = NamedType>>(found : &AbstractType, span : Span, expected : &AbstractType, context : &str, linker_types : &TypVec, declared_here : Option<SpanFile>, errors : &ErrorCollector) {
     if !type_compare(expected, found) {
         let expected_name = expected.to_string(linker_types);
         let found_name = found.to_string(linker_types);
@@ -241,7 +241,7 @@ pub fn typecheck(found : &AbstractType, span : Span, expected : &AbstractType, c
         assert!(expected_name != found_name, "{expected_name} != {found_name}");
     }
 }
-pub fn typecheck_is_array_indexer<'a>(arr_type : &'a AbstractType, span : Span, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>, errors : &ErrorCollector) -> Option<&'a AbstractType> {
+pub fn typecheck_is_array_indexer<'a, TypVec : Index<TypeUUID, Output = NamedType>>(arr_type : &'a AbstractType, span : Span, linker_types : &TypVec, errors : &ErrorCollector) -> Option<&'a AbstractType> {
     let AbstractType::Array(arr_element_type) = arr_type else {
         let arr_type_name = arr_type.to_string(linker_types);
         errors.error_basic(span, format!("Typing Error: Attempting to index into this, but it is not of array type, instead found a {arr_type_name}"));
@@ -291,7 +291,7 @@ impl ConcreteType {
             }
         }
     }
-    pub fn to_string(&self, linker_types : &ArenaAllocator<NamedType, TypeUUIDMarker>) -> String {
+    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec) -> String {
         match self {
             ConcreteType::Named(name) => {
                 linker_types[*name].get_full_name()
