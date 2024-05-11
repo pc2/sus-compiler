@@ -123,6 +123,7 @@ impl AbstractType {
 
 pub const BOOL_TYPE : AbstractType = AbstractType::Named(get_builtin_type("bool"));
 pub const INT_TYPE : AbstractType = AbstractType::Named(get_builtin_type("int"));
+const ERROR_TYPE : AbstractType = AbstractType::Error;
 pub const BOOL_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("bool"));
 pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("int"));
 
@@ -142,9 +143,9 @@ pub fn typecheck_unary_operator<TypVec : Index<TypeUUID, Output = NamedType>>(op
             UnaryOperator::Product => INT_TYPE,
             _ => unreachable!()
         };
-        if let Some(arr_content_typ) = typecheck_is_array_indexer(input_typ, span, linker_types, errors) {
-            typecheck(arr_content_typ, span, &gather_type, &format!("{op} input"), linker_types, None, errors);
-        }
+        let arr_content_typ = typecheck_is_array_indexer(input_typ, span, linker_types, errors);
+        typecheck(arr_content_typ, span, &gather_type, &format!("{op} input"), linker_types, None, errors);
+
         gather_type
     }
 }
@@ -241,13 +242,14 @@ pub fn typecheck<TypVec : Index<TypeUUID, Output = NamedType>>(found : &Abstract
         assert!(expected_name != found_name, "{expected_name} != {found_name}");
     }
 }
-pub fn typecheck_is_array_indexer<'a, TypVec : Index<TypeUUID, Output = NamedType>>(arr_type : &'a AbstractType, span : Span, linker_types : &TypVec, errors : &ErrorCollector) -> Option<&'a AbstractType> {
+
+pub fn typecheck_is_array_indexer<'a, TypVec : Index<TypeUUID, Output = NamedType>>(arr_type : &'a AbstractType, span : Span, linker_types : &TypVec, errors : &ErrorCollector) -> &'a AbstractType {
     let AbstractType::Array(arr_element_type) = arr_type else {
         let arr_type_name = arr_type.to_string(linker_types);
         errors.error_basic(span, format!("Typing Error: Attempting to index into this, but it is not of array type, instead found a {arr_type_name}"));
-        return None;
+        return &ERROR_TYPE;
     };
-    Some(&arr_element_type.deref())
+    &arr_element_type.deref()
 }
 
 #[derive(Debug,Clone,PartialEq,Eq)]
@@ -303,7 +305,7 @@ impl ConcreteType {
         }
     }
     pub fn down_array(&self) -> &ConcreteType {
-        let ConcreteType::Array(arr_box) = self else {unreachable!()};
+        let ConcreteType::Array(arr_box) = self else {unreachable!("Must be an array!")};
         let (sub, _sz) = arr_box.deref();
         sub
     }

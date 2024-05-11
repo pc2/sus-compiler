@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{flattening::{Instruction, Module}, instantiation::{ConnectToPathElem, InstantiatedModule, RealWire, RealWireDataSource, WireID}, linker::{get_builtin_type, TypeUUID}, typing::ConcreteType};
+use crate::{flattening::{Instruction, Module}, instantiation::{RealWirePathElem, InstantiatedModule, RealWire, RealWireDataSource, WireID}, linker::{get_builtin_type, TypeUUID}, typing::ConcreteType};
 
 fn get_type_name_size(id : TypeUUID) -> u64 {
     if id == get_builtin_type("int") {
@@ -60,16 +60,16 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
         wire_name_with_latency(wire, requested_latency, self.use_latency)
     }
 
-    fn write_path_to_string(&self, path : &[ConnectToPathElem], absolute_latency : i64) -> String {
+    fn write_path_to_string(&self, path : &[RealWirePathElem], absolute_latency : i64) -> String {
         let mut result = String::new();
         for path_elem in path {
             result.push_str(&match path_elem {
-                ConnectToPathElem::MuxArrayWrite{idx_wire} => {
+                RealWirePathElem::MuxArrayWrite{span:_, idx_wire} => {
                     let idx_wire_name = self.wire_name(*idx_wire, absolute_latency);
                     format!("[{idx_wire_name}]")
                 }
-                ConnectToPathElem::ConstArrayWrite{idx} => {
-                    format!("[{idx}]")
+                RealWirePathElem::ConstArrayWrite{span:_, idx} => {
+                    format!("[{}]", idx.unwrap())
                 }
             });
         }
@@ -129,17 +129,25 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
             write!(self.program_text, "{wire_or_reg}{type_str} {wire_name}")?;
 
             match &w.source {
+                RealWireDataSource::Select { root, path } => {
+                    write!(self.program_text, " = {}", self.wire_name(*root, w.absolute_latency))?;
+                    for pe in path {
+                        match pe {
+                            RealWirePathElem::MuxArrayWrite { span:_, idx_wire } => {
+                                write!(self.program_text, "[{}]", self.wire_name(*idx_wire, w.absolute_latency))?;
+                            }
+                            RealWirePathElem::ConstArrayWrite { span:_, idx } => {
+                                write!(self.program_text, "[{}]", idx.unwrap())?;
+                            }
+                        }
+                    }
+                    writeln!(self.program_text, ";")?;
+                }
                 RealWireDataSource::UnaryOp { op, right } => {
                     writeln!(self.program_text, " = {}{};", op.op_text(), self.wire_name(*right, w.absolute_latency))?;
                 }
                 RealWireDataSource::BinaryOp { op, left, right } => {
                     writeln!(self.program_text, " = {} {} {};", self.wire_name(*left, w.absolute_latency), op.op_text(), self.wire_name(*right, w.absolute_latency))?;
-                }
-                RealWireDataSource::ArrayAccess { arr, arr_idx } => {
-                    writeln!(self.program_text, " = {}[{}];", self.wire_name(*arr, w.absolute_latency), self.wire_name(*arr_idx, w.absolute_latency))?;
-                }
-                RealWireDataSource::ConstArrayAccess { arr, arr_idx } => {
-                    writeln!(self.program_text, " = {}[{arr_idx}];", self.wire_name(*arr, w.absolute_latency))?;
                 }
                 RealWireDataSource::Constant { value } => {
                     writeln!(self.program_text, " = {};", value.to_string())?;
@@ -200,10 +208,9 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
                     }
                     writeln!(self.program_text, "end")?;
                 }
+                RealWireDataSource::Select{root : _, path : _} => {}
                 RealWireDataSource::UnaryOp{op : _, right : _} => {}
                 RealWireDataSource::BinaryOp{op : _, left : _, right : _} => {}
-                RealWireDataSource::ArrayAccess{arr : _, arr_idx : _} => {}
-                RealWireDataSource::ConstArrayAccess{arr : _, arr_idx : _} => {}
                 RealWireDataSource::Constant{value : _} => {}
             }
         }

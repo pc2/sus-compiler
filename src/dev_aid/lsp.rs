@@ -11,7 +11,7 @@ use crate::{
     compiler_top::{add_file, recompile_all, update_file},
     errors::{CompileError, ErrorCollector, ErrorLevel},
     file_position::{FileText, LineCol, Span},
-    flattening::{WireReferenceRoot, FlatID, IdentifierType, Instruction, Module, WireInstance, WireSource},
+    flattening::{FlatID, IdentifierType, Instruction, Module, WireInstance, WireReference, WireReferenceRoot, WireSource},
     instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER},
     linker::{FileData, FileUUID, FileUUIDMarker, Linker, NameElem},
     typing::WrittenType,
@@ -268,20 +268,15 @@ enum LocationInfo<'linker> {
     Global(NameElem)
 }
 
-struct LocationInfoBuilder<'linker> {
+struct HoverContext<'linker> {
+    linker : &'linker Linker,
+    file : &'linker FileData,
+    position : usize,
     best_instruction : Option<LocationInfo<'linker>>,
     best_span : Span,
-    position : usize
 }
 
-impl<'linker> LocationInfoBuilder<'linker> {
-    fn new(token_idx : usize) -> Self {
-        Self{
-            best_instruction : None,
-            best_span : Span::MAX_POSSIBLE_SPAN,
-            position: token_idx
-        }
-    }
+impl<'linker> HoverContext<'linker> {
     fn update(&mut self, span : Span, info : LocationInfo<'linker>) {
         if span.contains_pos(self.position) && span.size() <= self.best_span.size() {
             //assert!(span.size() < self.best_span.size());
@@ -290,76 +285,102 @@ impl<'linker> LocationInfoBuilder<'linker> {
             self.best_instruction = Some(info);
         }
     }
-}
 
-    
-fn get_info_about_source_location<'linker>(linker : &'linker Linker, position : usize, file : FileUUID) -> Option<(LocationInfo<'linker>, Span)> {
-    let mut location_builder = LocationInfoBuilder::new(position);
-    
-    for global in &linker.files[file].associated_values {
-        match *global {
-            NameElem::Module(md_id) => {
-                let md = &linker.modules[md_id];
-                if md.link_info.span.contains_pos(position) {
-                    location_builder.update(md.link_info.name_span, LocationInfo::Global(NameElem::Module(md_id)));
-                    for (id, inst) in &md.instructions {
-                        match inst {
-                            Instruction::SubModule(sm) => {
-                                location_builder.update(sm.module_name_span, LocationInfo::Global(NameElem::Module(sm.module_uuid)));
-                            }
-                            Instruction::Declaration(decl) => {
-                                match decl.typ_expr.get_deepest_selected(position) {
-                                    Some(WrittenType::Named(span, name_id)) => {
-                                        location_builder.update(*span, LocationInfo::Global(NameElem::Type(*name_id)));
-                                    }
-                                    Some(typ) => {
-                                        location_builder.update(typ.get_span(), LocationInfo::Type(typ));
-                                    }
-                                    None => {}
-                                }
-                                if decl.declaration_itself_is_not_written_to && decl.name_span.contains_pos(position) {
-                                    location_builder.update(decl.name_span, LocationInfo::WireRef(md, id));
-                                }
-                            }
-                            Instruction::Wire(wire) => {
-                                let loc_info = if let WireSource::WireRead(decl_id) = &wire.source {
-                                    LocationInfo::WireRef(md, *decl_id)
-                                } else {
-                                    LocationInfo::Temporary(md, id, wire)
-                                };
-                                location_builder.update(wire.span, loc_info);
-                            }
-                            Instruction::Write(write) => {
-                                match write.to.root {
-                                    WireReferenceRoot::LocalDecl(decl_id) => {
-                                        location_builder.update(write.to.root_span, LocationInfo::WireRef(md, decl_id));
-                                    }
-                                    WireReferenceRoot::SubModulePort(port) => {
-                                        if let Some(span) = port.port_name_span {
-                                            todo!("LSP for named ports");
-                                        }
-                                    }
-                                }
-                            }
-                            Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
-                        };
-                    }
+    fn gather_info_wire_ref(&mut self, md : &'linker Module, wire_ref : &'linker WireReference) {
+        match &wire_ref.root {
+            WireReferenceRoot::LocalDecl(decl_id) => {
+                self.update(wire_ref.root_span, LocationInfo::WireRef(md, *decl_id));
+            }
+            WireReferenceRoot::NamedConstant(cst) => {
+                self.update(wire_ref.root_span, LocationInfo::Global(NameElem::Constant(*cst)))
+            }
+            WireReferenceRoot::SubModulePort(port) => {
+                if let Some(span) = port.port_name_span {
+                    todo!("LSP for named ports");
                 }
-            }
-            NameElem::Type(_) => {
-                todo!()
-            }
-            NameElem::Constant(_) => {
-                todo!()
             }
         }
     }
-    if let Some(instr) = location_builder.best_instruction {
-        Some((instr, location_builder.best_span))
-    } else {
-        None
+    
+    fn gather_info_module(&mut self, md : &'linker Module) {
+        for (id, inst) in &md.instructions {
+            match inst {
+                Instruction::SubModule(sm) => {
+                    self.update(sm.module_name_span, LocationInfo::Global(NameElem::Module(sm.module_uuid)));
+                }
+                Instruction::Declaration(decl) => {
+                    match decl.typ_expr.get_deepest_selected(self.position) {
+                        Some(WrittenType::Named(span, name_id)) => {
+                            self.update(*span, LocationInfo::Global(NameElem::Type(*name_id)));
+                        }
+                        Some(typ) => {
+                            self.update(typ.get_span(), LocationInfo::Type(typ));
+                        }
+                        None => {}
+                    }
+                    if decl.declaration_itself_is_not_written_to && decl.name_span.contains_pos(self.position) {
+                        self.update(decl.name_span, LocationInfo::WireRef(md, id));
+                    }
+                }
+                Instruction::Wire(wire) => {
+                    if let WireSource::WireRead(wire_ref) = &wire.source {
+                        self.gather_info_wire_ref(md, wire_ref);
+                    } else {
+                        self.update(wire.span, LocationInfo::Temporary(md, id, wire));
+                    };
+                }
+                Instruction::Write(write) => {
+                    self.gather_info_wire_ref(md, &write.to);
+                }
+                Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
+            };
+        }
+    }
+
+    fn gather_info(&mut self) {
+        for global in &self.file.associated_values {
+            match *global {
+                NameElem::Module(md_id) => {
+                    let md = &self.linker.modules[md_id];
+                    
+                    if md.link_info.span.contains_pos(self.position) {
+                        self.update(md.link_info.name_span, LocationInfo::Global(NameElem::Module(md_id)));
+                        self.gather_info_module(md);
+                    }
+                }
+                NameElem::Type(_) => {
+                    todo!()
+                }
+                NameElem::Constant(_) => {
+                    todo!()
+                }
+            }
+        }
+    }
+
+    fn extract_result(self) -> Option<(LocationInfo<'linker>, Span)> {
+        if let Some(instr) = self.best_instruction {
+            Some((instr, self.best_span))
+        } else {
+            None
+        }
     }
 }
+
+fn get_info_about_source_location<'linker>(linker : &'linker Linker, position : usize, file : FileUUID) -> Option<(LocationInfo<'linker>, Span)> {
+    let mut ctx = HoverContext {
+        linker,
+        position,
+        file : &linker.files[file],
+        best_instruction : None,
+        best_span : Span::MAX_POSSIBLE_SPAN
+    };
+
+    ctx.gather_info();
+
+    ctx.extract_result()
+}
+
 
 fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::TextDocumentPositionParams) -> Option<(&'l FileData, LocationInfo<'l>, lsp_types::Range)> {
     let uuid = file_cache.find_uri(&text_pos.text_document.uri).unwrap();

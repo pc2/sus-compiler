@@ -121,6 +121,7 @@ pub enum WireReferencePathElement {
 #[derive(Debug, Clone, Copy)]
 pub enum WireReferenceRoot {
     LocalDecl(FlatID),
+    NamedConstant(ConstantUUID),
     SubModulePort(PortInfo)
 }
 
@@ -138,10 +139,11 @@ impl WireReferenceRoot {
 }
 
 impl WireReferenceRoot {
-    pub fn get_root_flat(&self) -> FlatID {
+    pub fn get_root_flat(&self) -> Option<FlatID> {
         match self {
-            WireReferenceRoot::LocalDecl(f) => *f,
-            WireReferenceRoot::SubModulePort(port) => port.submodule,
+            WireReferenceRoot::LocalDecl(f) => Some(*f),
+            WireReferenceRoot::NamedConstant(_) => None,
+            WireReferenceRoot::SubModulePort(port) => Some(port.submodule_flat),
         }
     }
 }
@@ -155,6 +157,17 @@ pub struct WireReference {
     pub root_span : Span,
     pub path : Vec<WireReferencePathElement>,
     pub span : Span
+}
+
+impl WireReference {
+    fn simple_port(span : Span, port : PortInfo) -> WireReference {
+        WireReference{
+            root : WireReferenceRoot::SubModulePort(port),
+            root_span : span,
+            path : Vec::new(),
+            span
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -281,7 +294,7 @@ impl core::fmt::Display for BinaryOperator {
 
 #[derive(Debug, Clone, Copy)]
 pub struct PortInfo {
-    pub submodule : FlatID,
+    pub submodule_flat : FlatID,
     pub port : PortID,
     /// Only set if the port is named as an explicit field. If the port name is implicit, such as in the function call syntax, then it is not present. 
     pub port_name_span : Option<Span>,
@@ -290,26 +303,26 @@ pub struct PortInfo {
 
 #[derive(Debug)]
 pub enum WireSource {
-    PortRead(PortInfo),
-    WireRead(FlatID), // Used to add a span to the reference of a wire. 
+    WireRead(WireReference), // Used to add a span to the reference of a wire. 
     UnaryOp{op : UnaryOperator, right : FlatID},
     BinaryOp{op : BinaryOperator, left : FlatID, right : FlatID},
-    ArrayAccess{arr : FlatID, arr_idx : FlatID, bracket_span : BracketSpan},
-    Constant(Value),
-    NamedConstant(ConstantUUID),
+    Constant(Value)
 }
 
 impl WireSource {
     /// Enumerates all instructions that this instruction depends on. This includes (maybe compiletime) wires, and submodules. 
     pub fn for_each_dependency<F : FnMut(FlatID)>(&self, func : &mut F) {
         match self {
-            &WireSource::WireRead(from_wire) => {func(from_wire)}
+            WireSource::WireRead(from_wire) => {
+                match &from_wire.root {
+                    WireReferenceRoot::LocalDecl(decl_id) => func(*decl_id),
+                    WireReferenceRoot::NamedConstant(_) => {}
+                    WireReferenceRoot::SubModulePort(submod_port) => func(submod_port.submodule_flat),
+                }
+            }
             &WireSource::UnaryOp { op:_, right } => {func(right)}
-            &WireSource::BinaryOp { op:_, left, right } => {func(left); func(right)}
-            &WireSource::ArrayAccess { arr, arr_idx, bracket_span:_ } => {func(arr); func(arr_idx)}
-            WireSource::PortRead(port) => {func(port.submodule)}
+            &WireSource::BinaryOp { op:_, left, right } => {func(left); func(right)},
             WireSource::Constant(_) => {}
-            WireSource::NamedConstant(_) => {}
         }
     }
 }
@@ -662,7 +675,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 let arg_wire = self.working_on.instructions[*arg_read_side].unwrap_wire();
                 let arg_wire_span = arg_wire.span;
                 let root = WireReferenceRoot::SubModulePort(PortInfo{
-                    submodule : instantiation_flat_id,
+                    submodule_flat : instantiation_flat_id,
                     port : port_id,
                     port_name_span : None, // Not present in function call notation
                     port_identifier_typ : IdentifierType::Input
@@ -727,27 +740,13 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         let submod = &self.modules[submodule.module_uuid];
 
         let port = submod.module_ports.get_port_by_name(name)?;
-        Some(PortInfo { submodule: submodule_decl, port, port_name_span : Some(port_name_span), port_identifier_typ: submod.module_ports.ports[port].id_typ })
+        Some(PortInfo { submodule_flat: submodule_decl, port, port_name_span : Some(port_name_span), port_identifier_typ: submod.module_ports.ports[port].id_typ })
     }
 
     fn flatten_expr(&mut self, cursor : &mut Cursor) -> FlatID {
         let (kind, expr_span) = cursor.kind_span();
         
-        let source = if kind == kind!("global_identifier") {
-            // TODO add namespacing
-            match self.resolve_identifier(expr_span) {
-                LocalOrGlobal::Local(id) => {
-                    WireSource::WireRead(id)
-                }
-                LocalOrGlobal::Global(global) => {
-                    if let Some(cst) = global.expect_constant() {
-                        WireSource::NamedConstant(cst)
-                    } else {
-                        WireSource::Constant(Value::Error)
-                    }
-                }
-            }
-        } else if kind == kind!("number") {
+        let source = if kind == kind!("number") {
             let text = &self.name_resolver.file_text[expr_span];
             WireSource::Constant(Value::Integer(BigInt::from_str(text).unwrap()))
         } else if kind == kind!("unary_op") {
@@ -773,16 +772,6 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
                 WireSource::BinaryOp{op, left, right}
             })
-        } else if kind == kind!("array_op") {
-            cursor.go_down_no_check(|cursor| {
-                cursor.field(field!("arr"));
-                let arr = self.flatten_expr(cursor);
-                
-                cursor.field(field!("arr_idx"));
-                let (arr_idx, bracket_span) = self.flatten_array_bracket(cursor);
-                
-                WireSource::ArrayAccess{arr, arr_idx, bracket_span}
-            })
         } else if kind == kind!("func_call") {
             if let Some((md_id, submodule, outputs)) = self.desugar_func_call(cursor) {
                 if outputs.len() != 1 {
@@ -792,12 +781,12 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
 
                 if outputs.len() >= 1 {
-                    WireSource::PortRead(PortInfo{
-                        submodule,
+                    WireSource::WireRead(WireReference::simple_port(expr_span, PortInfo{
+                        submodule_flat: submodule,
                         port: outputs.0,
                         port_name_span: None,
                         port_identifier_typ: IdentifierType::Output,
-                    })
+                    }))
                 } else {
                     // Function desugaring or using threw an error
                     WireSource::Constant(Value::Error)
@@ -808,20 +797,12 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             }
         } else if kind == kind!("parenthesis_expression") {
             return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| self.flatten_expr(cursor));
-        } else if kind == kind!("field_access") {
-            cursor.go_down_no_check(|cursor| {
-                cursor.field(field!("left"));
-                if let Some(instr_id) = self.get_or_alloc_module_by_global_identifier(cursor) {
-                    let submodule = self.working_on.instructions[instr_id].unwrap_submodule();
-
-                    cursor.field(field!("name"));
-                    //submodule.module_uuid
-                }
-            });
-            println!("TODO: Field access");
-            WireSource::Constant(Value::Error)
         } else {
-            cursor.could_not_match();
+            if let Some(wr) = self.flatten_wire_reference(cursor) {
+                WireSource::WireRead(wr)
+            } else {
+                WireSource::Constant(Value::Error)
+            }
         };
 
         let wire_instance = WireInstance{
@@ -832,12 +813,23 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         };
         self.working_on.instructions.alloc(Instruction::Wire(wire_instance))
     }
-    fn flatten_wire_reference(&mut self, cursor : &mut Cursor) -> Option<WireReference> {
-        let (kind, span) = cursor.kind_span();
-        if kind == kind!("global_identifier") {
-            let root = self.resolve_identifier(span).expect_local("assignments")?;
 
-            Some(WireReference{root : WireReferenceRoot::LocalDecl(root), root_span : span, path : Vec::new(), span})
+    fn flatten_wire_reference(&mut self, cursor : &mut Cursor) -> Option<WireReference> {
+        let (kind, expr_span) = cursor.kind_span();
+        if kind == kind!("global_identifier") {
+            // TODO add namespacing
+            let root = match self.resolve_identifier(expr_span) {
+                LocalOrGlobal::Local(id) => {
+                    WireReferenceRoot::LocalDecl(id)
+                }
+                LocalOrGlobal::Global(global) => {
+                    let cst = global.expect_constant()?;
+
+                    WireReferenceRoot::NamedConstant(cst)
+                }
+            };
+
+            Some(WireReference{root, root_span : expr_span, path : Vec::new(), span: expr_span})
         } else if kind == kind!("array_op") {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("arr"));
@@ -865,13 +857,38 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 
                 println!("TODO: Field access in assign");
 
+                /*else if kind == kind!("field_access") {
+                    cursor.go_down_no_check(|cursor| {
+                        /*cursor.field(field!("left"));
+                        
+                        let (left_kind, left_span) = cursor.kind_span();
+                        if left_kind == kind!("global_identifier") {
+
+
+                            let isntr_id = self.resolve_identifier(identifier_span).expect_local("submodule")?;
+                            let instr_id = self.get_or_alloc_module_by_global_identifier(cursor)?;
+            
+                    
+                            if let Some(port) = self.get_port(cursor) {
+                                WireSource::PortRead(port)
+                            } else {
+                            }
+                        } else {
+                            WireSource::Constant(Value::Error)
+                        }*/
+
+                        println!("TODO: Field access");
+                        WireSource::Constant(Value::Error)
+                    })
+                } */
+
                 return None
             })
-        } else if kind == kind!("number") {self.errors.error_basic(span, "Cannot assign to constant"); None
-        } else if kind == kind!("unary_op") {self.errors.error_basic(span, "Cannot assign to the result of an operator"); None
-        } else if kind == kind!("binary_op") {self.errors.error_basic(span, "Cannot assign to the result of an operator"); None
-        } else if kind == kind!("func_call") {self.errors.error_basic(span, "Cannot assign to submodule call"); None
-        } else if kind == kind!("parenthesis_expression") {self.errors.error_basic(span, "Remove these parentheses"); None
+        } else if kind == kind!("number") {self.errors.error_basic(expr_span, "A constant is not a wire reference"); None
+        } else if kind == kind!("unary_op") {self.errors.error_basic(expr_span, "The result of an operator is not a wire reference"); None
+        } else if kind == kind!("binary_op") {self.errors.error_basic(expr_span, "The result of an operator is not a wire reference"); None
+        } else if kind == kind!("func_call") {self.errors.error_basic(expr_span, "A submodule call is not a wire reference"); None
+        } else if kind == kind!("parenthesis_expression") {self.errors.error_basic(expr_span, "Remove these parentheses"); None
         } else {cursor.could_not_match()}
     }
 
@@ -930,12 +947,12 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             let mut to_iter = to.into_iter();
             for port in outputs {
                 if let Some(Ok((to, write_modifiers))) = to_iter.next() {
-                    let from = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{typ: AbstractType::Unknown, is_compiletime: false, span: func_call_span, source: WireSource::PortRead(PortInfo{
-                        submodule,
+                    let from = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{typ: AbstractType::Unknown, is_compiletime: false, span: func_call_span, source: WireSource::WireRead(WireReference::simple_port(to.span, PortInfo{
+                        submodule_flat: submodule,
                         port,
                         port_name_span: None,
                         port_identifier_typ: IdentifierType::Output,
-                    })}));
+                    }))}));
                     self.working_on.instructions.alloc(Instruction::Write(Write{from, to, write_modifiers}));
                 }
             }

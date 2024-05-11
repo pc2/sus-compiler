@@ -9,10 +9,10 @@ use tree_sitter::Tree;
 use crate::{
     arena_alloc::{ArenaAllocator, UUIDMarker, UUID},
     errors::{error_info, ErrorCollector},
-    file_position::{FileText, Span},
+    file_position::{FileText, Span, SpanFile},
     flattening::Module,
     parser::Documentation,
-    typing::ConcreteType,
+    typing::{AbstractType, ConcreteType},
     util::{const_str_position, const_str_position_in_tuples},
     value::{TypedValue, Value}
 };
@@ -66,9 +66,9 @@ pub const fn get_builtin_constant(name : &'static str) -> ConstantUUID {
 #[derive(Debug)]
 pub struct LinkInfo {
     pub file : FileUUID,
+    pub span : Span,
     pub name : String,
     pub name_span : Span,
-    pub span : Span,
     pub documentation : Documentation,
     pub errors : ErrorCollector,
     pub resolved_globals : ResolvedGlobals,
@@ -81,12 +81,15 @@ impl LinkInfo {
     pub fn get_full_name(&self) -> String {
         format!("::{}", self.name)
     }
+    pub fn get_span_file(&self) -> SpanFile {
+        (self.span, self.file)
+    }
 }
 
 pub struct LinkingErrorLocation {
     pub named_type : &'static str,
     pub full_name : String,
-    pub location : Option<(FileUUID, Span)>
+    pub location : Option<SpanFile>
 }
 
 pub trait Linkable {
@@ -96,6 +99,9 @@ pub trait Linkable {
     }
     fn get_linking_error_location(&self) -> LinkingErrorLocation;
     fn get_link_info(&self) -> Option<&LinkInfo>;
+    fn get_span_file(&self) -> Option<SpanFile> {
+        self.get_link_info().map(|l| (l.span, l.file))
+    }
     fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo>;
 }
 
@@ -109,6 +115,9 @@ impl NamedConstant {
         match self {
             NamedConstant::Builtin { name : _, val } => &val.typ
         }
+    }
+    pub fn get_abstract_type(&self) -> AbstractType {
+        self.get_concrete_type().into()
     }
 }
 
@@ -271,7 +280,7 @@ impl Linker {
         match global {
             NameElem::Module(id) => {
                 let md = &self.modules[id];
-                LinkingErrorLocation{named_type: "Module", full_name : md.link_info.get_full_name(), location: Some((md.link_info.file, md.link_info.name_span))}
+                LinkingErrorLocation{named_type: "Module", full_name : md.link_info.get_full_name(), location: Some((md.link_info.name_span, md.link_info.file))}
             }
             NameElem::Type(id) => self.types[id].get_linking_error_location(),
             NameElem::Constant(id) => self.constants[id].get_linking_error_location(),

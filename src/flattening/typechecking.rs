@@ -1,7 +1,7 @@
 
 use crate::{
     file_position::SpanFile,
-    linker::{ConstantUUIDMarker, ModuleUUIDMarker},
+    linker::{ConstantUUIDMarker, Linkable, ModuleUUIDMarker},
     typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, BOOL_TYPE, INT_TYPE}
 };
 
@@ -54,15 +54,8 @@ impl<'l, 'errs> DerefMut for TypeCheckingContext<'l, 'errs> {
 }
 
 impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
-    fn get_expected_type_of_module_port(&self, port : PortInfo) -> (AbstractType, SpanFile) {
-        let submodule_id = self.working_on.instructions[port.submodule].unwrap_submodule().module_uuid;
-        let module = &self.modules[submodule_id];
-        let decl = module.get_port_decl(port.port);
-        (decl.typ_expr.to_type(), (decl.typ_expr.get_span(), module.link_info.file))
-    }
-
     fn get_decl_of_module_port<'s>(&'s self, port : PortInfo) -> (&'s Declaration, FileUUID) {
-        let submodule_id = self.working_on.instructions[port.submodule].unwrap_submodule().module_uuid;
+        let submodule_id = self.working_on.instructions[port.submodule_flat].unwrap_submodule().module_uuid;
         let module = &self.modules[submodule_id];
         let decl = module.get_port_decl(port.port);
         (decl, module.link_info.file)
@@ -76,37 +69,50 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         typecheck(&wire.typ, wire.span, expected, context, &self.types, typ_decl_location, &self.errors);
     }
 
-    fn typecheck_connection(&self, to : &WireReference, from : FlatID) {
-        // Typecheck digging down into write side
-        let (mut write_to_type, declared_here) : (Option<AbstractType>, SpanFile) = match to.root {
+    fn get_wire_ref_declaration_point(&self, wire_ref_root : &WireReferenceRoot) -> Option<SpanFile> {
+        match wire_ref_root {
             WireReferenceRoot::LocalDecl(id) => {
-                let decl_root = self.working_on.instructions[id].unwrap_wire_declaration();
-                (Some(decl_root.typ.clone()), (decl_root.get_span(), self.errors.file))
+                let decl_root = self.working_on.instructions[*id].unwrap_wire_declaration();
+                Some((decl_root.get_span(), self.errors.file))
             },
-            WireReferenceRoot::SubModulePort(port) => {
-                let (expected_typ, port_decl) = self.get_expected_type_of_module_port(port);
-
-                (Some(expected_typ), port_decl)
+            WireReferenceRoot::NamedConstant(cst) => {
+                let linker_cst = &self.constants[*cst];
+                linker_cst.get_span_file()
             }
-            
+            WireReferenceRoot::SubModulePort(port) => {
+                let (decl, file) = self.get_decl_of_module_port(*port);
+                Some((decl.typ_expr.get_span(), file))
+            }
+        }
+    }
+
+    fn get_type_of_wire_reference(&self, wire_ref : &WireReference) -> AbstractType {
+        let mut write_to_type = match &wire_ref.root {
+            WireReferenceRoot::LocalDecl(id) => {
+                let decl_root = self.working_on.instructions[*id].unwrap_wire_declaration();
+                decl_root.typ.clone()
+            },
+            WireReferenceRoot::NamedConstant(cst) => {
+                let linker_cst = &self.constants[*cst];
+                linker_cst.get_abstract_type()
+            }
+            WireReferenceRoot::SubModulePort(port) => {
+                let (decl, _file) = self.get_decl_of_module_port(*port);
+                decl.typ_expr.to_type()
+            }
         };
-        for p in &to.path {
+
+        for p in &wire_ref.path {
             match p {
                 &WireReferencePathElement::ArrayIdx{idx, bracket_span} => {
                     let idx_wire = self.working_on.instructions[idx].unwrap_wire();
                     self.typecheck_wire_is_of_type(idx_wire, &INT_TYPE, None, "array index");
-                    if let Some(wr) = write_to_type {
-                        write_to_type = typecheck_is_array_indexer(&wr, bracket_span.outer_span(), &self.types, &self.errors).cloned();
-                    }
+                    write_to_type = typecheck_is_array_indexer(&write_to_type, bracket_span.outer_span(), &self.types, &self.errors).clone();
                 }
             }
         }
 
-        // Typecheck the value with target type
-        let from_wire = self.working_on.instructions[from].unwrap_wire();
-        if let Some(target_type) = write_to_type {
-            self.typecheck_wire_is_of_type(from_wire, &target_type, Some(declared_here), "connection");
-        }
+        write_to_type
     }
 
     fn typecheck(&mut self) {
@@ -139,11 +145,8 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 }
                 Instruction::Wire(w) => {
                     let result_typ = match &w.source {
-                        &WireSource::WireRead(from_wire) => {
-                            self.working_on.instructions[from_wire].unwrap_wire_declaration().typ.clone()
-                        }
-                        &WireSource::PortRead(port) => {
-                            self.get_expected_type_of_module_port(port).0
+                        WireSource::WireRead(from_wire) => {
+                            self.get_type_of_wire_reference(from_wire)
                         }
                         &WireSource::UnaryOp{op, right} => {
                             let right_wire = self.working_on.instructions[right].unwrap_wire();
@@ -157,30 +160,22 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                             self.typecheck_wire_is_of_type(right_wire, &input_right_type, None, &format!("{op} right"));
                             output_type
                         }
-                        &WireSource::ArrayAccess{arr, arr_idx, bracket_span:_} => {
-                            let arr_wire = self.working_on.instructions[arr].unwrap_wire();
-                            let arr_idx_wire = self.working_on.instructions[arr_idx].unwrap_wire();
-                
-                            self.typecheck_wire_is_of_type(arr_idx_wire, &INT_TYPE, None, "array index");
-                            if let Some(typ) = typecheck_is_array_indexer(&arr_wire.typ, arr_wire.span, &self.types, &self.errors) {
-                                typ.clone()
-                            } else {
-                                AbstractType::Error
-                            }
-                        }
                         WireSource::Constant(value) => {
                             value.get_type_of_constant()
-                        }
-                        &WireSource::NamedConstant(id) => {
-                            let NamedConstant::Builtin{name:_, val} = &self.constants[id];
-                            (&val.typ).into()
                         }
                     };
                     let Instruction::Wire(w) = &mut self.working_on.instructions[elem_id] else {unreachable!()};
                     w.typ = result_typ;
                 }
                 Instruction::Write(conn) => {
-                    self.typecheck_connection(&conn.to, conn.from);
+                    // Typecheck digging down into write side
+                    let write_to_type = self.get_type_of_wire_reference(&conn.to);
+                    let declared_here = self.get_wire_ref_declaration_point(&conn.to.root);
+
+                    // Typecheck the value with target type
+                    let from_wire = self.working_on.instructions[conn.from].unwrap_wire();
+
+                    self.typecheck_wire_is_of_type(from_wire, &write_to_type, declared_here, "connection");
                 }
             }
         }
@@ -205,6 +200,38 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     }
     fn must_be_compiletime(&self, wire : &WireInstance, context : &str) {
         self.must_be_compiletime_with_info(wire, context, || Vec::new());
+    }
+
+    fn get_root_identifier_type(&self, wire_ref_root : &WireReferenceRoot) -> IdentifierType {
+        match wire_ref_root {
+            WireReferenceRoot::LocalDecl(decl_id) => {
+                let decl = self.working_on.instructions[*decl_id].unwrap_wire_declaration();
+                decl.identifier_type
+            }
+            WireReferenceRoot::NamedConstant(_) => {
+                IdentifierType::Generative
+            }
+            WireReferenceRoot::SubModulePort(port) => {
+                let (decl, _file) = self.get_decl_of_module_port(*port);
+                decl.identifier_type
+            }
+        }
+    }
+
+    fn get_root_identifier_read_only(&self, wire_ref_root : &WireReferenceRoot) -> bool {
+        match wire_ref_root {
+            WireReferenceRoot::LocalDecl(decl_id) => {
+                let decl = self.working_on.instructions[*decl_id].unwrap_wire_declaration();
+                decl.read_only
+            }
+            WireReferenceRoot::NamedConstant(_) => {
+                true
+            }
+            WireReferenceRoot::SubModulePort(port) => {
+                let (decl, _file) = self.get_decl_of_module_port(*port);
+                decl.identifier_type == IdentifierType::Output
+            }
+        }
     }
 
     fn generative_check(&mut self) {
@@ -238,10 +265,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 Instruction::Wire(wire) => {
                     let mut is_generative = true;
                     if let WireSource::WireRead(from) = &wire.source {
-                        let decl = self.working_on.instructions[*from].unwrap_wire_declaration();
-                        if !decl.identifier_type.is_generative() {
-                            is_generative = false;
-                        }
+                        is_generative = self.get_root_identifier_type(&from.root) == IdentifierType::Generative;
                     } else {
                         wire.source.for_each_dependency(&mut |source_id| {
                             match &self.working_on.instructions[source_id] {
@@ -273,18 +297,21 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     }
 
     fn generative_check_write(&self, conn: &Write, declaration_depths: &mut FlatAlloc<Option<usize>, FlatIDMarker>, runtime_if_stack: &mut Vec<(UUID<FlatIDMarker>, Span)>) {
-        let (read_only, decl, file) = match conn.to.root {
+        let (decl, file) = match conn.to.root {
             WireReferenceRoot::LocalDecl(decl_id) => {
                 let decl = self.working_on.instructions[decl_id].unwrap_wire_declaration();
-                (decl.read_only, decl, self.errors.file)
+                (decl, self.errors.file)
+            }
+            WireReferenceRoot::NamedConstant(_) => {
+                self.errors.error_with_info(conn.to.root_span, "Cannot assign to a global", vec![]);
+                return;
             }
             WireReferenceRoot::SubModulePort(port) => {
-                let (decl, file) = self.get_decl_of_module_port(port);
-                (!decl.read_only, decl, file)
+                self.get_decl_of_module_port(port)
             }
         };
     
-        if read_only {
+        if self.get_root_identifier_read_only(&conn.to.root) {
             self.errors.error_with_info(conn.to.span, "Cannot Assign to Read-Only value", vec![decl.make_declared_here(file)]);
         }
     
@@ -296,15 +323,17 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     self.must_be_compiletime_with_info(from_wire, "Assignments to generative variables", || vec![decl.make_declared_here(file)]);
     
                     // Check that this declaration isn't used in a non-compiletime if
-                    let declared_at_depth = declaration_depths[conn.to.root.get_root_flat()].unwrap();
-            
-                    if runtime_if_stack.len() > declared_at_depth {
-                        let mut infos = Vec::new();
-                        infos.push(decl.make_declared_here(file));
-                        for (_, if_cond_span) in &runtime_if_stack[declared_at_depth..] {
-                            infos.push(error_info(*if_cond_span, file, "Runtime Condition here"));
+                    if let Some(root_flat) = conn.to.root.get_root_flat() {
+                        let declared_at_depth = declaration_depths[root_flat].unwrap();
+                
+                        if runtime_if_stack.len() > declared_at_depth {
+                            let mut infos = Vec::new();
+                            infos.push(decl.make_declared_here(file));
+                            for (_, if_cond_span) in &runtime_if_stack[declared_at_depth..] {
+                                infos.push(error_info(*if_cond_span, file, "Runtime Condition here"));
+                            }
+                            self.errors.error_with_info(conn.to.span, "Cannot write to generative variables in runtime conditional block", infos);
                         }
-                        self.errors.error_with_info(conn.to.span, "Cannot write to generative variables in runtime conditional block", infos);
                     }
                 }
             }
@@ -327,7 +356,9 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         for (inst_id, inst) in self.working_on.instructions.iter() {
             match inst {
                 Instruction::Write(conn) => {
-                    instance_fanins[conn.to.root.get_root_flat()].push(conn.from);
+                    if let Some(flat_root) = conn.to.root.get_root_flat() {
+                        instance_fanins[flat_root].push(conn.from);
+                    }
                 }
                 Instruction::SubModule(_) => {} // TODO Dependencies should be added here if for example generative templates get added
                 Instruction::Declaration(decl) => {
@@ -339,7 +370,9 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 Instruction::IfStatement(stm) => {
                     for id in UUIDRange(stm.then_start, stm.else_end) {
                         if let Instruction::Write(conn) = &self.working_on.instructions[id] {
-                            instance_fanins[conn.to.root.get_root_flat()].push(stm.condition);
+                            if let Some(flat_root) = conn.to.root.get_root_flat() {
+                                instance_fanins[flat_root].push(stm.condition);
+                            }
                         }
                     }
                 }

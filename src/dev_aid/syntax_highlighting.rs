@@ -6,7 +6,7 @@ use crate::{
     compiler_top::{add_file, recompile_all},
     errors::{CompileError, ErrorLevel},
     file_position::Span,
-    flattening::{WireReferenceRoot, IdentifierType, Instruction, WireSource},
+    flattening::{IdentifierType, Instruction, Module, WireReference, WireReferenceRoot, WireSource},
     linker::{FileUUID, FileUUIDMarker, Linker, NameElem}
 };
 
@@ -24,6 +24,23 @@ pub struct SyntaxHighlightSettings {
     pub show_tokens : bool
 }
 
+pub fn walk_name_color_wireref(module : &Module, wire_ref : &WireReference, result : &mut Vec<(IDEIdentifierType, Span)>) {
+    match &wire_ref.root {
+        WireReferenceRoot::LocalDecl(decl_id) => {
+            let decl = module.instructions[*decl_id].unwrap_wire_declaration();
+            result.push((IDEIdentifierType::Value(decl.identifier_type), wire_ref.root_span));
+        }
+        WireReferenceRoot::NamedConstant(_cst) => {
+            result.push((IDEIdentifierType::Constant, wire_ref.root_span));
+        }
+        WireReferenceRoot::SubModulePort(port) => {
+            if let Some(span) = port.port_name_span {
+                result.push((IDEIdentifierType::Value(port.port_identifier_typ), span))
+            }
+        }
+    }
+}
+
 pub fn walk_name_color(all_objects : &[NameElem], linker : &Linker) -> Vec<(IDEIdentifierType, Span)> {
     let mut result : Vec<(IDEIdentifierType, Span)> = Vec::new();
     for obj_uuid in all_objects {
@@ -34,22 +51,12 @@ pub fn walk_name_color(all_objects : &[NameElem], linker : &Linker) -> Vec<(IDEI
                     match item {
                         Instruction::Wire(w) => {
                             match &w.source {
-                                &WireSource::WireRead(from_wire) => {
-                                    let decl = module.instructions[from_wire].unwrap_wire_declaration();
-                                    result.push((IDEIdentifierType::Value(decl.identifier_type), w.span));
+                                WireSource::WireRead(from_wire) => {
+                                    walk_name_color_wireref(module, from_wire, &mut result);
                                 }
                                 WireSource::UnaryOp { op:_, right:_ } => {}
                                 WireSource::BinaryOp { op:_, left:_, right:_ } => {}
-                                WireSource::ArrayAccess { arr:_, arr_idx:_, bracket_span:_ } => {}
                                 WireSource::Constant(_) => {}
-                                WireSource::NamedConstant(_name) => {
-                                    result.push((IDEIdentifierType::Constant, w.span));
-                                }
-                                WireSource::PortRead(info) => {
-                                    if let Some(port_name_span) = &info.port_name_span {
-                                        result.push((IDEIdentifierType::Value(info.port_identifier_typ), *port_name_span))
-                                    }
-                                }
                             }
                         }
                         Instruction::Declaration(decl) => {
@@ -59,17 +66,7 @@ pub fn walk_name_color(all_objects : &[NameElem], linker : &Linker) -> Vec<(IDEI
                             result.push((IDEIdentifierType::Value(decl.identifier_type), decl.name_span));
                         }
                         Instruction::Write(conn) => {
-                            match conn.to.root {
-                                WireReferenceRoot::LocalDecl(decl_id) => {
-                                    let decl = module.instructions[decl_id].unwrap_wire_declaration();
-                                    result.push((IDEIdentifierType::Value(decl.identifier_type), conn.to.root_span));
-                                }
-                                WireReferenceRoot::SubModulePort(port) => {
-                                    if let Some(span) = port.port_name_span {
-                                        todo!("Syntax highlight for named ports")
-                                    }
-                                }
-                            }
+                            walk_name_color_wireref(module, &conn.to, &mut result);
                         }
                         Instruction::SubModule(sm) => {
                             result.push((IDEIdentifierType::Interface, sm.module_name_span));

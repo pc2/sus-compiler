@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use num::BigInt;
 
-use crate::{errors::ErrorCollector, file_position::Span, flattening::{BinaryOperator, UnaryOperator}, typing::{AbstractType, ConcreteType, BOOL_CONCRETE_TYPE, BOOL_TYPE, INT_CONCRETE_TYPE, INT_TYPE}};
+use crate::{errors::ErrorCollector, file_position::BracketSpan, flattening::{BinaryOperator, UnaryOperator}, typing::{AbstractType, ConcreteType, BOOL_CONCRETE_TYPE, BOOL_TYPE, INT_CONCRETE_TYPE, INT_TYPE}};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum Value {
@@ -196,12 +196,12 @@ impl TypedValue {
         self.value.unwrap_bool()
     }
 
-    pub fn array_access(&self, idx : usize, span : Span, errors : &ErrorCollector) -> Option<TypedValue> {
+    pub fn array_access(&self, idx : usize, span : BracketSpan, errors : &ErrorCollector) -> Option<TypedValue> {
         let typ = self.typ.down_array().clone();
 
         Some(if let Value::Array(arr) = &self.value {
             let Some(elem) = arr.get(idx) else {
-                errors.error_basic(span, format!("Compile-Time Array index is out of range: idx: {idx}, array size: {}", arr.len()));
+                errors.error_basic(span.outer_span(), format!("Compile-Time Array index is out of range: idx: {idx}, array size: {}", arr.len()));
                 return None
             };
             TypedValue{typ, value : elem.clone()}

@@ -87,7 +87,7 @@ impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
 
                 let decl_infos = coll.iter().map(|collider_global| {
                     let err_loc = linker.get_linking_error_location(*collider_global);
-                    if let Some((file, span)) = err_loc.location {
+                    if let Some((span, file)) = err_loc.location {
                         error_info(span, file, format!("{} {} declared here", err_loc.named_type, err_loc.full_name))
                     } else {
                         // Kinda hacky, point the 'builtin' back to the declaration location because builtins don't have a location
@@ -121,7 +121,7 @@ impl<'err_and_globals> ResolvedName<'err_and_globals> {
     pub fn not_expected_global_error(self, expected : &str) {
         // SAFETY: The allocated linker objects aren't going to change. 
         let info = unsafe{&*self.linker}.get_linking_error_location(self.name_elem.unwrap());
-        let infos = if let Some((file, definition_span)) = info.location {
+        let infos = if let Some((definition_span, file)) = info.location {
             vec![error_info(definition_span, file, "Defined here")]
         } else {
             vec![]
