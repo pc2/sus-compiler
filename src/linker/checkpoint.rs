@@ -1,4 +1,5 @@
-use crate::errors::ErrorCollector;
+
+use crate::errors::ErrorStore;
 
 use super::{LinkInfo, ResolvedGlobals};
 
@@ -16,7 +17,7 @@ pub struct CheckPoint {
 }
 
 impl CheckPoint {
-    pub fn checkpoint(errors : &ErrorCollector, resolved_globals : &ResolvedGlobals) -> CheckPoint {
+    pub fn checkpoint(errors : &ErrorStore, resolved_globals : &ResolvedGlobals) -> CheckPoint {
         CheckPoint {
             errors_cp : errors.checkpoint(),
             resolved_globals_cp : resolved_globals.checkpoint()

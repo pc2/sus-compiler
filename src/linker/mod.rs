@@ -8,7 +8,7 @@ use tree_sitter::Tree;
 
 use crate::{
     arena_alloc::{ArenaAllocator, UUIDMarker, UUID},
-    errors::{error_info, ErrorCollector},
+    errors::{error_info, CompileError, ErrorCollector, ErrorLevel, ErrorStore},
     file_position::{FileText, Span, SpanFile},
     flattening::Module,
     parser::Documentation,
@@ -70,11 +70,12 @@ pub struct LinkInfo {
     pub name : String,
     pub name_span : Span,
     pub documentation : Documentation,
-    pub errors : ErrorCollector,
+    pub errors : ErrorStore,
     pub resolved_globals : ResolvedGlobals,
 
     /// Reset checkpoints. These are to reset errors and resolved_globals 
-    pub after_initial_parse_cp : CheckPoint
+    pub after_initial_parse_cp : CheckPoint,
+    pub after_flatten_cp : Option<CheckPoint>
 }
 
 impl LinkInfo {
@@ -170,7 +171,7 @@ impl Linkable for NamedType {
 
 pub struct FileData {
     pub file_text : FileText,
-    pub parsing_errors : ErrorCollector,
+    pub parsing_errors : ErrorStore,
     /// In source file order
     pub associated_values : Vec<NameElem>,
     pub tree : tree_sitter::Tree
@@ -286,7 +287,7 @@ impl Linker {
             NameElem::Constant(id) => self.constants[id].get_linking_error_location(),
         }
     }
-    fn get_duplicate_declaration_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
+    fn get_duplicate_declaration_errors<F : FnMut(&CompileError)>(&self, file_uuid : FileUUID, f : &mut F) {
         // Conflicting Declarations
         for item in &self.global_namespace {
             let NamespaceElement::Colission(colission) = &item.1 else {continue};
@@ -313,18 +314,20 @@ impl Linker {
                 } else {
                     format!("'{this_object_name}' conflicts with other declarations:")
                 };
-                errors.error_with_info(info.name_span, reason, infos);
+                f(&CompileError{ position: info.name_span, reason, infos, level: ErrorLevel::Error });
             }
         }
     }
 
-    fn get_flattening_errors(&self, file_uuid : FileUUID, errors : &ErrorCollector) {
+    fn for_all_flattening_errors<F : FnMut(&CompileError)>(&self, file_uuid : FileUUID, func : &mut F) {
         for v in &self.files[file_uuid].associated_values {
             match v {
                 NameElem::Module(md_id) => {
                     let md = &self.modules[*md_id];
-                    errors.ingest(&md.link_info.errors);
-                    md.instantiations.collect_errors(errors);
+                    for e in &md.link_info.errors {
+                        func(e)
+                    }
+                    md.instantiations.for_each_error(func);
                 }
                 NameElem::Type(_) => {}
                 NameElem::Constant(_) => {}
@@ -332,11 +335,12 @@ impl Linker {
         }
     }
 
-    pub fn get_all_errors_in_file(&self, file_uuid : FileUUID) -> ErrorCollector {
-        let errors = self.files[file_uuid].parsing_errors.clone();
-        self.get_duplicate_declaration_errors(file_uuid, &errors);
-        self.get_flattening_errors(file_uuid, &errors);
-        errors
+    pub fn for_all_errors_in_file<F : FnMut(&CompileError)>(&self, file_uuid : FileUUID, mut f : F) {
+        for err in &self.files[file_uuid].parsing_errors {
+            f(err);
+        }
+        self.get_duplicate_declaration_errors(file_uuid, &mut f);
+        self.for_all_flattening_errors(file_uuid, &mut f);
     }
 
     pub fn remove_everything_in_file(&mut self, file_uuid : FileUUID) -> &mut FileData {
@@ -379,19 +383,30 @@ impl Linker {
         self.files.free(file_uuid);
     }
 
-    pub fn get_file_builder(&mut self, file_id : FileUUID) -> FileBuilder<'_> {
-        let file_data = &mut self.files[file_id];
-        FileBuilder{
+    pub fn with_file_builder<F : FnOnce(&mut FileBuilder<'_>)>(&mut self, file_id : FileUUID, f : F) {
+        let mut associated_values = Vec::new();
+        let mut parsing_errors = std::mem::replace(&mut self.files[file_id].parsing_errors, ErrorStore::new());
+        let file_data = &self.files[file_id];
+        let other_parsing_errors = parsing_errors.take_for_editing(file_id, &self.files);
+
+        let mut fb = FileBuilder{
             file_id,
             tree: &file_data.tree,
             file_text: &file_data.file_text,
-            other_parsing_errors : &file_data.parsing_errors,
-            associated_values: &mut file_data.associated_values,
+            files : &self.files,
+            other_parsing_errors : &other_parsing_errors,
+            associated_values: &mut associated_values,
             global_namespace: &mut self.global_namespace,
             types: &mut self.types,
             modules: &mut self.modules,
             constants: &mut self.constants
-        }
+        };
+        f(&mut fb);
+
+        let parsing_errors = other_parsing_errors.into_storage();
+        let file_data = &mut self.files[file_id];
+        file_data.parsing_errors = parsing_errors;
+        file_data.associated_values = associated_values;
     }
 }
 
@@ -400,13 +415,14 @@ impl Linker {
 pub struct FileBuilder<'linker> {
     pub file_id : FileUUID,
     pub tree : &'linker Tree,
-    pub file_text : &'linker FileText, 
-    pub other_parsing_errors : &'linker ErrorCollector,
+    pub file_text : &'linker FileText,
+    pub files : &'linker ArenaAllocator<FileData, FileUUIDMarker>,
+    pub other_parsing_errors : &'linker ErrorCollector<'linker>,
     associated_values : &'linker mut Vec<NameElem>,
     global_namespace : &'linker mut HashMap<String, NamespaceElement>,
+    modules : &'linker mut ArenaAllocator<Module, ModuleUUIDMarker>,
     #[allow(dead_code)]
     types : &'linker mut ArenaAllocator<NamedType, TypeUUIDMarker>,
-    modules : &'linker mut ArenaAllocator<Module, ModuleUUIDMarker>,
     #[allow(dead_code)]
     constants : &'linker mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>
 }

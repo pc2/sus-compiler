@@ -475,7 +475,7 @@ struct FlatteningContext<'l, 'errs> {
     #[allow(dead_code)]
     constants : Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
     name_resolver : NameResolver<'l, 'errs>,
-    errors : &'errs ErrorCollector,
+    errors : &'errs ErrorCollector<'l>,
 
     ports_to_visit : UUIDRange<PortIDMarker>,
 

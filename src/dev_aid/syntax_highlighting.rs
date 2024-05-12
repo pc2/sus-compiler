@@ -160,11 +160,9 @@ impl Cache<FileUUID> for ArenaVector<(PathBuf, Source<String>), FileUUIDMarker> 
 
 pub fn print_all_errors(linker : &Linker, paths_arena : &mut ArenaVector<(PathBuf, Source), FileUUIDMarker>) {
     for (file_uuid, f) in &linker.files {
-        let errors = linker.get_all_errors_in_file(file_uuid);
-
-        for err in errors.get().0 {
-            pretty_print_error(&err, f.parsing_errors.file, linker, paths_arena);
-        }
+        let errors = linker.for_all_errors_in_file(file_uuid, |err| {
+            pretty_print_error(err, file_uuid, linker, paths_arena);
+        });
     }
 }
 

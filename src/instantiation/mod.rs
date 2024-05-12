@@ -5,7 +5,7 @@ use num::BigInt;
 use crate::{
     arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID},
     compiler_top::instantiate,
-    errors::ErrorCollector,
+    errors::{CompileError, ErrorCollector, ErrorStore},
     file_position::{BracketSpan, Span},
     flattening::{initialization::PortIDMarker, BinaryOperator, FlatID, FlatIDMarker, FlatIDRange, IdentifierType, Instruction, Module, UnaryOperator, WireInstance, WireReference, WireReferencePathElement, WireReferenceRoot, WireSource, Write, WriteModifiers},
     instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError},
@@ -237,7 +237,7 @@ struct InstantiationContext<'fl, 'l> {
     wires : FlatAlloc<RealWire, WireIDMarker>,
     submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
     specified_latencies : Vec<(WireID, i64)>,
-    errors : ErrorCollector,
+    errors : ErrorCollector<'l>,
 
     md : &'fl Module,
     module : &'fl Module,
@@ -846,7 +846,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     
 
     fn instantiate_full(&mut self) -> Option<FlatAlloc<InstantiatedPort, PortIDMarker>> {
-        if self.md.link_info.errors.did_error.get() {
+        if self.md.link_info.errors.did_error {
             return None;// Don't instantiate modules that already errored. Otherwise instantiator may crash
         }
 
@@ -860,7 +860,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         self.instantiate_flattened_module(self.md.instructions.id_range(), None)?;
         let interface = self.compute_latencies();
         
-        if self.errors.did_error.get() {
+        if self.errors.did_error() {
             return None
         }
 
@@ -942,7 +942,7 @@ fn filter_unique_write_flats<'w>(writes : &'w [PathMuxSource<'w>], instructions 
 
 #[derive(Debug)]
 pub struct InstantiationList {
-    cache : RefCell<Vec<(Rc<InstantiatedModule>, ErrorCollector)>>
+    cache : RefCell<Vec<(Rc<InstantiatedModule>, ErrorStore)>>
 }
 
 impl InstantiationList {
@@ -963,7 +963,7 @@ impl InstantiationList {
                 md : module,
                 module,
                 linker : linker,
-                errors : module.link_info.errors.new_for_same_file_inherit_did_error()
+                errors : ErrorCollector::new_empty(module.link_info.file, &linker.files)
             };
 
             let interface = context.instantiate_full();
@@ -975,28 +975,31 @@ impl InstantiationList {
                 generation_state : context.generation_state
             });
 
-            if context.errors.did_error.get() {
-                cache_borrow.push((result, context.errors));
+            let instantiation_errors = context.errors.into_storage();
+            if instantiation_errors.did_error {
+                cache_borrow.push((result, instantiation_errors));
                 return None;
             } else {
-                cache_borrow.push((result.clone(), context.errors));
+                cache_borrow.push((result.clone(), instantiation_errors));
                 return Some(result);
             }
         }
         
         let instance_id = 0; // Temporary, will always be 0 while not template arguments
         let instance = &cache_borrow[instance_id];
-        if !instance.1.did_error.get() {
+        if !instance.1.did_error {
             Some(instance.0.clone())
         } else {
             None
         }
     }
 
-    pub fn collect_errors(&self, errors : &ErrorCollector) {
+    pub fn for_each_error<F : FnMut(&CompileError)>(&self, func : &mut F) {
         let cache_borrow = self.cache.borrow();
         for inst in cache_borrow.deref() {
-            errors.ingest(&inst.1);
+            for err in &inst.1 {
+                func(err)
+            }
         }
     }
 

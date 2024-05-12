@@ -65,7 +65,7 @@ impl<'linker, 'err_and_globals, IDM : UUIDMarker, T> Index<UUID<IDM>> for Intern
 
 pub struct NameResolver<'linker, 'err_and_globals> {
     pub file_text : &'linker FileText,
-    pub errors : &'err_and_globals ErrorCollector,
+    pub errors : &'err_and_globals ErrorCollector<'linker>,
     linker : *const Linker,
     resolved_globals : &'err_and_globals RefCell<ResolvedGlobals>
 }
@@ -113,7 +113,7 @@ impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
 pub struct ResolvedName<'err_and_globals> {
     pub name_elem : Option<NameElem>,
     pub span : Span,
-    pub errors : &'err_and_globals ErrorCollector,
+    pub errors : &'err_and_globals ErrorCollector<'err_and_globals>,
     linker : *const Linker
 }
 
@@ -179,7 +179,7 @@ pub fn with_module_editing_context<F : for<'linker, 'errs> FnOnce(
     let file : &FileData = &linker.files[md.link_info.file];
 
     // Extract errors and resolved_globals for easier editing
-    let errors_a = md.link_info.errors.take();
+    let errors_a = md.link_info.errors.take_for_editing(md.link_info.file, &linker.files);
     let resolved_globals_a = RefCell::new(md.link_info.resolved_globals.take());
 
     let errors = &errors_a;
@@ -197,5 +197,7 @@ pub fn with_module_editing_context<F : for<'linker, 'errs> FnOnce(
     assert!(md.link_info.resolved_globals.is_untouched());
     assert!(md.link_info.errors.is_untouched());
     md.link_info.resolved_globals = resolved_globals_a.into_inner();
-    md.link_info.errors = errors_a;
+    
+    md.link_info.errors = errors_a.into_storage();
+    md.link_info.after_flatten_cp = Some(CheckPoint::checkpoint(&md.link_info.errors, &md.link_info.resolved_globals));
 }

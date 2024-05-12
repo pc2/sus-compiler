@@ -1,8 +1,8 @@
 
 
-use std::cell::{RefCell, Cell};
+use std::cell::RefCell;
 
-use crate::{file_position::Span, linker::{checkpoint::ErrorCheckpoint, FileUUID}};
+use crate::{arena_alloc::ArenaAllocator, file_position::Span, linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker}};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ErrorLevel {
@@ -29,40 +29,76 @@ pub fn error_info<S : Into<String>>(position : Span, file : FileUUID, reason : S
     ErrorInfo{position, file, info : reason.into()}
 }
 
-// Class that collects and manages errors and warnings
-// Implemented such that it can be shared immutably. This makes many operations to do with parsing easier
-// It doesn't allow indexing, so no immutable references to contents can exist
+/// Stores all errors gathered within a context for reporting to the user. 
+/// 
+/// Only editable by converting to a ErrorCollector using [ErrorStore::take_for_editing]
 #[derive(Debug,Clone)]
-pub struct ErrorCollector {
-    errors : RefCell<Vec<CompileError>>,
-    pub did_error : Cell<bool>,
-    pub file : FileUUID,
-    file_len : usize, // Only used for debugging, to see no invalid errors are produced
+pub struct ErrorStore {
+    errors : Vec<CompileError>,
+    pub did_error : bool
 }
 
-#[allow(dead_code)]
-impl ErrorCollector {
-    pub fn new(file : FileUUID, file_len : usize) -> Self {
-        Self{errors : RefCell::new(Vec::new()), file, file_len, did_error : Cell::new(false)}
+impl ErrorStore {
+    pub fn new() -> ErrorStore {
+        ErrorStore{
+            errors : Vec::new(),
+            did_error : false
+        }
     }
-    pub fn reset(&mut self, file_len : usize) {
-        self.file_len = file_len;
-        self.errors.get_mut().clear();
+
+    pub fn take_for_editing<'linker>(&mut self, file : FileUUID, files : &'linker ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorCollector<'linker> {
+        let error_store = RefCell::new(std::mem::replace(self, ErrorStore::new()));
+        ErrorCollector { error_store, file, file_len : files[file].file_text.len(), files }
     }
-    pub fn reset_to(&mut self, checkpoint : ErrorCheckpoint) {
-        self.errors.borrow_mut().truncate(checkpoint.0);
-        self.did_error.set(checkpoint.1);
-    }
+
     pub fn checkpoint(&self) -> ErrorCheckpoint {
-        ErrorCheckpoint(self.errors.borrow().len(), self.did_error.get())
+        ErrorCheckpoint(self.errors.len(), self.did_error)
     }
 
-    pub fn new_for_same_file_clean_did_error(&self) -> Self {
-        Self{errors : RefCell::new(Vec::new()), file : self.file, file_len : self.file_len, did_error : Cell::new(false)}
+    pub fn reset_to(&mut self, checkpoint : ErrorCheckpoint) {
+        self.errors.truncate(checkpoint.0);
+        self.did_error = checkpoint.1;
     }
 
-    pub fn new_for_same_file_inherit_did_error(&self) -> Self {
-        Self{errors : RefCell::new(Vec::new()), file : self.file, file_len : self.file_len, did_error : self.did_error.clone()}
+    pub fn is_untouched(&self) -> bool {
+        self.errors.is_empty()
+    }
+}
+
+impl<'e> IntoIterator for &'e ErrorStore {
+    type Item = &'e CompileError;
+
+    type IntoIter = std::slice::Iter<'e, CompileError>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.errors.iter()
+    }
+}
+
+
+
+/// Class that collects and manages errors and warnings
+/// 
+/// Implemented such that it can be shared immutably. 
+/// This allows use in immutable contexts, because reporting errors isn't really changing the context
+#[derive(Clone)]
+pub struct ErrorCollector<'linker> {
+    error_store : RefCell<ErrorStore>,
+    /// Main file of this collector. Makes creating errors easier
+    pub file : FileUUID,
+    /// Only used for debugging, to see no invalid errors are produced
+    file_len : usize,
+    files : &'linker ArenaAllocator<FileData, FileUUIDMarker>
+}
+
+impl<'linker> ErrorCollector<'linker> {
+    pub fn new_empty(file : FileUUID, files : &'linker ArenaAllocator<FileData, FileUUIDMarker>) -> Self {
+        Self{error_store : RefCell::new(ErrorStore::new()), file, file_len : files[file].file_text.len(), files}
+    }
+
+    /// Turn the collector back into a [ErrorStore]
+    pub fn into_storage(self) -> ErrorStore {
+        self.error_store.into_inner()
     }
 
     fn assert_span_good(&self, span : Span) {
@@ -73,22 +109,19 @@ impl ErrorCollector {
     fn push_diagnostic(&self, diagnostic : CompileError) {
         self.assert_span_good(diagnostic.position);
         for info in &diagnostic.infos {
-            // Can only verify for diagnostics within this file, but that should be good enough to catch bugs
-            if info.file == self.file {
-                self.assert_span_good(info.position);
-            }
+            assert!(info.position.into_range().end <= self.files[info.file].file_text.len());
         }
-        self.errors.borrow_mut().push(diagnostic);
+        let mut store = self.error_store.borrow_mut();
+        store.did_error |= diagnostic.level == ErrorLevel::Error;
+        store.errors.push(diagnostic);
     }
 
     pub fn error_basic<S : Into<String>>(&self, position : Span, reason : S) {
         self.push_diagnostic(CompileError{position, reason : reason.into(), infos : Vec::new(), level : ErrorLevel::Error});
-        self.did_error.set(true);
     }
     
     pub fn error_with_info<S : Into<String>>(&self, position : Span, reason : S, infos : Vec<ErrorInfo>) {
         self.push_diagnostic(CompileError{position, reason : reason.into(), infos : infos, level : ErrorLevel::Error});
-        self.did_error.set(true);
     }
     
     pub fn warn_basic<S : Into<String>>(&self, position : Span, reason : S) {
@@ -99,20 +132,7 @@ impl ErrorCollector {
         self.push_diagnostic(CompileError{position, reason : reason.into(), infos : infos, level : ErrorLevel::Warning});
     }
 
-    pub fn get(self) -> (Vec<CompileError>, FileUUID) {
-        (self.errors.into_inner(), self.file)
-    }
-
-    pub fn ingest(&self, source : &Self) {
-        assert!(self.file == source.file);
-        assert!(self.file_len == source.file_len);
-        self.errors.borrow_mut().extend_from_slice(&source.errors.borrow());
-    }
-
-    pub fn take(&mut self) -> ErrorCollector {
-        std::mem::replace(self, self.new_for_same_file_clean_did_error())
-    }
-    pub fn is_untouched(&self) -> bool {
-        self.errors.borrow().is_empty()
+    pub fn did_error(&self) -> bool {
+        self.error_store.borrow().did_error
     }
 }

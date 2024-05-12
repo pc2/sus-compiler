@@ -37,7 +37,7 @@ struct TypeCheckingContext<'l, 'errs> {
     modules : InternalResolver<'l, 'errs, ModuleUUIDMarker, Module>,
     types : Resolver<'l, 'errs, TypeUUIDMarker, NamedType>,
     constants : Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
-    errors : &'errs ErrorCollector,
+    errors : &'errs ErrorCollector<'l>,
 }
 
 impl<'l, 'errs> Deref for TypeCheckingContext<'l, 'errs> {

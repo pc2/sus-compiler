@@ -3,7 +3,7 @@ use std::rc::Rc;
 use tree_sitter::Parser;
 
 use crate::{
-    debug::SpanDebugger ,errors::ErrorCollector, file_position::FileText, flattening::{flatten_all_modules, initialization::gather_initial_file_data, typechecking::typecheck_all_modules, Module}, instantiation::InstantiatedModule, linker::{FileData, FileUUID, Linker, ModuleUUID}
+    debug::SpanDebugger, errors::ErrorStore, file_position::FileText, flattening::{flatten_all_modules, initialization::gather_initial_file_data, typechecking::typecheck_all_modules, Module}, instantiation::InstantiatedModule, linker::{FileData, FileUUID, Linker, ModuleUUID}
 };
 
 pub fn add_file(text : String, linker : &mut Linker) -> FileUUID {
@@ -13,16 +13,18 @@ pub fn add_file(text : String, linker : &mut Linker) -> FileUUID {
     
     let file_id = linker.files.reserve();
     linker.files.alloc_reservation(file_id, FileData{
-        parsing_errors : ErrorCollector::new(file_id, text.len()),
+        parsing_errors : ErrorStore::new(),
         file_text : FileText::new(text),
         tree,
         associated_values : Vec::new()
     });
 
-    let mut builder = linker.get_file_builder(file_id);
-    let mut span_debugger = SpanDebugger::new("gather_initial_file_data in add_file", builder.file_text);
-    gather_initial_file_data(&mut builder);    
-    span_debugger.defuse();
+    linker.with_file_builder(file_id, |builder| {
+        let mut span_debugger = SpanDebugger::new("gather_initial_file_data in add_file", builder.file_text);
+        gather_initial_file_data(builder);
+        span_debugger.defuse();
+    });
+
     file_id
 }
 
@@ -33,14 +35,15 @@ pub fn update_file(text : String, file_id : FileUUID, linker : &mut Linker) {
     parser.set_language(&tree_sitter_sus::language()).unwrap();
     let tree = parser.parse(&text, None).unwrap();
 
-    file_data.parsing_errors.reset(text.len());
+    file_data.parsing_errors = ErrorStore::new();
     file_data.file_text = FileText::new(text);
     file_data.tree = tree;
 
-    let mut builder = linker.get_file_builder(file_id);
-    let mut span_debugger = SpanDebugger::new("gather_initial_file_data in update_file (temporary fix)", builder.file_text);
-    gather_initial_file_data(&mut builder);
-    span_debugger.defuse();
+    linker.with_file_builder(file_id, |builder| {
+        let mut span_debugger = SpanDebugger::new("gather_initial_file_data in update_file", builder.file_text);
+        gather_initial_file_data(builder);
+        span_debugger.defuse();
+    });
 }
 
 pub fn recompile_all(linker : &mut Linker) {
@@ -48,6 +51,7 @@ pub fn recompile_all(linker : &mut Linker) {
     for (_, md) in &mut linker.modules {
         let Module { link_info, module_ports:_, instructions, instantiations } = md;
         link_info.reset_to(link_info.after_initial_parse_cp);
+        link_info.after_flatten_cp = None;
         instructions.clear();
         instantiations.clear_instances()
     }

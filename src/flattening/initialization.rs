@@ -3,12 +3,7 @@ use sus_proc_macro::{field, kind};
 
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID},
-    file_position::{FileText, Span},
-    flattening::Module,
-    instantiation::InstantiationList,
-    linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals},
-    parser::Cursor
+    arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{FileText, Span}, flattening::Module, instantiation::InstantiationList, linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals}, parser::Cursor
 };
 
 use super::{FlatID, IdentifierType};
@@ -80,7 +75,7 @@ pub fn gather_initial_file_data(builder : &mut FileBuilder) {
         let (kind, span) = cursor.kind_span();
         match kind {
             kind!("module") => {
-                let parsing_errors = builder.other_parsing_errors.new_for_same_file_clean_did_error();
+                let parsing_errors = ErrorCollector::new_empty(builder.file_id, builder.files);
                 cursor.report_all_decendant_errors(&parsing_errors);
                 cursor.go_down_no_check(|cursor| {
                     let name_span = cursor.field_span(field!("name"), kind!("identifier"));
@@ -109,7 +104,8 @@ pub fn gather_initial_file_data(builder : &mut FileBuilder) {
                     interfaces.alloc(Interface{func_call_inputs, func_call_outputs, ports_for_this_interface : ports.range_since(ports_start_at)});
 
                     let resolved_globals = ResolvedGlobals::empty();
-                    let after_initial_parse_cp = CheckPoint::checkpoint(&parsing_errors, &resolved_globals);
+                    let errors = parsing_errors.into_storage();
+                    let after_initial_parse_cp = CheckPoint::checkpoint(&errors, &resolved_globals);
 
                     let md = Module{
                         link_info: LinkInfo {
@@ -118,9 +114,10 @@ pub fn gather_initial_file_data(builder : &mut FileBuilder) {
                             name,
                             name_span,
                             span,
-                            errors : parsing_errors,
+                            errors,
                             resolved_globals,
-                            after_initial_parse_cp
+                            after_initial_parse_cp,
+                            after_flatten_cp : None
                         },
                         instructions : FlatAlloc::new(),
                         module_ports : ModulePorts{

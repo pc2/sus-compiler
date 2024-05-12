@@ -9,7 +9,7 @@ use lsp_types::notification::Notification;
 use crate::{
     arena_alloc::ArenaVector,
     compiler_top::{add_file, recompile_all, update_file},
-    errors::{CompileError, ErrorCollector, ErrorLevel},
+    errors::{CompileError, ErrorLevel},
     file_position::{FileText, LineCol, Span},
     flattening::{FlatID, IdentifierType, Instruction, Module, WireInstance, WireReference, WireReferenceRoot, WireSource},
     instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER},
@@ -215,7 +215,7 @@ fn cvt_span_to_lsp_range(ch_sp : Span, file_text : &FileText) -> lsp_types::Rang
 }
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn convert_diagnostic(err : CompileError, main_file_text : &FileText, linker : &Linker, uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
+fn convert_diagnostic(err : &CompileError, main_file_text : &FileText, linker : &Linker, uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
     assert!(main_file_text.is_span_valid(err.position), "bad error: {}", err.reason);
     let error_pos = cvt_span_to_lsp_range(err.position, main_file_text);
 
@@ -224,39 +224,16 @@ fn convert_diagnostic(err : CompileError, main_file_text : &FileText, linker : &
         ErrorLevel::Warning => DiagnosticSeverity::WARNING,
     };
     let mut related_info = Vec::new();
-    for info in err.infos {
+    for info in &err.infos {
         let info_file_text = &linker.files[info.file].file_text;
         let file_name = uris[info.file].to_string();
         let info_span = info.position;
         assert!(info_file_text.is_span_valid(info_span), "bad info in {file_name}:\n{}; in err: {}.\nSpan is {info_span}, but file length is {}", info.info, err.reason, info_file_text.len());
         let info_pos = cvt_span_to_lsp_range(info_span, info_file_text);
         let location = Location{uri : uris[info.file].clone(), range : info_pos};
-        related_info.push(DiagnosticRelatedInformation { location, message: info.info });
+        related_info.push(DiagnosticRelatedInformation { location, message: info.info.clone() });
     }
-    Diagnostic::new(error_pos, Some(severity), None, None, err.reason, Some(related_info), None)
-}
-
-// Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn send_errors_warnings(connection: &Connection, errors : ErrorCollector, main_file_text : &FileText, linker : &Linker, uris : &ArenaVector<Url, FileUUIDMarker>) -> Result<(), Box<dyn Error + Sync + Send>> {
-    let mut diag_vec : Vec<Diagnostic> = Vec::new();
-    let (err_vec, file) = errors.get();
-    for err in err_vec {
-        diag_vec.push(convert_diagnostic(err, main_file_text, linker, uris));
-    }
-    
-    let params = &PublishDiagnosticsParams{
-        uri: uris[file].clone(),
-        diagnostics: diag_vec,
-        version: None
-    };
-    let params_json = serde_json::to_value(params)?;
-
-    connection.sender.send(Message::Notification(lsp_server::Notification{
-        method: PublishDiagnostics::METHOD.to_owned(),
-        params: params_json
-    }))?;
-
-    Ok(())
+    Diagnostic::new(error_pos, Some(severity), None, None, err.reason.clone(), Some(related_info), None)
 }
 
 
@@ -397,11 +374,25 @@ fn get_hover_info<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::T
 }
 
 fn push_all_errors(connection: &Connection, file_cache : &LoadedFileCache) -> Result<(), Box<dyn Error + Sync + Send>> {
-    for (uuid, file_data) in &file_cache.linker.files {
-        let errors = file_cache.linker.get_all_errors_in_file(uuid);
-    
-        // println!("Errors: {:?}", &errors);
-        send_errors_warnings(&connection, errors, &file_data.file_text, &file_cache.linker, &file_cache.uris)?;
+    for (file_id, file_data) in &file_cache.linker.files {
+        let mut diag_vec : Vec<Diagnostic> = Vec::new();
+
+        file_cache.linker.for_all_errors_in_file(file_id, |err| {
+            diag_vec.push(convert_diagnostic(err, &file_data.file_text, &file_cache.linker, &file_cache.uris));
+        });
+        
+        let params = &PublishDiagnosticsParams{
+            uri: file_cache.uris[file_id].clone(),
+            diagnostics: diag_vec,
+            version: None
+        };
+        let params_json = serde_json::to_value(params)?;
+
+        connection.sender.send(Message::Notification(lsp_server::Notification{
+            method: PublishDiagnostics::METHOD.to_owned(),
+            params: params_json
+        }))?;
+
     }
     Ok(())
 }
