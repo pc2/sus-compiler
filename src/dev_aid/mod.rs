@@ -1,5 +1,5 @@
 
-pub mod syntax_highlighting;
+pub mod ariadne_interface;
 
 pub mod tree_walk;
 
