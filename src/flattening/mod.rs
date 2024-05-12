@@ -12,7 +12,7 @@ pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, file_position::{BracketSpan, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID}, parser::Documentation, typing::{AbstractType, WrittenType}, value::Value
+    arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID}, parser::Documentation, typing::{AbstractType, WrittenType}, value::Value
 };
 
 use self::initialization::ModulePorts;
@@ -86,19 +86,47 @@ impl Module {
         self.instructions[flat_port].unwrap_wire_declaration()
     }
 
-    #[allow(dead_code)]
-    pub fn print_flattened_module(&self) {
+    pub fn make_port_info_string(&self, port_id : PortID, file_text : &FileText) -> String {
+        let port = &self.module_ports.ports[port_id];
+        let port_direction = if port.id_typ == IdentifierType::Input {"input"} else {"output"};
+        format!("{port_direction} {}", &file_text[port.decl_span])
+    }
+
+    pub fn make_all_ports_info_string(&self, file_text : &FileText) -> String {
+        let mut result = String::new();
+
+        for (port_id, _) in &self.module_ports.ports {
+            result.push_str("\n    ");
+            result.push_str(&self.make_port_info_string(port_id, file_text));
+        }
+
+        result
+    }
+
+    pub fn print_flattened_module(&self, file_text : &FileText) {
         println!("[[{}]]:", self.link_info.name);
         println!("Interface:");
-        for (_port_id, port) in &self.module_ports.ports {
-            let port_direction = if port.id_typ == IdentifierType::Input {"input"} else {"output"};
-            let port_name = &port.name;
-            println!("    {port_direction} {port_name} -> {:?}", port);
+        for (port_id, port) in &self.module_ports.ports {
+            println!("    {} -> {:?}", self.make_port_info_string(port_id, file_text), port);
         }
         println!("Instantiations:");
         for (id, inst) in &self.instructions {
             println!("    {:?}: {:?}", id, inst);
         }
+    }
+
+    /// Get a port by the given name. Reports non existing ports errors
+    pub fn get_port_by_name(&self, name_span : Span, file_text : &FileText, errors : &ErrorCollector) -> Option<PortID> {
+        let name_text = &file_text[name_span];
+        for (id, data) in &self.module_ports.ports {
+            if data.name == name_text {
+                return Some(id)
+            }
+        }
+        errors
+            .error(name_span, format!("There is no port '{name_text}' on module {}", self.link_info.name))
+            .info_obj(self);
+        return None
     }
 }
 
@@ -127,15 +155,15 @@ pub enum WireReferencePathElement {
 
 #[derive(Debug, Clone, Copy)]
 pub enum WireReferenceRoot {
-    LocalDecl(FlatID),
-    NamedConstant(ConstantUUID),
+    LocalDecl(FlatID, Span),
+    NamedConstant(ConstantUUID, Span),
     SubModulePort(PortInfo)
 }
 
 impl WireReferenceRoot {
     #[track_caller]
     pub fn unwrap_decl(&self) -> FlatID {
-        let Self::LocalDecl(decl) = self else {unreachable!()};
+        let Self::LocalDecl(decl, _) = self else {unreachable!()};
         *decl
     }
     #[track_caller]
@@ -148,8 +176,8 @@ impl WireReferenceRoot {
 impl WireReferenceRoot {
     pub fn get_root_flat(&self) -> Option<FlatID> {
         match self {
-            WireReferenceRoot::LocalDecl(f) => Some(*f),
-            WireReferenceRoot::NamedConstant(_) => None,
+            WireReferenceRoot::LocalDecl(f, _) => Some(*f),
+            WireReferenceRoot::NamedConstant(_, _) => None,
             WireReferenceRoot::SubModulePort(port) => Some(port.submodule_flat),
         }
     }
@@ -161,7 +189,6 @@ impl WireReferenceRoot {
 #[derive(Debug)]
 pub struct WireReference {
     pub root : WireReferenceRoot,
-    pub root_span : Span,
     pub path : Vec<WireReferencePathElement>,
     pub span : Span
 }
@@ -170,7 +197,6 @@ impl WireReference {
     fn simple_port(span : Span, port : PortInfo) -> WireReference {
         WireReference{
             root : WireReferenceRoot::SubModulePort(port),
-            root_span : span,
             path : Vec::new(),
             span
         }
@@ -301,6 +327,7 @@ impl core::fmt::Display for BinaryOperator {
 
 #[derive(Debug, Clone, Copy)]
 pub struct PortInfo {
+    pub submodule_name_span : Span,
     pub submodule_flat : FlatID,
     pub port : PortID,
     /// Only set if the port is named as an explicit field. If the port name is implicit, such as in the function call syntax, then it is not present. 
@@ -322,8 +349,8 @@ impl WireSource {
         match self {
             WireSource::WireRead(from_wire) => {
                 match &from_wire.root {
-                    WireReferenceRoot::LocalDecl(decl_id) => func(*decl_id),
-                    WireReferenceRoot::NamedConstant(_) => {}
+                    WireReferenceRoot::LocalDecl(decl_id, _) => func(*decl_id),
+                    WireReferenceRoot::NamedConstant(_, _) => {}
                     WireReferenceRoot::SubModulePort(submod_port) => func(submod_port.submodule_flat),
                 }
             }

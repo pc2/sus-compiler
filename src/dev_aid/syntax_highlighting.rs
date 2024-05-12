@@ -2,12 +2,7 @@
 use std::{ops::Range, path::PathBuf};
 
 use crate::{
-    arena_alloc::ArenaVector,
-    compiler_top::{add_file, recompile_all},
-    errors::{CompileError, ErrorLevel},
-    file_position::Span,
-    flattening::{IdentifierType, Instruction, Module, WireReference, WireReferenceRoot, WireSource},
-    linker::{FileUUID, FileUUIDMarker, Linker, NameElem}
+    arena_alloc::ArenaVector, compiler_top::{add_file, recompile_all}, config::config, errors::{CompileError, ErrorLevel}, file_position::Span, flattening::{IdentifierType, Instruction, Module, WireReference, WireReferenceRoot, WireSource}, linker::{FileUUID, FileUUIDMarker, Linker, NameElem}
 };
 
 use ariadne::*;
@@ -20,18 +15,14 @@ pub enum IDEIdentifierType {
     Constant
 }
 
-pub struct SyntaxHighlightSettings {
-    pub show_tokens : bool
-}
-
 pub fn walk_name_color_wireref(module : &Module, wire_ref : &WireReference, result : &mut Vec<(IDEIdentifierType, Span)>) {
     match &wire_ref.root {
-        WireReferenceRoot::LocalDecl(decl_id) => {
+        WireReferenceRoot::LocalDecl(decl_id, span) => {
             let decl = module.instructions[*decl_id].unwrap_wire_declaration();
-            result.push((IDEIdentifierType::Value(decl.identifier_type), wire_ref.root_span));
+            result.push((IDEIdentifierType::Value(decl.identifier_type), *span));
         }
-        WireReferenceRoot::NamedConstant(_cst) => {
-            result.push((IDEIdentifierType::Constant, wire_ref.root_span));
+        WireReferenceRoot::NamedConstant(_cst, span) => {
+            result.push((IDEIdentifierType::Constant, *span));
         }
         WireReferenceRoot::SubModulePort(port) => {
             if let Some(span) = port.port_name_span {
@@ -181,7 +172,7 @@ pub fn pretty_print_spans_in_reverse_order(file_text : String, spans : Vec<Range
         let config = 
             Config::default()
             .with_index_type(IndexType::Byte)
-            .with_color(false); // Disable color because LSP output doesn't support it
+            .with_color(!config().use_lsp); // Disable color because LSP output doesn't support it
     
         let mut report: ReportBuilder<'_, Range<usize>> = Report::build(ReportKind::Advice, (), span.start).with_config(config);
         report = report

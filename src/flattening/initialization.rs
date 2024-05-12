@@ -35,16 +35,6 @@ pub struct ModulePorts {
 impl ModulePorts {
     pub const MAIN_INTERFACE_ID : InterfaceID = InterfaceID::from_hidden_value(0);
 
-    /// Get a port by the given name. Returns None if it does not exist
-    pub fn get_port_by_name(&self, name : &str) -> Option<PortID> {
-        for (id, data) in &self.ports {
-            if data.name == name {
-                return Some(id)
-            }
-        }
-        return None
-    }
-
     /// This function is intended to retrieve a known port while walking the syntax tree. panics if the port doesn't exist
     pub fn get_port_by_decl_span(&self, span : Span) -> PortID {
         for (id, data) in &self.ports {

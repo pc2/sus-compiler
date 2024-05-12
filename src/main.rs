@@ -14,6 +14,7 @@ mod value;
 mod flattening;
 mod instantiation;
 mod debug;
+mod config;
 
 #[cfg(feature = "codegen")]
 mod codegen;
@@ -28,11 +29,11 @@ mod linker;
 mod compiler_top;
 
 use std::io::Write;
-use std::{env, ops::Deref};
+use std::ops::Deref;
 use std::error::Error;
 use std::fs::File;
-use std::path::PathBuf;
 use compiler_top::instantiate;
+use config::{config, parse_args};
 use flattening::Module;
 use codegen_fallback::gen_verilog_code;
 use dev_aid::syntax_highlighting::*;
@@ -57,88 +58,22 @@ fn codegen_to_file(linker : &Linker, id : ModuleUUID, md : &Module) -> Option<()
 }
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
-    let mut args = env::args();
-
-    let _executable_path = args.next();
-
-    let mut file_paths : Vec<PathBuf> = Vec::new();
-    let mut is_lsp = None;
-    let mut lsp_port = 25000;
-    let mut codegen = None;
-    let mut codegen_all = false;
-    let mut settings = SyntaxHighlightSettings{
-        show_tokens : false
-    };
+    let file_paths = parse_args();
     
-    while let Some(arg) = args.next() {
-        if arg.starts_with("-") {
-            if let Some((name, value)) = arg.split_once("=") {
-                match name {
-                    "--socket" => {
-                        lsp_port = u16::from_str_radix(value, 10).unwrap();
-                    }
-                    other => panic!("Unknown option {other}"),
-                }
-            } else {
-                match arg.as_str() {
-                    "--lsp" => {
-                        is_lsp = Some(false);
-                    }
-                    "--lsp-debug" => {
-                        is_lsp = Some(true);
-                    }
-                    "--codegen" => {
-                        codegen = Some(args.next().expect("Expected a module name after --codegen"));
-                    }
-                    "--codegen-all" => {
-                        codegen_all = true;
-                    }
-                    "--tokens" => {
-                        settings.show_tokens = true;
-                    }
-                    other => {
-                        panic!("Unknown option {other}");
-                    }
-                }
-            }
-        } else {
-            file_paths.push(PathBuf::from(arg));
-        }
-    }
-    
-    if let Some(debug) = is_lsp {
+    let config = config();
+
+    if config.use_lsp {
         #[cfg(feature = "lsp")]
-        return dev_aid::lsp::lsp_main(lsp_port, debug);
+        return dev_aid::lsp::lsp_main();
 
         #[cfg(not(feature = "lsp"))]
         panic!("LSP not enabled!")
-    }
-    if file_paths.len() == 0 {
-        // Quick debugging
-        file_paths.push(PathBuf::from("resetNormalizer.sus"));
-        file_paths.push(PathBuf::from("multiply_add.sus"));
-        file_paths.push(PathBuf::from("tinyTestFile.sus"));
-        codegen_all = true;
-        //codegen = Some("first_bit_idx_6".to_owned());
     }
 
     let (linker, mut paths_arena) = compile_all(file_paths);
     print_all_errors(&linker, &mut paths_arena);
     
-    // #[cfg(feature = "codegen")]
-    if let Some(module_name) = codegen {
-        //let gen_ctx = codegen::GenerationContext::new();
-        
-        let Some(id) = linker.get_module_id(&module_name) else {
-            panic!("Module {module_name} does not exist!");
-        };
-
-        let md = &linker.modules[id];
-        
-        codegen_to_file(&linker, id, md);
-    }
-
-    if codegen_all {
+    if config.codegen {
         for (id, md) in &linker.modules {
             codegen_to_file(&linker, id, md);
         }

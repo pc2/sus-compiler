@@ -120,8 +120,9 @@ pub struct ResolvedName<'err_and_globals> {
 
 impl<'err_and_globals> ResolvedName<'err_and_globals> {
     pub fn not_expected_global_error(self, expected : &str) {
+        let Some(name_elem) = self.name_elem else {return}; // Error already reported when grabbing object
         // SAFETY: The allocated linker objects aren't going to change. 
-        let info = unsafe{&*self.linker}.get_linking_error_location(self.name_elem.unwrap());
+        let info = unsafe{&*self.linker}.get_linking_error_location(name_elem);
         let name = &info.full_name;
         let global_type = info.named_type;
         let err_ref = self.errors.error(self.span, format!("{name} is not a {expected}, it is a {global_type} instead!"));

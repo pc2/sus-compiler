@@ -294,7 +294,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         let mut real_path = Vec::new();
 
         let root = match &wire_ref.root {
-            &WireReferenceRoot::LocalDecl(decl_id) => {
+            &WireReferenceRoot::LocalDecl(decl_id, _) => {
                 match &self.generation_state[decl_id] {
                     SubModuleOrWire::Wire(w) => RealWireRefRoot::Wire(*w),
                     SubModuleOrWire::CompileTimeValue(_) => RealWireRefRoot::Generative(decl_id),
@@ -302,7 +302,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     SubModuleOrWire::Unnasigned => unreachable!(),
                 }
             }
-            WireReferenceRoot::NamedConstant(cst) => {
+            WireReferenceRoot::NamedConstant(cst, _) => {
                 let NamedConstant::Builtin{name:_, val} = &self.linker.constants[*cst];
                 RealWireRefRoot::Constant(val.clone())
             }

@@ -3,7 +3,7 @@ use std::rc::Rc;
 use tree_sitter::Parser;
 
 use crate::{
-    debug::SpanDebugger, errors::ErrorStore, file_position::FileText, flattening::{flatten_all_modules, gather_initial_file_data, typecheck_all_modules, Module}, instantiation::InstantiatedModule, linker::{FileData, FileUUID, Linker, ModuleUUID}
+    config::config, debug::SpanDebugger, errors::ErrorStore, file_position::FileText, flattening::{flatten_all_modules, gather_initial_file_data, typecheck_all_modules, Module}, instantiation::InstantiatedModule, linker::{FileData, FileUUID, Linker, ModuleUUID}
 };
 
 pub fn add_file(text : String, linker : &mut Linker) -> FileUUID {
@@ -58,6 +58,12 @@ pub fn recompile_all(linker : &mut Linker) {
 
     flatten_all_modules(linker);
     typecheck_all_modules(linker);
+
+    if config().debug_flattened {
+        for (_, md) in &linker.modules {
+            md.print_flattened_module(&linker.files[md.link_info.file].file_text);
+        }
+    }
 
     // Make an initial instantiation of all modules
     // Won't be possible once we have template modules

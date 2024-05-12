@@ -71,11 +71,11 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
     fn get_wire_ref_declaration_point(&self, wire_ref_root : &WireReferenceRoot) -> Option<SpanFile> {
         match wire_ref_root {
-            WireReferenceRoot::LocalDecl(id) => {
+            WireReferenceRoot::LocalDecl(id, _) => {
                 let decl_root = self.working_on.instructions[*id].unwrap_wire_declaration();
                 Some((decl_root.get_span(), self.errors.file))
             },
-            WireReferenceRoot::NamedConstant(cst) => {
+            WireReferenceRoot::NamedConstant(cst, _) => {
                 let linker_cst = &self.constants[*cst];
                 linker_cst.get_span_file()
             }
@@ -88,11 +88,11 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
     fn get_type_of_wire_reference(&self, wire_ref : &WireReference) -> AbstractType {
         let mut write_to_type = match &wire_ref.root {
-            WireReferenceRoot::LocalDecl(id) => {
+            WireReferenceRoot::LocalDecl(id, _) => {
                 let decl_root = self.working_on.instructions[*id].unwrap_wire_declaration();
                 decl_root.typ.clone()
             },
-            WireReferenceRoot::NamedConstant(cst) => {
+            WireReferenceRoot::NamedConstant(cst, _) => {
                 let linker_cst = &self.constants[*cst];
                 linker_cst.get_abstract_type()
             }
@@ -203,11 +203,11 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
     fn get_root_identifier_type(&self, wire_ref_root : &WireReferenceRoot) -> IdentifierType {
         match wire_ref_root {
-            WireReferenceRoot::LocalDecl(decl_id) => {
+            WireReferenceRoot::LocalDecl(decl_id, _) => {
                 let decl = self.working_on.instructions[*decl_id].unwrap_wire_declaration();
                 decl.identifier_type
             }
-            WireReferenceRoot::NamedConstant(_) => {
+            WireReferenceRoot::NamedConstant(_, _) => {
                 IdentifierType::Generative
             }
             WireReferenceRoot::SubModulePort(port) => {
@@ -219,11 +219,11 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
     fn get_root_identifier_read_only(&self, wire_ref_root : &WireReferenceRoot) -> bool {
         match wire_ref_root {
-            WireReferenceRoot::LocalDecl(decl_id) => {
+            WireReferenceRoot::LocalDecl(decl_id, _) => {
                 let decl = self.working_on.instructions[*decl_id].unwrap_wire_declaration();
                 decl.read_only
             }
-            WireReferenceRoot::NamedConstant(_) => {
+            WireReferenceRoot::NamedConstant(_, _) => {
                 true
             }
             WireReferenceRoot::SubModulePort(port) => {
@@ -297,12 +297,12 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
     fn generative_check_write(&self, conn: &Write, declaration_depths: &mut FlatAlloc<Option<usize>, FlatIDMarker>, runtime_if_stack: &mut Vec<(UUID<FlatIDMarker>, Span)>) {
         let (decl, file) = match conn.to.root {
-            WireReferenceRoot::LocalDecl(decl_id) => {
+            WireReferenceRoot::LocalDecl(decl_id, _) => {
                 let decl = self.working_on.instructions[decl_id].unwrap_wire_declaration();
                 (decl, self.errors.file)
             }
-            WireReferenceRoot::NamedConstant(_) => {
-                self.errors.error(conn.to.root_span, "Cannot assign to a global");
+            WireReferenceRoot::NamedConstant(_, span) => {
+                self.errors.error(span, "Cannot assign to a global");
                 return;
             }
             WireReferenceRoot::SubModulePort(port) => {

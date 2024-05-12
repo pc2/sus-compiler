@@ -2,7 +2,7 @@
 
 use std::cell::RefCell;
 
-use crate::{arena_alloc::ArenaAllocator, file_position::{Span, SpanFile}, flattening::Declaration, linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker, LinkInfo}};
+use crate::{arena_alloc::ArenaAllocator, file_position::{Span, SpanFile}, flattening::{Declaration, Module}, linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker, LinkInfo}};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ErrorLevel {
@@ -143,38 +143,45 @@ impl<'ec> ErrorReference<'ec> {
         self.info((span, self.err_collector.file), reason)
     }
     pub fn info_obj<Obj : FileKnowingErrorInfoObject>(&self, obj : &Obj) -> &Self {
-        let ((position, file), info) = obj.make_global_info();
+        let ((position, file), info) = obj.make_global_info(&self.err_collector.files);
         self.existing_info(ErrorInfo{ position, file, info })
     }
     pub fn info_obj_same_file<Obj : ErrorInfoObject>(&self, obj : &Obj) -> &Self {
-        let (position, info) = obj.make_info();
+        let (position, info) = obj.make_info(&self.err_collector.files[self.err_collector.file]);
         self.existing_info(ErrorInfo{ position, file : self.err_collector.file, info })
     }
     pub fn info_obj_different_file<Obj : ErrorInfoObject>(&self, obj : &Obj, file : FileUUID) -> &Self {
-        let (position, info) = obj.make_info();
+        let (position, info) = obj.make_info(&self.err_collector.files[file]);
         self.existing_info(ErrorInfo{ position, file, info })
     }
 }
 
 /// This represents objects that can be given as info to an error in a straight-forward way. 
 pub trait ErrorInfoObject {
-    fn make_info(&self) -> (Span, String);
+    fn make_info(&self, file_data : &FileData) -> (Span, String);
 }
 
 pub trait FileKnowingErrorInfoObject {
-    fn make_global_info(&self) -> ((Span, FileUUID), String);
+    fn make_global_info(&self, files : &ArenaAllocator<FileData, FileUUIDMarker>) -> ((Span, FileUUID), String);
 }
 
 // Trait implementations in the compiler
 
 impl ErrorInfoObject for Declaration {
-    fn make_info(&self) -> (Span, String) {
+    fn make_info(&self, _file_data : &FileData) -> (Span, String) {
         (self.get_span(), format!("'{}' declared here", &self.name))
     }
 }
 
 impl FileKnowingErrorInfoObject for LinkInfo {
-    fn make_global_info(&self) -> ((Span, FileUUID), String) {
+    fn make_global_info(&self, _files : &ArenaAllocator<FileData, FileUUIDMarker>) -> ((Span, FileUUID), String) {
         ((self.name_span, self.file), format!("'{}' defined here", &self.name))
+    }
+}
+
+impl FileKnowingErrorInfoObject for Module {
+    fn make_global_info(&self, files : &ArenaAllocator<FileData, FileUUIDMarker>) -> ((Span, FileUUID), String) {
+        let ports_str = self.make_all_ports_info_string(&files[self.link_info.file].file_text);
+        ((self.link_info.name_span, self.link_info.file), format!("Module '{}' defined here. {}", &self.link_info.name, ports_str))
     }
 }

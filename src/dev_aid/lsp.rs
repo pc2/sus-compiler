@@ -7,15 +7,7 @@ use lsp_server::{Connection, Message, Response};
 use lsp_types::notification::Notification;
 
 use crate::{
-    arena_alloc::ArenaVector,
-    compiler_top::{add_file, recompile_all, update_file},
-    errors::{CompileError, ErrorLevel},
-    file_position::{FileText, LineCol, Span},
-    flattening::{FlatID, IdentifierType, Instruction, Module, WireInstance, WireReference, WireReferenceRoot, WireSource},
-    instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER},
-    linker::{FileData, FileUUID, FileUUIDMarker, Linker, NameElem},
-    typing::WrittenType,
-    walk_name_color
+    arena_alloc::ArenaVector, compiler_top::{add_file, recompile_all, update_file}, config::config, errors::{CompileError, ErrorLevel}, file_position::{FileText, LineCol, Span, SpanFile}, flattening::{FlatID, IdentifierType, Instruction, Module, PortID, WireInstance, WireReference, WireReferenceRoot, WireSource}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, ModuleUUID, NameElem}, typing::WrittenType, walk_name_color
 };
 
 use super::syntax_highlighting::IDEIdentifierType;
@@ -56,7 +48,7 @@ impl LoadedFileCache {
     }
 }
 
-pub fn lsp_main(port : u16, debug : bool) -> Result<(), Box<dyn Error + Sync + Send>> {
+pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
     std::env::set_var("RUST_BACKTRACE", "1"); // Enable backtrace because I can't set it in Env vars
     
     println!("starting LSP server");
@@ -64,8 +56,8 @@ pub fn lsp_main(port : u16, debug : bool) -> Result<(), Box<dyn Error + Sync + S
     // Create the transport. Includes the stdio (stdin and stdout) versions but this could
     // also be implemented to use sockets or HTTP.
     //let (connection, io_threads) = Connection::listen(SocketAddr::from(([127,0,0,1], 25000)))?;
-    println!("Connecting on port {}...", port);
-    let (connection, io_threads) = Connection::connect(SocketAddr::from(([127,0,0,1], port)))?;
+    println!("Connecting on port {}...", config().lsp_port);
+    let (connection, io_threads) = Connection::connect(SocketAddr::from(([127,0,0,1], config().lsp_port)))?;
     println!("connection established");
     
     // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
@@ -120,7 +112,7 @@ pub fn lsp_main(port : u16, debug : bool) -> Result<(), Box<dyn Error + Sync + S
     })
     .unwrap();
     let initialization_params = connection.initialize(server_capabilities)?;
-    main_loop(connection, initialization_params, debug)?;
+    main_loop(connection, initialization_params)?;
     io_threads.join()?;
 
     // Shut down gracefully.
@@ -242,7 +234,8 @@ enum LocationInfo<'linker> {
     WireRef(&'linker Module, FlatID),
     Temporary(&'linker Module, FlatID, &'linker WireInstance),
     Type(&'linker WrittenType),
-    Global(NameElem)
+    Global(NameElem),
+    Port(PortID, ModuleUUID)
 }
 
 struct HoverContext<'linker> {
@@ -265,15 +258,17 @@ impl<'linker> HoverContext<'linker> {
 
     fn gather_info_wire_ref(&mut self, md : &'linker Module, wire_ref : &'linker WireReference) {
         match &wire_ref.root {
-            WireReferenceRoot::LocalDecl(decl_id) => {
-                self.update(wire_ref.root_span, LocationInfo::WireRef(md, *decl_id));
+            WireReferenceRoot::LocalDecl(decl_id, span) => {
+                self.update(*span, LocationInfo::WireRef(md, *decl_id));
             }
-            WireReferenceRoot::NamedConstant(cst) => {
-                self.update(wire_ref.root_span, LocationInfo::Global(NameElem::Constant(*cst)))
+            WireReferenceRoot::NamedConstant(cst, span) => {
+                self.update(*span, LocationInfo::Global(NameElem::Constant(*cst)))
             }
             WireReferenceRoot::SubModulePort(port) => {
+                self.update(port.submodule_name_span, LocationInfo::WireRef(md, port.submodule_flat));
                 if let Some(span) = port.port_name_span {
-                    todo!("LSP for named ports");
+                    span.debug();
+                    self.update(span, LocationInfo::Port(port.port, md.instructions[port.submodule_flat].unwrap_submodule().module_uuid))
                 }
             }
         }
@@ -470,7 +465,7 @@ fn gather_completions(linker : &Linker, file_id : FileUUID, position : usize) ->
     result
 }
 
-fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut LoadedFileCache, debug : bool) -> Result<serde_json::Value, serde_json::Error> {
+fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut LoadedFileCache) -> Result<serde_json::Value, serde_json::Error> {
     match method {
         request::HoverRequest::METHOD => {
             let params : HoverParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
@@ -479,7 +474,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
             file_cache.ensure_contains_file(&params.text_document_position_params.text_document.uri);
             serde_json::to_value(&if let Some((file_data, info, range)) = get_hover_info(&file_cache, &params.text_document_position_params) {
                 let mut hover_list : Vec<MarkedString> = Vec::new();
-                if debug {
+                if config().lsp_debug_mode {
                     hover_list.push(MarkedString::String(format!("{info:?}")))
                 } else {
                     match info {
@@ -508,7 +503,19 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                             if let Some(link_info) = file_cache.linker.get_link_info(global) {
                                 hover_list.push(MarkedString::String(link_info.documentation.to_string(&file_data.file_text)));
                             }
-                            hover_list.push(MarkedString::String(file_cache.linker.get_full_name(global)));
+                            hover_list.push(MarkedString::String(format!("    {}", file_cache.linker.get_full_name(global))));
+                            match global {
+                                NameElem::Module(md_uuid) => {
+                                    let md = &file_cache.linker.modules[md_uuid];
+                                    hover_list.push(MarkedString::String(md.make_all_ports_info_string(&file_cache.linker.files[md.link_info.file].file_text)));
+                                }
+                                NameElem::Type(_) => todo!(),
+                                NameElem::Constant(_) => todo!(),
+                            }
+                        }
+                        LocationInfo::Port(port, md_uuid) => {
+                            let md = &file_cache.linker.modules[md_uuid];
+                            hover_list.push(MarkedString::String(md.make_port_info_string(port, &file_cache.linker.files[md.link_info.file].file_text)));
                         }
                     };
                 }
@@ -522,32 +529,40 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
             println!("GotoDefinition");
 
             file_cache.ensure_contains_file(&params.text_document_position_params.text_document.uri);
-            serde_json::to_value(&if let Some((_file_data, info, _range)) = get_hover_info(&file_cache, &params.text_document_position_params) {
+            
+            let mut goto_definition_list : Vec<SpanFile> = Vec::new();
+
+            if let Some((_file_data, info, _range)) = get_hover_info(&file_cache, &params.text_document_position_params) {
                 match info {
                     LocationInfo::WireRef(md, decl_id) => {
-                        let uri = file_cache.uris[md.link_info.file].clone();
                         let decl = md.instructions[decl_id].unwrap_wire_declaration();
-                        let range = to_position_range(file_cache.linker.files[md.link_info.file].file_text.get_span_linecol_range(decl.name_span));
-                        GotoDefinitionResponse::Scalar(Location{uri, range})
+                        goto_definition_list.push((decl.name_span, md.link_info.file));
                     }
-                    LocationInfo::Temporary(_, _, _) => {
-                        GotoDefinitionResponse::Array(Vec::new())
-                    }
-                    LocationInfo::Type(_) => {
-                        GotoDefinitionResponse::Array(Vec::new())
-                    }
+                    LocationInfo::Temporary(_, _, _) => {}
+                    LocationInfo::Type(_) => {}
                     LocationInfo::Global(id) => {
                         if let Some(link_info) = file_cache.linker.get_link_info(id) {
-                            let uri = file_cache.uris[link_info.file].clone();
-                            let range = to_position_range(file_cache.linker.files[link_info.file].file_text.get_span_linecol_range(link_info.name_span));
-                            GotoDefinitionResponse::Scalar(Location{uri, range})
-                        } else {
-                            GotoDefinitionResponse::Array(Vec::new())
+                            goto_definition_list.push((link_info.name_span, link_info.file));
                         }
                     }
+                    LocationInfo::Port(port_id, md_uuid) => {
+                        let md = &file_cache.linker.modules[md_uuid];
+                        let port = &md.module_ports.ports[port_id];
+                        goto_definition_list.push((port.name_span, md.link_info.file));
+                    }
                 }
+            }
+
+            let cvt = |(span, file)| {
+                let uri = file_cache.uris[file].clone();
+                let range = to_position_range(file_cache.linker.files[file].file_text.get_span_linecol_range(span));
+                Location{uri, range}
+            };
+            
+            serde_json::to_value(&if goto_definition_list.len() == 1 {
+                GotoDefinitionResponse::Scalar(cvt(goto_definition_list[0]))
             } else {
-                GotoDefinitionResponse::Array(Vec::new())
+                GotoDefinitionResponse::Array(goto_definition_list.into_iter().map(cvt).collect())
             })
         }
         request::SemanticTokensFullRequest::METHOD => {
@@ -616,7 +631,7 @@ fn handle_notification(connection: &Connection, notification : lsp_server::Notif
     Ok(())
 }
 
-fn main_loop(connection: Connection, initialize_params: serde_json::Value, debug : bool) -> Result<(), Box<dyn Error + Sync + Send>> {
+fn main_loop(connection: Connection, initialize_params: serde_json::Value) -> Result<(), Box<dyn Error + Sync + Send>> {
     let initialize_params: InitializeParams = serde_json::from_value(initialize_params).unwrap();
 
     let mut file_cache = initialize_all_files(&initialize_params);
@@ -632,7 +647,7 @@ fn main_loop(connection: Connection, initialize_params: serde_json::Value, debug
                     return Ok(());
                 }
 
-                let response_value = handle_request(&req.method, req.params, &mut file_cache, debug);
+                let response_value = handle_request(&req.method, req.params, &mut file_cache);
 
                 let result = response_value.unwrap();
                 let response = Response{id : req.id, result: Some(result), error: None};

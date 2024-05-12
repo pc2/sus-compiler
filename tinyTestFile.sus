@@ -12,3 +12,7 @@ module port_names : int i -> int o, int o2 {
 	o = np.out_port
 	o2 = np.out_port_two
 }
+
+module func_call : int i -> int o, int o2 {
+	o, o2 = named_ports(i)
+}

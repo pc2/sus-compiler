@@ -683,4 +683,18 @@ module monotonize_down : bool[16] mbf -> bool[16] mtDown {
 }
 
 
+module submodule_named_ports : int port_a, int port_b -> int port_c {
+	port_c = port_a + port_b
+}
 
+module use_submodule_named_ports : int i -> int o {
+	submodule_named_ports sm
+
+	o = sm(i, i)
+
+	sm.port_a = i
+
+	sm.port_b = i
+
+	o = sm.port_c
+}

@@ -287,7 +287,7 @@ impl Linker {
             NameElem::Constant(id) => self.constants[id].get_linking_error_location(),
         }
     }
-    fn get_duplicate_declaration_errors<F : FnMut(&CompileError)>(&self, file_uuid : FileUUID, f : &mut F) {
+    fn for_all_duplicate_declaration_errors<F : FnMut(&CompileError)>(&self, file_uuid : FileUUID, f : &mut F) {
         // Conflicting Declarations
         for item in &self.global_namespace {
             let NamespaceElement::Colission(colission) = &item.1 else {continue};
@@ -319,7 +319,7 @@ impl Linker {
         }
     }
 
-    fn for_all_flattening_errors<F : FnMut(&CompileError)>(&self, file_uuid : FileUUID, func : &mut F) {
+    fn for_all_errors_after_compile<F : FnMut(&CompileError)>(&self, file_uuid : FileUUID, func : &mut F) {
         for v in &self.files[file_uuid].associated_values {
             match v {
                 NameElem::Module(md_id) => {
@@ -339,8 +339,8 @@ impl Linker {
         for err in &self.files[file_uuid].parsing_errors {
             f(err);
         }
-        self.get_duplicate_declaration_errors(file_uuid, &mut f);
-        self.for_all_flattening_errors(file_uuid, &mut f);
+        self.for_all_duplicate_declaration_errors(file_uuid, &mut f);
+        self.for_all_errors_after_compile(file_uuid, &mut f);
     }
 
     pub fn remove_everything_in_file(&mut self, file_uuid : FileUUID) -> &mut FileData {
