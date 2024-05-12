@@ -1,6 +1,8 @@
 
+use std::ops::{Deref, DerefMut};
+
 use crate::{
-    errors::ErrorReference, file_position::SpanFile, linker::{ConstantUUIDMarker, FileUUID, Linkable, ModuleUUIDMarker}, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, BOOL_TYPE, INT_TYPE}
+    debug::SpanDebugger, errors::{ErrorCollector, ErrorReference}, file_position::SpanFile, linker::{with_module_editing_context, ConstantUUIDMarker, FileUUID, Linkable, Linker, ModuleUUIDMarker, NamedConstant, NamedType, Resolver, TypeUUIDMarker, WorkingOnResolver}, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, BOOL_TYPE, INT_TYPE}
 };
 
 use super::*;
@@ -32,14 +34,14 @@ pub fn typecheck_all_modules(linker : &mut Linker) {
 
 
 struct TypeCheckingContext<'l, 'errs> {
-    modules : InternalResolver<'l, 'errs, ModuleUUIDMarker, Module>,
+    modules : WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>,
     types : Resolver<'l, 'errs, TypeUUIDMarker, NamedType>,
     constants : Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
     errors : &'errs ErrorCollector<'l>,
 }
 
 impl<'l, 'errs> Deref for TypeCheckingContext<'l, 'errs> {
-    type Target = InternalResolver<'l, 'errs, ModuleUUIDMarker, Module>;
+    type Target = WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>;
 
     fn deref(&self) -> &Self::Target {
         &self.modules

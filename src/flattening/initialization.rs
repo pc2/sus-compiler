@@ -3,23 +3,10 @@ use sus_proc_macro::{field, kind};
 
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{FileText, Span}, flattening::Module, instantiation::InstantiationList, linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals}, parser::Cursor
+    arena_alloc::{FlatAlloc, UUID}, errors::ErrorCollector, file_position::{FileText, Span}, flattening::Module, instantiation::InstantiationList, linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals}, parser::Cursor
 };
 
-use super::{FlatID, IdentifierType};
-
-
-
-pub struct PortIDMarker;
-impl UUIDMarker for PortIDMarker {const DISPLAY_NAME : &'static str = "port_";}
-pub type PortID = UUID<PortIDMarker>;
-
-pub type PortIDRange = UUIDRange<PortIDMarker>;
-
-pub struct InterfaceIDMarker;
-impl UUIDMarker for InterfaceIDMarker {const DISPLAY_NAME : &'static str = "port_";}
-pub type InterfaceID = UUID<InterfaceIDMarker>;
-
+use super::*;
 
 #[derive(Debug)]
 pub struct Port {

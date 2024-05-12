@@ -7,7 +7,7 @@ use crate::{
     compiler_top::instantiate,
     errors::{CompileError, ErrorCollector, ErrorStore},
     file_position::{BracketSpan, Span},
-    flattening::{initialization::PortIDMarker, BinaryOperator, FlatID, FlatIDMarker, FlatIDRange, IdentifierType, Instruction, Module, UnaryOperator, WireInstance, WireReference, WireReferencePathElement, WireReferenceRoot, WireSource, Write, WriteModifiers},
+    flattening::{PortIDMarker, BinaryOperator, FlatID, FlatIDMarker, FlatIDRange, IdentifierType, Instruction, Module, UnaryOperator, WireInstance, WireReference, WireReferencePathElement, WireReferenceRoot, WireSource, Write, WriteModifiers},
     instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError},
     linker::{Linker, ModuleUUID, NamedConstant},
     list_of_lists::ListOfLists,
@@ -17,7 +17,7 @@ use crate::{
 
 use self::latency_algorithm::SpecifiedLatency;
 
-pub mod latency_algorithm;
+mod latency_algorithm;
 
 pub struct WireIDMarker;
 impl UUIDMarker for WireIDMarker {const DISPLAY_NAME : &'static str = "wire_";}

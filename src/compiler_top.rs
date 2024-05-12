@@ -3,7 +3,7 @@ use std::rc::Rc;
 use tree_sitter::Parser;
 
 use crate::{
-    debug::SpanDebugger, errors::ErrorStore, file_position::FileText, flattening::{flatten_all_modules, initialization::gather_initial_file_data, typechecking::typecheck_all_modules, Module}, instantiation::InstantiatedModule, linker::{FileData, FileUUID, Linker, ModuleUUID}
+    debug::SpanDebugger, errors::ErrorStore, file_position::FileText, flattening::{flatten_all_modules, gather_initial_file_data, typecheck_all_modules, Module}, instantiation::InstantiatedModule, linker::{FileData, FileUUID, Linker, ModuleUUID}
 };
 
 pub fn add_file(text : String, linker : &mut Linker) -> FileUUID {

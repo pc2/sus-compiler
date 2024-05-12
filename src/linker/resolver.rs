@@ -48,13 +48,13 @@ impl<'linker, 'err_and_globals, IDM : UUIDMarker, T> Index<UUID<IDM>> for Resolv
     }
 }
 
-pub struct InternalResolver<'linker, 'err_and_globals, IDM : UUIDMarker, T> {
+pub struct WorkingOnResolver<'linker, 'err_and_globals, IDM : UUIDMarker, T> {
     pub working_on : &'linker mut T,
     arr : *const ArenaAllocator<T, IDM>,
     resolved_globals : &'err_and_globals RefCell<ResolvedGlobals>
 }
 
-impl<'linker, 'err_and_globals, IDM : UUIDMarker, T> Index<UUID<IDM>> for InternalResolver<'linker, 'err_and_globals, IDM, T> where NameElem : From<UUID<IDM>> {
+impl<'linker, 'err_and_globals, IDM : UUIDMarker, T> Index<UUID<IDM>> for WorkingOnResolver<'linker, 'err_and_globals, IDM, T> where NameElem : From<UUID<IDM>> {
     type Output = T;
 
     fn index<'slf>(&'slf self, index: UUID<IDM>) -> &'slf Self::Output {
@@ -167,7 +167,7 @@ impl<'err_and_globals> ResolvedName<'err_and_globals> {
 ///     pub errors : &'err_and_globals ErrorCollector
 /// }
 pub fn with_module_editing_context<F : for<'linker, 'errs> FnOnce(
-    InternalResolver<'linker, 'errs, ModuleUUIDMarker, Module>,
+    WorkingOnResolver<'linker, 'errs, ModuleUUIDMarker, Module>,
     Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>,
     Resolver<'linker, 'errs, ConstantUUIDMarker, NamedConstant>,
     NameResolver<'linker, 'errs>
@@ -186,7 +186,7 @@ pub fn with_module_editing_context<F : for<'linker, 'errs> FnOnce(
 
     // Use context
     f(
-        InternalResolver{ working_on: md, arr: linker_modules_ptr, resolved_globals},
+        WorkingOnResolver{ working_on: md, arr: linker_modules_ptr, resolved_globals},
         Resolver{ arr: &linker.types, resolved_globals },
         Resolver{ arr: &linker.constants, resolved_globals },
         NameResolver{ file_text: &file.file_text, linker: linker_ptr, errors, resolved_globals }
