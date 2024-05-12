@@ -16,18 +16,6 @@ enum LocalOrGlobal<'l> {
     Global(ResolvedName<'l>)
 }
 
-impl<'l> LocalOrGlobal<'l> {
-    fn expect_local(self, context : &str) -> Option<FlatID> {
-        match self {
-            LocalOrGlobal::Local(local) => Some(local),
-            LocalOrGlobal::Global(global) => {
-                global.errors.error(global.span, format!("Can only use local variables in {context}!"));
-                None
-            }
-        }
-    }
-}
-
 #[derive(Debug)]
 enum PartialWireReference {
     /// Means the error has already been reported
@@ -82,7 +70,10 @@ impl<'l, 'errs> DerefMut for FlatteningContext<'l, 'errs> {
 }
 
 impl<'l, 'errs> FlatteningContext<'l, 'errs> {
-    fn resolve_identifier(&self, identifier_span : Span) -> LocalOrGlobal {
+    /// TODO add namespacing
+    fn resolve_identifier(&self, cursor : &mut Cursor) -> LocalOrGlobal {
+        assert!(cursor.kind() == kind!("global_identifier"));
+        let identifier_span = cursor.span();
         // Possibly local
         let name_text = &self.name_resolver.file_text[identifier_span];
         if let Some(decl_id) = self.local_variable_context.get_declaration_for(name_text) {
@@ -298,34 +289,32 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     fn get_or_alloc_module_by_global_identifier(&mut self, cursor : &mut Cursor) -> Option<(FlatID, Option<Span>)> {
         let (kind, span) = cursor.kind_span();
         if kind == kind!("global_identifier") {
-            cursor.go_down(kind!("global_identifier"), |cursor| {
-                match self.resolve_identifier(span) {
-                    LocalOrGlobal::Local(id) => {
-                        if let Instruction::SubModule(_) = &self.working_on.instructions[id] {
-                            Some((id, Some(span)))
-                        } else {
-                            let decl = self.working_on.instructions[id].unwrap_wire_declaration();
-                            self.errors
-                                .error(span, "Function call syntax is only possible on modules")
-                                .info_obj_same_file(decl);
-                            None
-                        }
-                    }
-                    LocalOrGlobal::Global(global) => {
-                        if let Some(module_uuid) = global.expect_module() {
-                            let documentation = cursor.extract_gathered_comments();
-                            Some((self.working_on.instructions.alloc(Instruction::SubModule(SubModuleInstance{
-                                name : None,
-                                module_uuid,
-                                module_name_span: span,
-                                documentation
-                            })), None))
-                        } else {
-                            None
-                        }
+            match self.resolve_identifier(cursor) {
+                LocalOrGlobal::Local(id) => {
+                    if let Instruction::SubModule(_) = &self.working_on.instructions[id] {
+                        Some((id, Some(span)))
+                    } else {
+                        let decl = self.working_on.instructions[id].unwrap_wire_declaration();
+                        self.errors
+                            .error(span, "Function call syntax is only possible on modules")
+                            .info_obj_same_file(decl);
+                        None
                     }
                 }
-            })
+                LocalOrGlobal::Global(global) => {
+                    if let Some(module_uuid) = global.expect_module() {
+                        let documentation = cursor.extract_gathered_comments();
+                        Some((self.working_on.instructions.alloc(Instruction::SubModule(SubModuleInstance{
+                            name : None,
+                            module_uuid,
+                            module_name_span: span,
+                            documentation
+                        })), None))
+                    } else {
+                        None
+                    }
+                }
+            }
         } else {
             self.errors.error(span, "Module name may not be an expression");
             None
@@ -417,8 +406,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     fn flatten_wire_reference(&mut self, cursor : &mut Cursor) -> PartialWireReference {
         let (kind, expr_span) = cursor.kind_span();
         if kind == kind!("global_identifier") {
-            // TODO add namespacing
-            match self.resolve_identifier(expr_span) {
+            match self.resolve_identifier(cursor) {
                 LocalOrGlobal::Local(decl_id) => {
                     match &self.working_on.instructions[decl_id] {
                         Instruction::SubModule(_) => PartialWireReference::ModuleButNoPort(decl_id, expr_span),

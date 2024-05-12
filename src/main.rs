@@ -36,7 +36,7 @@ use compiler_top::instantiate;
 use config::{config, parse_args};
 use flattening::Module;
 use codegen_fallback::gen_verilog_code;
-use dev_aid::syntax_highlighting::*;
+use dev_aid::ariadne_interface::*;
 use linker::{Linker, ModuleUUID};
 
 fn codegen_to_file(linker : &Linker, id : ModuleUUID, md : &Module) -> Option<()> {
