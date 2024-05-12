@@ -682,15 +682,16 @@ module monotonize_down : bool[16] mbf -> bool[16] mtDown {
 	}
 }
 
-
+// Main module documentation
 module submodule_named_ports : int port_a, int port_b -> int port_c {
 	port_c = port_a + port_b
 }
 
 module use_submodule_named_ports : int i -> int o {
+// Test submodule documentation
 	submodule_named_ports sm
 
-	o = sm(i, i)
+	//o = sm(i, i)
 
 	sm.port_a = i
 

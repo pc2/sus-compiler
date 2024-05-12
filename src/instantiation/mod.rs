@@ -430,7 +430,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
     fn compute_compile_time(&self, wire_inst : &WireInstance) -> Option<TypedValue> {
         Some(match &wire_inst.source {
-            WireSource::WireRead(wire_ref) => {
+            WireSource::WireRef(wire_ref) => {
                 self.compute_compile_time_wireref(wire_ref)?
             }
             &WireSource::UnaryOp{op, right} => {
@@ -476,7 +476,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
     fn wire_to_real_wire(&mut self, w: &WireInstance, typ : ConcreteType, original_wire : FlatID) -> Option<WireID> {
         let source = match &w.source {
-            WireSource::WireRead(wire_ref) => {
+            WireSource::WireRef(wire_ref) => {
                 let (root, path) = self.realize_wire_ref(wire_ref);
                 let root_wire = self.get_wire_ref_root_as_wire(root, original_wire);
 
@@ -537,7 +537,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             needed_until: CALCULATE_LATENCY_LATER
                         })
                     }).collect();
-                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, port_map, name : submodule.name.clone(), module_uuid : submodule.module_uuid}))
+                    let name = if let Some((name, _span)) = &submodule.name {
+                        name.clone()
+                    } else {
+                        self.get_unique_name()
+                    };
+                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, port_map, name, module_uuid : submodule.module_uuid}))
                 }
                 Instruction::Declaration(wire_decl) => {
                     let typ = self.concretize_type(&wire_decl.typ_expr)?;
@@ -570,7 +575,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 }
                 Instruction::Wire(w) => {
                     let typ = match &w.source {
-                        WireSource::WireRead(wire_ref) => {
+                        WireSource::WireRef(wire_ref) => {
                             let (root, path) = self.realize_wire_ref(wire_ref);
 
                             root.get_concrete_type_with_path(self, &path).clone()
@@ -725,7 +730,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             let wire_id = self.generation_state[port_decl_id].unwrap_wire();
             let wire = &self.wires[wire_id];
             
-            InstantiatedPort{ wire: wire_id, is_input: port.id_typ.unwrap_is_input(), absolute_latency: CALCULATE_LATENCY_LATER, typ : wire.typ.clone()}
+            InstantiatedPort{ wire: wire_id, is_input: port.identifier_type.unwrap_is_input(), absolute_latency: CALCULATE_LATENCY_LATER, typ : wire.typ.clone()}
         }).collect();
         result
     }

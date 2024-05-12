@@ -8,7 +8,7 @@ use crate::{
     arena_alloc::{UUIDRange, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, ResolvedName, Resolver, TypeUUIDMarker, WorkingOnResolver}, parser::Cursor, typing::{AbstractType, WrittenType}, value::Value
 };
 
-use super::{initialization::ModulePorts, name_context::LocalVariableContext};
+use super::name_context::LocalVariableContext;
 use super::*;
 
 enum LocalOrGlobal<'l> {
@@ -180,6 +180,8 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             )} else {None};
             // Parsing components done
 
+            let documentation = cursor.extract_gathered_comments();
+
             let typ_expr = match typ_or_module_expr {
                 ModuleOrWrittenType::WrittenType(typ) => {
                     typ
@@ -191,16 +193,15 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     }
                     let name = &self.name_resolver.file_text[name_span];
                     return self.alloc_declaration(name, whole_declaration_span, Instruction::SubModule(SubModuleInstance{
-                        name : name.to_owned(),
+                        name : Some((name.to_owned(), name_span)),
                         module_uuid,
-                        module_name_span: span
+                        module_name_span: span,
+                        documentation
                     }))
                 }
             };
 
-            let typ_expr_span = typ_expr.get_span();
             let name = &self.name_resolver.file_text[name_span];
-            let documentation = cursor.extract_gathered_comments();
 
             self.alloc_declaration(name, whole_declaration_span, Instruction::Declaration(Declaration{
                 typ : typ_expr.to_type(),
@@ -222,10 +223,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         )
     }
 
-    fn desugar_func_call(&mut self, cursor : &mut Cursor) -> Option<(ModuleUUID, Span, FlatID, PortIDRange)> {
+    fn desugar_func_call(&mut self, cursor : &mut Cursor) -> Option<(ModuleUUID, Option<Span>, FlatID, PortIDRange)> {
         cursor.go_down(kind!("func_call"), |cursor| {
             cursor.field(field!("name"));
-            let submodule_name_span = cursor.span();
             let instantiation_flat_id = self.get_or_alloc_module_by_global_identifier(cursor);
 
             cursor.field(field!("arguments"));
@@ -234,7 +234,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 self.flatten_expr(cursor)
             });
 
-            let instantiation_flat_id = instantiation_flat_id?;
+            let (instantiation_flat_id, submodule_name_span) = instantiation_flat_id?;
             let func_instantiation = self.working_on.instructions[instantiation_flat_id].unwrap_submodule();
 
             
@@ -282,7 +282,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     to: WireReference{
                         root,
                         path : Vec::new(),
-                        span : submodule_name_span,
+                        span : arg_wire_span,
                     },
                     write_modifiers : WriteModifiers::Connection{num_regs : 0, regs_span : arg_wire_span.empty_span_at_front()}
                 }));
@@ -293,14 +293,16 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 
     /// Produces a new [SubModuleInstance] if a global was passed, or a reference to the existing instance if it's referenced by name
-    fn get_or_alloc_module_by_global_identifier(&mut self, cursor : &mut Cursor) -> Option<FlatID> {
+    /// 
+    /// Returns the ID of the [SubModuleInstance], as well as submodule_name_span, if it was a local variable
+    fn get_or_alloc_module_by_global_identifier(&mut self, cursor : &mut Cursor) -> Option<(FlatID, Option<Span>)> {
         let (kind, span) = cursor.kind_span();
         if kind == kind!("global_identifier") {
-            cursor.go_down(kind!("global_identifier"), |_cursor| {
+            cursor.go_down(kind!("global_identifier"), |cursor| {
                 match self.resolve_identifier(span) {
                     LocalOrGlobal::Local(id) => {
                         if let Instruction::SubModule(_) = &self.working_on.instructions[id] {
-                            Some(id)
+                            Some((id, Some(span)))
                         } else {
                             let decl = self.working_on.instructions[id].unwrap_wire_declaration();
                             self.errors
@@ -311,13 +313,13 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     }
                     LocalOrGlobal::Global(global) => {
                         if let Some(module_uuid) = global.expect_module() {
-                            let md = &self.modules[module_uuid];
-                            let name = md.link_info.name.clone();
-                            Some(self.working_on.instructions.alloc(Instruction::SubModule(SubModuleInstance{
-                                name,
+                            let documentation = cursor.extract_gathered_comments();
+                            Some((self.working_on.instructions.alloc(Instruction::SubModule(SubModuleInstance{
+                                name : None,
                                 module_uuid,
-                                module_name_span: span
-                            })))
+                                module_name_span: span,
+                                documentation
+                            })), None))
                         } else {
                             None
                         }
@@ -336,7 +338,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         let submod = &self.modules[submodule.module_uuid];
 
         let port = submod.get_port_by_name(port_name_span, &self.name_resolver.file_text, self.errors)?;
-        Some(PortInfo { submodule_name_span, submodule_flat: submodule_decl, port, port_name_span : Some(port_name_span), port_identifier_typ: submod.module_ports.ports[port].id_typ })
+        Some(PortInfo { submodule_name_span : Some(submodule_name_span), submodule_flat: submodule_decl, port, port_name_span : Some(port_name_span), port_identifier_typ: submod.module_ports.ports[port].identifier_type })
     }
 
     fn flatten_expr(&mut self, cursor : &mut Cursor) -> FlatID {
@@ -378,7 +380,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
 
                 if outputs.len() >= 1 {
-                    WireSource::WireRead(WireReference::simple_port(expr_span, PortInfo{
+                    WireSource::WireRef(WireReference::simple_port(expr_span, PortInfo{
                         submodule_name_span,
                         submodule_flat: submodule,
                         port: outputs.0,
@@ -397,7 +399,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| self.flatten_expr(cursor));
         } else {
             if let Some(wr) = self.flatten_wire_reference(cursor).expect_ready(self) {
-                WireSource::WireRead(wr)
+                WireSource::WireRef(wr)
             } else {
                 WireSource::Constant(Value::Error)
             }
@@ -559,7 +561,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         typ: AbstractType::Unknown,
                         is_compiletime: false,
                         span: func_call_span,
-                        source: WireSource::WireRead(WireReference::simple_port(to.span, PortInfo{
+                        source: WireSource::WireRef(WireReference::simple_port(to.span, PortInfo{
                             submodule_name_span,
                             submodule_flat: submodule,
                             port,

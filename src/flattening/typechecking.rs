@@ -145,7 +145,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 }
                 Instruction::Wire(w) => {
                     let result_typ = match &w.source {
-                        WireSource::WireRead(from_wire) => {
+                        WireSource::WireRef(from_wire) => {
                             self.get_type_of_wire_reference(from_wire)
                         }
                         &WireSource::UnaryOp{op, right} => {
@@ -263,7 +263,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 }
                 Instruction::Wire(wire) => {
                     let mut is_generative = true;
-                    if let WireSource::WireRead(from) = &wire.source {
+                    if let WireSource::WireRef(from) = &wire.source {
                         is_generative = self.get_root_identifier_type(&from.root) == IdentifierType::Generative;
                     } else {
                         wire.source.for_each_dependency(&mut |source_id| {
@@ -391,7 +391,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         let mut wire_to_explore_queue : Vec<FlatID> = Vec::new();
 
         for (_id, port) in &ports.ports {
-            if port.id_typ == IdentifierType::Output {
+            if port.identifier_type == IdentifierType::Output {
                 is_instance_used_map[port.declaration_instruction] = true;
                 wire_to_explore_queue.push(port.declaration_instruction);
 

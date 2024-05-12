@@ -72,7 +72,6 @@ impl Display for Span {
 #[derive(Clone,Copy,Debug,PartialEq,Eq,Hash)]
 pub struct BracketSpan(Span);
 
-#[allow(dead_code)]
 impl BracketSpan {
     pub fn from_outer(span : Span) -> Self {Self(span.debug())}
     pub fn inner_span(&self) -> Span {
@@ -167,11 +166,6 @@ impl FileText {
     pub fn get_span_linecol_range(&self, span : Span) -> Range<LineCol> {
         span.debug();
         self.byte_to_linecol(span.0)..self.byte_to_linecol(span.1)
-    }
-
-    #[allow(dead_code)]
-    pub fn whole_file_span(&self) -> Span {
-        Span(0, self.file_text.len()).debug()
     }
 
     pub fn is_span_valid(&self, span : Span) -> bool {

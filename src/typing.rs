@@ -11,39 +11,9 @@ pub enum WrittenType {
 }
 
 impl WrittenType {
-    pub fn for_each_located_type<F : FnMut(Option<TypeUUID>, Span)>(&self, f : &mut F) {
-        match self {
-            WrittenType::Error(span) => {f(None, *span)}
-            WrittenType::Named(span, id) => {f(Some(*id), *span)}
-            WrittenType::Array(_span, arr_box) => {
-                let (arr, _idx, _br_span) = arr_box.deref();
-                arr.for_each_located_type(f);
-            }
-        }
-    }
-
     pub fn get_span(&self) -> Span {
         match self {
             WrittenType::Error(span) | WrittenType::Named(span, _) | WrittenType::Array(span, _) => *span
-        }
-    }
-
-    pub fn get_deepest_selected(&self, position : usize) -> Option<&WrittenType> {
-        let span = self.get_span();
-        if span.contains_pos(position) {
-            match self {
-                WrittenType::Error(_span) | WrittenType::Named(_span, _) => {}
-                WrittenType::Array(_span, arr_box) => {
-                    let (arr_typ, _idx, _br_span) = arr_box.deref();
-                    let sub = arr_typ.get_deepest_selected(position);
-                    if sub.is_some() {
-                        return sub;
-                    }
-                }
-            }
-            Some(self)
-        } else {
-            None
         }
     }
 

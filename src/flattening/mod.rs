@@ -15,8 +15,6 @@ use crate::{
     arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID}, parser::Documentation, typing::{AbstractType, WrittenType}, value::Value
 };
 
-use self::initialization::ModulePorts;
-
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum IdentifierType {
@@ -88,7 +86,7 @@ impl Module {
 
     pub fn make_port_info_string(&self, port_id : PortID, file_text : &FileText) -> String {
         let port = &self.module_ports.ports[port_id];
-        let port_direction = if port.id_typ == IdentifierType::Input {"input"} else {"output"};
+        let port_direction = if port.identifier_type == IdentifierType::Input {"input"} else {"output"};
         format!("{port_direction} {}", &file_text[port.decl_span])
     }
 
@@ -129,6 +127,46 @@ impl Module {
         return None
     }
 }
+
+
+#[derive(Debug)]
+pub struct Port {
+    pub name : String,
+    pub name_span : Span,
+    pub decl_span : Span,
+    pub identifier_type : IdentifierType,
+    pub interface : InterfaceID,
+    /// This is only set after flattening is done. Initially just [UUID::PLACEHOLDER]
+    pub declaration_instruction : FlatID
+}
+
+#[derive(Debug)]
+pub struct Interface {
+    pub ports_for_this_interface : PortIDRange,
+    pub func_call_inputs : PortIDRange,
+    pub func_call_outputs : PortIDRange
+}
+
+#[derive(Debug)]
+pub struct ModulePorts {
+    pub ports : FlatAlloc<Port, PortIDMarker>,
+    pub interfaces : FlatAlloc<Interface, InterfaceIDMarker>
+}
+
+impl ModulePorts {
+    pub const MAIN_INTERFACE_ID : InterfaceID = InterfaceID::from_hidden_value(0);
+
+    /// This function is intended to retrieve a known port while walking the syntax tree. panics if the port doesn't exist
+    pub fn get_port_by_decl_span(&self, span : Span) -> PortID {
+        for (id, data) in &self.ports {
+            if data.decl_span == span {
+                return id
+            }
+        }
+        unreachable!()
+    }
+}
+
 
 
 pub struct FlatIDMarker;
@@ -327,7 +365,8 @@ impl core::fmt::Display for BinaryOperator {
 
 #[derive(Debug, Clone, Copy)]
 pub struct PortInfo {
-    pub submodule_name_span : Span,
+    /// Even this can be implicit. In the inline function call instantiation syntax there's no named submodule. my_mod(a, b, c)
+    pub submodule_name_span : Option<Span>,
     pub submodule_flat : FlatID,
     pub port : PortID,
     /// Only set if the port is named as an explicit field. If the port name is implicit, such as in the function call syntax, then it is not present. 
@@ -337,7 +376,7 @@ pub struct PortInfo {
 
 #[derive(Debug)]
 pub enum WireSource {
-    WireRead(WireReference), // Used to add a span to the reference of a wire. 
+    WireRef(WireReference), // Used to add a span to the reference of a wire. 
     UnaryOp{op : UnaryOperator, right : FlatID},
     BinaryOp{op : BinaryOperator, left : FlatID, right : FlatID},
     Constant(Value)
@@ -347,7 +386,7 @@ impl WireSource {
     /// Enumerates all instructions that this instruction depends on. This includes (maybe compiletime) wires, and submodules. 
     pub fn for_each_dependency<F : FnMut(FlatID)>(&self, func : &mut F) {
         match self {
-            WireSource::WireRead(from_wire) => {
+            WireSource::WireRef(from_wire) => {
                 match &from_wire.root {
                     WireReferenceRoot::LocalDecl(decl_id, _) => func(*decl_id),
                     WireReferenceRoot::NamedConstant(_, _) => {}
@@ -397,8 +436,10 @@ impl Declaration {
 #[derive(Debug)]
 pub struct SubModuleInstance {
     pub module_uuid : ModuleUUID,
-    pub name : String,
-    pub module_name_span : Span
+    /// Name is not always present in source code. Such as in inline function call syntax: my_mod(a, b, c)
+    pub name : Option<(String, Span)>,
+    pub module_name_span : Span,
+    pub documentation : Documentation
 }
 
 #[derive(Debug)]

@@ -3,48 +3,10 @@ use sus_proc_macro::{field, kind};
 
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUID}, errors::ErrorCollector, file_position::{FileText, Span}, flattening::Module, instantiation::InstantiationList, linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals}, parser::Cursor
+    arena_alloc::{FlatAlloc, UUID}, errors::ErrorCollector, file_position::FileText, flattening::Module, instantiation::InstantiationList, linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals}, parser::Cursor
 };
 
 use super::*;
-
-#[derive(Debug)]
-pub struct Port {
-    pub name : String,
-    pub name_span : Span,
-    pub decl_span : Span,
-    pub id_typ : IdentifierType,
-    pub interface : InterfaceID,
-    /// This is only set after flattening is done. Initially just [UUID::PLACEHOLDER]
-    pub declaration_instruction : FlatID
-}
-
-#[derive(Debug)]
-pub struct Interface {
-    pub ports_for_this_interface : PortIDRange,
-    pub func_call_inputs : PortIDRange,
-    pub func_call_outputs : PortIDRange
-}
-
-#[derive(Debug)]
-pub struct ModulePorts {
-    pub ports : FlatAlloc<Port, PortIDMarker>,
-    pub interfaces : FlatAlloc<Interface, InterfaceIDMarker>
-}
-
-impl ModulePorts {
-    pub const MAIN_INTERFACE_ID : InterfaceID = InterfaceID::from_hidden_value(0);
-
-    /// This function is intended to retrieve a known port while walking the syntax tree. panics if the port doesn't exist
-    pub fn get_port_by_decl_span(&self, span : Span) -> PortID {
-        for (id, data) in &self.ports {
-            if data.decl_span == span {
-                return id
-            }
-        }
-        unreachable!()
-    }
-}
 
 pub fn gather_initial_file_data(builder : &mut FileBuilder) {
     let mut cursor = Cursor::new_at_root(builder.tree, builder.file_text);
@@ -120,7 +82,7 @@ fn gather_decl_names_in_list(id_typ: IdentifierType, interface : InterfaceID, po
             cursor.field(field!("type"));
             let name_span = cursor.field_span(field!("name"), kind!("identifier"));
             let name = file_text[name_span].to_owned();
-            ports.alloc(Port{name, name_span, decl_span, id_typ, interface, declaration_instruction : UUID::PLACEHOLDER})
+            ports.alloc(Port{name, name_span, decl_span, identifier_type: id_typ, interface, declaration_instruction : UUID::PLACEHOLDER})
         });
     });
     ports.range_since(list_start_at)
