@@ -2,7 +2,7 @@
 
 use std::cell::RefCell;
 
-use crate::{arena_alloc::ArenaAllocator, file_position::Span, linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker}};
+use crate::{arena_alloc::ArenaAllocator, file_position::{Span, SpanFile}, flattening::Declaration, linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker, LinkInfo}};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ErrorLevel {
@@ -23,10 +23,6 @@ pub struct CompileError {
     pub reason : String,
     pub infos : Vec<ErrorInfo>,
     pub level : ErrorLevel
-}
-
-pub fn error_info<S : Into<String>>(position : Span, file : FileUUID, reason : S) -> ErrorInfo {
-    ErrorInfo{position, file, info : reason.into()}
 }
 
 /// Stores all errors gathered within a context for reporting to the user. 
@@ -106,33 +102,79 @@ impl<'linker> ErrorCollector<'linker> {
         let rng = span.into_range();
         assert!(rng.end <= self.file_len); // Don't need to verify start, since Span already enforces start <= end
     }
-    fn push_diagnostic(&self, diagnostic : CompileError) {
-        self.assert_span_good(diagnostic.position);
-        for info in &diagnostic.infos {
-            assert!(info.position.into_range().end <= self.files[info.file].file_text.len());
-        }
+    fn push_diagnostic(&self, position : Span, reason : String, level : ErrorLevel) -> ErrorReference<'_> {
+        self.assert_span_good(position);
+        
         let mut store = self.error_store.borrow_mut();
-        store.did_error |= diagnostic.level == ErrorLevel::Error;
-        store.errors.push(diagnostic);
+        store.did_error |= level == ErrorLevel::Error;
+        let pos = store.errors.len();
+        store.errors.push(CompileError{ position, reason, infos: Vec::new(), level });
+        ErrorReference{ err_collector: self, pos }
     }
 
-    pub fn error_basic<S : Into<String>>(&self, position : Span, reason : S) {
-        self.push_diagnostic(CompileError{position, reason : reason.into(), infos : Vec::new(), level : ErrorLevel::Error});
+    pub fn error<S : Into<String>>(&self, position : Span, reason : S)-> ErrorReference<'_> {
+        self.push_diagnostic(position, reason.into(), ErrorLevel::Error)
     }
     
-    pub fn error_with_info<S : Into<String>>(&self, position : Span, reason : S, infos : Vec<ErrorInfo>) {
-        self.push_diagnostic(CompileError{position, reason : reason.into(), infos : infos, level : ErrorLevel::Error});
+    pub fn warn<S : Into<String>>(&self, position : Span, reason : S)-> ErrorReference<'_> {
+        self.push_diagnostic(position, reason.into(), ErrorLevel::Warning)
     }
     
-    pub fn warn_basic<S : Into<String>>(&self, position : Span, reason : S) {
-        self.push_diagnostic(CompileError{position, reason : reason.into(), infos : Vec::new(), level : ErrorLevel::Warning});
-    }
-    
-    pub fn warn_with_info<S : Into<String>>(&self, position : Span, reason : S, infos : Vec<ErrorInfo>) {
-        self.push_diagnostic(CompileError{position, reason : reason.into(), infos : infos, level : ErrorLevel::Warning});
-    }
-
     pub fn did_error(&self) -> bool {
         self.error_store.borrow().did_error
+    }
+}
+
+pub struct ErrorReference<'ec> {
+    err_collector : &'ec ErrorCollector<'ec>,
+    pos : usize
+}
+
+impl<'ec> ErrorReference<'ec> {
+    pub fn existing_info(&self, error_info : ErrorInfo) -> &Self {
+        assert!(error_info.position.debug().into_range().end <= self.err_collector.files[error_info.file].file_text.len());
+        self.err_collector.error_store.borrow_mut().errors[self.pos].infos.push(error_info);
+        self
+    }
+    pub fn info<S : Into<String>>(&self, (span, file) : SpanFile, reason : S) -> &Self {
+        self.existing_info(ErrorInfo{position : span, file, info : reason.into()})
+    }
+    pub fn info_same_file<S : Into<String>>(&self, span : Span, reason : S) -> &Self {
+        self.info((span, self.err_collector.file), reason)
+    }
+    pub fn info_obj<Obj : FileKnowingErrorInfoObject>(&self, obj : &Obj) -> &Self {
+        let ((position, file), info) = obj.make_global_info();
+        self.existing_info(ErrorInfo{ position, file, info })
+    }
+    pub fn info_obj_same_file<Obj : ErrorInfoObject>(&self, obj : &Obj) -> &Self {
+        let (position, info) = obj.make_info();
+        self.existing_info(ErrorInfo{ position, file : self.err_collector.file, info })
+    }
+    pub fn info_obj_different_file<Obj : ErrorInfoObject>(&self, obj : &Obj, file : FileUUID) -> &Self {
+        let (position, info) = obj.make_info();
+        self.existing_info(ErrorInfo{ position, file, info })
+    }
+}
+
+/// This represents objects that can be given as info to an error in a straight-forward way. 
+pub trait ErrorInfoObject {
+    fn make_info(&self) -> (Span, String);
+}
+
+pub trait FileKnowingErrorInfoObject {
+    fn make_global_info(&self) -> ((Span, FileUUID), String);
+}
+
+// Trait implementations in the compiler
+
+impl ErrorInfoObject for Declaration {
+    fn make_info(&self) -> (Span, String) {
+        (self.get_span(), format!("'{}' declared here", &self.name))
+    }
+}
+
+impl FileKnowingErrorInfoObject for LinkInfo {
+    fn make_global_info(&self) -> ((Span, FileUUID), String) {
+        ((self.name_span, self.file), format!("'{}' defined here", &self.name))
     }
 }

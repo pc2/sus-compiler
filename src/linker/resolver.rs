@@ -85,24 +85,25 @@ impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
             Some(NamespaceElement::Colission(coll)) => {
                 resolved_globals.all_resolved = false;
 
-                let decl_infos = coll.iter().map(|collider_global| {
+                let err_ref = self.errors.error(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."));
+                
+                for collider_global in coll.iter() {
                     let err_loc = linker.get_linking_error_location(*collider_global);
-                    if let Some((span, file)) = err_loc.location {
-                        error_info(span, file, format!("{} {} declared here", err_loc.named_type, err_loc.full_name))
+                    if let Some(span_file) = err_loc.location {
+                        err_ref.info(span_file, format!("{} {} declared here", err_loc.named_type, err_loc.full_name));
                     } else {
                         // Kinda hacky, point the 'builtin' back to the declaration location because builtins don't have a location
-                        error_info(name_span, self.errors.file, format!("{} {}", err_loc.named_type, err_loc.full_name))
+                        err_ref.info_same_file(name_span, format!("{} {}", err_loc.named_type, err_loc.full_name));
                     }
-                }).collect();
+                }
 
-                self.errors.error_with_info(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."), decl_infos);
 
                 ResolvedName{name_elem: None, linker : self.linker, errors: &self.errors, span: name_span}
             }
             None => {
                 resolved_globals.all_resolved = false;
 
-                self.errors.error_basic(name_span, format!("No Global of the name '{name}' was found. Did you forget to import it?"));
+                self.errors.error(name_span, format!("No Global of the name '{name}' was found. Did you forget to import it?"));
 
                 ResolvedName{name_elem: None, linker : self.linker, errors: &self.errors, span: name_span}
             }
@@ -121,14 +122,12 @@ impl<'err_and_globals> ResolvedName<'err_and_globals> {
     pub fn not_expected_global_error(self, expected : &str) {
         // SAFETY: The allocated linker objects aren't going to change. 
         let info = unsafe{&*self.linker}.get_linking_error_location(self.name_elem.unwrap());
-        let infos = if let Some((definition_span, file)) = info.location {
-            vec![error_info(definition_span, file, "Defined here")]
-        } else {
-            vec![]
-        };
         let name = &info.full_name;
         let global_type = info.named_type;
-        self.errors.error_with_info(self.span, format!("{name} is not a {expected}, it is a {global_type} instead!"), infos);
+        let err_ref = self.errors.error(self.span, format!("{name} is not a {expected}, it is a {global_type} instead!"));
+        if let Some(span_file) = info.location {
+            err_ref.info(span_file, "Defined here");
+        }
     }
     pub fn expect_constant(self) -> Option<ConstantUUID> {
         if let NameElem::Constant(id) = self.name_elem? {

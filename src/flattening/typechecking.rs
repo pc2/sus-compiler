@@ -1,8 +1,6 @@
 
 use crate::{
-    file_position::SpanFile,
-    linker::{ConstantUUIDMarker, Linkable, ModuleUUIDMarker},
-    typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, BOOL_TYPE, INT_TYPE}
+    errors::ErrorReference, file_position::SpanFile, linker::{ConstantUUIDMarker, FileUUID, Linkable, ModuleUUIDMarker}, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, BOOL_TYPE, INT_TYPE}
 };
 
 use super::*;
@@ -184,7 +182,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         for (_id, inst) in self.working_on.instructions.iter() {
             inst.for_each_embedded_type(&mut |typ, span| {
                 if typ.contains_error_or_unknown::<false, true>() {
-                    self.errors.error_basic(span, format!("Unresolved Type: {}", typ.to_string(&self.types)))
+                    self.errors.error(span, format!("Unresolved Type: {}", typ.to_string(&self.types)));
                 }
             });
         }
@@ -193,13 +191,12 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     /*
         ==== Generative Code Checking ====
     */
-    fn must_be_compiletime_with_info<CtxFunc : FnOnce() -> Vec<ErrorInfo>>(&self, wire : &WireInstance, context : &str, ctx_func : CtxFunc) {
+    fn must_be_compiletime(&self, wire : &WireInstance, context : &str) -> Option<ErrorReference<'_>> {
         if !wire.is_compiletime {
-            self.errors.error_with_info(wire.span, format!("{context} must be compile time"), ctx_func());
+            Some(self.errors.error(wire.span, format!("{context} must be compile time")))
+        } else {
+            None
         }
-    }
-    fn must_be_compiletime(&self, wire : &WireInstance, context : &str) {
-        self.must_be_compiletime_with_info(wire, context, || Vec::new());
     }
 
     fn get_root_identifier_type(&self, wire_ref_root : &WireReferenceRoot) -> IdentifierType {
@@ -303,7 +300,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 (decl, self.errors.file)
             }
             WireReferenceRoot::NamedConstant(_) => {
-                self.errors.error_with_info(conn.to.root_span, "Cannot assign to a global", vec![]);
+                self.errors.error(conn.to.root_span, "Cannot assign to a global");
                 return;
             }
             WireReferenceRoot::SubModulePort(port) => {
@@ -312,7 +309,8 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         };
     
         if self.get_root_identifier_read_only(&conn.to.root) {
-            self.errors.error_with_info(conn.to.span, "Cannot Assign to Read-Only value", vec![decl.make_declared_here(file)]);
+            self.errors.error(conn.to.span, "Cannot Assign to Read-Only value")
+                .info_obj_different_file(decl, file);
         }
     
         let from_wire = self.working_on.instructions[conn.from].unwrap_wire();
@@ -320,28 +318,31 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             WriteModifiers::Connection{num_regs : _, regs_span : _} => {
                 if decl.identifier_type.is_generative() {
                     // Check that whatever's written to this declaration is also generative
-                    self.must_be_compiletime_with_info(from_wire, "Assignments to generative variables", || vec![decl.make_declared_here(file)]);
-    
+                    if let Some(err_ref) = self.must_be_compiletime(from_wire, "Assignments to generative variables") {
+                        err_ref.info_obj_different_file(decl, file);
+                    }
+
                     // Check that this declaration isn't used in a non-compiletime if
                     if let Some(root_flat) = conn.to.root.get_root_flat() {
                         let declared_at_depth = declaration_depths[root_flat].unwrap();
                 
                         if runtime_if_stack.len() > declared_at_depth {
-                            let mut infos = Vec::new();
-                            infos.push(decl.make_declared_here(file));
+                            let err_ref = self.errors.error(conn.to.span, "Cannot write to generative variables in runtime conditional block");
+                            err_ref.info_obj_different_file(decl, file);
                             for (_, if_cond_span) in &runtime_if_stack[declared_at_depth..] {
-                                infos.push(error_info(*if_cond_span, file, "Runtime Condition here"));
+                                err_ref.info((*if_cond_span, file), "Runtime Condition here");
                             }
-                            self.errors.error_with_info(conn.to.span, "Cannot write to generative variables in runtime conditional block", infos);
                         }
                     }
                 }
             }
             WriteModifiers::Initial{initial_kw_span} => {
                 if decl.identifier_type != IdentifierType::State {
-                    self.errors.error_with_info(initial_kw_span, "Initial values can only be given to state registers!", vec![decl.make_declared_here(file)])
+                    self.errors
+                        .error(initial_kw_span, "Initial values can only be given to state registers!")
+                        .info_obj_different_file(decl, file);
                 }
-                self.must_be_compiletime(from_wire, "initial value assignment")
+                self.must_be_compiletime(from_wire, "initial value assignment");
             }
         }
     }
@@ -408,7 +409,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         for (id, inst) in self.working_on.instructions.iter() {
             if !is_instance_used_map[id] {
                 if let Instruction::Declaration(decl) = inst {
-                    self.errors.warn_basic(decl.name_span, "Unused Variable: This variable does not affect the output ports of this module");
+                    self.errors.warn(decl.name_span, "Unused Variable: This variable does not affect the output ports of this module");
                 }
             }
         }

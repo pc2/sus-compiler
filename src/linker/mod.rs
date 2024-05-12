@@ -8,7 +8,7 @@ use tree_sitter::Tree;
 
 use crate::{
     arena_alloc::{ArenaAllocator, UUIDMarker, UUID},
-    errors::{error_info, CompileError, ErrorCollector, ErrorLevel, ErrorStore},
+    errors::{CompileError, ErrorCollector, ErrorInfo, ErrorLevel, ErrorStore},
     file_position::{FileText, Span, SpanFile},
     flattening::Module,
     parser::Documentation,
@@ -308,7 +308,7 @@ impl Linker {
                     }
                 }
                 let this_object_name = &info.name;
-                let infos = conflict_infos.iter().map(|conf_info| error_info(conf_info.name_span, conf_info.file, "Conflicts with".to_owned())).collect();
+                let infos = conflict_infos.iter().map(|conf_info| ErrorInfo{position:conf_info.name_span, file: conf_info.file, info:"Conflicts with".to_owned()}).collect();
                 let reason = if builtin_conflict {
                     format!("Cannot redeclare the builtin '{this_object_name}'")
                 } else {

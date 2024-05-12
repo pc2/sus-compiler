@@ -1,6 +1,6 @@
 use std::ops::{Deref, Index};
 
-use crate::{errors::{error_info, ErrorCollector}, file_position::{BracketSpan, Span, SpanFile}, flattening::{BinaryOperator, FlatID, UnaryOperator}, linker::{get_builtin_type, Linkable, Linker, NamedType, TypeUUID}, value::{TypedValue, Value}};
+use crate::{errors::ErrorCollector, file_position::{BracketSpan, Span, SpanFile}, flattening::{BinaryOperator, FlatID, UnaryOperator}, linker::{get_builtin_type, Linkable, Linker, NamedType, TypeUUID}, value::{TypedValue, Value}};
 
 // These are 
 #[derive(Debug, Clone)]
@@ -233,12 +233,10 @@ pub fn typecheck<TypVec : Index<TypeUUID, Output = NamedType>>(found : &Abstract
     if !type_compare(expected, found) {
         let expected_name = expected.to_string(linker_types);
         let found_name = found.to_string(linker_types);
-        let decl_here_info = if let Some(declared_here) = declared_here {
-            vec![error_info(declared_here.0, declared_here.1, "Declared here")]
-        } else {
-            Vec::new()
-        };
-        errors.error_with_info(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"), decl_here_info);
+        let err_ref = errors.error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
+        if let Some(declared_here) = declared_here {
+            err_ref.info(declared_here, "Declared here");
+        }
         assert!(expected_name != found_name, "{expected_name} != {found_name}");
     }
 }
@@ -246,7 +244,7 @@ pub fn typecheck<TypVec : Index<TypeUUID, Output = NamedType>>(found : &Abstract
 pub fn typecheck_is_array_indexer<'a, TypVec : Index<TypeUUID, Output = NamedType>>(arr_type : &'a AbstractType, span : Span, linker_types : &TypVec, errors : &ErrorCollector) -> &'a AbstractType {
     let AbstractType::Array(arr_element_type) = arr_type else {
         let arr_type_name = arr_type.to_string(linker_types);
-        errors.error_basic(span, format!("Typing Error: Attempting to index into this, but it is not of array type, instead found a {arr_type_name}"));
+        errors.error(span, format!("Typing Error: Attempting to index into this, but it is not of array type, instead found a {arr_type_name}"));
         return &ERROR_TYPE;
     };
     &arr_element_type.deref()

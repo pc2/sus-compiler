@@ -248,13 +248,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn get_generation_value(&self, v : FlatID) -> Option<&TypedValue> {
         if let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] {
             if let Value::Unset | Value::Error = &vv.value {
-                self.errors.error_basic(self.md.instructions[v].unwrap_wire().span, format!("This variable is set but it's {vv:?}!"));
+                self.errors.error(self.md.instructions[v].unwrap_wire().span, format!("This variable is set but it's {vv:?}!"));
                 None
             } else {
                 Some(vv)
             }
         } else {
-            self.errors.error_basic(self.md.instructions[v].unwrap_wire().span, "This variable is not set at this point!");
+            self.errors.error(self.md.instructions[v].unwrap_wire().span, "This variable is not set at this point!");
             None
         }
     }
@@ -263,7 +263,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         match IntT::try_from(val) {
             Ok(val) => Some(val),
             Err(_) => {
-                self.errors.error_basic(span, format!("Generative integer does not fit in {}: {val}", std::any::type_name::<IntT>()));
+                self.errors.error(span, format!("Generative integer does not fit in {}: {val}", std::any::type_name::<IntT>()));
                 None
             }
         }
@@ -351,7 +351,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             let found_typ_name = found_typ.to_string(&self.linker.types);
             let write_to_typ_name = write_to_typ.to_string(&self.linker.types);
 
-            self.errors.error_with_info(from_flattened_wire.span, format!("Instantiation TypeError: Can't assign {found_typ_name} to {write_to_typ_name}"), vec![to_flattened_decl.make_declared_here(self.errors.file)]);
+            self.errors
+                .error(from_flattened_wire.span, format!("Instantiation TypeError: Can't assign {found_typ_name} to {write_to_typ_name}"))
+                .info_obj_same_file(to_flattened_decl);
         }
 
         let RealWireDataSource::Multiplexer{is_state : _, sources} = &mut self.wires[wire_id].source else {unreachable!("Should only be a writeable wire here")};
@@ -639,7 +641,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     if start_val > end_val {
                         let start_flat = &self.md.instructions[stm.start].unwrap_wire();
                         let end_flat = &self.md.instructions[stm.end].unwrap_wire();
-                        self.errors.error_basic(Span::new_overarching(start_flat.span, end_flat.span), format!("for loop range end is before begin: {start_val}:{end_val}"));
+                        self.errors.error(Span::new_overarching(start_flat.span, end_flat.span), format!("for loop range end is before begin: {start_val}:{end_val}"));
                         return None;
                     }
 
@@ -755,7 +757,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     wire.absolute_latency = *lat;
                     if *lat == CALCULATE_LATENCY_LATER {
                         if let Some(source_location) = self.md.instructions[wire.original_wire].get_location_of_module_part() {
-                            self.errors.error_basic(source_location, format!("Latency Counting couldn't reach this node"));
+                            self.errors.error(source_location, format!("Latency Counting couldn't reach this node"));
                         }
                     }
                 }
@@ -780,7 +782,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                                     if num_regs >= 1 {
                                         did_place_error = true;
                                         let this_register_plural = if num_regs == 1 {"This register is"} else {"These registers are"};
-                                        self.errors.error_basic(regs_span, format!("{this_register_plural}{rest_of_message}"));
+                                        self.errors.error(regs_span, format!("{this_register_plural}{rest_of_message}"));
                                     }
                                 }
                                 WriteModifiers::Initial{initial_kw_span : _} => {unreachable!("Initial assignment can only be from compile-time constant. Cannot be part of latency loop. ")}
@@ -789,14 +791,14 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         // Fallback if no register annotations used
                         if !did_place_error {
                             for wr in unique_write_instructions {
-                                self.errors.error_basic(wr.to.span, format!("This write is{rest_of_message}"));
+                                self.errors.error(wr.to.span, format!("This write is{rest_of_message}"));
                             }
                         }
                     }
                     LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
                         for port in bad_ports {
                             let port_decl = self.md.instructions[self.wires[WireID::from_hidden_value(port.0)].original_wire].unwrap_wire_declaration();
-                            self.errors.error_basic(port_decl.name_span, format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
+                            self.errors.error(port_decl.name_span, format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
                         }
                     }
                     LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path } => {
@@ -813,8 +815,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
                         let end_name = &end_wire.name;
                         let specified_end_latency = end_wire.absolute_latency;
-                        let reason = format!("Conflicting specified latency\n\n{path_message}\nBut this was specified as {end_name}'{specified_end_latency}");
-                        self.errors.error_with_info(end_latency_decl.span, reason, vec![start_decl.make_declared_here(self.errors.file)]);
+                        self.errors
+                            .error(end_latency_decl.span, format!("Conflicting specified latency\n\n{path_message}\nBut this was specified as {end_name}'{specified_end_latency}"))
+                            .info_obj_same_file(start_decl);
                     }
                 }
                 None

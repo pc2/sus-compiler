@@ -159,8 +159,8 @@ impl Cache<FileUUID> for ArenaVector<(PathBuf, Source<String>), FileUUIDMarker> 
 }
 
 pub fn print_all_errors(linker : &Linker, paths_arena : &mut ArenaVector<(PathBuf, Source), FileUUIDMarker>) {
-    for (file_uuid, f) in &linker.files {
-        let errors = linker.for_all_errors_in_file(file_uuid, |err| {
+    for (file_uuid, _f) in &linker.files {
+        linker.for_all_errors_in_file(file_uuid, |err| {
             pretty_print_error(err, file_uuid, linker, paths_arena);
         });
     }
@@ -174,7 +174,7 @@ pub fn pretty_print_spans_in_reverse_order(file_text : String, spans : Vec<Range
     for span in spans.into_iter().rev() {
         // If span not in file, just don't print it. This happens. 
         if span.end > text_len {
-            println!("Span {span:?} certainly does not correspond to this file. ");
+            println!("Span({}, {}) certainly does not correspond to this file. ", span.start, span.end);
             return;
         }
     
@@ -186,7 +186,8 @@ pub fn pretty_print_spans_in_reverse_order(file_text : String, spans : Vec<Range
         let mut report: ReportBuilder<'_, Range<usize>> = Report::build(ReportKind::Advice, (), span.start).with_config(config);
         report = report
             .with_label(
-                Label::new(span)
+                Label::new(span.clone())
+                    .with_message(format!("Span({}, {})", span.start, span.end))
                     .with_color(Color::Blue)
             );
     

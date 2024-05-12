@@ -2,7 +2,7 @@
 use sus_proc_macro::{field, kind, kw};
 use tree_sitter::{Tree, TreeCursor};
 
-use crate::{errors::{error_info, ErrorCollector}, file_position::{FileText, Span}};
+use crate::{errors::ErrorCollector, file_position::{FileText, Span}};
 
 use std::num::NonZeroU16;
 
@@ -293,8 +293,9 @@ impl<'t> Cursor<'t> {
                 ("syntax error", node.parent().unwrap())
             };
             let parent_node_name = parent_node.kind();
-            let parent_info = error_info(Span::from(parent_node.byte_range()), errors.file, format!("Parent node '{parent_node_name}'"));
-            errors.error_with_info(span, format!("While parsing '{parent_node_name}', parser found a {error_type} {of_name}"), vec![parent_info]);
+            errors
+                .error(span, format!("While parsing '{parent_node_name}', parser found a {error_type} {of_name}"))
+                .info_same_file(Span::from(parent_node.byte_range()), format!("Parent node '{parent_node_name}'"));
         }
         is_error
     }

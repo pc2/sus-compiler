@@ -201,7 +201,7 @@ impl TypedValue {
 
         Some(if let Value::Array(arr) = &self.value {
             let Some(elem) = arr.get(idx) else {
-                errors.error_basic(span.outer_span(), format!("Compile-Time Array index is out of range: idx: {idx}, array size: {}", arr.len()));
+                errors.error(span.outer_span(), format!("Compile-Time Array index is out of range: idx: {idx}, array size: {}", arr.len()));
                 return None
             };
             TypedValue{typ, value : elem.clone()}

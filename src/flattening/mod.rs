@@ -10,10 +10,10 @@ use sus_proc_macro::{field, kind, kw};
 use crate::{
     arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID},
     debug::SpanDebugger,
-    errors::{error_info, ErrorCollector, ErrorInfo},
+    errors::ErrorCollector,
     file_position::{BracketSpan, Span},
     instantiation::InstantiationList,
-    linker::{with_module_editing_context, ConstantUUID, ConstantUUIDMarker, FileUUID, InternalResolver, LinkInfo, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, ResolvedName, Resolver, TypeUUIDMarker},
+    linker::{with_module_editing_context, ConstantUUID, ConstantUUIDMarker, InternalResolver, LinkInfo, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, ResolvedName, Resolver, TypeUUIDMarker},
     parser::{Cursor, Documentation},
     typing::{AbstractType, WrittenType},
     value::Value
@@ -358,9 +358,6 @@ impl Declaration {
     pub fn get_span(&self) -> Span {
         Span::new_overarching(self.typ_expr.get_span(), self.name_span).debug()
     }
-    pub fn make_declared_here(&self, file : FileUUID) -> ErrorInfo {
-        error_info(self.get_span(), file, "Declared here")
-    }
 }
 
 #[derive(Debug)]
@@ -459,7 +456,7 @@ impl<'l> LocalOrGlobal<'l> {
         match self {
             LocalOrGlobal::Local(local) => Some(local),
             LocalOrGlobal::Global(global) => {
-                global.errors.error_basic(global.span, format!("Can only use local variables in {context}!"));
+                global.errors.error(global.span, format!("Can only use local variables in {context}!"));
                 None
             }
         }
@@ -557,7 +554,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 let (modifier_kind, modifier_span) = cursor.kind_span();
 
                 if !ALLOW_MODIFIERS {
-                    self.errors.error_basic(modifier_span, "Inputs and outputs of a module cannot be decorated with 'state' or 'gen'");
+                    self.errors.error(modifier_span, "Inputs and outputs of a module cannot be decorated with 'state' or 'gen'");
                     fallback_identifier_type
                 } else {
                     if modifier_kind == kw!("state") {
@@ -588,7 +585,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 ModuleOrWrittenType::Module(span, module_uuid) => {
                     assert!(ALLOW_MODULES);
                     if let Some((_, span)) = span_latency_specifier {
-                        self.errors.error_basic(span, "Cannot add latency specifier to module instances");
+                        self.errors.error(span, "Cannot add latency specifier to module instances");
                     }
                     let name = self.name_resolver.file_text[name_span].to_owned();
                     return self.working_on.instructions.alloc(Instruction::SubModule(SubModuleInstance{
@@ -616,7 +613,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             }));
 
             if let Err(conflict) = self.local_variable_context.add_declaration(name, inst_id) {
-                self.errors.error_with_info(Span::new_overarching(typ_expr_span, name_span), "This declaration conflicts with a previous declaration in the same scope", vec![self.working_on.instructions[conflict].unwrap_wire_declaration().make_declared_here(self.errors.file)])
+                self.errors
+                    .error(Span::new_overarching(typ_expr_span, name_span), "This declaration conflicts with a previous declaration in the same scope")
+                    .info_obj_same_file(self.working_on.instructions[conflict].unwrap_wire_declaration());
             }
 
             inst_id
@@ -657,17 +656,20 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             let mut args = arguments.as_slice();
             
             if arg_count != expected_arg_count {
-                let module_info = vec![error_info(md.link_info.span, md.link_info.file, "Interface defined here")];
                 if arg_count > expected_arg_count {
                     // Too many args, complain about excess args at the end
                     let excess_args_span = Span::new_overarching(self.working_on.instructions[args[expected_arg_count]].unwrap_wire().span, self.working_on.instructions[*args.last().unwrap()].unwrap_wire().span);
                     
-                    self.errors.error_with_info(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."), module_info);
+                    self.errors
+                        .error(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."))
+                        .info_obj(&md.link_info);
                     // Shorten args to still get proper type checking for smaller arg array
                     args = &args[..expected_arg_count];
                 } else {
                     // Too few args, mention missing argument names
-                    self.errors.error_with_info(arguments_span.close_bracket(), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."), module_info);
+                    self.errors
+                        .error(arguments_span.close_bracket(), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."))
+                        .info_obj(&md.link_info);
                 }
             }
 
@@ -707,7 +709,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                             Some(id)
                         } else {
                             let decl = self.working_on.instructions[id].unwrap_wire_declaration();
-                            self.errors.error_with_info(span, "Function call syntax is only possible on modules", vec![decl.make_declared_here(self.errors.file)]);
+                            self.errors
+                                .error(span, "Function call syntax is only possible on modules")
+                                .info_obj_same_file(decl);
                             None
                         }
                     }
@@ -727,7 +731,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
             })
         } else {
-            self.errors.error_basic(span, "Module name may not be an expression");
+            self.errors.error(span, "Module name may not be an expression");
             None
         }
     }
@@ -776,8 +780,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             if let Some((md_id, submodule, outputs)) = self.desugar_func_call(cursor) {
                 if outputs.len() != 1 {
                     let md = &self.modules[md_id];
-                    let info = error_info(md.link_info.span, md.link_info.file, "Module Defined here");
-                    self.errors.error_with_info(expr_span, "A function called in this context may only return one result. Split this function call into a separate line instead.", vec![info]);
+                    self.errors
+                        .error(expr_span, "A function called in this context may only return one result. Split this function call into a separate line instead.")
+                        .info_obj(&md.link_info);
                 }
 
                 if outputs.len() >= 1 {
@@ -884,11 +889,11 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
                 return None
             })
-        } else if kind == kind!("number") {self.errors.error_basic(expr_span, "A constant is not a wire reference"); None
-        } else if kind == kind!("unary_op") {self.errors.error_basic(expr_span, "The result of an operator is not a wire reference"); None
-        } else if kind == kind!("binary_op") {self.errors.error_basic(expr_span, "The result of an operator is not a wire reference"); None
-        } else if kind == kind!("func_call") {self.errors.error_basic(expr_span, "A submodule call is not a wire reference"); None
-        } else if kind == kind!("parenthesis_expression") {self.errors.error_basic(expr_span, "Remove these parentheses"); None
+        } else if kind == kind!("number") {self.errors.error(expr_span, "A constant is not a wire reference"); None
+        } else if kind == kind!("unary_op") {self.errors.error(expr_span, "The result of an operator is not a wire reference"); None
+        } else if kind == kind!("binary_op") {self.errors.error(expr_span, "The result of an operator is not a wire reference"); None
+        } else if kind == kind!("func_call") {self.errors.error(expr_span, "A submodule call is not a wire reference"); None
+        } else if kind == kind!("parenthesis_expression") {self.errors.error(expr_span, "Remove these parentheses"); None
         } else {cursor.could_not_match()}
     }
 
@@ -935,12 +940,15 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             let num_targets = to.len();
             if num_targets != num_func_outputs {
                 let md = &self.modules[md_id];
-                let info = vec![error_info(md.link_info.span, md.link_info.file, "Module Defined here")];
                 if num_targets > num_func_outputs {
                     let excess_results_span = Span::new_overarching(get_span(&to[num_func_outputs]), get_span(to.last().unwrap()));
-                    self.errors.error_with_info(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
+                    self.errors
+                        .error(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."))
+                        .info_obj(&md.link_info);
                 } else {
-                    self.errors.error_with_info(func_call_span, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."), info);
+                    self.errors
+                        .error(func_call_span, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."))
+                        .info_obj(&md.link_info);
                 }
             }
 
@@ -996,7 +1004,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         let read_side = self.flatten_expr(cursor);
                         
                         if to.len() != 1 {
-                            self.errors.error_basic(span, format!("Non-function assignments must output exactly 1 output instead of {}", to.len()));
+                            self.errors.error(span, format!("Non-function assignments must output exactly 1 output instead of {}", to.len()));
                         }
                         if let Some(Ok((to, write_modifiers))) = to.into_iter().next() {
                             self.working_on.instructions.alloc(Instruction::Write(Write{from: read_side, to, write_modifiers}));
@@ -1102,12 +1110,12 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         cursor.list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
                 if !is_first_item {
-                    self.errors.warn_basic(cursor.span(), "Standalone declarations and expressions should be on their own line.");
+                    self.errors.warn(cursor.span(), "Standalone declarations and expressions should be on their own line.");
                 }
                 is_first_item = false;
 
                 if let Some(span) = cursor.optional_field_span(field!("write_modifiers"), kind!("write_modifiers")) {
-                    self.errors.error_basic(span, "No write modifiers are allowed on non-assigned to declarations or expressions");
+                    self.errors.error(span, "No write modifiers are allowed on non-assigned to declarations or expressions");
                 }
                 
                 cursor.field(field!("expr_or_decl"));
@@ -1119,7 +1127,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     if kind == kind!("func_call") {
                         self.flatten_assign_function_call(Vec::new(), cursor);
                     } else {
-                        self.errors.warn_basic(span, "The result of this operation is not used");
+                        self.errors.warn(span, "The result of this operation is not used");
                         let _ = self.flatten_expr(cursor);
                     }
                 }
