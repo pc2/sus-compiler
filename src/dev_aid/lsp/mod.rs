@@ -1,4 +1,6 @@
 
+mod tree_walk;
+
 use std::{error::Error, ffi::OsStr, net::SocketAddr};
 use lsp_types::{notification::*, request::Request, *};
 
@@ -6,7 +8,7 @@ use crate::{
     arena_alloc::ArenaVector, compiler_top::{add_file, recompile_all, update_file}, config::config, errors::{CompileError, ErrorLevel}, file_position::{FileText, LineCol, Span, SpanFile}, flattening::{FlatID, IdentifierType, Instruction, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, NameElem}
 };
 
-use super::tree_walk::{self, InModule, LocationInfo};
+use tree_walk::{InModule, LocationInfo};
 
 struct LoadedFileCache {
     linker : Linker,
