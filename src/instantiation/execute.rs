@@ -12,10 +12,11 @@ use crate::{
     flattening::{PortIDMarker, BinaryOperator, FlatID, FlatIDMarker, FlatIDRange, IdentifierType, Instruction, Module, UnaryOperator, WireInstance, WireReference, WireReferencePathElement, WireReferenceRoot, WireSource, Write, WriteModifiers},
     instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError},
     linker::{Linker, NamedConstant},
-    list_of_lists::ListOfLists,
     typing::{typecheck_concrete_binary_operator, typecheck_concrete_unary_operator, ConcreteType, WrittenType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
     value::{compute_binary_op, compute_unary_op, TypedValue, Value}
 };
+
+use self::list_of_lists::ListOfLists;
 
 use super::*;
 

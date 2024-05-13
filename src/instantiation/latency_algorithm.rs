@@ -1,4 +1,5 @@
-use crate::list_of_lists::ListOfLists;
+use super::list_of_lists::ListOfLists;
+
 
 
 #[derive(Debug, Clone, Copy)]
