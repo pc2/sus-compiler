@@ -223,7 +223,8 @@ pub fn typecheck_is_array_indexer<'a, TypVec : Index<TypeUUID, Output = NamedTyp
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ConcreteType {
     Named(TypeUUID),
-    Array(Box<(ConcreteType, u64)>)
+    Array(Box<(ConcreteType, u64)>),
+    Unknown
 }
 
 impl Into<AbstractType> for &ConcreteType {
@@ -237,6 +238,7 @@ impl Into<AbstractType> for &ConcreteType {
                 let concrete_sub : AbstractType = sub.into();
                 AbstractType::Array(Box::new(concrete_sub))
             }
+            ConcreteType::Unknown => {AbstractType::Unknown}
         }
     }
 }
@@ -259,6 +261,7 @@ impl ConcreteType {
                 }
                 Value::Array(arr.into_boxed_slice())
             }
+            ConcreteType::Unknown => unreachable!()
         }
     }
     pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec) -> String {
@@ -270,6 +273,7 @@ impl ConcreteType {
                 let (elem_typ, arr_size) = arr_box.deref();
                 format!("{}[{}]", elem_typ.to_string(linker_types), arr_size)
             }
+            ConcreteType::Unknown => unreachable!()
         }
     }
     pub fn down_array(&self) -> &ConcreteType {

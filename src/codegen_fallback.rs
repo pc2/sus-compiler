@@ -31,6 +31,7 @@ fn typ_to_verilog_array(typ : &ConcreteType) -> String {
             let (sub_typ, size) = arr.deref();
             typ_to_verilog_array(sub_typ) + &arr_str(*size)
         }
+        ConcreteType::Unknown => unreachable!()
     }
 }
 
