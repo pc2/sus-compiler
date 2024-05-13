@@ -102,9 +102,9 @@ The main goals of the language are roughly listed below:
 - [x] Show last generation value
 - [x] Find all references
 - [x] Highlighting
+- [ ] Renaming
 - [x] Basic code completion
 - [ ] Port code completion
-- [ ] Renaming
 - [ ] Per-Line Resource Utilization Reporting
 
 ### Code Generation

@@ -10,6 +10,30 @@ use crate::{
 
 use tree_walk::{InModule, LocationInfo};
 
+
+
+fn from_position(pos : lsp_types::Position) -> LineCol {
+    LineCol{line : pos.line as usize, col : pos.character as usize}
+}
+fn to_position(char_line : LineCol) -> lsp_types::Position {
+    lsp_types::Position{line : char_line.line as u32, character : char_line.col as u32}
+}
+fn span_to_lsp_range(file_text : &FileText, ch_sp : Span) -> lsp_types::Range {
+    let rng = file_text.get_span_linecol_range(ch_sp);
+    Range {
+        start: to_position(rng.start),
+        end: to_position(rng.end)
+    }
+}
+fn cvt_location_list(location_vec: Vec<SpanFile>, file_cache: &LoadedFileCache) -> Vec<Location> {
+    location_vec.into_iter().map(|(span, file)| {
+        let uri = file_cache.uris[file].clone();
+        let range = span_to_lsp_range(&file_cache.linker.files[file].file_text, span);
+        Location{uri, range}
+    }).collect()
+}
+
+
 struct LoadedFileCache {
     linker : Linker,
     uris : ArenaVector<Url, FileUUIDMarker>
@@ -43,6 +67,21 @@ impl LoadedFileCache {
             recompile_all(&mut self.linker);
             file_uuid
         }
+    }
+    fn location_in_file(&mut self, text_pos : &lsp_types::TextDocumentPositionParams) -> (FileUUID, usize) {
+        let file_id = self.ensure_contains_file(&text_pos.text_document.uri);
+        let file_data = &self.linker.files[file_id];
+
+        let position = file_data.file_text.linecol_to_byte_clamp(from_position(text_pos.position));
+
+        (file_id, position)
+    }
+    fn get_selected_object(&self, file : FileUUID, byte_pos : usize) -> Option<(lsp_types::Range, LocationInfo)> {
+        let file_data = &self.linker.files[file];
+
+        let (span, info) = tree_walk::get_selected(&self.linker, file_data, byte_pos)?;
+
+        Some((span_to_lsp_range(&file_data.file_text, span), info))
     }
 }
 
@@ -130,12 +169,6 @@ fn get_modifiers_for_token(tok : IDEIdentifierType) -> u32 {
     }
 }
 
-fn from_position(pos : lsp_types::Position) -> LineCol {
-    LineCol{line : pos.line as usize, col : pos.character as usize}
-}
-fn to_position(char_line : LineCol) -> lsp_types::Position {
-    lsp_types::Position{line : char_line.line as u32, character : char_line.col as u32}
-}
 
 fn convert_to_semantic_tokens(file_data : &FileData, ide_tokens : &mut[(Span, IDEIdentifierType)]) -> Vec<SemanticToken> {
     ide_tokens.sort_by(|a, b| a.0.cmp(&b.0));
@@ -216,14 +249,6 @@ fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> Vec<SemanticT
     convert_to_semantic_tokens(file_data, &mut ide_tokens)
 }
 
-fn span_to_lsp_range(file_text : &FileText, ch_sp : Span) -> lsp_types::Range {
-    let rng = file_text.get_span_linecol_range(ch_sp);
-    Range {
-        start: to_position(rng.start),
-        end: to_position(rng.end)
-    }
-}
-
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
 fn convert_diagnostic(err : &CompileError, main_file_text : &FileText, linker : &Linker, uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
     assert!(main_file_text.is_span_valid(err.position), "bad error: {}", err.reason);
@@ -244,19 +269,6 @@ fn convert_diagnostic(err : &CompileError, main_file_text : &FileText, linker : 
         related_info.push(DiagnosticRelatedInformation { location, message: info.info.clone() });
     }
     Diagnostic::new(error_pos, Some(severity), None, None, err.reason.clone(), Some(related_info), None)
-}
-
-
-fn get_selected_object<'l>(file_cache : &'l LoadedFileCache, text_pos : &lsp_types::TextDocumentPositionParams) -> Option<(lsp_types::Range, LocationInfo<'l>)> {
-    let uuid = file_cache.find_uri(&text_pos.text_document.uri).unwrap();
-    
-    let file_data = &file_cache.linker.files[uuid];
-
-    let byte_pos = file_data.file_text.linecol_to_byte_clamp(from_position(text_pos.position));
-
-    let (span, info) = tree_walk::get_selected(&file_cache.linker, file_data, byte_pos)?;
-
-    Some((span_to_lsp_range(&file_data.file_text, span), info))
 }
 
 fn push_all_errors(connection: &lsp_server::Connection, file_cache : &LoadedFileCache) -> Result<(), Box<dyn Error + Sync + Send>> {
@@ -357,17 +369,68 @@ fn gather_completions(linker : &Linker, file_id : FileUUID, position : usize) ->
 }
 
 
+fn for_each_reference_in_file<F : FnMut(Span)>(linker: &Linker, file_id: FileUUID, file_data: &FileData, hover_info: LocationInfo, mut f : F) {
+    match hover_info {
+        LocationInfo::InModule(md, id, _) => {
+            if md.link_info.file == file_id {
+                tree_walk::visit_all_in_module(&linker, md, |span, info| {
+                    if let LocationInfo::InModule(_, id2, _) = info {
+                        if id == id2 {
+                            f(span);
+                        }
+                    }
+                });
+            }
+        }
+        LocationInfo::Type(_) => {}
+        LocationInfo::Global(name_elem) => {
+            tree_walk::visit_all(&linker, file_data, |span, info| {
+                if let LocationInfo::Global(ne) = info {
+                    if name_elem == ne {
+                        f(span);
+                    }
+                }
+            });
+        }
+        LocationInfo::Port(p_id, md_id, _) => {
+            tree_walk::visit_all(&linker, file_data, |span, info| {
+                if let LocationInfo::Port(p_id2, md_id2, _) = info {
+                    if p_id == p_id2 && md_id == md_id2 {
+                        f(span);
+                    }
+                }
+            });
+            let md = &linker.modules[md_id];
+            if md.link_info.file == file_id {
+                f(md.module_ports.ports[p_id].name_span);
+            }
+        }
+    }
+}
+
+fn gather_all_references(file_cache: &LoadedFileCache, file_id: FileUUID, pos: usize) -> Vec<SpanFile> {
+    let mut ref_locations = Vec::new();
+
+    if let Some((_location, hover_info)) = file_cache.get_selected_object(file_id, pos) {
+        for (other_file_id, other_file) in &file_cache.linker.files {
+            for_each_reference_in_file(&file_cache.linker, other_file_id, other_file, hover_info, |span| {ref_locations.push((span, other_file_id))});
+        }
+    }
+    ref_locations
+}
+
+
 fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut LoadedFileCache) -> Result<serde_json::Value, serde_json::Error> {
     match method {
         request::HoverRequest::METHOD => {
             let params : HoverParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("HoverRequest");
             
-            let file_uuid = file_cache.ensure_contains_file(&params.text_document_position_params.text_document.uri);
+            let (file_uuid, pos) = file_cache.location_in_file(&params.text_document_position_params);
             let file_data = &file_cache.linker.files[file_uuid];
             let mut hover_list : Vec<MarkedString> = Vec::new();
             
-            let range = if let Some((location, info)) = get_selected_object(&file_cache, &params.text_document_position_params) {
+            let range = if let Some((location, info)) = file_cache.get_selected_object(file_uuid, pos) {
                 if config().lsp_debug_mode {
                     hover_list.push(MarkedString::String(format!("{info:?}")))
                 } else {
@@ -434,11 +497,11 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
             let params : GotoDefinitionParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("GotoDefinition");
 
-            file_cache.ensure_contains_file(&params.text_document_position_params.text_document.uri);
+            let (file_uuid, pos) = file_cache.location_in_file(&params.text_document_position_params);
             
             let mut goto_definition_list : Vec<SpanFile> = Vec::new();
 
-            if let Some((_location, info)) = get_selected_object(&file_cache, &params.text_document_position_params) {
+            if let Some((_location, info)) = file_cache.get_selected_object(file_uuid, pos) {
                 match info {
                     LocationInfo::InModule(md, _decl_id, InModule::NamedLocal(decl)) => {
                         goto_definition_list.push((decl.name_span, md.link_info.file));
@@ -475,48 +538,13 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
         request::DocumentHighlightRequest::METHOD => {
             let params : DocumentHighlightParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
 
-            let file_id = file_cache.ensure_contains_file(&params.text_document_position_params.text_document.uri);
+            let (file_id, pos) = file_cache.location_in_file(&params.text_document_position_params);
             let file_data = &file_cache.linker.files[file_id];
 
             let mut ref_locations = Vec::new();
 
-            if let Some((_location, hover_info)) = get_selected_object(file_cache, &params.text_document_position_params) {
-                match hover_info {
-                    LocationInfo::InModule(md, id, _) => {
-                        if md.link_info.file == file_id {
-                            tree_walk::visit_all_in_module(&file_cache.linker, md, |span, info| {
-                                if let LocationInfo::InModule(_, id2, _) = info {
-                                    if id == id2 {
-                                        ref_locations.push(span);
-                                    }
-                                }
-                            });
-                        }
-                    }
-                    LocationInfo::Type(_) => {}
-                    LocationInfo::Global(name_elem) => {
-                        tree_walk::visit_all(&file_cache.linker, file_data, |span, info| {
-                            if let LocationInfo::Global(ne) = info {
-                                if name_elem == ne {
-                                    ref_locations.push(span);
-                                }
-                            }
-                        });
-                    }
-                    LocationInfo::Port(p_id, md_id, _) => {
-                        tree_walk::visit_all(&file_cache.linker, file_data, |span, info| {
-                            if let LocationInfo::Port(p_id2, md_id2, _) = info {
-                                if p_id == p_id2 && md_id == md_id2 {
-                                    ref_locations.push(span);
-                                }
-                            }
-                        });
-                        let md = &file_cache.linker.modules[md_id];
-                        if md.link_info.file == file_id {
-                            ref_locations.push(md.module_ports.ports[p_id].name_span);
-                        }
-                    }
-                }
+            if let Some((_location, hover_info)) = file_cache.get_selected_object(file_id, pos) {
+                for_each_reference_in_file(&file_cache.linker, file_id, file_data, hover_info, |span| {ref_locations.push(span)});
             }
 
             let result : Vec<DocumentHighlight> = ref_locations.into_iter().map(|sp| {
@@ -530,48 +558,9 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
         request::References::METHOD => {
             let params : ReferenceParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
 
-            let file_id = file_cache.ensure_contains_file(&params.text_document_position.text_document.uri);
+            let (file_id, pos) = file_cache.location_in_file(&params.text_document_position);
   
-            let mut ref_locations = Vec::new();
-
-            if let Some((_location, hover_info)) = get_selected_object(file_cache, &params.text_document_position) {
-                match hover_info {
-                    LocationInfo::InModule(md, id, _) => {
-                        tree_walk::visit_all_in_module(&file_cache.linker, md, |span, info| {
-                            if let LocationInfo::InModule(_, id2, _) = info {
-                                if id == id2 {
-                                    ref_locations.push((span, file_id));
-                                }
-                            }
-                        });
-                    }
-                    LocationInfo::Type(_) => {}
-                    LocationInfo::Global(name_elem) => {
-                        for (other_file_id, other_file) in &file_cache.linker.files {
-                            tree_walk::visit_all(&file_cache.linker, other_file, |span, info| {
-                                if let LocationInfo::Global(ne) = info {
-                                    if name_elem == ne {
-                                        ref_locations.push((span, other_file_id));
-                                    }
-                                }
-                            });
-                        }
-                    }
-                    LocationInfo::Port(p_id, md_id, _) => {
-                        for (other_file_id, other_file) in &file_cache.linker.files {
-                            tree_walk::visit_all(&file_cache.linker, other_file, |span, info| {
-                                if let LocationInfo::Port(p_id2, md_id2, _) = info {
-                                    if p_id == p_id2 && md_id == md_id2 {
-                                        ref_locations.push((span, other_file_id));
-                                    }
-                                }
-                            });
-                        }
-                        let md = &file_cache.linker.modules[md_id];
-                        ref_locations.push((md.module_ports.ports[p_id].name_span, md.link_info.file));
-                    }
-                }
-            }
+            let ref_locations = gather_all_references(file_cache, file_id, pos);
 
             serde_json::to_value(cvt_location_list(ref_locations, file_cache))
         }
@@ -584,27 +573,15 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
             let params : CompletionParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("Completion");
 
-            let uuid = file_cache.ensure_contains_file(&params.text_document_position.text_document.uri);
+            let (file_uuid, position) = file_cache.location_in_file(&params.text_document_position);
             
-            let file_data = &file_cache.linker.files[uuid];
-
-            let position = file_data.file_text.linecol_to_byte_clamp(from_position(params.text_document_position.position));
-
-            serde_json::to_value(&CompletionResponse::Array(gather_completions(&file_cache.linker, uuid, position)))
+            serde_json::to_value(&CompletionResponse::Array(gather_completions(&file_cache.linker, file_uuid, position)))
         }
         req => {
             println!("Other request: {req:?}");
             Ok(serde_json::Value::Null)
         }
     }
-}
-
-fn cvt_location_list(location_vec: Vec<SpanFile>, file_cache: &mut LoadedFileCache) -> Vec<Location> {
-    location_vec.into_iter().map(|(span, file)| {
-        let uri = file_cache.uris[file].clone();
-        let range = span_to_lsp_range(&file_cache.linker.files[file].file_text, span);
-        Location{uri, range}
-    }).collect()
 }
 
 fn handle_notification(connection: &lsp_server::Connection, notification : lsp_server::Notification, file_cache : &mut LoadedFileCache, initialize_params : &InitializeParams) -> Result<(), Box<dyn Error + Sync + Send>> {
