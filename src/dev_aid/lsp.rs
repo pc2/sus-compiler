@@ -61,7 +61,8 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
         definition_provider: Some(OneOf::Left(true)),
         document_highlight_provider: Some(OneOf::Left(true)),
         references_provider: Some(OneOf::Left(true)),
-        hover_provider : Some(HoverProviderCapability::Simple(true)),
+        hover_provider: Some(HoverProviderCapability::Simple(true)),
+        rename_provider: Some(OneOf::Left(true)),
         semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions{
             work_done_progress_options: WorkDoneProgressOptions {
                 work_done_progress: Some(false)
@@ -90,12 +91,6 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
             full: Some(SemanticTokensFullOptions::Bool(true)), // TODO: Support delta updating for faster syntax highlighting, just do whole file for now
         })),
         completion_provider : Some(CompletionOptions{resolve_provider : Some(true), ..Default::default()}),
-        /*workspace: Some(WorkspaceClientCapabilities{
-            did_change_watched_files : Some(DidChangeWatchedFilesClientCapabilities{
-
-            }),
-            ..Default::default()
-        }),*/
         text_document_sync : Some(TextDocumentSyncCapability::Kind(
             TextDocumentSyncKind::FULL
         )),
@@ -577,6 +572,11 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
             }
 
             serde_json::to_value(cvt_location_list(ref_locations, file_cache))
+        }
+        request::Rename::METHOD => {
+            let params : RenameParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
+
+            todo!("RENAMING");
         }
         request::Completion::METHOD => {
             let params : CompletionParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");

@@ -104,6 +104,7 @@ The main goals of the language are roughly listed below:
 - [x] Highlighting
 - [x] Basic code completion
 - [ ] Port code completion
+- [ ] Renaming
 - [ ] Per-Line Resource Utilization Reporting
 
 ### Code Generation
