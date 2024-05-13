@@ -100,9 +100,10 @@ The main goals of the language are roughly listed below:
 - [x] Go to definition
 - [x] File Creation/Deletion/Rename
 - [x] Show last generation value
-- [ ] Find all references
-- [ ] Highlighting
-- [x] Code completion
+- [x] Find all references
+- [x] Highlighting
+- [x] Basic code completion
+- [ ] Port code completion
 - [ ] Per-Line Resource Utilization Reporting
 
 ### Code Generation
@@ -111,6 +112,11 @@ The main goals of the language are roughly listed below:
 - [x] Can Generate Verilog for Blur2 filter
 - [ ] Can Generate Verilog for FIFO
 - [ ] Timing Failure extraction from vendor tools
+
+### Safety through Interface Asserts (PDL-style asserts)
+- [ ] btor2?
+- [ ] Language syntax
+- [ ] How powerful is it? 
 
 ### Simulation
 - [ ] Basic testbench

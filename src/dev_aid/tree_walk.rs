@@ -6,10 +6,15 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug)]
+pub enum InModule<'linker> {
+    NamedLocal(&'linker Declaration),
+    NamedSubmodule(&'linker SubModuleInstance),
+    Temporary(&'linker WireInstance),
+}
+
+#[derive(Clone, Copy, Debug)]
 pub enum LocationInfo<'linker> {
-    NamedLocal(&'linker Module, FlatID, &'linker Declaration),
-    NamedSubmodule(&'linker Module, FlatID, &'linker SubModuleInstance),
-    Temporary(&'linker Module, FlatID, &'linker WireInstance),
+    InModule(&'linker Module, FlatID, InModule<'linker>),
     Type(&'linker WrittenType),
     Global(NameElem),
     Port(PortID, ModuleUUID, &'linker Port)
@@ -24,6 +29,17 @@ pub fn visit_all<'linker, Visitor : FnMut(Span, LocationInfo<'linker>)>(linker :
     };
 
     walker.walk_file(file);
+}
+
+/// Walks the file, and provides all [LocationInfo]s. 
+pub fn visit_all_in_module<'linker, Visitor : FnMut(Span, LocationInfo<'linker>)>(linker : &'linker Linker, md : &'linker Module, visitor : Visitor) {
+    let mut walker = TreeWalker {
+        linker,
+        visitor,
+        should_prune: |_| false,
+    };
+
+    walker.walk_module(md);
 }
 
 /// Walks the file, and finds the [LocationInfo] that is the most relevant
@@ -68,14 +84,14 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
     fn walk_wire_ref(&mut self, md : &'linker Module, wire_ref : &'linker WireReference) {
         match &wire_ref.root {
             WireReferenceRoot::LocalDecl(decl_id, span) => {
-                self.visit(*span, LocationInfo::NamedLocal(md, *decl_id, md.instructions[*decl_id].unwrap_wire_declaration()));
+                self.visit(*span, LocationInfo::InModule(md, *decl_id, InModule::NamedLocal(md.instructions[*decl_id].unwrap_wire_declaration())));
             }
             WireReferenceRoot::NamedConstant(cst, span) => {
                 self.visit(*span, LocationInfo::Global(NameElem::Constant(*cst)))
             }
             WireReferenceRoot::SubModulePort(port) => {
                 if let Some(submod_name_span) = port.submodule_name_span {
-                    self.visit(submod_name_span, LocationInfo::NamedSubmodule(md, port.submodule_flat, md.instructions[port.submodule_flat].unwrap_submodule()));
+                    self.visit(submod_name_span, LocationInfo::InModule(md, port.submodule_flat, InModule::NamedSubmodule(md.instructions[port.submodule_flat].unwrap_submodule())));
                 }
                 if let Some(span) = port.port_name_span {
                     let module_uuid = md.instructions[port.submodule_flat].unwrap_submodule().module_uuid;
@@ -110,20 +126,20 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
                 Instruction::SubModule(sm) => {
                     self.visit(sm.module_name_span, LocationInfo::Global(NameElem::Module(sm.module_uuid)));
                     if let Some((_sm_name, sm_name_span)) = &sm.name {
-                        self.visit(*sm_name_span, LocationInfo::NamedSubmodule(md, id, sm));
+                        self.visit(*sm_name_span, LocationInfo::InModule(md, id, InModule::NamedSubmodule(sm)));
                     }
                 }
                 Instruction::Declaration(decl) => {
                     self.walk_type(&decl.typ_expr);
                     if decl.declaration_itself_is_not_written_to {
-                        self.visit(decl.name_span, LocationInfo::NamedLocal(md, id, decl));
+                        self.visit(decl.name_span, LocationInfo::InModule(md, id, InModule::NamedLocal(decl)));
                     }
                 }
                 Instruction::Wire(wire) => {
                     if let WireSource::WireRef(wire_ref) = &wire.source {
                         self.walk_wire_ref(md, wire_ref);
                     } else {
-                        self.visit(wire.span, LocationInfo::Temporary(md, id, wire));
+                        self.visit(wire.span, LocationInfo::InModule(md, id, InModule::Temporary(wire)));
                     };
                 }
                 Instruction::Write(write) => {
