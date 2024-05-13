@@ -59,12 +59,9 @@ pub fn parse_args() -> Vec<PathBuf> {
 
     // For debugging
     if file_paths.len() == 0 {
-        // Quick debugging
-        //file_paths.push(PathBuf::from("resetNormalizer.sus"));
-        //file_paths.push(PathBuf::from("multiply_add.sus"));
+        file_paths.push(PathBuf::from("test.sus"));
         file_paths.push(PathBuf::from("tinyTestFile.sus"));
         config.codegen = true;
-        //codegen = Some("first_bit_idx_6".to_owned());
     }
 
     file_paths

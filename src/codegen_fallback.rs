@@ -29,9 +29,9 @@ fn typ_to_verilog_array(typ : &ConcreteType) -> String {
         }
         ConcreteType::Array(arr) => {
             let (sub_typ, size) = arr.deref();
-            typ_to_verilog_array(sub_typ) + &arr_str(*size)
+            typ_to_verilog_array(sub_typ) + &arr_str(size.unwrap())
         }
-        ConcreteType::Unknown => unreachable!()
+        ConcreteType::Unknown | ConcreteType::Error => unreachable!()
     }
 }
 

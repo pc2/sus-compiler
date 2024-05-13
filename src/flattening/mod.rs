@@ -384,7 +384,7 @@ pub enum WireSource {
 
 impl WireSource {
     /// Enumerates all instructions that this instruction depends on. This includes (maybe compiletime) wires, and submodules. 
-    pub fn for_each_dependency<F : FnMut(FlatID)>(&self, func : &mut F) {
+    pub fn for_each_dependency<F : FnMut(FlatID)>(&self, mut func : F) {
         match self {
             WireSource::WireRef(from_wire) => {
                 match &from_wire.root {
@@ -491,7 +491,7 @@ impl Instruction {
         sm
     }
 
-    pub fn for_each_embedded_type<F : FnMut(&AbstractType, Span)>(&self, f : &mut F) {
+    pub fn for_each_embedded_type<F : FnMut(&AbstractType, Span)>(&self, mut f : F) {
         match self {
             Instruction::SubModule(_) | Instruction::Write(_) | Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
             Instruction::Declaration(decl) => {

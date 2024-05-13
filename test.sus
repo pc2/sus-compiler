@@ -699,3 +699,17 @@ module use_submodule_named_ports : int i -> int o {
 
 	o = sm.port_c
 }
+
+module contains_submodule_submodule : int a, int b, int c -> int r {
+	// Temp val
+    int tmp = submodule(a, b)
+	doNothing()
+	reg r = tmp + c
+}
+
+
+
+module beeep {
+
+}
+

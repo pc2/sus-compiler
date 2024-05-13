@@ -53,7 +53,7 @@ impl Value {
             (Self::Bool(_), typ) if *typ == BOOL_CONCRETE_TYPE => true,
             (Self::Array(arr_slice), ConcreteType::Array(arr_typ_box)) => {
                 let (arr_content_typ, arr_size_typ) = arr_typ_box.deref();
-                if arr_slice.len() != *arr_size_typ as usize {
+                if arr_slice.len() != arr_size_typ.unwrap() as usize {
                     return false;
                 }
                 for v in arr_slice.iter() {

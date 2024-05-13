@@ -28,7 +28,7 @@ impl WrittenType {
         }
     }
 
-    pub fn for_each_generative_input<F : FnMut(FlatID)>(&self, f : &mut F) {
+    pub fn for_each_generative_input<F : FnMut(FlatID)>(&self, mut f : F) {
         match self {
             WrittenType::Error(_) | WrittenType::Named(_, _) => {}
             WrittenType::Array(_span, arr_box) => {
@@ -223,8 +223,9 @@ pub fn typecheck_is_array_indexer<'a, TypVec : Index<TypeUUID, Output = NamedTyp
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ConcreteType {
     Named(TypeUUID),
-    Array(Box<(ConcreteType, u64)>),
-    Unknown
+    Array(Box<(ConcreteType, Option<u64>)>),
+    Unknown,
+    Error
 }
 
 impl Into<AbstractType> for &ConcreteType {
@@ -238,7 +239,8 @@ impl Into<AbstractType> for &ConcreteType {
                 let concrete_sub : AbstractType = sub.into();
                 AbstractType::Array(Box::new(concrete_sub))
             }
-            ConcreteType::Unknown => {AbstractType::Unknown}
+            ConcreteType::Unknown => AbstractType::Unknown,
+            ConcreteType::Error => AbstractType::Error
         }
     }
 }
@@ -254,14 +256,15 @@ impl ConcreteType {
             }
             ConcreteType::Array(arr) => {
                 let (arr_typ, arr_size) = arr.deref();
+                let arr_size = arr_size.unwrap();
                 let mut arr = Vec::new();
-                if *arr_size > 0 {
+                if arr_size > 0 {
                     let content_typ = arr_typ.get_initial_val(linker);
-                    arr.resize(*arr_size as usize, content_typ);
+                    arr.resize(arr_size as usize, content_typ);
                 }
                 Value::Array(arr.into_boxed_slice())
             }
-            ConcreteType::Unknown => unreachable!()
+            ConcreteType::Unknown | ConcreteType::Error => unreachable!()
         }
     }
     pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec) -> String {
@@ -271,9 +274,9 @@ impl ConcreteType {
             }
             ConcreteType::Array(arr_box) => {
                 let (elem_typ, arr_size) = arr_box.deref();
-                format!("{}[{}]", elem_typ.to_string(linker_types), arr_size)
+                format!("{}[{}]", elem_typ.to_string(linker_types), arr_size.unwrap())
             }
-            ConcreteType::Unknown => unreachable!()
+            ConcreteType::Unknown | ConcreteType::Error => unreachable!()
         }
     }
     pub fn down_array(&self) -> &ConcreteType {

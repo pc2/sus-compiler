@@ -127,7 +127,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         self.typecheck_wire_is_of_type(latency_spec_wire, &INT_TYPE, None, "latency specifier");
                     }
 
-                    decl.typ_expr.for_each_generative_input(&mut |param_id| {
+                    decl.typ_expr.for_each_generative_input(|param_id| {
                         self.typecheck_wire_is_of_type(self.working_on.instructions[param_id].unwrap_wire(), &INT_TYPE, None, "Array size");
                     });
                 }
@@ -182,7 +182,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
         // Post type application. Flag any remaining Type::Unknown
         for (_id, inst) in self.working_on.instructions.iter() {
-            inst.for_each_embedded_type(&mut |typ, span| {
+            inst.for_each_embedded_type(|typ, span| {
                 if typ.contains_error_or_unknown::<false, true>() {
                     self.errors.error(span, format!("Unresolved Type: {}", typ.to_string(&self.types)));
                 }
@@ -257,7 +257,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         self.must_be_compiletime(self.working_on.instructions[latency_specifier].unwrap_wire(), "Latency specifier");
                     }
 
-                    decl.typ_expr.for_each_generative_input(&mut |param_id| {
+                    decl.typ_expr.for_each_generative_input(|param_id| {
                         self.must_be_compiletime(self.working_on.instructions[param_id].unwrap_wire(), "Array size");
                     });
                 }
@@ -266,7 +266,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     if let WireSource::WireRef(from) = &wire.source {
                         is_generative = self.get_root_identifier_type(&from.root) == IdentifierType::Generative;
                     } else {
-                        wire.source.for_each_dependency(&mut |source_id| {
+                        wire.source.for_each_dependency(|source_id| {
                             match &self.working_on.instructions[source_id] {
                                 Instruction::SubModule(_sm) => {
                                     is_generative = false; // TODO generative submodules
@@ -365,10 +365,10 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 }
                 Instruction::SubModule(_) => {} // TODO Dependencies should be added here if for example generative templates get added
                 Instruction::Declaration(decl) => {
-                    decl.typ_expr.for_each_generative_input(&mut |id| instance_fanins[inst_id].push(id));
+                    decl.typ_expr.for_each_generative_input(|id| instance_fanins[inst_id].push(id));
                 }
                 Instruction::Wire(wire) => {
-                    wire.source.for_each_dependency(&mut |id| instance_fanins[inst_id].push(id));
+                    wire.source.for_each_dependency(|id| instance_fanins[inst_id].push(id));
                 }
                 Instruction::IfStatement(stm) => {
                     for id in UUIDRange(stm.then_start, stm.else_end) {

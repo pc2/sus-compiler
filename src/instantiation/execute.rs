@@ -181,17 +181,17 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         self.extract_integer_from_value(&val.value, span)
     }
 
-    fn concretize_type(&self, typ : &WrittenType) -> Option<ConcreteType> {
+    fn concretize_type(&self, typ : &WrittenType) -> ConcreteType {
         match typ {
             WrittenType::Error(_) => unreachable!("Bad types should be caught in flattening: {}", typ.to_string(&self.linker.types)),
             WrittenType::Named(_, id) => {
-                Some(ConcreteType::Named(*id))
+                ConcreteType::Named(*id)
             }
             WrittenType::Array(_, arr_box) => {
                 let (arr_content_typ, arr_size_wire, _bracket_span) = arr_box.deref();
                 let inner_typ = self.concretize_type(arr_content_typ);
                 let arr_size = self.extract_integer_from_generative(*arr_size_wire);
-                Some(ConcreteType::Array(Box::new((inner_typ?, arr_size?))))
+                ConcreteType::Array(Box::new((inner_typ, arr_size)))
             }
         }
     }
@@ -452,7 +452,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_wire, instance, port_map, name, module_uuid : submodule.module_uuid}))
                 }
                 Instruction::Declaration(wire_decl) => {
-                    let typ = self.concretize_type(&wire_decl.typ_expr)?;
+                    let typ = self.concretize_type(&wire_decl.typ_expr);
                     if wire_decl.identifier_type.is_generative() {
                         let initial_value = typ.into_initial_typed_val(self.linker);
                         SubModuleOrWire::CompileTimeValue(initial_value)
@@ -591,7 +591,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         // Wire to wire Fanin
         for (id, wire) in &self.wires {
             fanins.new_group();
-            wire.source.iter_sources_with_min_latency(&mut |from, delta_latency| {
+            wire.source.iter_sources_with_min_latency(|from, delta_latency| {
                 fanins.push_to_last_group(FanInOut{other : from.get_hidden_value(), delta_latency});
             });
 
@@ -757,16 +757,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         Some(interface)
     }
     
-
-    
-
     fn instantiate_full(&mut self) -> Option<FlatAlloc<InstantiatedPort, PortIDMarker>> {
         if self.md.link_info.errors.did_error {
             return None;// Don't instantiate modules that already errored. Otherwise instantiator may crash
         }
 
         for (_id, inst) in &self.md.instructions {
-            inst.for_each_embedded_type(&mut |typ,_span| {
+            inst.for_each_embedded_type(|typ,_span| {
                 assert!(!typ.contains_error_or_unknown::<true,true>(), "Types brought into instantiation may not contain 'bad types': {typ:?} in {inst:?}");
             })
         }
