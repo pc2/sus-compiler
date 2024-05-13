@@ -130,6 +130,7 @@ impl<'err_and_globals> ResolvedName<'err_and_globals> {
             err_ref.info(span_file, "Defined here");
         }
     }
+    
     pub fn expect_constant(self) -> Option<ConstantUUID> {
         if let NameElem::Constant(id) = self.name_elem? {
             Some(id)

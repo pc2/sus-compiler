@@ -656,7 +656,7 @@ module monotonize_down : bool[16] mbf -> bool[16] mtDown {
 			mbf2[i] = mbf[i]
 		}
 	}
-	
+
 	for int i in 0..16 {
 		if i % 4 < 2 {
 			mbf4[i] = mbf2[i] | mbf2[i+2]

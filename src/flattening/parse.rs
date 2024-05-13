@@ -613,6 +613,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 self.flatten_if_statement(cursor);
             } else if kind == kind!("for_statement") {
                 cursor.go_down_no_check(|cursor| {
+                    let loop_var_decl_frame = self.local_variable_context.new_frame();
                     cursor.field(field!("for_decl"));
                     let loop_var_decl = self.flatten_declaration::<false, false>(IdentifierType::Generative, true, true, cursor);
 
@@ -627,13 +628,16 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     let code_start = self.working_on.instructions.get_next_alloc_id();
 
                     cursor.field(field!("block"));
-                    self.flatten_code(cursor);
+                    // We already started a new local_variable_context to include the loop var
+                    self.flatten_code_keep_context(cursor);
                     
                     let code_end = self.working_on.instructions.get_next_alloc_id();
 
                     let Instruction::ForStatement(for_stmt) = &mut self.working_on.instructions[for_id] else {unreachable!()};
 
                     for_stmt.loop_body = UUIDRange(code_start, code_end);
+
+                    self.local_variable_context.pop_frame(loop_var_decl_frame);
                 })
             } else if kind == kind!("interface_statement") {
                 println!("TODO: Interface Statement");

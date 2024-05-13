@@ -33,6 +33,7 @@ impl<'file, IdT: Copy> LocalVariableContext<'file, IdT> {
     pub fn pop_frame(&mut self, prev_save : usize) {
         assert!(self.current_frame_starts_at >= prev_save);
         self.current_frame_starts_at = prev_save;
+        self.local_stack.truncate(prev_save);
     }
 }
 
