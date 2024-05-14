@@ -14,10 +14,71 @@ pub enum InModule<'linker> {
 
 #[derive(Clone, Copy, Debug)]
 pub enum LocationInfo<'linker> {
-    InModule(&'linker Module, FlatID, InModule<'linker>),
+    InModule(ModuleUUID, &'linker Module, FlatID, InModule<'linker>),
     Type(&'linker WrittenType),
     Global(NameElem),
-    Port(PortID, ModuleUUID, &'linker Port)
+    /// The contained module only refers to the module on which the port is defined
+    /// No reference to the module in which the reference was found is provided
+    Port(ModuleUUID, &'linker Module, PortID, &'linker Port)
+}
+
+/// Permits really efficient [RefersTo::refers_to_same_as] [LocationInfo] checking
+#[derive(Clone, Copy, Debug)]
+pub struct RefersTo {
+    pub local : Option<(ModuleUUID, FlatID)>,
+    pub global : Option<NameElem>,
+    pub port : Option<(ModuleUUID, PortID)>
+}
+
+impl<'linker> From<LocationInfo<'linker>> for RefersTo {
+    fn from(info : LocationInfo) -> Self {
+        let mut result = RefersTo{
+            local: None,
+            global: None,
+            port: None,
+        };
+        match info {
+            LocationInfo::InModule(md_id, md, flat_id, flat_obj) => {
+                match flat_obj {
+                    InModule::NamedLocal(_) => {
+                        for (port_id, port) in &md.module_ports.ports {
+                            if port.declaration_instruction == flat_id {
+                                result.port = Some((md_id, port_id));
+                            }
+                        }
+                        result.local = Some((md_id, flat_id));
+                    },
+                    InModule::NamedSubmodule(_) => {
+                        result.local = Some((md_id, flat_id));
+                    },
+                    InModule::Temporary(_) => {}
+                }
+            }
+            LocationInfo::Type(_) => {}
+            LocationInfo::Global(name_elem) => {
+                result.global = Some(name_elem);
+            }
+            LocationInfo::Port(md_id, md, p_id, port) => {
+                result.local = Some((md_id, port.declaration_instruction));
+                result.port = Some((md_id, p_id))
+            }
+        }
+        result
+    }
+}
+
+impl RefersTo {
+    pub fn refers_to_same_as(&self, info : LocationInfo) -> bool {
+        match info {
+            LocationInfo::InModule(md_id, _, obj, _) => self.local == Some((md_id, obj)),
+            LocationInfo::Type(_) => false,
+            LocationInfo::Global(ne) => self.global == Some(ne),
+            LocationInfo::Port(md_id, _, p_id, _) => self.port == Some((md_id, p_id))
+        }
+    }
+    pub fn is_global(&self) -> bool {
+        self.global.is_some() | self.port.is_some()
+    }
 }
 
 /// Walks the file, and provides all [LocationInfo]s. 
@@ -32,14 +93,14 @@ pub fn visit_all<'linker, Visitor : FnMut(Span, LocationInfo<'linker>)>(linker :
 }
 
 /// Walks the file, and provides all [LocationInfo]s. 
-pub fn visit_all_in_module<'linker, Visitor : FnMut(Span, LocationInfo<'linker>)>(linker : &'linker Linker, md : &'linker Module, visitor : Visitor) {
+pub fn visit_all_in_module<'linker, Visitor : FnMut(Span, LocationInfo<'linker>)>(linker : &'linker Linker, md_id : ModuleUUID, visitor : Visitor) {
     let mut walker = TreeWalker {
         linker,
         visitor,
         should_prune: |_| false,
     };
 
-    walker.walk_module(md);
+    walker.walk_module(md_id);
 }
 
 /// Walks the file, and finds the [LocationInfo] that is the most relevant
@@ -81,22 +142,22 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
         }
     }
 
-    fn walk_wire_ref(&mut self, md : &'linker Module, wire_ref : &'linker WireReference) {
+    fn walk_wire_ref(&mut self, md_id : ModuleUUID, md : &'linker Module, wire_ref : &'linker WireReference) {
         match &wire_ref.root {
             WireReferenceRoot::LocalDecl(decl_id, span) => {
-                self.visit(*span, LocationInfo::InModule(md, *decl_id, InModule::NamedLocal(md.instructions[*decl_id].unwrap_wire_declaration())));
+                self.visit(*span, LocationInfo::InModule(md_id, md, *decl_id, InModule::NamedLocal(md.instructions[*decl_id].unwrap_wire_declaration())));
             }
             WireReferenceRoot::NamedConstant(cst, span) => {
                 self.visit(*span, LocationInfo::Global(NameElem::Constant(*cst)))
             }
             WireReferenceRoot::SubModulePort(port) => {
                 if let Some(submod_name_span) = port.submodule_name_span {
-                    self.visit(submod_name_span, LocationInfo::InModule(md, port.submodule_flat, InModule::NamedSubmodule(md.instructions[port.submodule_flat].unwrap_submodule())));
+                    self.visit(submod_name_span, LocationInfo::InModule(md_id, md, port.submodule_flat, InModule::NamedSubmodule(md.instructions[port.submodule_flat].unwrap_submodule())));
                 }
                 if let Some(span) = port.port_name_span {
                     let module_uuid = md.instructions[port.submodule_flat].unwrap_submodule().module_uuid;
                     let submodule = &self.linker.modules[module_uuid];
-                    self.visit(span, LocationInfo::Port(port.port, module_uuid, &submodule.module_ports.ports[port.port]))
+                    self.visit(span, LocationInfo::Port(module_uuid, submodule, port.port, &submodule.module_ports.ports[port.port]))
                 }
             }
         }
@@ -120,33 +181,38 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
         }
     }
     
-    fn walk_module(&mut self, md : &'linker Module) {
-        for (id, inst) in &md.instructions {
-            match inst {
-                Instruction::SubModule(sm) => {
-                    self.visit(sm.module_name_span, LocationInfo::Global(NameElem::Module(sm.module_uuid)));
-                    if let Some((_sm_name, sm_name_span)) = &sm.name {
-                        self.visit(*sm_name_span, LocationInfo::InModule(md, id, InModule::NamedSubmodule(sm)));
+    fn walk_module(&mut self, md_id : ModuleUUID) {
+        let md = &self.linker.modules[md_id];
+        if !(self.should_prune)(md.link_info.span) {
+            self.visit(md.link_info.name_span, LocationInfo::Global(NameElem::Module(md_id)));
+
+            for (id, inst) in &md.instructions {
+                match inst {
+                    Instruction::SubModule(sm) => {
+                        self.visit(sm.module_name_span, LocationInfo::Global(NameElem::Module(sm.module_uuid)));
+                        if let Some((_sm_name, sm_name_span)) = &sm.name {
+                            self.visit(*sm_name_span, LocationInfo::InModule(md_id, md, id, InModule::NamedSubmodule(sm)));
+                        }
                     }
-                }
-                Instruction::Declaration(decl) => {
-                    self.walk_type(&decl.typ_expr);
-                    if decl.declaration_itself_is_not_written_to {
-                        self.visit(decl.name_span, LocationInfo::InModule(md, id, InModule::NamedLocal(decl)));
+                    Instruction::Declaration(decl) => {
+                        self.walk_type(&decl.typ_expr);
+                        if decl.declaration_itself_is_not_written_to {
+                            self.visit(decl.name_span, LocationInfo::InModule(md_id, md, id, InModule::NamedLocal(decl)));
+                        }
                     }
-                }
-                Instruction::Wire(wire) => {
-                    if let WireSource::WireRef(wire_ref) = &wire.source {
-                        self.walk_wire_ref(md, wire_ref);
-                    } else {
-                        self.visit(wire.span, LocationInfo::InModule(md, id, InModule::Temporary(wire)));
-                    };
-                }
-                Instruction::Write(write) => {
-                    self.walk_wire_ref(md, &write.to);
-                }
-                Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
-            };
+                    Instruction::Wire(wire) => {
+                        if let WireSource::WireRef(wire_ref) = &wire.source {
+                            self.walk_wire_ref(md_id, md, wire_ref);
+                        } else {
+                            self.visit(wire.span, LocationInfo::InModule(md_id, md, id, InModule::Temporary(wire)));
+                        };
+                    }
+                    Instruction::Write(write) => {
+                        self.walk_wire_ref(md_id, md, &write.to);
+                    }
+                    Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
+                };
+            }
         }
     }
 
@@ -154,12 +220,7 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
         for global in &file.associated_values {
             match *global {
                 NameElem::Module(md_id) => {
-                    let md = &self.linker.modules[md_id];
-                    
-                    if !(self.should_prune)(md.link_info.span) {
-                        self.visit(md.link_info.name_span, LocationInfo::Global(NameElem::Module(md_id)));
-                        self.walk_module(md);
-                    }
+                    self.walk_module(md_id);
                 }
                 NameElem::Type(_) => {
                     todo!()
