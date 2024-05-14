@@ -36,7 +36,7 @@ fn cvt_location_list(location_vec: Vec<SpanFile>, file_cache: &LoadedFileCache) 
 }
 fn cvt_location_list_of_lists(location_vec: Vec<(FileUUID, Vec<Span>)>, file_cache: &LoadedFileCache) -> Vec<Location> {
     let mut result_len = 0;
-    for (f, v) in &location_vec {
+    for (_f, v) in &location_vec {
         result_len += v.len();
     }
     let mut result = Vec::with_capacity(result_len);

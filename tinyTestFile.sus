@@ -23,3 +23,7 @@ module port_names : int i -> int o, int o2 {
 module func_call : int i -> int o, int o2 {
 	o, o2 = named_ports(i)
 }
+
+module use_submodule_named_ports {
+	submodule_named_ports submod
+}

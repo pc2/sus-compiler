@@ -58,7 +58,7 @@ impl<'linker> From<LocationInfo<'linker>> for RefersTo {
             LocationInfo::Global(name_elem) => {
                 result.global = Some(name_elem);
             }
-            LocationInfo::Port(md_id, md, p_id, port) => {
+            LocationInfo::Port(md_id, _md, p_id, port) => {
                 result.local = Some((md_id, port.declaration_instruction));
                 result.port = Some((md_id, p_id))
             }

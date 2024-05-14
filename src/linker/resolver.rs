@@ -131,6 +131,7 @@ impl<'err_and_globals> ResolvedName<'err_and_globals> {
         }
     }
     
+    #[allow(dead_code)]
     pub fn expect_constant(self) -> Option<ConstantUUID> {
         if let NameElem::Constant(id) = self.name_elem? {
             Some(id)
