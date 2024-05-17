@@ -12,7 +12,7 @@ pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID}, parser::Documentation, typing::{AbstractType, WrittenType}, value::Value
+    arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID}, parser::Documentation, pretty_print_many_spans, typing::{AbstractType, WrittenType}, value::Value
 };
 
 
@@ -107,10 +107,14 @@ impl Module {
         for (port_id, port) in &self.module_ports.ports {
             println!("    {} -> {:?}", self.make_port_info_string(port_id, file_text), port);
         }
-        println!("Instantiations:");
+        println!("Instructions:");
+        let mut spans_print = Vec::new();
         for (id, inst) in &self.instructions {
-            println!("    {:?}: {:?}", id, inst);
+            println!("    {id:?}: {inst:?}");
+            let span = self.get_instruction_span(id);
+            spans_print.push((format!("{id:?}"), span.into_range()));
         }
+        pretty_print_many_spans(file_text.file_text.clone(), &spans_print);
     }
 
     /// Get a port by the given name. Reports non existing ports errors
@@ -125,6 +129,17 @@ impl Module {
             .error(name_span, format!("There is no port '{name_text}' on module {}", self.link_info.name))
             .info_obj(self);
         return None
+    }
+
+    pub fn get_instruction_span(&self, instr_id : FlatID) -> Span {
+        match &self.instructions[instr_id] {
+            Instruction::SubModule(sm) => sm.module_name_span,
+            Instruction::Declaration(decl) => decl.get_span(),
+            Instruction::Wire(w) => w.span,
+            Instruction::Write(conn) => conn.to.span,
+            Instruction::IfStatement(if_stmt) => self.get_instruction_span(if_stmt.condition),
+            Instruction::ForStatement(for_stmt) => self.get_instruction_span(for_stmt.loop_var_decl),
+        }
     }
 }
 
@@ -386,11 +401,16 @@ impl WireSource {
     /// Enumerates all instructions that this instruction depends on. This includes (maybe compiletime) wires, and submodules. 
     pub fn for_each_dependency<F : FnMut(FlatID)>(&self, mut func : F) {
         match self {
-            WireSource::WireRef(from_wire) => {
-                match &from_wire.root {
+            WireSource::WireRef(wire_ref) => {
+                match &wire_ref.root {
                     WireReferenceRoot::LocalDecl(decl_id, _) => func(*decl_id),
                     WireReferenceRoot::NamedConstant(_, _) => {}
                     WireReferenceRoot::SubModulePort(submod_port) => func(submod_port.submodule_flat),
+                }
+                for p in &wire_ref.path {
+                    match p {
+                        WireReferencePathElement::ArrayIdx { idx, bracket_span:_ } => func(*idx),
+                    }
                 }
             }
             &WireSource::UnaryOp { op:_, right } => {func(right)}
@@ -501,16 +521,6 @@ impl Instruction {
                 f(&w.typ, w.span);
             }
         }
-    }
-
-    pub fn get_location_of_module_part(&self) -> Option<Span> {
-        Some(match self {
-            Instruction::SubModule(sm) => sm.module_name_span,
-            Instruction::Declaration(decl) => decl.name_span,
-            Instruction::Wire(w) => w.span,
-            Instruction::Write(conn) => conn.to.span,
-            Instruction::IfStatement(_) | Instruction::ForStatement(_) => return None
-        })
     }
 }
 

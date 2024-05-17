@@ -1,4 +1,10 @@
 
+//timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
+module multiply_v : int a, int b -> int r {
+	r = a * b
+}
+
+/*
 module named_ports : int in_port -> int out_port, int out_port_two {
 	out_port = in_port
 	out_port_two = in_port
@@ -27,3 +33,4 @@ module func_call : int i -> int o, int o2 {
 module use_submodule_named_ports {
 	submodule_named_ports submod
 }
+*/

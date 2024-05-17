@@ -36,10 +36,10 @@ use config::{config, parse_args};
 use flattening::Module;
 use codegen_fallback::gen_verilog_code;
 use dev_aid::ariadne_interface::*;
-use linker::{Linker, ModuleUUID};
+use linker::Linker;
 
-fn codegen_to_file(linker : &Linker, id : ModuleUUID, md : &Module) -> Option<()> {
-    let Some(inst) = instantiate(linker, id) else {
+fn codegen_to_file(linker : &Linker, md : &Module) -> Option<()> {
+    let Some(inst) = instantiate(linker, md) else {
         println!("Module {} instantiation encountered errors.", md.link_info.name);
 
         return None;
@@ -73,8 +73,8 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     print_all_errors(&linker, &mut paths_arena);
     
     if config.codegen {
-        for (id, md) in &linker.modules {
-            codegen_to_file(&linker, id, md);
+        for (_id, md) in &linker.modules {
+            codegen_to_file(&linker, md);
         }
     }
 

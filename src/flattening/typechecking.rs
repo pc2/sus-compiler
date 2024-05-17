@@ -201,22 +201,6 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     }
 
-    fn get_root_identifier_type(&self, wire_ref_root : &WireReferenceRoot) -> IdentifierType {
-        match wire_ref_root {
-            WireReferenceRoot::LocalDecl(decl_id, _) => {
-                let decl = self.working_on.instructions[*decl_id].unwrap_wire_declaration();
-                decl.identifier_type
-            }
-            WireReferenceRoot::NamedConstant(_, _) => {
-                IdentifierType::Generative
-            }
-            WireReferenceRoot::SubModulePort(port) => {
-                let (decl, _file) = self.get_decl_of_module_port(*port);
-                decl.identifier_type
-            }
-        }
-    }
-
     fn get_root_identifier_read_only(&self, wire_ref_root : &WireReferenceRoot) -> bool {
         match wire_ref_root {
             WireReferenceRoot::LocalDecl(decl_id, _) => {
@@ -263,23 +247,24 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 }
                 Instruction::Wire(wire) => {
                     let mut is_generative = true;
-                    if let WireSource::WireRef(from) = &wire.source {
-                        is_generative = self.get_root_identifier_type(&from.root) == IdentifierType::Generative;
-                    } else {
-                        wire.source.for_each_dependency(|source_id| {
-                            match &self.working_on.instructions[source_id] {
-                                Instruction::SubModule(_sm) => {
-                                    is_generative = false; // TODO generative submodules
-                                }
-                                Instruction::Wire(source_wire) => {
-                                    if !source_wire.is_compiletime {
-                                        is_generative = false;
-                                    }
-                                }
-                                _other => unreachable!()
+                    wire.source.for_each_dependency(|source_id| {
+                        match &self.working_on.instructions[source_id] {
+                            Instruction::SubModule(_sm) => {
+                                is_generative = false; // TODO generative submodules
                             }
-                        });
-                    }
+                            Instruction::Wire(source_wire) => {
+                                if !source_wire.is_compiletime {
+                                    is_generative = false;
+                                }
+                            }
+                            Instruction::Declaration(decl) => {
+                                if !decl.identifier_type.is_generative() {
+                                    is_generative = false;
+                                }
+                            }
+                            other => unreachable!("{other:?}")
+                        }
+                    });
                     let Instruction::Wire(wire) = &mut self.working_on.instructions[inst_id] else {unreachable!()};
                     wire.is_compiletime = is_generative;
                 }

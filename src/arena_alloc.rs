@@ -173,10 +173,10 @@ impl<T, IndexMarker : UUIDMarker> ArenaAllocator<T, IndexMarker> {
         self.data.clear();
         self.free_slots.clear();
     }
-    pub fn iter<'a>(&'a self) -> ArenaIterator<'a, T, IndexMarker> {
+    pub fn iter<'a>(&'a self) -> FlatOptionIterator<'a, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn iter_mut<'a>(&'a mut self) -> ArenaIteratorMut<'a, T, IndexMarker> {
+    pub fn iter_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
         self.into_iter()
     }
 }
@@ -197,12 +197,12 @@ impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for ArenaAllocator
     }
 }
 
-pub struct ArenaIterator<'a, T, IndexMarker> {
+pub struct FlatOptionIterator<'a, T, IndexMarker> {
     it: Enumerate<std::slice::Iter<'a, Option<T>>>,
     _ph : PhantomData<IndexMarker>
 }
 
-impl<'a, T, IndexMarker : UUIDMarker> Iterator for ArenaIterator<'a, T, IndexMarker> {
+impl<'a, T, IndexMarker : UUIDMarker> Iterator for FlatOptionIterator<'a, T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -220,12 +220,12 @@ impl<'a, T, IndexMarker : UUIDMarker> Iterator for ArenaIterator<'a, T, IndexMar
     }
 }
 
-pub struct ArenaIteratorMut<'a, T, IndexMarker> {
+pub struct FlatOptionIteratorMut<'a, T, IndexMarker> {
     it: Enumerate<std::slice::IterMut<'a, Option<T>>>,
     _ph : PhantomData<IndexMarker>
 }
 
-impl<'a, T, IndexMarker : UUIDMarker> Iterator for ArenaIteratorMut<'a, T, IndexMarker> {
+impl<'a, T, IndexMarker : UUIDMarker> Iterator for FlatOptionIteratorMut<'a, T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a mut T);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -246,20 +246,20 @@ impl<'a, T, IndexMarker : UUIDMarker> Iterator for ArenaIteratorMut<'a, T, Index
 impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a ArenaAllocator<T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a T);
 
-    type IntoIter = ArenaIterator<'a, T, IndexMarker>;
+    type IntoIter = FlatOptionIterator<'a, T, IndexMarker>;
 
     fn into_iter(self) -> Self::IntoIter {
-        ArenaIterator{it : self.data.iter().enumerate(), _ph : PhantomData}
+        FlatOptionIterator{it : self.data.iter().enumerate(), _ph : PhantomData}
     }
 }
 
 impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a mut ArenaAllocator<T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a mut T);
 
-    type IntoIter = ArenaIteratorMut<'a, T, IndexMarker>;
+    type IntoIter = FlatOptionIteratorMut<'a, T, IndexMarker>;
 
     fn into_iter(self) -> Self::IntoIter {
-        ArenaIteratorMut{it : self.data.iter_mut().enumerate(), _ph : PhantomData}
+        FlatOptionIteratorMut{it : self.data.iter_mut().enumerate(), _ph : PhantomData}
     }
 }
 
@@ -282,10 +282,10 @@ impl<T, IndexMarker : UUIDMarker> ArenaVector<T, IndexMarker> {
     pub fn remove(&mut self, UUID(uuid, _) : UUID<IndexMarker>) {
         self.data[uuid] = None;
     }
-    pub fn iter<'a>(&'a self) -> ArenaIterator<'a, T, IndexMarker> {
+    pub fn iter<'a>(&'a self) -> FlatOptionIterator<'a, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn iter_mut<'a>(&'a mut self) -> ArenaIteratorMut<'a, T, IndexMarker> {
+    pub fn iter_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
         self.into_iter()
     }
 }
@@ -307,20 +307,20 @@ impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for ArenaVector<T,
 impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a ArenaVector<T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a T);
 
-    type IntoIter = ArenaIterator<'a, T, IndexMarker>;
+    type IntoIter = FlatOptionIterator<'a, T, IndexMarker>;
 
     fn into_iter(self) -> Self::IntoIter {
-        ArenaIterator{it : self.data.iter().enumerate(), _ph : PhantomData}
+        FlatOptionIterator{it : self.data.iter().enumerate(), _ph : PhantomData}
     }
 }
 
 impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a mut ArenaVector<T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a mut T);
 
-    type IntoIter = ArenaIteratorMut<'a, T, IndexMarker>;
+    type IntoIter = FlatOptionIteratorMut<'a, T, IndexMarker>;
 
     fn into_iter(self) -> Self::IntoIter {
-        ArenaIteratorMut{it : self.data.iter_mut().enumerate(), _ph : PhantomData}
+        FlatOptionIteratorMut{it : self.data.iter_mut().enumerate(), _ph : PhantomData}
     }
 }
 
@@ -475,6 +475,15 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
     }
     pub fn range_since(&self, id : UUID<IndexMarker>) -> UUIDRange<IndexMarker> {
         UUIDRange(id, UUID(self.data.len(), PhantomData))
+    }
+}
+
+impl<T, IndexMarker : UUIDMarker> FlatAlloc<Option<T>, IndexMarker> {
+    pub fn iter_valids<'a>(&'a self) -> FlatOptionIterator<'a, T, IndexMarker> {
+        FlatOptionIterator{ it: self.data.iter().enumerate(), _ph: PhantomData }
+    }
+    pub fn iter_valids_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
+        FlatOptionIteratorMut{ it: self.data.iter_mut().enumerate(), _ph: PhantomData }
     }
 }
 

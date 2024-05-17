@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use num::BigInt;
 
-use crate::{errors::ErrorCollector, file_position::BracketSpan, flattening::{BinaryOperator, UnaryOperator}, typing::{AbstractType, ConcreteType, BOOL_CONCRETE_TYPE, BOOL_TYPE, INT_CONCRETE_TYPE, INT_TYPE}};
+use crate::{flattening::{BinaryOperator, UnaryOperator}, typing::{AbstractType, ConcreteType, BOOL_CONCRETE_TYPE, BOOL_TYPE, INT_CONCRETE_TYPE, INT_TYPE}};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum Value {
@@ -11,6 +11,30 @@ pub enum Value {
     Array(Box<[Value]>),
     Unset,
     Error
+}
+
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Bool(b) => b.fmt(f),
+            Value::Integer(i) => i.fmt(f),
+            Value::Array(arr_box) => {
+                f.write_str("[")?;
+                let mut iter = arr_box.iter();
+                if let Some(v) = iter.next() {
+                    v.fmt(f)?;
+
+                    for v in iter {
+                        f.write_str(", ")?;
+                        v.fmt(f)?;
+                    }
+                }
+                f.write_str("]")
+            }
+            Value::Unset => f.write_str("{value_unset}"),
+            Value::Error => f.write_str("{value_error}"),
+        }
+    }
 }
 
 impl Value {
@@ -53,7 +77,7 @@ impl Value {
             (Self::Bool(_), typ) if *typ == BOOL_CONCRETE_TYPE => true,
             (Self::Array(arr_slice), ConcreteType::Array(arr_typ_box)) => {
                 let (arr_content_typ, arr_size_typ) = arr_typ_box.deref();
-                if arr_slice.len() != arr_size_typ.unwrap() as usize {
+                if arr_slice.len() != arr_size_typ.unwrap_value().unwrap_usize() {
                     return false;
                 }
                 for v in arr_slice.iter() {
@@ -80,6 +104,13 @@ impl Value {
     pub fn unwrap_integer(&self) -> &BigInt {
         let Self::Integer(i) = self else {panic!("{:?} is not an integer!", self)};
         i
+    }
+
+    #[track_caller]
+    pub fn unwrap_usize(&self) -> usize {
+        let Self::Integer(i) = self else {panic!("{:?} is not an integer!", self)};
+        use num::ToPrimitive;
+        i.to_usize().expect("Integer too large? Program crash")
     }
 
     #[track_caller]
@@ -194,20 +225,5 @@ impl TypedValue {
     #[track_caller]
     pub fn unwrap_bool(&self) -> bool {
         self.value.unwrap_bool()
-    }
-
-    pub fn array_access(&self, idx : usize, span : BracketSpan, errors : &ErrorCollector) -> Option<TypedValue> {
-        let typ = self.typ.down_array().clone();
-
-        Some(if let Value::Array(arr) = &self.value {
-            let Some(elem) = arr.get(idx) else {
-                errors.error(span.outer_span(), format!("Compile-Time Array index is out of range: idx: {idx}, array size: {}", arr.len()));
-                return None
-            };
-            TypedValue{typ, value : elem.clone()}
-        } else {
-            assert!(self.value == Value::Error || self.value == Value::Unset);
-            TypedValue{typ, value : Value::Error}
-        })
     }
 }

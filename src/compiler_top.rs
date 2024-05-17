@@ -3,7 +3,7 @@ use std::rc::Rc;
 use tree_sitter::Parser;
 
 use crate::{
-    config::config, debug::SpanDebugger, errors::ErrorStore, file_position::FileText, flattening::{flatten_all_modules, gather_initial_file_data, typecheck_all_modules, Module}, instantiation::InstantiatedModule, linker::{FileData, FileUUID, Linker, ModuleUUID}
+    config::config, debug::SpanDebugger, errors::ErrorStore, file_position::FileText, flattening::{flatten_all_modules, gather_initial_file_data, typecheck_all_modules, Module}, instantiation::InstantiatedModule, linker::{FileData, FileUUID, Linker}
 };
 
 pub fn add_file(text : String, linker : &mut Linker) -> FileUUID {
@@ -67,16 +67,18 @@ pub fn recompile_all(linker : &mut Linker) {
 
     // Make an initial instantiation of all modules
     // Won't be possible once we have template modules
-    for (id, _md) in &linker.modules {
+    for (_id, md) in &linker.modules {
         //md.print_flattened_module();
         // Already instantiate any modules without parameters
         // Currently this is all modules
-        let _inst = instantiate(&linker, id);
+        let span_debug = format!("instantiating {}", &md.link_info.name);
+        let mut span_debugger = SpanDebugger::new(&span_debug, &linker.files[md.link_info.file].file_text);
+        let _inst = instantiate(&linker, md);
+        span_debugger.defuse();
     }
 }
 
-pub fn instantiate(linker : &Linker, module_id : ModuleUUID) -> Option<Rc<InstantiatedModule>> {
-    let md = &linker.modules[module_id];
+pub fn instantiate(linker : &Linker, md : &Module) -> Option<Rc<InstantiatedModule>> {
     println!("Instantiating {}", md.link_info.name);
 
     md.instantiations.instantiate(&md.link_info.name, md, linker)

@@ -244,21 +244,6 @@ impl Linker {
         result
     }
 
-    pub fn get_module_id(&self, name : &str) -> Option<ModuleUUID> {
-        let NamespaceElement::Global(NameElem::Module(id)) = self.global_namespace.get(name)? else {return None};
-        Some(*id)
-    }
-    #[allow(dead_code)]
-    pub fn get_type_id(&self, name : &str) -> Option<TypeUUID> {
-        let NamespaceElement::Global(NameElem::Type(id)) = self.global_namespace.get(name)? else {return None};
-        Some(*id)
-    }
-    #[allow(dead_code)]
-    pub fn get_constant_id(&self, name : &str) -> Option<ConstantUUID> {
-        let NamespaceElement::Global(NameElem::Constant(id)) = self.global_namespace.get(name)? else {return None};
-        Some(*id)
-    }
-
     pub fn get_link_info(&self, global : NameElem) -> Option<&LinkInfo> {
         match global {
             NameElem::Module(md_id) => Some(&self.modules[md_id].link_info),

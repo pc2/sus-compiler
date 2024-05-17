@@ -2,7 +2,7 @@
 use std::{ops::Range, path::PathBuf};
 
 use crate::{
-    arena_alloc::ArenaVector, compiler_top::{add_file, recompile_all}, config::config, errors::{CompileError, ErrorLevel}, linker::{FileUUID, FileUUIDMarker, Linker}
+    arena_alloc::ArenaVector, compiler_top::{add_file, recompile_all}, config::config, errors::{CompileError, ErrorLevel}, linker::{FileUUID, FileUUIDMarker, Linker},
 };
 
 use ariadne::*;
@@ -116,5 +116,34 @@ pub fn pretty_print_spans_in_reverse_order(file_text : String, spans : Vec<Range
     
         report.finish().print(&mut source).unwrap();
     }
+}
+
+pub fn pretty_print_many_spans(file_text : String, spans : &[(String, Range<usize>)]) {
+    let text_len = file_text.len();
+    let mut source = Source::from(file_text);
+
+    let config = 
+    Config::default()
+    .with_index_type(IndexType::Byte)
+    .with_color(!config().use_lsp); // Disable color because LSP output doesn't support it
+
+    if spans.len() == 0 {return}
+
+    let mut report: ReportBuilder<'_, Range<usize>> = Report::build(ReportKind::Advice, (), spans[0].1.start).with_config(config);
+    
+    for (text, span) in spans.into_iter().rev() {
+        // If span not in file, just don't print it. This happens. 
+        if span.end > text_len {
+            println!("Span({}, {}) certainly does not correspond to this file. ", span.start, span.end);
+            return;
+        }
+    
+        report = report.with_label(
+            Label::new(span.clone())
+                .with_message(text)
+                .with_color(Color::Blue)
+        );
+    }
+    report.finish().print(&mut source).unwrap();
 }
 

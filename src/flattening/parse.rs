@@ -209,8 +209,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 
     fn flatten_array_bracket(&mut self, cursor : &mut Cursor) -> (FlatID, BracketSpan) {
+        let bracket_span = BracketSpan::from_outer(cursor.span());
         cursor.go_down_content(kind!("array_bracket_expression"), 
-            |cursor| (self.flatten_expr(cursor), BracketSpan::from_outer(cursor.span()))
+            |cursor| (self.flatten_expr(cursor), bracket_span)
         )
     }
 

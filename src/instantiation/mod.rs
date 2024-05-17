@@ -5,6 +5,8 @@ mod list_of_lists;
 
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
+use num::BigInt;
+
 use crate::{
     arena_alloc::{FlatAlloc, UUIDMarker, UUID},
     errors::{CompileError, ErrorStore},
@@ -39,7 +41,7 @@ pub struct ConnectFrom {
 #[derive(Debug)]
 pub enum RealWirePathElem {
     MuxArrayWrite{span : BracketSpan, idx_wire : WireID},
-    ConstArrayWrite{span : BracketSpan, idx : Option<usize>} // Maybe errored
+    ConstArrayWrite{span : BracketSpan, idx : BigInt}
 }
 
 #[derive(Debug)]
@@ -140,13 +142,12 @@ pub struct InstantiatedPort {
 pub struct InstantiatedModule {
     /// Unique name involving all template arguments
     pub name : String,
-    /// Interface is only valid if all wires of the interface were valid
-    /// 
-    /// Each port has a bool associated with it. It is true if 
-    pub interface_ports : FlatAlloc<InstantiatedPort, PortIDMarker>,
+    pub errors : ErrorStore,
+    /// This matches the ports in [Module::module_ports]. Ports are not None when they are not part of this instantiation. 
+    pub interface_ports : FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     pub wires : FlatAlloc<RealWire, WireIDMarker>,
     pub submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
-    pub generation_state : FlatAlloc<SubModuleOrWire, FlatIDMarker>
+    pub generation_state : FlatAlloc<SubModuleOrWire, FlatIDMarker>,
 }
 
 #[derive(Debug, Clone)]
@@ -183,9 +184,17 @@ pub enum RealWireRefRoot {
     Constant(TypedValue)
 }
 
+impl RealWireRefRoot {
+    #[track_caller]
+    pub fn unwrap_wire(&self) -> WireID {
+        let Self::Wire(w) = self else {unreachable!("RealWireRefRoot::unwrap_wire")};
+        *w
+    }
+}
+
 #[derive(Debug)]
 pub struct InstantiationList {
-    cache : RefCell<Vec<(Rc<InstantiatedModule>, ErrorStore)>>
+    cache : RefCell<Vec<Rc<InstantiatedModule>>>
 }
 
 impl InstantiationList {
@@ -198,14 +207,14 @@ impl InstantiationList {
         
         // Temporary, no template arguments yet
         if cache_borrow.is_empty() {
-            let (result, instantiation_errors) = perform_instantiation(name, module, linker);
-            cache_borrow.push((Rc::new(result), instantiation_errors));
+            let result = perform_instantiation(name, module, linker);
+            cache_borrow.push(Rc::new(result));
         }
         
         let instance_id = 0; // Temporary, will always be 0 while not template arguments
         let instance = &cache_borrow[instance_id];
-        if !instance.1.did_error {
-            Some(instance.0.clone())
+        if !instance.errors.did_error {
+            Some(instance.clone())
         } else {
             None
         }
@@ -214,7 +223,7 @@ impl InstantiationList {
     pub fn for_each_error<F : FnMut(&CompileError)>(&self, func : &mut F) {
         let cache_borrow = self.cache.borrow();
         for inst in cache_borrow.deref() {
-            for err in &inst.1 {
+            for err in &inst.errors {
                 func(err)
             }
         }
@@ -229,7 +238,7 @@ impl InstantiationList {
     pub fn for_each_instance<F : FnMut(&InstantiatedModule)>(&self, mut f : F) {
         let borrow = self.cache.borrow();
         for v in borrow.iter() {
-            f(v.0.as_ref())
+            f(v.as_ref())
         }
     }
 }
