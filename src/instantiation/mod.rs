@@ -2,16 +2,18 @@
 mod latency_algorithm;
 mod execute;
 mod list_of_lists;
+mod typecheck;
+mod latency_count;
 
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use num::BigInt;
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, config, errors::{CompileError, ErrorStore}, file_position::BracketSpan, flattening::{BinaryOperator, FlatID, FlatIDMarker, Module, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, typing::ConcreteType, value::{TypedValue, Value}
+    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::BracketSpan, flattening::{BinaryOperator, FlatID, FlatIDMarker, Module, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, typing::ConcreteType, value::{TypedValue, Value}
 };
 
-use self::{execute::perform_instantiation, latency_algorithm::SpecifiedLatency};
+use self::latency_algorithm::SpecifiedLatency;
 
 pub struct WireIDMarker;
 impl UUIDMarker for WireIDMarker {const DISPLAY_NAME : &'static str = "wire_";}
@@ -243,4 +245,66 @@ impl InstantiationList {
             f(v.as_ref())
         }
     }
+}
+
+
+struct InstantiationContext<'fl, 'l> {
+    name : String,
+    generation_state : FlatAlloc<SubModuleOrWire, FlatIDMarker>,
+    wires : FlatAlloc<RealWire, WireIDMarker>,
+    submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
+    specified_latencies : Vec<(WireID, i64)>,
+
+    interface_ports : FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
+    errors : ErrorCollector<'l>,
+
+    md : &'fl Module,
+    linker : &'l Linker,
+}
+
+impl<'fl, 'l> InstantiationContext<'fl, 'l> {
+    fn extract(self) -> InstantiatedModule {
+        InstantiatedModule {
+            name : self.name,
+            wires : self.wires,
+            submodules : self.submodules,
+            interface_ports : self.interface_ports,
+            generation_state : self.generation_state,
+            errors : self.errors.into_storage()
+        }
+    }
+}
+
+fn perform_instantiation(md : &Module, linker : &Linker) -> InstantiatedModule {
+    let mut context = InstantiationContext{
+        name : md.link_info.name.clone(),
+        generation_state : md.instructions.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect(),
+        wires : FlatAlloc::new(),
+        submodules : FlatAlloc::new(),
+        specified_latencies : Vec::new(),
+        interface_ports : md.ports.iter().map(|_| None).collect(),
+        errors : ErrorCollector::new_empty(md.link_info.file, &linker.files),
+        md,
+        linker : linker
+    };
+
+    // Don't instantiate modules that already errored. Otherwise instantiator may crash
+    if md.link_info.errors.did_error {
+        println!("Not Instantiating {} due to flattening errors", md.link_info.name);
+        return context.extract();
+    }
+
+    println!("Instantiating {}", md.link_info.name);
+
+    if let Err(e) = context.execute_module() {
+        context.errors.error(e.0, e.1);
+
+        return context.extract();
+    }
+
+    println!("Concrete Typechecking and Latency Counting {}", md.link_info.name);
+    context.typecheck();
+    context.compute_latencies();
+
+    context.extract()
 }
