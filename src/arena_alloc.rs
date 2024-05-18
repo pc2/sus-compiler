@@ -503,7 +503,7 @@ impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for FlatAlloc<T, I
 
 impl<T : Debug, IndexMarker> Debug for FlatAlloc<T, IndexMarker> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        f.debug_struct("FlatAlloc").field("data", &self.data).finish()
+        self.data.fmt(f)
     }
 }
 

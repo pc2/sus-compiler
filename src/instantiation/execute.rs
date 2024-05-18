@@ -373,18 +373,18 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             let instance_to_add : SubModuleOrWire = match instr {
                 Instruction::SubModule(submodule) => {
                     let sub_module = &self.linker.modules[submodule.module_uuid];
-                    let Some(instance) = sub_module.instantiations.instantiate(sub_module, self.linker) else {return Err((submodule.module_name_span, "Error instantiating submodule".to_owned()))}; // Avoid error from submodule
-
-                    let port_map = std::iter::zip(instance.interface_ports.iter(), sub_module.ports.iter()).map(|((_, instance_data), (_, port_data))| {
-                        let typ = if let Some(instance_data) = instance_data {
-                            instance_data.typ.clone()
+                    
+                    let new_submodule_id = self.submodules.get_next_alloc_id();
+                    let port_map = sub_module.ports.iter().map(|(port_id, port_data)| {
+                        let source = if port_data.identifier_type.unwrap_is_input() {
+                            RealWireDataSource::Multiplexer { is_state: None, sources: Vec::new() }
                         } else {
-                            ConcreteType::Error
+                            RealWireDataSource::OutPort { sub_module_id: new_submodule_id, port_id }
                         };
                         self.wires.alloc(RealWire {
-                            source: RealWireDataSource::Multiplexer { is_state: None, sources: Vec::new() },
+                            source,
                             original_instruction,
-                            typ,
+                            typ : ConcreteType::Unknown,
                             name: port_data.name.clone(),
                             absolute_latency: CALCULATE_LATENCY_LATER,
                             needed_until: CALCULATE_LATENCY_LATER
@@ -395,7 +395,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     } else {
                         self.get_unique_name()
                     };
-                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_flat: original_instruction, instance, port_map, name, module_uuid : submodule.module_uuid}))
+                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_instruction, instance : None, port_map, name, module_uuid : submodule.module_uuid}))
                 }
                 Instruction::Declaration(wire_decl) => {
                     self.instantiate_declaration(wire_decl, original_instruction)?

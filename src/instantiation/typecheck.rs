@@ -28,6 +28,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
             match &this_wire.source {
                 RealWireDataSource::ReadOnly => {}
+                RealWireDataSource::OutPort { sub_module_id:_, port_id:_ } => {} // Currently all ports have their types assigned at execution time
                 RealWireDataSource::Multiplexer { is_state:_, sources:_ } => {} // Do muxes later. 
                 &RealWireDataSource::UnaryOp { op, right } => {
                     let right_typ = self.wires[right].typ.clone();

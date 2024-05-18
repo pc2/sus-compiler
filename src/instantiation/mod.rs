@@ -10,7 +10,7 @@ use std::{cell::RefCell, ops::Deref, rc::Rc};
 use num::BigInt;
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::BracketSpan, flattening::{BinaryOperator, FlatID, FlatIDMarker, Module, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, typing::ConcreteType, value::{TypedValue, Value}
+    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::BracketSpan, flattening::{BinaryOperator, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, typing::ConcreteType, value::{TypedValue, Value}
 };
 
 use self::latency_algorithm::SpecifiedLatency;
@@ -61,46 +61,12 @@ impl MultiplexerSource {
 #[derive(Debug)]
 pub enum RealWireDataSource {
     ReadOnly,
+    OutPort{sub_module_id : SubModuleID, port_id : PortID},
     Multiplexer{is_state : Option<Value>, sources : Vec<MultiplexerSource>},
     UnaryOp{op : UnaryOperator, right : WireID},
     BinaryOp{op : BinaryOperator, left : WireID, right : WireID},
     Select{root : WireID, path : Vec<RealWirePathElem>},
     Constant{value : Value}
-}
-
-impl RealWireDataSource {
-    fn iter_sources_with_min_latency<F : FnMut(WireID, i64)>(&self, mut f : F) {
-        match self {
-            RealWireDataSource::ReadOnly => {}
-            RealWireDataSource::Multiplexer { is_state: _, sources } => {
-                for s in sources {
-                    f(s.from.from, s.from.num_regs);
-                    if let Some(c) = s.from.condition {
-                        f(c, s.from.num_regs);
-                    }
-                }
-            }
-            RealWireDataSource::UnaryOp { op: _, right } => {
-                f(*right, 0);
-            }
-            RealWireDataSource::BinaryOp { op: _, left, right } => {
-                f(*left, 0);
-                f(*right, 0);
-            }
-            RealWireDataSource::Select { root, path } => {
-                f(*root, 0);
-                for v in path {
-                    match v {
-                        RealWirePathElem::MuxArrayWrite { span:_, idx_wire } => {
-                            f(*idx_wire, 0);
-                        }
-                        RealWirePathElem::ConstArrayWrite { span:_, idx:_ } => {}
-                    }
-                }
-            }
-            RealWireDataSource::Constant { value: _ } => {}
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -119,8 +85,8 @@ pub struct RealWire {
 
 #[derive(Debug)]
 pub struct SubModule {
-    pub original_flat : FlatID,
-    pub instance : Rc<InstantiatedModule>,
+    pub original_instruction : FlatID,
+    pub instance : Option<Rc<InstantiatedModule>>,
     pub port_map : FlatAlloc<WireID, PortIDMarker>,
     pub name : String,
     pub module_uuid : ModuleUUID
@@ -210,6 +176,9 @@ impl InstantiationList {
                 for (id, w) in &result.wires {
                     println!("{id:?} -> {w:?}");
                 }
+                for (id, sm) in &result.submodules {
+                    println!("SubModule {id:?}: {sm:?}");
+                }
             }
 
             cache_borrow.push(Rc::new(result));
@@ -273,6 +242,26 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             errors : self.errors.into_storage()
         }
     }
+
+    fn instantiate_submodules(&mut self) {
+        for (_sm_id, sm) in &mut self.submodules {
+            let sub_module = &self.linker.modules[sm.module_uuid];
+            if let Some(instance) = sub_module.instantiations.instantiate(sub_module, self.linker) {
+                for (port_id, port) in &instance.interface_ports {
+                    let wire = &mut self.wires[sm.port_map[port_id]];
+                    wire.typ = if let Some(instance_data) = port {
+                        instance_data.typ.clone()
+                    } else {
+                        // TODO report ports being used when not enabled
+                        ConcreteType::Error
+                    };
+                }
+                sm.instance = Some(instance);
+            } else {
+                self.errors.error(self.md.instructions[sm.original_instruction].unwrap_submodule().module_name_span, "Error instantiating submodule");
+            };
+        }
+    }
 }
 
 fn perform_instantiation(md : &Module, linker : &Linker) -> InstantiatedModule {
@@ -302,8 +291,13 @@ fn perform_instantiation(md : &Module, linker : &Linker) -> InstantiatedModule {
         return context.extract();
     }
 
-    println!("Concrete Typechecking and Latency Counting {}", md.link_info.name);
+    println!("Instantiating submodules for {}", md.link_info.name);
+    context.instantiate_submodules();
+
+    println!("Concrete Typechecking {}", md.link_info.name);
     context.typecheck();
+
+    println!("Latency Counting {}", md.link_info.name);
     context.compute_latencies();
 
     context.extract()

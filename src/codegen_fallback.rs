@@ -150,7 +150,7 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
                 RealWireDataSource::Constant { value } => {
                     writeln!(self.program_text, " = {};", value.to_string())?;
                 }
-                RealWireDataSource::ReadOnly => {
+                RealWireDataSource::ReadOnly | RealWireDataSource::OutPort { sub_module_id:_, port_id:_ } => {
                     writeln!(self.program_text, ";")?;
                 }
                 RealWireDataSource::Multiplexer{is_state, sources : _} => {
@@ -168,12 +168,13 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
         
         // Output all submodules
         for (_id, sm) in &self.instance.submodules {
-            let sm_instance_name = &sm.instance.name;
+            let sm_inst : &InstantiatedModule = sm.instance.as_ref().expect("Invalid submodules are impossible to remain by the time codegen happens");
+            let sm_instance_name = &sm_inst.name;
             let sm_name = &sm.name;
             writeln!(self.program_text, "{sm_instance_name} {sm_name}(")?;
             writeln!(self.program_text, "\t.clk(clk),")?;
-            for (port_id, iport) in sm.instance.interface_ports.iter_valids() {
-                let port_name = wire_name_self_latency(&sm.instance.wires[iport.wire], self.use_latency);
+            for (port_id, iport) in sm_inst.interface_ports.iter_valids() {
+                let port_name = wire_name_self_latency(&sm_inst.wires[iport.wire], self.use_latency);
                 let wire_name = wire_name_self_latency(&self.instance.wires[sm.port_map[port_id]], self.use_latency);
                 writeln!(self.program_text, "\t.{port_name}({wire_name}),")?;
             }
@@ -183,7 +184,6 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
         // For multiplexers, output 
         for (_id, w) in &self.instance.wires {
             match &w.source {
-                RealWireDataSource::ReadOnly => {}
                 RealWireDataSource::Multiplexer{is_state, sources} => {
                     let output_name = wire_name_self_latency(w, self.use_latency);
                     if is_state.is_some() {
@@ -205,6 +205,8 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
                     }
                     writeln!(self.program_text, "end")?;
                 }
+                RealWireDataSource::ReadOnly => {}
+                RealWireDataSource::OutPort { sub_module_id:_, port_id:_ } => {}
                 RealWireDataSource::Select{root : _, path : _} => {}
                 RealWireDataSource::UnaryOp{op : _, right : _} => {}
                 RealWireDataSource::BinaryOp{op : _, left : _, right : _} => {}

@@ -12,7 +12,6 @@ use self::list_of_lists::ListOfLists;
 
 use super::*;
 
-
 struct PathMuxSource<'s> {
     to_wire : &'s RealWire,
     to_latency : i64,
@@ -85,6 +84,52 @@ fn filter_unique_write_flats<'w>(writes : &'w [PathMuxSource<'w>], instructions 
 
 
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
+    fn iter_sources_with_min_latency<F : FnMut(WireID, i64)>(&self, wire_source : &RealWireDataSource, mut f : F) {
+        match wire_source {
+            RealWireDataSource::ReadOnly => {}
+            RealWireDataSource::OutPort { sub_module_id, port_id } => {
+                let sub_mod = &self.submodules[*sub_module_id];
+                let Some(inst) = &sub_mod.instance else {return}; // This module hasn't been instantiated yet
+                let this_output_port = inst.interface_ports[*port_id].as_ref().unwrap();
+                assert!(!this_output_port.is_input);
+
+                for (input_port_id, input_port) in inst.interface_ports.iter_valids() {
+                    if !input_port.is_input {continue} // Skip other outputs
+                    // TODO multiple interfaces
+
+                    f(sub_mod.port_map[input_port_id], this_output_port.absolute_latency - input_port.absolute_latency);
+                } 
+            }
+            RealWireDataSource::Multiplexer { is_state: _, sources } => {
+                for s in sources {
+                    f(s.from.from, s.from.num_regs);
+                    if let Some(c) = s.from.condition {
+                        f(c, s.from.num_regs);
+                    }
+                }
+            }
+            RealWireDataSource::UnaryOp { op: _, right } => {
+                f(*right, 0);
+            }
+            RealWireDataSource::BinaryOp { op: _, left, right } => {
+                f(*left, 0);
+                f(*right, 0);
+            }
+            RealWireDataSource::Select { root, path } => {
+                f(*root, 0);
+                for v in path {
+                    match v {
+                        RealWirePathElem::MuxArrayWrite { span:_, idx_wire } => {
+                            f(*idx_wire, 0);
+                        }
+                        RealWirePathElem::ConstArrayWrite { span:_, idx:_ } => {}
+                    }
+                }
+            }
+            RealWireDataSource::Constant { value: _ } => {}
+        }
+    }
+
     fn make_fanins(&self) -> (ListOfLists<FanInOut>, Vec<SpecifiedLatency>) {
         let mut fanins : ListOfLists<FanInOut> = ListOfLists::new_with_groups_capacity(self.wires.len());
         let mut initial_latencies = Vec::new();
@@ -92,38 +137,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         // Wire to wire Fanin
         for (id, wire) in &self.wires {
             fanins.new_group();
-            wire.source.iter_sources_with_min_latency(|from, delta_latency| {
+            self.iter_sources_with_min_latency(&wire.source, |from, delta_latency| {
                 fanins.push_to_last_group(FanInOut{other : from.get_hidden_value(), delta_latency});
             });
-
-            // Submodules Fanin
-            // This creates two way connections, from any input i to output o it creates a |o| - |i| length connection, and a -(|o| - |i|) backward connection. This fixes them to be an exact latency apart. 
-            // This is O(lots) but doesn't matter, usually very few submodules. Fix this if needed
-            for (_id, sub_mod) in &self.submodules {
-                for (port_id, self_wire) in &sub_mod.port_map {
-                    // Can assign to the wire, too keep in line with ListOfLists build order
-                    if *self_wire != id {continue}
-
-                    // Skip non-instantiated ports
-                    let Some(port_in_submodule) = &sub_mod.instance.interface_ports[port_id] else {continue};
-
-                    for (other_port_id, other_port_in_submodule) in sub_mod.instance.interface_ports.iter_valids() {
-                        if other_port_in_submodule.is_input == !other_port_in_submodule.is_input {
-                            // Valid input/output or output/input pair. Apply delta absolute latency
-
-                            let mut delta_latency = other_port_in_submodule.absolute_latency - port_in_submodule.absolute_latency;
-
-                            if port_in_submodule.is_input {
-                                delta_latency = -delta_latency;
-                            }
-
-                            let other_wire_in_self = sub_mod.port_map[other_port_id];
-
-                            fanins.push_to_last_group(FanInOut{other: other_wire_in_self.get_hidden_value(), delta_latency});
-                        }
-                    }
-                }
-            }
 
             if wire.absolute_latency != CALCULATE_LATENCY_LATER {
                 initial_latencies.push(SpecifiedLatency { wire: id.get_hidden_value(), latency: wire.absolute_latency })

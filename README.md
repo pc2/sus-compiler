@@ -51,7 +51,7 @@ The main goals of the language are roughly listed below:
 - [x] If Statements
 - [x] Latency Specifiers
 - [x] Get rid of semicolons
-- [ ] Access module inputs / outputs through field names
+- [x] Access module inputs / outputs through field names
 - [ ] Array Slices
 - [ ] Bound Specifiers
 - [ ] Structs
