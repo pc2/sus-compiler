@@ -34,7 +34,7 @@ The main goals of the language are roughly listed below:
 - [ ] Arbitrary single-clock full flow
 - [ ] Arbitrary FPGA hardware full flow
 - [x] Generative Code
-- [ ] Templates
+- [ ] Generative Parameters
 - [ ] Type Templates
 
 ### Language Features
@@ -78,6 +78,11 @@ The main goals of the language are roughly listed below:
 - [ ] Integer and Array Bounds Checking
 - [ ] Conflicting assignments (such as calling the same module twice in a single cycle, multiple assignments to a single variable)
 
+### Inference
+- [ ] Template Type Inference
+- [ ] Generative Parameter Inference
+- [ ] Latency Count Inferece
+
 ### Latency Counting
 - [x] Basic latency assignment algorithm
 - [x] Net-positive latency cycles error
@@ -90,6 +95,7 @@ The main goals of the language are roughly listed below:
 - [ ] Latency cuts
 - [ ] Latency Offset
 - [ ] Latency Cuts & Latency Counting for "disjoint Input-Output blocks"
+- [ ] Split Latencies
 
 ### LSP
 - [x] Basic LSP for VSCode integration

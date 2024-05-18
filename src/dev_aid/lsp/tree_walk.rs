@@ -41,7 +41,7 @@ impl<'linker> From<LocationInfo<'linker>> for RefersTo {
             LocationInfo::InModule(md_id, md, flat_id, flat_obj) => {
                 match flat_obj {
                     InModule::NamedLocal(_) => {
-                        for (port_id, port) in &md.module_ports.ports {
+                        for (port_id, port) in &md.ports {
                             if port.declaration_instruction == flat_id {
                                 result.port = Some((md_id, port_id));
                             }
@@ -157,7 +157,7 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
                 if let Some(span) = port.port_name_span {
                     let module_uuid = md.instructions[port.submodule_flat].unwrap_submodule().module_uuid;
                     let submodule = &self.linker.modules[module_uuid];
-                    self.visit(span, LocationInfo::Port(module_uuid, submodule, port.port, &submodule.module_ports.ports[port.port]))
+                    self.visit(span, LocationInfo::Port(module_uuid, submodule, port.port, &submodule.ports[port.port]))
                 }
             }
         }

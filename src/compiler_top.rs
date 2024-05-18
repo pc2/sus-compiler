@@ -1,9 +1,8 @@
-use std::rc::Rc;
 
 use tree_sitter::Parser;
 
 use crate::{
-    config::config, debug::SpanDebugger, errors::ErrorStore, file_position::FileText, flattening::{flatten_all_modules, gather_initial_file_data, typecheck_all_modules, Module}, instantiation::InstantiatedModule, linker::{FileData, FileUUID, Linker}
+    config::config, debug::SpanDebugger, errors::ErrorStore, file_position::FileText, flattening::{flatten_all_modules, gather_initial_file_data, typecheck_all_modules, Module}, linker::{FileData, FileUUID, Linker}
 };
 
 pub fn add_file(text : String, linker : &mut Linker) -> FileUUID {
@@ -49,7 +48,7 @@ pub fn update_file(text : String, file_id : FileUUID, linker : &mut Linker) {
 pub fn recompile_all(linker : &mut Linker) {
     // First reset all modules back to post-gather_initial_file_data
     for (_, md) in &mut linker.modules {
-        let Module { link_info, module_ports:_, instructions, instantiations } = md;
+        let Module { link_info, ports:_, interfaces:_, instructions, instantiations } = md;
         link_info.reset_to(link_info.after_initial_parse_cp);
         link_info.after_flatten_cp = None;
         instructions.clear();
@@ -59,7 +58,7 @@ pub fn recompile_all(linker : &mut Linker) {
     flatten_all_modules(linker);
     typecheck_all_modules(linker);
 
-    if config().debug_flattened {
+    if config().debug_print_module_contents {
         for (_, md) in &linker.modules {
             md.print_flattened_module(&linker.files[md.link_info.file].file_text);
         }
@@ -71,15 +70,9 @@ pub fn recompile_all(linker : &mut Linker) {
         //md.print_flattened_module();
         // Already instantiate any modules without parameters
         // Currently this is all modules
-        let span_debug = format!("instantiating {}", &md.link_info.name);
-        let mut span_debugger = SpanDebugger::new(&span_debug, &linker.files[md.link_info.file].file_text);
-        let _inst = instantiate(&linker, md);
+        let span_debug_message = format!("instantiating {}", &md.link_info.name);
+        let mut span_debugger = SpanDebugger::new(&span_debug_message, &linker.files[md.link_info.file].file_text);
+        let _inst = md.instantiations.instantiate(md, linker);
         span_debugger.defuse();
     }
-}
-
-pub fn instantiate(linker : &Linker, md : &Module) -> Option<Rc<InstantiatedModule>> {
-    println!("Instantiating {}", md.link_info.name);
-
-    md.instantiations.instantiate(&md.link_info.name, md, linker)
 }

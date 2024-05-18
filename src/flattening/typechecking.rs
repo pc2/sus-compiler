@@ -25,7 +25,7 @@ pub fn typecheck_all_modules(linker : &mut Linker) {
             
             context.typecheck();
             context.generative_check();
-            context.find_unused_variables(&module.module_ports);    
+            context.find_unused_variables(&module.ports);    
         });
 
         span_debugger.defuse();
@@ -337,7 +337,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     /* 
         ==== Additional Warnings ====
     */
-    fn find_unused_variables(&self, ports : &ModulePorts) {
+    fn find_unused_variables(&self, ports : &FlatAlloc<Port, PortIDMarker>) {
         // Setup Wire Fanouts List for faster processing
         let mut instance_fanins : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.working_on.instructions.iter().map(|_| Vec::new()).collect();
 
@@ -375,7 +375,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
         let mut wire_to_explore_queue : Vec<FlatID> = Vec::new();
 
-        for (_id, port) in &ports.ports {
+        for (_id, port) in ports {
             if port.identifier_type == IdentifierType::Output {
                 is_instance_used_map[port.declaration_instruction] = true;
                 wire_to_explore_queue.push(port.declaration_instruction);

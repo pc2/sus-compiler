@@ -8,13 +8,7 @@ use std::{cell::RefCell, ops::Deref, rc::Rc};
 use num::BigInt;
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUID},
-    errors::{CompileError, ErrorStore},
-    file_position::BracketSpan,
-    flattening::{PortIDMarker, BinaryOperator, FlatID, FlatIDMarker, Module, UnaryOperator},
-    linker::{Linker, ModuleUUID},
-    typing::ConcreteType,
-    value::{TypedValue, Value}
+    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, config, errors::{CompileError, ErrorStore}, file_position::BracketSpan, flattening::{BinaryOperator, FlatID, FlatIDMarker, Module, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, typing::ConcreteType, value::{TypedValue, Value}
 };
 
 use self::{execute::perform_instantiation, latency_algorithm::SpecifiedLatency};
@@ -110,7 +104,7 @@ impl RealWireDataSource {
 #[derive(Debug)]
 pub struct RealWire {
     pub source : RealWireDataSource,
-    pub original_wire : FlatID,
+    pub original_instruction : FlatID,
     pub typ : ConcreteType,
     pub name : String,
     /// Before latency counting, non i64::MIN values specify specified latency
@@ -202,19 +196,27 @@ impl InstantiationList {
         Self{cache : RefCell::new(Vec::new())}
     }
 
-    pub fn instantiate(&self, name : &str, module : &Module, linker : &Linker) -> Option<Rc<InstantiatedModule>> {
+    pub fn instantiate(&self, md : &Module, linker : &Linker) -> Option<Rc<InstantiatedModule>> {
         let mut cache_borrow = self.cache.borrow_mut();
         
         // Temporary, no template arguments yet
         if cache_borrow.is_empty() {
-            let result = perform_instantiation(name, module, linker);
+            let result = perform_instantiation(md, linker);
+
+            if config().debug_print_module_contents {
+                println!("[[Instantiated {}]]", &result.name);
+                for (id, w) in &result.wires {
+                    println!("{id:?} -> {w:?}");
+                }
+            }
+
             cache_borrow.push(Rc::new(result));
         }
         
         let instance_id = 0; // Temporary, will always be 0 while not template arguments
-        let instance = &cache_borrow[instance_id];
-        if !instance.errors.did_error {
-            Some(instance.clone())
+        let instance_rc = &cache_borrow[instance_id];
+        if !instance_rc.errors.did_error {
+            Some(instance_rc.clone())
         } else {
             None
         }

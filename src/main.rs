@@ -31,7 +31,6 @@ use std::io::Write;
 use std::ops::Deref;
 use std::error::Error;
 use std::fs::File;
-use compiler_top::instantiate;
 use config::{config, parse_args};
 use flattening::Module;
 use codegen_fallback::gen_verilog_code;
@@ -39,7 +38,7 @@ use dev_aid::ariadne_interface::*;
 use linker::Linker;
 
 fn codegen_to_file(linker : &Linker, md : &Module) -> Option<()> {
-    let Some(inst) = instantiate(linker, md) else {
+    let Some(inst) = md.instantiations.instantiate(md, linker) else {
         println!("Module {} instantiation encountered errors.", md.link_info.name);
 
         return None;

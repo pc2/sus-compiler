@@ -108,7 +108,7 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
 
         // Then output all declarations, and the wires we can already assign
         for (_id, w) in &self.instance.wires {
-            if let Instruction::Declaration(wire_decl) = &self.md.instructions[w.original_wire] {
+            if let Instruction::Declaration(wire_decl) = &self.md.instructions[w.original_instruction] {
                 // Don't print named inputs and outputs, already did that in interface
                 if wire_decl.identifier_type.is_port() {
                     continue;

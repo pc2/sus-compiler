@@ -233,8 +233,8 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             let module_uuid = func_instantiation.module_uuid;
             let md = &self.modules[module_uuid];
 
-            let inputs = md.module_ports.interfaces[ModulePorts::MAIN_INTERFACE_ID].func_call_inputs;
-            let outputs = md.module_ports.interfaces[ModulePorts::MAIN_INTERFACE_ID].func_call_outputs;
+            let inputs = md.interfaces[Module::MAIN_INTERFACE_ID].func_call_inputs;
+            let outputs = md.interfaces[Module::MAIN_INTERFACE_ID].func_call_outputs;
 
             let arg_count = arguments.len();
             let expected_arg_count = inputs.len();
@@ -328,7 +328,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         let submod = &self.modules[submodule.module_uuid];
 
         let port = submod.get_port_by_name(port_name_span, &self.name_resolver.file_text, self.errors)?;
-        Some(PortInfo { submodule_name_span : Some(submodule_name_span), submodule_flat: submodule_decl, port, port_name_span : Some(port_name_span), port_identifier_typ: submod.module_ports.ports[port].identifier_type })
+        Some(PortInfo { submodule_name_span : Some(submodule_name_span), submodule_flat: submodule_decl, port, port_name_span : Some(port_name_span), port_identifier_typ: submod.ports[port].identifier_type })
     }
 
     fn flatten_expr(&mut self, cursor : &mut Cursor) -> FlatID {
@@ -742,7 +742,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
             let id = self.flatten_declaration::<false, false>(identifier_type, read_only, true, cursor);
             let this_port_id = self.ports_to_visit.next().unwrap();
-            let port = &mut self.working_on.module_ports.ports[this_port_id];
+            let port = &mut self.working_on.ports[this_port_id];
             assert_eq!(port.decl_span, found_decl_span);
             port.declaration_instruction = id;
         });
@@ -799,7 +799,7 @@ pub fn flatten<'cursor_linker, 'errs>(linker : *mut Linker, module_uuid : Module
         println!("Flattening {}", modules.working_on.link_info.name);
 
         let mut context = FlatteningContext {
-            ports_to_visit : modules.working_on.module_ports.ports.id_range(),
+            ports_to_visit : modules.working_on.ports.id_range(),
             errors : name_resolver.errors,
             modules, 
             types, 

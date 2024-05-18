@@ -1,16 +1,16 @@
 
 //timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
-module multiply_v : int a, int b -> int r {
+/*module multiply_v : int a, int b -> int r {
 	r = a * b
-}
+}*/
 
-/*
+
 module named_ports : int in_port -> int out_port, int out_port_two {
 	out_port = in_port
 	out_port_two = in_port
 }
 
-module port_names : int i -> int o, int o2 {
+/*module port_names : int i -> int o, int o2 {
 	named_ports np
 
 	o, o2 = np(i)
@@ -24,13 +24,8 @@ module port_names : int i -> int o, int o2 {
 
 	o = np.out_port
 	o2 = np.out_port_two
-}
+}*/
 
 module func_call : int i -> int o, int o2 {
 	o, o2 = named_ports(i)
 }
-
-module use_submodule_named_ports {
-	submodule_named_ports submod
-}
-*/

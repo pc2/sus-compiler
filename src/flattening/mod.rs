@@ -68,7 +68,10 @@ pub struct Module {
     pub link_info : LinkInfo,
 
     /// Created by Stage 1: Initialization
-    pub module_ports : ModulePorts,
+    pub ports : FlatAlloc<Port, PortIDMarker>,
+
+    /// Created by Stage 1: Initialization
+    pub interfaces : FlatAlloc<Interface, InterfaceIDMarker>,
 
     /// Created in Stage 2: Flattening and Typechecking
     pub instructions : FlatAlloc<Instruction, FlatIDMarker>,
@@ -78,14 +81,16 @@ pub struct Module {
 }
 
 impl Module {
+    pub const MAIN_INTERFACE_ID : InterfaceID = InterfaceID::from_hidden_value(0);
+    
     pub fn get_port_decl(&self, port : PortID) -> &Declaration {
-        let flat_port = self.module_ports.ports[port].declaration_instruction;
+        let flat_port = self.ports[port].declaration_instruction;
 
         self.instructions[flat_port].unwrap_wire_declaration()
     }
 
     pub fn make_port_info_string(&self, port_id : PortID, file_text : &FileText) -> String {
-        let port = &self.module_ports.ports[port_id];
+        let port = &self.ports[port_id];
         let port_direction = if port.identifier_type == IdentifierType::Input {"input"} else {"output"};
         format!("{port_direction} {}", &file_text[port.decl_span])
     }
@@ -93,7 +98,7 @@ impl Module {
     pub fn make_all_ports_info_string(&self, file_text : &FileText) -> String {
         let mut result = String::new();
 
-        for (port_id, _) in &self.module_ports.ports {
+        for (port_id, _) in &self.ports {
             result.push_str("\n    ");
             result.push_str(&self.make_port_info_string(port_id, file_text));
         }
@@ -104,7 +109,7 @@ impl Module {
     pub fn print_flattened_module(&self, file_text : &FileText) {
         println!("[[{}]]:", self.link_info.name);
         println!("Interface:");
-        for (port_id, port) in &self.module_ports.ports {
+        for (port_id, port) in &self.ports {
             println!("    {} -> {:?}", self.make_port_info_string(port_id, file_text), port);
         }
         println!("Instructions:");
@@ -120,7 +125,7 @@ impl Module {
     /// Get a port by the given name. Reports non existing ports errors
     pub fn get_port_by_name(&self, name_span : Span, file_text : &FileText, errors : &ErrorCollector) -> Option<PortID> {
         let name_text = &file_text[name_span];
-        for (id, data) in &self.module_ports.ports {
+        for (id, data) in &self.ports {
             if data.name == name_text {
                 return Some(id)
             }
@@ -140,6 +145,16 @@ impl Module {
             Instruction::IfStatement(if_stmt) => self.get_instruction_span(if_stmt.condition),
             Instruction::ForStatement(for_stmt) => self.get_instruction_span(for_stmt.loop_var_decl),
         }
+    }
+
+    /// This function is intended to retrieve a known port while walking the syntax tree. panics if the port doesn't exist
+    pub fn get_port_by_decl_span(&self, span : Span) -> PortID {
+        for (id, data) in &self.ports {
+            if data.decl_span == span {
+                return id
+            }
+        }
+        unreachable!()
     }
 }
 
@@ -161,28 +176,6 @@ pub struct Interface {
     pub func_call_inputs : PortIDRange,
     pub func_call_outputs : PortIDRange
 }
-
-#[derive(Debug)]
-pub struct ModulePorts {
-    pub ports : FlatAlloc<Port, PortIDMarker>,
-    pub interfaces : FlatAlloc<Interface, InterfaceIDMarker>
-}
-
-impl ModulePorts {
-    pub const MAIN_INTERFACE_ID : InterfaceID = InterfaceID::from_hidden_value(0);
-
-    /// This function is intended to retrieve a known port while walking the syntax tree. panics if the port doesn't exist
-    pub fn get_port_by_decl_span(&self, span : Span) -> PortID {
-        for (id, data) in &self.ports {
-            if data.decl_span == span {
-                return id
-            }
-        }
-        unreachable!()
-    }
-}
-
-
 
 pub struct FlatIDMarker;
 impl UUIDMarker for FlatIDMarker {const DISPLAY_NAME : &'static str = "obj_";}

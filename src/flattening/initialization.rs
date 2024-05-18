@@ -32,10 +32,10 @@ pub fn gather_initial_file_data(builder : &mut FileBuilder) {
                     if cursor.optional_field(field!("interface_ports")) {
                         cursor.go_down(kind!("interface_ports"), |cursor| {
                             if cursor.optional_field(field!("inputs")) {
-                                func_call_inputs = gather_decl_names_in_list(IdentifierType::Input, ModulePorts::MAIN_INTERFACE_ID, &mut ports, cursor, builder.file_text);
+                                func_call_inputs = gather_decl_names_in_list(IdentifierType::Input, Module::MAIN_INTERFACE_ID, &mut ports, cursor, builder.file_text);
                             }
                             if cursor.optional_field(field!("outputs")) {
-                                func_call_outputs = gather_decl_names_in_list(IdentifierType::Output, ModulePorts::MAIN_INTERFACE_ID, &mut ports, cursor, builder.file_text);
+                                func_call_outputs = gather_decl_names_in_list(IdentifierType::Output, Module::MAIN_INTERFACE_ID, &mut ports, cursor, builder.file_text);
                             }
                         })
                     }
@@ -59,10 +59,8 @@ pub fn gather_initial_file_data(builder : &mut FileBuilder) {
                             after_flatten_cp : None
                         },
                         instructions : FlatAlloc::new(),
-                        module_ports : ModulePorts{
-                            ports,
-                            interfaces
-                        },
+                        ports,
+                        interfaces,
                         instantiations: InstantiationList::new()
                     };
     

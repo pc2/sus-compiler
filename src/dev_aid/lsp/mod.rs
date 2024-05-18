@@ -345,7 +345,7 @@ fn gather_hover_infos(md: &Module, id: FlatID, is_generative : bool, file_cache:
             hover_list.push(MarkedString::String(value_str));
         } else {
             for (_id, wire) in &inst.wires {
-                if wire.original_wire != id {continue}
+                if wire.original_instruction != id {continue}
                 let typ_str = wire.typ.to_string(&file_cache.linker.types);
                 let name_str = &wire.name;
                 let latency_str = if wire.absolute_latency != CALCULATE_LATENCY_LATER {

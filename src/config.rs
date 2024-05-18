@@ -6,7 +6,7 @@ pub struct ConfigStruct {
     pub lsp_debug_mode : bool,
     pub lsp_port : u16,
     pub codegen : bool,
-    pub debug_flattened : bool
+    pub debug_print_module_contents : bool
 }
 
 pub fn config() -> &'static ConfigStruct {
@@ -45,7 +45,7 @@ pub fn parse_args() -> Vec<PathBuf> {
                         config.codegen = true;
                     }
                     "--debug" => {
-                        config.debug_flattened = true;
+                        config.debug_print_module_contents = true;
                     }
                     other => {
                         panic!("Unknown option {other}");
@@ -77,6 +77,6 @@ static CONFIG : ConfigStructWrapper = ConfigStructWrapper{cf: UnsafeCell::new(Co
     use_lsp : false,
     lsp_port : 25000,
     lsp_debug_mode : false,
-    debug_flattened : false,
+    debug_print_module_contents : false,
     codegen : false
 })};
