@@ -61,7 +61,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 }
                 for s in sources {
                     let source_typ = &self.wires[s.from.from].typ;
-                    let destination_typ = self.walk_type_along_path(self.wires[this_wire_id].typ.clone(), &s.path);
+                    let destination_typ = self.walk_type_along_path(self.wires[this_wire_id].typ.clone(), &s.to_path);
                     destination_typ.check_type(&source_typ, span, &self.linker.types, &self.errors);
                 }
             };

@@ -169,7 +169,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
                         let RealWireDataSource::Multiplexer{is_state : _, sources} = &mut self.wires[*write_to_wire].source else {caught_by_typecheck!("Should only be a writeable wire here")};
 
-                        sources.push(MultiplexerSource{from, path : wire_ref_inst.path});
+                        sources.push(MultiplexerSource{from, to_path : wire_ref_inst.path});
                     }
                     RealWireRefRoot::Generative(decl_id) => {
                         let found_v = self.generation_state[conn_from].unwrap_generation_value().clone();

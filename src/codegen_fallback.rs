@@ -194,7 +194,7 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
                     }
                     
                     for s in sources {
-                        let path = self.write_path_to_string(&s.path, w.absolute_latency);
+                        let path = self.write_path_to_string(&s.to_path, w.absolute_latency);
                         let from_name = self.wire_name(s.from.from, w.absolute_latency);
                         if let Some(cond) = s.from.condition {
                             let cond_name = self.wire_name(cond, w.absolute_latency);

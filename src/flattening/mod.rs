@@ -217,6 +217,16 @@ pub enum WireReferencePathElement {
     ArrayIdx{idx : FlatID, bracket_span : BracketSpan},
 }
 
+impl WireReferencePathElement {
+    fn for_each_dependency<F : FnMut(FlatID)>(path : &[WireReferencePathElement], mut f : F) {
+        for p in path {
+            match p {
+                WireReferencePathElement::ArrayIdx { idx, bracket_span:_ } => f(*idx),
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum WireReferenceRoot {
     LocalDecl(FlatID, Span),

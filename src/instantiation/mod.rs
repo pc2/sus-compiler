@@ -40,22 +40,24 @@ pub enum RealWirePathElem {
     ConstArrayWrite{span : BracketSpan, idx : BigInt}
 }
 
-#[derive(Debug)]
-pub struct MultiplexerSource {
-    pub path : Vec<RealWirePathElem>,
-    pub from : ConnectFrom
-}
-
-impl MultiplexerSource {
-    pub fn for_each_source<F : FnMut(WireID)>(&self, mut f : F) {
-        f(self.from.from);
-        for path_elem in &self.path {
-            match path_elem {
-                RealWirePathElem::MuxArrayWrite { span:_, idx_wire } => {f(*idx_wire)}
+impl RealWirePathElem {
+    fn for_each_wire_in_path<F : FnMut(WireID)>(path : &[RealWirePathElem], mut f : F) {
+        for v in path {
+            match v {
+                RealWirePathElem::MuxArrayWrite { span:_, idx_wire } => {
+                    f(*idx_wire);
+                }
                 RealWirePathElem::ConstArrayWrite { span:_, idx:_ } => {}
             }
         }
     }
+}
+
+
+#[derive(Debug)]
+pub struct MultiplexerSource {
+    pub to_path : Vec<RealWirePathElem>,
+    pub from : ConnectFrom
 }
 
 #[derive(Debug)]

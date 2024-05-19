@@ -32,11 +32,13 @@ fn gather_all_mux_inputs<'w>(wires : &'w FlatAlloc<RealWire, WireIDMarker>, conf
 
         for s in sources {
             let mut predecessor_found = false;
-            s.for_each_source(|source| {
+            let mut predecessor_adder = |source| {
                 if source == from_wire_id {
                     predecessor_found = true;
                 }
-            });
+            };
+            predecessor_adder(s.from.from);
+            RealWirePathElem::for_each_wire_in_path(&s.to_path, predecessor_adder);
             if predecessor_found {
                 connection_list.push(PathMuxSource{to_wire, mux_input : s, to_latency : to.latency});
             }
@@ -82,7 +84,6 @@ fn filter_unique_write_flats<'w>(writes : &'w [PathMuxSource<'w>], instructions 
     result
 }
 
-
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn iter_sources_with_min_latency<F : FnMut(WireID, i64)>(&self, wire_source : &RealWireDataSource, mut f : F) {
         match wire_source {
@@ -103,6 +104,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             RealWireDataSource::Multiplexer { is_state: _, sources } => {
                 for s in sources {
                     f(s.from.from, s.from.num_regs);
+                    RealWirePathElem::for_each_wire_in_path(&s.to_path, |w| {f(w, s.from.num_regs)});
                     if let Some(c) = s.from.condition {
                         f(c, s.from.num_regs);
                     }
@@ -117,14 +119,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
             RealWireDataSource::Select { root, path } => {
                 f(*root, 0);
-                for v in path {
-                    match v {
-                        RealWirePathElem::MuxArrayWrite { span:_, idx_wire } => {
-                            f(*idx_wire, 0);
-                        }
-                        RealWirePathElem::ConstArrayWrite { span:_, idx:_ } => {}
-                    }
-                }
+                RealWirePathElem::for_each_wire_in_path(path, |w| {f(w, 0)});
             }
             RealWireDataSource::Constant { value: _ } => {}
         }

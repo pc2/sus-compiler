@@ -321,6 +321,9 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                             }
                         }
                     }
+                    WireReferencePathElement::for_each_dependency(&conn.to.path, |idx_wire| {
+                        self.must_be_compiletime(self.working_on.instructions[idx_wire].unwrap_wire(), "initial value assignment");
+                    })
                 }
             }
             WriteModifiers::Initial{initial_kw_span} => {
@@ -346,6 +349,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 Instruction::Write(conn) => {
                     if let Some(flat_root) = conn.to.root.get_root_flat() {
                         instance_fanins[flat_root].push(conn.from);
+                        WireReferencePathElement::for_each_dependency(&conn.to.path, |idx_wire| instance_fanins[flat_root].push(idx_wire));
                     }
                 }
                 Instruction::SubModule(_) => {} // TODO Dependencies should be added here if for example generative templates get added
