@@ -641,7 +641,14 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     self.local_variable_context.pop_frame(loop_var_decl_frame);
                 })
             } else if kind == kind!("interface_statement") {
-                println!("TODO: Interface Statement");
+                cursor.go_down_no_check(|cursor| {
+                    // Skip name
+                    cursor.field(field!("name"));
+
+                    if cursor.optional_field(field!("interface_ports")) {
+                        self.flatten_interface_ports(cursor);
+                    }
+                });
             } else if kind == kind!("cross_statement") {
                 println!("TODO: Cross Statement");
             } else {
@@ -676,7 +683,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         }
     }
 
-    /// See [Self::flatten_standalone_decls][]
+    /// See [Self::flatten_standalone_decls]
     /// Two cases:
     /// - Left side of assignment:
     ///     No modules, Yes write modifiers, Only assignable expressions
@@ -703,7 +710,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
 
-    /// See [Self::flatten_assignment_left_side][]
+    /// See [Self::flatten_assignment_left_side]
     /// - Standalone declarations:
     ///     Yes modules, No write modifiers, Yes expressions (-> single expressions)
     fn flatten_standalone_decls(&mut self, cursor : &mut Cursor) {
@@ -751,11 +758,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     fn flatten_interface_ports(&mut self, cursor : &mut Cursor) {
         cursor.go_down(kind!("interface_ports"), |cursor| {
             if cursor.optional_field(field!("inputs")) {
-                // Read only on inputs and outputs is obviously flipped for submodules, since we're looking at the other side of the in/outputs. 
                 self.flatten_declaration_list(IdentifierType::Input, true, cursor)
             }
             if cursor.optional_field(field!("outputs")) {
-                // Read only on inputs and outputs is obviously flipped for submodules, since we're looking at the other side of the in/outputs. 
                 self.flatten_declaration_list(IdentifierType::Output, false, cursor)
             }
         })

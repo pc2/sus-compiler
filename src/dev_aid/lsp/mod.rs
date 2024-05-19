@@ -252,6 +252,9 @@ pub fn walk_name_color(file : &FileData, linker : &Linker) -> Vec<(Span, IDEIden
             LocationInfo::Port(_, _, _, port) => {
                 IDEIdentifierType::Value(port.identifier_type)
             }
+            LocationInfo::Interface(_, _, _, _) => {
+                IDEIdentifierType::Interface
+            }
         }));
     });
 
@@ -509,6 +512,9 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                         LocationInfo::Port(_md_uuid, md, port_id, _) => {
                             hover_list.push(MarkedString::String(md.make_port_info_string(port_id, &file_cache.linker.files[md.link_info.file].file_text)));
                         }
+                        LocationInfo::Interface(_md_uuid, md, interface_id, _) => {
+                            hover_list.push(MarkedString::String(md.make_interface_info_string(interface_id, &file_cache.linker.files[md.link_info.file].file_text)));
+                        }
                     };
                 }
                 Some(span_to_lsp_range(&file_data.file_text, location))
@@ -542,6 +548,9 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                     }
                     LocationInfo::Port(_md_uuid, md, _port_id, port) => {
                         goto_definition_list.push((port.name_span, md.link_info.file));
+                    }
+                    LocationInfo::Interface(_md_uuid, md, _interface_id, interface) => {
+                        goto_definition_list.push((interface.name_span, md.link_info.file));
                     }
                 }
             }

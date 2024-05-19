@@ -368,13 +368,13 @@ impl Linker {
         self.files.free(file_uuid);
     }
 
-    pub fn with_file_builder<F : FnOnce(&mut FileBuilder<'_>)>(&mut self, file_id : FileUUID, f : F) {
+    pub fn with_file_builder<F : FnOnce(FileBuilder<'_>)>(&mut self, file_id : FileUUID, f : F) {
         let mut associated_values = Vec::new();
         let mut parsing_errors = std::mem::replace(&mut self.files[file_id].parsing_errors, ErrorStore::new());
         let file_data = &self.files[file_id];
         let other_parsing_errors = parsing_errors.take_for_editing(file_id, &self.files);
 
-        let mut fb = FileBuilder{
+        f(FileBuilder{
             file_id,
             tree: &file_data.tree,
             file_text: &file_data.file_text,
@@ -385,8 +385,7 @@ impl Linker {
             types: &mut self.types,
             modules: &mut self.modules,
             constants: &mut self.constants
-        };
-        f(&mut fb);
+        });
 
         let parsing_errors = other_parsing_errors.into_storage();
         let file_data = &mut self.files[file_id];

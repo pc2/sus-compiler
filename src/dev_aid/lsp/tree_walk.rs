@@ -2,7 +2,7 @@
 use std::ops::Deref;
 
 use crate::{
-    file_position::Span, flattening::{Declaration, FlatID, Instruction, Module, Port, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource}, linker::{FileData, Linker, ModuleUUID, NameElem}, typing::WrittenType
+    file_position::Span, flattening::{Declaration, FlatID, Instruction, Interface, InterfaceID, Module, Port, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource}, linker::{FileData, Linker, ModuleUUID, NameElem}, typing::WrittenType
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -19,7 +19,8 @@ pub enum LocationInfo<'linker> {
     Global(NameElem),
     /// The contained module only refers to the module on which the port is defined
     /// No reference to the module in which the reference was found is provided
-    Port(ModuleUUID, &'linker Module, PortID, &'linker Port)
+    Port(ModuleUUID, &'linker Module, PortID, &'linker Port),
+    Interface(ModuleUUID, &'linker Module, InterfaceID, &'linker Interface)
 }
 
 /// Permits really efficient [RefersTo::refers_to_same_as] [LocationInfo] checking
@@ -27,7 +28,8 @@ pub enum LocationInfo<'linker> {
 pub struct RefersTo {
     pub local : Option<(ModuleUUID, FlatID)>,
     pub global : Option<NameElem>,
-    pub port : Option<(ModuleUUID, PortID)>
+    pub port : Option<(ModuleUUID, PortID)>,
+    pub interface : Option<(ModuleUUID, InterfaceID)>
 }
 
 impl<'linker> From<LocationInfo<'linker>> for RefersTo {
@@ -36,6 +38,7 @@ impl<'linker> From<LocationInfo<'linker>> for RefersTo {
             local: None,
             global: None,
             port: None,
+            interface : None,
         };
         match info {
             LocationInfo::InModule(md_id, md, flat_id, flat_obj) => {
@@ -62,6 +65,9 @@ impl<'linker> From<LocationInfo<'linker>> for RefersTo {
                 result.local = Some((md_id, port.declaration_instruction));
                 result.port = Some((md_id, p_id))
             }
+            LocationInfo::Interface(md_id, _md, i_id, _interface) => {
+                result.interface = Some((md_id, i_id))
+            }
         }
         result
     }
@@ -73,7 +79,8 @@ impl RefersTo {
             LocationInfo::InModule(md_id, _, obj, _) => self.local == Some((md_id, obj)),
             LocationInfo::Type(_) => false,
             LocationInfo::Global(ne) => self.global == Some(ne),
-            LocationInfo::Port(md_id, _, p_id, _) => self.port == Some((md_id, p_id))
+            LocationInfo::Port(md_id, _, p_id, _) => self.port == Some((md_id, p_id)),
+            LocationInfo::Interface(md_id, _, i_id, _) => self.interface == Some((md_id, i_id))
         }
     }
     pub fn is_global(&self) -> bool {
@@ -185,6 +192,13 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
         let md = &self.linker.modules[md_id];
         if !(self.should_prune)(md.link_info.span) {
             self.visit(md.link_info.name_span, LocationInfo::Global(NameElem::Module(md_id)));
+
+            let mut interface_iter = md.interfaces.iter();
+            // Skip main interface
+            interface_iter.next();
+            for (interface_id, interface) in interface_iter {
+                self.visit(interface.name_span, LocationInfo::Interface(md_id, md, interface_id, interface));
+            }
 
             for (id, inst) in &md.instructions {
                 match inst {

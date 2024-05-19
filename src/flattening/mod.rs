@@ -95,12 +95,29 @@ impl Module {
         format!("{port_direction} {}", &file_text[port.decl_span])
     }
 
-    pub fn make_all_ports_info_string(&self, file_text : &FileText) -> String {
+    pub fn make_interface_info_string(&self, interface_id : InterfaceID, file_text : &FileText) -> String {
         let mut result = String::new();
 
-        for (port_id, _) in &self.ports {
-            result.push_str("\n    ");
-            result.push_str(&self.make_port_info_string(port_id, file_text));
+        for (port_id, port) in &self.ports {
+            if port.interface == interface_id {
+                result.push_str("\n    ");
+                result.push_str(&self.make_port_info_string(port_id, file_text));
+            }
+        }
+
+        result
+    }
+
+    pub fn make_all_ports_info_string(&self, file_text : &FileText) -> String {
+        let mut result = self.make_interface_info_string(Module::MAIN_INTERFACE_ID, file_text);
+        
+        let mut interface_iter = self.interfaces.iter();
+        // Already did main interface
+        interface_iter.next();
+
+        for (interface_id, interface) in interface_iter {
+            result.push_str(&format!("\n    {}:", &interface.name));
+            result.push_str(&self.make_interface_info_string(interface_id, file_text));
         }
 
         result
@@ -172,7 +189,8 @@ pub struct Port {
 
 #[derive(Debug)]
 pub struct Interface {
-    pub ports_for_this_interface : PortIDRange,
+    pub name_span : Span,
+    pub name : String,
     pub func_call_inputs : PortIDRange,
     pub func_call_outputs : PortIDRange
 }
