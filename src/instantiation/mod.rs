@@ -278,10 +278,11 @@ fn perform_instantiation(md : &Module, linker : &Linker) -> InstantiatedModule {
         md,
         linker : linker
     };
-
+    
     // Don't instantiate modules that already errored. Otherwise instantiator may crash
     if md.link_info.errors.did_error {
         println!("Not Instantiating {} due to flattening errors", md.link_info.name);
+        context.errors.set_did_error();
         return context.extract();
     }
 
@@ -292,6 +293,19 @@ fn perform_instantiation(md : &Module, linker : &Linker) -> InstantiatedModule {
 
         return context.extract();
     }
+
+
+
+    if config().debug_print_module_contents {
+        println!("[[Executed {}]]", &context.name);
+        for (id, w) in &context.wires {
+            println!("{id:?} -> {w:?}");
+        }
+        for (id, sm) in &context.submodules {
+            println!("SubModule {id:?}: {sm:?}");
+        }
+    }
+
 
     println!("Instantiating submodules for {}", md.link_info.name);
     context.instantiate_submodules();

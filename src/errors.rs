@@ -123,6 +123,9 @@ impl<'linker> ErrorCollector<'linker> {
     pub fn did_error(&self) -> bool {
         self.error_store.borrow().did_error
     }
+    pub fn set_did_error(&mut self) {
+        self.error_store.get_mut().did_error = true;
+    }
 }
 
 pub struct ErrorReference<'ec> {

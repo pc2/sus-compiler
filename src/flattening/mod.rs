@@ -4,9 +4,6 @@ mod initialization;
 mod typechecking;
 mod parse;
 
-
-use sus_proc_macro::kw;
-
 pub use parse::flatten_all_modules;
 pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
@@ -14,42 +11,6 @@ pub use typechecking::typecheck_all_modules;
 use crate::{
     arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID}, parser::Documentation, pretty_print_many_spans, typing::{AbstractType, WrittenType}, value::Value
 };
-
-
-#[derive(Debug,Clone,Copy,PartialEq,Eq)]
-pub enum IdentifierType {
-    Input,
-    Output,
-    Local,
-    State,
-    Generative
-}
-
-impl IdentifierType {
-    pub fn get_keyword(&self) -> &'static str {
-        match self {
-            IdentifierType::Input => "input",
-            IdentifierType::Output => "output",
-            IdentifierType::Local => "",
-            IdentifierType::State => "state",
-            IdentifierType::Generative => "gen",
-        }
-    }
-    pub fn is_generative(&self) -> bool {
-        *self == IdentifierType::Generative
-    }
-    pub fn is_port(&self) -> bool {
-        *self == IdentifierType::Input || *self == IdentifierType::Output
-    }
-    #[track_caller]
-    pub fn unwrap_is_input(&self) -> bool {
-        match self {
-            IdentifierType::Input => true,
-            IdentifierType::Output => false,
-            _ => unreachable!()
-        }
-    }
-}
 
 /// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage. 
 /// 
@@ -172,6 +133,42 @@ impl Module {
             }
         }
         unreachable!()
+    }
+}
+
+
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
+pub enum IdentifierType {
+    Input,
+    Output,
+    Local,
+    State,
+    Generative
+}
+
+impl IdentifierType {
+    pub fn get_keyword(&self) -> &'static str {
+        match self {
+            IdentifierType::Input => "input",
+            IdentifierType::Output => "output",
+            IdentifierType::Local => "",
+            IdentifierType::State => "state",
+            IdentifierType::Generative => "gen",
+        }
+    }
+    pub fn is_generative(&self) -> bool {
+        *self == IdentifierType::Generative
+    }
+    pub fn is_port(&self) -> bool {
+        *self == IdentifierType::Input || *self == IdentifierType::Output
+    }
+    #[track_caller]
+    pub fn unwrap_is_input(&self) -> bool {
+        match self {
+            IdentifierType::Input => true,
+            IdentifierType::Output => false,
+            _ => unreachable!()
+        }
     }
 }
 
@@ -300,36 +297,6 @@ pub enum UnaryOperator {
     Product,
     Negate,
 }
-impl UnaryOperator {
-    pub fn from_kind_id(kind_id : u16) -> Self {
-        match kind_id {
-            kw!("+") => UnaryOperator::Sum,
-            kw!("*") => UnaryOperator::Product,
-            kw!("-") => UnaryOperator::Negate,
-            kw!("&") => UnaryOperator::And,
-            kw!("|") => UnaryOperator::Or,
-            kw!("^") => UnaryOperator::Xor,
-            kw!("!") => UnaryOperator::Not,
-            _ => unreachable!()
-        }
-    }
-    pub fn op_text(&self) -> &'static str {
-        match self {
-            UnaryOperator::And => "&",
-            UnaryOperator::Or => "|",
-            UnaryOperator::Xor => "^",
-            UnaryOperator::Not => "!",
-            UnaryOperator::Sum => "+",
-            UnaryOperator::Product => "*",
-            UnaryOperator::Negate => "-",
-        }
-    }
-}
-impl core::fmt::Display for UnaryOperator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.op_text())
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperator {
@@ -349,54 +316,6 @@ pub enum BinaryOperator {
     GreaterEq,
     Lesser,
     LesserEq
-}
-impl BinaryOperator {
-    pub fn from_kind_id(kind_id : u16) -> Self {
-        match kind_id {
-            kw!("&") => BinaryOperator::And,
-            kw!("|") => BinaryOperator::Or,
-            kw!("^") => BinaryOperator::Xor,
-            //kw!("<<") => BinaryOperator::ShiftLeft,
-            //kw!(">>") => BinaryOperator::ShiftRight,
-            kw!("+") => BinaryOperator::Add,
-            kw!("-") => BinaryOperator::Subtract,
-            kw!("*") => BinaryOperator::Multiply,
-            kw!("/") => BinaryOperator::Divide,
-            kw!("%") => BinaryOperator::Modulo,
-            kw!("==") => BinaryOperator::Equals,
-            kw!("!=") => BinaryOperator::NotEquals,
-            kw!(">") => BinaryOperator::Greater,
-            kw!(">=") => BinaryOperator::GreaterEq,
-            kw!("<") => BinaryOperator::Lesser,
-            kw!("<=") => BinaryOperator::LesserEq,
-            _ => unreachable!()
-        }
-    }
-    pub fn op_text(&self) -> &'static str {
-        match self {
-            BinaryOperator::And => "&",
-            BinaryOperator::Or => "|",
-            BinaryOperator::Xor => "^",
-            //BinaryOperator::ShiftLeft => "<<",
-            //BinaryOperator::ShiftRight => ">>",
-            BinaryOperator::Add => "+",
-            BinaryOperator::Subtract => "-",
-            BinaryOperator::Multiply => "*",
-            BinaryOperator::Divide => "/",
-            BinaryOperator::Modulo => "%",
-            BinaryOperator::Equals => "==",
-            BinaryOperator::NotEquals => "!=",
-            BinaryOperator::Greater => ">",
-            BinaryOperator::GreaterEq => ">=",
-            BinaryOperator::Lesser => "<",
-            BinaryOperator::LesserEq => "<=",
-        }
-    }
-}
-impl core::fmt::Display for BinaryOperator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.op_text())
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -445,6 +364,7 @@ const IS_GEN_UNINIT : bool = false;
 
 #[derive(Debug)]
 pub struct WireInstance {
+    pub interface : InterfaceID,
     pub typ : AbstractType,
     pub is_compiletime : bool,
     pub span : Span,
@@ -453,6 +373,7 @@ pub struct WireInstance {
 
 #[derive(Debug)]
 pub struct Declaration {
+    pub interface : InterfaceID,
     pub typ_expr : WrittenType,
     pub typ : AbstractType,
     pub name_span : Span,

@@ -1,6 +1,6 @@
 
 
-module DUAL_PORT_MEM {
+/*module DUAL_PORT_MEM {
 	bool[20][512] mem
 
 	interface write : bool write, bool[20] wr_data, int wr_addr
@@ -14,17 +14,72 @@ module DUAL_PORT_MEM {
 	if read {
 		rd_data = mem[rd_addr]
 	}
-}
+}*/
 
-
+// LC Bug?
 module FIFO {
-	interface push : bool push, bool[20] data
-	out bool ready
-	
-	interface pop : bool pop -> bool[20] data, bool data_valid
+	gen int BITWIDTH = 20
+	gen int DEPTH = 512
 
 
-	
+	bool[BITWIDTH][DEPTH] mem
+
+	//interface iii : bool pop, bool push, bool[BITWIDTH] data_in -> bool[BITWIDTH] data_out, bool data_valid
 
 
+	interface push : bool push, bool[BITWIDTH] data_in
+	interface pop : bool pop -> bool[BITWIDTH] data_out, bool data_valid
+
+	state int read_addr
+	state int write_addr
+
+	//initial read_addr = 0
+	//initial write_addr = 0
+
+
+	if pop {
+		data_valid = read_addr != write_addr
+		data_out = mem[read_addr]
+	}
+
+	if push {
+		mem[write_addr] = data_in
+
+	}
 }
+
+/*module FIFO {
+	gen int BITWIDTH = 20
+	gen int DEPTH = 512
+	// The FIFO may still receive data for 5 cycles after ready is de-asserted
+	gen int ALMOST_FULL_THRESHOLD = 5
+	
+	bool[BITWIDTH][DEPTH] mem
+
+	interface push : bool push, bool[BITWIDTH] data_in -> bool ready
+	
+	interface pop : bool pop -> bool[BITWIDTH] data_out, bool data_valid
+
+
+	state int read_addr
+	state int write_addr
+
+	initial read_addr = 0
+	initial write_addr = 0
+
+
+	if pop {
+		data_valid = read_addr != write_addr
+		if read_addr != write_addr {
+			data_out = mem[read_addr]
+			read_addr = (read_addr) + 1 % DEPTH
+		}
+	}
+
+	if push {
+		mem[write_addr] = data_in
+		// Wrapping subtract
+		int space_remaining = (read_addr - write_addr) % DEPTH
+		ready = space_remaining > ALMOST_FULL_THRESHOLD
+	}
+}*/

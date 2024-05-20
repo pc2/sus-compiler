@@ -42,6 +42,88 @@ impl PartialWireReference {
     }
 }
 
+
+impl UnaryOperator {
+    pub fn from_kind_id(kind_id : u16) -> Self {
+        match kind_id {
+            kw!("+") => UnaryOperator::Sum,
+            kw!("*") => UnaryOperator::Product,
+            kw!("-") => UnaryOperator::Negate,
+            kw!("&") => UnaryOperator::And,
+            kw!("|") => UnaryOperator::Or,
+            kw!("^") => UnaryOperator::Xor,
+            kw!("!") => UnaryOperator::Not,
+            _ => unreachable!()
+        }
+    }
+    pub fn op_text(&self) -> &'static str {
+        match self {
+            UnaryOperator::And => "&",
+            UnaryOperator::Or => "|",
+            UnaryOperator::Xor => "^",
+            UnaryOperator::Not => "!",
+            UnaryOperator::Sum => "+",
+            UnaryOperator::Product => "*",
+            UnaryOperator::Negate => "-",
+        }
+    }
+}
+impl core::fmt::Display for UnaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.op_text())
+    }
+}
+
+
+impl BinaryOperator {
+    pub fn from_kind_id(kind_id : u16) -> Self {
+        match kind_id {
+            kw!("&") => BinaryOperator::And,
+            kw!("|") => BinaryOperator::Or,
+            kw!("^") => BinaryOperator::Xor,
+            //kw!("<<") => BinaryOperator::ShiftLeft,
+            //kw!(">>") => BinaryOperator::ShiftRight,
+            kw!("+") => BinaryOperator::Add,
+            kw!("-") => BinaryOperator::Subtract,
+            kw!("*") => BinaryOperator::Multiply,
+            kw!("/") => BinaryOperator::Divide,
+            kw!("%") => BinaryOperator::Modulo,
+            kw!("==") => BinaryOperator::Equals,
+            kw!("!=") => BinaryOperator::NotEquals,
+            kw!(">") => BinaryOperator::Greater,
+            kw!(">=") => BinaryOperator::GreaterEq,
+            kw!("<") => BinaryOperator::Lesser,
+            kw!("<=") => BinaryOperator::LesserEq,
+            _ => unreachable!()
+        }
+    }
+    pub fn op_text(&self) -> &'static str {
+        match self {
+            BinaryOperator::And => "&",
+            BinaryOperator::Or => "|",
+            BinaryOperator::Xor => "^",
+            //BinaryOperator::ShiftLeft => "<<",
+            //BinaryOperator::ShiftRight => ">>",
+            BinaryOperator::Add => "+",
+            BinaryOperator::Subtract => "-",
+            BinaryOperator::Multiply => "*",
+            BinaryOperator::Divide => "/",
+            BinaryOperator::Modulo => "%",
+            BinaryOperator::Equals => "==",
+            BinaryOperator::NotEquals => "!=",
+            BinaryOperator::Greater => ">",
+            BinaryOperator::GreaterEq => ">=",
+            BinaryOperator::Lesser => "<",
+            BinaryOperator::LesserEq => "<=",
+        }
+    }
+}
+impl core::fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.op_text())
+    }
+}
+
 struct FlatteningContext<'l, 'errs> {
     modules : WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>,
     #[allow(dead_code)]
@@ -195,6 +277,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             let name = &self.name_resolver.file_text[name_span];
 
             self.alloc_declaration(name, whole_declaration_span, Instruction::Declaration(Declaration{
+                interface : InterfaceID::PLACEHOLDER,
                 typ : typ_expr.to_type(),
                 typ_expr,
                 read_only,
@@ -396,6 +479,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         };
 
         let wire_instance = WireInstance{
+            interface : InterfaceID::PLACEHOLDER,
             typ : AbstractType::Unknown,
             is_compiletime : IS_GEN_UNINIT,
             span: expr_span,
@@ -547,6 +631,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             for port in outputs {
                 if let Some(Ok((to, write_modifiers))) = to_iter.next() {
                     let from = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{
+                        interface : InterfaceID::PLACEHOLDER,
                         typ: AbstractType::Unknown,
                         is_compiletime: false,
                         span: func_call_span,
@@ -567,7 +652,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         };
         for leftover_to in to_iter {
             if let Ok((to, write_modifiers)) = leftover_to {
-                let err_id = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{typ : AbstractType::Error, is_compiletime : true, span : func_call_span, source : WireSource::Constant(Value::Error)}));
+                let err_id = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{interface : InterfaceID::PLACEHOLDER, typ : AbstractType::Error, is_compiletime : true, span : func_call_span, source : WireSource::Constant(Value::Error)}));
                 self.working_on.instructions.alloc(Instruction::Write(Write{from: err_id, to, write_modifiers}));
             }
         }

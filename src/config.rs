@@ -6,7 +6,8 @@ pub struct ConfigStruct {
     pub lsp_debug_mode : bool,
     pub lsp_port : u16,
     pub codegen : bool,
-    pub debug_print_module_contents : bool
+    pub debug_print_module_contents : bool,
+    pub debug_print_latency_graph : bool
 }
 
 pub fn config() -> &'static ConfigStruct {
@@ -47,6 +48,9 @@ pub fn parse_args() -> Vec<PathBuf> {
                     "--debug" => {
                         config.debug_print_module_contents = true;
                     }
+                    "--debug-latency" => {
+                        config.debug_print_latency_graph = true;
+                    }
                     other => {
                         panic!("Unknown option {other}");
                     }
@@ -59,7 +63,7 @@ pub fn parse_args() -> Vec<PathBuf> {
 
     // For debugging
     if file_paths.len() == 0 {
-        file_paths.push(PathBuf::from("test.sus"));
+        //file_paths.push(PathBuf::from("test.sus"));
         file_paths.push(PathBuf::from("tinyTestFile.sus"));
         config.codegen = true;
     }
@@ -78,5 +82,6 @@ static CONFIG : ConfigStructWrapper = ConfigStructWrapper{cf: UnsafeCell::new(Co
     lsp_port : 25000,
     lsp_debug_mode : false,
     debug_print_module_contents : false,
-    codegen : false
+    codegen : false,
+    debug_print_latency_graph : false
 })};

@@ -25,7 +25,7 @@ pub fn typecheck_all_modules(linker : &mut Linker) {
             
             context.typecheck();
             context.generative_check();
-            context.find_unused_variables(&module.ports);    
+            context.find_unused_variables();    
         });
 
         span_debugger.defuse();
@@ -340,46 +340,14 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     /* 
         ==== Additional Warnings ====
     */
-    fn find_unused_variables(&self, ports : &FlatAlloc<Port, PortIDMarker>) {
-        // Setup Wire Fanouts List for faster processing
-        let mut instance_fanins : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.working_on.instructions.iter().map(|_| Vec::new()).collect();
-
-        for (inst_id, inst) in self.working_on.instructions.iter() {
-            match inst {
-                Instruction::Write(conn) => {
-                    if let Some(flat_root) = conn.to.root.get_root_flat() {
-                        instance_fanins[flat_root].push(conn.from);
-                        WireReferencePathElement::for_each_dependency(&conn.to.path, |idx_wire| instance_fanins[flat_root].push(idx_wire));
-                    }
-                }
-                Instruction::SubModule(_) => {} // TODO Dependencies should be added here if for example generative templates get added
-                Instruction::Declaration(decl) => {
-                    decl.typ_expr.for_each_generative_input(|id| instance_fanins[inst_id].push(id));
-                }
-                Instruction::Wire(wire) => {
-                    wire.source.for_each_dependency(|id| instance_fanins[inst_id].push(id));
-                }
-                Instruction::IfStatement(stm) => {
-                    for id in UUIDRange(stm.then_start, stm.else_end) {
-                        if let Instruction::Write(conn) = &self.working_on.instructions[id] {
-                            if let Some(flat_root) = conn.to.root.get_root_flat() {
-                                instance_fanins[flat_root].push(stm.condition);
-                            }
-                        }
-                    }
-                }
-                Instruction::ForStatement(stm) => {
-                    instance_fanins[stm.loop_var_decl].push(stm.start);
-                    instance_fanins[stm.loop_var_decl].push(stm.end);
-                }
-            }
-        }
+    fn find_unused_variables(&self) {
+        let instruction_fanins = self.make_fanins();
 
         let mut is_instance_used_map : FlatAlloc<bool, FlatIDMarker> = self.working_on.instructions.iter().map(|_| false).collect();
 
         let mut wire_to_explore_queue : Vec<FlatID> = Vec::new();
 
-        for (_id, port) in ports {
+        for (_id, port) in &self.working_on.ports {
             if port.identifier_type == IdentifierType::Output {
                 is_instance_used_map[port.declaration_instruction] = true;
                 wire_to_explore_queue.push(port.declaration_instruction);
@@ -388,7 +356,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
 
         while let Some(item) = wire_to_explore_queue.pop() {
-            for from in &instance_fanins[item] {
+            for from in &instruction_fanins[item] {
                 if !is_instance_used_map[*from] {
                     is_instance_used_map[*from] = true;
                     wire_to_explore_queue.push(*from);
@@ -404,5 +372,42 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 }
             }
         }
+    }
+
+    fn make_fanins(&self) -> FlatAlloc<Vec<UUID<FlatIDMarker>>, FlatIDMarker> {
+        // Setup Wire Fanouts List for faster processing
+        let mut instruction_fanins : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.working_on.instructions.iter().map(|_| Vec::new()).collect();
+        
+        for (inst_id, inst) in self.working_on.instructions.iter() {
+            match inst {
+                Instruction::Write(conn) => {
+                    if let Some(flat_root) = conn.to.root.get_root_flat() {
+                        instruction_fanins[flat_root].push(conn.from);
+                        WireReferencePathElement::for_each_dependency(&conn.to.path, |idx_wire| instruction_fanins[flat_root].push(idx_wire));
+                    }
+                }
+                Instruction::SubModule(_) => {} // TODO Dependencies should be added here if for example generative templates get added
+                Instruction::Declaration(decl) => {
+                    decl.typ_expr.for_each_generative_input(|id| instruction_fanins[inst_id].push(id));
+                }
+                Instruction::Wire(wire) => {
+                    wire.source.for_each_dependency(|id| instruction_fanins[inst_id].push(id));
+                }
+                Instruction::IfStatement(stm) => {
+                    for id in UUIDRange(stm.then_start, stm.else_end) {
+                        if let Instruction::Write(conn) = &self.working_on.instructions[id] {
+                            if let Some(flat_root) = conn.to.root.get_root_flat() {
+                                instruction_fanins[flat_root].push(stm.condition);
+                            }
+                        }
+                    }
+                }
+                Instruction::ForStatement(stm) => {
+                    instruction_fanins[stm.loop_var_decl].push(stm.start);
+                    instruction_fanins[stm.loop_var_decl].push(stm.end);
+                }
+            }
+        }
+        instruction_fanins
     }
 }

@@ -1,3 +1,5 @@
+use crate::config::config;
+
 use super::list_of_lists::ListOfLists;
 
 
@@ -57,6 +59,8 @@ struct LatencyStackElem<'d> {
     Leaves is_latency_pinned[start_node] == false
 */
 fn count_latency<'d>(is_latency_pinned : &mut [bool], absolute_latency : &mut [i64], fanouts : &'d ListOfLists<FanInOut>, start_node : usize, stack : &mut Vec<LatencyStackElem<'d>>) -> Result<(), LatencyCountingError> {
+    assert_list_valid(is_latency_pinned, absolute_latency);
+    
     assert!(absolute_latency[start_node] != i64::MIN);
     
     assert!(stack.is_empty());
@@ -65,6 +69,7 @@ fn count_latency<'d>(is_latency_pinned : &mut [bool], absolute_latency : &mut [i
 
     while let Some(top) = stack.last_mut() {
         if let Some(&FanInOut{other, delta_latency}) = top.remaining_fanout.next() {
+            assert!(absolute_latency[top.node_idx] != i64::MIN);
             let to_node_min_latency = absolute_latency[top.node_idx] + delta_latency;
             if to_node_min_latency > absolute_latency[other] {
                 if is_latency_pinned[other] {
@@ -80,6 +85,7 @@ fn count_latency<'d>(is_latency_pinned : &mut [bool], absolute_latency : &mut [i
                 } else {
                     absolute_latency[other] = to_node_min_latency;
                     stack.push(LatencyStackElem{node_idx : other, remaining_fanout : fanouts[other].iter()});
+                    assert!(absolute_latency[other] != i64::MIN);
                     is_latency_pinned[other] = true;
                 }
             }
@@ -90,6 +96,14 @@ fn count_latency<'d>(is_latency_pinned : &mut [bool], absolute_latency : &mut [i
     }
 
     Ok(())
+}
+
+fn assert_list_valid(is_latency_pinned: &[bool], absolute_latency: &[i64]) {
+    for (idx, lp) in is_latency_pinned.iter().enumerate() {
+        if *lp {
+            assert!(absolute_latency[idx] != i64::MIN);
+        }
+    }
 }
 
 fn invert_latency(latencies : &mut [i64]) {
@@ -140,11 +154,14 @@ impl<'d> LatencySolverSide<'d> {
         }
     }
 
+    
+
     // Returns true if new nodes were discovered on the other side
     fn init_with_given_latencies(&mut self, given_latencies : &[SpecifiedLatency], destination : &mut Self, is_latency_pinned : &mut [bool], stack : &mut Vec<LatencyStackElem<'d>>) -> Result<bool, LatencyCountingError> {
         for n in self.precomputed_seed_nodes.iter_mut() {*n = i64::MIN}
 
         for lat in given_latencies {
+            assert!(lat.latency != i64::MIN);
             self.precomputed_seed_nodes[lat.wire] = lat.latency;
             is_latency_pinned[lat.wire] = true;
         }
@@ -162,8 +179,11 @@ impl<'d> LatencySolverSide<'d> {
         // Fully precompute given latency buffer
         for lat in given_latencies {
             assert!(is_latency_pinned[lat.wire]);
+            assert_list_valid(is_latency_pinned, &self.precomputed_seed_nodes);
             count_latency(is_latency_pinned, &mut self.precomputed_seed_nodes, self.fanouts, lat.wire, stack)?;
+            // reinstate initial latency seed
             is_latency_pinned[lat.wire] = true;
+            assert_list_valid(is_latency_pinned, &self.precomputed_seed_nodes);
         }
 
         Self::push_to_destination_ports(&mut destination.sources, &mut self.precomputed_seed_nodes)
@@ -188,8 +208,11 @@ impl<'d> LatencySolverSide<'d> {
             assert!(temporary_buffer[port.wire] == i64::MIN || temporary_buffer[port.wire] == port.absolute_latency);
             //assert!(self.is_latency_pinned[*output] == false);
             is_latency_pinned[port.wire] = true;
+            assert_list_valid(is_latency_pinned, temporary_buffer);
             count_latency(is_latency_pinned, temporary_buffer, &self.fanouts, port.wire, stack)?;
+            // Repin latency, because it was unpinned by count_latency
             is_latency_pinned[port.wire] = true;
+            assert_list_valid(is_latency_pinned, temporary_buffer);
             
             something_found |= Self::push_to_destination_ports(&mut destination.sources, temporary_buffer)?;
         }
@@ -214,6 +237,28 @@ fn extract_solution<'d>(mut latencies : Vec<i64>, fanins : &'d ListOfLists<FanIn
 }
 
 pub fn solve_latencies<'d>(fanins : &'d ListOfLists<FanInOut>, fanouts : &'d ListOfLists<FanInOut>, inputs : &'d [usize], outputs : &'d [usize], mut specified_latencies : Vec<SpecifiedLatency>) -> Result<Vec<i64>, LatencyCountingError> {
+    if config().debug_print_latency_graph {
+        println!("==== BEGIN LATENCY TEST CASE ====");
+        println!("let fanins : [&[FanInOut]; {}] = [", fanins.len());
+        for (idx, fin) in fanins.iter().enumerate() {
+            print!("\t/*{idx}*/&[");
+            for FanInOut { other, delta_latency } in fin {
+                print!("mk_fan({other}, {delta_latency}),")
+            }
+            println!("],");
+        }
+        println!("];");
+        println!("let fanins = ListOfLists::from_slice_slice(&fanins);");
+        println!("let fanouts = convert_fanin_to_fanout(&fanins);");
+
+        println!("let inputs = vec!{inputs:?};");
+        println!("let outputs = vec!{outputs:?};");
+        println!("let specified_latencies = vec!{specified_latencies:?};");
+        println!("let found_latencies = solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();");
+        println!("==== END LATENCY TEST CASE ====");
+    }
+    
+    
     assert!(fanins.len() == fanouts.len());
     if fanins.len() == 0 {
         return Ok(Vec::new());
@@ -616,6 +661,50 @@ mod tests {
         let latencies = solve_latencies(&fanins, &fanouts, &[0], &[2, 3], Vec::new()).unwrap();
 
         assert_eq!(latencies, &[0, 1, 2, 3]); 
+    }
+    
+    #[test]
+    fn single_interface_fifo_no_crash() {
+        let fanins : [&[FanInOut]; 10] = [
+            /*0*/&[mk_fan(3, 0),mk_fan(7, 0),mk_fan(2, 0),],
+            /*1*/&[],
+            /*2*/&[],
+            /*3*/&[],
+            /*4*/&[mk_fan(9, 0),mk_fan(1, 0),],
+            /*5*/&[mk_fan(8, 0),mk_fan(1, 0),],
+            /*6*/&[],
+            /*7*/&[],
+            /*8*/&[mk_fan(6, 0),mk_fan(7, 0),],
+            /*9*/&[mk_fan(0, 0),mk_fan(6, 0),],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+        let fanouts = convert_fanin_to_fanout(&fanins);
+        let inputs = vec![1, 2, 3];
+        let outputs = vec![4, 5];
+        let specified_latencies = vec![];
+        let _found_latencies = solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();
+    }
+
+    #[test]
+    fn two_interface_fifo_do_crash() {
+        let fanins : [&[FanInOut]; 10] = [
+            /*0*/&[mk_fan(1, 0),mk_fan(7, 0),mk_fan(2, 0),],
+            /*1*/&[],
+            /*2*/&[],
+            /*3*/&[],
+            /*4*/&[mk_fan(9, 0),mk_fan(3, 0),],
+            /*5*/&[mk_fan(8, 0),mk_fan(3, 0),],
+            /*6*/&[],
+            /*7*/&[],
+            /*8*/&[mk_fan(6, 0),mk_fan(7, 0),],
+            /*9*/&[mk_fan(0, 0),mk_fan(6, 0),],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+        let fanouts = convert_fanin_to_fanout(&fanins);
+        let inputs = vec![1, 2, 3];
+        let outputs = vec![4, 5];
+        let specified_latencies = vec![];
+        let _found_latencies = solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();
     }
 }
 
