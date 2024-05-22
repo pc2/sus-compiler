@@ -202,7 +202,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         // Fallback if no register annotations used
                         if !did_place_error {
                             for wr in unique_write_instructions {
-                                self.errors.error(wr.to.span, format!("This write is{rest_of_message}"));
+                                self.errors.error(wr.to_span, format!("This write is{rest_of_message}"));
                             }
                         }
                     }

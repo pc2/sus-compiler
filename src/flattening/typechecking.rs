@@ -296,7 +296,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         };
     
         if self.get_root_identifier_read_only(&conn.to.root) {
-            self.errors.error(conn.to.span, "Cannot Assign to Read-Only value")
+            self.errors.error(conn.to_span, "Cannot Assign to Read-Only value")
                 .info_obj_different_file(decl, file);
         }
     
@@ -314,7 +314,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         let declared_at_depth = declaration_depths[root_flat].unwrap();
                 
                         if runtime_if_stack.len() > declared_at_depth {
-                            let err_ref = self.errors.error(conn.to.span, "Cannot write to generative variables in runtime conditional block");
+                            let err_ref = self.errors.error(conn.to_span, "Cannot write to generative variables in runtime conditional block");
                             err_ref.info_obj_different_file(decl, file);
                             for (_, if_cond_span) in &runtime_if_stack[declared_at_depth..] {
                                 err_ref.info((*if_cond_span, file), "Runtime Condition here");

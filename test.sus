@@ -333,6 +333,13 @@ module add_indices_to_array :
 	}
 }
 
+module assignment_producer : -> int v'0, int o'0, bool j'0 {}
+
+module test_various_assignments {
+	state int[3] st
+	bool b
+	reg int a, st[2], reg reg b = assignment_producer()
+}
 
 //timeline (bs -> /, true) | (bs -> v, false)
 module first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros {

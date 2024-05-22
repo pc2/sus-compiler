@@ -119,7 +119,7 @@ impl Module {
             Instruction::SubModule(sm) => sm.module_name_span,
             Instruction::Declaration(decl) => decl.get_span(),
             Instruction::Wire(w) => w.span,
-            Instruction::Write(conn) => conn.to.span,
+            Instruction::Write(conn) => conn.to_span,
             Instruction::IfStatement(if_stmt) => self.get_instruction_span(if_stmt.condition),
             Instruction::ForStatement(for_stmt) => self.get_instruction_span(for_stmt.loop_var_decl),
         }
@@ -260,16 +260,14 @@ impl WireReferenceRoot {
 #[derive(Debug)]
 pub struct WireReference {
     pub root : WireReferenceRoot,
-    pub path : Vec<WireReferencePathElement>,
-    pub span : Span
+    pub path : Vec<WireReferencePathElement>
 }
 
 impl WireReference {
-    fn simple_port(span : Span, port : PortInfo) -> WireReference {
+    fn simple_port(port : PortInfo) -> WireReference {
         WireReference{
             root : WireReferenceRoot::SubModulePort(port),
-            path : Vec::new(),
-            span
+            path : Vec::new()
         }
     }
 }
@@ -284,6 +282,7 @@ pub enum WriteModifiers {
 pub struct Write {
     pub from : FlatID,
     pub to : WireReference,
+    pub to_span : Span,
     pub write_modifiers : WriteModifiers,
 }
 
