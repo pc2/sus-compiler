@@ -9,12 +9,7 @@ use std::ops::Deref;
 use num::BigInt;
 
 use crate::{
-    arena_alloc::UUIDRange,
-    file_position::Span,
-    flattening::{BinaryOperator, Declaration, FlatID, FlatIDRange, IdentifierType, Instruction, UnaryOperator, WireInstance, WireReference, WireReferencePathElement, WireReferenceRoot, WireSource, WriteModifiers},
-    linker::NamedConstant,
-    typing::{ConcreteType, WrittenType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
-    value::{compute_binary_op, compute_unary_op, TypedValue, Value}
+    arena_alloc::UUIDRange, concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, file_position::Span, flattening::{BinaryOperator, Declaration, FlatID, FlatIDRange, IdentifierType, Instruction, UnaryOperator, WireInstance, WireReference, WireReferencePathElement, WireReferenceRoot, WireSource, WriteModifiers, WrittenType}, linker::NamedConstant, value::{compute_binary_op, compute_unary_op, TypedValue, Value}
 };
 
 use super::*;

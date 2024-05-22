@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use num::BigInt;
 
-use crate::{flattening::{BinaryOperator, UnaryOperator}, typing::{AbstractType, ConcreteType, BOOL_CONCRETE_TYPE, BOOL_TYPE, INT_CONCRETE_TYPE, INT_TYPE}};
+use crate::{abstract_type::{AbstractType, BOOL_TYPE, INT_TYPE}, concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, flattening::{BinaryOperator, UnaryOperator}};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum Value {

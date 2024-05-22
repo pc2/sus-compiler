@@ -12,7 +12,8 @@ use crate::{
     file_position::{FileText, Span, SpanFile},
     flattening::Module,
     parser::Documentation,
-    typing::{AbstractType, ConcreteType},
+    abstract_type::AbstractType,
+    concrete_type::ConcreteType,
     util::{const_str_position, const_str_position_in_tuples},
     value::{TypedValue, Value}
 };

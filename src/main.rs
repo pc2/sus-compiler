@@ -20,7 +20,8 @@ mod codegen;
 
 mod codegen_fallback;
 
-mod typing;
+mod concrete_type;
+mod abstract_type;
 
 mod dev_aid;
 mod linker;

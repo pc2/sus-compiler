@@ -4,12 +4,14 @@ mod initialization;
 mod typechecking;
 mod parse;
 
+use std::ops::{Deref, Index};
+
 pub use parse::flatten_all_modules;
 pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID}, parser::Documentation, pretty_print_many_spans, typing::{AbstractType, WrittenType}, value::Value
+    abstract_type::AbstractType, arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, Linkable, ModuleUUID, NamedType, TypeUUID}, parser::Documentation, pretty_print_many_spans, value::Value
 };
 
 /// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage. 
@@ -329,6 +331,15 @@ pub struct PortInfo {
 }
 
 #[derive(Debug)]
+pub struct WireInstance {
+    pub interface : InterfaceID,
+    pub typ : AbstractType,
+    pub is_compiletime : bool,
+    pub span : Span,
+    pub source : WireSource
+}
+
+#[derive(Debug)]
 pub enum WireSource {
     WireRef(WireReference), // Used to add a span to the reference of a wire. 
     UnaryOp{op : UnaryOperator, right : FlatID},
@@ -361,14 +372,54 @@ impl WireSource {
 
 const IS_GEN_UNINIT : bool = false;
 
-#[derive(Debug)]
-pub struct WireInstance {
-    pub interface : InterfaceID,
-    pub typ : AbstractType,
-    pub is_compiletime : bool,
-    pub span : Span,
-    pub source : WireSource
+
+#[derive(Debug, Clone)]
+pub enum WrittenType {
+    Error(Span),
+    Named(Span, TypeUUID),
+    Array(Span, Box<(WrittenType, FlatID, BracketSpan)>)
 }
+
+impl WrittenType {
+    pub fn get_span(&self) -> Span {
+        match self {
+            WrittenType::Error(span) | WrittenType::Named(span, _) | WrittenType::Array(span, _) => *span
+        }
+    }
+
+    pub fn to_type(&self) -> AbstractType {
+        match self {
+            WrittenType::Error(_) => AbstractType::Error,
+            WrittenType::Named(_, id) => AbstractType::Named(*id),
+            WrittenType::Array(_, arr_box) => {
+                let (elem_typ, _arr_idx, _br_span) = arr_box.deref();
+                AbstractType::Array(Box::new(elem_typ.to_type()))
+            }
+        }
+    }
+
+    pub fn for_each_generative_input<F : FnMut(FlatID)>(&self, mut f : F) {
+        match self {
+            WrittenType::Error(_) | WrittenType::Named(_, _) => {}
+            WrittenType::Array(_span, arr_box) => {
+                f(arr_box.deref().1)
+            }
+        }
+    }
+
+    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec) -> String {
+        match self {
+            WrittenType::Error(_) => {
+                "{error}".to_owned()
+            }
+            WrittenType::Named(_, id) => {
+                linker_types[*id].get_full_name()
+            }
+            WrittenType::Array(_, sub) => sub.deref().0.to_string(linker_types) + "[]",
+        }
+    }
+}
+
 
 #[derive(Debug)]
 pub struct Declaration {

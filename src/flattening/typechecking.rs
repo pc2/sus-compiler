@@ -2,7 +2,7 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-    debug::SpanDebugger, errors::{ErrorCollector, ErrorReference}, file_position::SpanFile, linker::{with_module_editing_context, ConstantUUIDMarker, FileUUID, Linkable, Linker, ModuleUUIDMarker, NamedConstant, NamedType, Resolver, TypeUUIDMarker, WorkingOnResolver}, typing::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, BOOL_TYPE, INT_TYPE}
+    debug::SpanDebugger, errors::{ErrorCollector, ErrorReference}, file_position::SpanFile, linker::{with_module_editing_context, ConstantUUIDMarker, FileUUID, Linkable, Linker, ModuleUUIDMarker, NamedConstant, NamedType, Resolver, TypeUUIDMarker, WorkingOnResolver}, abstract_type::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, BOOL_TYPE, INT_TYPE}
 };
 
 use super::*;

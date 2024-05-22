@@ -2,7 +2,7 @@
 use std::ops::Deref;
 
 use crate::{
-    file_position::Span, flattening::{Declaration, FlatID, Instruction, Interface, InterfaceID, Module, Port, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource}, linker::{FileData, Linker, ModuleUUID, NameElem}, typing::WrittenType
+    file_position::Span, flattening::{Declaration, FlatID, Instruction, Interface, InterfaceID, Module, Port, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource, WrittenType}, linker::{FileData, Linker, ModuleUUID, NameElem}
 };
 
 #[derive(Clone, Copy, Debug)]

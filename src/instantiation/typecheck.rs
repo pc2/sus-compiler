@@ -1,6 +1,6 @@
 
 
-use crate::typing::ConcreteType;
+use crate::concrete_type::ConcreteType;
 
 use super::*;
 

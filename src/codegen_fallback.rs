@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{flattening::{Instruction, Module}, instantiation::{RealWirePathElem, InstantiatedModule, RealWire, RealWireDataSource, WireID}, linker::{get_builtin_type, TypeUUID}, typing::ConcreteType};
+use crate::{flattening::{Instruction, Module}, instantiation::{RealWirePathElem, InstantiatedModule, RealWire, RealWireDataSource, WireID}, linker::{get_builtin_type, TypeUUID}, concrete_type::ConcreteType};
 
 fn get_type_name_size(id : TypeUUID) -> u64 {
     if id == get_builtin_type("int") {
