@@ -488,9 +488,9 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                         LocationInfo::InModule(_md_id, md, id, InModule::Temporary(wire)) => {
                             let typ_str = wire.typ.to_string(&file_cache.linker.types);
 
-                            let gen_kw = if wire.is_compiletime {"gen "} else {""};
+                            let gen_kw = if wire.typ.is_generative() {"gen "} else {""};
                             hover_list.push(MarkedString::String(format!("{gen_kw}{typ_str}")));
-                            gather_hover_infos(md, id, wire.is_compiletime, file_cache, &mut hover_list);
+                            gather_hover_infos(md, id, wire.typ.is_generative(), file_cache, &mut hover_list);
                         }
                         LocationInfo::Type(typ) => {
                             hover_list.push(MarkedString::String(typ.to_type().to_string(&file_cache.linker.types)));

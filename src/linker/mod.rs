@@ -7,15 +7,7 @@ use std::{collections::{HashMap, HashSet}, cell::RefCell};
 use tree_sitter::Tree;
 
 use crate::{
-    arena_alloc::{ArenaAllocator, UUIDMarker, UUID},
-    errors::{CompileError, ErrorCollector, ErrorInfo, ErrorLevel, ErrorStore},
-    file_position::{FileText, Span, SpanFile},
-    flattening::Module,
-    parser::Documentation,
-    abstract_type::AbstractType,
-    concrete_type::ConcreteType,
-    util::{const_str_position, const_str_position_in_tuples},
-    value::{TypedValue, Value}
+    abstract_type::{FullType, DomainType}, arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, concrete_type::ConcreteType, errors::{CompileError, ErrorCollector, ErrorInfo, ErrorLevel, ErrorStore}, file_position::{FileText, Span, SpanFile}, flattening::Module, parser::Documentation, util::{const_str_position, const_str_position_in_tuples}, value::{TypedValue, Value}
 };
 
 use self::checkpoint::CheckPoint;
@@ -118,8 +110,11 @@ impl NamedConstant {
             NamedConstant::Builtin { name : _, val } => &val.typ
         }
     }
-    pub fn get_abstract_type(&self) -> AbstractType {
-        self.get_concrete_type().into()
+    pub fn get_full_type(&self) -> FullType {
+        FullType {
+            typ: self.get_concrete_type().into(),
+            domain: DomainType::Generative
+        }
     }
 }
 

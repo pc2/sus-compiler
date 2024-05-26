@@ -40,10 +40,12 @@ use linker::Linker;
 
 fn codegen_to_file(linker : &Linker, md : &Module) -> Option<()> {
     let Some(inst) = md.instantiations.instantiate(md, linker) else {
-        println!("Module {} instantiation encountered errors.", md.link_info.name);
+        println!("Instantiating error: {}", md.link_info.name);
 
         return None;
     };
+    println!("Instantiating success: {}", md.link_info.name);
+
 
     let module_name = md.link_info.name.deref();
 

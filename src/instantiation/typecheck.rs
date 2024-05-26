@@ -1,11 +1,6 @@
-
-
 use crate::concrete_type::ConcreteType;
 
 use super::*;
-
-
-
 
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn walk_type_along_path(&self, mut cur_typ : ConcreteType, path : &[RealWirePathElem]) -> ConcreteType {

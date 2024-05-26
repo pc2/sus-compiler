@@ -396,7 +396,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     self.instantiate_declaration(wire_decl, original_instruction)?
                 }
                 Instruction::Wire(w) => {
-                    if w.is_compiletime {
+                    if w.typ.is_generative() {
                         let value_computed = self.compute_compile_time(w)?;
                         SubModuleOrWire::CompileTimeValue(value_computed)
                     } else {
@@ -413,7 +413,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     let then_range = UUIDRange(stm.then_start, stm.then_end_else_start);
                     let else_range = UUIDRange(stm.then_end_else_start, stm.else_end);
                     let if_condition_wire = self.md.instructions[stm.condition].unwrap_wire();
-                    if if_condition_wire.is_compiletime {
+                    if if_condition_wire.typ.is_generative() {
                         let condition_val = self.get_generation_value(stm.condition)?;
                         let run_range = if condition_val.unwrap_bool() {
                             then_range

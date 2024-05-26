@@ -2,7 +2,7 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-    debug::SpanDebugger, errors::{ErrorCollector, ErrorReference}, file_position::SpanFile, linker::{with_module_editing_context, ConstantUUIDMarker, FileUUID, Linkable, Linker, ModuleUUIDMarker, NamedConstant, NamedType, Resolver, TypeUUIDMarker, WorkingOnResolver}, abstract_type::{get_binary_operator_types, typecheck, typecheck_is_array_indexer, typecheck_unary_operator, BOOL_TYPE, INT_TYPE}
+    abstract_type::{DomainType, TypeUnifier, BOOL_TYPE, INT_TYPE}, debug::SpanDebugger, errors::ErrorCollector, file_position::SpanFile, linker::{with_module_editing_context, ConstantUUIDMarker, FileUUID, Linkable, Linker, ModuleUUIDMarker, NamedConstant, Resolver, WorkingOnResolver}
 };
 
 use super::*;
@@ -19,7 +19,10 @@ pub fn typecheck_all_modules(linker : &mut Linker) {
             let mut context = TypeCheckingContext{
                 errors : name_resolver.errors,
                 modules,
-                types,
+                type_checker : TypeUnifier{
+                    linker_types: types,
+                    errors: name_resolver.errors,
+                },
                 constants
             };
             
@@ -35,7 +38,7 @@ pub fn typecheck_all_modules(linker : &mut Linker) {
 
 struct TypeCheckingContext<'l, 'errs> {
     modules : WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>,
-    types : Resolver<'l, 'errs, TypeUUIDMarker, NamedType>,
+    type_checker : TypeUnifier<'l, 'errs>,
     constants : Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
     errors : &'errs ErrorCollector<'l>,
 }
@@ -60,14 +63,6 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         let decl = module.get_port_decl(port.port);
         (decl, module.link_info.file)
     }
-    
-
-    /*
-        ==== Typechecking ====
-    */
-    fn typecheck_wire_is_of_type(&self, wire : &WireInstance, expected : &AbstractType, typ_decl_location : Option<SpanFile>, context : &str) {
-        typecheck(&wire.typ, wire.span, expected, context, &self.types, typ_decl_location, &self.errors);
-    }
 
     fn get_wire_ref_declaration_point(&self, wire_ref_root : &WireReferenceRoot) -> Option<SpanFile> {
         match wire_ref_root {
@@ -86,7 +81,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     }
 
-    fn get_type_of_wire_reference(&self, wire_ref : &WireReference) -> AbstractType {
+    fn get_type_of_wire_reference(&self, wire_ref : &WireReference) -> FullType {
         let mut write_to_type = match &wire_ref.root {
             WireReferenceRoot::LocalDecl(id, _) => {
                 let decl_root = self.working_on.instructions[*id].unwrap_wire_declaration();
@@ -94,11 +89,14 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             },
             WireReferenceRoot::NamedConstant(cst, _) => {
                 let linker_cst = &self.constants[*cst];
-                linker_cst.get_abstract_type()
+                linker_cst.get_full_type()
             }
             WireReferenceRoot::SubModulePort(port) => {
                 let (decl, _file) = self.get_decl_of_module_port(*port);
-                decl.typ_expr.to_type()
+                FullType {
+                    typ : decl.typ_expr.to_type(),
+                    domain : DomainType::Wire(Module::MAIN_INTERFACE_ID) // TODO backwards compatible single interfaces, fix
+                }
             }
         };
 
@@ -106,8 +104,8 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             match p {
                 &WireReferencePathElement::ArrayIdx{idx, bracket_span} => {
                     let idx_wire = self.working_on.instructions[idx].unwrap_wire();
-                    self.typecheck_wire_is_of_type(idx_wire, &INT_TYPE, None, "array index");
-                    write_to_type = typecheck_is_array_indexer(&write_to_type, bracket_span.outer_span(), &self.types, &self.errors).clone();
+                    
+                    write_to_type = self.type_checker.typecheck_array_access(&write_to_type, bracket_span.outer_span(), &idx_wire.typ, idx_wire.span);
                 }
             }
         }
@@ -124,24 +122,26 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 Instruction::Declaration(decl) => {
                     if let Some(latency_spec) = decl.latency_specifier {
                         let latency_spec_wire = &self.working_on.instructions[latency_spec].unwrap_wire();
-                        self.typecheck_wire_is_of_type(latency_spec_wire, &INT_TYPE, None, "latency specifier");
+                        self.type_checker.typecheck(&latency_spec_wire.typ, latency_spec_wire.span, &FullType { typ: INT_TYPE, domain: DomainType::Generative }, "latency specifier", None);
                     }
 
                     decl.typ_expr.for_each_generative_input(|param_id| {
-                        self.typecheck_wire_is_of_type(self.working_on.instructions[param_id].unwrap_wire(), &INT_TYPE, None, "Array size");
+                        let wire = self.working_on.instructions[param_id].unwrap_wire();
+                        self.type_checker.typecheck(&wire.typ, wire.span, &FullType { typ: INT_TYPE, domain: DomainType::Generative }, "Array size", None);
                     });
                 }
                 Instruction::IfStatement(stm) => {
                     let wire = &self.working_on.instructions[stm.condition].unwrap_wire();
-                    self.typecheck_wire_is_of_type(wire, &BOOL_TYPE, None, "if statement condition")
+                    self.type_checker.typecheck(&wire.typ, wire.span, &FullType { typ: BOOL_TYPE, domain: DomainType::Unknown }, "if statement condition", None);
                 }
                 Instruction::ForStatement(stm) => {
                     let loop_var = &self.working_on.instructions[stm.loop_var_decl].unwrap_wire_declaration();
                     let start = &self.working_on.instructions[stm.start].unwrap_wire();
                     let end = &self.working_on.instructions[stm.end].unwrap_wire();
                     let loop_var_decl_span = Some((loop_var.get_span(), self.errors.file));
-                    self.typecheck_wire_is_of_type(start, &loop_var.typ, loop_var_decl_span, "for loop");
-                    self.typecheck_wire_is_of_type(end, &loop_var.typ, loop_var_decl_span, "for loop");
+
+                    self.type_checker.typecheck(&start.typ, start.span, &loop_var.typ, "for loop", loop_var_decl_span);
+                    self.type_checker.typecheck(&end.typ, end.span, &loop_var.typ, "for loop", loop_var_decl_span);
                 }
                 Instruction::Wire(w) => {
                     let result_typ = match &w.source {
@@ -150,15 +150,12 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         }
                         &WireSource::UnaryOp{op, right} => {
                             let right_wire = self.working_on.instructions[right].unwrap_wire();
-                            typecheck_unary_operator(op, &right_wire.typ, right_wire.span, &self.types, &self.errors)
+                            self.type_checker.typecheck_unary_operator(op, &right_wire.typ, right_wire.span)
                         }
                         &WireSource::BinaryOp{op, left, right} => {
                             let left_wire = self.working_on.instructions[left].unwrap_wire();
                             let right_wire = self.working_on.instructions[right].unwrap_wire();
-                            let ((input_left_type, input_right_type), output_type) = get_binary_operator_types(op);
-                            self.typecheck_wire_is_of_type(left_wire, &input_left_type, None, &format!("{op} left"));
-                            self.typecheck_wire_is_of_type(right_wire, &input_right_type, None, &format!("{op} right"));
-                            output_type
+                            self.type_checker.typecheck_binary_operator(op, &left_wire.typ, &right_wire.typ, left_wire.span, right_wire.span)
                         }
                         WireSource::Constant(value) => {
                             value.get_type_of_constant()
@@ -169,13 +166,22 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 }
                 Instruction::Write(conn) => {
                     // Typecheck digging down into write side
-                    let write_to_type = self.get_type_of_wire_reference(&conn.to);
+                    let mut write_to_type = self.get_type_of_wire_reference(&conn.to);
                     let declared_here = self.get_wire_ref_declaration_point(&conn.to.root);
+
+                    let write_context = match conn.write_modifiers {
+                        WriteModifiers::Connection { num_regs:_, regs_span:_ } => "connection",
+                        WriteModifiers::Initial { initial_kw_span:_ } => {
+                            write_to_type.domain = DomainType::Generative;
+                            "initial value"
+                        }
+                    };
 
                     // Typecheck the value with target type
                     let from_wire = self.working_on.instructions[conn.from].unwrap_wire();
 
-                    self.typecheck_wire_is_of_type(from_wire, &write_to_type, declared_here, "connection");
+                    from_wire.span.debug();
+                    self.type_checker.typecheck(&from_wire.typ, from_wire.span, &write_to_type, write_context, declared_here);
                 }
             }
         }
@@ -184,39 +190,19 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         for (_id, inst) in self.working_on.instructions.iter() {
             inst.for_each_embedded_type(|typ, span| {
                 if typ.contains_error_or_unknown::<false, true>() {
-                    self.errors.error(span, format!("Unresolved Type: {}", typ.to_string(&self.types)));
+                    self.errors.error(span, format!("Unresolved Type: {}", typ.to_string(&self.type_checker.linker_types)));
                 }
             });
         }
     }
 
+
+
+
+
     /*
         ==== Generative Code Checking ====
     */
-    fn must_be_compiletime(&self, wire : &WireInstance, context : &str) -> Option<ErrorReference<'_>> {
-        if !wire.is_compiletime {
-            Some(self.errors.error(wire.span, format!("{context} must be compile time")))
-        } else {
-            None
-        }
-    }
-
-    fn get_root_identifier_read_only(&self, wire_ref_root : &WireReferenceRoot) -> bool {
-        match wire_ref_root {
-            WireReferenceRoot::LocalDecl(decl_id, _) => {
-                let decl = self.working_on.instructions[*decl_id].unwrap_wire_declaration();
-                decl.read_only
-            }
-            WireReferenceRoot::NamedConstant(_, _) => {
-                true
-            }
-            WireReferenceRoot::SubModulePort(port) => {
-                let (decl, _file) = self.get_decl_of_module_port(*port);
-                decl.identifier_type == IdentifierType::Output
-            }
-        }
-    }
-
     fn generative_check(&mut self) {
         let mut runtime_if_stack : Vec<(FlatID, Span)> = Vec::new();
 
@@ -236,42 +222,12 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         assert!(declaration_depths[inst_id].is_none());
                         declaration_depths[inst_id] = Some(runtime_if_stack.len())
                     }
-
-                    if let Some(latency_specifier) = decl.latency_specifier {
-                        self.must_be_compiletime(self.working_on.instructions[latency_specifier].unwrap_wire(), "Latency specifier");
-                    }
-
-                    decl.typ_expr.for_each_generative_input(|param_id| {
-                        self.must_be_compiletime(self.working_on.instructions[param_id].unwrap_wire(), "Array size");
-                    });
                 }
-                Instruction::Wire(wire) => {
-                    let mut is_generative = true;
-                    wire.source.for_each_dependency(|source_id| {
-                        match &self.working_on.instructions[source_id] {
-                            Instruction::SubModule(_sm) => {
-                                is_generative = false; // TODO generative submodules
-                            }
-                            Instruction::Wire(source_wire) => {
-                                if !source_wire.is_compiletime {
-                                    is_generative = false;
-                                }
-                            }
-                            Instruction::Declaration(decl) => {
-                                if !decl.identifier_type.is_generative() {
-                                    is_generative = false;
-                                }
-                            }
-                            other => unreachable!("{other:?}")
-                        }
-                    });
-                    let Instruction::Wire(wire) = &mut self.working_on.instructions[inst_id] else {unreachable!()};
-                    wire.is_compiletime = is_generative;
-                }
+                Instruction::Wire(_) => {}
                 Instruction::Write(conn) => self.generative_check_write(conn, &mut declaration_depths, &mut runtime_if_stack),
                 Instruction::IfStatement(if_stmt) => {
                     let condition_wire = self.working_on.instructions[if_stmt.condition].unwrap_wire();
-                    if !condition_wire.is_compiletime {
+                    if !condition_wire.typ.is_generative() {
                         runtime_if_stack.push((if_stmt.else_end, condition_wire.span));
                     }
                 }
@@ -284,6 +240,10 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         let (decl, file) = match conn.to.root {
             WireReferenceRoot::LocalDecl(decl_id, _) => {
                 let decl = self.working_on.instructions[decl_id].unwrap_wire_declaration();
+                if decl.read_only {
+                    self.errors.error(conn.to_span, "Cannot assign to read-only declaration")
+                        .info_obj_same_file(decl);
+                }
                 (decl, self.errors.file)
             }
             WireReferenceRoot::NamedConstant(_, span) => {
@@ -291,25 +251,21 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 return;
             }
             WireReferenceRoot::SubModulePort(port) => {
-                self.get_decl_of_module_port(port)
+                let r = self.get_decl_of_module_port(port);
+
+                if r.0.read_only {
+                    self.errors.error(conn.to_span, "Cannot assign to a submodule output port")
+                    .info_obj_different_file(r.0, r.1);
+                }
+
+                r
             }
         };
     
-        if self.get_root_identifier_read_only(&conn.to.root) {
-            self.errors.error(conn.to_span, "Cannot Assign to Read-Only value")
-                .info_obj_different_file(decl, file);
-        }
-    
-        let from_wire = self.working_on.instructions[conn.from].unwrap_wire();
         match conn.write_modifiers {
             WriteModifiers::Connection{num_regs : _, regs_span : _} => {
                 if decl.identifier_type.is_generative() {
-                    // Check that whatever's written to this declaration is also generative
-                    if let Some(err_ref) = self.must_be_compiletime(from_wire, "Assignments to generative variables") {
-                        err_ref.info_obj_different_file(decl, file);
-                    }
-
-                    // Check that this declaration isn't used in a non-compiletime if
+                    // Check that this generative declaration isn't used in a non-compiletime if
                     if let Some(root_flat) = conn.to.root.get_root_flat() {
                         let declared_at_depth = declaration_depths[root_flat].unwrap();
                 
@@ -317,22 +273,18 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                             let err_ref = self.errors.error(conn.to_span, "Cannot write to generative variables in runtime conditional block");
                             err_ref.info_obj_different_file(decl, file);
                             for (_, if_cond_span) in &runtime_if_stack[declared_at_depth..] {
-                                err_ref.info((*if_cond_span, file), "Runtime Condition here");
+                                err_ref.info((*if_cond_span, file), "Runtime condition here");
                             }
                         }
                     }
-                    WireReferencePathElement::for_each_dependency(&conn.to.path, |idx_wire| {
-                        self.must_be_compiletime(self.working_on.instructions[idx_wire].unwrap_wire(), "initial value assignment");
-                    })
                 }
             }
             WriteModifiers::Initial{initial_kw_span} => {
                 if decl.identifier_type != IdentifierType::State {
                     self.errors
-                        .error(initial_kw_span, "Initial values can only be given to state registers!")
+                        .error(initial_kw_span, "Initial values can only be given to state registers")
                         .info_obj_different_file(decl, file);
                 }
-                self.must_be_compiletime(from_wire, "initial value assignment");
             }
         }
     }

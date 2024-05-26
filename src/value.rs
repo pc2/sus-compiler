@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use num::BigInt;
 
-use crate::{abstract_type::{AbstractType, BOOL_TYPE, INT_TYPE}, concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, flattening::{BinaryOperator, UnaryOperator}};
+use crate::{abstract_type::{AbstractType, FullType, DomainType, BOOL_TYPE, INT_TYPE}, concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, flattening::{BinaryOperator, UnaryOperator}};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum Value {
@@ -38,21 +38,24 @@ impl std::fmt::Display for Value {
 }
 
 impl Value {
-    pub fn get_type_of_constant(&self) -> AbstractType {
-        match self {
-            Value::Bool(_) => BOOL_TYPE,
-            Value::Integer(_) => INT_TYPE,
-            Value::Array(_b) => {
-                unreachable!("Can't express arrays as constants (yet?)");
-                /*let content_typ = if let Some(b_first) = b.first() {
-                    b_first.get_type()
-                } else {
-                    Type::Invalid
+    pub fn get_type_of_constant(&self) -> FullType {
+        FullType {
+            typ : match self {
+                Value::Bool(_) => BOOL_TYPE,
+                Value::Integer(_) => INT_TYPE,
+                Value::Array(_b) => {
+                    unreachable!("Can't express arrays as constants (yet?)");
+                    /*let content_typ = if let Some(b_first) = b.first() {
+                        b_first.get_type()
+                    } else {
+                        Type::Invalid
+                    }
+                    Type::Array(Box::new((content_typ, b.len())))*/
                 }
-                Type::Array(Box::new((content_typ, b.len())))*/
-            }
-            Value::Unset => AbstractType::Error,
-            Value::Error => AbstractType::Error,
+                Value::Unset => AbstractType::Error,
+                Value::Error => AbstractType::Error,
+            },
+            domain : DomainType::Generative
         }
     }
     pub fn get_concrete_type_of_constant(&self) -> ConcreteType {

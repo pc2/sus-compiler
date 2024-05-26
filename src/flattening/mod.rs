@@ -11,7 +11,7 @@ pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
 
 use crate::{
-    abstract_type::AbstractType, arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, Linkable, ModuleUUID, NamedType, TypeUUID}, parser::Documentation, pretty_print_many_spans, value::Value
+    abstract_type::{AbstractType, FullType}, arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, Linkable, ModuleUUID, NamedType, TypeUUID}, parser::Documentation, pretty_print_many_spans, value::Value
 };
 
 /// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage. 
@@ -234,19 +234,6 @@ pub enum WireReferenceRoot {
 }
 
 impl WireReferenceRoot {
-    #[track_caller]
-    pub fn unwrap_decl(&self) -> FlatID {
-        let Self::LocalDecl(decl, _) = self else {unreachable!()};
-        *decl
-    }
-    #[track_caller]
-    pub fn unwrap_module_port(&self) -> &PortInfo {
-        let Self::SubModulePort(port) = self else {unreachable!()};
-        port
-    }
-}
-
-impl WireReferenceRoot {
     pub fn get_root_flat(&self) -> Option<FlatID> {
         match self {
             WireReferenceRoot::LocalDecl(f, _) => Some(*f),
@@ -332,9 +319,7 @@ pub struct PortInfo {
 
 #[derive(Debug)]
 pub struct WireInstance {
-    pub interface : InterfaceID,
-    pub typ : AbstractType,
-    pub is_compiletime : bool,
+    pub typ : FullType,
     pub span : Span,
     pub source : WireSource
 }
@@ -369,9 +354,6 @@ impl WireSource {
         }
     }
 }
-
-const IS_GEN_UNINIT : bool = false;
-
 
 #[derive(Debug, Clone)]
 pub enum WrittenType {
@@ -423,9 +405,8 @@ impl WrittenType {
 
 #[derive(Debug)]
 pub struct Declaration {
-    pub interface : InterfaceID,
     pub typ_expr : WrittenType,
-    pub typ : AbstractType,
+    pub typ : FullType,
     pub name_span : Span,
     pub name : String,
     /// Variables are read_only when they may not be controlled by the current block of code. 
@@ -503,7 +484,7 @@ impl Instruction {
         sm
     }
 
-    pub fn for_each_embedded_type<F : FnMut(&AbstractType, Span)>(&self, mut f : F) {
+    pub fn for_each_embedded_type<F : FnMut(&FullType, Span)>(&self, mut f : F) {
         match self {
             Instruction::SubModule(_) | Instruction::Write(_) | Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
             Instruction::Declaration(decl) => {

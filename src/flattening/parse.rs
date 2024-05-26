@@ -5,7 +5,7 @@ use std::{iter::zip, ops::{Deref, DerefMut}, str::FromStr};
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 use crate::{
-    arena_alloc::{UUIDRange, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, ResolvedName, Resolver, TypeUUIDMarker, WorkingOnResolver}, parser::Cursor, abstract_type::AbstractType, value::Value
+    arena_alloc::{UUIDRange, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, ResolvedName, Resolver, TypeUUIDMarker, WorkingOnResolver}, parser::Cursor, value::Value
 };
 
 use super::name_context::LocalVariableContext;
@@ -277,8 +277,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             let name = &self.name_resolver.file_text[name_span];
 
             self.alloc_declaration(name, whole_declaration_span, Instruction::Declaration(Declaration{
-                interface : InterfaceID::PLACEHOLDER,
-                typ : typ_expr.to_type(),
+                typ : FullType::new_unknown_interface(typ_expr.to_type(), identifier_type.is_generative()),
                 typ_expr,
                 read_only,
                 declaration_itself_is_not_written_to,
@@ -479,9 +478,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         };
 
         let wire_instance = WireInstance{
-            interface : InterfaceID::PLACEHOLDER,
-            typ : AbstractType::Unknown,
-            is_compiletime : IS_GEN_UNINIT,
+            typ : FullType::new_unknown(),
             span: expr_span,
             source
         };
@@ -622,9 +619,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             for port in outputs {
                 if let Some((Some((to, write_modifiers)), to_span)) = to_iter.next() {
                     let from = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{
-                        interface : InterfaceID::PLACEHOLDER,
-                        typ: AbstractType::Unknown,
-                        is_compiletime: false,
+                        typ: FullType::new_unknown(),
                         span: func_call_span,
                         source: WireSource::WireRef(WireReference::simple_port(PortInfo{
                             submodule_name_span,
@@ -643,7 +638,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         };
         for leftover_to in to_iter {
             if let (Some((to, write_modifiers)), to_span) = leftover_to {
-                let err_id = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{interface : InterfaceID::PLACEHOLDER, typ : AbstractType::Error, is_compiletime : true, span : func_call_span, source : WireSource::Constant(Value::Error)}));
+                let err_id = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{typ : FullType::new_unknown(), span : func_call_span, source : WireSource::Constant(Value::Error)}));
                 self.working_on.instructions.alloc(Instruction::Write(Write{from: err_id, to, to_span, write_modifiers}));
             }
         }
@@ -857,14 +852,6 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
 }
-
-#[derive(Debug)]
-pub struct FlattenedInterfacePort {
-    pub wire_id : FlatID,
-    pub port_name : String,
-    pub span : Span
-}
-
 
 /// This method flattens all given code into a simple set of assignments, operators and submodules. 
 /// It already does basic type checking and assigns a type to every wire. 

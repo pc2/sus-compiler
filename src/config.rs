@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, env, path::PathBuf};
+use std::{cell::UnsafeCell, env, ffi::OsStr, path::PathBuf};
 
 
 pub struct ConfigStruct {
@@ -63,8 +63,12 @@ pub fn parse_args() -> Vec<PathBuf> {
 
     // For debugging
     if file_paths.len() == 0 {
-        //file_paths.push(PathBuf::from("test.sus"));
-        file_paths.push(PathBuf::from("tinyTestFile.sus"));
+        for file in std::fs::read_dir(".").unwrap() {
+            let file_path = file.unwrap().path();
+            if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
+                file_paths.push(file_path);
+            }
+        }
         config.codegen = true;
     }
 
