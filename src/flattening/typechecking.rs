@@ -253,7 +253,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             WireReferenceRoot::SubModulePort(port) => {
                 let r = self.get_decl_of_module_port(port);
 
-                if r.0.read_only {
+                if !r.0.identifier_type.unwrap_is_input() {
                     self.errors.error(conn.to_span, "Cannot assign to a submodule output port")
                     .info_obj_different_file(r.0, r.1);
                 }

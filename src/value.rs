@@ -170,7 +170,7 @@ pub fn compute_unary_op(op : UnaryOperator, v : &TypedValue) -> TypedValue {
         UnaryOperator::Negate => {
             assert_eq!(v.typ, INT_CONCRETE_TYPE);
             let Value::Integer(v) = &v.value else {panic!()};
-            TypedValue::make_integer(!-v)
+            TypedValue::make_integer(-v)
         }
     }
 }
