@@ -1,9 +1,5 @@
 use std::{
-    ops::{IndexMut, Index},
-    marker::PhantomData,
-    iter::Enumerate,
-    fmt::{Debug, Result, Formatter},
-    hash::{Hash, Hasher}
+    cmp::Ordering, fmt::{Debug, Formatter, Result}, hash::{Hash, Hasher}, iter::Enumerate, marker::PhantomData, ops::{Index, IndexMut}
 };
 
 use crate::block_vector::{BlockVec, BlockVecIterMut, BlockVecIter};
@@ -56,6 +52,12 @@ impl<IndexMarker : UUIDMarker> UUID<IndexMarker> {
 }
 
 pub struct UUIDRange<IndexMarker>(pub UUID<IndexMarker>, pub UUID<IndexMarker>);
+
+impl<IndexMarker> UUIDRange<IndexMarker> {
+    pub fn contains(&self, id : UUID<IndexMarker>) -> bool {
+        self.0.0 >= id.0 && self.1.0 < id.0
+    }
+}
 
 impl<IndexMarker : UUIDMarker> Debug for UUIDRange<IndexMarker> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
@@ -475,6 +477,26 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
     }
     pub fn range_since(&self, id : UUID<IndexMarker>) -> UUIDRange<IndexMarker> {
         UUIDRange(id, UUID(self.data.len(), PhantomData))
+    }
+    /// TODO replace once get_many_mut stabilizes
+    pub fn get2_mut(&mut self, id_a : UUID<IndexMarker>, id_b : UUID<IndexMarker>) -> Option<(&mut T, &mut T)> {
+        match id_b.0.cmp(&id_a.0) {
+            Ordering::Equal => None,
+            Ordering::Less => {
+                let (l, r) = self.data.split_at_mut(id_a.0);
+                Some((&mut r[0], &mut l[id_b.0]))
+            }
+            Ordering::Greater => {
+                let (l, r) = self.data.split_at_mut(id_b.0);
+                Some((&mut l[id_a.0], &mut r[0]))
+            }
+        }
+    }
+    pub fn get(&self, id : UUID<IndexMarker>) -> Option<&T> {
+        self.data.get(id.0)
+    }
+    pub fn get_mut(&mut self, id : UUID<IndexMarker>) -> Option<&mut T> {
+        self.data.get_mut(id.0)
     }
 }
 

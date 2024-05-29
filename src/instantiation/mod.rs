@@ -245,7 +245,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
     }
 
-    fn instantiate_submodules(&mut self) {
+    fn instantiate_submodules(&mut self) -> bool {
+        let mut success = true;
         for (_sm_id, sm) in &mut self.submodules {
             let sub_module = &self.linker.modules[sm.module_uuid];
             if let Some(instance) = sub_module.instantiations.instantiate(sub_module, self.linker) {
@@ -261,8 +262,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 sm.instance = Some(instance);
             } else {
                 self.errors.error(self.md.instructions[sm.original_instruction].unwrap_submodule().module_name_span, "Error instantiating submodule");
+                success = false;
             };
         }
+        success
     }
 }
 
@@ -308,7 +311,9 @@ fn perform_instantiation(md : &Module, linker : &Linker) -> InstantiatedModule {
 
 
     println!("Instantiating submodules for {}", md.link_info.name);
-    context.instantiate_submodules();
+    if !context.instantiate_submodules() {
+        return context.extract();
+    }
 
     println!("Concrete Typechecking {}", md.link_info.name);
     context.typecheck();

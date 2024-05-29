@@ -56,6 +56,12 @@ pub fn recompile_all(linker : &mut Linker) {
     }
 
     flatten_all_modules(linker);
+    if config().debug_print_module_contents {
+        for (_, md) in &linker.modules {
+            md.print_flattened_module(&linker.files[md.link_info.file].file_text);
+        }
+    }
+    
     typecheck_all_modules(linker);
 
     if config().debug_print_module_contents {

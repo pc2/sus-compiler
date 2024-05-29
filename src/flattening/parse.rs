@@ -269,6 +269,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         name : Some((name.to_owned(), name_span)),
                         module_uuid,
                         module_name_span: span,
+                        local_interface_domains : FlatAlloc::new(),
                         documentation
                     }))
                 }
@@ -277,8 +278,8 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             let name = &self.name_resolver.file_text[name_span];
 
             self.alloc_declaration(name, whole_declaration_span, Instruction::Declaration(Declaration{
-                typ : FullType::new_unknown_interface(typ_expr.to_type(), identifier_type.is_generative()),
                 typ_expr,
+                typ : FullType::new_unset(),
                 read_only,
                 declaration_itself_is_not_written_to,
                 identifier_type,
@@ -391,6 +392,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                             name : None,
                             module_uuid,
                             module_name_span: span,
+                            local_interface_domains : FlatAlloc::new(),
                             documentation
                         })), None))
                     } else {
@@ -478,7 +480,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         };
 
         let wire_instance = WireInstance{
-            typ : FullType::new_unknown(),
+            typ : FullType::new_unset(),
             span: expr_span,
             source
         };
@@ -619,7 +621,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             for port in outputs {
                 if let Some((Some((to, write_modifiers)), to_span)) = to_iter.next() {
                     let from = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{
-                        typ: FullType::new_unknown(),
+                        typ: FullType::new_unset(),
                         span: func_call_span,
                         source: WireSource::WireRef(WireReference::simple_port(PortInfo{
                             submodule_name_span,
@@ -638,7 +640,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         };
         for leftover_to in to_iter {
             if let (Some((to, write_modifiers)), to_span) = leftover_to {
-                let err_id = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{typ : FullType::new_unknown(), span : func_call_span, source : WireSource::Constant(Value::Error)}));
+                let err_id = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{typ : FullType::new_unset(), span : func_call_span, source : WireSource::Constant(Value::Error)}));
                 self.working_on.instructions.alloc(Instruction::Write(Write{from: err_id, to, to_span, write_modifiers}));
             }
         }

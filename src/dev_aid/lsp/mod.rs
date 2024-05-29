@@ -464,7 +464,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                 } else {
                     match info {
                         LocationInfo::InModule(_md_id, md, decl_id, InModule::NamedLocal(decl)) => {
-                            let typ_str = decl.typ.to_string(&file_cache.linker.types);
+                            let typ_str = decl.typ.to_string(&file_cache.linker.types, &md.interfaces);
                             let name_str = &decl.name;
 
                             let identifier_type_keyword = decl.identifier_type.get_keyword();
@@ -486,7 +486,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                             hover_list.push(MarkedString::String(submodule.link_info.documentation.to_string(&file_cache.linker.files[submodule.link_info.file].file_text)));
                         }
                         LocationInfo::InModule(_md_id, md, id, InModule::Temporary(wire)) => {
-                            let typ_str = wire.typ.to_string(&file_cache.linker.types);
+                            let typ_str = wire.typ.to_string(&file_cache.linker.types, &md.interfaces);
 
                             let gen_kw = if wire.typ.is_generative() {"gen "} else {""};
                             hover_list.push(MarkedString::String(format!("{gen_kw}{typ_str}")));

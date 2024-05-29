@@ -432,6 +432,7 @@ pub struct SubModuleInstance {
     /// Name is not always present in source code. Such as in inline function call syntax: my_mod(a, b, c)
     pub name : Option<(String, Span)>,
     pub module_name_span : Span,
+    pub local_interface_domains : FlatAlloc<InterfaceID, InterfaceIDMarker>,
     pub documentation : Documentation
 }
 
@@ -482,18 +483,6 @@ impl Instruction {
     pub fn unwrap_write(&self) -> &Write {
         let Self::Write(sm) = self else {panic!("unwrap_write on not a Write! Found {self:?}")};
         sm
-    }
-
-    pub fn for_each_embedded_type<F : FnMut(&FullType, Span)>(&self, mut f : F) {
-        match self {
-            Instruction::SubModule(_) | Instruction::Write(_) | Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
-            Instruction::Declaration(decl) => {
-                f(&decl.typ, decl.typ_expr.get_span());
-            }
-            Instruction::Wire(w) => {
-                f(&w.typ, w.span);
-            }
-        }
     }
 }
 

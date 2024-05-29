@@ -16,13 +16,17 @@ module DUAL_PORT_MEM {
 	}
 }
 
+module offset_backwards : bool i'0 -> bool o'-5 {
+
+}
+
 module FIFO {
 	gen int BITWIDTH = 20
 	gen int DEPTH = 512
 	// The FIFO may still receive data for 5 cycles after ready is de-asserted
 	gen int ALMOST_FULL_THRESHOLD = 5
 	
-	interface push : bool push, bool[BITWIDTH] data_in -> bool ready
+	interface push : bool push'0, bool[BITWIDTH] data_in -> bool ready'-ALMOST_FULL_THRESHOLD+1
 	
 	interface pop : bool pop -> bool[BITWIDTH] data_out, bool data_valid
 
@@ -45,8 +49,10 @@ module FIFO {
 	if push {
 		mem[write_addr] = data_in
 		write_addr = (write_addr + 1) % DEPTH
-		// Wrapping subtract
-		int space_remaining = (read_addr - write_addr) % DEPTH
-		reg ready = space_remaining > ALMOST_FULL_THRESHOLD
 	}
+	
+	// Wrapping subtract
+	int space_remaining = (read_addr - write_addr) % DEPTH
+	reg bool r = space_remaining > ALMOST_FULL_THRESHOLD
+	ready = offset_backwards(r)
 }
