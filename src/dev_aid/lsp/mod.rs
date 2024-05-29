@@ -1,14 +1,18 @@
 
+mod semantic_tokens;
 mod tree_walk;
+mod hover_info;
 
 use std::{collections::HashMap, error::Error, ffi::OsStr, net::SocketAddr};
+use hover_info::hover;
 use lsp_types::{notification::*, request::Request, *};
+use semantic_tokens::{semantic_token_capabilities, make_semantic_tokens};
 
 use crate::{
-    arena_alloc::ArenaVector, compiler_top::{add_file, recompile_all, update_file}, config::config, errors::{CompileError, ErrorLevel}, file_position::{FileText, LineCol, Span, SpanFile}, flattening::{FlatID, IdentifierType, Instruction, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, ModuleUUID, NameElem}
+    arena_alloc::ArenaVector, compiler_top::{add_file, recompile_all, update_file}, config::config, errors::{CompileError, ErrorLevel}, file_position::{FileText, LineCol, Span, SpanFile}, flattening::{FlatID, Instruction}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, ModuleUUID}
 };
 
-use tree_walk::{InModule, LocationInfo};
+use tree_walk::{get_selected_object, InModule, LocationInfo};
 
 use self::tree_walk::RefersTo;
 
@@ -92,13 +96,6 @@ impl LoadedFileCache {
 
         (file_id, position)
     }
-    fn get_selected_object(&self, file : FileUUID, byte_pos : usize) -> Option<(Span, LocationInfo)> {
-        let file_data = &self.linker.files[file];
-
-        let (span, info) = tree_walk::get_selected(&self.linker, file_data, byte_pos)?;
-
-        Some((span, info))
-    }
 }
 
 pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
@@ -120,33 +117,7 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
         references_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         rename_provider: Some(OneOf::Left(true)),
-        semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions{
-            work_done_progress_options: WorkDoneProgressOptions {
-                work_done_progress: Some(false)
-            },
-            legend: SemanticTokensLegend{
-                token_types: vec![
-                    SemanticTokenType::COMMENT, // When updating, see ['get_semantic_token_type_from_ide_token']
-                    SemanticTokenType::KEYWORD,
-                    SemanticTokenType::OPERATOR,
-                    SemanticTokenType::VARIABLE,
-                    SemanticTokenType::PARAMETER,
-                    SemanticTokenType::TYPE,
-                    SemanticTokenType::NUMBER,
-                    SemanticTokenType::FUNCTION,
-                    SemanticTokenType::EVENT,
-                    SemanticTokenType::ENUM_MEMBER
-                ],
-                token_modifiers: vec![
-                    SemanticTokenModifier::ASYNC, // repurpose ASYNC for "State"
-                    SemanticTokenModifier::DECLARATION,
-                    SemanticTokenModifier::DEFINITION,
-                    SemanticTokenModifier::READONLY
-                ],
-            },
-            range: Some(false), // Don't support ranges yet
-            full: Some(SemanticTokensFullOptions::Bool(true)), // TODO: Support delta updating for faster syntax highlighting, just do whole file for now
-        })),
+        semantic_tokens_provider: Some(semantic_token_capabilities()),
         completion_provider : Some(CompletionOptions{resolve_provider : Some(true), ..Default::default()}),
         text_document_sync : Some(TextDocumentSyncCapability::Kind(
             TextDocumentSyncKind::FULL
@@ -161,111 +132,6 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
     // Shut down gracefully.
     println!("shutting down server");
     Ok(())
-}
-
-fn get_semantic_token_type_from_ide_token(tok : IDEIdentifierType) -> u32 {
-    match tok {
-        IDEIdentifierType::Value(IdentifierType::Input) => 4,
-        IDEIdentifierType::Value(IdentifierType::Output) => 4,
-        IDEIdentifierType::Value(IdentifierType::State) => 3,
-        IDEIdentifierType::Value(IdentifierType::Local) => 3,
-        IDEIdentifierType::Value(IdentifierType::Generative) => 3,
-        IDEIdentifierType::Constant => 9, // make it 'OPERATOR'?
-        IDEIdentifierType::Interface => 7, // FUNCTION
-        IDEIdentifierType::Type => 5, // All others are 'TYPE'
-    }
-}
-
-// Produces a bitset with 'modifier bits'
-fn get_modifiers_for_token(tok : IDEIdentifierType) -> u32 {
-    match tok {
-        IDEIdentifierType::Value(IdentifierType::State) => 1, // repurpose ASYNC for "State"
-        IDEIdentifierType::Value(IdentifierType::Generative) => 8, // repurpose READONLY
-        _other => 0
-    }
-}
-
-
-fn convert_to_semantic_tokens(file_data : &FileData, ide_tokens : &mut[(Span, IDEIdentifierType)]) -> Vec<SemanticToken> {
-    ide_tokens.sort_by(|a, b| a.0.cmp(&b.0));
-    
-    let mut cursor = Position {line : 0, character : 0};
-
-    ide_tokens.into_iter().map(|(span, ide_kind)| {
-        let typ = get_semantic_token_type_from_ide_token(*ide_kind);
-        let mod_bits = get_modifiers_for_token(*ide_kind);
-
-        let tok_range = file_data.file_text.get_span_linecol_range(*span);
-        let start_pos = to_position(tok_range.start);
-        let end_pos = to_position(tok_range.end);
-
-        assert!(end_pos.line == start_pos.line);
-
-        let delta_line = start_pos.line - cursor.line;
-
-        if delta_line != 0 {
-            cursor.character = 0;
-        }
-
-        let delta_col = start_pos.character - cursor.character;
-        cursor = start_pos;
-
-        SemanticToken{
-            delta_line: delta_line,
-            delta_start: delta_col,
-            length: end_pos.character - start_pos.character,
-            token_type: typ,
-            token_modifiers_bitset: mod_bits,
-        }
-    }).collect()
-}
-
-
-#[derive(Debug,Clone,Copy,PartialEq,Eq)]
-pub enum IDEIdentifierType {
-    Value(IdentifierType),
-    Type,
-    Interface,
-    Constant
-}
-
-pub fn walk_name_color(file : &FileData, linker : &Linker) -> Vec<(Span, IDEIdentifierType)> {
-    let mut result : Vec<(Span, IDEIdentifierType)> = Vec::new();
-
-    tree_walk::visit_all(linker, file, |span, item| {
-        result.push((span, match item {
-            LocationInfo::InModule(_, _md_id, _, InModule::NamedLocal(decl)) => {
-                IDEIdentifierType::Value(decl.identifier_type)
-            }
-            LocationInfo::InModule(_, _md_id, _, InModule::NamedSubmodule(_)) => {
-                IDEIdentifierType::Interface
-            }
-            LocationInfo::InModule(_, _md_id, _, InModule::Temporary(_)) => {return}
-            LocationInfo::Type(_) => {return}
-            LocationInfo::Global(g) => {
-                match g {
-                    NameElem::Module(_) => IDEIdentifierType::Interface,
-                    NameElem::Type(_) => IDEIdentifierType::Type,
-                    NameElem::Constant(_) => IDEIdentifierType::Constant,
-                }
-            }
-            LocationInfo::Port(_, _, _, port) => {
-                IDEIdentifierType::Value(port.identifier_type)
-            }
-            LocationInfo::Interface(_, _, _, _) => {
-                IDEIdentifierType::Interface
-            }
-        }));
-    });
-
-    result
-}
-
-
-fn do_syntax_highlight(file_data : &FileData, linker : &Linker) -> Vec<SemanticToken> {
-    let mut ide_tokens = walk_name_color(file_data, linker);
-
-    convert_to_semantic_tokens(file_data, &mut ide_tokens)
 }
 
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
@@ -337,31 +203,6 @@ fn initialize_all_files(init_params : &InitializeParams) -> LoadedFileCache {
     result
 }
 
-fn gather_hover_infos(md: &Module, id: FlatID, is_generative : bool, file_cache: &LoadedFileCache, hover_list: &mut Vec<MarkedString>) {
-    md.instantiations.for_each_instance(|inst| {
-        if is_generative {
-            let value_str = match &inst.generation_state[id] {
-                SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => unreachable!(),
-                SubModuleOrWire::CompileTimeValue(v) => format!(" = {}", v.value.to_string()),
-                SubModuleOrWire::Unnasigned => format!("never assigned to"),
-            };
-            hover_list.push(MarkedString::String(value_str));
-        } else {
-            for (_id, wire) in &inst.wires {
-                if wire.original_instruction != id {continue}
-                let typ_str = wire.typ.to_string(&file_cache.linker.types);
-                let name_str = &wire.name;
-                let latency_str = if wire.absolute_latency != CALCULATE_LATENCY_LATER {
-                    format!("{}", wire.absolute_latency)
-                } else {
-                    "?".to_owned()
-                };
-                hover_list.push(MarkedString::String(format!("{typ_str} {name_str}'{latency_str}")));
-            }
-        }
-    });
-}
-
 fn gather_completions(linker : &Linker, file_id : FileUUID, position : usize) -> Vec<CompletionItem> {
     let mut result = Vec::new();
 
@@ -410,13 +251,13 @@ fn for_each_local_reference_in_module(linker: &Linker, md_id: ModuleUUID, local 
     ref_locations
 }
 
-fn gather_all_references_in_one_file(file_cache: &LoadedFileCache, file_id: FileUUID, pos: usize) -> Vec<Span> {
-    if let Some((_location, hover_info)) = file_cache.get_selected_object(file_id, pos) {
+fn gather_all_references_in_one_file(linker: &Linker, file_id: FileUUID, pos: usize) -> Vec<Span> {
+    if let Some((_location, hover_info)) = get_selected_object(linker, file_id, pos) {
         let refers_to = RefersTo::from(hover_info);
         if refers_to.is_global() {
-            gather_references_in_file(&file_cache.linker, &file_cache.linker.files[file_id], refers_to)
+            gather_references_in_file(&linker, &linker.files[file_id], refers_to)
         } else if let Some(local) = refers_to.local {
-            for_each_local_reference_in_module(&file_cache.linker, local.0, local.1)
+            for_each_local_reference_in_module(&linker, local.0, local.1)
         } else {
             Vec::new()
         }
@@ -425,20 +266,20 @@ fn gather_all_references_in_one_file(file_cache: &LoadedFileCache, file_id: File
     }
 }
 
-fn gather_all_references_across_all_files(file_cache: &LoadedFileCache, file_id: FileUUID, pos: usize) -> Vec<(FileUUID, Vec<Span>)> {
+fn gather_all_references_across_all_files(linker: &Linker, file_id: FileUUID, pos: usize) -> Vec<(FileUUID, Vec<Span>)> {
     let mut ref_locations = Vec::new();
 
-    if let Some((_location, hover_info)) = file_cache.get_selected_object(file_id, pos) {
+    if let Some((_location, hover_info)) = get_selected_object(linker, file_id, pos) {
         let refers_to = RefersTo::from(hover_info);
         if refers_to.is_global() {
-            for (other_file_id, other_file) in &file_cache.linker.files {
-                let found_refs = gather_references_in_file(&file_cache.linker, other_file, refers_to);
+            for (other_file_id, other_file) in &linker.files {
+                let found_refs = gather_references_in_file(&linker, other_file, refers_to);
                 if found_refs.len() > 0 {
                     ref_locations.push((other_file_id, found_refs))
                 }
             }
         } else if let Some(local) = refers_to.local {
-            let found_refs = for_each_local_reference_in_module(&file_cache.linker, local.0, local.1);
+            let found_refs = for_each_local_reference_in_module(&linker, local.0, local.1);
             if found_refs.len() > 0 {
                 ref_locations.push((file_id, found_refs))
             }
@@ -458,64 +299,11 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
             let file_data = &file_cache.linker.files[file_uuid];
             let mut hover_list : Vec<MarkedString> = Vec::new();
             
-            let range = if let Some((location, info)) = file_cache.get_selected_object(file_uuid, pos) {
+            let range = if let Some((location, info)) = get_selected_object(&file_cache.linker, file_uuid, pos) {
                 if config().lsp_debug_mode {
                     hover_list.push(MarkedString::String(format!("{info:?}")))
                 } else {
-                    match info {
-                        LocationInfo::InModule(_md_id, md, decl_id, InModule::NamedLocal(decl)) => {
-                            let typ_str = decl.typ.to_string(&file_cache.linker.types, &md.interfaces);
-                            let name_str = &decl.name;
-
-                            let identifier_type_keyword = decl.identifier_type.get_keyword();
-                            hover_list.push(MarkedString::String(decl.documentation.to_string(&file_data.file_text)));
-                            hover_list.push(MarkedString::String(format!("{identifier_type_keyword} {typ_str} {name_str}")));
-
-                            gather_hover_infos(md, decl_id, decl.identifier_type.is_generative(), file_cache, &mut hover_list);
-                        }
-                        LocationInfo::InModule(_, _, _, InModule::NamedSubmodule(submod)) => {
-                            let submodule = &file_cache.linker.modules[submod.module_uuid];
-                            
-                            // Declaration's documentation
-                            hover_list.push(MarkedString::String(submod.documentation.to_string(&file_data.file_text)));
-
-                            hover_list.push(MarkedString::String(format!("    {} {}", submodule.link_info.get_full_name(), submod.name.as_ref().expect("Impossible to select an unnamed submodule").0)));
-                            hover_list.push(MarkedString::String(submodule.make_all_ports_info_string(&file_cache.linker.files[submodule.link_info.file].file_text)));
-                            
-                            // Module documentation
-                            hover_list.push(MarkedString::String(submodule.link_info.documentation.to_string(&file_cache.linker.files[submodule.link_info.file].file_text)));
-                        }
-                        LocationInfo::InModule(_md_id, md, id, InModule::Temporary(wire)) => {
-                            let typ_str = wire.typ.to_string(&file_cache.linker.types, &md.interfaces);
-
-                            let gen_kw = if wire.typ.is_generative() {"gen "} else {""};
-                            hover_list.push(MarkedString::String(format!("{gen_kw}{typ_str}")));
-                            gather_hover_infos(md, id, wire.typ.is_generative(), file_cache, &mut hover_list);
-                        }
-                        LocationInfo::Type(typ) => {
-                            hover_list.push(MarkedString::String(typ.to_type().to_string(&file_cache.linker.types)));
-                        }
-                        LocationInfo::Global(global) => {
-                            if let Some(link_info) = file_cache.linker.get_link_info(global) {
-                                hover_list.push(MarkedString::String(link_info.documentation.to_string(&file_data.file_text)));
-                            }
-                            hover_list.push(MarkedString::String(format!("    {}", file_cache.linker.get_full_name(global))));
-                            match global {
-                                NameElem::Module(md_uuid) => {
-                                    let md = &file_cache.linker.modules[md_uuid];
-                                    hover_list.push(MarkedString::String(md.make_all_ports_info_string(&file_cache.linker.files[md.link_info.file].file_text)));
-                                }
-                                NameElem::Type(_) => {}
-                                NameElem::Constant(_) => {}
-                            }
-                        }
-                        LocationInfo::Port(_md_uuid, md, port_id, _) => {
-                            hover_list.push(MarkedString::String(md.make_port_info_string(port_id, &file_cache.linker.files[md.link_info.file].file_text)));
-                        }
-                        LocationInfo::Interface(_md_uuid, md, interface_id, _) => {
-                            hover_list.push(MarkedString::String(md.make_interface_info_string(interface_id, &file_cache.linker.files[md.link_info.file].file_text)));
-                        }
-                    };
+                    hover_list = hover(info, &file_cache.linker, file_data);
                 }
                 Some(span_to_lsp_range(&file_data.file_text, location))
             } else {
@@ -531,7 +319,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
             
             let mut goto_definition_list : Vec<SpanFile> = Vec::new();
 
-            if let Some((_location, info)) = file_cache.get_selected_object(file_uuid, pos) {
+            if let Some((_location, info)) = get_selected_object(&file_cache.linker, file_uuid, pos) {
                 match info {
                     LocationInfo::InModule(_md_id, md, _decl_id, InModule::NamedLocal(decl)) => {
                         goto_definition_list.push((decl.name_span, md.link_info.file));
@@ -563,9 +351,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
 
             let uuid = file_cache.ensure_contains_file(&params.text_document.uri);
             
-            let file_data = &file_cache.linker.files[uuid];
-
-            serde_json::to_value(SemanticTokensResult::Tokens(lsp_types::SemanticTokens {result_id: None, data: do_syntax_highlight(file_data, &file_cache.linker)}))
+            serde_json::to_value(SemanticTokensResult::Tokens(make_semantic_tokens(uuid, &file_cache.linker)))
         }
         request::DocumentHighlightRequest::METHOD => {
             let params : DocumentHighlightParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
@@ -573,7 +359,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
             let (file_id, pos) = file_cache.location_in_file(&params.text_document_position_params);
             let file_data = &file_cache.linker.files[file_id];
 
-            let ref_locations = gather_all_references_in_one_file(&file_cache, file_id, pos);
+            let ref_locations = gather_all_references_in_one_file(&file_cache.linker, file_id, pos);
 
             let result : Vec<DocumentHighlight> = ref_locations.into_iter().map(|sp| {
                 DocumentHighlight{
@@ -588,7 +374,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
 
             let (file_id, pos) = file_cache.location_in_file(&params.text_document_position);
   
-            let ref_locations = gather_all_references_across_all_files(file_cache, file_id, pos);
+            let ref_locations = gather_all_references_across_all_files(&file_cache.linker, file_id, pos);
 
             serde_json::to_value(cvt_location_list_of_lists(ref_locations, file_cache))
         }
@@ -597,7 +383,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
 
             let (file_id, pos) = file_cache.location_in_file(&params.text_document_position);
   
-            let ref_locations_lists = gather_all_references_across_all_files(file_cache, file_id, pos);
+            let ref_locations_lists = gather_all_references_across_all_files(&file_cache.linker, file_id, pos);
 
             let changes : HashMap<_, _> = ref_locations_lists.into_iter().map(|(file, spans)| {
                 let file_text = &file_cache.linker.files[file].file_text;

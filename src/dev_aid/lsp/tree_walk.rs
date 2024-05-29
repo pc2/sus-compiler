@@ -2,7 +2,7 @@
 use std::ops::Deref;
 
 use crate::{
-    file_position::Span, flattening::{Declaration, FlatID, Instruction, Interface, InterfaceID, Module, Port, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource, WrittenType}, linker::{FileData, Linker, ModuleUUID, NameElem}
+    file_position::Span, flattening::{Declaration, FlatID, Instruction, Interface, InterfaceID, Module, Port, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource, WrittenType}, linker::{FileData, FileUUID, Linker, ModuleUUID, NameElem}
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -113,7 +113,9 @@ pub fn visit_all_in_module<'linker, Visitor : FnMut(Span, LocationInfo<'linker>)
 /// Walks the file, and finds the [LocationInfo] that is the most relevant
 /// 
 /// IE, the [LocationInfo] in the selection area that has the smallest span. 
-pub fn get_selected<'linker>(linker : &'linker Linker, file : &'linker FileData, position : usize) -> Option<(Span, LocationInfo<'linker>)> {
+pub fn get_selected_object<'linker>(linker : &'linker Linker, file : FileUUID, position : usize) -> Option<(Span, LocationInfo<'linker>)> {
+    let file_data = &linker.files[file];
+    
     let mut best_object : Option<LocationInfo<'linker>> = None;
     let mut best_span : Span = Span::MAX_POSSIBLE_SPAN;
     
@@ -130,11 +132,10 @@ pub fn get_selected<'linker>(linker : &'linker Linker, file : &'linker FileData,
         should_prune: |span| !span.contains_pos(position),
     };
 
-    walker.walk_file(file);
+    walker.walk_file(file_data);
 
     best_object.map(|v| (best_span, v))
 }
-
 
 struct TreeWalker<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) -> bool> {
     linker : &'linker Linker,
