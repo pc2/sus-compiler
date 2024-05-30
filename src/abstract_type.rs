@@ -1,6 +1,6 @@
-use std::{cell::RefCell, ops::{Deref, Index}};
+use std::{borrow::Cow, cell::RefCell, ops::{Deref, Index}};
 
-use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span, SpanFile}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, Interface, UnaryOperator}, linker::{get_builtin_type, Linkable, NamedType, Resolver, TypeUUID, TypeUUIDMarker}};
+use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span, SpanFile}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, IdentifierType, Interface, UnaryOperator}, linker::{get_builtin_type, Linkable, NamedType, Resolver, TypeUUID, TypeUUIDMarker}};
 
 /// This contains only the information that can be easily type-checked. 
 /// 
@@ -59,6 +59,34 @@ impl DomainType {
         let Self::Physical(w) = self else {unreachable!()};
         *w
     }
+    pub fn is_generative(&self) -> bool {
+        match self {
+            DomainType::Generative => true,
+            DomainType::Physical(_) => false,
+        }
+    }
+    pub fn new_unset() -> DomainType {
+        DomainType::Physical(DomainID::PLACEHOLDER)
+    }
+    pub fn to_string(&self, interfaces : &FlatAlloc<Interface, DomainIDMarker>, need_domains : bool, ident_typ : IdentifierType) -> Cow<'static, str> {
+        match &self {
+            DomainType::Generative => {
+                Cow::Borrowed("gen ")
+            }
+            DomainType::Physical(w) => {
+                if need_domains {
+                    let ident_txt = ident_typ.get_keyword();
+                    Cow::Owned(if let Some(interf) = interfaces.get(*w) {
+                        format!("{ident_txt}{{{}}} ", interf.name)
+                    } else {
+                        format!("{ident_txt}{{unnamed domain {}}} ", w.get_hidden_value())
+                    })
+                } else {
+                    Cow::Borrowed("")
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -72,30 +100,7 @@ impl FullType {
         FullType { typ, domain: DomainType::Generative }
     }
     pub fn new_unset() -> FullType {
-        FullType {
-            typ: AbstractType::Error,
-            domain: DomainType::Physical(DomainID::PLACEHOLDER)
-        }
-    }
-    pub fn is_generative(&self) -> bool {
-        match self.domain {
-            DomainType::Generative => true,
-            DomainType::Physical(_) => false,
-        }
-    }
-    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec, interfaces : &FlatAlloc<Interface, DomainIDMarker>) -> String {
-        let mut result = self.typ.to_string(linker_types);
-        match &self.domain {
-            DomainType::Generative => {} // gen keyword already included
-            DomainType::Physical(w) => {
-                if let Some(interf) = interfaces.get(*w) {
-                    result.push_str(&format!("{{{}}}", interf.name));
-                } else {
-                    result.push_str(&format!("{{unnamed domain {}}}", w.get_hidden_value()));
-                }
-            }
-        }
-        result
+        FullType { typ : AbstractType::Error, domain: DomainType::Physical(DomainID::PLACEHOLDER) }
     }
 }
 
@@ -383,16 +388,17 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         }
     }
 
-    pub fn finalize_type(&mut self, typ : &mut FullType, span : Span, interfaces : &FlatAlloc<Interface, DomainIDMarker>, best_name : BestName) {
+    pub fn finalize_type(&mut self, typ : &mut FullType, span : Span, best_name : BestName) {
         match &mut typ.domain {
             DomainType::Generative => {}
             DomainType::Physical(w) => {
+                assert!(*w != DomainID::PLACEHOLDER);
                 let root = self.finalize_domain(*w, best_name);
                 *w = root;
             }
         }
         if typ.typ.contains_error_or_unknown::<true, true>() {
-            self.errors.error(span, format!("Unresolved Type: {}", typ.to_string(&self.linker_types, interfaces)));
+            self.errors.error(span, format!("Unresolved Type: {}", typ.typ.to_string(&self.linker_types)));
         }
     }
 }

@@ -2,7 +2,7 @@
 use lsp_types::{LanguageString, MarkedString};
 
 use crate::{
-    flattening::{FlatID, InterfaceToDomainMap, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, LinkInfo, Linker, NameElem}, parser::Documentation
+    flattening::{FlatID, IdentifierType, InterfaceToDomainMap, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, LinkInfo, Linker, NameElem}, parser::Documentation
 };
 
 use super::tree_walk::{InModule, LocationInfo};
@@ -65,12 +65,12 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
 
     match info {
         LocationInfo::InModule(_md_id, md, decl_id, InModule::NamedLocal(decl)) => {
-            let typ_str = decl.typ.to_string(&linker.types, &md.interfaces);
+            let domain_str = decl.typ.domain.to_string(&md.interfaces, md.is_multi_domain(), decl.identifier_type);
+            let typ_str = decl.typ.typ.to_string(&linker.types);
             let name_str = &decl.name;
 
-            let identifier_type_keyword = decl.identifier_type.get_keyword();
             hover.documentation(&decl.documentation);
-            hover.sus_code(format!("{identifier_type_keyword} {typ_str} {name_str}"));
+            hover.sus_code(format!("{domain_str}{typ_str} {name_str}"));
 
             hover.gather_hover_infos(md, decl_id, decl.identifier_type.is_generative());
         }
@@ -82,7 +82,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
 
             hover.sus_code(format!("{} {}", submodule.link_info.get_full_name(), submod.name.as_ref().expect("Impossible to select an unnamed submodule").0));
             
-            let show_interfaces = submodule.is_multi_interface().then_some(InterfaceToDomainMap{
+            let show_interfaces = submodule.is_multi_domain().then_some(InterfaceToDomainMap{
                 local_domain_map: &submod.local_interface_domains,
                 domains: &md.domains,
             });
@@ -92,11 +92,11 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.documentation_link_info(&submodule.link_info);
         }
         LocationInfo::InModule(_md_id, md, id, InModule::Temporary(wire)) => {
-            let typ_str = wire.typ.to_string(&linker.types, &md.interfaces);
+            let typ_str = wire.typ.typ.to_string(&linker.types);
 
-            let gen_kw = if wire.typ.is_generative() {"gen "} else {""};
-            hover.sus_code(format!("{gen_kw}{typ_str}"));
-            hover.gather_hover_infos(md, id, wire.typ.is_generative());
+            let domain = wire.typ.domain.to_string(&md.interfaces, md.is_multi_domain(), IdentifierType::Local);
+            hover.sus_code(format!("{domain}{typ_str}"));
+            hover.gather_hover_infos(md, id, wire.typ.domain.is_generative());
         }
         LocationInfo::Type(typ) => {
             hover.sus_code(typ.to_type().to_string(&linker.types));

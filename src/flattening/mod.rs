@@ -154,8 +154,8 @@ impl Module {
         unreachable!()
     }
 
-    pub fn is_multi_interface(&self) -> bool {
-        self.interfaces.len() > 1
+    pub fn is_multi_domain(&self) -> bool {
+        self.domains.len() > 1
     }
 }
 

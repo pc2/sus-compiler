@@ -324,11 +324,11 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         for (id, inst) in self.modules.working_on.instructions.iter_mut() {
             match inst {
                 Instruction::Wire(w) => {
-                    self.type_checker.finalize_type(&mut w.typ, w.span, &self.modules.working_on.interfaces, BestName::UnnamedWire);
+                    self.type_checker.finalize_type(&mut w.typ, w.span, BestName::UnnamedWire);
                 }
                 Instruction::Declaration(decl) => {
                     let span = decl.get_span();
-                    self.type_checker.finalize_type(&mut decl.typ, span, &self.modules.working_on.interfaces, BestName::NamedWire(id))
+                    self.type_checker.finalize_type(&mut decl.typ, span, BestName::NamedWire(id))
                 }
                 Instruction::SubModule(sm) => {
                     for (interface_id, i) in &mut sm.local_interface_domains {
