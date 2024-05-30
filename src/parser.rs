@@ -205,23 +205,26 @@ impl<'t> Cursor<'t> {
     /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
     #[track_caller]
     pub fn list<F : FnMut(&mut Self)>(&mut self, parent_kind : u16, mut func : F) {
-        self.go_down(parent_kind, |cursor| {
+        self.assert_is_kind(parent_kind);
+
+        if self.cursor.goto_first_child() {
             loop {
-                if let Some(found) = cursor.cursor.field_id() {
+                if let Some(found) = self.cursor.field_id() {
                     if found == field!("item") {
-                        func(cursor);
+                        func(self);
                     } else {
-                        cursor.print_stack();
+                        self.print_stack();
                         panic!("List did not only contain 'item' fields, found field '{}' instead!", tree_sitter_sus::language().field_name_for_id(found.into()).unwrap());
                     }
                 } else {
-                    cursor.maybe_add_comment();
+                    self.maybe_add_comment();
                 }
-                if !cursor.cursor.goto_next_sibling() {
+                if !self.cursor.goto_next_sibling() {
                     break;
                 }
             }
-        });
+            assert!(self.cursor.goto_parent());
+        }
     }
 
     /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
@@ -325,23 +328,25 @@ impl<'t> Cursor<'t> {
     /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
     #[track_caller]
     pub fn list_and_report_errors<F : FnMut(&mut Self)>(&mut self, parent_kind : u16, errors : &ErrorCollector, mut func : F) {
-        self.go_down(parent_kind, |cursor| {
+        self.assert_is_kind(parent_kind);
+        if self.cursor.goto_first_child() {
             loop {
-                cursor.push_potential_node_error(errors);
-                if let Some(found) = cursor.cursor.field_id() {
+                self.push_potential_node_error(errors);
+                if let Some(found) = self.cursor.field_id() {
                     if found == field!("item") {
-                        func(cursor);
+                        func(self);
                     } else {
-                        cursor.print_stack();
+                        self.print_stack();
                         panic!("List did not only contain 'item' fields, found field '{}' instead!", tree_sitter_sus::language().field_name_for_id(found.into()).unwrap());
                     }
                 } else {
-                    cursor.maybe_add_comment();
+                    self.maybe_add_comment();
                 }
-                if !cursor.cursor.goto_next_sibling() {
+                if !self.cursor.goto_next_sibling() {
                     break;
                 }
             }
-        });
+            assert!(self.cursor.goto_parent());
+        }
     }
 }

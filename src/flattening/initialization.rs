@@ -10,7 +10,7 @@ use super::*;
 
 struct ModuleInitializationContext<'linker> {
     ports : FlatAlloc<Port, PortIDMarker>,
-    interfaces : FlatAlloc<Interface, InterfaceIDMarker>,
+    interfaces : FlatAlloc<Interface, DomainIDMarker>,
     file_text : &'linker FileText
 }
 
@@ -74,7 +74,7 @@ impl<'linker> ModuleInitializationContext<'linker> {
         });
     }
 
-    fn gather_func_call_ports(&mut self, interface_name_span : Span, cursor : &mut Cursor) -> InterfaceID {
+    fn gather_func_call_ports(&mut self, interface_name_span : Span, cursor : &mut Cursor) -> DomainID {
         let mut func_call_inputs = PortIDRange::empty();
         let mut func_call_outputs = PortIDRange::empty();
         
@@ -101,7 +101,7 @@ impl<'linker> ModuleInitializationContext<'linker> {
         interface
     }
 
-    fn gather_decl_names_in_list(&mut self, id_typ: IdentifierType, interface : InterfaceID, cursor: &mut Cursor) -> PortIDRange {
+    fn gather_decl_names_in_list(&mut self, id_typ: IdentifierType, interface : DomainID, cursor: &mut Cursor) -> PortIDRange {
         let list_start_at = self.ports.get_next_alloc_id();
         cursor.list(kind!("declaration_list"), |cursor| {
             let decl_span = cursor.span();
@@ -138,9 +138,11 @@ pub fn gather_initial_file_data(mut builder : FileBuilder) {
                     let after_initial_parse_cp = CheckPoint::checkpoint(&errors, &resolved_globals);
 
                     let main_interface = &ctx.interfaces[Module::MAIN_INTERFACE_ID];
+                    
+                    let main_interface_used = ctx.ports.iter().any(|(_, p)| p.interface == Module::MAIN_INTERFACE_ID);
 
                     let md = Module{
-                        link_info: LinkInfo {
+                        link_info : LinkInfo {
                             documentation: cursor.extract_gathered_comments(),
                             file: builder.file_id,
                             name : main_interface.name.clone(),
@@ -151,8 +153,10 @@ pub fn gather_initial_file_data(mut builder : FileBuilder) {
                             after_initial_parse_cp,
                             after_flatten_cp : None
                         },
+                        main_interface_used,
                         instructions : FlatAlloc::new(),
                         ports : ctx.ports,
+                        domains : FlatAlloc::new(),
                         interfaces : ctx.interfaces,
                         instantiations: InstantiationList::new()
                     };

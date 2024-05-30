@@ -22,7 +22,7 @@ use crate::{
 /// 
 ///     2.1: Parsing: Parse source code to create instruction list. 
 /// 
-///     2.2: Typecheck: Add typ variables to everything. [Declaration::typ], [WireInstance::typ] and [WireInstance::is_compiletime] are set in this stage. 
+///     2.2: Typecheck: Add typ variables to everything. [Declaration::typ], [WireInstance::typ] and [SubModuleInstance::local_interface_domains] are set in this stage. 
 /// 
 /// 3. Instantiation: Actually run generative code and instantiate modules. 
 #[derive(Debug)]
@@ -32,58 +32,75 @@ pub struct Module {
 
     /// Created by Stage 1: Initialization
     pub ports : FlatAlloc<Port, PortIDMarker>,
+    
+    /// Created by Stage 1: Initialization
+    pub main_interface_used : bool,
 
     /// Created by Stage 1: Initialization
-    pub interfaces : FlatAlloc<Interface, InterfaceIDMarker>,
+    /// 
+    /// Every interface is a distinct Domain, but domains need not be attached to an interface
+    pub interfaces : FlatAlloc<Interface, DomainIDMarker>,
 
     /// Created in Stage 2: Flattening and Typechecking
     pub instructions : FlatAlloc<Instruction, FlatIDMarker>,
+
+    /// Created in Stage 2: Flattening and Typechecking
+    /// 
+    /// Every interface is a distinct Domain, but domains need not be attached to an interface
+    pub domains : FlatAlloc<DomainInfo, DomainIDMarker>,
 
     /// Created in Stage 3: Instantiation
     pub instantiations : InstantiationList
 }
 
 impl Module {
-    pub const MAIN_INTERFACE_ID : InterfaceID = InterfaceID::from_hidden_value(0);
-    
+    pub const MAIN_INTERFACE_ID : DomainID = DomainID::from_hidden_value(0);
+
     pub fn get_port_decl(&self, port : PortID) -> &Declaration {
         let flat_port = self.ports[port].declaration_instruction;
 
         self.instructions[flat_port].unwrap_wire_declaration()
     }
 
-    pub fn make_port_info_string(&self, port_id : PortID, file_text : &FileText) -> String {
+    pub fn make_port_info_fmt(&self, port_id : PortID, file_text : &FileText, result : &mut String) {
+        use std::fmt::Write;
         let port = &self.ports[port_id];
         let port_direction = if port.identifier_type == IdentifierType::Input {"input"} else {"output"};
-        format!("{port_direction} {}", &file_text[port.decl_span])
+        writeln!(result, "{port_direction} {}", &file_text[port.decl_span]).unwrap()
+    }
+    pub fn make_port_info_string(&self, port_id : PortID, file_text : &FileText) -> String {
+        let mut r = String::new(); self.make_port_info_fmt(port_id, file_text, &mut r); r
     }
 
-    pub fn make_interface_info_string(&self, interface_id : InterfaceID, file_text : &FileText) -> String {
-        let mut result = String::new();
-
+    pub fn make_interface_info_fmt(&self, interface_id : DomainID, file_text : &FileText, result : &mut String) {
         for (port_id, port) in &self.ports {
             if port.interface == interface_id {
-                result.push_str("\n    ");
-                result.push_str(&self.make_port_info_string(port_id, file_text));
+                self.make_port_info_fmt(port_id, file_text, result);
             }
         }
-
-        result
+    }
+    pub fn make_interface_info_string(&self, interface_id : DomainID, file_text : &FileText) -> String {
+        let mut r = String::new(); self.make_interface_info_fmt(interface_id, file_text, &mut r); r
     }
 
-    pub fn make_all_ports_info_string(&self, file_text : &FileText) -> String {
-        let mut result = self.make_interface_info_string(Module::MAIN_INTERFACE_ID, file_text);
-        
+    pub fn make_all_ports_info_fmt(&self, file_text : &FileText, local_domains : Option<InterfaceToDomainMap>, result : &mut String) {
         let mut interface_iter = self.interfaces.iter();
-        // Already did main interface
-        interface_iter.next();
-
-        for (interface_id, interface) in interface_iter {
-            result.push_str(&format!("\n    {}:", &interface.name));
-            result.push_str(&self.make_interface_info_string(interface_id, file_text));
+        if !self.main_interface_used {
+            interface_iter.next();
         }
 
-        result
+        for (interface_id, interface) in interface_iter {
+            use std::fmt::Write;
+            if let Some(domain_map) = &local_domains {
+                writeln!(result, "{}: ({})", &interface.name, domain_map.get_submodule_interface_domain(interface_id).name).unwrap();
+            } else {
+                writeln!(result, "{}:", &interface.name).unwrap();
+            }
+            self.make_interface_info_fmt(interface_id, file_text, result);
+        }
+    }
+    pub fn make_all_ports_info_string(&self, file_text : &FileText, local_domains : Option<InterfaceToDomainMap>) -> String {
+        let mut r = String::new(); self.make_all_ports_info_fmt(file_text, local_domains, &mut r); r
     }
 
     pub fn print_flattened_module(&self, file_text : &FileText) {
@@ -136,6 +153,28 @@ impl Module {
         }
         unreachable!()
     }
+
+    pub fn is_multi_interface(&self) -> bool {
+        self.interfaces.len() > 1
+    }
+}
+
+#[derive(Debug)]
+pub struct DomainInfo {
+    pub name : String,
+}
+
+#[derive(Clone, Copy)]
+pub struct InterfaceToDomainMap<'linker> {
+    pub local_domain_map : &'linker FlatAlloc<DomainID, DomainIDMarker>,
+    pub domains : &'linker FlatAlloc<DomainInfo, DomainIDMarker>
+}
+
+impl<'linker> InterfaceToDomainMap<'linker> {
+    pub fn get_submodule_interface_domain(&self, domain : DomainID) -> &'linker DomainInfo {
+        let local_domain = self.local_domain_map[domain];
+        &self.domains[local_domain]
+    }
 }
 
 
@@ -181,7 +220,7 @@ pub struct Port {
     pub name_span : Span,
     pub decl_span : Span,
     pub identifier_type : IdentifierType,
-    pub interface : InterfaceID,
+    pub interface : DomainID,
     /// This is only set after flattening is done. Initially just [UUID::PLACEHOLDER]
     pub declaration_instruction : FlatID
 }
@@ -206,9 +245,10 @@ pub type PortID = UUID<PortIDMarker>;
 
 pub type PortIDRange = UUIDRange<PortIDMarker>;
 
-pub struct InterfaceIDMarker;
-impl UUIDMarker for InterfaceIDMarker {const DISPLAY_NAME : &'static str = "port_";}
-pub type InterfaceID = UUID<InterfaceIDMarker>;
+pub struct DomainIDMarker;
+impl UUIDMarker for DomainIDMarker {const DISPLAY_NAME : &'static str = "port_";}
+/// Interfaces are also indexed using DomainIDs. But in general, these refer to (clock/latency counting) domains
+pub type DomainID = UUID<DomainIDMarker>;
 
 
 #[derive(Debug, Clone, Copy)]
@@ -432,8 +472,18 @@ pub struct SubModuleInstance {
     /// Name is not always present in source code. Such as in inline function call syntax: my_mod(a, b, c)
     pub name : Option<(String, Span)>,
     pub module_name_span : Span,
-    pub local_interface_domains : FlatAlloc<InterfaceID, InterfaceIDMarker>,
+    pub local_interface_domains : FlatAlloc<DomainID, DomainIDMarker>,
     pub documentation : Documentation
+}
+
+impl SubModuleInstance {
+    pub fn get_name<'o, 's : 'o, 'l : 'o>(&'s self, corresponding_module : &'l Module) -> &'o str {
+        if let Some((n, _span)) = &self.name {
+            n
+        } else {
+            &corresponding_module.link_info.name
+        }
+    }
 }
 
 #[derive(Debug)]

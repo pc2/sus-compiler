@@ -713,3 +713,98 @@ module contains_submodule_submodule : int a, int b, int c -> int r {
 	doNothing()
 	reg r = tmp + c
 }
+
+
+
+module cross_int {
+	interface in : int i'0
+	interface out : -> int o'0
+}
+
+module cross_memory {
+	interface in : bool[20][512] i'0
+	interface out : -> bool[20][512] o'0
+}
+
+module offset_backwards : bool i'0 -> bool o'-5 {
+
+}
+
+module DUAL_PORT_MEM {
+	state bool[20][512] mem
+
+	interface write : bool write, bool[20] wr_data, int wr_addr
+
+	interface read : bool read, int rd_addr -> bool[20] rd_data
+
+	if write {
+		mem[wr_addr] = wr_data
+	}
+
+	cross_memory cr_m
+	cr_m.i = mem
+	if read {
+		rd_data = cr_m.o[rd_addr]
+	}
+}
+
+module FIFO {
+	gen int BITWIDTH = 20
+	gen int DEPTH = 512
+	// The FIFO may still receive data for 5 cycles after ready is de-asserted
+	gen int ALMOST_FULL_THRESHOLD = 5
+	
+	interface push : bool push'0, bool[BITWIDTH] data_in -> bool ready'-ALMOST_FULL_THRESHOLD+1
+	
+	interface pop : bool pop -> bool[BITWIDTH] data_out, bool data_valid
+	
+	state bool[BITWIDTH][DEPTH] mem
+	state int read_addr
+	state int write_addr
+
+	initial read_addr = 0
+	initial write_addr = 0
+
+	cross_int write_to_pop
+	write_to_pop.i = write_addr
+
+	cross_int read_to_push
+	read_to_push.i = read_addr
+
+	cross_memory mem_to_pop
+	mem_to_pop.i = mem
+
+	if pop {
+		data_valid = read_addr != write_to_pop.o
+		if data_valid {
+			reg data_out = mem_to_pop.o[read_addr]
+			read_addr = (read_addr + 1) % DEPTH
+		}
+	}
+
+	if push {
+		mem[write_addr] = data_in
+		write_addr = (write_addr + 1) % DEPTH
+	}
+	
+	// Wrapping subtract
+	int space_remaining = (read_to_push.o - write_addr) % DEPTH
+	reg bool r = space_remaining > ALMOST_FULL_THRESHOLD
+	ready = offset_backwards(r)
+}
+
+module test_separated_domain : int main {
+	int domain2
+
+	int domain3
+
+	int domain4
+
+	cross_int ci
+	ci.i = domain3
+	domain4 = ci.o
+
+	int domain5
+
+
+}

@@ -184,7 +184,7 @@ impl FileKnowingErrorInfoObject for LinkInfo {
 
 impl FileKnowingErrorInfoObject for Module {
     fn make_global_info(&self, files : &ArenaAllocator<FileData, FileUUIDMarker>) -> ((Span, FileUUID), String) {
-        let ports_str = self.make_all_ports_info_string(&files[self.link_info.file].file_text);
+        let ports_str = self.make_all_ports_info_string(&files[self.link_info.file].file_text, None);
         ((self.link_info.name_span, self.link_info.file), format!("Module '{}' defined here. {}", &self.link_info.name, ports_str))
     }
 }

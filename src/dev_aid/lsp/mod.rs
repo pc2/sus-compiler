@@ -98,42 +98,6 @@ impl LoadedFileCache {
     }
 }
 
-pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
-    std::env::set_var("RUST_BACKTRACE", "1"); // Enable backtrace because I can't set it in Env vars
-    
-    println!("starting LSP server");
-
-    // Create the transport. Includes the stdio (stdin and stdout) versions but this could
-    // also be implemented to use sockets or HTTP.
-    //let (connection, io_threads) = Connection::listen(SocketAddr::from(([127,0,0,1], 25000)))?;
-    println!("Connecting on port {}...", config().lsp_port);
-    let (connection, io_threads) = lsp_server::Connection::connect(SocketAddr::from(([127,0,0,1], config().lsp_port)))?;
-    println!("connection established");
-    
-    // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
-    let server_capabilities = serde_json::to_value(&ServerCapabilities {
-        definition_provider: Some(OneOf::Left(true)),
-        document_highlight_provider: Some(OneOf::Left(true)),
-        references_provider: Some(OneOf::Left(true)),
-        hover_provider: Some(HoverProviderCapability::Simple(true)),
-        rename_provider: Some(OneOf::Left(true)),
-        semantic_tokens_provider: Some(semantic_token_capabilities()),
-        completion_provider : Some(CompletionOptions{resolve_provider : Some(true), ..Default::default()}),
-        text_document_sync : Some(TextDocumentSyncCapability::Kind(
-            TextDocumentSyncKind::FULL
-        )),
-        ..Default::default()
-    })
-    .unwrap();
-    let initialization_params = connection.initialize(server_capabilities)?;
-    main_loop(connection, initialization_params)?;
-    io_threads.join()?;
-
-    // Shut down gracefully.
-    println!("shutting down server");
-    Ok(())
-}
-
 // Requires that token_positions.len() == tokens.len() + 1 to include EOF token
 fn convert_diagnostic(err : &CompileError, main_file_text : &FileText, linker : &Linker, uris : &ArenaVector<Url, FileUUIDMarker>) -> Diagnostic {
     assert!(main_file_text.is_span_valid(err.position), "bad error: {}", err.reason);
@@ -334,8 +298,8 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                             goto_definition_list.push((link_info.name_span, link_info.file));
                         }
                     }
-                    LocationInfo::Port(_md_uuid, md, _port_id, port) => {
-                        goto_definition_list.push((port.name_span, md.link_info.file));
+                    LocationInfo::Port(_sm, md, port_id) => {
+                        goto_definition_list.push((md.ports[port_id].name_span, md.link_info.file));
                     }
                     LocationInfo::Interface(_md_uuid, md, _interface_id, interface) => {
                         goto_definition_list.push((interface.name_span, md.link_info.file));
@@ -441,6 +405,9 @@ fn handle_notification(connection: &lsp_server::Connection, notification : lsp_s
 }
 
 fn main_loop(connection: lsp_server::Connection, initialize_params: serde_json::Value) -> Result<(), Box<dyn Error + Sync + Send>> {
+    println!("initialize_params: ");
+    println!("{initialize_params}");
+
     let initialize_params: InitializeParams = serde_json::from_value(initialize_params).unwrap();
 
     let mut file_cache = initialize_all_files(&initialize_params);
@@ -470,5 +437,41 @@ fn main_loop(connection: lsp_server::Connection, initialize_params: serde_json::
             }
         }
     }
+    Ok(())
+}
+
+pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
+    std::env::set_var("RUST_BACKTRACE", "1"); // Enable backtrace because I can't set it in Env vars
+    
+    println!("starting LSP server");
+
+    // Create the transport. Includes the stdio (stdin and stdout) versions but this could
+    // also be implemented to use sockets or HTTP.
+    //let (connection, io_threads) = Connection::listen(SocketAddr::from(([127,0,0,1], 25000)))?;
+    println!("Connecting on port {}...", config().lsp_port);
+    let (connection, io_threads) = lsp_server::Connection::connect(SocketAddr::from(([127,0,0,1], config().lsp_port)))?;
+    println!("connection established");
+    
+    // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
+    let server_capabilities = serde_json::to_value(&ServerCapabilities {
+        definition_provider: Some(OneOf::Left(true)),
+        document_highlight_provider: Some(OneOf::Left(true)),
+        references_provider: Some(OneOf::Left(true)),
+        hover_provider: Some(HoverProviderCapability::Simple(true)),
+        rename_provider: Some(OneOf::Left(true)),
+        semantic_tokens_provider: Some(semantic_token_capabilities()),
+        completion_provider : Some(CompletionOptions{resolve_provider : Some(true), ..Default::default()}),
+        text_document_sync : Some(TextDocumentSyncCapability::Kind(
+            TextDocumentSyncKind::FULL
+        )),
+        ..Default::default()
+    })
+    .unwrap();
+    let initialization_params = connection.initialize(server_capabilities)?;
+    main_loop(connection, initialization_params)?;
+    io_threads.join()?;
+
+    // Shut down gracefully.
+    println!("shutting down server");
     Ok(())
 }

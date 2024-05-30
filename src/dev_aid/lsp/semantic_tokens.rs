@@ -1,9 +1,45 @@
 
 use lsp_types::{Position, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities, WorkDoneProgressOptions};
 
-use crate::{dev_aid::lsp::to_position, file_position::Span, flattening::IdentifierType, linker::{FileData, FileUUID, Linker, NameElem}};
+use crate::{abstract_type::DomainType, dev_aid::lsp::to_position, file_position::Span, flattening::{DomainID, IdentifierType}, linker::{FileData, FileUUID, Linker, NameElem}};
 
 use super::tree_walk::{self, InModule, LocationInfo};
+
+const NUM_INTERFACE_DISTINGUISHERS : u32 = 4;
+const TOKEN_TYPES : [SemanticTokenType; 7] = [
+    SemanticTokenType::VARIABLE, // These are all for distinguishing interfaces
+    SemanticTokenType::STRING,
+    SemanticTokenType::NUMBER,
+    SemanticTokenType::REGEXP,
+
+    SemanticTokenType::ENUM_MEMBER,
+    SemanticTokenType::FUNCTION,
+    SemanticTokenType::TYPE,
+];
+
+fn get_semantic_token_type_from_ide_token(tok : IDEIdentifierType) -> u32 {
+    match tok {
+        IDEIdentifierType::Local { is_state : _, interface } => interface % NUM_INTERFACE_DISTINGUISHERS,
+        IDEIdentifierType::Generative => NUM_INTERFACE_DISTINGUISHERS, // ENUM_MEMBER
+        IDEIdentifierType::Constant => NUM_INTERFACE_DISTINGUISHERS, // ENUM_MEMBER
+        IDEIdentifierType::Interface => NUM_INTERFACE_DISTINGUISHERS+1, // FUNCTION
+        IDEIdentifierType::Type => NUM_INTERFACE_DISTINGUISHERS+2, // TYPE
+    }
+}
+
+
+const TOKEN_MODIFIERS : [SemanticTokenModifier; 2] = [
+    SemanticTokenModifier::ASYNC, // "State"
+    SemanticTokenModifier::MODIFICATION, // "Generative"
+];
+// Produces a bitset with 'modifier bits'
+fn get_modifiers_for_token(tok : IDEIdentifierType) -> u32 {
+    match tok {
+        IDEIdentifierType::Local { is_state: true, interface:_ } => 1, // ASYNC
+        IDEIdentifierType::Generative => 2, // MODIFICATION
+        _other => 0
+    }
+}
 
 
 pub fn semantic_token_capabilities() -> SemanticTokensServerCapabilities {
@@ -12,51 +48,13 @@ pub fn semantic_token_capabilities() -> SemanticTokensServerCapabilities {
             work_done_progress: Some(false)
         },
         legend: SemanticTokensLegend{
-            token_types: vec![
-                SemanticTokenType::COMMENT, // When updating, see ['get_semantic_token_type_from_ide_token']
-                SemanticTokenType::KEYWORD,
-                SemanticTokenType::OPERATOR,
-                SemanticTokenType::VARIABLE,
-                SemanticTokenType::PARAMETER,
-                SemanticTokenType::TYPE,
-                SemanticTokenType::NUMBER,
-                SemanticTokenType::FUNCTION,
-                SemanticTokenType::EVENT,
-                SemanticTokenType::ENUM_MEMBER
-            ],
-            token_modifiers: vec![
-                SemanticTokenModifier::ASYNC, // repurpose ASYNC for "State"
-                SemanticTokenModifier::DECLARATION,
-                SemanticTokenModifier::DEFINITION,
-                SemanticTokenModifier::READONLY
-            ],
+            token_types: Vec::from(TOKEN_TYPES),
+            token_modifiers: Vec::from(TOKEN_MODIFIERS),
         },
         range: Some(false), // Don't support ranges yet
         full: Some(SemanticTokensFullOptions::Bool(true)), // TODO: Support delta updating for faster syntax highlighting, just do whole file for now
     })
 }
-
-
-fn get_semantic_token_type_from_ide_token(tok : IDEIdentifierType) -> u32 {
-    match tok {
-        IDEIdentifierType::Local { is_state:false } => 4,
-        IDEIdentifierType::Local { is_state:true } => 3,
-        IDEIdentifierType::Generative => 3,
-        IDEIdentifierType::Constant => 9, // make it 'OPERATOR'?
-        IDEIdentifierType::Interface => 7, // FUNCTION
-        IDEIdentifierType::Type => 5, // All others are 'TYPE'
-    }
-}
-
-// Produces a bitset with 'modifier bits'
-fn get_modifiers_for_token(tok : IDEIdentifierType) -> u32 {
-    match tok {
-        IDEIdentifierType::Local { is_state: true } => 1, // repurpose ASYNC for "State"
-        IDEIdentifierType::Generative => 8, // repurpose READONLY
-        _other => 0
-    }
-}
-
 
 fn convert_to_semantic_tokens(file_data : &FileData, ide_tokens : &mut[(Span, IDEIdentifierType)]) -> Vec<SemanticToken> {
     ide_tokens.sort_by(|a, b| a.0.cmp(&b.0));
@@ -95,18 +93,24 @@ fn convert_to_semantic_tokens(file_data : &FileData, ide_tokens : &mut[(Span, ID
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 enum IDEIdentifierType {
-    Local{is_state : bool},
+    Local{is_state : bool, interface : u32},
     Generative,
     Type,
     Interface,
     Constant
 }
 
-fn ide_from_identifier_typ(t : IdentifierType) -> IDEIdentifierType {
-    match t {
-        IdentifierType::Input | IdentifierType::Output | IdentifierType::Local => IDEIdentifierType::Local { is_state: false },
-        IdentifierType::State =>  IDEIdentifierType::Local { is_state: true },
-        IdentifierType::Generative => IDEIdentifierType::Generative
+impl IDEIdentifierType {
+    fn make_local(is_state : bool, domain : DomainID, main_interface_used : bool) -> IDEIdentifierType {
+        let offset = if main_interface_used {0} else {1};
+        IDEIdentifierType::Local { is_state, interface: (domain.get_hidden_value() - offset) as u32 }
+    }
+    fn from_identifier_typ(t : IdentifierType, domain : DomainType, main_interface_used : bool) -> IDEIdentifierType {
+        match t {
+            IdentifierType::Input | IdentifierType::Output | IdentifierType::Local => Self::make_local(false, domain.unwrap_physical(), main_interface_used),
+            IdentifierType::State =>  Self::make_local(true, domain.unwrap_physical(), main_interface_used),
+            IdentifierType::Generative => IDEIdentifierType::Generative
+        }
     }
 }
 
@@ -115,13 +119,13 @@ fn walk_name_color(file : &FileData, linker : &Linker) -> Vec<(Span, IDEIdentifi
 
     tree_walk::visit_all(linker, file, |span, item| {
         result.push((span, match item {
-            LocationInfo::InModule(_, _md_id, _, InModule::NamedLocal(decl)) => {
-                ide_from_identifier_typ(decl.identifier_type)
+            LocationInfo::InModule(_md_id, md, _, InModule::NamedLocal(decl)) => {
+                IDEIdentifierType::from_identifier_typ(decl.identifier_type, decl.typ.domain, md.main_interface_used)
             }
-            LocationInfo::InModule(_, _md_id, _, InModule::NamedSubmodule(_)) => {
+            LocationInfo::InModule(_md_id, _, _, InModule::NamedSubmodule(_)) => {
                 IDEIdentifierType::Interface
             }
-            LocationInfo::InModule(_, _md_id, _, InModule::Temporary(_)) => {return}
+            LocationInfo::InModule(_md_id, _, _, InModule::Temporary(_)) => {return}
             LocationInfo::Type(_) => {return}
             LocationInfo::Global(g) => {
                 match g {
@@ -130,8 +134,9 @@ fn walk_name_color(file : &FileData, linker : &Linker) -> Vec<(Span, IDEIdentifi
                     NameElem::Constant(_) => IDEIdentifierType::Constant,
                 }
             }
-            LocationInfo::Port(_, _, _, port) => {
-                ide_from_identifier_typ(port.identifier_type)
+            LocationInfo::Port(_, md, port_id) => {
+                let interface = md.ports[port_id].interface;
+                IDEIdentifierType::make_local(false, interface, md.main_interface_used)
             }
             LocationInfo::Interface(_, _, _, _) => {
                 IDEIdentifierType::Interface

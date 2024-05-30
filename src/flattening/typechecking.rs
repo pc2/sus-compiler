@@ -2,7 +2,7 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-    abstract_type::{DomainType, TypeUnifier, BOOL_TYPE, INT_TYPE}, debug::SpanDebugger, errors::ErrorCollector, file_position::SpanFile, linker::{with_module_editing_context, ConstantUUIDMarker, FileUUID, Linkable, Linker, ModuleUUIDMarker, NamedConstant, Resolver, WorkingOnResolver}
+    abstract_type::{BestName, DomainType, TypeUnifier, BOOL_TYPE, INT_TYPE}, debug::SpanDebugger, errors::ErrorCollector, file_position::SpanFile, linker::{with_module_editing_context, ConstantUUIDMarker, FileUUID, Linkable, Linker, ModuleUUIDMarker, NamedConstant, Resolver, WorkingOnResolver}
 };
 
 use super::*;
@@ -37,7 +37,7 @@ pub fn typecheck_all_modules(linker : &mut Linker) {
 struct ConditionStackElem {
     ends_at : FlatID,
     span : Span,
-    domain : InterfaceID
+    domain : DomainID
 }
 
 enum ExtraInstructionData {
@@ -233,33 +233,32 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             Instruction::Declaration(decl) => {
                 if let Some(latency_spec) = decl.latency_specifier {
                     let latency_spec_wire = self.working_on.instructions[latency_spec].unwrap_wire();
-                    self.type_checker.typecheck(&latency_spec_wire.typ, latency_spec_wire.span, &FullType { typ: INT_TYPE, domain: DomainType::Generative }, "latency specifier", None);
+                    self.type_checker.typecheck_and_generative::<true>(&latency_spec_wire.typ, latency_spec_wire.span, &INT_TYPE, "latency specifier");
                 }
 
                 decl.typ_expr.for_each_generative_input(|param_id| {
                     let wire = self.working_on.instructions[param_id].unwrap_wire();
-                    self.type_checker.typecheck(&wire.typ, wire.span, &FullType { typ: INT_TYPE, domain: DomainType::Generative }, "Array size", None);
+                    self.type_checker.typecheck_and_generative::<true>(&wire.typ, wire.span, &INT_TYPE, "array size");
                 });
 
                 let typ = decl.typ_expr.to_type();
                 let Instruction::Declaration(decl) = &mut self.modules.working_on.instructions[instr_id] else {unreachable!()};
                 decl.typ.typ = typ;
-                if decl.typ.domain == DomainType::Error {
+                if decl.typ.domain == DomainType::Physical(DomainID::PLACEHOLDER) {
                     decl.typ.domain = self.type_checker.new_unknown_domain(decl.identifier_type.is_generative());
                 }
             }
             Instruction::IfStatement(stm) => {
                 let wire = &self.working_on.instructions[stm.condition].unwrap_wire();
-                self.type_checker.typecheck(&wire.typ, wire.span, &self.type_checker.new_unknown_domain_fulltype(BOOL_TYPE, false), "if statement condition", None);
+                self.type_checker.typecheck_and_generative::<false>(&wire.typ, wire.span, &BOOL_TYPE, "if statement condition");
             }
             Instruction::ForStatement(stm) => {
                 let loop_var = &self.working_on.instructions[stm.loop_var_decl].unwrap_wire_declaration();
                 let start = &self.working_on.instructions[stm.start].unwrap_wire();
                 let end = &self.working_on.instructions[stm.end].unwrap_wire();
-                let loop_var_decl_span = Some((loop_var.get_span(), self.errors.file));
 
-                self.type_checker.typecheck(&start.typ, start.span, &loop_var.typ, "for loop", loop_var_decl_span);
-                self.type_checker.typecheck(&end.typ, end.span, &loop_var.typ, "for loop", loop_var_decl_span);
+                self.type_checker.typecheck_and_generative::<true>(&start.typ, start.span, &loop_var.typ.typ, "for loop start");
+                self.type_checker.typecheck_and_generative::<true>(&end.typ, end.span, &loop_var.typ.typ, "for loop end");
             }
             Instruction::Wire(w) => {
                 let result_typ = match &w.source {
@@ -299,12 +298,12 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 let from_wire = self.working_on.instructions[conn.from].unwrap_wire();
 
                 from_wire.span.debug();
-                self.type_checker.typecheck(&from_wire.typ, from_wire.span, &write_to_type, write_context, declared_here);
+                self.type_checker.typecheck_write_to(&from_wire.typ, from_wire.span, &write_to_type, write_context, declared_here);
             }
         }
     }
 
-    fn get_current_condition_domain(&self) -> Option<(InterfaceID, Span)> {
+    fn get_current_condition_domain(&self) -> Option<(DomainID, Span)> {
         let last = self.runtime_condition_stack.last()?;
         Some((last.domain, last.span))
     }
@@ -322,23 +321,38 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
 
         // Post type application. Solidify types and flag any remaining AbstractType::Unknown
-        for (_id, inst) in self.modules.working_on.instructions.iter_mut() {
+        for (id, inst) in self.modules.working_on.instructions.iter_mut() {
             match inst {
                 Instruction::Wire(w) => {
-                    self.type_checker.finalize_type(&mut w.typ, w.span, &self.modules.working_on.interfaces);
+                    self.type_checker.finalize_type(&mut w.typ, w.span, &self.modules.working_on.interfaces, BestName::UnnamedWire);
                 }
                 Instruction::Declaration(decl) => {
                     let span = decl.get_span();
-                    self.type_checker.finalize_type(&mut decl.typ, span, &self.modules.working_on.interfaces)
+                    self.type_checker.finalize_type(&mut decl.typ, span, &self.modules.working_on.interfaces, BestName::NamedWire(id))
                 }
                 Instruction::SubModule(sm) => {
-                    for (_id, i) in &mut sm.local_interface_domains {
-                        *i = self.type_checker.finalize_domain(*i);
+                    for (interface_id, i) in &mut sm.local_interface_domains {
+                        *i = self.type_checker.finalize_domain(*i, BestName::SubModule(id, interface_id));
                     }
                 }
                 _other => {}
             }
         }
+
+        let resulting_domain_infos = self.type_checker.final_domains.iter().map(|(id, best_name)| {
+            DomainInfo { name: match *best_name {
+                BestName::ExistingInterface => self.modules.working_on.interfaces[id].name.clone(),
+                BestName::SubModule(sm_instr, sm_interface) => {
+                    let sm = self.working_on.instructions[sm_instr].unwrap_submodule();
+                    let md = &self.modules[sm.module_uuid];
+                    format!("{}_{}", sm.get_name(&md), md.interfaces[sm_interface].name)
+                }
+                BestName::NamedWire(decl_id) => self.working_on.instructions[decl_id].unwrap_wire_declaration().name.clone(),
+                BestName::UnnamedWire => format!("domain_{}", id.get_hidden_value())
+            }}
+        }).collect();
+
+        self.modules.working_on.domains = resulting_domain_infos;
     }
     
     /* 

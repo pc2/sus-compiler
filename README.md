@@ -100,6 +100,7 @@ The main goals of the language are roughly listed below:
 ### LSP
 - [x] Basic LSP for VSCode integration
 - [x] Syntax Highlighting
+- [x] Coloring of domain wires
 - [x] Error and Warning Reporting
 - [x] Hover type information
 - [x] Hover documentation

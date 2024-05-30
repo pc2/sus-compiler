@@ -1,6 +1,6 @@
 use std::{cell::RefCell, ops::{Deref, Index}};
 
-use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span, SpanFile}, flattening::{BinaryOperator, Interface, InterfaceID, InterfaceIDMarker, UnaryOperator}, linker::{get_builtin_type, Linkable, NamedType, Resolver, TypeUUID, TypeUUIDMarker}};
+use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span, SpanFile}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, Interface, UnaryOperator}, linker::{get_builtin_type, Linkable, NamedType, Resolver, TypeUUID, TypeUUIDMarker}};
 
 /// This contains only the information that can be easily type-checked. 
 /// 
@@ -46,28 +46,18 @@ impl AbstractType {
 pub const BOOL_TYPE : AbstractType = AbstractType::Named(get_builtin_type("bool"));
 pub const INT_TYPE : AbstractType = AbstractType::Named(get_builtin_type("int"));
 
-///     Error
-///       |
-///   Generative
-///       | 
-///     Wire*
-///       |
-///    Unknown
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DomainType {
     /// Generative conflicts with nothing
     Generative,
     /// This object is a real wire. It corresponds to a certain (clock) domain. It can only affect wires in the same clock domain. 
-    Physical(InterfaceID),
-    Error,
+    /// Initial value is Physical(DomainID::PLACEHOLDER)
+    Physical(DomainID)
 }
-
 impl DomainType {
-    pub fn contains_error<const CHECK_ERROR : bool>(&self) -> bool {
-        match self {
-            DomainType::Generative | DomainType::Physical(_) => false,
-            DomainType::Error => CHECK_ERROR,
-        }
+    pub fn unwrap_physical(&self) -> DomainID {
+        let Self::Physical(w) = self else {unreachable!()};
+        *w
     }
 }
 
@@ -84,17 +74,16 @@ impl FullType {
     pub fn new_unset() -> FullType {
         FullType {
             typ: AbstractType::Error,
-            domain: DomainType::Error
+            domain: DomainType::Physical(DomainID::PLACEHOLDER)
         }
     }
     pub fn is_generative(&self) -> bool {
         match self.domain {
             DomainType::Generative => true,
-            DomainType::Error => unreachable!("Unresolved DomainType"),
             DomainType::Physical(_) => false,
         }
     }
-    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec, interfaces : &FlatAlloc<Interface, InterfaceIDMarker>) -> String {
+    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec, interfaces : &FlatAlloc<Interface, DomainIDMarker>) -> String {
         let mut result = self.typ.to_string(linker_types);
         match &self.domain {
             DomainType::Generative => {} // gen keyword already included
@@ -105,24 +94,38 @@ impl FullType {
                     result.push_str(&format!("{{unnamed domain {}}}", w.get_hidden_value()));
                 }
             }
-            DomainType::Error => {
-                result.push_str("{{error domain}}");
-            }
         }
         result
     }
 }
 
 #[derive(Debug, Clone)]
-enum DomainInfo {
+enum DomainTypeSubstitution {
     /// Known Domains correspond to the declared interfaces on the module. 
     /// 
     /// They are mutually exclusive. When two known domains come into contact, they produce an error
     KnownDomain{name : String},
     /// Unknown Domains are not mutually exclusive. When an unknown interface meets a known or unknown interface, it converts to an AliasFor
-    UnknownDomain,
+    UnknownDomain{converts_to : DomainID},
     /// Hindley-Milner Type Unification. When domains are merged, AliasFor objects are created from one of the domains to the other
-    AliasFor(InterfaceID)
+    AliasFor(DomainID)
+}
+
+pub enum BestName {
+    ExistingInterface,
+    SubModule(FlatID, DomainID),
+    NamedWire(FlatID),
+    UnnamedWire
+}
+impl BestName {
+    fn strength(&self) -> i8 {
+        match self {
+            BestName::ExistingInterface => 3,
+            BestName::SubModule(_, _) => 2,
+            BestName::NamedWire(_) => 1,
+            BestName::UnnamedWire => 0
+        }
+    }
 }
 
 /// Unification of domains? 
@@ -132,14 +135,16 @@ enum DomainInfo {
 /// 'x U 'y -> 'x = 'y
 pub struct TypeUnifier<'linker, 'errs> {
     pub linker_types : Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>,
-    domains : RefCell<FlatAlloc<DomainInfo, InterfaceIDMarker>>,
+    domain_substitutor : RefCell<FlatAlloc<DomainTypeSubstitution, DomainIDMarker>>,
     errors : &'errs ErrorCollector<'linker>,
+    pub final_domains : FlatAlloc<BestName, DomainIDMarker>,
 }
 
 impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
-    pub fn new(linker_types : Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>, errors : &'errs ErrorCollector<'linker>, interfaces : &FlatAlloc<Interface, InterfaceIDMarker>) -> Self {
-        let domains = interfaces.iter().map(|(_id, interface)| DomainInfo::KnownDomain { name: interface.name.clone() }).collect();
-        Self {linker_types, errors, domains : RefCell::new(domains)}
+    pub fn new(linker_types : Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>, errors : &'errs ErrorCollector<'linker>, interfaces : &FlatAlloc<Interface, DomainIDMarker>) -> Self {
+        let domains = interfaces.iter().map(|(_id, interface)| DomainTypeSubstitution::KnownDomain { name: interface.name.clone() }).collect();
+        let final_domains = interfaces.iter().map(|(_id, _interface)| BestName::ExistingInterface).collect();
+        Self {linker_types, errors, domain_substitutor : RefCell::new(domains), final_domains}
     }
 
     // ===== Types =====
@@ -225,16 +230,16 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
     }
 
     // ===== Domains =====
-    fn get_root_domain(&self, mut v : InterfaceID) -> InterfaceID {
-        let doms_borrow = self.domains.borrow();
-        while let DomainInfo::AliasFor(new_v) = &doms_borrow[v] {
+    fn get_root_domain(&self, mut v : DomainID) -> DomainID {
+        let doms_borrow = self.domain_substitutor.borrow();
+        while let DomainTypeSubstitution::AliasFor(new_v) = &doms_borrow[v] {
             v = *new_v;
         }
         v
     }
 
-    pub fn new_unknown_domain_id(&self) -> InterfaceID {
-        self.domains.borrow_mut().alloc(DomainInfo::UnknownDomain)
+    pub fn new_unknown_domain_id(&self) -> DomainID {
+        self.domain_substitutor.borrow_mut().alloc(DomainTypeSubstitution::UnknownDomain{converts_to : DomainID::PLACEHOLDER})
     }
 
     pub fn new_unknown_domain(&self, is_generative : bool) -> DomainType {
@@ -245,33 +250,26 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         }
     }
 
-    pub fn new_unknown_domain_fulltype(&self, typ : AbstractType, is_generative : bool) -> FullType {
-        FullType {
-            typ,
-            domain : self.new_unknown_domain(is_generative),
-        }
-    }
-
     /// Returns the names of the KnownDomains on error
-    fn try_merge_physical<ErrFunc : FnOnce(&str, &str)>(&self, a : InterfaceID, b : InterfaceID, err_func : ErrFunc) -> bool {
+    fn try_merge_physical<ErrFunc : FnOnce(&str, &str)>(&self, a : DomainID, b : DomainID, err_func : ErrFunc) -> bool {
         let root_a = self.get_root_domain(a);
         let root_b = self.get_root_domain(b);
 
-        let mut domains_borrow = self.domains.borrow_mut();
+        let mut domains_borrow = self.domain_substitutor.borrow_mut();
         let Some((dom_a, dom_b)) = domains_borrow.get2_mut(root_a, root_b) else {return true}; // Same domain anyway
 
         match (dom_a, dom_b) {
-            (DomainInfo::AliasFor(_), _) | (_, DomainInfo::AliasFor(_)) => unreachable!(),
-            (DomainInfo::KnownDomain { name:name_a }, DomainInfo::KnownDomain { name:name_b }) => {
+            (DomainTypeSubstitution::AliasFor(_), _) | (_, DomainTypeSubstitution::AliasFor(_)) => unreachable!(),
+            (DomainTypeSubstitution::KnownDomain { name:name_a }, DomainTypeSubstitution::KnownDomain { name:name_b }) => {
                 err_func(name_a, name_b);
                 false
             }
-            (DomainInfo::KnownDomain { name:_ }, dom_b @ DomainInfo::UnknownDomain) => {
-                *dom_b = DomainInfo::AliasFor(root_a);
+            (DomainTypeSubstitution::KnownDomain { name:_ }, dom_b @ DomainTypeSubstitution::UnknownDomain{converts_to : _}) => {
+                *dom_b = DomainTypeSubstitution::AliasFor(root_a);
                 true
             }
-            (dom_a @ DomainInfo::UnknownDomain, DomainInfo::UnknownDomain) | (dom_a @ DomainInfo::UnknownDomain, DomainInfo::KnownDomain { name:_ }) => {
-                *dom_a = DomainInfo::AliasFor(root_b);
+            (dom_a @ DomainTypeSubstitution::UnknownDomain{converts_to : _}, DomainTypeSubstitution::UnknownDomain{converts_to : _}) | (dom_a @ DomainTypeSubstitution::UnknownDomain{converts_to : _}, DomainTypeSubstitution::KnownDomain { name:_ }) => {
+                *dom_a = DomainTypeSubstitution::AliasFor(root_b);
                 true
             }
         }
@@ -284,23 +282,19 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
     /// The error function is called with None as the first argument if it's generative. A bit hacky but eh
     pub fn combine_domains<const B_MUST_BE_SUBTYPE : bool, ErrFunc : FnOnce(Option<&str>, &str)>(&self, a : &DomainType, b : &DomainType, err_func : ErrFunc) -> DomainType {
         match (a, b) {
-            (DomainType::Error, _) | (_, DomainType::Error) => DomainType::Error,
             (DomainType::Physical(wa), DomainType::Physical(wb)) => {
-                if self.try_merge_physical(*wa, *wb, |l, r| err_func(Some(l), r)) {
-                    DomainType::Physical(*wa)
-                } else {
-                    DomainType::Error
-                }
+                self.try_merge_physical(*wa, *wb, |l, r| err_func(Some(l), r));
+                DomainType::Physical(*wa)
             }
             (DomainType::Generative, DomainType::Physical(w)) => {
                 if B_MUST_BE_SUBTYPE {
                     let root = self.get_root_domain(*w);
-                    let domains_borrow = self.domains.borrow();
+                    let domains_borrow = self.domain_substitutor.borrow();
 
                     let other_domain = match &domains_borrow[root] {
-                        DomainInfo::KnownDomain { name } => &name,
-                        DomainInfo::UnknownDomain => "as-of-yet-unknown",
-                        DomainInfo::AliasFor(_) => unreachable!()
+                        DomainTypeSubstitution::KnownDomain { name } => &name,
+                        DomainTypeSubstitution::UnknownDomain{converts_to : _} => "as-of-yet-unknown",
+                        DomainTypeSubstitution::AliasFor(_) => unreachable!()
                     };
                     err_func(None, other_domain);
                 }
@@ -317,7 +311,15 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
 
     // ===== Both =====
     
-    pub fn typecheck(&self, found : &FullType, span : Span, expected : &FullType, context : &str, declared_here : Option<SpanFile>) {
+    pub fn typecheck_and_generative<const MUST_BE_GENERATIVE : bool>(&self, found : &FullType, span : Span, expected : &AbstractType, context : &str) {
+        self.typecheck_abstr(&found.typ, span, &expected, context, None);
+
+        if MUST_BE_GENERATIVE && found.domain != DomainType::Generative {
+            self.errors.error(span, format!("A generative value is required in {context}"));
+        }
+    }
+
+    pub fn typecheck_write_to(&self, found : &FullType, span : Span, expected : &FullType, context : &str, declared_here : Option<SpanFile>) {
         self.typecheck_abstr(&found.typ, span, &expected.typ, context, declared_here);
 
         self.combine_domains::<true, _>(&expected.domain, &found.domain, |expected_domain, found_domain| {
@@ -361,21 +363,32 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         }
     }
 
-    pub fn finalize_domain(&self, w : InterfaceID) -> InterfaceID {
-        self.get_root_domain(w)
+    /// At this point, the only elements in self.domains that aren't [DomainTypeSubstitution::AliasFor] are unique, and each represent their domain
+    pub fn finalize_domain(&mut self, w : DomainID, best_name : BestName) -> DomainID {
+        let root_dom = self.get_root_domain(w);
+        match &mut self.domain_substitutor.get_mut()[root_dom] {
+            DomainTypeSubstitution::KnownDomain { name:_ } => root_dom,
+            DomainTypeSubstitution::UnknownDomain { converts_to } => {
+                if *converts_to == DomainID::PLACEHOLDER {
+                    *converts_to = self.final_domains.alloc(best_name);
+                } else {
+                    let found_name = &mut self.final_domains[*converts_to];
+                    if best_name.strength() > found_name.strength() {
+                        *found_name = best_name;
+                    }
+                }
+                *converts_to
+            }
+            DomainTypeSubstitution::AliasFor(_) => unreachable!()
+        }
     }
 
-    pub fn finalize_type(&self, typ : &mut FullType, span : Span, interfaces : &FlatAlloc<Interface, InterfaceIDMarker>) {
+    pub fn finalize_type(&mut self, typ : &mut FullType, span : Span, interfaces : &FlatAlloc<Interface, DomainIDMarker>, best_name : BestName) {
         match &mut typ.domain {
             DomainType::Generative => {}
             DomainType::Physical(w) => {
-                let root = self.finalize_domain(*w);
+                let root = self.finalize_domain(*w, best_name);
                 *w = root;
-            }
-            DomainType::Error => {
-                if typ.typ.contains_error_or_unknown::<true, true>() {
-                    self.errors.error(span, format!("Error Domain"));
-                }
             }
         }
         if typ.typ.contains_error_or_unknown::<true, true>() {
@@ -387,7 +400,7 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
 impl<'linker, 'errs> std::fmt::Debug for TypeUnifier<'linker, 'errs> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("TypeUnifier::domains\n")?;
-        let domains_borrow = self.domains.borrow();
+        let domains_borrow = self.domain_substitutor.borrow();
         for (id, d) in domains_borrow.iter() {
             id.fmt(f)?;
             f.write_str(" -> ")?;
