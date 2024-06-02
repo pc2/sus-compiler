@@ -136,7 +136,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
         for p in &wire_ref.path {
             match p {
-                &WireReferencePathElement::ArrayIdx{idx, bracket_span} => {
+                &WireReferencePathElement::ArrayAccess{idx, bracket_span} => {
                     let idx_wire = self.working_on.instructions[idx].unwrap_wire();
                     
                     write_to_type = self.type_checker.typecheck_array_access(&write_to_type, bracket_span.outer_span(), &idx_wire.typ, idx_wire.span);

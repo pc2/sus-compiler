@@ -254,14 +254,14 @@ pub type DomainID = UUID<DomainIDMarker>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum WireReferencePathElement {
-    ArrayIdx{idx : FlatID, bracket_span : BracketSpan},
+    ArrayAccess{idx : FlatID, bracket_span : BracketSpan},
 }
 
 impl WireReferencePathElement {
     fn for_each_dependency<F : FnMut(FlatID)>(path : &[WireReferencePathElement], mut f : F) {
         for p in path {
             match p {
-                WireReferencePathElement::ArrayIdx { idx, bracket_span:_ } => f(*idx),
+                WireReferencePathElement::ArrayAccess { idx, bracket_span:_ } => f(*idx),
             }
         }
     }
@@ -281,6 +281,11 @@ impl WireReferenceRoot {
             WireReferenceRoot::NamedConstant(_, _) => None,
             WireReferenceRoot::SubModulePort(port) => Some(port.submodule_flat),
         }
+    }
+    #[track_caller]
+    pub fn unwrap_local_decl(&self) -> FlatID {
+        let Self::LocalDecl(decl, _) = self else {unreachable!()};
+        *decl
     }
 }
 
@@ -385,7 +390,7 @@ impl WireSource {
                 }
                 for p in &wire_ref.path {
                     match p {
-                        WireReferencePathElement::ArrayIdx { idx, bracket_span:_ } => func(*idx),
+                        WireReferencePathElement::ArrayAccess { idx, bracket_span:_ } => func(*idx),
                     }
                 }
             }

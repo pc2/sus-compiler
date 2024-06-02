@@ -116,6 +116,11 @@ impl NamedConstant {
             domain: DomainType::Generative
         }
     }
+    pub fn get_value(&self) -> &TypedValue {
+        match self {
+            NamedConstant::Builtin { name:_, val } => &val,
+        }
+    }
 }
 
 #[derive(Debug)]

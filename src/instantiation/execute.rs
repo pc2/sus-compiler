@@ -4,7 +4,7 @@
 //! 
 //! As for typing, it only instantiates written types and leaves the rest for further typechecking. 
 
-use std::ops::Deref;
+use std::ops::{Deref, Index, IndexMut};
 
 use num::BigInt;
 
@@ -21,42 +21,27 @@ macro_rules! caught_by_typecheck {
 
 pub type ExecutionResult<T> = Result<T, (Span, String)>;
 
-fn write_gen_variable<'t, 'p>(mut target : &'t mut Value, conn_path : &'p [RealWirePathElem], to_write : Value, wires : &FlatAlloc<RealWire, WireIDMarker>) -> ExecutionResult<()> {
-    for elem in conn_path {
-        match elem {
-            RealWirePathElem::ArrayAccess{span, idx_wire} => {
-                let idx = wires[*idx_wire].source.unwrap_constant_integer(); // Caught by typecheck
-                let Value::Array(a_box) = target else {caught_by_typecheck!("Non-array")};
-                let array_len = a_box.len();
-                let Some(tt) = usize::try_from(idx).ok().and_then(|pos| a_box.get_mut(pos)) else {
-                    return Err((span.inner_span(), format!("Index {idx} is out of bounds for this array of size {}", array_len)))
-                };
-                target = tt
-            }
-        }
-    }
-    *target = to_write;
-    Ok(())
-}
-fn array_access(tv : &TypedValue, idx : &BigInt, span : BracketSpan) -> ExecutionResult<TypedValue> {
-    let typ = tv.typ.down_array().clone();
-
-    let Value::Array(arr) = &tv.value else {caught_by_typecheck!("Value must be an array")};
-
-    if let Some(elem) = usize::try_from(idx).ok().and_then(|idx| arr.get(idx)) {
-        Ok(TypedValue{typ, value : elem.clone()})
-    } else {
-        Err((span.outer_span(), format!("Compile-Time Array index is out of range: idx: {idx}, array size: {}", arr.len())))
-    }
-}
-
-struct InstantiatedWireRef {
-    root : RealWireRefRoot,
-    path : Vec<RealWirePathElem>
-}
-impl<'fl, 'l> InstantiationContext<'fl, 'l> {
+impl<'fl> GenerationState<'fl> {
     fn span_of(&self, v : FlatID) -> Span {
         self.md.instructions[v].unwrap_wire().span
+    }
+
+    fn write_gen_variable(&self, mut target : &mut Value, conn_path : &[WireReferencePathElement], to_write : Value) -> ExecutionResult<()> {
+        for elem in conn_path {
+            match elem {
+                &WireReferencePathElement::ArrayAccess{idx, bracket_span} => {
+                    let idx = self.get_generation_integer(idx)?; // Caught by typecheck
+                    let Value::Array(a_box) = target else {caught_by_typecheck!("Non-array")};
+                    let array_len = a_box.len();
+                    let Some(tt) = usize::try_from(idx).ok().and_then(|pos| a_box.get_mut(pos)) else {
+                        return Err((bracket_span.inner_span(), format!("Index {idx} is out of bounds for this array of size {}", array_len)))
+                    };
+                    target = tt
+                }
+            }
+        }
+        *target = to_write;
+        Ok(())
     }
     fn get_generation_value(&self, v : FlatID) -> ExecutionResult<&TypedValue> {
         if let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] {
@@ -80,7 +65,35 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             (self.span_of(idx), format!("Value {val_as_int} does not fit in {}", std::any::type_name::<INT>()))
         })
     }
+}
 
+impl<'fl> Index<FlatID> for GenerationState<'fl> {
+    type Output = SubModuleOrWire;
+
+    fn index(&self, index: FlatID) -> &Self::Output {
+        &self.generation_state[index]
+    }
+}
+
+impl<'fl> IndexMut<FlatID> for GenerationState<'fl> {
+    fn index_mut(&mut self, index: FlatID) -> &mut Self::Output {
+        &mut self.generation_state[index]
+    }
+}
+
+fn array_access(tv : &TypedValue, idx : &BigInt, span : BracketSpan) -> ExecutionResult<TypedValue> {
+    let typ = tv.typ.down_array().clone();
+
+    let Value::Array(arr) = &tv.value else {caught_by_typecheck!("Value must be an array")};
+
+    if let Some(elem) = usize::try_from(idx).ok().and_then(|idx| arr.get(idx)) {
+        Ok(TypedValue{typ, value : elem.clone()})
+    } else {
+        Err((span.outer_span(), format!("Compile-Time Array index is out of range: idx: {idx}, array size: {}", arr.len())))
+    }
+}
+
+impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     /// Uses the current context to turn a [WrittenType] into a [ConcreteType]. 
     /// 
     /// Failures are fatal. 
@@ -93,24 +106,23 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             WrittenType::Array(_, arr_box) => {
                 let (arr_content_typ, arr_size_wire, _bracket_span) = arr_box.deref();
                 let inner_typ = self.concretize_type(arr_content_typ)?;
-                let arr_size = self.get_generation_integer(*arr_size_wire)?;
+                let arr_size = self.generation_state.get_generation_integer(*arr_size_wire)?;
                 ConcreteType::Array(Box::new((inner_typ, ConcreteType::Value(Value::Integer(arr_size.clone())))))
             }
         })
     }
 
-    fn instantiate_port_wire_ref_root(&self, port : PortID, submodule_instr : FlatID) -> InstantiatedWireRef {
+    fn instantiate_port_wire_ref_root(&self, port : PortID, submodule_instr : FlatID) -> RealWireRefRoot {
         let sm = &self.submodules[self.generation_state[submodule_instr].unwrap_submodule_instance()];
-        let root = RealWireRefRoot::Wire(sm.port_map[port]);
-
-        InstantiatedWireRef{root, path : Vec::new()}
+        RealWireRefRoot::Wire{wire_id : sm.port_map[port], preamble : Vec::new()}
     }
 
-    fn realize_wire_ref_root(&self, wire_ref_root : &WireReferenceRoot) -> InstantiatedWireRef {
-        let root = match wire_ref_root {
+    // Points to the wire in the hardware that corresponds to the root of this. 
+    fn determine_wire_ref_root(&self, wire_ref_root : &WireReferenceRoot) -> RealWireRefRoot {
+        match wire_ref_root {
             &WireReferenceRoot::LocalDecl(decl_id, _) => {
                 match &self.generation_state[decl_id] {
-                    SubModuleOrWire::Wire(w) => RealWireRefRoot::Wire(*w),
+                    SubModuleOrWire::Wire(w) => RealWireRefRoot::Wire{wire_id : *w, preamble : Vec::new()},
                     SubModuleOrWire::CompileTimeValue(_) => RealWireRefRoot::Generative(decl_id),
                     SubModuleOrWire::SubModule(_) => unreachable!(),
                     SubModuleOrWire::Unnasigned => unreachable!(),
@@ -123,26 +135,22 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             WireReferenceRoot::SubModulePort(port) => {
                 return self.instantiate_port_wire_ref_root(port.port, port.submodule_flat);
             }
-        };
-
-        InstantiatedWireRef{root, path : Vec::new()}
+        }
     }
 
-    fn instantiate_wire_ref(&mut self, wire_ref : &WireReference) -> InstantiatedWireRef {
-        // Later on, potentially allow module arrays
-        let mut result = self.realize_wire_ref_root(&wire_ref.root);
-
-        for v in &wire_ref.path {
+    /// [Self::determine_wire_ref_root] may have included a preamble path already, this must be built upon by this function
+    fn instantiate_wire_ref_path(&mut self, mut preamble : Vec<RealWirePathElem>, path : &[WireReferencePathElement]) -> Vec<RealWirePathElem> {
+        for v in path {
             match v {
-                &WireReferencePathElement::ArrayIdx{idx, bracket_span} => {
+                &WireReferencePathElement::ArrayAccess{idx, bracket_span} => {
                     let idx_wire = self.get_wire_or_constant_as_wire(idx);
                     assert_eq!(self.wires[idx_wire].typ, INT_CONCRETE_TYPE, "Caught by typecheck");
-                    result.path.push(RealWirePathElem::ArrayAccess{ span:bracket_span, idx_wire});
+                    preamble.push(RealWirePathElem::ArrayAccess{ span:bracket_span, idx_wire});
                 }
             }
         }
 
-        result
+        preamble
     }
 
     fn instantiate_write_to_wire(&mut self, write_to_wire : WireID, to_path : Vec<RealWirePathElem>, from : WireID, num_regs : i64, original_instruction : FlatID, condition : Option<WireID>) {
@@ -158,57 +166,59 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         sources.push(MultiplexerSource{from, to_path});
     }
 
-    fn instantiate_connection(&mut self, wire_ref_inst : InstantiatedWireRef, write_modifiers : &WriteModifiers, conn_from : FlatID, original_connection : FlatID, condition : Option<WireID>) -> ExecutionResult<()> {
+    fn instantiate_connection(&mut self, target_wire_ref : &WireReference, write_modifiers : &WriteModifiers, conn_from : FlatID, original_connection : FlatID, condition : Option<WireID>) -> ExecutionResult<()> {
         match write_modifiers {
             WriteModifiers::Connection{num_regs, regs_span : _} => {
-                match &wire_ref_inst.root {
-                    RealWireRefRoot::Wire(write_to_wire) => {
+                match self.determine_wire_ref_root(&target_wire_ref.root) {
+                    RealWireRefRoot::Wire{wire_id: target_wire, preamble} => {
                         let from = self.get_wire_or_constant_as_wire(conn_from);
-                        self.instantiate_write_to_wire(*write_to_wire, wire_ref_inst.path, from, *num_regs, original_connection, condition);
+                        let instantiated_path = self.instantiate_wire_ref_path(preamble, &target_wire_ref.path);
+                        self.instantiate_write_to_wire(target_wire, instantiated_path, from, *num_regs, original_connection, condition);
                     }
-                    RealWireRefRoot::Generative(decl_id) => {
+                    RealWireRefRoot::Generative(target_decl) => {
                         let found_v = self.generation_state[conn_from].unwrap_generation_value().clone();
 
-                        let SubModuleOrWire::CompileTimeValue(v_writable) = &mut self.generation_state[*decl_id] else {caught_by_typecheck!()};
-                        write_gen_variable(&mut v_writable.value, &wire_ref_inst.path, found_v.value, &self.wires)?;
+                        let SubModuleOrWire::CompileTimeValue(v_writable) = &mut self.generation_state[target_decl] else {unreachable!()};
+                        let mut new_val = std::mem::replace(&mut v_writable.value, Value::Error);
+                        self.generation_state.write_gen_variable(&mut new_val, &target_wire_ref.path, found_v.value)?;
+
+                        let SubModuleOrWire::CompileTimeValue(v_writable) = &mut self.generation_state[target_decl] else {unreachable!()};
+                        v_writable.value = new_val;
                     }
-                    RealWireRefRoot::Constant(_) => {
-                        caught_by_typecheck!("Cannot assign to constants!")
+                    RealWireRefRoot::Constant(_cst) => {
+                        caught_by_typecheck!("Cannot assign to constants");
                     },
                 }
             }
             WriteModifiers::Initial{initial_kw_span : _} => {
-                let found_v = self.get_generation_value(conn_from)?.clone();
+                let found_v = self.generation_state.get_generation_value(conn_from)?.clone();
 
-                let root_wire = wire_ref_inst.root.unwrap_wire();
+                let root_wire = self.generation_state[target_wire_ref.root.unwrap_local_decl()].unwrap_wire();
                 let RealWireDataSource::Multiplexer{is_state : Some(initial_value), sources : _} = &mut self.wires[root_wire].source else {caught_by_typecheck!()};
-                let mut new_init_val = std::mem::replace(initial_value, Value::Error);
-                write_gen_variable(&mut new_init_val, &wire_ref_inst.path, found_v.value, &self.wires)?;
-                let RealWireDataSource::Multiplexer{is_state : Some(initial_value), sources : _} = &mut self.wires[root_wire].source else {caught_by_typecheck!()};
-                *initial_value = new_init_val;
+                self.generation_state.write_gen_variable(initial_value, &target_wire_ref.path, found_v.value)?;
             }
         }
         Ok(())
     }
-    fn compute_compile_time_wireref(&self, wire_ref_inst : InstantiatedWireRef) -> ExecutionResult<TypedValue> {
-        let mut work_on_value = match &wire_ref_inst.root {
-            &RealWireRefRoot::Generative(decl_id) => {
-                self.get_generation_value(decl_id)?.clone()
+    fn compute_compile_time_wireref(&self, wire_ref : &WireReference) -> ExecutionResult<TypedValue> {
+        let mut work_on_value : TypedValue = match &wire_ref.root {
+            &WireReferenceRoot::LocalDecl(decl_id, _span) => {
+                self.generation_state.get_generation_value(decl_id)?.clone()
             }
-            RealWireRefRoot::Constant(cst) => {
-                cst.clone()
+            WireReferenceRoot::NamedConstant(const_id, _span) => {
+                self.linker.constants[*const_id].get_value().clone()
             }
-            RealWireRefRoot::Wire(_) => {
-                caught_by_typecheck!("Write to a non-generative wire at compiletime.")
+            &WireReferenceRoot::SubModulePort(_) => {
+                todo!("Don't yet support compile time functions")
             }
         };
 
-        for path_elem in &wire_ref_inst.path {
+        for path_elem in &wire_ref.path {
             work_on_value = match path_elem {
-                RealWirePathElem::ArrayAccess { span, idx_wire } => {
-                    let idx = self.wires[*idx_wire].source.unwrap_constant_integer();
+                &WireReferencePathElement::ArrayAccess{idx, bracket_span} => {
+                    let idx = self.generation_state.get_generation_integer(idx)?;
 
-                    array_access(&work_on_value, &idx, *span)?
+                    array_access(&work_on_value, idx, bracket_span)?
                 }
             }
         }
@@ -218,16 +228,15 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn compute_compile_time(&mut self, wire_inst : &WireInstance) -> ExecutionResult<TypedValue> {
         Ok(match &wire_inst.source {
             WireSource::WireRef(wire_ref) => {
-                let wire_ref_instance = self.instantiate_wire_ref(wire_ref);
-                self.compute_compile_time_wireref(wire_ref_instance)?
+                self.compute_compile_time_wireref(wire_ref)?
             }
             &WireSource::UnaryOp{op, right} => {
-                let right_val = self.get_generation_value(right)?;
+                let right_val = self.generation_state.get_generation_value(right)?;
                 compute_unary_op(op, right_val)
             }
             &WireSource::BinaryOp{op, left, right} => {
-                let left_val = self.get_generation_value(left)?;
-                let right_val = self.get_generation_value(right)?;
+                let left_val = self.generation_state.get_generation_value(left)?;
+                let right_val = self.generation_state.get_generation_value(right)?;
                 compute_binary_op(left_val, op, right_val)
             }
             WireSource::Constant(value) => TypedValue::from_value(value.clone())
@@ -252,27 +261,28 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
         }
     }
-    fn get_wire_ref_root_as_wire(&mut self, root : RealWireRefRoot, original_instruction : FlatID) -> WireID {
+    fn get_wire_ref_root_as_wire(&mut self, wire_ref_root : &WireReferenceRoot, original_instruction : FlatID) -> (WireID, Vec<RealWirePathElem>) {
+        let root = self.determine_wire_ref_root(wire_ref_root);
         match root {
-            RealWireRefRoot::Wire(w) => w,
+            RealWireRefRoot::Wire{wire_id, preamble} => (wire_id, preamble),
             RealWireRefRoot::Generative(decl_id) => {
                 let value = self.generation_state[decl_id].unwrap_generation_value().clone();
-                self.alloc_wire_for_const(value, decl_id)
+                (self.alloc_wire_for_const(value, decl_id), Vec::new())
             }
-            RealWireRefRoot::Constant(value) => self.alloc_wire_for_const(value, original_instruction)
+            RealWireRefRoot::Constant(value) => (self.alloc_wire_for_const(value, original_instruction), Vec::new())
         }
     }
     fn wire_to_real_wire(&mut self, w: &WireInstance, original_instruction : FlatID) -> ExecutionResult<WireID> {
         let source = match &w.source {
             WireSource::WireRef(wire_ref) => {
-                let inst = self.instantiate_wire_ref(wire_ref);
-                let root_wire = self.get_wire_ref_root_as_wire(inst.root, original_instruction);
+                let (root_wire, path_preamble) = self.get_wire_ref_root_as_wire(&wire_ref.root, original_instruction);
+                let path = self.instantiate_wire_ref_path(path_preamble, &wire_ref.path);
 
-                if inst.path.is_empty() { // Little optimization reduces instructions
+                if path.is_empty() { // Little optimization reduces instructions
                     return Ok(root_wire)
                 }
 
-                RealWireDataSource::Select { root: root_wire, path : inst.path }
+                RealWireDataSource::Select { root: root_wire, path }
             }
             &WireSource::UnaryOp{op, right} => {
                 let right = self.get_wire_or_constant_as_wire(right);
@@ -349,13 +359,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             };
 
             let absolute_latency : i64 = if let Some(spec) = &wire_decl.latency_specifier {
-                self.get_generation_small_int(*spec)?
+                self.generation_state.get_generation_small_int(*spec)?
             } else {
                 CALCULATE_LATENCY_LATER
             };
             let wire_id = self.wires.alloc(RealWire{name: wire_decl.name.clone(), typ, original_instruction, source, absolute_latency, needed_until : CALCULATE_LATENCY_LATER});
             if let Some(lat_spec_flat) = wire_decl.latency_specifier {
-                let specified_absolute_latency : i64 = self.get_generation_small_int(lat_spec_flat)?;
+                let specified_absolute_latency : i64 = self.generation_state.get_generation_small_int(lat_spec_flat)?;
                 self.specified_latencies.push((wire_id, specified_absolute_latency));
             }
             SubModuleOrWire::Wire(wire_id)
@@ -407,8 +417,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     }
                 }
                 Instruction::Write(conn) => {
-                    let to_inst = self.instantiate_wire_ref(&conn.to);
-                    self.instantiate_connection(to_inst, &conn.write_modifiers, conn.from, original_instruction, condition)?;
+                    self.instantiate_connection(&conn.to, &conn.write_modifiers, conn.from, original_instruction, condition)?;
                     continue;
                 }
                 Instruction::FuncCall(fc) => {
@@ -427,7 +436,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     let else_range = UUIDRange(stm.then_end_else_start, stm.else_end);
                     let if_condition_wire = self.md.instructions[stm.condition].unwrap_wire();
                     if if_condition_wire.typ.domain.is_generative() {
-                        let condition_val = self.get_generation_value(stm.condition)?;
+                        let condition_val = self.generation_state.get_generation_value(stm.condition)?;
                         let run_range = if condition_val.unwrap_bool() {
                             then_range
                         } else {
@@ -459,8 +468,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 }
                 Instruction::ForStatement(stm) => {
                     // TODO Non integer for loops?
-                    let start_val = self.get_generation_value(stm.start)?.unwrap_integer().clone();
-                    let end_val = self.get_generation_value(stm.end)?.unwrap_integer().clone();
+                    let start_val = self.generation_state.get_generation_value(stm.start)?.unwrap_integer().clone();
+                    let end_val = self.generation_state.get_generation_value(stm.end)?.unwrap_integer().clone();
                     if start_val > end_val {
                         let start_flat = &self.md.instructions[stm.start].unwrap_wire();
                         let end_flat = &self.md.instructions[stm.end].unwrap_wire();

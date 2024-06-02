@@ -34,7 +34,7 @@ pub struct ConnectFrom {
     pub original_connection : FlatID
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RealWirePathElem {
     ArrayAccess{span : BracketSpan, idx_wire : WireID},
 }
@@ -154,17 +154,10 @@ impl SubModuleOrWire {
 
 #[derive(Debug, Clone)]
 pub enum RealWireRefRoot {
-    Wire(WireID),
+    /// The preamble isn't really used yet, but it's there for when we have submodule arrays (soon)
+    Wire{wire_id : WireID, preamble : Vec<RealWirePathElem>},
     Generative(FlatID),
     Constant(TypedValue)
-}
-
-impl RealWireRefRoot {
-    #[track_caller]
-    pub fn unwrap_wire(&self) -> WireID {
-        let Self::Wire(w) = self else {unreachable!("RealWireRefRoot::unwrap_wire")};
-        *w
-    }
 }
 
 #[derive(Debug)]
@@ -229,10 +222,15 @@ impl InstantiationList {
     }
 }
 
+#[derive(Debug)]
+struct GenerationState<'fl> {
+    generation_state : FlatAlloc<SubModuleOrWire, FlatIDMarker>,
+    md : &'fl Module
+}
 
 struct InstantiationContext<'fl, 'l> {
     name : String,
-    generation_state : FlatAlloc<SubModuleOrWire, FlatIDMarker>,
+    generation_state : GenerationState<'fl>,
     wires : FlatAlloc<RealWire, WireIDMarker>,
     submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
     specified_latencies : Vec<(WireID, i64)>,
@@ -251,7 +249,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             wires : self.wires,
             submodules : self.submodules,
             interface_ports : self.interface_ports,
-            generation_state : self.generation_state,
+            generation_state : self.generation_state.generation_state,
             errors : self.errors.into_storage()
         }
     }
@@ -283,7 +281,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 fn perform_instantiation(md : &Module, linker : &Linker) -> InstantiatedModule {
     let mut context = InstantiationContext{
         name : md.link_info.name.clone(),
-        generation_state : md.instructions.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect(),
+        generation_state : GenerationState{md, generation_state: md.instructions.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect()},
         wires : FlatAlloc::new(),
         submodules : FlatAlloc::new(),
         specified_latencies : Vec::new(),

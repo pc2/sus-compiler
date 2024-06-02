@@ -526,7 +526,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     }
                     PartialWireReference::Error => {}
                     PartialWireReference::Ready(wr) => {
-                        wr.path.push(WireReferencePathElement::ArrayIdx{idx, bracket_span});
+                        wr.path.push(WireReferencePathElement::ArrayAccess{idx, bracket_span});
                     }
                 }
                 
