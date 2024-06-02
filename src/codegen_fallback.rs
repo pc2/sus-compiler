@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{flattening::{Instruction, Module}, instantiation::{RealWirePathElem, InstantiatedModule, RealWire, RealWireDataSource, WireID}, linker::{get_builtin_type, TypeUUID}, concrete_type::ConcreteType};
+use crate::{concrete_type::ConcreteType, flattening::{Instruction, Module}, instantiation::{InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem, WireID}, linker::{get_builtin_type, TypeUUID}, value::Value};
 
 fn get_type_name_size(id : TypeUUID) -> u64 {
     if id == get_builtin_type("int") {
@@ -52,13 +52,37 @@ fn wire_name_self_latency(wire : &RealWire, use_latency : bool) -> String {
     wire_name_with_latency(wire, wire.absolute_latency, use_latency)
 }
 
-impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> { 
-    fn wire_name(&self, wire_id : WireID, requested_latency : i64) -> String {
-        let wire = &self.instance.wires[wire_id];
-        wire_name_with_latency(wire, requested_latency, self.use_latency)
+impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> {
+    /// This is for making the resulting Verilog a little nicer to read
+    fn can_inline(&self, wire : &RealWire) -> bool {
+        match &wire.source {
+            RealWireDataSource::Constant { value } => {
+                match value {
+                    Value::Bool(_) | Value::Integer(_) => true,
+                    _other => false
+                }
+            }
+            _other => false,
+        }
+    }
+    
+    fn operation_to_string(&self, wire : &RealWire) -> String {
+        match &wire.source {
+            RealWireDataSource::Constant { value } => value.to_string(),
+            _other => unreachable!()
+        }
     }
 
-    fn write_path_to_string(&self, path : &[RealWirePathElem], absolute_latency : i64) -> String {
+    fn wire_name(&self, wire_id : WireID, requested_latency : i64) -> String {
+        let wire = &self.instance.wires[wire_id];
+        if self.can_inline(wire) {
+            self.operation_to_string(wire)
+        } else {
+            wire_name_with_latency(wire, requested_latency, self.use_latency)
+        }
+    }
+
+    fn wire_ref_path_to_string(&self, path : &[RealWirePathElem], absolute_latency : i64) -> String {
         let mut result = String::new();
         for path_elem in path {
             result.push_str(&match path_elem {
@@ -80,7 +104,7 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
                 let from = wire_name_with_latency(w, i, self.use_latency);
                 let to = wire_name_with_latency(w, i+1, self.use_latency);
 
-                writeln!(self.program_text, "reg{type_str} {to}; always @(posedge clk) begin {to} <= {from}; end // Latency register")?;
+                writeln!(self.program_text, "/*latency*/ reg{type_str} {to}; always @(posedge clk) begin {to} <= {from}; end")?;
             }
         }
         Ok(())
@@ -105,6 +129,9 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
 
         // Then output all declarations, and the wires we can already assign
         for (_id, w) in &self.instance.wires {
+            // For better readability of output Verilog
+            if self.can_inline(w) {continue;}
+
             if let Instruction::Declaration(wire_decl) = &self.md.instructions[w.original_instruction] {
                 // Don't print named inputs and outputs, already did that in interface
                 if wire_decl.identifier_type.is_port() {
@@ -125,15 +152,9 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
 
             match &w.source {
                 RealWireDataSource::Select { root, path } => {
-                    write!(self.program_text, " = {}", self.wire_name(*root, w.absolute_latency))?;
-                    for pe in path {
-                        match pe {
-                            RealWirePathElem::ArrayAccess { span:_, idx_wire } => {
-                                write!(self.program_text, "[{}]", self.wire_name(*idx_wire, w.absolute_latency))?;
-                            }
-                        }
-                    }
-                    writeln!(self.program_text, ";")?;
+                    let wire_name = self.wire_name(*root, w.absolute_latency);
+                    let path = self.wire_ref_path_to_string(&path, w.absolute_latency);
+                    write!(self.program_text, " = {wire_name}{path};")?;
                 }
                 RealWireDataSource::UnaryOp { op, right } => {
                     writeln!(self.program_text, " = {}{};", op.op_text(), self.wire_name(*right, w.absolute_latency))?;
@@ -188,7 +209,7 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
                     }
                     
                     for s in sources {
-                        let path = self.write_path_to_string(&s.to_path, w.absolute_latency);
+                        let path = self.wire_ref_path_to_string(&s.to_path, w.absolute_latency);
                         let from_name = self.wire_name(s.from.from, w.absolute_latency);
                         if let Some(cond) = s.from.condition {
                             let cond_name = self.wire_name(cond, w.absolute_latency);
