@@ -102,11 +102,15 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         })
     }
 
-    fn instantiate_wire_ref(&self, wire_ref : &WireReference) -> ExecutionResult<InstantiatedWireRef> {
-        // Later on, potentially allow module arrays
-        let mut path = Vec::new();
+    fn instantiate_port_wire_ref_root(&self, port : PortID, submodule_instr : FlatID) -> InstantiatedWireRef {
+        let sm = &self.submodules[self.generation_state[submodule_instr].unwrap_submodule_instance()];
+        let root = RealWireRefRoot::Wire(sm.port_map[port]);
 
-        let root = match &wire_ref.root {
+        InstantiatedWireRef{root, path : Vec::new()}
+    }
+
+    fn realize_wire_ref_root(&self, wire_ref_root : &WireReferenceRoot) -> InstantiatedWireRef {
+        let root = match wire_ref_root {
             &WireReferenceRoot::LocalDecl(decl_id, _) => {
                 match &self.generation_state[decl_id] {
                     SubModuleOrWire::Wire(w) => RealWireRefRoot::Wire(*w),
@@ -120,10 +124,16 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 RealWireRefRoot::Constant(val.clone())
             }
             WireReferenceRoot::SubModulePort(port) => {
-                let sm = &self.submodules[self.generation_state[port.submodule_flat].unwrap_submodule_instance()];
-                RealWireRefRoot::Wire(sm.port_map[port.port])
+                return self.instantiate_port_wire_ref_root(port.port, port.submodule_flat);
             }
         };
+
+        InstantiatedWireRef{root, path : Vec::new()}
+    }
+
+    fn instantiate_wire_ref(&self, wire_ref : &WireReference) -> InstantiatedWireRef {
+        // Later on, potentially allow module arrays
+        let mut result = self.realize_wire_ref_root(&wire_ref.root);
 
         for v in &wire_ref.path {
             match v {
@@ -134,10 +144,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         &SubModuleOrWire::Wire(idx_wire) => {
                             assert!(self.wires[idx_wire].typ == INT_CONCRETE_TYPE);
         
-                            path.push(RealWirePathElem::MuxArrayWrite{ span:bracket_span, idx_wire});
+                            result.path.push(RealWirePathElem::MuxArrayWrite{ span:bracket_span, idx_wire});
                         }
                         SubModuleOrWire::CompileTimeValue(cv) => {
-                            path.push(RealWirePathElem::ConstArrayWrite{
+                            result.path.push(RealWirePathElem::ConstArrayWrite{
                                 idx : cv.value.unwrap_integer().clone(),
                                 span : bracket_span
                             });
@@ -147,24 +157,29 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
         }
 
-        Ok(InstantiatedWireRef{root, path})
+        result
     }
 
-    fn process_connection(&mut self, wire_ref_inst : InstantiatedWireRef, write_modifiers : &WriteModifiers, conn_from : FlatID, original_connection : FlatID, condition : Option<WireID>) -> ExecutionResult<()> {
+    fn instantiate_write_to_wire(&mut self, write_to_wire : WireID, to_path : Vec<RealWirePathElem>, from : WireID, num_regs : i64, original_instruction : FlatID, condition : Option<WireID>) {
+        let from = ConnectFrom {
+            num_regs,
+            from,
+            condition,
+            original_connection : original_instruction
+        };
+
+        let RealWireDataSource::Multiplexer{is_state : _, sources} = &mut self.wires[write_to_wire].source else {caught_by_typecheck!("Should only be a writeable wire here")};
+
+        sources.push(MultiplexerSource{from, to_path});
+    }
+
+    fn instantiate_connection(&mut self, wire_ref_inst : InstantiatedWireRef, write_modifiers : &WriteModifiers, conn_from : FlatID, original_connection : FlatID, condition : Option<WireID>) -> ExecutionResult<()> {
         match write_modifiers {
             WriteModifiers::Connection{num_regs, regs_span : _} => {
                 match &wire_ref_inst.root {
                     RealWireRefRoot::Wire(write_to_wire) => {
-                        let from = ConnectFrom {
-                            num_regs : *num_regs,
-                            from : self.get_wire_or_constant_as_wire(conn_from),
-                            condition,
-                            original_connection
-                        };
-
-                        let RealWireDataSource::Multiplexer{is_state : _, sources} = &mut self.wires[*write_to_wire].source else {caught_by_typecheck!("Should only be a writeable wire here")};
-
-                        sources.push(MultiplexerSource{from, to_path : wire_ref_inst.path});
+                        let from = self.get_wire_or_constant_as_wire(conn_from);
+                        self.instantiate_write_to_wire(*write_to_wire, wire_ref_inst.path, from, *num_regs, original_connection, condition);
                     }
                     RealWireRefRoot::Generative(decl_id) => {
                         let found_v = self.generation_state[conn_from].unwrap_generation_value().clone();
@@ -216,7 +231,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn compute_compile_time(&self, wire_inst : &WireInstance) -> ExecutionResult<TypedValue> {
         Ok(match &wire_inst.source {
             WireSource::WireRef(wire_ref) => {
-                let wire_ref_instance = self.instantiate_wire_ref(wire_ref)?;
+                let wire_ref_instance = self.instantiate_wire_ref(wire_ref);
                 self.compute_compile_time_wireref(wire_ref_instance)?
             }
             &WireSource::UnaryOp{op, right} => {
@@ -263,7 +278,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn wire_to_real_wire(&mut self, w: &WireInstance, original_instruction : FlatID) -> ExecutionResult<WireID> {
         let source = match &w.source {
             WireSource::WireRef(wire_ref) => {
-                let inst = self.instantiate_wire_ref(wire_ref)?;
+                let inst = self.instantiate_wire_ref(wire_ref);
                 let root_wire = self.get_wire_ref_root_as_wire(inst.root, original_instruction);
 
                 if inst.path.is_empty() { // Little optimization reduces instructions
@@ -405,8 +420,19 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     }
                 }
                 Instruction::Write(conn) => {
-                    let to_inst = self.instantiate_wire_ref(&conn.to)?;
-                    self.process_connection(to_inst, &conn.write_modifiers, conn.from, original_instruction, condition)?;
+                    let to_inst = self.instantiate_wire_ref(&conn.to);
+                    self.instantiate_connection(to_inst, &conn.write_modifiers, conn.from, original_instruction, condition)?;
+                    continue;
+                }
+                Instruction::FuncCall(fc) => {
+                    let submod_id = self.generation_state[fc.submodule_instruction].unwrap_submodule_instance();
+                    for (port, arg) in std::iter::zip(fc.func_call_inputs.iter(), fc.arguments.iter()) {
+                        let from = self.get_wire_or_constant_as_wire(*arg);
+                        let submod = &self.submodules[submod_id];
+                        let port_wire = submod.port_map[port];
+                        self.instantiate_write_to_wire(port_wire, Vec::new(), from, 0, original_instruction, condition);
+                    }
+
                     continue;
                 }
                 Instruction::IfStatement(stm) => {

@@ -75,11 +75,23 @@ impl<'l, 'errs> DerefMut for TypeCheckingContext<'l, 'errs> {
 }
 
 impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
-    fn get_decl_of_module_port<'s>(&'s self, port : PortInfo) -> (&'s Declaration, FileUUID) {
-        let submodule_id = self.working_on.instructions[port.submodule_flat].unwrap_submodule().module_uuid;
+    fn get_decl_of_module_port<'s>(&'s self, port : PortID, submodule_instr : FlatID) -> (&'s Declaration, FileUUID) {
+        let submodule_id = self.working_on.instructions[submodule_instr].unwrap_submodule().module_uuid;
         let module = &self.modules[submodule_id];
-        let decl = module.get_port_decl(port.port);
+        let decl = module.get_port_decl(port);
         (decl, module.link_info.file)
+    }
+
+    fn get_type_of_port(&self, port : PortID, submodule_instr : FlatID) -> FullType {
+        let (decl, _file) = self.get_decl_of_module_port(port, submodule_instr);
+        let submodule_inst = self.working_on.instructions[submodule_instr].unwrap_submodule();
+        let submodule_module = &self.modules[submodule_inst.module_uuid];
+        let port_interface = submodule_module.ports[port].interface;
+        let port_local_domain = submodule_inst.local_interface_domains[port_interface];
+        FullType {
+            typ : decl.typ_expr.to_type(),
+            domain : DomainType::Physical(port_local_domain)
+        }
     }
 
     fn get_wire_ref_declaration_point(&self, wire_ref_root : &WireReferenceRoot) -> Option<SpanFile> {
@@ -93,8 +105,8 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 linker_cst.get_span_file()
             }
             WireReferenceRoot::SubModulePort(port) => {
-                let (decl, file) = self.get_decl_of_module_port(*port);
-                Some((decl.typ_expr.get_span(), file))
+                let (decl, file) = self.get_decl_of_module_port(port.port, port.submodule_flat);
+                Some((decl.get_span(), file))
             }
         }
     }
@@ -110,15 +122,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 linker_cst.get_full_type()
             }
             WireReferenceRoot::SubModulePort(port) => {
-                let (decl, _file) = self.get_decl_of_module_port(*port);
-                let submodule_inst = self.working_on.instructions[port.submodule_flat].unwrap_submodule();
-                let submodule_module = &self.modules[submodule_inst.module_uuid];
-                let port_interface = submodule_module.ports[port.port].interface;
-                let port_local_domain = submodule_inst.local_interface_domains[port_interface];
-                FullType {
-                    typ : decl.typ_expr.to_type(),
-                    domain : DomainType::Physical(port_local_domain)
-                }
+                self.get_type_of_port(port.port, port.submodule_flat)
             }
         };
 
@@ -152,6 +156,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
         match &self.working_on.instructions[inst_id] {
             Instruction::SubModule(_) => {}
+            Instruction::FuncCall(_) => {}
             Instruction::Declaration(decl) => {
                 if decl.identifier_type.is_generative() {
                     assert!(matches!(self.declaration_depths[inst_id], ExtraInstructionData::Unset));
@@ -174,7 +179,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         return;
                     }
                     WireReferenceRoot::SubModulePort(port) => {
-                        let r = self.get_decl_of_module_port(port);
+                        let r = self.get_decl_of_module_port(port.port, port.submodule_flat);
 
                         if !r.0.identifier_type.unwrap_is_input() {
                             self.errors.error(conn.to_span, "Cannot assign to a submodule output port")
@@ -280,6 +285,20 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 };
                 let Instruction::Wire(w) = &mut self.working_on.instructions[instr_id] else {unreachable!()};
                 w.typ = result_typ;
+            }
+            Instruction::FuncCall(fc) => {
+                for (port, arg) in std::iter::zip(fc.func_call_inputs.into_iter(), &fc.arguments) {
+                    let write_to_type = self.get_type_of_port(port, fc.submodule_instruction);
+
+                    let (decl, file) = self.get_decl_of_module_port(port, fc.submodule_instruction);
+                    let declared_here = (decl.get_span(), file);
+
+                    // Typecheck the value with target type
+                    let from_wire = self.working_on.instructions[*arg].unwrap_wire();
+
+                    from_wire.span.debug();
+                    self.type_checker.typecheck_write_to(&from_wire.typ, from_wire.span, &write_to_type, "function argument", Some(declared_here));
+                }
             }
             Instruction::Write(conn) => {
                 // Typecheck digging down into write side
@@ -405,6 +424,11 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     }
                 }
                 Instruction::SubModule(_) => {} // TODO Dependencies should be added here if for example generative templates get added
+                Instruction::FuncCall(fc) => {
+                    for a in &fc.arguments {
+                        instruction_fanins[fc.submodule_instruction].push(*a);
+                    }
+                }
                 Instruction::Declaration(decl) => {
                     decl.typ_expr.for_each_generative_input(|id| instruction_fanins[inst_id].push(id));
                 }

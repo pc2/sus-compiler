@@ -225,6 +225,11 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
                     Instruction::Write(write) => {
                         self.walk_wire_ref(md_id, md, &write.to);
                     }
+                    Instruction::FuncCall(fc) => {
+                        if let Some(submod_name_span) = fc.name_span {
+                            self.visit(submod_name_span, LocationInfo::InModule(md_id, md, fc.submodule_instruction, InModule::NamedSubmodule(md.instructions[fc.submodule_instruction].unwrap_submodule())));
+                        }
+                    }
                     Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
                 };
             }

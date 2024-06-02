@@ -808,3 +808,12 @@ module test_separated_domain : int main {
 
 
 }
+
+module no_port_module {}
+
+module use_no_input_module {
+	no_port_module()
+
+	no_port_module no_port
+	no_port()
+}

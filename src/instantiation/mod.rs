@@ -10,7 +10,7 @@ use std::{cell::RefCell, ops::Deref, rc::Rc};
 use num::BigInt;
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::BracketSpan, flattening::{BinaryOperator, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, concrete_type::ConcreteType, value::{TypedValue, Value}
+    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::BracketSpan, flattening::{BinaryOperator, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, value::{TypedValue, Value}
 };
 
 use self::latency_algorithm::SpecifiedLatency;

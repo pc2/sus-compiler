@@ -53,12 +53,6 @@ impl<IndexMarker : UUIDMarker> UUID<IndexMarker> {
 
 pub struct UUIDRange<IndexMarker>(pub UUID<IndexMarker>, pub UUID<IndexMarker>);
 
-impl<IndexMarker> UUIDRange<IndexMarker> {
-    pub fn contains(&self, id : UUID<IndexMarker>) -> bool {
-        self.0.0 >= id.0 && self.1.0 < id.0
-    }
-}
-
 impl<IndexMarker : UUIDMarker> Debug for UUIDRange<IndexMarker> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.write_str(IndexMarker::DISPLAY_NAME)?;
@@ -87,16 +81,38 @@ impl<IndexMarker> Hash for UUIDRange<IndexMarker> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UUIDRangeIter<IndexMarker : UUIDMarker>(UUID<IndexMarker>, UUID<IndexMarker>);
+impl<IndexMarker> IntoIterator for UUIDRange<IndexMarker> {
+    type Item = UUID<IndexMarker>;
 
-impl<IndexMarker : UUIDMarker> UUIDRange<IndexMarker> {
-    pub fn empty() -> Self {
-        UUIDRange(UUID(0, PhantomData), UUID(0, PhantomData))
+    type IntoIter = UUIDRangeIter<IndexMarker>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        UUIDRangeIter(self.0, self.1)
     }
 }
 
-impl<IndexMarker : UUIDMarker> Iterator for UUIDRange<IndexMarker> {
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct UUIDRangeIter<IndexMarker>(UUID<IndexMarker>, UUID<IndexMarker>);
+
+impl<IndexMarker> UUIDRange<IndexMarker> {
+    pub fn empty() -> Self {
+        UUIDRange(UUID(0, PhantomData), UUID(0, PhantomData))
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    pub fn contains(&self, id : UUID<IndexMarker>) -> bool {
+        self.0.0 >= id.0 && self.1.0 < id.0
+    }
+    pub fn iter(&self) -> UUIDRangeIter<IndexMarker> {
+        self.into_iter()
+    }
+    pub fn len(&self) -> usize {
+        self.1.0 - self.0.0
+    }
+}
+
+impl<IndexMarker> Iterator for UUIDRangeIter<IndexMarker> {
     type Item = UUID<IndexMarker>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -108,9 +124,19 @@ impl<IndexMarker : UUIDMarker> Iterator for UUIDRange<IndexMarker> {
             Some(result)
         }
     }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let sz = self.len();
+        (sz, Some(sz))
+    }
 }
 
-impl<IndexMarker : UUIDMarker> UUIDRange<IndexMarker> {
+impl<IndexMarker> ExactSizeIterator for UUIDRangeIter<IndexMarker> {
+    fn len(&self) -> usize {
+        self.1.0 - self.0.0
+    }
+}
+
+impl<IndexMarker> UUIDRangeIter<IndexMarker> {
     pub fn skip_to(&mut self, to : UUID<IndexMarker>) {
         assert!(to.0 >= self.0.0);
         assert!(to.0 <= self.1.0);

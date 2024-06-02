@@ -136,6 +136,7 @@ impl Module {
     pub fn get_instruction_span(&self, instr_id : FlatID) -> Span {
         match &self.instructions[instr_id] {
             Instruction::SubModule(sm) => sm.module_name_span,
+            Instruction::FuncCall(fc) => fc.whole_func_span,
             Instruction::Declaration(decl) => decl.get_span(),
             Instruction::Wire(w) => w.span,
             Instruction::Write(conn) => conn.to_span,
@@ -393,6 +394,9 @@ impl WireSource {
             WireSource::Constant(_) => {}
         }
     }
+    pub const fn new_error() -> WireSource {
+        WireSource::Constant(Value::Error)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -469,9 +473,9 @@ impl Declaration {
 #[derive(Debug)]
 pub struct SubModuleInstance {
     pub module_uuid : ModuleUUID,
+    pub module_name_span : Span,
     /// Name is not always present in source code. Such as in inline function call syntax: my_mod(a, b, c)
     pub name : Option<(String, Span)>,
-    pub module_name_span : Span,
     pub local_interface_domains : FlatAlloc<DomainID, DomainIDMarker>,
     pub documentation : Documentation
 }
@@ -485,6 +489,28 @@ impl SubModuleInstance {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct FuncCallInstruction {
+    pub submodule_instruction : FlatID,
+    pub module_uuid : ModuleUUID,
+    /// arguments.len() == func_call_inputs.len() ALWAYS
+    pub arguments : Vec<FlatID>,
+    /// arguments.len() == func_call_inputs.len() ALWAYS
+    pub func_call_inputs : PortIDRange,
+    pub func_call_outputs : PortIDRange,
+    /// If this is None, that means the submodule was declared implicitly. Hence it could also be used at compiletime
+    pub name_span : Option<Span>,
+    pub arguments_span : BracketSpan,
+    pub whole_func_span : Span,
+}
+
+impl FuncCallInstruction {
+    pub fn could_be_at_compile_time(&self) -> bool {
+        todo!("self.name_span.is_none() but also other requirements, like if the module is a function")
+    }
+}
+
 
 #[derive(Debug)]
 pub struct IfStatement {
@@ -506,6 +532,7 @@ pub struct ForStatement {
 #[derive(Debug)]
 pub enum Instruction {
     SubModule(SubModuleInstance),
+    FuncCall(FuncCallInstruction),
     Declaration(Declaration),
     Wire(WireInstance),
     Write(Write),
@@ -530,9 +557,9 @@ impl Instruction {
         sm
     }
     #[track_caller]
-    pub fn unwrap_write(&self) -> &Write {
-        let Self::Write(sm) = self else {panic!("unwrap_write on not a Write! Found {self:?}")};
-        sm
+    pub fn unwrap_func_call(&self) -> &FuncCallInstruction {
+        let Self::FuncCall(fc) = self else {panic!("unwrap_func_call on not a FuncCallInstruction! Found {self:?}")};
+        fc
     }
 }
 

@@ -1,11 +1,11 @@
 
 
-use std::{iter::zip, ops::{Deref, DerefMut}, str::FromStr};
+use std::{ops::{Deref, DerefMut}, str::FromStr};
 
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 use crate::{
-    arena_alloc::{UUIDRange, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, ResolvedName, Resolver, TypeUUIDMarker, WorkingOnResolver}, parser::Cursor, value::Value
+    arena_alloc::{UUIDRange, UUIDRangeIter, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, ResolvedName, Resolver, TypeUUIDMarker, WorkingOnResolver}, parser::Cursor, value::Value
 };
 
 use super::name_context::LocalVariableContext;
@@ -133,7 +133,7 @@ struct FlatteningContext<'l, 'errs> {
     name_resolver : NameResolver<'l, 'errs>,
     errors : &'errs ErrorCollector<'l>,
 
-    ports_to_visit : UUIDRange<PortIDMarker>,
+    ports_to_visit : UUIDRangeIter<PortIDMarker>,
 
     local_variable_context : LocalVariableContext<'l, FlatID>
 }
@@ -298,72 +298,67 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         )
     }
 
-    fn desugar_func_call(&mut self, cursor : &mut Cursor) -> Option<(ModuleUUID, Option<Span>, FlatID, PortIDRange)> {
+    fn alloc_error(&mut self, span : Span) -> FlatID {
+        self.working_on.instructions.alloc(Instruction::Wire(WireInstance{typ : FullType::new_unset(), span, source : WireSource::new_error()}))
+    }
+
+    fn flatten_func_call(&mut self, cursor : &mut Cursor) -> Option<FlatID> {
+        let whole_func_span = cursor.span();
         cursor.go_down(kind!("func_call"), |cursor| {
             cursor.field(field!("name"));
-            let instantiation_flat_id = self.get_or_alloc_module_by_global_identifier(cursor);
+            let function_root = self.get_or_alloc_module_by_global_identifier(cursor);
 
             cursor.field(field!("arguments"));
             let arguments_span = BracketSpan::from_outer(cursor.span());
-            let arguments = cursor.collect_list(kind!("parenthesis_expression_list"), |cursor| {
+            let mut arguments = cursor.collect_list(kind!("parenthesis_expression_list"), |cursor| {
                 self.flatten_expr(cursor)
             });
 
-            let (instantiation_flat_id, submodule_name_span) = instantiation_flat_id?;
-            let func_instantiation = self.working_on.instructions[instantiation_flat_id].unwrap_submodule();
+            let (submodule_instruction, name_span) = function_root?;
+            let func_module = self.working_on.instructions[submodule_instruction].unwrap_submodule();
 
-            
-            let module_uuid = func_instantiation.module_uuid;
+            let module_uuid = func_module.module_uuid;
             let md = &self.modules[module_uuid];
 
-            let inputs = md.interfaces[Module::MAIN_INTERFACE_ID].func_call_inputs;
-            let outputs = md.interfaces[Module::MAIN_INTERFACE_ID].func_call_outputs;
-
-            let arg_count = arguments.len();
-            let expected_arg_count = inputs.len();
-
-            let mut args = arguments.as_slice();
+            let interface = &md.interfaces[Module::MAIN_INTERFACE_ID];
+            let func_call_inputs = interface.func_call_inputs;
+            let func_call_outputs = interface.func_call_outputs;
             
+            let arg_count = arguments.len();
+            let expected_arg_count = func_call_inputs.len();
+
             if arg_count != expected_arg_count {
                 if arg_count > expected_arg_count {
                     // Too many args, complain about excess args at the end
-                    let excess_args_span = Span::new_overarching(self.working_on.instructions[args[expected_arg_count]].unwrap_wire().span, self.working_on.instructions[*args.last().unwrap()].unwrap_wire().span);
+                    let excess_args_span = Span::new_overarching(self.working_on.instructions[arguments[expected_arg_count]].unwrap_wire().span, self.working_on.instructions[*arguments.last().unwrap()].unwrap_wire().span);
                     
                     self.errors
                         .error(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."))
                         .info_obj(&md.link_info);
                     // Shorten args to still get proper type checking for smaller arg array
-                    args = &args[..expected_arg_count];
+                    arguments.truncate(expected_arg_count);
                 } else {
                     // Too few args, mention missing argument names
                     self.errors
                         .error(arguments_span.close_bracket(), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."))
                         .info_obj(&md.link_info);
+
+                    while arguments.len() < expected_arg_count {
+                        arguments.push(self.alloc_error(arguments_span.close_bracket()));
+                    }
                 }
             }
 
-            for (port_id, arg_read_side) in zip(inputs, args) {
-                let arg_wire = self.working_on.instructions[*arg_read_side].unwrap_wire();
-                let arg_wire_span = arg_wire.span;
-                let root = WireReferenceRoot::SubModulePort(PortInfo{
-                    submodule_name_span,
-                    submodule_flat : instantiation_flat_id,
-                    port : port_id,
-                    port_name_span : None, // Not present in function call notation
-                    port_identifier_typ : IdentifierType::Input
-                });
-                self.working_on.instructions.alloc(Instruction::Write(Write{
-                    from: *arg_read_side,
-                    to: WireReference{
-                        root,
-                        path : Vec::new(),
-                    },
-                    to_span : arg_wire_span,
-                    write_modifiers : WriteModifiers::Connection{num_regs : 0, regs_span : arg_wire_span.empty_span_at_front()}
-                }));
-            }
-
-            Some((module_uuid, submodule_name_span, instantiation_flat_id, outputs))
+            Some(self.working_on.instructions.alloc(Instruction::FuncCall(FuncCallInstruction{
+                submodule_instruction,
+                module_uuid,
+                arguments,
+                func_call_inputs,
+                func_call_outputs,
+                name_span,
+                arguments_span,
+                whole_func_span
+            })))
         })
     }
 
@@ -445,29 +440,30 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 WireSource::BinaryOp{op, left, right}
             })
         } else if kind == kind!("func_call") {
-            if let Some((md_id, submodule_name_span, submodule, outputs)) = self.desugar_func_call(cursor) {
-                if outputs.len() != 1 {
-                    let md = &self.modules[md_id];
+            if let Some(fc_id) = self.flatten_func_call(cursor) {
+                let fc = self.working_on.instructions[fc_id].unwrap_func_call();
+                if fc.func_call_outputs.len() != 1 {
+                    let md = &self.modules[fc.module_uuid];
                     self.errors
                         .error(expr_span, "A function called in this context may only return one result. Split this function call into a separate line instead.")
                         .info_obj(&md.link_info);
                 }
 
-                if outputs.len() >= 1 {
+                if fc.func_call_outputs.len() >= 1 {
                     WireSource::WireRef(WireReference::simple_port(PortInfo{
-                        submodule_name_span,
-                        submodule_flat: submodule,
-                        port: outputs.0,
+                        submodule_name_span : fc.name_span,
+                        submodule_flat: fc.submodule_instruction,
+                        port: fc.func_call_outputs.0,
                         port_name_span: None,
                         port_identifier_typ: IdentifierType::Output,
                     }))
                 } else {
                     // Function desugaring or using threw an error
-                    WireSource::Constant(Value::Error)
+                    WireSource::new_error()
                 }
             } else {
                 // Function desugaring or using threw an error
-                WireSource::Constant(Value::Error)
+                WireSource::new_error()
             }
         } else if kind == kind!("parenthesis_expression") {
             return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| self.flatten_expr(cursor));
@@ -475,7 +471,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             if let Some(wr) = self.flatten_wire_reference(cursor).expect_ready(self) {
                 WireSource::WireRef(wr)
             } else {
-                WireSource::Constant(Value::Error)
+                WireSource::new_error()
             }
         };
 
@@ -498,7 +494,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                             let root = WireReferenceRoot::LocalDecl(decl_id, expr_span);
                             PartialWireReference::Ready(WireReference{root, path : Vec::new()})
                         }
-                        Instruction::Wire(_) | Instruction::Write(_) | Instruction::IfStatement(_) | Instruction::ForStatement(_) => unreachable!()
+                        Instruction::Wire(_) | Instruction::Write(_) | Instruction::IfStatement(_) | Instruction::ForStatement(_) | Instruction::FuncCall(_) => unreachable!()
                     }
                 }
                 LocalOrGlobal::Global(global) => {
@@ -599,12 +595,17 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
     fn flatten_assign_function_call(&mut self, to : Vec<(Option<(WireReference, WriteModifiers)>, Span)>, cursor : &mut Cursor) {
         let func_call_span = cursor.span();
-        let to_iter = if let Some((md_id, submodule_name_span, submodule, outputs)) = self.desugar_func_call(cursor) {
+        let to_iter = if let Some(fc_id) = self.flatten_func_call(cursor) {
+            let fc = self.working_on.instructions[fc_id].unwrap_func_call();
+
+            let outputs = fc.func_call_outputs;
+            let submodule_name_span = fc.name_span;
+            let submodule_flat = fc.submodule_instruction;
 
             let num_func_outputs = outputs.len();
             let num_targets = to.len();
             if num_targets != num_func_outputs {
-                let md = &self.modules[md_id];
+                let md = &self.modules[fc.module_uuid];
                 if num_targets > num_func_outputs {
                     let excess_results_span = Span::new_overarching(to[num_func_outputs].1, to.last().unwrap().1);
                     self.errors
@@ -624,11 +625,11 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         typ: FullType::new_unset(),
                         span: func_call_span,
                         source: WireSource::WireRef(WireReference::simple_port(PortInfo{
-                            submodule_name_span,
-                            submodule_flat: submodule,
                             port,
                             port_name_span: None,
                             port_identifier_typ: IdentifierType::Output,
+                            submodule_name_span,
+                            submodule_flat,
                         }))
                     }));
                     self.working_on.instructions.alloc(Instruction::Write(Write{from, to, to_span, write_modifiers}));
@@ -640,7 +641,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         };
         for leftover_to in to_iter {
             if let (Some((to, write_modifiers)), to_span) = leftover_to {
-                let err_id = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{typ : FullType::new_unset(), span : func_call_span, source : WireSource::Constant(Value::Error)}));
+                let err_id = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{typ : FullType::new_unset(), span : func_call_span, source : WireSource::new_error()}));
                 self.working_on.instructions.alloc(Instruction::Write(Write{from: err_id, to, to_span, write_modifiers}));
             }
         }
@@ -869,7 +870,7 @@ pub fn flatten<'cursor_linker, 'errs>(linker : *mut Linker, module_uuid : Module
         println!("Flattening {}", modules.working_on.link_info.name);
 
         let mut context = FlatteningContext {
-            ports_to_visit : modules.working_on.ports.id_range(),
+            ports_to_visit : modules.working_on.ports.id_range().into_iter(),
             errors : name_resolver.errors,
             modules, 
             types, 

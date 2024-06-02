@@ -77,9 +77,9 @@ fn make_path_info_string(writes : &[PathMuxSource<'_>], from_latency : i64, from
 fn filter_unique_write_flats<'w>(writes : &'w [PathMuxSource<'w>], instructions : &'w FlatAlloc<Instruction, FlatIDMarker>) -> Vec<&'w crate::flattening::Write> {
     let mut result : Vec<&'w crate::flattening::Write> = Vec::new();
     for w in writes {
-        let original_write = instructions[w.mux_input.from.original_connection].unwrap_write();
-        
-        if !result.iter().any(|found_write| std::ptr::eq(*found_write, original_write)) {result.push(original_write)}
+        if let Instruction::Write(original_write) = &instructions[w.mux_input.from.original_connection] {
+            if !result.iter().any(|found_write| std::ptr::eq(*found_write, original_write)) {result.push(original_write)}
+        }
     }
     result
 }
