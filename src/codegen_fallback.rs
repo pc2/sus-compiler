@@ -62,12 +62,9 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
         let mut result = String::new();
         for path_elem in path {
             result.push_str(&match path_elem {
-                RealWirePathElem::MuxArrayWrite{span:_, idx_wire} => {
+                RealWirePathElem::ArrayAccess{span:_, idx_wire} => {
                     let idx_wire_name = self.wire_name(*idx_wire, absolute_latency);
                     format!("[{idx_wire_name}]")
-                }
-                RealWirePathElem::ConstArrayWrite{span:_, idx} => {
-                    format!("[{}]", idx)
                 }
             });
         }
@@ -131,11 +128,8 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
                     write!(self.program_text, " = {}", self.wire_name(*root, w.absolute_latency))?;
                     for pe in path {
                         match pe {
-                            RealWirePathElem::MuxArrayWrite { span:_, idx_wire } => {
+                            RealWirePathElem::ArrayAccess { span:_, idx_wire } => {
                                 write!(self.program_text, "[{}]", self.wire_name(*idx_wire, w.absolute_latency))?;
-                            }
-                            RealWirePathElem::ConstArrayWrite { span:_, idx } => {
-                                write!(self.program_text, "[{}]", idx)?;
                             }
                         }
                     }

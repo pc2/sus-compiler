@@ -6,7 +6,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn walk_type_along_path(&self, mut cur_typ : ConcreteType, path : &[RealWirePathElem]) -> ConcreteType {
         for p in path {
             match p {
-                RealWirePathElem::MuxArrayWrite { span:_, idx_wire:_ } | RealWirePathElem::ConstArrayWrite { span:_, idx:_ } => {
+                RealWirePathElem::ArrayAccess { span:_, idx_wire:_ } => {
                     cur_typ = cur_typ.down_array().clone();
                 }
             }

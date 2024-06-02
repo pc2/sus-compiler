@@ -36,18 +36,16 @@ pub struct ConnectFrom {
 
 #[derive(Debug)]
 pub enum RealWirePathElem {
-    MuxArrayWrite{span : BracketSpan, idx_wire : WireID},
-    ConstArrayWrite{span : BracketSpan, idx : BigInt}
+    ArrayAccess{span : BracketSpan, idx_wire : WireID},
 }
 
 impl RealWirePathElem {
     fn for_each_wire_in_path<F : FnMut(WireID)>(path : &[RealWirePathElem], mut f : F) {
         for v in path {
             match v {
-                RealWirePathElem::MuxArrayWrite { span:_, idx_wire } => {
+                RealWirePathElem::ArrayAccess { span:_, idx_wire } => {
                     f(*idx_wire);
                 }
-                RealWirePathElem::ConstArrayWrite { span:_, idx:_ } => {}
             }
         }
     }
@@ -69,6 +67,19 @@ pub enum RealWireDataSource {
     BinaryOp{op : BinaryOperator, left : WireID, right : WireID},
     Select{root : WireID, path : Vec<RealWirePathElem>},
     Constant{value : Value}
+}
+
+impl RealWireDataSource {
+    #[track_caller]
+    pub fn unwrap_constant(&self) -> &Value {
+        let Self::Constant { value } = self else {unreachable!()};
+        value
+    }
+    #[track_caller]
+    pub fn unwrap_constant_integer(&self) -> &BigInt {
+        let Self::Constant { value : Value::Integer(v)} = self else {unreachable!()};
+        v
+    }
 }
 
 #[derive(Debug)]

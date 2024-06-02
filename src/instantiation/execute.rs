@@ -21,19 +21,17 @@ macro_rules! caught_by_typecheck {
 
 pub type ExecutionResult<T> = Result<T, (Span, String)>;
 
-fn write_gen_variable<'t, 'p>(mut target : &'t mut Value, conn_path : &'p [RealWirePathElem], to_write : Value) -> ExecutionResult<()> {
+fn write_gen_variable<'t, 'p>(mut target : &'t mut Value, conn_path : &'p [RealWirePathElem], to_write : Value, wires : &FlatAlloc<RealWire, WireIDMarker>) -> ExecutionResult<()> {
     for elem in conn_path {
         match elem {
-            RealWirePathElem::ConstArrayWrite{span, idx} => {
+            RealWirePathElem::ArrayAccess{span, idx_wire} => {
+                let idx = wires[*idx_wire].source.unwrap_constant_integer(); // Caught by typecheck
                 let Value::Array(a_box) = target else {caught_by_typecheck!("Non-array")};
                 let array_len = a_box.len();
                 let Some(tt) = usize::try_from(idx).ok().and_then(|pos| a_box.get_mut(pos)) else {
                     return Err((span.inner_span(), format!("Index {idx} is out of bounds for this array of size {}", array_len)))
                 };
                 target = tt
-            }
-            RealWirePathElem::MuxArrayWrite {span:_,  idx_wire:_ } => {
-                caught_by_typecheck!("Non-generative array access");
             }
         }
     }
@@ -56,7 +54,6 @@ struct InstantiatedWireRef {
     root : RealWireRefRoot,
     path : Vec<RealWirePathElem>
 }
-
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn span_of(&self, v : FlatID) -> Span {
         self.md.instructions[v].unwrap_wire().span
@@ -131,28 +128,16 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         InstantiatedWireRef{root, path : Vec::new()}
     }
 
-    fn instantiate_wire_ref(&self, wire_ref : &WireReference) -> InstantiatedWireRef {
+    fn instantiate_wire_ref(&mut self, wire_ref : &WireReference) -> InstantiatedWireRef {
         // Later on, potentially allow module arrays
         let mut result = self.realize_wire_ref_root(&wire_ref.root);
 
         for v in &wire_ref.path {
             match v {
                 &WireReferencePathElement::ArrayIdx{idx, bracket_span} => {
-                    match &self.generation_state[idx] {
-                        SubModuleOrWire::SubModule(_) => unreachable!(),
-                        SubModuleOrWire::Unnasigned => unreachable!(),
-                        &SubModuleOrWire::Wire(idx_wire) => {
-                            assert!(self.wires[idx_wire].typ == INT_CONCRETE_TYPE);
-        
-                            result.path.push(RealWirePathElem::MuxArrayWrite{ span:bracket_span, idx_wire});
-                        }
-                        SubModuleOrWire::CompileTimeValue(cv) => {
-                            result.path.push(RealWirePathElem::ConstArrayWrite{
-                                idx : cv.value.unwrap_integer().clone(),
-                                span : bracket_span
-                            });
-                        }
-                    }
+                    let idx_wire = self.get_wire_or_constant_as_wire(idx);
+                    assert_eq!(self.wires[idx_wire].typ, INT_CONCRETE_TYPE, "Caught by typecheck");
+                    result.path.push(RealWirePathElem::ArrayAccess{ span:bracket_span, idx_wire});
                 }
             }
         }
@@ -185,7 +170,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         let found_v = self.generation_state[conn_from].unwrap_generation_value().clone();
 
                         let SubModuleOrWire::CompileTimeValue(v_writable) = &mut self.generation_state[*decl_id] else {caught_by_typecheck!()};
-                        write_gen_variable(&mut v_writable.value, &wire_ref_inst.path, found_v.value)?;
+                        write_gen_variable(&mut v_writable.value, &wire_ref_inst.path, found_v.value, &self.wires)?;
                     }
                     RealWireRefRoot::Constant(_) => {
                         caught_by_typecheck!("Cannot assign to constants!")
@@ -195,8 +180,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             WriteModifiers::Initial{initial_kw_span : _} => {
                 let found_v = self.get_generation_value(conn_from)?.clone();
 
-                let RealWireDataSource::Multiplexer{is_state : Some(initial_value), sources : _} = &mut self.wires[wire_ref_inst.root.unwrap_wire()].source else {caught_by_typecheck!()};
-                write_gen_variable(initial_value, &wire_ref_inst.path, found_v.value)?;
+                let root_wire = wire_ref_inst.root.unwrap_wire();
+                let RealWireDataSource::Multiplexer{is_state : Some(initial_value), sources : _} = &mut self.wires[root_wire].source else {caught_by_typecheck!()};
+                let mut new_init_val = std::mem::replace(initial_value, Value::Error);
+                write_gen_variable(&mut new_init_val, &wire_ref_inst.path, found_v.value, &self.wires)?;
+                let RealWireDataSource::Multiplexer{is_state : Some(initial_value), sources : _} = &mut self.wires[root_wire].source else {caught_by_typecheck!()};
+                *initial_value = new_init_val;
             }
         }
         Ok(())
@@ -216,19 +205,17 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         for path_elem in &wire_ref_inst.path {
             work_on_value = match path_elem {
-                RealWirePathElem::ConstArrayWrite { span, idx } => {
+                RealWirePathElem::ArrayAccess { span, idx_wire } => {
+                    let idx = self.wires[*idx_wire].source.unwrap_constant_integer();
+
                     array_access(&work_on_value, &idx, *span)?
-                }
-                RealWirePathElem::MuxArrayWrite { span, idx_wire:_ } => {
-                    span.outer_span().debug();
-                    caught_by_typecheck!("Write to a non-generative wire at compiletime.")
                 }
             }
         }
 
         Ok(work_on_value)
     }
-    fn compute_compile_time(&self, wire_inst : &WireInstance) -> ExecutionResult<TypedValue> {
+    fn compute_compile_time(&mut self, wire_inst : &WireInstance) -> ExecutionResult<TypedValue> {
         Ok(match &wire_inst.source {
             WireSource::WireRef(wire_ref) => {
                 let wire_ref_instance = self.instantiate_wire_ref(wire_ref);
