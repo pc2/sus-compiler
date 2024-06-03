@@ -7,10 +7,8 @@ mod latency_count;
 
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
-use num::BigInt;
-
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::BracketSpan, flattening::{BinaryOperator, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, value::{TypedValue, Value}
+    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::BracketSpan, flattening::{BinaryOperator, DomainID, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, value::{TypedValue, Value}
 };
 
 use self::latency_algorithm::SpecifiedLatency;
@@ -69,25 +67,13 @@ pub enum RealWireDataSource {
     Constant{value : Value}
 }
 
-impl RealWireDataSource {
-    #[track_caller]
-    pub fn unwrap_constant(&self) -> &Value {
-        let Self::Constant { value } = self else {unreachable!()};
-        value
-    }
-    #[track_caller]
-    pub fn unwrap_constant_integer(&self) -> &BigInt {
-        let Self::Constant { value : Value::Integer(v)} = self else {unreachable!()};
-        v
-    }
-}
-
 #[derive(Debug)]
 pub struct RealWire {
     pub source : RealWireDataSource,
     pub original_instruction : FlatID,
     pub typ : ConcreteType,
     pub name : String,
+    pub domain : DomainID,
     /// Before latency counting, non i64::MIN values specify specified latency
     pub absolute_latency : i64,
     /// Is used to add implicit registers to wires that are used longer than one cycle. 

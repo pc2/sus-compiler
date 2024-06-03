@@ -5,12 +5,13 @@ use crate::{abstract_type::DomainType, dev_aid::lsp::to_position, file_position:
 
 use super::tree_walk::{self, InModule, LocationInfo};
 
-const NUM_INTERFACE_DISTINGUISHERS : u32 = 4;
-const TOKEN_TYPES : [SemanticTokenType; 7] = [
+const NUM_INTERFACE_DISTINGUISHERS : u32 = 5;
+const TOKEN_TYPES : [SemanticTokenType; 8] = [
     SemanticTokenType::VARIABLE, // These are all for distinguishing interfaces
     SemanticTokenType::STRING,
     SemanticTokenType::NUMBER,
     SemanticTokenType::REGEXP,
+    SemanticTokenType::COMMENT,
 
     SemanticTokenType::ENUM_MEMBER,
     SemanticTokenType::FUNCTION,

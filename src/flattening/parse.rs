@@ -352,6 +352,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             Some(self.working_on.instructions.alloc(Instruction::FuncCall(FuncCallInstruction{
                 submodule_instruction,
                 module_uuid,
+                submodule_interface : Module::MAIN_INTERFACE_ID, // TODO also support other interfaces
                 arguments,
                 func_call_inputs,
                 func_call_outputs,

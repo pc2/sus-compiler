@@ -3,7 +3,7 @@
 use std::{cmp::max, iter::zip};
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUID},
+    arena_alloc::FlatAlloc,
     flattening::{FlatIDMarker, Instruction, WriteModifiers},
     instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}
 };
@@ -240,7 +240,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             let wire = &self.wires[id];
             let mut needed_until = wire.absolute_latency;
             for target_fanout in &fanouts[id.get_hidden_value()] {
-                let target_wire = &self.wires[UUID::from_hidden_value(target_fanout.other)];
+                let target_wire = &self.wires[WireID::from_hidden_value(target_fanout.other)];
 
                 needed_until = max(needed_until, target_wire.absolute_latency);
             }

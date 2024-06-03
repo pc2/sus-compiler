@@ -499,6 +499,7 @@ impl SubModuleInstance {
 pub struct FuncCallInstruction {
     pub submodule_instruction : FlatID,
     pub module_uuid : ModuleUUID,
+    pub submodule_interface : DomainID,
     /// arguments.len() == func_call_inputs.len() ALWAYS
     pub arguments : Vec<FlatID>,
     /// arguments.len() == func_call_inputs.len() ALWAYS
