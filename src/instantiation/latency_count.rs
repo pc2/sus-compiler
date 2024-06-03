@@ -94,11 +94,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let this_output_port = inst.interface_ports[*port_id].as_ref().unwrap();
                 assert!(!this_output_port.is_input);
 
-                for (input_port_id, input_port) in inst.interface_ports.iter_valids() {
+                for (input_port_id, attached_wire) in sub_mod.port_map.iter_valids() {
+                    let input_port = inst.interface_ports[input_port_id].as_ref().unwrap(); // Non-present port should have been caught once the submodule was instantiated
                     if !input_port.is_input {continue} // Skip other outputs
                     // TODO multiple interfaces
 
-                    f(sub_mod.port_map[input_port_id], this_output_port.absolute_latency - input_port.absolute_latency);
+                    f(attached_wire.maps_to_wire, this_output_port.absolute_latency - input_port.absolute_latency);
                 } 
             }
             RealWireDataSource::Multiplexer { is_state: _, sources } => {
@@ -172,66 +173,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         self.errors.error(source_location, format!("Latency Counting couldn't reach this node"));
                     }
                 }
-                Some(())
             }
             Err(err) => {
-                match err {
-                    LatencyCountingError::NetPositiveLatencyCycle { conflict_path, net_roundtrip_latency } => {
-                        let writes_involved = gather_all_mux_inputs(&self.wires, &conflict_path);
-                        assert!(!writes_involved.is_empty());
-                        let (first_write, later_writes) = writes_involved.split_first().unwrap();
-                        let first_write_desired_latency = first_write.to_latency + net_roundtrip_latency;
-                        let mut path_message = make_path_info_string(later_writes, first_write.to_latency, &first_write.to_wire.name);
-                        write_path_elem_to_string(&mut path_message, &first_write.to_wire.name, first_write_desired_latency, writes_involved.last().unwrap().to_latency);
-                        let unique_write_instructions = filter_unique_write_flats(&writes_involved, &self.md.instructions);
-                        let rest_of_message = format!(" part of a net-positive latency cycle of +{net_roundtrip_latency}\n\n{path_message}\nWhich conflicts with the starting latency");
-                        
-                        let mut did_place_error = false;
-                        for wr in &unique_write_instructions {
-                            match wr.write_modifiers {
-                                WriteModifiers::Connection { num_regs, regs_span } => {
-                                    if num_regs >= 1 {
-                                        did_place_error = true;
-                                        let this_register_plural = if num_regs == 1 {"This register is"} else {"These registers are"};
-                                        self.errors.error(regs_span, format!("{this_register_plural}{rest_of_message}"));
-                                    }
-                                }
-                                WriteModifiers::Initial{initial_kw_span : _} => {unreachable!("Initial assignment can only be from compile-time constant. Cannot be part of latency loop. ")}
-                            }
-                        }
-                        // Fallback if no register annotations used
-                        if !did_place_error {
-                            for wr in unique_write_instructions {
-                                self.errors.error(wr.to_span, format!("This write is{rest_of_message}"));
-                            }
-                        }
-                    }
-                    LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
-                        for port in bad_ports {
-                            let port_decl = self.md.instructions[self.wires[WireID::from_hidden_value(port.0)].original_instruction].unwrap_wire_declaration();
-                            self.errors.error(port_decl.name_span, format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
-                        }
-                    }
-                    LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path } => {
-                        let start_wire = &self.wires[WireID::from_hidden_value(conflict_path.first().unwrap().wire)];
-                        let end_wire = &self.wires[WireID::from_hidden_value(conflict_path.last().unwrap().wire)];
-                        let start_decl = self.md.instructions[start_wire.original_instruction].unwrap_wire_declaration();
-                        let end_decl = self.md.instructions[end_wire.original_instruction].unwrap_wire_declaration();
-                        let end_latency_decl = self.md.instructions[end_decl.latency_specifier.unwrap()].unwrap_wire();
-                        
-
-                        let writes_involved = gather_all_mux_inputs(&self.wires, &conflict_path);
-                        let path_message = make_path_info_string(&writes_involved, start_wire.absolute_latency, &start_wire.name);
-                        //assert!(!writes_involved.is_empty());
-
-                        let end_name = &end_wire.name;
-                        let specified_end_latency = end_wire.absolute_latency;
-                        self.errors
-                            .error(end_latency_decl.span, format!("Conflicting specified latency\n\n{path_message}\nBut this was specified as {end_name}'{specified_end_latency}"))
-                            .info_obj_same_file(start_decl);
-                    }
-                }
-                None
+                self.report_error(err);
             }
         };
 
@@ -250,6 +194,65 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         // Finally update interface absolute latencies
         for (_id, port) in self.interface_ports.iter_valids_mut() {
             port.absolute_latency = self.wires[port.wire].absolute_latency;
+        }
+    }
+
+    fn report_error(&self, err: LatencyCountingError) {
+        match err {
+            LatencyCountingError::NetPositiveLatencyCycle { conflict_path, net_roundtrip_latency } => {
+                let writes_involved = gather_all_mux_inputs(&self.wires, &conflict_path);
+                assert!(!writes_involved.is_empty());
+                let (first_write, later_writes) = writes_involved.split_first().unwrap();
+                let first_write_desired_latency = first_write.to_latency + net_roundtrip_latency;
+                let mut path_message = make_path_info_string(later_writes, first_write.to_latency, &first_write.to_wire.name);
+                write_path_elem_to_string(&mut path_message, &first_write.to_wire.name, first_write_desired_latency, writes_involved.last().unwrap().to_latency);
+                let unique_write_instructions = filter_unique_write_flats(&writes_involved, &self.md.instructions);
+                let rest_of_message = format!(" part of a net-positive latency cycle of +{net_roundtrip_latency}\n\n{path_message}\nWhich conflicts with the starting latency");
+        
+                let mut did_place_error = false;
+                for wr in &unique_write_instructions {
+                    match wr.write_modifiers {
+                        WriteModifiers::Connection { num_regs, regs_span } => {
+                            if num_regs >= 1 {
+                                did_place_error = true;
+                                let this_register_plural = if num_regs == 1 {"This register is"} else {"These registers are"};
+                                self.errors.error(regs_span, format!("{this_register_plural}{rest_of_message}"));
+                            }
+                        }
+                        WriteModifiers::Initial{initial_kw_span : _} => {unreachable!("Initial assignment can only be from compile-time constant. Cannot be part of latency loop. ")}
+                    }
+                }
+                // Fallback if no register annotations used
+                if !did_place_error {
+                    for wr in unique_write_instructions {
+                        self.errors.error(wr.to_span, format!("This write is{rest_of_message}"));
+                    }
+                }
+            }
+            LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
+                for port in bad_ports {
+                    let port_decl = self.md.instructions[self.wires[WireID::from_hidden_value(port.0)].original_instruction].unwrap_wire_declaration();
+                    self.errors.error(port_decl.name_span, format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
+                }
+            }
+            LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path } => {
+                let start_wire = &self.wires[WireID::from_hidden_value(conflict_path.first().unwrap().wire)];
+                let end_wire = &self.wires[WireID::from_hidden_value(conflict_path.last().unwrap().wire)];
+                let start_decl = self.md.instructions[start_wire.original_instruction].unwrap_wire_declaration();
+                let end_decl = self.md.instructions[end_wire.original_instruction].unwrap_wire_declaration();
+                let end_latency_decl = self.md.instructions[end_decl.latency_specifier.unwrap()].unwrap_wire();
+        
+    
+                let writes_involved = gather_all_mux_inputs(&self.wires, &conflict_path);
+                let path_message = make_path_info_string(&writes_involved, start_wire.absolute_latency, &start_wire.name);
+                //assert!(!writes_involved.is_empty());
+    
+                let end_name = &end_wire.name;
+                let specified_end_latency = end_wire.absolute_latency;
+                self.errors
+                    .error(end_latency_decl.span, format!("Conflicting specified latency\n\n{path_message}\nBut this was specified as {end_name}'{specified_end_latency}"))
+                    .info_obj_same_file(start_decl);
+            }
         }
     }
 }

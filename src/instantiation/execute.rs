@@ -9,7 +9,7 @@ use std::ops::{Deref, Index, IndexMut};
 use num::BigInt;
 
 use crate::{
-    abstract_type::DomainType, arena_alloc::UUIDRange, concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, file_position::Span, flattening::{BinaryOperator, Declaration, FlatID, FlatIDRange, IdentifierType, Instruction, UnaryOperator, WireInstance, WireReference, WireReferencePathElement, WireReferenceRoot, WireSource, WriteModifiers, WrittenType}, linker::NamedConstant, value::{compute_binary_op, compute_unary_op, TypedValue, Value}
+    abstract_type::DomainType, arena_alloc::UUIDRange, concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, file_position::Span, flattening::{BinaryOperator, Declaration, FlatID, FlatIDRange, IdentifierType, Instruction, UnaryOperator, WireInstance, WireReference, WireReferencePathElement, WireReferenceRoot, WireSource, WriteModifiers, WrittenType}, linker::NamedConstant, util::add_to_small_set, value::{compute_binary_op, compute_unary_op, TypedValue, Value}
 };
 
 use super::*;
@@ -112,13 +112,14 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         })
     }
 
-    fn instantiate_port_wire_ref_root(&self, port : PortID, submodule_instr : FlatID) -> RealWireRefRoot {
-        let sm = &self.submodules[self.generation_state[submodule_instr].unwrap_submodule_instance()];
-        RealWireRefRoot::Wire{wire_id : sm.port_map[port], preamble : Vec::new()}
+    fn instantiate_port_wire_ref_root(&mut self, port : PortID, submodule_instr : FlatID, port_name_span : Option<Span>) -> RealWireRefRoot {
+        let submod_id = self.generation_state[submodule_instr].unwrap_submodule_instance();
+        let wire_id = self.get_submodule_port(submod_id, port, port_name_span);
+        RealWireRefRoot::Wire{wire_id, preamble : Vec::new()}
     }
 
     // Points to the wire in the hardware that corresponds to the root of this. 
-    fn determine_wire_ref_root(&self, wire_ref_root : &WireReferenceRoot) -> RealWireRefRoot {
+    fn determine_wire_ref_root(&mut self, wire_ref_root : &WireReferenceRoot) -> RealWireRefRoot {
         match wire_ref_root {
             &WireReferenceRoot::LocalDecl(decl_id, _) => {
                 match &self.generation_state[decl_id] {
@@ -133,7 +134,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 RealWireRefRoot::Constant(val.clone())
             }
             WireReferenceRoot::SubModulePort(port) => {
-                return self.instantiate_port_wire_ref_root(port.port, port.submodule_flat);
+                return self.instantiate_port_wire_ref_root(port.port, port.submodule_flat, port.port_name_span);
             }
         }
     }
@@ -262,6 +263,44 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
         }
     }
+
+    /// Allocates ports on first use, to see which ports are used, and to determine instantiation based on this
+    fn get_submodule_port(&mut self, sub_module_id : SubModuleID, port_id : PortID, port_name_span : Option<Span>) -> WireID {
+        let submod_instance = &mut self.submodules[sub_module_id]; // Separately grab the same submodule every time because we take a &mut in for get_wire_or_constant_as_wire
+        let wire_found = &mut submod_instance.port_map[port_id];
+
+        if let Some(wire_found) = wire_found {
+            if let Some(sp) = port_name_span {
+                // Deduplicate these spans, so we don't produce overly huge errors, nor allocate more memory than needed
+                add_to_small_set(&mut wire_found.name_refs, sp);
+            }
+            wire_found.maps_to_wire
+        } else {
+            let port_data = &self.linker.modules[submod_instance.module_uuid].ports[port_id];
+            let submodule_instruction = self.md.instructions[submod_instance.original_instruction].unwrap_submodule();
+            let source = if port_data.identifier_type.unwrap_is_input() {
+                RealWireDataSource::Multiplexer { is_state: None, sources: Vec::new() }
+            } else {
+                RealWireDataSource::OutPort { sub_module_id, port_id }
+            };
+            let domain = submodule_instruction.local_interface_domains[port_data.interface];
+            let new_wire = self.wires.alloc(RealWire {
+                source,
+                original_instruction : submod_instance.original_instruction,
+                domain,
+                typ : ConcreteType::Unknown,
+                name: format!("{}_{}", submod_instance.name, port_data.name),
+                absolute_latency: CALCULATE_LATENCY_LATER,
+                needed_until: CALCULATE_LATENCY_LATER
+            });
+
+            let name_refs = if let Some(sp) = port_name_span {vec![sp]} else {Vec::new()};
+            
+            *wire_found = Some(UsedPort{maps_to_wire: new_wire, name_refs});
+            new_wire
+        }
+    }
+
     fn get_wire_ref_root_as_wire(&mut self, wire_ref_root : &WireReferenceRoot, original_instruction : FlatID, domain : DomainID) -> (WireID, Vec<RealWirePathElem>) {
         let root = self.determine_wire_ref_root(wire_ref_root);
         match root {
@@ -391,30 +430,14 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::SubModule(submodule) => {
                     let sub_module = &self.linker.modules[submodule.module_uuid];
                     
-                    let new_submodule_id = self.submodules.get_next_alloc_id();
                     let name = if let Some((name, _span)) = &submodule.name {
                         name.clone()
                     } else {
                         self.get_unique_name()
                     };
-                    let port_map = sub_module.ports.iter().map(|(port_id, port_data)| {
-                        let source = if port_data.identifier_type.unwrap_is_input() {
-                            RealWireDataSource::Multiplexer { is_state: None, sources: Vec::new() }
-                        } else {
-                            RealWireDataSource::OutPort { sub_module_id: new_submodule_id, port_id }
-                        };
-                        let domain = submodule.local_interface_domains[port_data.interface];
-                        self.wires.alloc(RealWire {
-                            source,
-                            original_instruction,
-                            domain,
-                            typ : ConcreteType::Unknown,
-                            name: format!("{}_{}", name, port_data.name),
-                            absolute_latency: CALCULATE_LATENCY_LATER,
-                            needed_until: CALCULATE_LATENCY_LATER
-                        })
-                    }).collect();
-                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_instruction, instance : None, port_map, name, module_uuid : submodule.module_uuid}))
+                    let port_map = sub_module.ports.iter().map(|_| None).collect();
+                    let interface_call_sites = sub_module.interfaces.iter().map(|_| Vec::new()).collect();
+                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_instruction, instance : None, port_map, interface_call_sites, name, module_uuid : submodule.module_uuid}))
                 }
                 Instruction::Declaration(wire_decl) => {
                     self.instantiate_declaration(wire_decl, original_instruction)?
@@ -439,10 +462,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     let submod_id = self.generation_state[fc.submodule_instruction].unwrap_submodule_instance();
                     let original_submod_instr = &self.md.instructions[fc.submodule_instruction].unwrap_submodule();
                     let domain = original_submod_instr.local_interface_domains[fc.submodule_interface];
+                    add_to_small_set(&mut self.submodules[submod_id].interface_call_sites[fc.submodule_interface], fc.interface_span);
                     for (port, arg) in std::iter::zip(fc.func_call_inputs.iter(), fc.arguments.iter()) {
                         let from = self.get_wire_or_constant_as_wire(*arg, domain);
-                        let submod_instance = &self.submodules[submod_id]; // Separately grab the same submodule every time because we take a &mut in for get_wire_or_constant_as_wire
-                        let port_wire = submod_instance.port_map[port];
+                        let port_wire = self.get_submodule_port(submod_id, port, None);
                         self.instantiate_write_to_wire(port_wire, Vec::new(), from, 0, original_instruction, condition);
                     }
 

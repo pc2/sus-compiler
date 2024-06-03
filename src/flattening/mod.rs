@@ -507,6 +507,8 @@ pub struct FuncCallInstruction {
     pub func_call_outputs : PortIDRange,
     /// If this is None, that means the submodule was declared implicitly. Hence it could also be used at compiletime
     pub name_span : Option<Span>,
+    /// Best-effort span for the interface that is called. [my_mod<abc>](), my_mod<abc> mm; [mm]() or mm.[my_interface]()
+    pub interface_span : Span,
     pub arguments_span : BracketSpan,
     pub whole_func_span : Span,
 }

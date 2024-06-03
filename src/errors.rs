@@ -2,7 +2,7 @@
 
 use std::cell::RefCell;
 
-use crate::{arena_alloc::ArenaAllocator, file_position::{Span, SpanFile}, flattening::{Declaration, Module}, linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker, LinkInfo}};
+use crate::{arena_alloc::ArenaAllocator, file_position::{Span, SpanFile}, flattening::{Declaration, Module, Port, SubModuleInstance}, linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker, LinkInfo}};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ErrorLevel {
@@ -120,6 +120,10 @@ impl<'linker> ErrorCollector<'linker> {
         self.push_diagnostic(position, reason.into(), ErrorLevel::Warning)
     }
     
+    pub fn todo<S : Into<String>>(&self, position : Span, reason : S)-> ErrorReference<'_> {
+        self.push_diagnostic(position, format!("TODO: {}", reason.into()), ErrorLevel::Warning)
+    }
+    
     pub fn did_error(&self) -> bool {
         self.error_store.borrow().did_error
     }
@@ -176,9 +180,25 @@ impl ErrorInfoObject for Declaration {
     }
 }
 
+impl ErrorInfoObject for SubModuleInstance {
+    fn make_info(&self, _file_data : &FileData) -> (Span, String) {
+        if let Some((name, span)) = &self.name {
+            (*span, format!("{name} declared here"))
+        } else {
+            (self.module_name_span, "Used here".to_owned())
+        }
+    }
+}
+
 impl FileKnowingErrorInfoObject for LinkInfo {
     fn make_global_info(&self, _files : &ArenaAllocator<FileData, FileUUIDMarker>) -> ((Span, FileUUID), String) {
         ((self.name_span, self.file), format!("'{}' defined here", &self.name))
+    }
+}
+
+impl ErrorInfoObject for Port {
+    fn make_info(&self, _file_data : &FileData) -> (Span, String) {
+        (self.name_span, format!("Port '{}' declared here", &self.name))
     }
 }
 

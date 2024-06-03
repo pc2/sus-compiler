@@ -306,6 +306,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         let whole_func_span = cursor.span();
         cursor.go_down(kind!("func_call"), |cursor| {
             cursor.field(field!("name"));
+            let interface_span = cursor.span();
             let function_root = self.get_or_alloc_module_by_global_identifier(cursor);
 
             cursor.field(field!("arguments"));
@@ -357,6 +358,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 func_call_inputs,
                 func_call_outputs,
                 name_span,
+                interface_span,
                 arguments_span,
                 whole_func_span
             })))

@@ -779,6 +779,7 @@ module FIFO {
 		if data_valid {
 			reg data_out = mem_to_pop.o[read_addr]
 			read_addr = (read_addr + 1) % DEPTH
+			//write_addr = 1
 		}
 	}
 
@@ -791,6 +792,11 @@ module FIFO {
 	int space_remaining = (read_to_push.o - write_addr) % DEPTH
 	reg bool r = space_remaining > ALMOST_FULL_THRESHOLD
 	ready = offset_backwards(r)
+}
+
+module use_fifo {
+	FIFO f
+
 }
 
 module test_separated_domain : int main {
@@ -816,4 +822,20 @@ module use_no_input_module {
 
 	no_port_module no_port
 	no_port()
+}
+
+module mod_with_unused_interface {
+	if false {
+		interface v : int a -> int b
+	}
+}
+
+module use_bad_interface {
+	mod_with_unused_interface mm
+
+	mm.a
+
+	
+
+	// ICE: mm.a = 5
 }

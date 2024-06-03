@@ -8,7 +8,7 @@ mod latency_count;
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::BracketSpan, flattening::{BinaryOperator, DomainID, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, value::{TypedValue, Value}
+    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, value::{TypedValue, Value}
 };
 
 use self::latency_algorithm::SpecifiedLatency;
@@ -83,10 +83,17 @@ pub struct RealWire {
 }
 
 #[derive(Debug)]
+pub struct UsedPort {
+    pub maps_to_wire : WireID,
+    pub name_refs : Vec<Span>
+}
+
+#[derive(Debug)]
 pub struct SubModule {
     pub original_instruction : FlatID,
     pub instance : Option<Rc<InstantiatedModule>>,
-    pub port_map : FlatAlloc<WireID, PortIDMarker>,
+    pub port_map : FlatAlloc<Option<UsedPort>, PortIDMarker>,
+    pub interface_call_sites : FlatAlloc<Vec<Span>, DomainIDMarker>,
     pub name : String,
     pub module_uuid : ModuleUUID
 }
@@ -243,20 +250,66 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn instantiate_submodules(&mut self) -> bool {
         let mut success = true;
         for (_sm_id, sm) in &mut self.submodules {
+            let submod_obj = self.md.instructions[sm.original_instruction].unwrap_submodule();
             let sub_module = &self.linker.modules[sm.module_uuid];
             if let Some(instance) = sub_module.instantiations.instantiate(sub_module, self.linker) {
-                for (port_id, port) in &instance.interface_ports {
-                    let wire = &mut self.wires[sm.port_map[port_id]];
-                    wire.typ = if let Some(instance_data) = port {
-                        instance_data.typ.clone()
-                    } else {
-                        // TODO report ports being used when not enabled
-                        ConcreteType::Error
-                    };
+                for (port_id, concrete_port) in &instance.interface_ports {
+                    let connecting_wire = &sm.port_map[port_id];
+
+                    match (concrete_port, connecting_wire) {
+                        (None, None) => {} // Invalid port not connected, good!
+                        (None, Some(connecting_wire)) => {
+                            // Port is not enabled, but attempted to be used
+                            // A question may be "What if no port was in the source code? There would be no error reported"
+                            // But this is okay, because non-visible ports are only possible for function calls
+                            // We have a second routine that reports invalid interfaces. 
+                            let source_code_port = &sub_module.ports[port_id];
+                            for span in &connecting_wire.name_refs {
+                                self.errors.error(*span, format!("Port '{}' is used, but the instantiated module has this port disabled", source_code_port.name))
+                                    .info_obj_different_file(source_code_port, sub_module.link_info.file)
+                                    .info_obj_same_file(submod_obj);
+                            }
+                        }
+                        (Some(_concrete_port), None) => {
+                            // Port is enabled, but not used
+                            let source_code_port = &sub_module.ports[port_id];
+                            self.errors.warn(submod_obj.module_name_span, format!("Unused port '{}'", source_code_port.name))
+                                .info_obj_different_file(source_code_port, sub_module.link_info.file)
+                                .info_obj_same_file(submod_obj);
+                        }
+                        (Some(concrete_port), Some(connecting_wire)) => {
+                            let wire = &mut self.wires[connecting_wire.maps_to_wire];
+                            wire.typ = concrete_port.typ.clone()
+                        }
+                    }
+                }
+                for (interface_id, interface_references) in &sm.interface_call_sites {
+                    if !interface_references.is_empty() {
+                        let sm_interface = &sub_module.interfaces[interface_id];
+                        let interface_name = &sm_interface.name;
+                        if let Some(representative_port) = sm_interface.func_call_inputs.first().or(sm_interface.func_call_outputs.first()) {
+                            if instance.interface_ports[representative_port].is_none() {
+                                for span in interface_references {
+                                    self.errors.error(*span, format!("The interface '{interface_name}' is disabled in this submodule instance"))
+                                        .info_obj_same_file(self.md.instructions[sm.original_instruction].unwrap_submodule())
+                                        .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
+                                }
+                            }
+                        } else {
+                            for span in interface_references {
+                                self.errors.todo(*span, format!("Using empty interface '{interface_name}' (This is a TODO with Actions etc)"))
+                                    .info_obj_same_file(self.md.instructions[sm.original_instruction].unwrap_submodule())
+                                    .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
+                            }
+                        }
+                        if sub_module.ports.iter().any(|(port_id, port)| port.interface == interface_id && instance.interface_ports[port_id].is_none()) {
+                            // We say an interface is invalid if it has an invalid port. 
+                        }
+                    }
                 }
                 sm.instance = Some(instance);
             } else {
-                self.errors.error(self.md.instructions[sm.original_instruction].unwrap_submodule().module_name_span, "Error instantiating submodule");
+                self.errors.error(submod_obj.module_name_span, "Error instantiating submodule");
                 success = false;
             };
         }

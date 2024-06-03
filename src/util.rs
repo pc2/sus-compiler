@@ -43,3 +43,9 @@ pub const fn const_str_position_in_tuples<T>(v : &str, list : &[(&str, T)]) -> O
     }
     None
 }
+
+pub fn add_to_small_set<T : Eq>(set_vec : &mut Vec<T>, elem : T) {
+    if !set_vec.contains(&elem) {
+        set_vec.push(elem);
+    }
+}

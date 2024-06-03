@@ -154,7 +154,7 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
                 RealWireDataSource::Select { root, path } => {
                     let wire_name = self.wire_name(*root, w.absolute_latency);
                     let path = self.wire_ref_path_to_string(&path, w.absolute_latency);
-                    write!(self.program_text, " = {wire_name}{path};")?;
+                    writeln!(self.program_text, " = {wire_name}{path};")?;
                 }
                 RealWireDataSource::UnaryOp { op, right } => {
                     writeln!(self.program_text, " = {}{};", op.op_text(), self.wire_name(*right, w.absolute_latency))?;
@@ -190,7 +190,12 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
             writeln!(self.program_text, "\t.clk(clk),")?;
             for (port_id, iport) in sm_inst.interface_ports.iter_valids() {
                 let port_name = wire_name_self_latency(&sm_inst.wires[iport.wire], self.use_latency);
-                let wire_name = wire_name_self_latency(&self.instance.wires[sm.port_map[port_id]], self.use_latency);
+                let wire_name = if let Some(port_wire) = &sm.port_map[port_id] {
+                    wire_name_self_latency(&self.instance.wires[port_wire.maps_to_wire], self.use_latency)
+                } else {
+                    // Ports that are defined on the submodule, but not used by impl
+                    String::new()
+                };
                 writeln!(self.program_text, "\t.{port_name}({wire_name}),")?;
             }
             writeln!(self.program_text, ");")?;
