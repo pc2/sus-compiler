@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{concrete_type::ConcreteType, flattening::{Instruction, Module}, instantiation::{InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem, WireID}, linker::{get_builtin_type, TypeUUID}, value::Value};
+use crate::{concrete_type::ConcreteType, flattening::{Instruction, Module}, instantiation::{InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem, WireID, CALCULATE_LATENCY_LATER}, linker::{get_builtin_type, TypeUUID}, value::Value};
 
 fn get_type_name_size(id : TypeUUID) -> u64 {
     if id == get_builtin_type("int") {
@@ -100,6 +100,8 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
             let type_str = typ_to_verilog_array(&w.typ);
 
             // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
+            assert!(w.absolute_latency != CALCULATE_LATENCY_LATER);
+            assert!(w.needed_until != CALCULATE_LATENCY_LATER);
             for i in w.absolute_latency..w.needed_until {
                 let from = wire_name_with_latency(w, i, self.use_latency);
                 let to = wire_name_with_latency(w, i+1, self.use_latency);

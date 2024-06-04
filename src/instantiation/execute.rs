@@ -413,10 +413,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 absolute_latency,
                 needed_until : CALCULATE_LATENCY_LATER
             });
-            if let Some(lat_spec_flat) = wire_decl.latency_specifier {
-                let specified_absolute_latency : i64 = self.generation_state.get_generation_small_int(lat_spec_flat)?;
-                self.specified_latencies.push((wire_id, specified_absolute_latency));
-            }
             SubModuleOrWire::Wire(wire_id)
         })
     }
@@ -547,7 +543,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     wire : *wire_id,
                     is_input: port.identifier_type.unwrap_is_input(),
                     absolute_latency: CALCULATE_LATENCY_LATER,
-                    typ: wire.typ.clone()
+                    typ: wire.typ.clone(),
+                    interface : wire.domain
                 })
             }
         }

@@ -31,7 +31,7 @@ The main goals of the language are roughly listed below:
 ### Major Milestones
 - [x] Tree Sitter as parsing frontend
 - [x] Arbitrary pipelined full flow
-- [ ] Arbitrary single-clock full flow
+- [x] Arbitrary single-clock full flow
 - [ ] Arbitrary FPGA hardware full flow
 - [x] Generative Code
 - [ ] Generative Parameters
@@ -56,9 +56,9 @@ The main goals of the language are roughly listed below:
 - [ ] Bound Specifiers
 - [ ] Structs
 - [x] For Loops
-- [ ] Multi-Interface Syntax
+- [x] Multi-Interface Syntax
 - [ ] Native Module integration syntax
-- [ ] Can Parse FIFO implementation
+- [x] Can Parse FIFO implementation
 - [ ] Clock Domain Crossings
 - [ ] Rhythm Syntax
 - [ ] Generator Syntax
@@ -118,7 +118,7 @@ The main goals of the language are roughly listed below:
 - [x] Expression Flattening
 - [x] Can Generate Verilog for Multiply-Add pipeline
 - [x] Can Generate Verilog for Blur2 filter
-- [ ] Can Generate Verilog for FIFO
+- [x] Can Generate Verilog for FIFO
 - [ ] Timing Failure extraction from vendor tools
 
 ### Safety through Interface Asserts (PDL-style asserts)

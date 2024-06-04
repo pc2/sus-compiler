@@ -103,7 +103,8 @@ pub struct InstantiatedPort {
     pub wire : WireID,
     pub is_input : bool,
     pub absolute_latency : i64,
-    pub typ : ConcreteType
+    pub typ : ConcreteType,
+    pub interface : DomainID
 }
 
 #[derive(Debug)]
@@ -226,7 +227,6 @@ struct InstantiationContext<'fl, 'l> {
     generation_state : GenerationState<'fl>,
     wires : FlatAlloc<RealWire, WireIDMarker>,
     submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
-    specified_latencies : Vec<(WireID, i64)>,
 
     interface_ports : FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     errors : ErrorCollector<'l>,
@@ -323,7 +323,6 @@ fn perform_instantiation(md : &Module, linker : &Linker) -> InstantiatedModule {
         generation_state : GenerationState{md, generation_state: md.instructions.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect()},
         wires : FlatAlloc::new(),
         submodules : FlatAlloc::new(),
-        specified_latencies : Vec::new(),
         interface_ports : md.ports.iter().map(|_| None).collect(),
         errors : ErrorCollector::new_empty(md.link_info.file, &linker.files),
         md,
