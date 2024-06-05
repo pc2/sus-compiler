@@ -839,3 +839,21 @@ module use_bad_interface {
 
 	// ICE: mm.a = 5
 }
+
+// TODO valid and index should be part of a separate 'interface'
+module sequenceDownFrom : int upTo, bool start -> bool ready, bool valid, int index {
+	//interface sequence : -> 
+
+	state int cur = 0
+
+	index = cur
+	valid = cur != 0
+	ready = !valid
+	if valid {
+		cur = cur - 1
+	}
+
+	if start {
+		cur = upTo
+	}
+}

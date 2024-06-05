@@ -106,6 +106,8 @@ impl<'linker> ModuleInitializationContext<'linker> {
         cursor.list(kind!("declaration_list"), |cursor| {
             let decl_span = cursor.span();
             cursor.go_down(kind!("declaration"), |cursor| {
+                // Skip declaration_modifiers if it exists
+                let _ = cursor.optional_field(field!("declaration_modifiers"));
                 cursor.field(field!("type"));
                 let name_span = cursor.field_span(field!("name"), kind!("identifier"));
                 let name = self.file_text[name_span].to_owned();
