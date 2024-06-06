@@ -730,15 +730,17 @@ module contains_submodule_submodule : int a, int b, int c -> int r {
 module cross_int {
 	interface in : int i'0
 	interface out : -> int o'0
+	o = 1
 }
 
 module cross_memory {
 	interface in : bool[20][512] i'0
 	interface out : -> bool[20][512] o'0
+	o[0][0] = true
 }
 
 module offset_backwards : bool i'0 -> bool o'-5 {
-
+	o = true
 }
 
 module DUAL_PORT_MEM {
