@@ -193,6 +193,19 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     // Returns a proper interface if all ports involved did not produce an error. If a port did produce an error then returns None. 
     // Computes all latencies involved
     pub fn compute_latencies(&mut self) {
+        let mut any_invalid_port = false;
+        for (port_id, p) in self.interface_ports.iter_valids() {
+            if !p.is_input {
+                let RealWireDataSource::Multiplexer{is_state:_, sources} = &self.wires[p.wire].source else {unreachable!()};
+                if sources.is_empty() {
+                    any_invalid_port = true;
+                    let port = &self.md.ports[port_id];
+                    self.errors.error(port.name_span, format!("Output port '{}' is never written to. ", port.name));
+                }
+            }
+        }
+        if any_invalid_port {return} // Early exit so we don't flood WIP modules with "Node not reached by Latency Counting" errors
+
         let latency_node_mapper = WireToLatencyMap::compute(&self.wires, self.md.domains.id_range(), &self.interface_ports);
 
         for (domain_id, domain_info) in &latency_node_mapper.domain_infos {

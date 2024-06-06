@@ -689,6 +689,17 @@ module monotonize_down : bool[16] mbf -> bool[16] mtDown {
 	}
 }
 
+module my_mod : int i -> bool a, bool b {
+	a = i == 3
+	b = i == 5
+}
+
+module use_my_mod : -> bool either {
+	bool x, bool y = my_mod(3)
+
+	either = x | y
+}
+
 // Main module documentation
 module submodule_named_ports : int port_a, int port_b -> int port_c {
 	port_c = port_a + port_b
@@ -754,7 +765,7 @@ module FIFO {
 	// The FIFO may still receive data for 5 cycles after ready is de-asserted
 	gen int ALMOST_FULL_THRESHOLD = 5
 	
-	interface push : bool push'0, bool[BITWIDTH] data_in -> bool ready'-ALMOST_FULL_THRESHOLD+1
+	interface push : bool push'ALMOST_FULL_THRESHOLD, bool[BITWIDTH] data_in -> bool ready'1
 	
 	interface pop : bool pop -> bool[BITWIDTH] data_out, bool data_valid
 	
@@ -777,7 +788,7 @@ module FIFO {
 	if pop {
 		data_valid = read_addr != write_to_pop.o
 		if data_valid {
-			reg data_out = mem_to_pop.o[read_addr]
+			reg reg reg data_out = mem_to_pop.o[read_addr]
 			read_addr = (read_addr + 1) % DEPTH
 			//write_addr = 1
 		}
