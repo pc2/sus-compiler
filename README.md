@@ -1,21 +1,36 @@
 # SUS Language
+## Core philosophy
 The Hardware Design Language to replace VHDL and Verilog for FPGA Hardware Design. 
 
-#### Example of some SUS code in the official VSCode Language Server. 
+SUS is meant to be a direct competitor to Synthesizeable Verilog and VHDL. Its main goal is to be an intuitive and thin syntax for building Netlists, such that traditional synthesis tools can still be used to analyze the resulting hardware. SUS shall impose no paradigm on the hardware designer, such as requiring specific communication protocols or iteration constructs. 
+
+The one restriction SUS does impose over Verilog and VHDL is that it requires the hardware to be *synchronous* over one or more clocks. Asynchronous hardware is therefore *unrepresentable* making SUS less suitable for ASIC development. 
+
+#### What SUS gives you
+- A direct 1-to-1 mapping from code to netlist
+- Type safety with Bounded Integers[^todo]
+- Clock Domain Crossing safety
+- A built-in syntax for pipelining that does not impose structural constraints
+- Syntactic sugar for common constructs like valid signals, resets and submodule communication
+- In-IDE compilation errors and synthesis information
+- Parametrized Hardware Generation
+- Formal Verification Integration[^todo]
+- Moving some[^timing] timing constraints to the source file
+
+[^todo]: Not implemented yet
+[^timing]: Some timing constraints affect the cycle-by-cycle functioning of the design, such as the relative speeds of synchronous clocks and False/Multi-Cycle Path constraints. Because they affect the cycle-wise behaviour of the design, they should be provided as part of the language and incorporated in simulation. Of course, timing constraints like real clock speeds, edge patterns and external component timings still rightfully belong in the Timing Constraints file. It should not be possible to express SUS code that behaves differently between Simulation and Synthesis. 
+
+#### What SUS does not do
+- Provide abstractions for handshake protocols (Like AXI)
+- Runtime Iteration Constructs
+- Automatic Pipelining
+
+Of course, while the language does not support such protocols directly, they can be provided as libraries. 
+
+#### Example of some SUS code in the SUS VSCode Language Server. 
 ![SUS LSP Example](philosophy/images/susLSPExample.png)
 
-## Core philosophy
-This project is an attempt to create a correct-by-default HDL that focusses on making common hardware constructs compact and intuitive to represent. It must make programming easier and thereby safer without sacrificing on low level control. Much akin to what Rust is doing for the software industry. 
-
-The main goals of the language are roughly listed below:
-- Type Safety (duh)
-- Easily pipelining hardware
-- Hardware inspection tools, in IDE
-- Timing and data validity
-- Data loss and duplication safety
-- Integrate timing constraints into source files. 
-
-### Comparison to other HDLs
+## Comparison to other HDLs
 There's a few categories of HDLs as I see it nowadays. I shall visit them in turn:
 
 #### The Old Guard: (System-)Verilog and VHDL:
@@ -38,7 +53,7 @@ The above opinions on the other styles of hardware design are shared by my colle
 
 One big decision all of these (,including SUS) make is going all-in on Synchronous Hardware. A clock becomes a fundamental language construct instead of being a regular wire. A thing most of them also share is a Rust-inspired syntax, and being written in Rust. 
 
-### Basic constructs (Similar to many current HDLs, such as Chisel)
+## Basic constructs
 - Bundles
 - Interfaces
 - Handle control signals with streams
@@ -51,7 +66,7 @@ One big decision all of these (,including SUS) make is going all-in on Synchrono
 - [x] Tree Sitter as parsing frontend
 - [x] Arbitrary pipelined full flow
 - [x] Arbitrary single-clock full flow
-- [ ] Arbitrary FPGA hardware full flow
+- [ ] Arbitrary multi-clock full flow
 - [x] Generative Code
 - [ ] Generative Parameters
 - [ ] Type Templates
