@@ -1,25 +1,42 @@
 # SUS Language
-A Hardware Description Language focussed on strong type and temporal safety features
+The Hardware Design Language to replace VHDL and Verilog for FPGA Hardware Design. 
 
-Main Inspirations: [TL-Verilog](https://arxiv.org/abs/1811.01780), [Filament](https://rachitnigam.com/files/pubs/filament.pdf), [Spade](https://spade-lang.org/), [Rust](https://www.rust-lang.org/)
-
+#### Example of some SUS code in the official VSCode Language Server. 
 ![SUS LSP Example](philosophy/images/susLSPExample.png)
 
 ## Core philosophy
-This project is an attempt to create a safety-first, correct-by-default HDL. It must make programming easier and safer without sacrificing on low level control. Much akin to what Rust is for the software industry. 
-
-Current HDLs mostly build on top of existing Software languages such as Chisel and SpinalHDL. This allows for great software integration, but throws away a lot of the terseness and extended type safety that HDLs could benefit from. 
-
-An interesting new innovation is TL-Verilog. In this language they built a higher level abstraction for designing hardware, by moving away from the Register-Transfer level to a pipeline-focussed design. This makes TL-Verilog well-suited for the development of multi-stage pipelines (a critical tenet of performance-oriented hardware). While TL-Verilog does this one thing far better than other languages, it lacks proper support for more complex pipelines, forcing the user to drop down to Verilog. This makes it not a replacement, but an extention of Verilog. 
+This project is an attempt to create a correct-by-default HDL that focusses on making common hardware constructs compact and intuitive to represent. It must make programming easier and thereby safer without sacrificing on low level control. Much akin to what Rust is doing for the software industry. 
 
 The main goals of the language are roughly listed below:
-- Strong and extensible Typing
+- Type Safety (duh)
+- Easily pipelining hardware
+- Hardware inspection tools, in IDE
+- Timing and data validity
 - Data loss and duplication safety
-- Easy to create and fine-tune processing pipelines
-- Easy to test
-- Testing Software Integration
-- Better visualization of data flow --> Eliminate Wave plots
 - Integrate timing constraints into source files. 
+
+### Comparison to other HDLs
+There's a few categories of HDLs as I see it nowadays. I shall visit them in turn:
+
+#### The Old Guard: (System-)Verilog and VHDL:
+These languages were originally designed as Hardware *Description* Languages, meant to describe exactly how hand-drawn hardware components function. Later on a "Synthesizeable Subset" was created from these languages to actually create hardware from them. The issue is, these old languages still carry this simulation-first core design. The feature-set that's actually available for synthesis is rather small, and common constructs like pipelining routinely introduce bugs. Even things like what inputs and outputs mean are left vague. 
+
+#### High Level Synthesis: [BlueSpec](https://bluespec.com), [Intel OneAPI](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html), [Xilinx Vitis](https://www.xilinx.com/products/design-tools/vitis.html)
+This approach attempts to generate hardware from an imperative description in an existing software language, usually C++. They rely on control flow analysis and a clever compiler to turn this description into hardware that actually performs the operation. The core issue with these is an over-reliance on such compiler smarts. This usually means fiddling with compiler directives until the compiler actually outputs the hardware you originally had in mind. In some cases, it may not even be possible to express the hardware you intend because the compiler designers didn't provide it. The final nail is that optimization on such generated hardware is nigh-impossible. The powerful synthesis tools like Intel Quartus and Vivado with their timing analyzers are unuseable. The tradeoff is inefficient use of resources and lower clock speeds.
+
+One final thing that must be said about the corporate HLS flows, is that the promise of 'portability' is absolute bogus. These systems are simply more attempts to build walled gardens around their respective platforms. This is evident from Intel's deprecation of the more open OpenCL frontend they used to have, in favor of their platform-locked Intel OneAPI. (Which, funnily enough, is just a thin wrapper around the old OpenCL codebase). If I sound salty, it is because I am. 
+
+#### Embedded Languages such as [Chisel](https://www.chisel-lang.org/) and [SpinalHDL](https://github.com/SpinalHDL/SpinalHDL):
+If one is being pedantic, they actually shouldn't actually be called "languages" per se, but rather hardware construction libraries within an existing software language; usually Scala. There is a solid argument to be made for this style though. Why invent a new meta-language for the generation of hardware when there's widely-used software languages already out there? My main arguments against this approach are written below, but they can be summed up as the language designers having made the tradeoff of reducing development time on the compiler sacrificing the useability of the final product. 
+
+- No hardware-specific language abstractions. Abstractions have to be built on top of the Object-Oriented or Functional basis of Scala. The regular scala constructs don't map to hardware, so instead functions have to be introduced (like `when()` for 'if') to imitate these but for hardware. 
+- Providing hardware-specific tooling for such languages is difficult. One can't hover over a variable in the code and get hardware-specific information from it, because the LSP is for Scala, not for Chisel. Also the Edit-Test-Debug cycle is longer, as there is no direct in-editor feedback for incorrect hardware. 
+- Finally, there is the philosophical question of: "Is the full feature set of a modern software language really necessary for hardware design?". Are Virtual Functions, Resource management, and other software features necessary to generate hardware? In practice, 99% of hardware generation code is simple for loops and conditionals. Anything more complicated than that shouldn't be happening on every compile. 
+
+#### New Hardware *Design* Languages such as [TL-Verilog](https://arxiv.org/abs/1811.01780), [Spade](https://spade-lang.org/), [Filament](https://filamenthdl.com/), [RustHDL](https://rust-hdl.org/) and now [SUS](.)
+The above opinions on the other styles of hardware design are shared by my colleagues building these new hardware *design* languages. The main differences between them are philosophical: What common hardware constructs and concepts should be abstracted and how? 
+
+One big decision all of these (,including SUS) make is going all-in on Synchronous Hardware. A clock becomes a fundamental language construct instead of being a regular wire. A thing most of them also share is a Rust-inspired syntax, and being written in Rust. 
 
 ### Basic constructs (Similar to many current HDLs, such as Chisel)
 - Bundles
@@ -29,7 +46,7 @@ The main goals of the language are roughly listed below:
 - Syntactic sugar for Resets
 - Lambda Modules
 
-## Tasks
+## Roadmap
 ### Major Milestones
 - [x] Tree Sitter as parsing frontend
 - [x] Arbitrary pipelined full flow
@@ -136,15 +153,6 @@ The main goals of the language are roughly listed below:
 ![Architecture of the SUS Compiler](philosophy/images/susArchitecture.png)
 
 ## Features
-
-### Streams
-Streams are the main abstraction used in this language. The main stream type is the 'pipe' stream. Data traveling along a 'pipe' stream has an extra bit which denotes if the data is valid. 
-
-### Time slicing
-
-Streams data going through a pipe expects operations to only be performed on data of the same 'time slice'. This is data that has departed at the same time. Performing operations on data of different time slices is an error, unless cast explicitly (for things like FIR filters or fixed size convolutions). 
-
-A big benefit of 'time slicing' is greater ability for debugging. Instead of staring at wave plots, the whole trajectory of a data packet can be followed throughout the pipeline, making spotting errors far easier. 
 
 ### Easy Pipelining
 Critical for achieving high frequencies. Computation is split up over multiple stages split by registers, such that multiple operations can be 'coming down the pipe' at the same time. This is one area where the mainstream HDLs like (System)Verilog and VHDL really suffer, as it is a lot of work to define the registers manually. Two languages have already made important strides in this regard. TL-Verilog and Filament.    
@@ -287,7 +295,7 @@ The oldest design languages such as Verilog and VHDL keep their RTL code and Tim
 
 Timing information itself should not be part of the RTL. So the clocks' absolute frequency, rise and fall times etc, those still belong in the regular constraints file. But Clocks' relative frequency, wether they're synchronous, and other constraints that directly affect the hardware such as false paths and multicycle paths should certainly be in the RTL specification itself. 
 
-As an added benefit, hardware modules can then alter their construction based on this information, so for example, a FIFO can use a standard synchronous implementation for a single clock, but then switch to different CDC approaches for (un-)synchronized clocks. 
+As an added benefit, hardware modules can then alter their construction based on this information, so for example, a FIFO can use a standard synchronous implementation for a single clock, but then switch to different CDC approaches for asynchronous clocks. 
 
 By including clocks in the language itself, we can then start making statements about data rates. For example a stream may be outputting on clock A, with full bandwidth, and then be transported onto clock A*2 at half its bandwidth. One neat way of expressing the signal throughput is done by [Aetherling](https://aetherling.org/). Signals are expressed as sequences of valid and invalid elements. This can then again filter out bad designs, where the bandwidth from one clock may not be carryable by another clock. 
 
