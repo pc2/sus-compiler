@@ -743,7 +743,7 @@ module offset_backwards : bool i'0 -> bool o'-5 {
 	o = true
 }
 
-module DUAL_PORT_MEM {
+module dual_port_mem {
 	state bool[20][512] mem
 
 	interface write : bool write, bool[20] wr_data, int wr_addr
@@ -767,7 +767,7 @@ module FIFO {
 	// The FIFO may still receive data for 5 cycles after ready is de-asserted
 	gen int ALMOST_FULL_THRESHOLD = 5
 	
-	interface push : bool push'ALMOST_FULL_THRESHOLD, bool[BITWIDTH] data_in -> bool ready'1
+	interface push : bool push'ALMOST_FULL_THRESHOLD, bool[BITWIDTH] data_in -> bool ready'0
 	
 	interface pop : bool pop -> bool[BITWIDTH] data_out, bool data_valid
 	
@@ -790,9 +790,9 @@ module FIFO {
 	if pop {
 		data_valid = read_addr != write_to_pop.o
 		if data_valid {
-			reg reg reg data_out = mem_to_pop.o[read_addr]
+			// Add some pipelining registers, just because we can
+			reg reg data_out = mem_to_pop.o[read_addr]
 			read_addr = (read_addr + 1) % DEPTH
-			//write_addr = 1
 		}
 	}
 
@@ -803,7 +803,7 @@ module FIFO {
 	
 	// Wrapping subtract
 	int space_remaining = (read_to_push.o - write_addr) % DEPTH
-	reg bool r = space_remaining > ALMOST_FULL_THRESHOLD
+	bool r = space_remaining > ALMOST_FULL_THRESHOLD
 	ready = offset_backwards(r)
 }
 

@@ -1,8 +1,9 @@
 # SUS Language
-## Core philosophy
-The Hardware Design Language to replace VHDL and Verilog for FPGA Hardware Design. 
+The Hardware Design Language to replace VHDL and Verilog for FPGA Development. 
 
-SUS is meant to be a direct competitor to Synthesizeable Verilog and VHDL. Its main goal is to be an intuitive and thin syntax for building Netlists, such that traditional synthesis tools can still be used to analyze the resulting hardware. SUS shall impose no paradigm on the hardware designer, such as requiring specific communication protocols or iteration constructs. 
+## Core philosophy
+
+SUS is meant to be a direct competitor to Synthesizeable Verilog and VHDL. Its main goal is to be an intuitive and thin syntax for building Netlists, such that traditional synthesis tools can still be used to analyze the resulting hardware. SUS shall impose no paradigm on the hardware designer, such as requiring specific communication protocols or iteration constructs. In other words, SUS is not there to abstract away complexity, but rather to make the inherent complexity of hardware design more manageable. 
 
 The one restriction SUS does impose over Verilog and VHDL is that it requires the hardware to be *synchronous* over one or more clocks. Asynchronous hardware is therefore *unrepresentable* making SUS less suitable for ASIC development. 
 
@@ -13,7 +14,7 @@ The one restriction SUS does impose over Verilog and VHDL is that it requires th
 - A built-in syntax for pipelining that does not impose structural constraints
 - Syntactic sugar for common constructs like valid signals, resets and submodule communication
 - In-IDE compilation errors and synthesis information
-- Parametrized Hardware Generation
+- Hardware Generators
 - Formal Verification Integration[^todo]
 - Moving some[^timing] timing constraints to the source file
 
@@ -23,7 +24,7 @@ The one restriction SUS does impose over Verilog and VHDL is that it requires th
 #### What SUS does not do
 - Provide abstractions for handshake protocols (Like AXI)
 - Runtime Iteration Constructs
-- Automatic Pipelining
+- Automatic Pipelining & Retiming
 
 Of course, while the language does not support such protocols directly, they can be provided as libraries. 
 
@@ -51,15 +52,60 @@ If one is being pedantic, they actually shouldn't actually be called "languages"
 #### New Hardware *Design* Languages such as [TL-Verilog](https://arxiv.org/abs/1811.01780), [Spade](https://spade-lang.org/), [Filament](https://filamenthdl.com/), [RustHDL](https://rust-hdl.org/) and now [SUS](.)
 The above opinions on the other styles of hardware design are shared by my colleagues building these new hardware *design* languages. The main differences between them are philosophical: What common hardware constructs and concepts should be abstracted and how? 
 
-One big decision all of these (,including SUS) make is going all-in on Synchronous Hardware. A clock becomes a fundamental language construct instead of being a regular wire. A thing most of them also share is a Rust-inspired syntax, and being written in Rust. 
+One big decision all of these (including SUS) make is going all-in on Synchronous Hardware. A clock becomes a fundamental language construct instead of being a regular wire. A thing most of them also share is a Rust-inspired syntax, and being written in Rust. 
 
-## Basic constructs
-- Bundles
-- Interfaces
-- Handle control signals with streams
-- Clocks are handled with dedicated syntax
-- Syntactic sugar for Resets
-- Lambda Modules
+## Main Features through examples
+### Pipelining through [Latency Counting](philosophy/latency.md)
+```Verilog
+module pow17 : int i -> int o {
+	    int i2  = i * i
+	reg int i4  = i2 * i2
+	    int i8  = i4 * i4
+	reg int i16 = i8 * i8
+	        o   = i16 * i
+}
+```
+![Registers can be inserted](philosophy/images/insertRegisters.png)
+
+### FIZZ-BUZZ Lookup Table using Generative Code
+```Verilog
+module fizz_buzz_gen : int v -> int fb {
+	gen int FIZZ = 15
+	gen int BUZZ = 11
+	gen int FIZZ_BUZZ = 1511
+	gen int TABLE_SIZE = 256
+
+	gen int[TABLE_SIZE] lut
+	
+	for int i in 0..TABLE_SIZE {
+		gen bool fizz = i % 3 == 0
+		gen bool buzz = i % 5 == 0
+		
+		gen int tbl_fb
+		if fizz & buzz {
+			tbl_fb = FIZZ_BUZZ
+		} else if fizz {
+			tbl_fb = FIZZ
+		} else if buzz {
+			tbl_fb = BUZZ
+		} else {
+			tbl_fb = i
+		}
+
+		lut[i] = tbl_fb
+	}
+
+	fb = lut[v]
+}
+```
+In the end, the generative code is executed and all that results is a lookup table. 
+
+### (Clock-) Domains for separating out logically distinct pipelines
+For this feature to be useable you really must use the LSP. The semantic analysis of the compiler gives important visual feedback while programming that makes this much easier to understand. 
+
+In this example, we create a memory block with a read port and a write port. This module has two domains: The read interface domain and write interface domain. Every wire in the design is part of one of these domains (or an anonymous domain if it's not connected to either interface). Signals are not allowed to cross from one domain to another unless explicitly passed through a domain crossing primitive. 
+
+![Dual Port Memory](philosophy/images/dualPortMem.png)
 
 ## Roadmap
 ### Major Milestones
@@ -89,15 +135,18 @@ One big decision all of these (,including SUS) make is going all-in on Synchrono
 - [ ] Array Slices
 - [ ] Bound Specifiers
 - [ ] Structs
-- [x] For Loops
+- [x] Generative variables and assignments
+- [x] Generative Conditions
+- [x] Generative For Loops
+- [ ] Generative While Loops
 - [x] Multi-Interface Syntax
 - [ ] Native Module integration syntax
 - [x] Can Parse FIFO implementation
 - [ ] Clock Domain Crossings
 - [ ] Rhythm Syntax
-- [ ] Generator Syntax
+- [ ] Interface Generator Syntax
 
-### Linking and Name Resolution
+### Performance, Linking and Name Resolution
 - [ ] Namespaces
 - [x] Single File Name Resolution
 - [x] Multi File Name Resolution
@@ -153,12 +202,18 @@ One big decision all of these (,including SUS) make is going all-in on Synchrono
 - [x] Can Generate Verilog for Multiply-Add pipeline
 - [x] Can Generate Verilog for Blur2 filter
 - [x] Can Generate Verilog for FIFO
-- [ ] Timing Failure extraction from vendor tools
+
+### Fun projects to do in SUS
+- [ ] Bit-Serial Matrix Multiply
+- [ ] Dedekind Kernel Port
+- [ ] Sparse Matrix Multiply
+- [ ] RISC-V CPU
 
 ### Safety through Interface Asserts (PDL-style asserts)
 - [ ] btor2?
 - [ ] Language syntax
 - [ ] How powerful is it? 
+- [ ] Timing Failure extraction from vendor tools
 
 ### Simulation
 - [ ] Basic testbench
@@ -166,197 +221,6 @@ One big decision all of these (,including SUS) make is going all-in on Synchrono
 
 ## Architecture
 ![Architecture of the SUS Compiler](philosophy/images/susArchitecture.png)
-
-## Features
-
-### Easy Pipelining
-Critical for achieving high frequencies. Computation is split up over multiple stages split by registers, such that multiple operations can be 'coming down the pipe' at the same time. This is one area where the mainstream HDLs like (System)Verilog and VHDL really suffer, as it is a lot of work to define the registers manually. Two languages have already made important strides in this regard. TL-Verilog and Filament.    
-[**TL-Verilog**](https://arxiv.org/abs/1811.01780) greatly simplifies the notation for pipeline creation. Instead of explicitly having to add registers on each wire, they divide the logic into pipeline stages notationally. Additionally they add several basic control flow structures, such as FIFOs and ring queues. Its notational simplicity could be considered the gold standard for 'simple' 1-clock-per-stage pipelines.   
-[**Filament**](https://rachitnigam.com/files/pubs/filament.pdf) has made incredible strides in improving safety for more complex pipelines, which involve processing steps taking multiple cycles. In their paper they describe a syntax of adding Delay and hold time annotations to every signal, adding module instantiations and preventing multiple uses of the same module at the same time. They were able to create a comprehensive semantic type system that captured the full timing information for statically scheduled pipelining. 
-
-I consider 'static pipelining' to be a solved problem. The one thing we can still innovate on in this area is combining these ideas. To encode the full semantic richness of Filament while keeping that terse notation that makes TL-Verilog shine. 
-
-An example of such static pipeline can be shown as follows: 
-```
-pipeline multiply_add : i32 a, i32 b, i32 c -> i32 result {
-  reg i32 tmp = a * b
-  i32 tmp2 = tmp + c
-  reg result = tmp2 + a
-}
-```
-Pipeline stages are denoted by adding the 'reg' keyword to statements. Either at the statement level, or to add registers within expressions. This example could[^1] compile to the following Verilog code:
-```Verilog
-module multiply_add(
-  input[31:0] a,
-  input[31:0] b,
-  input[31:0] c,
-  output reg[31:0] result_DD // Note 'DD' means twice delayed signal
-) {
-  reg[31:0] tmp_D;
-  wire[31:0] tmp2_D;
-  reg[31:0] a_D; // Also need to delay a and c, to be in sync with tmp_D
-  reg[31:0] c_D;
-
-  always @(posedge clk) begin 
-    tmp_D <= a * b;
-    c_D <= c;
-    a_D <= a;
-  end
-  
-  assign tmp2_D = tmp_D + c_D;
-
-  always @(posedge clk) begin 
-    result_DD <= tmp_D + a_D;
-  end
-}
-```
-
-### Regex-Like Timeline descriptions
-Often we will build modules that process a stream of data, where the operations are dependent on the order of the data. But where separate runs are still independent. IE there is no latent state between runs, as opposed to modules such as memory modules, or FIFOs, which do carry latent state. 
-
-If we have a proper description of the timeline of our outputs, we can match our output pattern to this stream, and throw a compiler error if it doesn't. 
-
-Making this distinction allows us to express timeline-bound operations, such as accumulators and stream processors with sufficient safety features. 
-
-For fixed-length timelines, this was already explored in Filament. We extend that to dynamic runtime timeline length. 
-
-Below is an example of a 2-wide blur filter. Its interface is described in the first part, and its run timeline shown on the timeline section. It takes a stream of indeterminate length. The first element is eaten without producing a result, and for all subsequent elements it outputs a result. (Note the difference between the 'state' registers that deal with the persistent data across cycles, and the 'reg' "pipeline step" operator.) This module takes a stream of length N, and outputs the first element of a stream of length (N-1) 2 clock cycles later. 
-```
-timeline (a, true -> /) | (a, false -> /) .. (a, false -> r)* .. (a, true -> r)
-module blur : int a, bool done -> int result {
-	state bool working = false // Initial value, not a real assignment
-	state int prev
-
-	if working {
-		reg result = prev + a // Add a pipeline stage for shits and giggles
-	}
-	prev = a
-	working = !done
-}
-```
-
-This could[^1] compile to the following Verilog
-```Verilog
-module blur(
-  input valid_in,
-  input[31:0] a,
-  output reg valid_out,
-  output reg[31:0] result
-) {
-  // Data path
-  reg[31:0] prev;
-
-  always @(posedge clk) begin
-    prev <= a;
-    result <= a + prev_a;
-  end
-  
-  // Control path
-  reg prev_valid;
-  always @(posedge clk) begin
-    prev_valid <= valid_in;
-    valid_out <= valid_in && prev_valid;
-  end
-}
-```
-
-[^1]: Control signals should be fully managed by the compiler. The compiler may decide not to output a certain control signal if the target module for example doesn't require it. 
-
-### Stricter integer types
-I propose to add one generic integer type: *int<low, high>*. Instead of specifying the bitwidth of this integer, we specify its absolute range. It is not necessary to specify this range for every integer, as in most cases it can be inferred by the compiler. This inference allows the compiler to use the minimum bitwidth necessary to represent the integer. Signed integers are just integers with a negative lower bound. 
-
-Integers come in two flavors: theorethically infinite integers, and modular arithmetic integers. 
-
-Integer bounds should rarely have to be specified. The compiler should be able to infer them most of the time. 
-
-Provide easy naming syntax for commonly-used integers: u8, u16, i8, i64, etc. 
-Predefined integer sizes should also include things like udsp "Preferred DSP size" or something
-
-We can add functions such as `int -> to2cpl -> bool[]` and `bool[] -> from2cpl -> int`
-
-This also allows us to more strictly define our interfaces. Instead of requesting an int of so many bits, we request a specific range. 
-
-Casting integers to smaller ranges is again a place where explicitly casting is required. The simulator can then check this at runtime. 
-
-### Modules
-There are no functions, every function is a module. 
-
-Modules come in three flavors: Pipelines, multi-cycle pipelines and Modules
-Basic pipeline:
-```
-pipeline <name>: <typ> <name>, <typ> <name>, ... -> <result_typ> <result_name>, ... {
-  // Code...
-}
-```
-multi-cycle pipelines have an additional field that describes the timeline. 
-```
-pipeline <name>: <typ> <name>, <typ> <name>, ... -> <result_typ> <result_name>, ... : timeline (a -> /)*..(/ -> r) {
-  // Code that may utilize results across clock cycles...
-}
-```
-Finally, true modules may have multiple interfaces, and may contain state that is kept across calls
-```
-module <name>: <typ> <name>, <typ> <name>, ... -> <result_typ> <result_name>, ... : timeline (a -> /)*..(/ -> r) {
-  // Code that may utilize results across clock cycles...
-}
-```
-
-A module is instantiated as follows: `output1, output2 = myModule(input1, input2)`
-
-This can still change
-
-### Clocks as language constructs
-The oldest design languages such as Verilog and VHDL keep their RTL code and Timing Constraints separate. This is nice in one part, because the clock speed doesn't actually affect the theorethical functioning of the hardware. But on the other hand, once you have multiple clocks, their relative clock speed does have an effect on the actual functioning of the hardware. Clocks are just passed in as regular wires, and therefore can also be used as regular signals. 
-
-Timing information itself should not be part of the RTL. So the clocks' absolute frequency, rise and fall times etc, those still belong in the regular constraints file. But Clocks' relative frequency, wether they're synchronous, and other constraints that directly affect the hardware such as false paths and multicycle paths should certainly be in the RTL specification itself. 
-
-As an added benefit, hardware modules can then alter their construction based on this information, so for example, a FIFO can use a standard synchronous implementation for a single clock, but then switch to different CDC approaches for asynchronous clocks. 
-
-By including clocks in the language itself, we can then start making statements about data rates. For example a stream may be outputting on clock A, with full bandwidth, and then be transported onto clock A*2 at half its bandwidth. One neat way of expressing the signal throughput is done by [Aetherling](https://aetherling.org/). Signals are expressed as sequences of valid and invalid elements. This can then again filter out bad designs, where the bandwidth from one clock may not be carryable by another clock. 
-
-### Integrate Timing Constraints into language text itself
-- False Paths
-- Multicycle Paths
-
-Often, false paths are used to denote semi-constants that should be disseminated throughout the FPGA, or bits of hardware that won't affect each other, because only one will be active. Adding false paths relaxes the placement problem, leading to more optimal hardware implementations for the paths that matter. 
-
-Constants specifically require that the modules the constant affect aren't being used when the constant changes. This should be representible in some way. 
-
-### Strong Standard Library
-- Avoids repeating common structures
-- Refuse to rely on "inference" for hard logic blocks, instead start from the constraints inherent in these hard logic blocks to adapt the hardware around these blocks. For example hard logic registers around multiply blocks and BRAM blocks. This integrates well with streams for example. 
-
-## Constraints
-
-### Data Loss
-- No data loss
-- No new invalid data
-- every read must correspond to data destruction
-- data destruction must happen together with a read
-- Stream Splits and merges may not lose or duplicate date
-
-### Temporal safety
-- Operations may only happen on data of the same 'time slice' within a stream
-- "Happens-before" relations -> proving FIFOs
-- LTL assertions of hardware
-
-### Strong Typing
-- Actual data types
-- sized integers   (Min-max), not necessarily on power of 2 boundary
-- representation independent integers?
-- Structs
-- Include Rust-style enum types?
-- operator overloading?
-
-## Goals
-### Formal proofs for correctness of common constructs
-- Multiply-Add circuit
-- Skid Buffer
-- Safe Stream Split over multiple work units
-- Safe Stream Merge of multiple work blocks
-- FIFO
-- Ready/Acknowledge Clock domain Crossing
-- Ring pipeline
 
 ## Long Term Strategy
 [https://www.youtube.com/watch?v=XZ3w_jec1v8]("The Economics of Programming Languages" by Evan Czaplicki (Strange Loop 2023))
