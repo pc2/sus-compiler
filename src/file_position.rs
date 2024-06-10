@@ -49,6 +49,10 @@ impl Span {
         self.debug();
         Span(self.0, self.0).debug()
     }
+    pub fn empty_span_at_end(self) -> Span {
+        self.debug();
+        Span(self.1, self.1).debug()
+    }
 }
 
 impl PartialOrd for Span {

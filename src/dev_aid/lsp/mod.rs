@@ -233,17 +233,19 @@ fn gather_all_references_in_one_file(linker: &Linker, file_id: FileUUID, pos: us
 fn gather_all_references_across_all_files(linker: &Linker, file_id: FileUUID, pos: usize) -> Vec<(FileUUID, Vec<Span>)> {
     let mut ref_locations = Vec::new();
 
-    if let Some((_location, hover_info)) = get_selected_object(linker, file_id, pos) {
+    if let Some((location, hover_info)) = get_selected_object(linker, file_id, pos) {
         let refers_to = RefersTo::from(hover_info);
         if refers_to.is_global() {
             for (other_file_id, other_file) in &linker.files {
                 let found_refs = gather_references_in_file(&linker, other_file, refers_to);
+                for r in &found_refs {assert!(location.size() == r.size())}
                 if found_refs.len() > 0 {
                     ref_locations.push((other_file_id, found_refs))
                 }
             }
         } else if let Some(local) = refers_to.local {
             let found_refs = for_each_local_reference_in_module(&linker, local.0, local.1);
+            for r in &found_refs {assert!(location.size() == r.size())}
             if found_refs.len() > 0 {
                 ref_locations.push((file_id, found_refs))
             }
@@ -289,7 +291,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                         goto_definition_list.push((decl.name_span, md.link_info.file));
                     }
                     LocationInfo::InModule(_md_id, md, _decl_id, InModule::NamedSubmodule(submod_decl)) => {
-                        goto_definition_list.push((submod_decl.module_name_span, md.link_info.file))
+                        goto_definition_list.push((submod_decl.name.as_ref().unwrap().1, md.link_info.file))
                     }
                     LocationInfo::InModule(_, _, _, InModule::Temporary(_)) => {}
                     LocationInfo::Type(_) => {}
@@ -319,6 +321,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
         }
         request::DocumentHighlightRequest::METHOD => {
             let params : DocumentHighlightParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
+            println!("DocumentHighlight");
 
             let (file_id, pos) = file_cache.location_in_file(&params.text_document_position_params);
             let file_data = &file_cache.linker.files[file_id];
@@ -335,6 +338,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
         }
         request::References::METHOD => {
             let params : ReferenceParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
+            println!("FindAllReferences");
 
             let (file_id, pos) = file_cache.location_in_file(&params.text_document_position);
   
@@ -344,6 +348,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
         }
         request::Rename::METHOD => {
             let params : RenameParams = serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
+            println!("Rename");
 
             let (file_id, pos) = file_cache.location_in_file(&params.text_document_position);
   
@@ -355,6 +360,8 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                     TextEdit { range: span_to_lsp_range(file_text, span), new_text: params.new_name.clone() }
                 }).collect())
             }).collect();
+
+            println!("{changes:?}");
 
             serde_json::to_value(WorkspaceEdit{
                 changes : Some(changes),

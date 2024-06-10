@@ -134,7 +134,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 RealWireRefRoot::Constant(val.clone())
             }
             WireReferenceRoot::SubModulePort(port) => {
-                return self.instantiate_port_wire_ref_root(port.port, port.submodule_flat, port.port_name_span);
+                return self.instantiate_port_wire_ref_root(port.port, port.submodule_decl, port.port_name_span);
             }
         }
     }
@@ -455,10 +455,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     continue;
                 }
                 Instruction::FuncCall(fc) => {
-                    let submod_id = self.generation_state[fc.submodule_instruction].unwrap_submodule_instance();
-                    let original_submod_instr = &self.md.instructions[fc.submodule_instruction].unwrap_submodule();
-                    let domain = original_submod_instr.local_interface_domains[fc.submodule_interface];
-                    add_to_small_set(&mut self.submodules[submod_id].interface_call_sites[fc.submodule_interface], fc.interface_span);
+                    let submod_id = self.generation_state[fc.interface_reference.submodule_decl].unwrap_submodule_instance();
+                    let original_submod_instr = &self.md.instructions[fc.interface_reference.submodule_decl].unwrap_submodule();
+                    let domain = original_submod_instr.local_interface_domains[fc.interface_reference.submodule_interface];
+                    add_to_small_set(&mut self.submodules[submod_id].interface_call_sites[fc.interface_reference.submodule_interface], fc.interface_reference.interface_span);
                     for (port, arg) in std::iter::zip(fc.func_call_inputs.iter(), fc.arguments.iter()) {
                         let from = self.get_wire_or_constant_as_wire(*arg, domain);
                         let port_wire = self.get_submodule_port(submod_id, port, None);

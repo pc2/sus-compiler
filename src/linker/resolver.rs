@@ -150,6 +150,7 @@ impl<'err_and_globals> ResolvedName<'err_and_globals> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn expect_module(self) -> Option<ModuleUUID> {
         if let NameElem::Module(id) = self.name_elem? {
             Some(id)

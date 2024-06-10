@@ -769,7 +769,7 @@ module FIFO {
 	
 	interface push : bool push'ALMOST_FULL_THRESHOLD, bool[BITWIDTH] data_in -> bool ready'0
 	
-	interface pop : bool pop -> bool[BITWIDTH] data_out, bool data_valid
+	interface pop : bool pop -> bool data_valid, bool[BITWIDTH] data_out
 	
 	state bool[BITWIDTH][DEPTH] mem
 	state int read_addr
@@ -808,8 +808,13 @@ module FIFO {
 }
 
 module use_fifo {
-	FIFO f
+	FIFO fiii
 
+	bool[20] data
+
+	bool valid, bool[20] data2 = fiii.pop(true)
+
+	//bool ready = fiii.push(valid, data2)
 }
 
 module test_separated_domain : int main {

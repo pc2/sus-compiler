@@ -105,7 +105,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 linker_cst.get_span_file()
             }
             WireReferenceRoot::SubModulePort(port) => {
-                let (decl, file) = self.get_decl_of_module_port(port.port, port.submodule_flat);
+                let (decl, file) = self.get_decl_of_module_port(port.port, port.submodule_decl);
                 Some((decl.get_span(), file))
             }
         }
@@ -122,7 +122,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 linker_cst.get_full_type()
             }
             WireReferenceRoot::SubModulePort(port) => {
-                self.get_type_of_port(port.port, port.submodule_flat)
+                self.get_type_of_port(port.port, port.submodule_decl)
             }
         };
 
@@ -179,7 +179,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         return;
                     }
                     WireReferenceRoot::SubModulePort(port) => {
-                        let r = self.get_decl_of_module_port(port.port, port.submodule_flat);
+                        let r = self.get_decl_of_module_port(port.port, port.submodule_decl);
 
                         if !r.0.identifier_type.unwrap_is_input() {
                             self.errors.error(conn.to_span, "Cannot assign to a submodule output port")
@@ -288,9 +288,9 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
             Instruction::FuncCall(fc) => {
                 for (port, arg) in std::iter::zip(fc.func_call_inputs.into_iter(), &fc.arguments) {
-                    let write_to_type = self.get_type_of_port(port, fc.submodule_instruction);
+                    let write_to_type = self.get_type_of_port(port, fc.interface_reference.submodule_decl);
 
-                    let (decl, file) = self.get_decl_of_module_port(port, fc.submodule_instruction);
+                    let (decl, file) = self.get_decl_of_module_port(port, fc.interface_reference.submodule_decl);
                     let declared_here = (decl.get_span(), file);
 
                     // Typecheck the value with target type
@@ -426,7 +426,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 Instruction::SubModule(_) => {} // TODO Dependencies should be added here if for example generative templates get added
                 Instruction::FuncCall(fc) => {
                     for a in &fc.arguments {
-                        instruction_fanins[fc.submodule_instruction].push(*a);
+                        instruction_fanins[fc.interface_reference.submodule_decl].push(*a);
                     }
                 }
                 Instruction::Declaration(decl) => {

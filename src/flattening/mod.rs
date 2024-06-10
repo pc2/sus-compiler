@@ -120,15 +120,22 @@ impl Module {
     }
 
     /// Get a port by the given name. Reports non existing ports errors
-    pub fn get_port_by_name(&self, name_span : Span, file_text : &FileText, errors : &ErrorCollector) -> Option<PortID> {
+    /// 
+    /// Prefer interfaces over ports in name conflicts
+    pub fn get_port_or_interface_by_name(&self, name_span : Span, file_text : &FileText, errors : &ErrorCollector) -> Option<PortOrInterface> {
         let name_text = &file_text[name_span];
+        for (id, data) in &self.interfaces {
+            if data.name == name_text {
+                return Some(PortOrInterface::Interface(id))
+            }
+        }
         for (id, data) in &self.ports {
             if data.name == name_text {
-                return Some(id)
+                return Some(PortOrInterface::Port(id))
             }
         }
         errors
-            .error(name_span, format!("There is no port '{name_text}' on module {}", self.link_info.name))
+            .error(name_span, format!("There is no port or interface of name '{name_text}' on module {}", self.link_info.name))
             .info_obj(self);
         return None
     }
@@ -158,6 +165,12 @@ impl Module {
     pub fn is_multi_domain(&self) -> bool {
         self.domains.len() > 1
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PortOrInterface {
+    Port(PortID),
+    Interface(DomainID)
 }
 
 #[derive(Debug)]
@@ -279,7 +292,7 @@ impl WireReferenceRoot {
         match self {
             WireReferenceRoot::LocalDecl(f, _) => Some(*f),
             WireReferenceRoot::NamedConstant(_, _) => None,
-            WireReferenceRoot::SubModulePort(port) => Some(port.submodule_flat),
+            WireReferenceRoot::SubModulePort(port) => Some(port.submodule_decl),
         }
     }
     #[track_caller]
@@ -354,13 +367,15 @@ pub enum BinaryOperator {
 
 #[derive(Debug, Clone, Copy)]
 pub struct PortInfo {
-    /// Even this can be implicit. In the inline function call instantiation syntax there's no named submodule. my_mod(a, b, c)
-    pub submodule_name_span : Option<Span>,
-    pub submodule_flat : FlatID,
+    pub submodule_decl : FlatID,
     pub port : PortID,
+    pub port_identifier_typ : IdentifierType,
     /// Only set if the port is named as an explicit field. If the port name is implicit, such as in the function call syntax, then it is not present. 
     pub port_name_span : Option<Span>,
-    pub port_identifier_typ : IdentifierType
+    /// Even this can be implicit. In the inline function call instantiation syntax there's no named submodule. my_mod(a, b, c)
+    /// 
+    /// Finally, if [Self::port_name_span].is_none(), then for highlighting and renaming, this points to a duplicate of a Function Call
+    pub submodule_name_span : Option<Span>
 }
 
 #[derive(Debug)]
@@ -386,7 +401,7 @@ impl WireSource {
                 match &wire_ref.root {
                     WireReferenceRoot::LocalDecl(decl_id, _) => func(*decl_id),
                     WireReferenceRoot::NamedConstant(_, _) => {}
-                    WireReferenceRoot::SubModulePort(submod_port) => func(submod_port.submodule_flat),
+                    WireReferenceRoot::SubModulePort(submod_port) => func(submod_port.submodule_decl),
                 }
                 for p in &wire_ref.path {
                     match p {
@@ -496,19 +511,28 @@ impl SubModuleInstance {
 }
 
 #[derive(Debug)]
-pub struct FuncCallInstruction {
-    pub submodule_instruction : FlatID,
-    pub module_uuid : ModuleUUID,
+pub struct ModuleInterfaceReference {
+    pub submodule_decl : FlatID,
     pub submodule_interface : DomainID,
+
+    /// If this is None, that means the submodule was declared implicitly. Hence it could also be used at compiletime
+    pub name_span : Option<Span>,
+
+    /// Best-effort span for the interface that is called. [my_mod<abc>](), my_mod<abc> mm; [mm]() or mm.[my_interface]()
+    /// 
+    /// if interface_span == name_span then no specific interface is selected, so the main interface is used
+    pub interface_span : Span,
+}
+
+#[derive(Debug)]
+pub struct FuncCallInstruction {
+    pub interface_reference : ModuleInterfaceReference,
     /// arguments.len() == func_call_inputs.len() ALWAYS
     pub arguments : Vec<FlatID>,
     /// arguments.len() == func_call_inputs.len() ALWAYS
     pub func_call_inputs : PortIDRange,
     pub func_call_outputs : PortIDRange,
-    /// If this is None, that means the submodule was declared implicitly. Hence it could also be used at compiletime
-    pub name_span : Option<Span>,
-    /// Best-effort span for the interface that is called. [my_mod<abc>](), my_mod<abc> mm; [mm]() or mm.[my_interface]()
-    pub interface_span : Span,
+
     pub arguments_span : BracketSpan,
     pub whole_func_span : Span,
 }

@@ -2,7 +2,7 @@
 use std::ops::Deref;
 
 use crate::{
-    file_position::Span, flattening::{Declaration, FlatID, Instruction, Interface, DomainID, Module, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource, WrittenType}, linker::{FileData, FileUUID, Linker, ModuleUUID, NameElem}
+    file_position::Span, flattening::{Declaration, DomainID, FlatID, Instruction, Interface, Module, ModuleInterfaceReference, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource, WrittenType}, linker::{FileData, FileUUID, Linker, ModuleUUID, NameElem}
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -44,10 +44,8 @@ impl<'linker> From<LocationInfo<'linker>> for RefersTo {
             LocationInfo::InModule(md_id, md, flat_id, flat_obj) => {
                 match flat_obj {
                     InModule::NamedLocal(_) => {
-                        for (port_id, port) in &md.ports {
-                            if port.declaration_instruction == flat_id {
-                                result.port = Some((md_id, port_id));
-                            }
+                        if let Some((port_id, _)) = md.ports.iter().find(|(_, port)| port.declaration_instruction == flat_id) {
+                            result.port = Some((md_id, port_id));
                         }
                         result.local = Some((md_id, flat_id));
                     },
@@ -84,7 +82,7 @@ impl RefersTo {
         }
     }
     pub fn is_global(&self) -> bool {
-        self.global.is_some() | self.port.is_some()
+        self.global.is_some() | self.port.is_some() | self.interface.is_some()
     }
 }
 
@@ -159,13 +157,15 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
                 self.visit(*span, LocationInfo::Global(NameElem::Constant(*cst)))
             }
             WireReferenceRoot::SubModulePort(port) => {
-                if let Some(submod_name_span) = port.submodule_name_span {
-                    self.visit(submod_name_span, LocationInfo::InModule(md_id, md, port.submodule_flat, InModule::NamedSubmodule(md.instructions[port.submodule_flat].unwrap_submodule())));
-                }
                 if let Some(span) = port.port_name_span {
-                    let sm_instruction = md.instructions[port.submodule_flat].unwrap_submodule();
+                    let sm_instruction = md.instructions[port.submodule_decl].unwrap_submodule();
                     let submodule = &self.linker.modules[sm_instruction.module_uuid];
-                    self.visit(span, LocationInfo::Port(sm_instruction, submodule, port.port))
+                    self.visit(span, LocationInfo::Port(sm_instruction, submodule, port.port));
+
+                    // port_name_span being enabled means submodule_name_span is for sure
+                    // And if port_name_span is invalid, then submodule_name_span points to a duplicate!
+                    // So in effect, port_name_span validity is a proxy for non-duplicate-ness of submodule_name_span
+                    self.visit(port.submodule_name_span.unwrap(), LocationInfo::InModule(md_id, md, port.submodule_decl, InModule::NamedSubmodule(md.instructions[port.submodule_decl].unwrap_submodule())));
                 }
             }
         }
@@ -189,6 +189,19 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
         }
     }
     
+    fn walk_interface_reference(&mut self, md_id : ModuleUUID, md : &'linker Module, iref : &ModuleInterfaceReference) {
+        if let Some(submod_name_span) = iref.name_span {
+            let submodule_instruction = iref.submodule_decl;
+            let submodule = md.instructions[submodule_instruction].unwrap_submodule();
+            self.visit(submod_name_span, LocationInfo::InModule(md_id, md, submodule_instruction, InModule::NamedSubmodule(submodule)));
+            if iref.interface_span != submod_name_span {
+                let submod_md = &self.linker.modules[submodule.module_uuid];
+                let interface = &submod_md.interfaces[iref.submodule_interface];
+                self.visit(iref.interface_span, LocationInfo::Interface(submodule.module_uuid, submod_md, iref.submodule_interface, interface));
+            }
+        }
+    }
+
     fn walk_module(&mut self, md_id : ModuleUUID) {
         let md = &self.linker.modules[md_id];
         if !(self.should_prune)(md.link_info.span) {
@@ -226,9 +239,7 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
                         self.walk_wire_ref(md_id, md, &write.to);
                     }
                     Instruction::FuncCall(fc) => {
-                        if let Some(submod_name_span) = fc.name_span {
-                            self.visit(submod_name_span, LocationInfo::InModule(md_id, md, fc.submodule_instruction, InModule::NamedSubmodule(md.instructions[fc.submodule_instruction].unwrap_submodule())));
-                        }
+                        self.walk_interface_reference(md_id, md, &fc.interface_reference);
                     }
                     Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
                 };

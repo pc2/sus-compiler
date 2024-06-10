@@ -2,7 +2,7 @@
 
 use std::cell::RefCell;
 
-use crate::{arena_alloc::ArenaAllocator, file_position::{Span, SpanFile}, flattening::{Declaration, Module, Port, SubModuleInstance}, linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker, LinkInfo}};
+use crate::{arena_alloc::ArenaAllocator, file_position::{Span, SpanFile}, flattening::{Declaration, Interface, Module, Port, SubModuleInstance}, linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker, LinkInfo}};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ErrorLevel {
@@ -161,6 +161,12 @@ impl<'ec> ErrorReference<'ec> {
         let (position, info) = obj.make_info(&self.err_collector.files[file]);
         self.existing_info(ErrorInfo{ position, file, info })
     }
+    pub fn suggest_replace<S : Into<String>>(&self, replace_span : Span, replace_with : S) -> &Self {
+        self.info_same_file(replace_span, format!("SUGGEST: Replace this with \"{}\"", replace_with.into()))
+    }
+    pub fn suggest_remove(&self, remove_span : Span) -> &Self {
+        self.info_same_file(remove_span, "SUGGEST: Remove this")
+    }
 }
 
 /// This represents objects that can be given as info to an error in a straight-forward way. 
@@ -193,6 +199,14 @@ impl ErrorInfoObject for SubModuleInstance {
 impl FileKnowingErrorInfoObject for LinkInfo {
     fn make_global_info(&self, _files : &ArenaAllocator<FileData, FileUUIDMarker>) -> ((Span, FileUUID), String) {
         ((self.name_span, self.file), format!("'{}' defined here", &self.name))
+    }
+}
+
+/// For interfaces of this module
+impl FileKnowingErrorInfoObject for (&'_ Module, &'_ Interface) {
+    fn make_global_info(&self, _files : &ArenaAllocator<FileData, FileUUIDMarker>) -> ((Span, FileUUID), String) {
+        let (md, interface) = *self;
+        ((interface.name_span, md.link_info.file), format!("Interface '{}' defined here", &interface.name))
     }
 }
 
