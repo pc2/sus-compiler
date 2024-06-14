@@ -21,7 +21,6 @@ pub fn typecheck_all_modules(linker : &mut Linker) {
                 type_checker : TypeUnifier::new(types, name_resolver.errors, &modules.working_on.interfaces),
                 constants,
                 runtime_condition_stack : Vec::new(),
-                declaration_depths : modules.working_on.instructions.iter().map(|_| ExtraInstructionData::Unset).collect(),
                 modules,
             };
             
@@ -40,25 +39,12 @@ struct ConditionStackElem {
     domain : DomainID
 }
 
-enum ExtraInstructionData {
-    Declaration{decl_depth : usize},
-    Unset
-}
-
-impl ExtraInstructionData {
-    fn unwrap_declaration_depth(&self) -> usize {
-        let Self::Declaration{decl_depth} = self else {unreachable!()};
-        *decl_depth
-    }
-}
-
 struct TypeCheckingContext<'l, 'errs> {
     modules : WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>,
     type_checker : TypeUnifier<'l, 'errs>,
     constants : Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
     errors : &'errs ErrorCollector<'l>,
-    runtime_condition_stack : Vec<ConditionStackElem>,
-    declaration_depths : FlatAlloc<ExtraInstructionData, FlatIDMarker>
+    runtime_condition_stack : Vec<ConditionStackElem>
 }
 
 impl<'l, 'errs> Deref for TypeCheckingContext<'l, 'errs> {
@@ -159,8 +145,9 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             Instruction::FuncCall(_) => {}
             Instruction::Declaration(decl) => {
                 if decl.identifier_type.is_generative() {
-                    assert!(matches!(self.declaration_depths[inst_id], ExtraInstructionData::Unset));
-                    self.declaration_depths[inst_id] = ExtraInstructionData::Declaration{decl_depth : self.runtime_condition_stack.len()}
+                    assert!(decl.declaration_runtime_depth == DECL_DEPTH_LATER);
+                    let Instruction::Declaration(decl) = &mut self.modules.working_on.instructions[inst_id] else {unreachable!()};
+                    decl.declaration_runtime_depth = self.runtime_condition_stack.len()
                 }
             }
             Instruction::Wire(_) => {}
@@ -195,12 +182,12 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         if decl.identifier_type.is_generative() {
                             // Check that this generative declaration isn't used in a non-compiletime if
                             if let Some(root_flat) = conn.to.root.get_root_flat() {
-                                let declared_at_depth = self.declaration_depths[root_flat].unwrap_declaration_depth();
+                                let to_decl = self.working_on.instructions[root_flat].unwrap_wire_declaration();
             
-                                if self.runtime_condition_stack.len() > declared_at_depth {
+                                if self.runtime_condition_stack.len() > to_decl.declaration_runtime_depth {
                                     let err_ref = self.errors.error(conn.to_span, "Cannot write to generative variables in runtime conditional block");
                                     err_ref.info_obj_different_file(decl, file);
-                                    for elem in &self.runtime_condition_stack[declared_at_depth..] {
+                                    for elem in &self.runtime_condition_stack[to_decl.declaration_runtime_depth..] {
                                         err_ref.info((elem.span, file), "Runtime condition here");
                                     }
                                 }

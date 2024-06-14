@@ -139,6 +139,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Generative Conditions
 - [x] Generative For Loops
 - [ ] Generative While Loops
+- [ ] Generative Parameters
 - [x] Multi-Interface Syntax
 - [ ] Native Module integration syntax
 - [x] Can Parse FIFO implementation
@@ -202,6 +203,8 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Can Generate Verilog for Multiply-Add pipeline
 - [x] Can Generate Verilog for Blur2 filter
 - [x] Can Generate Verilog for FIFO
+- [ ] Multi-Clock Modules
+- [ ] Clock Tracking for SubModules
 
 ### Fun projects to do in SUS
 - [ ] Bit-Serial Matrix Multiply

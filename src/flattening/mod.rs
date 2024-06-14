@@ -467,12 +467,15 @@ impl WrittenType {
 }
 
 
+const DECL_DEPTH_LATER : usize = usize::MAX;
+
 #[derive(Debug)]
 pub struct Declaration {
     pub typ_expr : WrittenType,
     pub typ : FullType,
     pub name_span : Span,
     pub name : String,
+    pub declaration_runtime_depth : usize,
     /// Variables are read_only when they may not be controlled by the current block of code. 
     /// This is for example, the inputs of the current module, or the outputs of nested modules. 
     /// But could also be the iterator of a for loop. 
@@ -496,6 +499,7 @@ pub struct SubModuleInstance {
     pub module_name_span : Span,
     /// Name is not always present in source code. Such as in inline function call syntax: my_mod(a, b, c)
     pub name : Option<(String, Span)>,
+    pub declaration_runtime_depth : usize,
     pub local_interface_domains : FlatAlloc<DomainID, DomainIDMarker>,
     pub documentation : Documentation
 }

@@ -289,6 +289,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         name : Some((name.to_owned(), name_span)),
                         module_uuid,
                         module_name_span: span,
+                        declaration_runtime_depth : DECL_DEPTH_LATER,
                         local_interface_domains : FlatAlloc::new(),
                         documentation
                     }))
@@ -305,6 +306,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 identifier_type,
                 name : name.to_owned(),
                 name_span,
+                declaration_runtime_depth : DECL_DEPTH_LATER,
                 latency_specifier : span_latency_specifier.map(|(ls, _)| ls),
                 documentation
             }))
@@ -389,6 +391,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     name : None,
                     module_uuid,
                     module_name_span,
+                    declaration_runtime_depth : DECL_DEPTH_LATER,
                     local_interface_domains : FlatAlloc::new(),
                     documentation
                 }));
