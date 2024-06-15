@@ -144,6 +144,14 @@ impl core::fmt::Display for BinaryOperator {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeclarationContext {
+    Input,
+    Output,
+    ForLoopGenerative,
+    PlainWire
+}
+
 struct FlatteningContext<'l, 'errs> {
     modules : WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>,
     #[allow(dead_code)]
@@ -242,27 +250,69 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         inst_id
     }
     
-    fn flatten_declaration<const ALLOW_MODULES : bool, const ALLOW_MODIFIERS : bool>(&mut self, fallback_identifier_type : IdentifierType, read_only : bool, declaration_itself_is_not_written_to : bool, cursor : &mut Cursor) -> FlatID {
+    fn flatten_declaration<const ALLOW_MODULES : bool>(&mut self, declaration_context : DeclarationContext, read_only : bool, declaration_itself_is_not_written_to : bool, cursor : &mut Cursor) -> FlatID {
         let whole_declaration_span = cursor.span();
         cursor.go_down(kind!("declaration"), |cursor| {
-            let identifier_type = if cursor.optional_field(field!("declaration_modifiers")) {
-                let (modifier_kind, modifier_span) = cursor.kind_span();
+            // Extra inputs and outputs declared in the body of the module
+            let io_kw = cursor.optional_field(field!("io_port_modifiers")).then(|| cursor.kind_span());
 
-                if !ALLOW_MODIFIERS {
-                    self.errors.error(modifier_span, "Inputs and outputs of a module cannot be decorated with 'state' or 'gen'");
-                    fallback_identifier_type
-                } else {
-                    if modifier_kind == kw!("state") {
-                        IdentifierType::State
-                    } else if modifier_kind == kw!("gen") {
-                        IdentifierType::Generative
-                    } else {
-                        cursor.could_not_match()
+            let is_input_port = match declaration_context {
+                DeclarationContext::Input | DeclarationContext::Output => {
+                    if let Some((_, io_span)) = io_kw {
+                        self.errors.error(io_span, "Cannot redeclare 'input' or 'output' on functional syntax IO");
+                    }
+                    Some(declaration_context == DeclarationContext::Input)
+                }
+                DeclarationContext::ForLoopGenerative => {
+                    if let Some((_, io_span)) = io_kw {
+                        self.errors.error(io_span, "Cannot declare 'input' or 'output' to the iterator of a for loop");
+                    }
+                    None
+                }
+                DeclarationContext::PlainWire => {
+                    match io_kw {
+                        Some((kw!("input"), _)) => Some(true),
+                        Some((kw!("output"), _)) => Some(false),
+                        None => None,
+                        Some((_, _)) => cursor.could_not_match(),
                     }
                 }
-            } else {fallback_identifier_type};
+            };
+
+            // State or Generative
+            let declaration_modifiers = cursor.optional_field(field!("declaration_modifiers")).then(|| cursor.kind_span());
             
+            let identifier_type = match declaration_context {
+                DeclarationContext::Input | DeclarationContext::Output | DeclarationContext::PlainWire => {
+                    match declaration_modifiers {
+                        Some((kw!("state"), modifier_span)) => {
+                            if is_input_port == Some(true) {
+                                self.errors.error(modifier_span, "Inputs cannot be decorated with 'state'");
+                            }
+                            IdentifierType::State
+                        }
+                        Some((kw!("gen"), modifier_span)) => {
+                            if is_input_port.is_some() {
+                                self.errors.error(modifier_span, "Cannot make an input or output generative");
+                            }
+                            IdentifierType::Generative
+                        }
+                        Some(_) => cursor.could_not_match(),
+                        None => {
+                            IdentifierType::Local
+                        }
+                    }
+                }
+                DeclarationContext::ForLoopGenerative => {
+                    if let Some((_, modifier_span)) = declaration_modifiers {
+                        self.errors.error(modifier_span, "Cannot add modifiers to the iterator of a for loop");
+                    }
+                    IdentifierType::Generative
+                }
+            };
+
             cursor.field(field!("type"));
+            let decl_span = Span::new_overarching(cursor.span(), whole_declaration_span.empty_span_at_end());
             let typ_or_module_expr = self.flatten_module_or_type::<ALLOW_MODULES>(cursor);
             
             let name_span = cursor.field_span(field!("name"), kind!("identifier"));
@@ -298,18 +348,29 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
             let name = &self.name_resolver.file_text[name_span];
 
-            self.alloc_declaration(name, whole_declaration_span, Instruction::Declaration(Declaration{
+            let decl_id = self.alloc_declaration(name, whole_declaration_span, Instruction::Declaration(Declaration{
                 typ_expr,
                 typ : FullType::new_unset(),
                 read_only,
                 declaration_itself_is_not_written_to,
+                is_input_port,
                 identifier_type,
                 name : name.to_owned(),
                 name_span,
+                decl_span,
                 declaration_runtime_depth : DECL_DEPTH_LATER,
                 latency_specifier : span_latency_specifier.map(|(ls, _)| ls),
                 documentation
-            }))
+            }));
+
+            if is_input_port.is_some() {
+                let this_port_id = self.ports_to_visit.next().unwrap();
+                let port = &mut self.working_on.ports[this_port_id];
+                assert_eq!(port.name_span, name_span);
+                port.declaration_instruction = decl_id;
+            }
+
+            decl_id
         })
     }
 
@@ -478,7 +539,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         submodule_decl: fc.interface_reference.submodule_decl,
                         port: interface.func_call_outputs.0,
                         port_name_span: None,
-                        port_identifier_typ: IdentifierType::Output,
+                        is_input: false,
                     }))
                 } else {
                     // Function desugaring or using threw an error
@@ -584,7 +645,13 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
                         match submod.get_port_or_interface_by_name(port_name_span, &self.name_resolver.file_text, self.errors) {
                             Some(PortOrInterface::Port(port)) => {
-                                let port_info = PortInfo { submodule_name_span : Some(submodule_name_span), submodule_decl, port, port_name_span : Some(port_name_span), port_identifier_typ: submod.ports[port].identifier_type };
+                                let port_info = PortInfo{
+                                    submodule_name_span : Some(submodule_name_span),
+                                    submodule_decl,
+                                    port,
+                                    port_name_span : Some(port_name_span),
+                                    is_input: submod.ports[port].is_input
+                                };
                                 PartialWireReference::WireReference(WireReference{
                                     root : WireReferenceRoot::SubModulePort(port_info),
                                     path : Vec::new()
@@ -673,7 +740,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         source: WireSource::WireRef(WireReference::simple_port(PortInfo{
                             port,
                             port_name_span: None,
-                            port_identifier_typ: IdentifierType::Output,
+                            is_input: false,
                             submodule_name_span,
                             submodule_decl
                         }))
@@ -736,7 +803,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 cursor.go_down_no_check(|cursor| {
                     let loop_var_decl_frame = self.local_variable_context.new_frame();
                     cursor.field(field!("for_decl"));
-                    let loop_var_decl = self.flatten_declaration::<false, false>(IdentifierType::Generative, true, true, cursor);
+                    let loop_var_decl = self.flatten_declaration::<false>(DeclarationContext::ForLoopGenerative, true, true, cursor);
 
                     cursor.field(field!("from"));
                     let start = self.flatten_expr(cursor);
@@ -769,8 +836,6 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         self.flatten_interface_ports(cursor);
                     }
                 });
-            } else if kind == kind!("cross_statement") {
-                println!("TODO: Cross Statement");
             } else {
                 cursor.could_not_match()
             }
@@ -816,7 +881,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 let (kind, span) = cursor.kind_span();
 
                 (if kind == kind!("declaration") {
-                    let root = self.flatten_declaration::<false, true>(IdentifierType::Local, false, true, cursor);
+                    let root = self.flatten_declaration::<false>(DeclarationContext::PlainWire, false, true, cursor);
                     let flat_root_decl = self.working_on.instructions[root].unwrap_wire_declaration();
                     Some((WireReference{root : WireReferenceRoot::LocalDecl(root, flat_root_decl.name_span), path: Vec::new()}, write_modifiers))
                 } else { // It's _expression
@@ -850,7 +915,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 let (kind, span) = cursor.kind_span();
 
                 if kind == kind!("declaration") {
-                    let _ = self.flatten_declaration::<true, true>(IdentifierType::Local, false, true, cursor);
+                    let _ = self.flatten_declaration::<true>(DeclarationContext::PlainWire, false, true, cursor);
                 } else { // It's _expression
                     if kind == kind!("func_call") {
                         self.flatten_assign_function_call(Vec::new(), cursor);
@@ -863,25 +928,19 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
 
-    fn flatten_declaration_list(&mut self, identifier_type : IdentifierType, read_only : bool, cursor : &mut Cursor) {
+    fn flatten_declaration_list(&mut self, declaration_context : DeclarationContext, read_only : bool, cursor : &mut Cursor) {
         cursor.list(kind!("declaration_list"), |cursor| {
-            let found_decl_span = cursor.span();
-
-            let id = self.flatten_declaration::<false, false>(identifier_type, read_only, true, cursor);
-            let this_port_id = self.ports_to_visit.next().unwrap();
-            let port = &mut self.working_on.ports[this_port_id];
-            assert_eq!(port.decl_span, found_decl_span);
-            port.declaration_instruction = id;
+            let _ = self.flatten_declaration::<false>(declaration_context, read_only, true, cursor);
         });
     }
 
     fn flatten_interface_ports(&mut self, cursor : &mut Cursor) {
         cursor.go_down(kind!("interface_ports"), |cursor| {
             if cursor.optional_field(field!("inputs")) {
-                self.flatten_declaration_list(IdentifierType::Input, true, cursor)
+                self.flatten_declaration_list(DeclarationContext::Input, true, cursor)
             }
             if cursor.optional_field(field!("outputs")) {
-                self.flatten_declaration_list(IdentifierType::Output, false, cursor)
+                self.flatten_declaration_list(DeclarationContext::Output, false, cursor)
             }
         })
     }

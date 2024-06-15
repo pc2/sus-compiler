@@ -1,0 +1,25 @@
+/*
+module MockFIFO {
+	interface push : bool push'5, bool[20] data_in'5 -> bool ready'0
+	interface pop : bool pop'0 -> bool data_valid'0, bool[20] data_out'2
+
+    ready = true
+    data_valid = true
+    data_out[0] = true
+}
+
+module use_mock_fifo {
+	MockFIFO fiii
+
+	bool[20] data
+
+	bool valid, bool[20] data2 = fiii.pop(true)
+
+	bool ready = fiii.push(valid, data2)
+}
+*/
+module boop {
+
+	output bool ready'0
+
+}

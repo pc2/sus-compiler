@@ -1,5 +1,5 @@
 
-use sus_proc_macro::{field, kind};
+use sus_proc_macro::{field, kind, kw};
 
 
 use crate::{
@@ -11,6 +11,7 @@ use super::*;
 struct ModuleInitializationContext<'linker> {
     ports : FlatAlloc<Port, PortIDMarker>,
     interfaces : FlatAlloc<Interface, DomainIDMarker>,
+    current_interface : DomainID,
     file_text : &'linker FileText
 }
 
@@ -22,21 +23,21 @@ impl<'linker> ModuleInitializationContext<'linker> {
         assert!(self.interfaces.len() == 1); // Therefore the first interface is [Module::MAIN_INTERFACE_ID]
 
         cursor.field(field!("block"));
-        self.gather_all_interfaces_in_block(cursor);
+        self.gather_all_ports_in_block(cursor);
     }
 
-    fn gather_interfaces_in_if_stmt(&mut self, cursor : &mut Cursor) {
+    fn gather_ports_in_if_stmt(&mut self, cursor : &mut Cursor) {
         cursor.go_down_no_check(|cursor| {
             cursor.field(field!("condition"));
             cursor.field(field!("then_block"));
-            self.gather_all_interfaces_in_block(cursor);
+            self.gather_all_ports_in_block(cursor);
             if cursor.optional_field(field!("else_block")) {
                 match cursor.kind() {
                     kind!("if_statement") => {
-                        self.gather_interfaces_in_if_stmt(cursor);
+                        self.gather_ports_in_if_stmt(cursor);
                     }
                     kind!("block") => {
-                        self.gather_all_interfaces_in_block(cursor);
+                        self.gather_all_ports_in_block(cursor);
                     }
                     _other => unreachable!()
                 }
@@ -44,7 +45,32 @@ impl<'linker> ModuleInitializationContext<'linker> {
         })
     }
 
-    fn gather_all_interfaces_in_block(&mut self, cursor : &mut Cursor) {
+    fn gather_assign_left_side(&mut self, cursor : &mut Cursor) {
+        cursor.list(kind!("assign_left_side"), |cursor| {
+            cursor.go_down(kind!("assign_to"), |cursor| {
+                let _ = cursor.optional_field(field!("write_modifiers"));
+                cursor.field(field!("expr_or_decl"));
+                
+                if cursor.kind() == kind!("declaration") {
+                    cursor.go_down_no_check(|cursor| {
+                        if cursor.optional_field(field!("io_port_modifiers")) {
+                            let is_input = match cursor.kind() {
+                                kw!("input") => true,
+                                kw!("output") => false,
+                                _ => cursor.could_not_match()
+                            };
+
+                            // Skip
+                            let _ = cursor.optional_field(field!("declaration_modifiers"));
+                            self.finish_gather_decl(is_input, cursor);
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    fn gather_all_ports_in_block(&mut self, cursor : &mut Cursor) {
         cursor.list(kind!("block"), |cursor| {
             match cursor.kind() {
                 kind!("interface_statement") => {
@@ -55,10 +81,10 @@ impl<'linker> ModuleInitializationContext<'linker> {
                     });
                 },
                 kind!("block") => {
-                    self.gather_all_interfaces_in_block(cursor);
+                    self.gather_all_ports_in_block(cursor);
                 }
                 kind!("if_statement") => {
-                    self.gather_interfaces_in_if_stmt(cursor);
+                    self.gather_ports_in_if_stmt(cursor);
                 }
                 kind!("for_statement") => {
                     cursor.go_down_no_check(|cursor| {
@@ -66,27 +92,36 @@ impl<'linker> ModuleInitializationContext<'linker> {
                         cursor.field(field!("from"));
                         cursor.field(field!("to"));
                         cursor.field(field!("block"));
-                        self.gather_all_interfaces_in_block(cursor);
+                        self.gather_all_ports_in_block(cursor);
                     })
+                }
+                kind!("assign_left_side") => {
+                    self.gather_assign_left_side(cursor);
+                }
+                kind!("decl_assign_statement") => {
+                    cursor.go_down_no_check(|cursor| {
+                        cursor.field(field!("assign_left"));
+                        self.gather_assign_left_side(cursor);
+                    });
                 }
                 _other => {} // Nothing
             }
         });
     }
 
-    fn gather_func_call_ports(&mut self, interface_name_span : Span, cursor : &mut Cursor) -> DomainID {
+    fn gather_func_call_ports(&mut self, interface_name_span : Span, cursor : &mut Cursor) {
         let mut func_call_inputs = PortIDRange::empty();
         let mut func_call_outputs = PortIDRange::empty();
         
-        let interface = self.interfaces.get_next_alloc_id();
+        self.current_interface = self.interfaces.get_next_alloc_id();
 
         if cursor.optional_field(field!("interface_ports")) {
             cursor.go_down(kind!("interface_ports"), |cursor| {
                 if cursor.optional_field(field!("inputs")) {
-                    func_call_inputs = self.gather_decl_names_in_list(IdentifierType::Input, interface, cursor);
+                    func_call_inputs = self.gather_decl_names_in_list(true, cursor);
                 }
                 if cursor.optional_field(field!("outputs")) {
-                    func_call_outputs = self.gather_decl_names_in_list(IdentifierType::Output, interface, cursor);
+                    func_call_outputs = self.gather_decl_names_in_list(false, cursor);
                 }
             })
         }
@@ -97,24 +132,26 @@ impl<'linker> ModuleInitializationContext<'linker> {
             name_span: interface_name_span,
             name: self.file_text[interface_name_span].to_owned()
         });
-
-        interface
     }
 
-    fn gather_decl_names_in_list(&mut self, id_typ: IdentifierType, interface : DomainID, cursor: &mut Cursor) -> PortIDRange {
+    fn gather_decl_names_in_list(&mut self, is_input : bool, cursor : &mut Cursor) -> PortIDRange {
         let list_start_at = self.ports.get_next_alloc_id();
         cursor.list(kind!("declaration_list"), |cursor| {
-            let decl_span = cursor.span();
             cursor.go_down(kind!("declaration"), |cursor| {
-                // Skip declaration_modifiers if it exists
+                // Skip fields if they exist
+                let _ = cursor.optional_field(field!("io_port_modifiers"));
                 let _ = cursor.optional_field(field!("declaration_modifiers"));
-                cursor.field(field!("type"));
-                let name_span = cursor.field_span(field!("name"), kind!("identifier"));
-                let name = self.file_text[name_span].to_owned();
-                self.ports.alloc(Port{name, name_span, decl_span, identifier_type: id_typ, interface, declaration_instruction : UUID::PLACEHOLDER})
+                self.finish_gather_decl(is_input, cursor);
             });
         });
         self.ports.range_since(list_start_at)
+    }
+
+    fn finish_gather_decl(&mut self, is_input: bool, cursor: &mut Cursor) {
+        cursor.field(field!("type"));
+        let name_span = cursor.field_span(field!("name"), kind!("identifier"));
+        let name = self.file_text[name_span].to_owned();
+        self.ports.alloc(Port{name, name_span, is_input, interface : self.current_interface, declaration_instruction : UUID::PLACEHOLDER});
     }
 }
 
@@ -130,6 +167,7 @@ pub fn gather_initial_file_data(mut builder : FileBuilder) {
                     let mut ctx = ModuleInitializationContext {
                         ports: FlatAlloc::new(),
                         interfaces: FlatAlloc::new(),
+                        current_interface: DomainID::PLACEHOLDER,
                         file_text: builder.file_text,
                     };
 

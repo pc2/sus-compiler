@@ -1,5 +1,7 @@
 
 
+use crate::config::config;
+
 use super::list_of_lists::ListOfLists;
 
 
@@ -240,6 +242,10 @@ fn pop_a_port(ports : &mut Vec<PortLatencyCandidate>) -> Option<PortLatencyCandi
 
 /// All elements in latencies must initially be [LatencyNode::UNSET] or pinned known values
 pub fn solve_latencies(fanins : &ListOfLists<FanInOut>, fanouts : &ListOfLists<FanInOut>, inputs : &[usize], outputs : &[usize], mut specified_latencies : Vec<SpecifiedLatency>) -> Result<Vec<i64>, LatencyCountingError> {
+    if config().debug_print_latency_graph {
+        print_latency_test_case(fanins, inputs, outputs, &specified_latencies);
+    }
+
     if fanins.len() == 0 {
         return Ok(Vec::new())
     }
@@ -318,6 +324,29 @@ pub fn solve_latencies(fanins : &ListOfLists<FanInOut>, fanouts : &ListOfLists<F
     }
 
     Ok(working_latencies.into_iter().map(|v| v.get_maybe()).collect())
+}
+
+fn print_latency_test_case(fanins: &ListOfLists<FanInOut>, inputs : &[usize], outputs : &[usize], specified_latencies : &[SpecifiedLatency]) {
+    println!("==== BEGIN LATENCY TEST CASE ====");
+    println!("#[test]");
+    println!("fn new_test_case() {{");
+    println!("    let fanins : [&[FanInOut]; {}] = [", fanins.len());
+    for (idx, fin) in fanins.iter().enumerate() {
+        print!("        /*{idx}*/&[");
+        for FanInOut { other, delta_latency } in fin {
+            print!("mk_fan({other}, {delta_latency}),")
+        }
+        println!("],");
+    }
+    println!("    ];");
+    println!("    let fanins = ListOfLists::from_slice_slice(&fanins);");
+    println!("    let fanouts = convert_fanin_to_fanout(&fanins);");
+    println!("    let inputs = vec!{inputs:?};");
+    println!("    let outputs = vec!{outputs:?};");
+    println!("    let specified_latencies = vec!{specified_latencies:?};");
+    println!("    let found_latencies = solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();");
+    println!("}}");
+    println!("==== END LATENCY TEST CASE ====");
 }
 
 
@@ -743,6 +772,28 @@ mod tests {
         let found_latencies = solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();
 
         assert_eq!(found_latencies, [0; 5]);
+    }
+
+    #[test]
+    fn crashing_fifo_use() {
+        let fanins : [&[FanInOut]; 10] = [
+            /*0*/&[mk_fan(4, 0),],
+            /*1*/&[mk_fan(5, 0),],
+            /*2*/&[],
+            /*3*/&[mk_fan(2, 0),],
+            /*4*/&[mk_fan(3, 0),],
+            /*5*/&[mk_fan(3, 1),],
+            /*6*/&[mk_fan(9, 0),],
+            /*7*/&[mk_fan(0, 0),],
+            /*8*/&[mk_fan(1, 0),],
+            /*9*/&[mk_fan(7, -2),mk_fan(8, -2),],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+        let fanouts = convert_fanin_to_fanout(&fanins);
+        let inputs = vec![];
+        let outputs = vec![];
+        let specified_latencies = vec![SpecifiedLatency{wire : 0, latency : 0}];
+        let found_latencies = solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();
     }
 }
 

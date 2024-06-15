@@ -1,6 +1,6 @@
-use std::{borrow::Cow, cell::RefCell, ops::{Deref, Index}};
+use std::{cell::RefCell, ops::{Deref, Index}};
 
-use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span, SpanFile}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, IdentifierType, Interface, UnaryOperator}, linker::{get_builtin_type, Linkable, NamedType, Resolver, TypeUUID, TypeUUIDMarker}};
+use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span, SpanFile}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, Interface, UnaryOperator}, linker::{get_builtin_type, Linkable, NamedType, Resolver, TypeUUID, TypeUUIDMarker}};
 
 /// This contains only the information that can be easily type-checked. 
 /// 
@@ -68,23 +68,11 @@ impl DomainType {
     pub fn new_unset() -> DomainType {
         DomainType::Physical(DomainID::PLACEHOLDER)
     }
-    pub fn to_string(&self, interfaces : &FlatAlloc<Interface, DomainIDMarker>, need_domains : bool, ident_typ : IdentifierType) -> Cow<'static, str> {
-        match &self {
-            DomainType::Generative => {
-                Cow::Borrowed("gen ")
-            }
-            DomainType::Physical(w) => {
-                if need_domains {
-                    let ident_txt = ident_typ.get_keyword();
-                    Cow::Owned(if let Some(interf) = interfaces.get(*w) {
-                        format!("{ident_txt}{{{}}} ", interf.name)
-                    } else {
-                        format!("{ident_txt}{{unnamed domain {}}} ", w.get_hidden_value())
-                    })
-                } else {
-                    Cow::Borrowed("")
-                }
-            }
+    pub fn physical_to_string(physical_id : DomainID, interfaces : &FlatAlloc<Interface, DomainIDMarker>) -> String {
+        if let Some(interf) = interfaces.get(physical_id) {
+            format!("{{{}}}", interf.name)
+        } else {
+            format!("{{unnamed domain {}}}", physical_id.get_hidden_value())
         }
     }
 }

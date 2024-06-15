@@ -135,6 +135,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [ ] Array Slices
 - [ ] Bound Specifiers
 - [ ] Structs
+- [ ] Conditional Bindings
 - [x] Generative variables and assignments
 - [x] Generative Conditions
 - [x] Generative For Loops

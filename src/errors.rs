@@ -182,7 +182,7 @@ pub trait FileKnowingErrorInfoObject {
 
 impl ErrorInfoObject for Declaration {
     fn make_info(&self, _file_data : &FileData) -> (Span, String) {
-        (self.get_span(), format!("'{}' declared here", &self.name))
+        (self.decl_span, format!("'{}' declared here", &self.name))
     }
 }
 

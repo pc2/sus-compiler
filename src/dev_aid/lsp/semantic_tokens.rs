@@ -108,7 +108,7 @@ impl IDEIdentifierType {
     }
     fn from_identifier_typ(t : IdentifierType, domain : DomainType, main_interface_used : bool) -> IDEIdentifierType {
         match t {
-            IdentifierType::Input | IdentifierType::Output | IdentifierType::Local => Self::make_local(false, domain.unwrap_physical(), main_interface_used),
+            IdentifierType::Local => Self::make_local(false, domain.unwrap_physical(), main_interface_used),
             IdentifierType::State =>  Self::make_local(true, domain.unwrap_physical(), main_interface_used),
             IdentifierType::Generative => IDEIdentifierType::Generative
         }

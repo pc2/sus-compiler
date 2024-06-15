@@ -1,8 +1,10 @@
 
+use std::borrow::Cow;
+
 use lsp_types::{LanguageString, MarkedString};
 
 use crate::{
-    flattening::{FlatID, IdentifierType, InterfaceToDomainMap, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, LinkInfo, Linker, NameElem}, parser::Documentation
+    abstract_type::DomainType, flattening::{FlatID, IdentifierType, InterfaceToDomainMap, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, LinkInfo, Linker, NameElem}, parser::Documentation
 };
 
 use super::tree_walk::{InModule, LocationInfo};
@@ -65,12 +67,33 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
 
     match info {
         LocationInfo::InModule(_md_id, md, decl_id, InModule::NamedLocal(decl)) => {
-            let domain_str = decl.typ.domain.to_string(&md.interfaces, md.is_multi_domain(), decl.identifier_type);
+            let mut details_vec : Vec<&str> = Vec::with_capacity(5);
+            let domain_str = if md.is_multi_domain() {
+                if let DomainType::Physical(ph) = decl.typ.domain {
+                    Some(DomainType::physical_to_string(ph, &md.interfaces))
+                } else {None}
+            } else {None};
+
+            if let Some(ds) = &domain_str {
+                details_vec.push(ds);
+            }
+            if let Some(is_input) = decl.is_input_port {
+                details_vec.push(if is_input {"input"} else {"output"});
+            }
+
+            match decl.identifier_type {
+                IdentifierType::Local => {}
+                IdentifierType::State => {details_vec.push("state")}
+                IdentifierType::Generative => {details_vec.push("gen")}
+            }
+
             let typ_str = decl.typ.typ.to_string(&linker.types);
-            let name_str = &decl.name;
+            details_vec.push(&typ_str);
+
+            details_vec.push(&decl.name);
 
             hover.documentation(&decl.documentation);
-            hover.sus_code(format!("{domain_str}{typ_str} {name_str}"));
+            hover.sus_code(details_vec.join(" "));
 
             hover.gather_hover_infos(md, decl_id, decl.identifier_type.is_generative());
         }
@@ -92,10 +115,17 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.documentation_link_info(&submodule.link_info);
         }
         LocationInfo::InModule(_md_id, md, id, InModule::Temporary(wire)) => {
-            let typ_str = wire.typ.typ.to_string(&linker.types);
-
-            let domain = wire.typ.domain.to_string(&md.interfaces, md.is_multi_domain(), IdentifierType::Local);
-            hover.sus_code(format!("{domain}{typ_str}"));
+            let mut details_vec : Vec<Cow<str>> = Vec::with_capacity(2);
+            match wire.typ.domain {
+                DomainType::Generative => {details_vec.push(Cow::Borrowed("gen"))}
+                DomainType::Physical(ph) => {
+                    if md.is_multi_domain() {
+                        details_vec.push(Cow::Owned(DomainType::physical_to_string(ph, &md.interfaces)))
+                    }
+                }
+            };
+            details_vec.push(Cow::Owned(wire.typ.typ.to_string(&linker.types)));
+            hover.sus_code(details_vec.join(" "));
             hover.gather_hover_infos(md, id, wire.typ.domain.is_generative());
         }
         LocationInfo::Type(typ) => {

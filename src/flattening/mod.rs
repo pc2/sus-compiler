@@ -65,8 +65,9 @@ impl Module {
     pub fn make_port_info_fmt(&self, port_id : PortID, file_text : &FileText, result : &mut String) {
         use std::fmt::Write;
         let port = &self.ports[port_id];
-        let port_direction = if port.identifier_type == IdentifierType::Input {"input"} else {"output"};
-        writeln!(result, "{port_direction} {}", &file_text[port.decl_span]).unwrap()
+        let port_direction = if port.is_input {"input"} else {"output"};
+        let port_decl_instr = self.instructions[port.declaration_instruction].unwrap_wire_declaration();
+        writeln!(result, "{port_direction} {}", &file_text[port_decl_instr.decl_span]).unwrap()
     }
     pub fn make_port_info_string(&self, port_id : PortID, file_text : &FileText) -> String {
         let mut r = String::new(); self.make_port_info_fmt(port_id, file_text, &mut r); r
@@ -92,7 +93,7 @@ impl Module {
         for (interface_id, interface) in interface_iter {
             use std::fmt::Write;
             if let Some(domain_map) = &local_domains {
-                writeln!(result, "{}: ({})", &interface.name, domain_map.get_submodule_interface_domain(interface_id).name).unwrap();
+                writeln!(result, "{}: {{{}}}", &interface.name, domain_map.get_submodule_interface_domain(interface_id).name).unwrap();
             } else {
                 writeln!(result, "{}:", &interface.name).unwrap();
             }
@@ -144,22 +145,12 @@ impl Module {
         match &self.instructions[instr_id] {
             Instruction::SubModule(sm) => sm.module_name_span,
             Instruction::FuncCall(fc) => fc.whole_func_span,
-            Instruction::Declaration(decl) => decl.get_span(),
+            Instruction::Declaration(decl) => decl.decl_span,
             Instruction::Wire(w) => w.span,
             Instruction::Write(conn) => conn.to_span,
             Instruction::IfStatement(if_stmt) => self.get_instruction_span(if_stmt.condition),
             Instruction::ForStatement(for_stmt) => self.get_instruction_span(for_stmt.loop_var_decl),
         }
-    }
-
-    /// This function is intended to retrieve a known port while walking the syntax tree. panics if the port doesn't exist
-    pub fn get_port_by_decl_span(&self, span : Span) -> PortID {
-        for (id, data) in &self.ports {
-            if data.decl_span == span {
-                return id
-            }
-        }
-        unreachable!()
     }
 
     pub fn is_multi_domain(&self) -> bool {
@@ -194,18 +185,14 @@ impl<'linker> InterfaceToDomainMap<'linker> {
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum IdentifierType {
-    Input,
-    Output,
     Local,
     State,
-    Generative
+    Generative,
 }
 
 impl IdentifierType {
     pub fn get_keyword(&self) -> &'static str {
         match self {
-            IdentifierType::Input => "input",
-            IdentifierType::Output => "output",
             IdentifierType::Local => "",
             IdentifierType::State => "state",
             IdentifierType::Generative => "gen",
@@ -214,17 +201,6 @@ impl IdentifierType {
     pub fn is_generative(&self) -> bool {
         *self == IdentifierType::Generative
     }
-    pub fn is_port(&self) -> bool {
-        *self == IdentifierType::Input || *self == IdentifierType::Output
-    }
-    #[track_caller]
-    pub fn unwrap_is_input(&self) -> bool {
-        match self {
-            IdentifierType::Input => true,
-            IdentifierType::Output => false,
-            _ => unreachable!()
-        }
-    }
 }
 
 
@@ -232,8 +208,7 @@ impl IdentifierType {
 pub struct Port {
     pub name : String,
     pub name_span : Span,
-    pub decl_span : Span,
-    pub identifier_type : IdentifierType,
+    pub is_input : bool,
     pub interface : DomainID,
     /// This is only set after flattening is done. Initially just [UUID::PLACEHOLDER]
     pub declaration_instruction : FlatID
@@ -369,7 +344,7 @@ pub enum BinaryOperator {
 pub struct PortInfo {
     pub submodule_decl : FlatID,
     pub port : PortID,
-    pub port_identifier_typ : IdentifierType,
+    pub is_input : bool,
     /// Only set if the port is named as an explicit field. If the port name is implicit, such as in the function call syntax, then it is not present. 
     pub port_name_span : Option<Span>,
     /// Even this can be implicit. In the inline function call instantiation syntax there's no named submodule. my_mod(a, b, c)
@@ -473,6 +448,7 @@ const DECL_DEPTH_LATER : usize = usize::MAX;
 pub struct Declaration {
     pub typ_expr : WrittenType,
     pub typ : FullType,
+    pub decl_span : Span,
     pub name_span : Span,
     pub name : String,
     pub declaration_runtime_depth : usize,
@@ -482,15 +458,10 @@ pub struct Declaration {
     pub read_only : bool,
     /// If the program text already covers the write, then lsp stuff on this declaration shouldn't use it. 
     pub declaration_itself_is_not_written_to : bool,
+    pub is_input_port : Option<bool>,
     pub identifier_type : IdentifierType,
     pub latency_specifier : Option<FlatID>,
     pub documentation : Documentation
-}
-
-impl Declaration {
-    pub fn get_span(&self) -> Span {
-        Span::new_overarching(self.typ_expr.get_span(), self.name_span).debug()
-    }
 }
 
 #[derive(Debug)]

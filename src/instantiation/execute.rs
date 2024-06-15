@@ -278,7 +278,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         } else {
             let port_data = &self.linker.modules[submod_instance.module_uuid].ports[port_id];
             let submodule_instruction = self.md.instructions[submod_instance.original_instruction].unwrap_submodule();
-            let source = if port_data.identifier_type.unwrap_is_input() {
+            let source = if port_data.is_input {
                 RealWireDataSource::Multiplexer { is_state: None, sources: Vec::new() }
             } else {
                 RealWireDataSource::OutPort { sub_module_id, port_id }
@@ -541,7 +541,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let wire = &self.wires[*wire_id];
                 self.interface_ports[port_id] = Some(InstantiatedPort{
                     wire : *wire_id,
-                    is_input: port.identifier_type.unwrap_is_input(),
+                    is_input: port.is_input,
                     absolute_latency: CALCULATE_LATENCY_LATER,
                     typ: wire.typ.clone(),
                     interface : wire.domain

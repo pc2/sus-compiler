@@ -84,7 +84,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         match wire_ref_root {
             WireReferenceRoot::LocalDecl(id, _) => {
                 let decl_root = self.working_on.instructions[*id].unwrap_wire_declaration();
-                Some((decl_root.get_span(), self.errors.file))
+                Some((decl_root.decl_span, self.errors.file))
             },
             WireReferenceRoot::NamedConstant(cst, _) => {
                 let linker_cst = &self.constants[*cst];
@@ -92,7 +92,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
             WireReferenceRoot::SubModulePort(port) => {
                 let (decl, file) = self.get_decl_of_module_port(port.port, port.submodule_decl);
-                Some((decl.get_span(), file))
+                Some((decl.decl_span, file))
             }
         }
     }
@@ -168,7 +168,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     WireReferenceRoot::SubModulePort(port) => {
                         let r = self.get_decl_of_module_port(port.port, port.submodule_decl);
 
-                        if !r.0.identifier_type.unwrap_is_input() {
+                        if !r.0.is_input_port.unwrap() {
                             self.errors.error(conn.to_span, "Cannot assign to a submodule output port")
                             .info_obj_different_file(r.0, r.1);
                         }
@@ -278,7 +278,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     let write_to_type = self.get_type_of_port(port, fc.interface_reference.submodule_decl);
 
                     let (decl, file) = self.get_decl_of_module_port(port, fc.interface_reference.submodule_decl);
-                    let declared_here = (decl.get_span(), file);
+                    let declared_here = (decl.decl_span, file);
 
                     // Typecheck the value with target type
                     let from_wire = self.working_on.instructions[*arg].unwrap_wire();
@@ -333,8 +333,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     self.type_checker.finalize_type(&mut w.typ, w.span, BestName::UnnamedWire);
                 }
                 Instruction::Declaration(decl) => {
-                    let span = decl.get_span();
-                    self.type_checker.finalize_type(&mut decl.typ, span, BestName::NamedWire(id))
+                    self.type_checker.finalize_type(&mut decl.typ, decl.decl_span, BestName::NamedWire(id))
                 }
                 Instruction::SubModule(sm) => {
                     for (interface_id, i) in &mut sm.local_interface_domains {
@@ -372,7 +371,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         let mut wire_to_explore_queue : Vec<FlatID> = Vec::new();
 
         for (_id, port) in &self.working_on.ports {
-            if port.identifier_type == IdentifierType::Output {
+            if !port.is_input {
                 is_instance_used_map[port.declaration_instruction] = true;
                 wire_to_explore_queue.push(port.declaration_instruction);
 

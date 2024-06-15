@@ -136,7 +136,7 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
 
             if let Instruction::Declaration(wire_decl) = &self.md.instructions[w.original_instruction] {
                 // Don't print named inputs and outputs, already did that in interface
-                if wire_decl.identifier_type.is_port() {
+                if wire_decl.is_input_port.is_some() {
                     continue;
                 }
             }
