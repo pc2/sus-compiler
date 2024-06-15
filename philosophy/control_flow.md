@@ -36,6 +36,61 @@ module m : int a, bool b -> int c {
 }
 ```
 
+### Conditional bindings
+
+In hardware design, pretty much all data signals will be coupled with `valid` signals. Having dedicated syntactic sugar for this is thus valuable to lift some mental load for the hardware designer. 
+
+As an example, take the `pop` interface of a FIFO. 
+```verilog
+interface pop : bool do_pop -> bool pop_valid, T data
+```
+
+This is both an action (setting the `do_pop` signal), but also may fail (`pop_valid`). Both control signals can be hidden with this syntactic sugar. Furthermore, the output data of the FIFO is only available when the pop was successful. This adds nice implicit semantics that for example the formal verifier could then check. 
+
+```verilog
+FIFO myFifo
+if myFifo.pop() : T data {
+    ...
+}
+```
+Which is equivalent to this:
+```verilog
+FIFO myFifo
+myFifo.do_pop = true
+if myFifo.pop_valid {
+    T data = myFifo.data_out
+    ...
+}
+```
+
+This syntax can also be used to approximate imperative control flow. We would want something in hardware _like_ the lambda functions in software, but what semantics should they have? As a first approximation, we can have the submodule 'trigger' some of our hardware using this validity logic. In this example we use a submodule that generates an index stream of valid matrix indices, and calls our code with that:
+```verilog
+MatrixIterator mit
+
+state bool start
+initial start = true
+
+if start {
+    mit.start(40, 40)
+    start = false
+}
+
+if mit.next() : int x, int y {
+    ...
+}
+```
+
+Finally, this might be a good syntax alternative for implementing Sum Types. Sum types map weirdly to hardware, as their mere existence may or may not introduce wire dependencies on the variants, depending on how the wires were reused. Instead, we could use these conditional bindings to make a bootleg match:
+
+```verilog
+if my_instruction.is_jump() : int target_addr {
+    ...
+}
+if my_instruction.is_add() : int reg_a, int reg_b, int reg_target {
+    ...
+}
+```
+
 ## `for`
 The `for` statement only comes in its generative form. It's used to generate repetitive hardware. 
 
