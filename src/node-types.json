@@ -362,10 +362,6 @@
             "named": true
           },
           {
-            "type": "cross_statement",
-            "named": true
-          },
-          {
             "type": "decl_assign_statement",
             "named": true
           },
@@ -379,22 +375,6 @@
           },
           {
             "type": "interface_statement",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
-    "type": "cross_statement",
-    "named": true,
-    "fields": {
-      "item": {
-        "multiple": true,
-        "required": true,
-        "types": [
-          {
-            "type": "assign_to",
             "named": true
           }
         ]
@@ -1259,10 +1239,6 @@
   },
   {
     "type": "^",
-    "named": false
-  },
-  {
-    "type": "cross",
     "named": false
   },
   {

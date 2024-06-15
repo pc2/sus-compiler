@@ -73,21 +73,6 @@ module.exports = grammar({
             field('block', $.block)
         ),
 
-        interface_statement: $ => seq(
-            'interface',
-            field('name', $.identifier),
-            optional(field('interface_ports', $.interface_ports))
-            //field('block', $.block)
-        ),
-
-        cross_statement: $ => seq(
-            'cross',
-            sepSeq1(
-                field('item', $.assign_to),
-                $._comma
-            ),
-        ),
-
         identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
         number: $ => /\d[\d_]*/,
 
@@ -189,23 +174,6 @@ module.exports = grammar({
 
         _linebreak: $ => repeat1('\n'), // For things that must be separated by at least one newline (whitespace after is to optimize gobbling up any extra newlines)
         
-        block: $ => seq(
-            '{',
-            newlineSepSeq($, choice(
-                $.block,
-                $.decl_assign_statement,
-    
-                // Decls only should only allow a single declaration, and cannot contain expressions, 
-                // but we allow some tolerance in the grammar here, so we can generate better errors after. 
-                $.assign_left_side,
-                $.if_statement,
-                $.for_statement,
-                $.interface_statement,
-                $.cross_statement
-            )),
-            '}'
-        ),
-        
         write_modifiers: $ => choice(
             repeat1(field('item', 'reg')),
             field('item', 'initial')
@@ -221,6 +189,28 @@ module.exports = grammar({
         assign_left_side: $ => sepSeq1(
             field('item', $.assign_to),
             $._comma
+        ),
+
+        block: $ => seq(
+            '{',
+            newlineSepSeq($, choice(
+                $.block,
+                $.decl_assign_statement,
+    
+                // Decls only should only allow a single declaration, and cannot contain expressions, 
+                // but we allow some tolerance in the grammar here, so we can generate better errors after. 
+                $.assign_left_side,
+                $.if_statement,
+                $.for_statement,
+                $.interface_statement
+            )),
+            '}'
+        ),
+        
+        interface_statement: $ => seq(
+            'interface',
+            field('name', $.identifier),
+            optional(field('interface_ports', $.interface_ports))
         ),
 
         decl_assign_statement: $ => seq(
