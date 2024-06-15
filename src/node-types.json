@@ -453,6 +453,20 @@
           }
         ]
       },
+      "io_port_modifiers": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "input",
+            "named": false
+          },
+          {
+            "type": "output",
+            "named": false
+          }
+        ]
+      },
       "latency_specifier": {
         "multiple": false,
         "required": false,
@@ -1270,6 +1284,10 @@
     "named": false
   },
   {
+    "type": "input",
+    "named": false
+  },
+  {
     "type": "interface",
     "named": false
   },
@@ -1284,6 +1302,10 @@
   {
     "type": "number",
     "named": true
+  },
+  {
+    "type": "output",
+    "named": false
   },
   {
     "type": "reg",

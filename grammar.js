@@ -96,6 +96,10 @@ module.exports = grammar({
         )),
 
         declaration: $ => seq(
+            optional(field('io_port_modifiers', choice(
+                'input',
+                'output'
+            ))),
             optional(field('declaration_modifiers', choice(
                 'state',
                 'gen'

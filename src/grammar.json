@@ -365,6 +365,31 @@
           "members": [
             {
               "type": "FIELD",
+              "name": "io_port_modifiers",
+              "content": {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": "input"
+                  },
+                  {
+                    "type": "STRING",
+                    "value": "output"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
               "name": "declaration_modifiers",
               "content": {
                 "type": "CHOICE",
