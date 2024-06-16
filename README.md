@@ -3,9 +3,16 @@ The Hardware Design Language to replace VHDL and Verilog for FPGA Development.
 
 ## Core philosophy
 
-SUS is meant to be a direct competitor to Synthesizeable Verilog and VHDL. Its main goal is to be an intuitive and thin syntax for building Netlists, such that traditional synthesis tools can still be used to analyze the resulting hardware. SUS shall impose no paradigm on the hardware designer, such as requiring specific communication protocols or iteration constructs. In other words, SUS is not there to abstract away complexity, but rather to make the inherent complexity of hardware design more manageable. 
+SUS is meant to be a direct competitor to Synthesizeable Verilog and VHDL. Its main goal is to be an intuitive and thin syntax for building netlists, such that traditional synthesis tools can still be used to analyze the resulting hardware. SUS shall impose no paradigm on the hardware designer, such as requiring specific communication protocols or iteration constructs. In other words, SUS is not there to abstract away complexity, but rather to make the inherent complexity of hardware design more manageable.
 
 The one restriction SUS does impose over Verilog and VHDL is that it requires the hardware to be *synchronous* over one or more clocks. Asynchronous hardware is therefore *unrepresentable* making SUS less suitable for ASIC development. 
+
+There are three main features that set SUS apart from the rest: 
+- Generative Variables and Types can be freely combined. Any "Dependent Types" headaches that are caused by this are sidestepped by doing the main type checking after instantiation. 
+- Easy Pipelining through an orthogonal language construct called "Latency Counting". This means that adding pipeline registers does not interfere with other language features such as generative or conditional code. 
+- Separation of pipelines with interfaces. This keeps the user from accidentally crossing signals that have no logical relationship. At this level Clock Domain Crossings are implemented.
+
+Finally, an important consideration of SUS is the user interface. SUS comes with a VSCode IDE plugin that allows the copiler to be used fully in-IDE. Compiling, typechecking and instantiation is done as the user writes code, leading to a very tight development feedback loop. 
 
 #### What SUS gives you
 - A direct 1-to-1 mapping from code to netlist
@@ -58,11 +65,11 @@ One big decision all of these (including SUS) make is going all-in on Synchronou
 ### Pipelining through [Latency Counting](philosophy/latency.md)
 ```Verilog
 module pow17 : int i -> int o {
-	    int i2  = i * i
-	reg int i4  = i2 * i2
-	    int i8  = i4 * i4
-	reg int i16 = i8 * i8
-	        o   = i16 * i
+        int i2  = i * i
+    reg int i4  = i2 * i2
+        int i8  = i4 * i4
+    reg int i16 = i8 * i8
+            o   = i16 * i
 }
 ```
 ![Registers can be inserted](philosophy/images/insertRegisters.png)
@@ -70,32 +77,32 @@ module pow17 : int i -> int o {
 ### FIZZ-BUZZ Lookup Table using Generative Code
 ```Verilog
 module fizz_buzz_gen : int v -> int fb {
-	gen int FIZZ = 15
-	gen int BUZZ = 11
-	gen int FIZZ_BUZZ = 1511
-	gen int TABLE_SIZE = 256
+    gen int FIZZ = 15
+    gen int BUZZ = 11
+    gen int FIZZ_BUZZ = 1511
+    gen int TABLE_SIZE = 256
 
-	gen int[TABLE_SIZE] lut
-	
-	for int i in 0..TABLE_SIZE {
-		gen bool fizz = i % 3 == 0
-		gen bool buzz = i % 5 == 0
-		
-		gen int tbl_fb
-		if fizz & buzz {
-			tbl_fb = FIZZ_BUZZ
-		} else if fizz {
-			tbl_fb = FIZZ
-		} else if buzz {
-			tbl_fb = BUZZ
-		} else {
-			tbl_fb = i
-		}
+    gen int[TABLE_SIZE] lut
+    
+    for int i in 0..TABLE_SIZE {
+        gen bool fizz = i % 3 == 0
+        gen bool buzz = i % 5 == 0
+        
+        gen int tbl_fb
+        if fizz & buzz {
+            tbl_fb = FIZZ_BUZZ
+        } else if fizz {
+            tbl_fb = FIZZ
+        } else if buzz {
+            tbl_fb = BUZZ
+        } else {
+            tbl_fb = i
+        }
 
-		lut[i] = tbl_fb
-	}
+        lut[i] = tbl_fb
+    }
 
-	fb = lut[v]
+    fb = lut[v]
 }
 ```
 In the end, the generative code is executed and all that results is a lookup table. 
@@ -143,6 +150,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [ ] Generative Parameters
 - [x] Multi-Interface Syntax
 - [ ] Native Module integration syntax
+- [ ] Intrinsic Modules
 - [x] Can Parse FIFO implementation
 - [ ] Clock Domain Crossings
 - [ ] Rhythm Syntax
@@ -166,7 +174,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 ### Inference
 - [ ] Template Type Inference
 - [ ] Generative Parameter Inference
-- [ ] Latency Count Inferece
+- [ ] Latency Count Inference
 
 ### Latency Counting
 - [x] Basic latency assignment algorithm
