@@ -313,12 +313,18 @@ pub fn solve_latencies(fanins : &ListOfLists<FanInOut>, fanouts : &ListOfLists<F
         }
     }
     
-    // Finally we add in the backwards latencies. TODO maybe be more conservative here?
+    // First pin all these latencies
     for idx in 0..working_latencies.len() {
         if working_latencies[idx].is_set() { // it's a defined latency!
             if !working_latencies[idx].is_pinned() { // Just to avoid the is_pinned check in pin()
                 working_latencies[idx].pin();
             }
+        }
+    }
+
+    // Finally we add in the backwards latencies. TODO maybe be more conservative here?
+    for idx in 0..working_latencies.len() {
+        if working_latencies[idx].is_pinned() {
             count_latency::<true>(&mut working_latencies, &fanins, idx, &mut stack)?;
         }
     }
@@ -709,8 +715,10 @@ mod tests {
         assert_eq!(latencies, &[0, 1, 2, 3]); 
     }
     
+    // From here on it's examples that crashed in practical examples. These crashes were then fixed
+
     #[test]
-    fn single_interface_fifo_no_crash() {
+    fn single_interface_fifo() {
         let fanins : [&[FanInOut]; 10] = [
             /*0*/&[mk_fan(3, 0),mk_fan(7, 0),mk_fan(2, 0),],
             /*1*/&[],
@@ -734,7 +742,7 @@ mod tests {
     }
 
     #[test]
-    fn two_interface_fifo_do_crash() {
+    fn two_interface_fifo() {
         let fanins : [&[FanInOut]; 8] = [
             /*0*/&[mk_fan(1, 0),mk_fan(7, 0),mk_fan(2, 0),],
             /*1*/&[],
@@ -756,7 +764,7 @@ mod tests {
     }
 
     #[test]
-    fn minimal_crash() {
+    fn minimal_two_interface_fifo() {
         let fanins : [&[FanInOut]; 5] = [
             /*0*/&[],
             /*1*/&[mk_fan(0, 0), mk_fan(3, 0)],
@@ -775,7 +783,7 @@ mod tests {
     }
 
     #[test]
-    fn crashing_fifo_use() {
+    fn fifo_use() {
         let fanins : [&[FanInOut]; 10] = [
             /*0*/&[mk_fan(4, 0),],
             /*1*/&[mk_fan(5, 0),],
@@ -793,7 +801,23 @@ mod tests {
         let inputs = vec![];
         let outputs = vec![];
         let specified_latencies = vec![SpecifiedLatency{wire : 0, latency : 0}];
-        let found_latencies = solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();
+        let _found_latencies = solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();
+    }
+
+    #[test]
+    fn minimal_fifo_use() {
+        let fanins : [&[FanInOut]; 4] = [
+            /*0*/&[mk_fan(2, 0)],
+            /*1*/&[mk_fan(2, 0)],
+            /*2*/&[],
+            /*3*/&[mk_fan(1, -1), mk_fan(0, -2)],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+        let fanouts = convert_fanin_to_fanout(&fanins);
+        let inputs = vec![];
+        let outputs = vec![];
+        let specified_latencies = vec![SpecifiedLatency{wire : 0, latency : 0}];
+        let _found_latencies = solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();
     }
 }
 
