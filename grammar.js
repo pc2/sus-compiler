@@ -37,18 +37,17 @@ module.exports = grammar({
     name: 'sus',
 
     rules: {
+        // Top level structure
+
         source_file: $ => newlineSepSeq($, $.module),
 
-        _comma: $ => seq(
-            ',',
-            optional($._linebreak)
+        module: $ => seq(
+            'module',
+            field('name', $.identifier),
+            optional(field('interface_ports', $.interface_ports)),
+            field('block', $.block)
         ),
         
-        _interface_ports_output: $ => seq(
-            '->',
-            optional($._linebreak),
-            field('outputs', $.declaration_list)
-        ),
         interface_ports: $ => seq(
             ':',
             optional($._linebreak),
@@ -60,26 +59,99 @@ module.exports = grammar({
                 $._interface_ports_output
             ),
         ),
+        _interface_ports_output: $ => seq(
+            '->',
+            optional($._linebreak),
+            field('outputs', $.declaration_list)
+        ),
+
+        // Statements
+
+        block: $ => seq(
+            '{',
+            newlineSepSeq($, choice(
+                $.block,
+                $.decl_assign_statement,
+    
+                // Decls should only allow a single declaration, and cannot contain expressions, 
+                // but we allow some tolerance in the grammar here, so we can generate better errors after. 
+                $.assign_left_side,
+                $.if_statement,
+                $.for_statement,
+                $.interface_statement
+            )),
+            '}'
+        ),
+        
+        interface_statement: $ => seq(
+            'interface',
+            field('name', $.identifier),
+            optional(field('interface_ports', $.interface_ports))
+        ),
+
+        decl_assign_statement: $ => seq(
+            field('assign_left', $.assign_left_side),
+            '=',
+            field('assign_value', $._expression)
+        ),
+        assign_left_side: $ => sepSeq1(
+            field('item', $.assign_to),
+            $._comma
+        ),
+        assign_to: $ => seq(
+            optional(field('write_modifiers', $.write_modifiers)),
+            field('expr_or_decl', choice(
+                $._expression,
+                $.declaration
+            ))
+        ),
+        write_modifiers: $ => choice(
+            repeat1(field('item', 'reg')),
+            field('item', 'initial')
+        ),
+
+        if_statement: $ => seq(
+            'if',
+            field('condition', $._expression),
+            field('then_block', $.block),
+            optional(seq(
+                'else',
+                field('else_block', choice(
+                    $.block,
+                    $.if_statement
+                ))
+            ))
+        ),
+        for_statement: $ => seq(
+            'for',
+            field('for_decl', $.declaration),
+            'in',
+            field('from', $._expression),
+            '..',
+            field('to', $._expression),
+            field('block', $.block)
+        ),
+
+        // Declarations
 
         declaration_list: $ => sepSeq1(
             field('item', $.declaration),
             $._comma
         ),
 
-        module: $ => seq(
-            'module',
+        declaration: $ => seq(
+            optional(field('io_port_modifiers', choice(
+                'input',
+                'output'
+            ))),
+            optional(field('declaration_modifiers', choice(
+                'state',
+                'gen'
+            ))),
+            field('type', $._type),
             field('name', $.identifier),
-            optional(field('interface_ports', $.interface_ports)),
-            field('block', $.block)
+            optional(field('latency_specifier', $.latency_specifier))
         ),
-
-        identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
-        number: $ => /\d[\d_]*/,
-
-        global_identifier: $ => prec(PREC.namespace_path, seq(
-            //optional('::'),
-            sepSeq1(field('item', $.identifier), '::')
-        )),
 
         array_type: $ => seq(
             field('arr', $._type),
@@ -95,18 +167,17 @@ module.exports = grammar({
             field('content', $._expression)
         )),
 
-        declaration: $ => seq(
-            optional(field('io_port_modifiers', choice(
-                'input',
-                'output'
-            ))),
-            optional(field('declaration_modifiers', choice(
-                'state',
-                'gen'
-            ))),
-            field('type', $._type),
-            field('name', $.identifier),
-            optional(field('latency_specifier', $.latency_specifier))
+        // Expressions
+
+        _expression: $ => choice(
+            $.global_identifier,
+            $.array_op,
+            $.number,
+            $.parenthesis_expression,
+            $.unary_op,
+            $.binary_op,
+            $.func_call,
+            $.field_access
         ),
 
         unary_op: $ => prec(PREC.unary, seq(
@@ -165,85 +236,24 @@ module.exports = grammar({
             ']'
         ),
 
-        _expression: $ => choice(
-            $.global_identifier,
-            $.array_op,
-            $.number,
-            $.parenthesis_expression,
-            $.unary_op,
-            $.binary_op,
-            $.func_call,
-            $.field_access
+        // Utilities
+
+        _comma: $ => seq(
+            ',',
+            optional($._linebreak)
         ),
 
         _linebreak: $ => repeat1('\n'), // For things that must be separated by at least one newline (whitespace after is to optimize gobbling up any extra newlines)
-        
-        write_modifiers: $ => choice(
-            repeat1(field('item', 'reg')),
-            field('item', 'initial')
-        ),
 
-        assign_to: $ => seq(
-            optional(field('write_modifiers', $.write_modifiers)),
-            field('expr_or_decl', choice(
-                $._expression,
-                $.declaration
-            ))
-        ),
-        assign_left_side: $ => sepSeq1(
-            field('item', $.assign_to),
-            $._comma
-        ),
+        global_identifier: $ => prec(PREC.namespace_path, seq(
+            //optional('::'),
+            sepSeq1(field('item', $.identifier), '::')
+        )),
 
-        block: $ => seq(
-            '{',
-            newlineSepSeq($, choice(
-                $.block,
-                $.decl_assign_statement,
-    
-                // Decls only should only allow a single declaration, and cannot contain expressions, 
-                // but we allow some tolerance in the grammar here, so we can generate better errors after. 
-                $.assign_left_side,
-                $.if_statement,
-                $.for_statement,
-                $.interface_statement
-            )),
-            '}'
-        ),
-        
-        interface_statement: $ => seq(
-            'interface',
-            field('name', $.identifier),
-            optional(field('interface_ports', $.interface_ports))
-        ),
+        identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
+        number: $ => /\d[\d_]*/,
 
-        decl_assign_statement: $ => seq(
-            field('assign_left', $.assign_left_side),
-            '=',
-            field('assign_value', $._expression)
-        ),
-
-        if_statement: $ => seq(
-            'if',
-            field('condition', $._expression),
-            field('then_block', $.block),
-            optional(seq(
-                'else',
-                field('else_block', choice(
-                    $.block,
-                    $.if_statement
-                ))
-            ))
-        ),
-        for_statement: $ => seq(
-            'for',
-            field('for_decl', $.declaration),
-            'in',
-            field('from', $._expression),
-            '..',
-            field('to', $._expression),
-            field('block', $.block)
-        ),
+        // Extras
 
         single_line_comment: $ => /\/\/[^\n]*/,
         multi_line_comment: $ => /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\//,
