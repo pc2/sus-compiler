@@ -970,31 +970,11 @@
         ]
       },
       "template_params": {
-        "multiple": true,
+        "multiple": false,
         "required": false,
         "types": [
           {
-            "type": "\n",
-            "named": false
-          },
-          {
-            "type": ",",
-            "named": false
-          },
-          {
-            "type": "<",
-            "named": false
-          },
-          {
-            "type": ">",
-            "named": false
-          },
-          {
-            "type": "template_generative_expression",
-            "named": true
-          },
-          {
-            "type": "template_type",
+            "type": "template_params",
             "named": true
           }
         ]
@@ -1108,20 +1088,21 @@
   {
     "type": "template_declaration_arguments",
     "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "declaration",
-          "named": true
-        },
-        {
-          "type": "template_declaration_type",
-          "named": true
-        }
-      ]
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "declaration",
+            "named": true
+          },
+          {
+            "type": "template_declaration_type",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -1180,6 +1161,26 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "template_params",
+    "named": true,
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "template_generative_expression",
+            "named": true
+          },
+          {
+            "type": "template_type",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {

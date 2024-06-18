@@ -1,12 +1,16 @@
 
+// Makes a list of "item" fields
 function sepSeq1(rule, sepChar) {
-  return seq(rule, repeat(seq(sepChar, rule)))
+    const itemRule = field("item", rule);
+    return seq(itemRule, repeat(seq(sepChar, itemRule)))
 }
 
+// Makes a list of "item" fields
 function sepSeq(rule, sepChar) {
-  return optional(sepSeq1(rule, sepChar))
+    return optional(sepSeq1(rule, sepChar))
 }
 
+// Makes a list of "item" fields
 function newlineSepSeq($, rule) {
     return seq(
         optional($._linebreak),
@@ -70,7 +74,7 @@ module.exports = grammar({
 
         template_declaration_arguments: $ => seq(
             '<',
-            sepSeq1(choice($.template_declaration_type, $.declaration), $._comma),
+            sepSeq(choice($.template_declaration_type, $.declaration), $._comma),
             '>'
         ),
 
@@ -107,10 +111,7 @@ module.exports = grammar({
             '=',
             field('assign_value', $._expression)
         ),
-        assign_left_side: $ => sepSeq1(
-            field('item', $.assign_to),
-            $._comma
-        ),
+        assign_left_side: $ => sepSeq1($.assign_to, $._comma),
         assign_to: $ => seq(
             optional(field('write_modifiers', $.write_modifiers)),
             field('expr_or_decl', choice(
@@ -147,10 +148,7 @@ module.exports = grammar({
 
         // Declarations
 
-        declaration_list: $ => sepSeq1(
-            field('item', $.declaration),
-            $._comma
-        ),
+        declaration_list: $ => sepSeq1($.declaration, $._comma),
 
         declaration: $ => seq(
             optional(field('io_port_modifiers', choice(
@@ -179,11 +177,12 @@ module.exports = grammar({
         ),
         named_type: $ => seq(
             field('name', $.global_identifier),
-            optional(field('template_params', seq(
-                '<',
-                sepSeq1(choice($.template_type, $.template_generative_expression), $._comma),
-                '>'
-            )))
+            optional(field('template_params', $.template_params))
+        ),
+        template_params: $ => seq(
+            '<',
+            sepSeq(choice($.template_type, $.template_generative_expression), $._comma),
+            '>'
         ),
         template_type: $ => $._type,
         template_generative_expression: $ => $._expression,
@@ -246,7 +245,7 @@ module.exports = grammar({
         
         parenthesis_expression_list: $ => seq(
             '(',
-            sepSeq(field('item', $._expression), $._comma),
+            sepSeq($._expression, $._comma),
             ')'
         ),
 
@@ -273,7 +272,7 @@ module.exports = grammar({
 
         global_identifier: $ => prec(PREC.namespace_path, seq(
             //optional('::'),
-            sepSeq1(field('item', $.identifier), '::')
+            sepSeq1($.identifier, '::')
         )),
 
         identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
