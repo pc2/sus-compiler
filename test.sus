@@ -864,7 +864,7 @@ module use_bad_interface {
 
 	mm.a
 
-	// ICE: mm.a = 5
+	// ICE(not yet implemented: Type Unification Unknown Named(type_1)): mm.a = 5
 }
 
 /*
@@ -917,7 +917,11 @@ module sumUpTo : bool start {
 		int idx = iter_index
 	}
 
-
+	int<t> beep
 }
 
+/* TODO
+module templateModule<abc> {
 
+}
+*/

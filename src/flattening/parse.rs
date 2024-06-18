@@ -205,14 +205,27 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
     
+    fn flatten_template_args(&self, cursor : &mut Cursor) -> () {
+        if cursor.optional_field(field!("template_params")) {
+            self.errors.todo(cursor.span(), "Template parameters");
+        }
+    }
+
     fn flatten_type(&mut self, cursor : &mut Cursor) -> WrittenType {
         let (kind, span) = cursor.kind_span();
-        if kind == kind!("global_identifier") {
-            if let Some(typ_id) = &self.name_resolver.resolve_global(span).expect_type() {
-                WrittenType::Named(span, *typ_id)
-            } else {
-                WrittenType::Error(span)
-            }
+        if kind == kind!("named_type") {
+            cursor.go_down_no_check(|cursor| {
+                let name_span = cursor.field_span(field!("name"), kind!("global_identifier"));
+                let resolved = self.name_resolver.resolve_global(name_span);
+
+                let template_args = self.flatten_template_args(cursor);
+
+                if let Some(typ_id) = resolved.expect_type() {
+                    WrittenType::Named(name_span, typ_id)
+                } else {
+                    WrittenType::Error(name_span)
+                }
+            })
         } else if kind == kind!("array_type") {
             self.flatten_array_type(span, cursor)
         } else {cursor.could_not_match()}
@@ -221,18 +234,24 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     fn flatten_module_or_type<const ALLOW_MODULES : bool>(&mut self, cursor : &mut Cursor) -> ModuleOrWrittenType {
         let (kind, span) = cursor.kind_span();
         // Only difference is that 
-        if kind == kind!("global_identifier") {
-            let found_global = self.name_resolver.resolve_global(span);
-            match &found_global.name_elem {
-                Some(NameElem::Type(typ_id)) => ModuleOrWrittenType::WrittenType(WrittenType::Named(span, *typ_id)),
-                Some(NameElem::Module(md)) if ALLOW_MODULES => ModuleOrWrittenType::Module(span, *md),
-                Some(_) => {
-                    let accepted_text = if ALLOW_MODULES {"Type or Module"} else {"Type"};
-                    found_global.not_expected_global_error(accepted_text);
-                    ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
+        if kind == kind!("named_type") {
+            cursor.go_down_no_check(|cursor| {
+                let name_span = cursor.field_span(field!("name"), kind!("global_identifier"));
+                let found_global = self.name_resolver.resolve_global(name_span);
+
+                let template_args = self.flatten_template_args(cursor);
+                
+                match &found_global.name_elem {
+                    Some(NameElem::Type(typ_id)) => ModuleOrWrittenType::WrittenType(WrittenType::Named(name_span, *typ_id)),
+                    Some(NameElem::Module(md)) if ALLOW_MODULES => ModuleOrWrittenType::Module(name_span, *md),
+                    Some(_) => {
+                        let accepted_text = if ALLOW_MODULES {"Type or Module"} else {"Type"};
+                        found_global.not_expected_global_error(accepted_text);
+                        ModuleOrWrittenType::WrittenType(WrittenType::Error(name_span))
+                    }
+                    None => ModuleOrWrittenType::WrittenType(WrittenType::Error(name_span)) // Non existent global already covered by Linker
                 }
-                None => ModuleOrWrittenType::WrittenType(WrittenType::Error(span)) // Non existent global already covered by Linker
-            }
+            })
         } else if kind == kind!("array_type") {
             ModuleOrWrittenType::WrittenType(self.flatten_array_type(span, cursor))
         } else {cursor.could_not_match()}
@@ -948,6 +967,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     fn flatten_module(&mut self, cursor : &mut Cursor) {
         cursor.go_down(kind!("module"), |cursor| {
             let name_span = cursor.field_span(field!("name"), kind!("identifier"));
+            if cursor.optional_field(field!("template_declaration_arguments")) {
+                todo!("Template Decl Args");
+            }
             let module_name = &self.name_resolver.file_text[name_span];
             println!("TREE SITTER module! {module_name}");
             // Interface is allocated in self

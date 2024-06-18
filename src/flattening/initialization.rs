@@ -18,6 +18,9 @@ struct ModuleInitializationContext<'linker> {
 impl<'linker> ModuleInitializationContext<'linker> {
     fn gather_initial_module(&mut self, cursor : &mut Cursor) {
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
+        if cursor.optional_field(field!("template_declaration_arguments")) {
+            todo!("Template Decl Args");
+        }
 
         self.gather_func_call_ports(name_span, cursor);
         assert!(self.interfaces.len() == 1); // Therefore the first interface is [Module::MAIN_INTERFACE_ID]
