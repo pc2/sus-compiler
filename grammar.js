@@ -44,6 +44,7 @@ module.exports = grammar({
         module: $ => seq(
             'module',
             field('name', $.identifier),
+            optional(field('template_declaration_arguments', $.template_declaration_arguments)),
             optional(field('interface_ports', $.interface_ports)),
             field('block', $.block)
         ),
@@ -63,6 +64,18 @@ module.exports = grammar({
             '->',
             optional($._linebreak),
             field('outputs', $.declaration_list)
+        ),
+
+        // Template Declaration
+
+        template_declaration_arguments: $ => seq(
+            '<',
+            sepSeq1(choice($.template_declaration_type, $.declaration), $._comma),
+            '>'
+        ),
+
+        template_declaration_type: $ => seq(
+            $.identifier // The template type name
         ),
 
         // Statements
@@ -153,19 +166,32 @@ module.exports = grammar({
             optional(field('latency_specifier', $.latency_specifier))
         ),
 
+        // Types
+
+        _type: $ => choice(
+            $.named_type,
+            $.array_type
+        ),
+
         array_type: $ => seq(
             field('arr', $._type),
             field('arr_idx', $.array_bracket_expression)
         ),
-        _type: $ => choice(
-            $.global_identifier,
-            $.array_type
+        named_type: $ => seq(
+            field('name', $.global_identifier),
+            optional(field('template_params', seq(
+                '<',
+                sepSeq1(choice($.template_type, $.template_generative_expression), $._comma),
+                '>'
+            )))
         ),
+        template_type: $ => $._type,
+        template_generative_expression: $ => $._expression,
 
-        latency_specifier: $ => seq(seq(
+        latency_specifier: $ => seq(
             '\'',
             field('content', $._expression)
-        )),
+        ),
 
         // Expressions
 
@@ -260,7 +286,7 @@ module.exports = grammar({
     },
 
     conflicts: $ => [
-        [$._expression, $._type] // Just because LR(1) is too weak to resolve 'ident[] a' vs 'type_name[]'. Tree sitter resolves this itself with more expensive GLR. NOT a precedence relation. 
+        [$.named_type, $._expression] // Just because LR(1) is too weak to resolve 'ident[] a' vs 'type_name[]'. Tree sitter resolves this itself with more expensive GLR. NOT a precedence relation. 
     ],
 
     word: $=> $.identifier,
