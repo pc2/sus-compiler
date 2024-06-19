@@ -164,10 +164,15 @@ module.exports = grammar({
             optional(field('latency_specifier', $.latency_specifier))
         ),
 
+        latency_specifier: $ => seq(
+            '\'',
+            field('content', $._expression)
+        ),
+
         // Types
 
         _type: $ => choice(
-            $.named_type,
+            $.template_global,
             $.array_type
         ),
 
@@ -175,27 +180,11 @@ module.exports = grammar({
             field('arr', $._type),
             field('arr_idx', $.array_bracket_expression)
         ),
-        named_type: $ => seq(
-            field('name', $.global_identifier),
-            optional(field('template_params', $.template_params))
-        ),
-        template_params: $ => seq(
-            '<',
-            sepSeq(choice($.template_type, $.template_generative_expression), $._comma),
-            '>'
-        ),
-        template_type: $ => $._type,
-        template_generative_expression: $ => $._expression,
-
-        latency_specifier: $ => seq(
-            '\'',
-            field('content', $._expression)
-        ),
 
         // Expressions
 
         _expression: $ => choice(
-            $.global_identifier,
+            $.template_global,
             $.array_op,
             $.number,
             $.parenthesis_expression,
@@ -263,20 +252,33 @@ module.exports = grammar({
 
         // Utilities
 
+        // myFunc::<int, 2>
+        template_global: $ => prec(PREC.namespace_path, seq(
+            optional(field('global_path', '::')),
+            field('item', $.identifier),
+            repeat(seq(
+                '::',
+                field('item', choice($.identifier, $.template_params))
+            ))
+        )),
+        
+        template_params: $ => seq(
+            '<',
+            sepSeq(choice($.template_type, $.template_generative_expression), $._comma),
+            '>'
+        ),
+        template_type: $ => $._type,
+        template_generative_expression: $ => $._expression,
+
+        identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
+        number: $ => /\d[\d_]*/,
+
         _comma: $ => seq(
             ',',
             optional($._linebreak)
         ),
 
         _linebreak: $ => repeat1('\n'), // For things that must be separated by at least one newline (whitespace after is to optimize gobbling up any extra newlines)
-
-        global_identifier: $ => prec(PREC.namespace_path, seq(
-            //optional('::'),
-            sepSeq1($.identifier, '::')
-        )),
-
-        identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
-        number: $ => /\d[\d_]*/,
 
         // Extras
 
@@ -285,7 +287,7 @@ module.exports = grammar({
     },
 
     conflicts: $ => [
-        [$.named_type, $._expression] // Just because LR(1) is too weak to resolve 'ident[] a' vs 'type_name[]'. Tree sitter resolves this itself with more expensive GLR. NOT a precedence relation. 
+        [$._type, $._expression] // Just because LR(1) is too weak to resolve 'ident[] a' vs 'type_name[]'. Tree sitter resolves this itself with more expensive GLR. NOT a precedence relation. 
     ],
 
     word: $=> $.identifier,

@@ -24,15 +24,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
@@ -68,15 +68,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
@@ -110,7 +110,7 @@
             "named": true
           },
           {
-            "type": "named_type",
+            "type": "template_global",
             "named": true
           }
         ]
@@ -172,15 +172,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
@@ -226,15 +226,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
@@ -326,15 +326,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
@@ -416,15 +416,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
@@ -496,7 +496,7 @@
             "named": true
           },
           {
-            "type": "named_type",
+            "type": "template_global",
             "named": true
           }
         ]
@@ -544,15 +544,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
@@ -618,15 +618,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
@@ -656,15 +656,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
@@ -710,10 +710,6 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
@@ -722,23 +718,11 @@
             "named": true
           },
           {
-            "type": "unary_op",
+            "type": "template_global",
             "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
-    "type": "global_identifier",
-    "named": true,
-    "fields": {
-      "item": {
-        "multiple": true,
-        "required": true,
-        "types": [
+          },
           {
-            "type": "identifier",
+            "type": "unary_op",
             "named": true
           }
         ]
@@ -770,15 +754,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
@@ -890,15 +874,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
@@ -956,32 +940,6 @@
     }
   },
   {
-    "type": "named_type",
-    "named": true,
-    "fields": {
-      "name": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "global_identifier",
-            "named": true
-          }
-        ]
-      },
-      "template_params": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "template_params",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
     "type": "parenthesis_expression",
     "named": true,
     "fields": {
@@ -1006,15 +964,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
@@ -1050,15 +1008,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
@@ -1145,10 +1103,6 @@
           "named": true
         },
         {
-          "type": "global_identifier",
-          "named": true
-        },
-        {
           "type": "number",
           "named": true
         },
@@ -1157,10 +1111,34 @@
           "named": true
         },
         {
+          "type": "template_global",
+          "named": true
+        },
+        {
           "type": "unary_op",
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "template_global",
+    "named": true,
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "template_params",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -1196,7 +1174,7 @@
           "named": true
         },
         {
-          "type": "named_type",
+          "type": "template_global",
           "named": true
         }
       ]
@@ -1261,15 +1239,15 @@
             "named": true
           },
           {
-            "type": "global_identifier",
-            "named": true
-          },
-          {
             "type": "number",
             "named": true
           },
           {
             "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
             "named": true
           },
           {
