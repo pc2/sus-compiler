@@ -254,7 +254,7 @@ module.exports = grammar({
 
         // myFunc::<int, 2>
         template_global: $ => prec(PREC.namespace_path, seq(
-            optional(field('global_path', '::')),
+            optional(field('is_global_path', '::')),
             field('item', $.identifier),
             repeat(seq(
                 '::',

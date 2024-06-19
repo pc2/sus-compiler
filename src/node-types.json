@@ -1125,6 +1125,16 @@
     "type": "template_global",
     "named": true,
     "fields": {
+      "is_global_path": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "::",
+            "named": false
+          }
+        ]
+      },
       "item": {
         "multiple": true,
         "required": true,
