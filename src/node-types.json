@@ -1052,10 +1052,6 @@
         "required": false,
         "types": [
           {
-            "type": "declaration",
-            "named": true
-          },
-          {
             "type": "template_declaration_type",
             "named": true
           }
@@ -1109,7 +1105,57 @@
     }
   },
   {
-    "type": "template_param",
+    "type": "template_params",
+    "named": true,
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "template_type_param",
+            "named": true
+          },
+          {
+            "type": "template_value_param",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "template_type_param",
+    "named": true,
+    "fields": {
+      "arg": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "array_type",
+            "named": true
+          },
+          {
+            "type": "template_global",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "template_value_param",
     "named": true,
     "fields": {
       "arg": {
@@ -1118,10 +1164,6 @@
         "types": [
           {
             "type": "array_op",
-            "named": true
-          },
-          {
-            "type": "array_type",
             "named": true
           },
           {
@@ -1160,22 +1202,6 @@
         "types": [
           {
             "type": "identifier",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
-    "type": "template_params",
-    "named": true,
-    "fields": {
-      "item": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "template_param",
             "named": true
           }
         ]
@@ -1350,6 +1376,10 @@
   },
   {
     "type": "::",
+    "named": false
+  },
+  {
+    "type": ";",
     "named": false
   },
   {

@@ -74,7 +74,7 @@ module.exports = grammar({
 
         template_declaration_arguments: $ => seq(
             '<',
-            sepSeq(choice($.template_declaration_type, $.declaration), $._comma),
+            sepSeq($.template_declaration_type, $._comma),
             '>'
         ),
 
@@ -262,16 +262,27 @@ module.exports = grammar({
             ))
         )),
         
-        template_param : $ => seq(
+        template_type_param : $ => seq(
             optional(seq(
                 field('name', $.identifier),
                 '='
             )),
-            field('arg', choice($._type, $._expression))
+            field('arg', $._type)
+        ),
+        template_value_param : $ => seq(
+            optional(seq(
+                field('name', $.identifier),
+                '='
+            )),
+            field('arg', $._expression)
         ),
         template_params: $ => seq(
             '<',
-            sepSeq($.template_param, $._comma),
+            sepSeq($.template_type_param, $._comma),
+            optional(seq(
+                ';',
+                sepSeq($.template_value_param, $._comma),
+            )),
             '>'
         ),
         identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
