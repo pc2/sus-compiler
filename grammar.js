@@ -262,14 +262,18 @@ module.exports = grammar({
             ))
         )),
         
+        template_param : $ => seq(
+            optional(seq(
+                field('name', $.identifier),
+                '='
+            )),
+            field('arg', choice($._type, $._expression))
+        ),
         template_params: $ => seq(
             '<',
-            sepSeq(choice($.template_type, $.template_generative_expression), $._comma),
+            sepSeq($.template_param, $._comma),
             '>'
         ),
-        template_type: $ => $._type,
-        template_generative_expression: $ => $._expression,
-
         identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
         number: $ => /\d[\d_]*/,
 

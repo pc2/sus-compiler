@@ -1437,6 +1437,53 @@
         ]
       }
     },
+    "template_param": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "FIELD",
+                  "name": "name",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "identifier"
+                  }
+                },
+                {
+                  "type": "STRING",
+                  "value": "="
+                }
+              ]
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "FIELD",
+          "name": "arg",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_type"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_expression"
+              }
+            ]
+          }
+        }
+      ]
+    },
     "template_params": {
       "type": "SEQ",
       "members": [
@@ -1454,17 +1501,8 @@
                   "type": "FIELD",
                   "name": "item",
                   "content": {
-                    "type": "CHOICE",
-                    "members": [
-                      {
-                        "type": "SYMBOL",
-                        "name": "template_type"
-                      },
-                      {
-                        "type": "SYMBOL",
-                        "name": "template_generative_expression"
-                      }
-                    ]
+                    "type": "SYMBOL",
+                    "name": "template_param"
                   }
                 },
                 {
@@ -1480,17 +1518,8 @@
                         "type": "FIELD",
                         "name": "item",
                         "content": {
-                          "type": "CHOICE",
-                          "members": [
-                            {
-                              "type": "SYMBOL",
-                              "name": "template_type"
-                            },
-                            {
-                              "type": "SYMBOL",
-                              "name": "template_generative_expression"
-                            }
-                          ]
+                          "type": "SYMBOL",
+                          "name": "template_param"
                         }
                       }
                     ]
@@ -1508,14 +1537,6 @@
           "value": ">"
         }
       ]
-    },
-    "template_type": {
-      "type": "SYMBOL",
-      "name": "_type"
-    },
-    "template_generative_expression": {
-      "type": "SYMBOL",
-      "name": "_expression"
     },
     "identifier": {
       "type": "PATTERN",
