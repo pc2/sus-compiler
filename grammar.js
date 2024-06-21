@@ -115,8 +115,8 @@ module.exports = grammar({
         assign_to: $ => seq(
             optional(field('write_modifiers', $.write_modifiers)),
             field('expr_or_decl', choice(
-                $._expression,
-                $.declaration
+                $.declaration,
+                $._expression
             ))
         ),
         write_modifiers: $ => choice(
@@ -278,10 +278,10 @@ module.exports = grammar({
         ),
         template_params: $ => seq(
             '<',
-            sepSeq($.template_type_param, $._comma),
+            sepSeq($.template_value_param, $._comma),
             ';',
-            optional(sepSeq($.template_value_param, $._comma)),
-            '>'
+            sepSeq($.template_type_param, $._comma),
+            prec(11, '>')
         ),
         identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
         number: $ => /\d[\d_]*/,
@@ -300,7 +300,8 @@ module.exports = grammar({
     },
 
     conflicts: $ => [
-        [$._type, $._expression] // Just because LR(1) is too weak to resolve 'ident[] a' vs 'type_name[]'. Tree sitter resolves this itself with more expensive GLR. NOT a precedence relation. 
+        [$._type, $._expression], // Just because LR(1) is too weak to resolve 'ident[] a' vs 'type_name[]'. Tree sitter resolves this itself with more expensive GLR. NOT a precedence relation. 
+        //[$.binary_op, $.template_params]
     ],
 
     word: $=> $.identifier,
