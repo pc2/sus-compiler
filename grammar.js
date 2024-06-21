@@ -279,10 +279,8 @@ module.exports = grammar({
         template_params: $ => seq(
             '<',
             sepSeq($.template_type_param, $._comma),
-            optional(seq(
-                ';',
-                sepSeq($.template_value_param, $._comma),
-            )),
+            ';',
+            optional(sepSeq($.template_value_param, $._comma)),
             '>'
         ),
         identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,

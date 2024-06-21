@@ -1544,55 +1544,50 @@
           ]
         },
         {
+          "type": "STRING",
+          "value": ";"
+        },
+        {
           "type": "CHOICE",
           "members": [
             {
-              "type": "SEQ",
+              "type": "CHOICE",
               "members": [
                 {
-                  "type": "STRING",
-                  "value": ";"
-                },
-                {
-                  "type": "CHOICE",
+                  "type": "SEQ",
                   "members": [
                     {
-                      "type": "SEQ",
-                      "members": [
-                        {
-                          "type": "FIELD",
-                          "name": "item",
-                          "content": {
-                            "type": "SYMBOL",
-                            "name": "template_value_param"
-                          }
-                        },
-                        {
-                          "type": "REPEAT",
-                          "content": {
-                            "type": "SEQ",
-                            "members": [
-                              {
-                                "type": "SYMBOL",
-                                "name": "_comma"
-                              },
-                              {
-                                "type": "FIELD",
-                                "name": "item",
-                                "content": {
-                                  "type": "SYMBOL",
-                                  "name": "template_value_param"
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      ]
+                      "type": "FIELD",
+                      "name": "item",
+                      "content": {
+                        "type": "SYMBOL",
+                        "name": "template_value_param"
+                      }
                     },
                     {
-                      "type": "BLANK"
+                      "type": "REPEAT",
+                      "content": {
+                        "type": "SEQ",
+                        "members": [
+                          {
+                            "type": "SYMBOL",
+                            "name": "_comma"
+                          },
+                          {
+                            "type": "FIELD",
+                            "name": "item",
+                            "content": {
+                              "type": "SYMBOL",
+                              "name": "template_value_param"
+                            }
+                          }
+                        ]
+                      }
                     }
                   ]
+                },
+                {
+                  "type": "BLANK"
                 }
               ]
             },
