@@ -7,7 +7,7 @@ use std::{collections::{HashMap, HashSet}, cell::RefCell};
 use tree_sitter::Tree;
 
 use crate::{
-    abstract_type::{FullType, DomainType}, arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, concrete_type::ConcreteType, errors::{CompileError, ErrorCollector, ErrorInfo, ErrorLevel, ErrorStore}, file_position::{FileText, Span, SpanFile}, flattening::Module, parser::Documentation, util::{const_str_position, const_str_position_in_tuples}, value::{TypedValue, Value}
+    abstract_type::{DomainType, FullType}, arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, errors::{CompileError, ErrorCollector, ErrorInfo, ErrorLevel, ErrorStore}, file_position::{FileText, Span, SpanFile}, flattening::Module, parser::Documentation, util::{const_str_position, const_str_position_in_tuples}, value::{TypedValue, Value}
 };
 
 use self::checkpoint::CheckPoint;
@@ -27,6 +27,10 @@ pub type ConstantUUID = UUID<ConstantUUIDMarker>;
 pub struct FileUUIDMarker;
 impl UUIDMarker for FileUUIDMarker {const DISPLAY_NAME : &'static str = "file_";}
 pub type FileUUID = UUID<FileUUIDMarker>;
+
+pub struct TemplateArgIDMarker;
+impl UUIDMarker for TemplateArgIDMarker {const DISPLAY_NAME : &'static str = "template_arg_";}
+pub type TemplateArgID = UUID<TemplateArgIDMarker>;
 
 const BUILTIN_TYPES : [&'static str; 2] = [
     "bool",
@@ -57,6 +61,19 @@ pub const fn get_builtin_constant(name : &'static str) -> ConstantUUID {
 }
 
 #[derive(Debug)]
+pub struct TemplateInput {
+    pub name : String,
+    pub name_span : Span,
+    pub kind : TemplateInputKind
+}
+
+#[derive(Debug)]
+pub enum TemplateInputKind {
+    Type(),
+    Generative()
+}
+
+#[derive(Debug)]
 pub struct LinkInfo {
     pub file : FileUUID,
     pub span : Span,
@@ -65,6 +82,8 @@ pub struct LinkInfo {
     pub documentation : Documentation,
     pub errors : ErrorStore,
     pub resolved_globals : ResolvedGlobals,
+
+    pub template_arguments : FlatAlloc<TemplateInput, TemplateArgIDMarker>,
 
     /// Reset checkpoints. These are to reset errors and resolved_globals 
     pub after_initial_parse_cp : CheckPoint,

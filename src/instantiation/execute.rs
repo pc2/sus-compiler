@@ -431,7 +431,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     } else {
                         self.get_unique_name()
                     };
-                    let port_map = sub_module.ports.iter().map(|_| None).collect();
+                    let port_map = FlatAlloc::new_nones(sub_module.ports.len());
                     let interface_call_sites = sub_module.interfaces.iter().map(|_| Vec::new()).collect();
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_instruction, instance : None, port_map, interface_call_sites, name, module_uuid : submodule.module_uuid}))
                 }

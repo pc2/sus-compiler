@@ -66,8 +66,7 @@ impl Module {
         use std::fmt::Write;
         let port = &self.ports[port_id];
         let port_direction = if port.is_input {"input"} else {"output"};
-        let port_decl_instr = self.instructions[port.declaration_instruction].unwrap_wire_declaration();
-        writeln!(result, "{port_direction} {}", &file_text[port_decl_instr.decl_span]).unwrap()
+        writeln!(result, "{port_direction} {}", &file_text[port.decl_span]).unwrap()
     }
     pub fn make_port_info_string(&self, port_id : PortID, file_text : &FileText) -> String {
         let mut r = String::new(); self.make_port_info_fmt(port_id, file_text, &mut r); r
@@ -208,6 +207,7 @@ impl IdentifierType {
 pub struct Port {
     pub name : String,
     pub name_span : Span,
+    pub decl_span : Span,
     pub is_input : bool,
     pub interface : DomainID,
     /// This is only set after flattening is done. Initially just [UUID::PLACEHOLDER]

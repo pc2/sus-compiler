@@ -152,9 +152,17 @@ impl<'linker> ModuleInitializationContext<'linker> {
 
     fn finish_gather_decl(&mut self, is_input: bool, cursor: &mut Cursor) {
         cursor.field(field!("type"));
+        let type_span = cursor.span();
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
         let name = self.file_text[name_span].to_owned();
-        self.ports.alloc(Port{name, name_span, is_input, interface : self.current_interface, declaration_instruction : UUID::PLACEHOLDER});
+        self.ports.alloc(Port{
+            name,
+            name_span,
+            decl_span : Span::new_overarching(type_span, name_span),
+            is_input,
+            interface : self.current_interface,
+            declaration_instruction : UUID::PLACEHOLDER
+        });
     }
 }
 
@@ -193,6 +201,7 @@ pub fn gather_initial_file_data(mut builder : FileBuilder) {
                             span,
                             errors,
                             resolved_globals,
+                            template_arguments : FlatAlloc::new(), // TODO
                             after_initial_parse_cp,
                             after_flatten_cp : None
                         },

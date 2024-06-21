@@ -72,7 +72,7 @@ pub struct NameResolver<'linker, 'err_and_globals> {
 
 impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
     /// SAFETY: Files are never touched, and as long as this object is managed properly linker will also exist long enough. 
-    pub fn resolve_global<'slf>(&'slf self, name_span : Span) -> ResolvedName<'slf> {
+    pub fn resolve_global<'slf>(&'slf self, name_span : Span) -> Option<ResolvedName<'slf>> {
         let name = &self.file_text[name_span];
         let linker = unsafe{&*self.linker};
 
@@ -80,7 +80,7 @@ impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
         match linker.global_namespace.get(name) {
             Some(NamespaceElement::Global(found)) => {
                 resolved_globals.referenced_globals.push(*found);
-                ResolvedName{name_elem: Some(*found), linker : self.linker, errors: &self.errors, span: name_span}
+                Some(ResolvedName{name_elem: *found, linker : self.linker, errors: &self.errors, span: name_span})
             }
             Some(NamespaceElement::Colission(coll)) => {
                 resolved_globals.all_resolved = false;
@@ -97,32 +97,33 @@ impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
                     }
                 }
 
-
-                ResolvedName{name_elem: None, linker : self.linker, errors: &self.errors, span: name_span}
+                None
             }
             None => {
                 resolved_globals.all_resolved = false;
 
                 self.errors.error(name_span, format!("No Global of the name '{name}' was found. Did you forget to import it?"));
 
-                ResolvedName{name_elem: None, linker : self.linker, errors: &self.errors, span: name_span}
+                None
             }
         }
     }
 }
 
 pub struct ResolvedName<'err_and_globals> {
-    pub name_elem : Option<NameElem>,
+    pub name_elem : NameElem,
     pub span : Span,
     pub errors : &'err_and_globals ErrorCollector<'err_and_globals>,
     linker : *const Linker
 }
 
 impl<'err_and_globals> ResolvedName<'err_and_globals> {
-    pub fn not_expected_global_error(self, expected : &str) {
-        let Some(name_elem) = self.name_elem else {return}; // Error already reported when grabbing object
+    pub fn get_linking_error_location(&self) -> LinkingErrorLocation {
+        unsafe{&*self.linker}.get_linking_error_location(self.name_elem)
+    }
+    pub fn not_expected_global_error(&self, expected : &str) {
         // SAFETY: The allocated linker objects aren't going to change. 
-        let info = unsafe{&*self.linker}.get_linking_error_location(name_elem);
+        let info = self.get_linking_error_location();
         let name = &info.full_name;
         let global_type = info.named_type;
         let err_ref = self.errors.error(self.span, format!("{name} is not a {expected}, it is a {global_type} instead!"));
@@ -132,8 +133,8 @@ impl<'err_and_globals> ResolvedName<'err_and_globals> {
     }
     
     #[allow(dead_code)]
-    pub fn expect_constant(self) -> Option<ConstantUUID> {
-        if let NameElem::Constant(id) = self.name_elem? {
+    pub fn expect_constant(&self) -> Option<ConstantUUID> {
+        if let NameElem::Constant(id) = self.name_elem {
             Some(id)
         } else {
             self.not_expected_global_error("Constant");
@@ -141,8 +142,8 @@ impl<'err_and_globals> ResolvedName<'err_and_globals> {
         }
     }
 
-    pub fn expect_type(self) -> Option<TypeUUID> {
-        if let NameElem::Type(id) = self.name_elem? {
+    pub fn expect_type(&self) -> Option<TypeUUID> {
+        if let NameElem::Type(id) = self.name_elem {
             Some(id)
         } else {
             self.not_expected_global_error("Type");
@@ -151,8 +152,8 @@ impl<'err_and_globals> ResolvedName<'err_and_globals> {
     }
 
     #[allow(dead_code)]
-    pub fn expect_module(self) -> Option<ModuleUUID> {
-        if let NameElem::Module(id) = self.name_elem? {
+    pub fn expect_module(&self) -> Option<ModuleUUID> {
+        if let NameElem::Module(id) = self.name_elem {
             Some(id)
         } else {
             self.not_expected_global_error("Module");

@@ -44,7 +44,7 @@ impl<'linker> From<LocationInfo<'linker>> for RefersTo {
             LocationInfo::InModule(md_id, md, flat_id, flat_obj) => {
                 match flat_obj {
                     InModule::NamedLocal(_) => {
-                        if let Some((port_id, _)) = md.ports.iter().find(|(_, port)| port.declaration_instruction == flat_id) {
+                        if let Some(port_id) = md.ports.find(|_, port| port.declaration_instruction == flat_id) {
                             result.port = Some((md_id, port_id));
                         }
                         result.local = Some((md_id, flat_id));

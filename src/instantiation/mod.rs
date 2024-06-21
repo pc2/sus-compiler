@@ -323,7 +323,7 @@ fn perform_instantiation(md : &Module, linker : &Linker) -> InstantiatedModule {
         generation_state : GenerationState{md, generation_state: md.instructions.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect()},
         wires : FlatAlloc::new(),
         submodules : FlatAlloc::new(),
-        interface_ports : md.ports.iter().map(|_| None).collect(),
+        interface_ports : FlatAlloc::new_nones(md.ports.len()),
         errors : ErrorCollector::new_empty(md.link_info.file, &linker.files),
         md,
         linker : linker

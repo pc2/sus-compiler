@@ -213,6 +213,9 @@ impl<T, IndexMarker : UUIDMarker> ArenaAllocator<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
         self.into_iter()
     }
+    pub fn find<F : FnMut(UUID<IndexMarker>, &T) -> bool>(&self, mut predicate : F) -> Option<UUID<IndexMarker>> {
+        self.iter().find(|(id, v)| predicate(*id, v)).map(|(id, _)| id)
+    }
 }
 
 impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ArenaAllocator<T, IndexMarker> {
@@ -321,6 +324,9 @@ impl<T, IndexMarker : UUIDMarker> ArenaVector<T, IndexMarker> {
     }
     pub fn iter_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
         self.into_iter()
+    }
+    pub fn find<F : FnMut(UUID<IndexMarker>, &T) -> bool>(&self, mut predicate : F) -> Option<UUID<IndexMarker>> {
+        self.iter().find(|(id, v)| predicate(*id, v)).map(|(id, _)| id)
     }
 }
 
@@ -474,7 +480,7 @@ pub struct FlatAlloc<T, IndexMarker> {
 }
 
 impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self{data : Vec::new(), _ph : PhantomData}
     }
     pub fn with_capacity(cap : usize) -> Self {
@@ -507,6 +513,9 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> FlatAllocIterMut<'a, T, IndexMarker> {
         self.into_iter()
     }
+    pub fn find<F : FnMut(UUID<IndexMarker>, &T) -> bool>(&self, mut predicate : F) -> Option<UUID<IndexMarker>> {
+        self.iter().find(|(id, v)| predicate(*id, v)).map(|(id, _)| id)
+    }
     pub fn range_since(&self, id : UUID<IndexMarker>) -> UUIDRange<IndexMarker> {
         UUIDRange(id, UUID(self.data.len(), PhantomData))
     }
@@ -538,6 +547,9 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<Option<T>, IndexMarker> {
     }
     pub fn iter_valids_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
         FlatOptionIteratorMut{ it: self.data.iter_mut().enumerate(), _ph: PhantomData }
+    }
+    pub fn new_nones(size : usize) -> Self {
+        Self{data : (0..size).into_iter().map(|_| None).collect(), _ph : PhantomData}
     }
 }
 

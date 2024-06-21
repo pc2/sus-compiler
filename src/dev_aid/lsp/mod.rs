@@ -64,9 +64,7 @@ impl LoadedFileCache {
         Self{linker, uris}
     }
     fn find_uri(&self, uri : &Url) -> Option<FileUUID> {
-        self.uris.iter()
-            .find(|(_uuid, uri_found)| **uri_found == *uri)
-            .map(|(uuid, _uri_found)| uuid)
+        self.uris.find(|_uuid, uri_found| uri_found == uri)
     }
     fn update_text(&mut self, uri : Url, new_file_text : String) {
         if let Some(found_file_uuid) = self.find_uri(&uri) {
