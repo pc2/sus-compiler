@@ -1,4 +1,6 @@
 
-module test : ::int::<beep = 20 > 3; BEEP = raboop > ab {
-	FIFO::<> badoop
+module test<T> : ::int::<beep = 20 > 3; BEEP = int::<;>> ab {
+	input gen int MY_INPUT
+
+	FIFO::<;> badoop
 }

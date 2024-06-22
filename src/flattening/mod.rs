@@ -14,6 +14,29 @@ use crate::{
     abstract_type::{AbstractType, FullType}, arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, Linkable, ModuleUUID, NamedType, TypeUUID}, parser::Documentation, pretty_print_many_spans, value::Value
 };
 
+
+pub struct FlatIDMarker;
+impl UUIDMarker for FlatIDMarker {const DISPLAY_NAME : &'static str = "obj_";}
+pub type FlatID = UUID<FlatIDMarker>;
+
+pub type FlatIDRange = UUIDRange<FlatIDMarker>;
+
+pub struct PortIDMarker;
+impl UUIDMarker for PortIDMarker {const DISPLAY_NAME : &'static str = "port_";}
+pub type PortID = UUID<PortIDMarker>;
+
+pub type PortIDRange = UUIDRange<PortIDMarker>;
+
+pub struct DomainIDMarker;
+impl UUIDMarker for DomainIDMarker {const DISPLAY_NAME : &'static str = "port_";}
+/// Interfaces are also indexed using DomainIDs. But in general, these refer to (clock/latency counting) domains
+pub type DomainID = UUID<DomainIDMarker>;
+
+pub struct TemplateIDMarker;
+impl UUIDMarker for TemplateIDMarker {const DISPLAY_NAME : &'static str = "template_arg_";}
+pub type TemplateID = UUID<TemplateIDMarker>;
+
+
 /// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage. 
 /// 
 /// 1. Initialization: initial name resolution and port discovery. The Module objects themselves are constructed. 
@@ -221,24 +244,6 @@ pub struct Interface {
     pub func_call_inputs : PortIDRange,
     pub func_call_outputs : PortIDRange
 }
-
-pub struct FlatIDMarker;
-impl UUIDMarker for FlatIDMarker {const DISPLAY_NAME : &'static str = "obj_";}
-pub type FlatID = UUID<FlatIDMarker>;
-
-pub type FlatIDRange = UUIDRange<FlatIDMarker>;
-
-pub struct PortIDMarker;
-impl UUIDMarker for PortIDMarker {const DISPLAY_NAME : &'static str = "port_";}
-pub type PortID = UUID<PortIDMarker>;
-
-pub type PortIDRange = UUIDRange<PortIDMarker>;
-
-pub struct DomainIDMarker;
-impl UUIDMarker for DomainIDMarker {const DISPLAY_NAME : &'static str = "port_";}
-/// Interfaces are also indexed using DomainIDs. But in general, these refer to (clock/latency counting) domains
-pub type DomainID = UUID<DomainIDMarker>;
-
 
 #[derive(Debug, Clone, Copy)]
 pub enum WireReferencePathElement {
@@ -463,6 +468,32 @@ pub struct Declaration {
     pub latency_specifier : Option<FlatID>,
     pub documentation : Documentation
 }
+
+
+#[derive(Debug)]
+pub struct TemplateInput {
+    pub name : String,
+    pub name_span : Span,
+    pub kind : TemplateInputKind
+}
+
+#[derive(Debug)]
+pub enum TemplateInputKind {
+    Type,
+    Generative{declaration_instruction : FlatID}
+}
+
+pub struct TemplateArg {
+    pub name_specification : Option<Span>,
+    pub whole_span : Span,
+    pub typ : TemplateArgType
+}
+
+pub enum TemplateArgType {
+    Type(WrittenType),
+    Value(FlatID)
+}
+
 
 #[derive(Debug)]
 pub struct SubModuleInstance {

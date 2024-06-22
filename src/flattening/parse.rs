@@ -5,26 +5,15 @@ use std::{ops::{Deref, DerefMut}, str::FromStr};
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 use crate::{
-    arena_alloc::{UUIDRange, UUIDRangeIter, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, ResolvedName, Resolver, TemplateArgIDMarker, TemplateInput, TypeUUIDMarker, WorkingOnResolver}, parser::Cursor, value::Value
+    arena_alloc::{UUIDRange, UUIDRangeIter, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, ResolvedName, Resolver, TypeUUIDMarker, WorkingOnResolver}, parser::Cursor, value::Value
 };
 
 use super::name_context::LocalVariableContext;
 use super::*;
 
-struct TemplateArg {
-    pub name_specification : Option<Span>,
-    pub whole_span : Span,
-    pub typ : TemplateArgType
-}
-
-enum TemplateArgType {
-    Type(WrittenType),
-    Value(FlatID)
-}
-
 enum LocalOrGlobal<'l> {
     Local(FlatID),
-    Global(ResolvedName<'l>, FlatAlloc<Option<TemplateArg>, TemplateArgIDMarker>, Option<BracketSpan>),
+    Global(ResolvedName<'l>, FlatAlloc<Option<TemplateArg>, TemplateIDMarker>, Option<BracketSpan>),
     // Error is already handled
     NotFound(Span)
 }
@@ -218,8 +207,8 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
 
-    fn collect_template_args(&self, global : &ResolvedName, template_argument_list : Vec<TemplateArg>) -> FlatAlloc<Option<TemplateArg>, TemplateArgIDMarker> {
-        let empty_template : FlatAlloc<TemplateInput, TemplateArgIDMarker> = FlatAlloc::new();
+    fn collect_template_args(&self, global : &ResolvedName, template_argument_list : Vec<TemplateArg>) -> FlatAlloc<Option<TemplateArg>, TemplateIDMarker> {
+        let empty_template : FlatAlloc<TemplateInput, TemplateIDMarker> = FlatAlloc::new();
     
         let template_info = match global.name_elem {
             NameElem::Module(md_id) => {
@@ -229,7 +218,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             NameElem::Type(_ty) => &empty_template, //TODO
         };
     
-        let mut resulting_template_arguments : FlatAlloc<Option<TemplateArg>, TemplateArgIDMarker> = FlatAlloc::new_nones(template_info.len());
+        let mut resulting_template_arguments : FlatAlloc<Option<TemplateArg>, TemplateIDMarker> = FlatAlloc::new_nones(template_info.len());
     
         let mut index_iter = template_info.id_range().iter();
     
@@ -1092,7 +1081,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         cursor.go_down(kind!("module"), |cursor| {
             let name_span = cursor.field_span(field!("name"), kind!("identifier"));
             if cursor.optional_field(field!("template_declaration_arguments")) {
-                todo!("Template Decl Args");
+                self.name_resolver.errors.error(cursor.span(), "Template Decl Args");
             }
             let module_name = &self.name_resolver.file_text[name_span];
             println!("TREE SITTER module! {module_name}");

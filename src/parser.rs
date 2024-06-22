@@ -97,9 +97,9 @@ impl<'t> Cursor<'t> {
 
     /// The cursor advances to the next field, regardless if it is the requested field. If the found field is the requested field, the function is called. 
     /// 
-    /// If no more fields are available, the cursor lands at the end of the siblings, and None is returned
+    /// If no more fields are available, the cursor lands at the end of the siblings, and false is returned
     /// 
-    /// If the found field is incorrect, None is returned
+    /// If the found field is incorrect, false is returned
     #[must_use]
     pub fn optional_field(&mut self, field_id : NonZeroU16) -> bool {
         // If a previous call to field already found this field, then we must immediately skip it. 

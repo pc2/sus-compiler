@@ -12,6 +12,7 @@ struct ModuleInitializationContext<'linker> {
     ports : FlatAlloc<Port, PortIDMarker>,
     interfaces : FlatAlloc<Interface, DomainIDMarker>,
     current_interface : DomainID,
+    template_inputs : FlatAlloc<TemplateInput, TemplateIDMarker>,
     file_text : &'linker FileText
 }
 
@@ -19,7 +20,17 @@ impl<'linker> ModuleInitializationContext<'linker> {
     fn gather_initial_module(&mut self, cursor : &mut Cursor) {
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
         if cursor.optional_field(field!("template_declaration_arguments")) {
-            todo!("Template Decl Args");
+            cursor.list(kind!("template_declaration_arguments"), |cursor| {
+                cursor.go_down(kind!("template_declaration_type"), |cursor| {
+                    let name_span = cursor.field_span(field!("name"), kind!("identifier"));
+                    let name = self.file_text[name_span].to_owned();
+                    self.template_inputs.alloc(TemplateInput{
+                        name,
+                        name_span,
+                        kind: TemplateInputKind::Type
+                    });
+                });
+            });
         }
 
         self.gather_func_call_ports(name_span, cursor);
@@ -63,8 +74,6 @@ impl<'linker> ModuleInitializationContext<'linker> {
                                 _ => cursor.could_not_match()
                             };
 
-                            // Skip
-                            let _ = cursor.optional_field(field!("declaration_modifiers"));
                             self.finish_gather_decl(is_input, cursor);
                         }
                     });
@@ -143,7 +152,6 @@ impl<'linker> ModuleInitializationContext<'linker> {
             cursor.go_down(kind!("declaration"), |cursor| {
                 // Skip fields if they exist
                 let _ = cursor.optional_field(field!("io_port_modifiers"));
-                let _ = cursor.optional_field(field!("declaration_modifiers"));
                 self.finish_gather_decl(is_input, cursor);
             });
         });
@@ -151,18 +159,31 @@ impl<'linker> ModuleInitializationContext<'linker> {
     }
 
     fn finish_gather_decl(&mut self, is_input: bool, cursor: &mut Cursor) {
+        // If generative input it's a template arg
+        let is_gen = if cursor.optional_field(field!("declaration_modifiers")) {
+            cursor.kind() == kw!("gen")
+        } else {false};
+
         cursor.field(field!("type"));
         let type_span = cursor.span();
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
         let name = self.file_text[name_span].to_owned();
-        self.ports.alloc(Port{
-            name,
-            name_span,
-            decl_span : Span::new_overarching(type_span, name_span),
-            is_input,
-            interface : self.current_interface,
-            declaration_instruction : UUID::PLACEHOLDER
-        });
+        if is_gen {
+            self.template_inputs.alloc(TemplateInput {
+                name,
+                name_span,
+                kind: TemplateInputKind::Generative{declaration_instruction : UUID::PLACEHOLDER}
+            });
+        } else {
+            self.ports.alloc(Port{
+                name,
+                name_span,
+                decl_span : Span::new_overarching(type_span, name_span),
+                is_input,
+                interface : self.current_interface,
+                declaration_instruction : UUID::PLACEHOLDER
+            });
+        }
     }
 }
 
@@ -179,6 +200,7 @@ pub fn gather_initial_file_data(mut builder : FileBuilder) {
                         ports: FlatAlloc::new(),
                         interfaces: FlatAlloc::new(),
                         current_interface: DomainID::PLACEHOLDER,
+                        template_inputs : FlatAlloc::new(),
                         file_text: builder.file_text,
                     };
 
