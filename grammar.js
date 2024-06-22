@@ -79,7 +79,11 @@ module.exports = grammar({
         ),
 
         template_declaration_type: $ => seq(
-            $.identifier // The template type name
+            field('name', $.identifier),
+            optional(seq(
+                '=',
+                field('default_value', $._type)
+            ))
         ),
 
         // Statements
