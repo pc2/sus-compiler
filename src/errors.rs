@@ -121,7 +121,7 @@ impl<'linker> ErrorCollector<'linker> {
     }
     
     pub fn todo<S : Into<String>>(&self, position : Span, reason : S)-> ErrorReference<'_> {
-        self.push_diagnostic(position, format!("TODO: {}", reason.into()), ErrorLevel::Warning)
+        self.push_diagnostic(position, format!("TODO: {}", reason.into()), ErrorLevel::Error)
     }
     
     pub fn did_error(&self) -> bool {

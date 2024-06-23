@@ -9,7 +9,7 @@ The one restriction SUS does impose over Verilog and VHDL is that it requires th
 
 There are three main features that set SUS apart from the rest: 
 - Generative Variables and Types can be freely combined. Any "Dependent Types" headaches that are caused by this are sidestepped by doing the main type checking after instantiation. 
-- Easy Pipelining through an orthogonal language construct called "Latency Counting". This means that adding pipeline registers does not interfere with other language features such as generative or conditional code. 
+- Easy Pipelining through an orthogonal language construct called "Latency Counting". 'Orthogonal' means that adding pipeline registers does not interfere with other language features such as generative or conditional code. 
 - Separation of pipelines with interfaces. This keeps the user from accidentally crossing signals that have no logical relationship. At this level Clock Domain Crossings are implemented.
 
 Finally, an important consideration of SUS is the user interface. SUS comes with a VSCode IDE plugin that allows the copiler to be used fully in-IDE. Compiling, typechecking and instantiation is done as the user writes code, leading to a very tight development feedback loop. 
@@ -33,7 +33,7 @@ Finally, an important consideration of SUS is the user interface. SUS comes with
 - Runtime Iteration Constructs
 - Automatic Pipelining & Retiming
 
-Of course, while the language does not support such protocols directly, they can be provided as libraries. 
+Of course, while the language does not support such protocols directly in the syntax, as this would put unneccesary extra constraints on the output hardware, modules for handling them are[^todo] provided in the standard library. 
 
 #### Example of some SUS code in the SUS VSCode Language Server. 
 ![SUS LSP Example](philosophy/images/susLSPExample.png)

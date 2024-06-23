@@ -2,5 +2,17 @@
 module test<T> : ::int::<beep = 20 > 3; BEEP = int::<;>> ab {
 	input gen int MY_INPUT
 
+	MY_INPUT = 3
+
+	input int beep
+
+	beep = 3
+
 	FIFO::<;> badoop
+}
+
+module use_test {
+	test::<MY_INPUT = 3;> test_mod
+
+
 }

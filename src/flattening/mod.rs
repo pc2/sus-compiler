@@ -54,6 +54,8 @@ pub struct Module {
     pub link_info : LinkInfo,
 
     /// Created by Stage 1: Initialization
+    /// 
+    /// [Port::declaration_instruction] are set in Stage 2: Flattening
     pub ports : FlatAlloc<Port, PortIDMarker>,
     
     /// Created by Stage 1: Initialization
@@ -106,24 +108,36 @@ impl Module {
         let mut r = String::new(); self.make_interface_info_fmt(interface_id, file_text, &mut r); r
     }
 
-    pub fn make_all_ports_info_fmt(&self, file_text : &FileText, local_domains : Option<InterfaceToDomainMap>, result : &mut String) {
+    pub fn make_all_ports_info_string(&self, file_text : &FileText, local_domains : Option<InterfaceToDomainMap>) -> String {
+        use std::fmt::Write;
+
         let mut interface_iter = self.interfaces.iter();
         if !self.main_interface_used {
             interface_iter.next();
         }
 
+        let mut type_args : Vec<&str> = Vec::new();
+        let mut temporary_gen_input_builder = String::new();
+        for (_id, t) in &self.link_info.template_arguments {
+            match &t.kind {
+                TemplateInputKind::Type { default_value:_ } => type_args.push(&t.name),
+                TemplateInputKind::Generative { decl_span, declaration_instruction:_ } => writeln!(temporary_gen_input_builder, "input gen {}", &file_text[*decl_span]).unwrap(), 
+            }
+        }
+
+        let mut result = format!("module {}<{}>:\n", self.link_info.get_full_name(), type_args.join(", "));
+        result.push_str(&temporary_gen_input_builder);
+
         for (interface_id, interface) in interface_iter {
-            use std::fmt::Write;
             if let Some(domain_map) = &local_domains {
                 writeln!(result, "{}: {{{}}}", &interface.name, domain_map.get_submodule_interface_domain(interface_id).name).unwrap();
             } else {
                 writeln!(result, "{}:", &interface.name).unwrap();
             }
-            self.make_interface_info_fmt(interface_id, file_text, result);
+            self.make_interface_info_fmt(interface_id, file_text, &mut result);
         }
-    }
-    pub fn make_all_ports_info_string(&self, file_text : &FileText, local_domains : Option<InterfaceToDomainMap>) -> String {
-        let mut r = String::new(); self.make_all_ports_info_fmt(file_text, local_domains, &mut r); r
+
+        result
     }
 
     pub fn print_flattened_module(&self, file_text : &FileText) {
@@ -449,6 +463,30 @@ impl WrittenType {
 
 const DECL_DEPTH_LATER : usize = usize::MAX;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeclarationPortInfo {
+    NotPort,
+    RegularPort{is_input : bool},
+    GenerativeInput
+}
+
+impl DeclarationPortInfo {
+    pub fn as_regular_port(&self) -> Option<bool> {
+        if let DeclarationPortInfo::RegularPort{is_input} = self {
+            Some(*is_input)
+        } else {
+            None
+        }
+    }
+    pub fn implies_read_only(&self) -> bool {
+        match self {
+            DeclarationPortInfo::NotPort => false,
+            DeclarationPortInfo::RegularPort { is_input } => *is_input,
+            DeclarationPortInfo::GenerativeInput => true,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Declaration {
     pub typ_expr : WrittenType,
@@ -463,7 +501,7 @@ pub struct Declaration {
     pub read_only : bool,
     /// If the program text already covers the write, then lsp stuff on this declaration shouldn't use it. 
     pub declaration_itself_is_not_written_to : bool,
-    pub is_input_port : Option<bool>,
+    pub is_port : DeclarationPortInfo,
     pub identifier_type : IdentifierType,
     pub latency_specifier : Option<FlatID>,
     pub documentation : Documentation
@@ -479,8 +517,9 @@ pub struct TemplateInput {
 
 #[derive(Debug)]
 pub enum TemplateInputKind {
-    Type,
-    Generative{declaration_instruction : FlatID}
+    /// TODO this isn't quite right, because WrittenType requires access to the instructions, and ostensibly types get executed beforehand. Look into it
+    Type{default_value : Option<WrittenType>},
+    Generative{decl_span : Span, declaration_instruction : FlatID}
 }
 
 pub struct TemplateArg {

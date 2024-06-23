@@ -27,7 +27,7 @@ impl<'linker> ModuleInitializationContext<'linker> {
                     self.template_inputs.alloc(TemplateInput{
                         name,
                         name_span,
-                        kind: TemplateInputKind::Type
+                        kind: TemplateInputKind::Type{default_value : None} // UNSET, gets overwritten in Flattening
                     });
                 });
             });
@@ -66,6 +66,7 @@ impl<'linker> ModuleInitializationContext<'linker> {
                 cursor.field(field!("expr_or_decl"));
                 
                 if cursor.kind() == kind!("declaration") {
+                    let whole_decl_span = cursor.span();
                     cursor.go_down_no_check(|cursor| {
                         if cursor.optional_field(field!("io_port_modifiers")) {
                             let is_input = match cursor.kind() {
@@ -74,7 +75,7 @@ impl<'linker> ModuleInitializationContext<'linker> {
                                 _ => cursor.could_not_match()
                             };
 
-                            self.finish_gather_decl(is_input, cursor);
+                            self.finish_gather_decl(is_input, whole_decl_span, cursor);
                         }
                     });
                 }
@@ -149,16 +150,17 @@ impl<'linker> ModuleInitializationContext<'linker> {
     fn gather_decl_names_in_list(&mut self, is_input : bool, cursor : &mut Cursor) -> PortIDRange {
         let list_start_at = self.ports.get_next_alloc_id();
         cursor.list(kind!("declaration_list"), |cursor| {
+            let whole_decl_span = cursor.span();
             cursor.go_down(kind!("declaration"), |cursor| {
                 // Skip fields if they exist
                 let _ = cursor.optional_field(field!("io_port_modifiers"));
-                self.finish_gather_decl(is_input, cursor);
+                self.finish_gather_decl(is_input, whole_decl_span, cursor);
             });
         });
         self.ports.range_since(list_start_at)
     }
 
-    fn finish_gather_decl(&mut self, is_input: bool, cursor: &mut Cursor) {
+    fn finish_gather_decl(&mut self, is_input: bool, whole_decl_span : Span, cursor: &mut Cursor) {
         // If generative input it's a template arg
         let is_gen = if cursor.optional_field(field!("declaration_modifiers")) {
             cursor.kind() == kw!("gen")
@@ -166,19 +168,20 @@ impl<'linker> ModuleInitializationContext<'linker> {
 
         cursor.field(field!("type"));
         let type_span = cursor.span();
+        let decl_span = Span::new_overarching(type_span, whole_decl_span.empty_span_at_end());
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
         let name = self.file_text[name_span].to_owned();
         if is_gen {
             self.template_inputs.alloc(TemplateInput {
                 name,
                 name_span,
-                kind: TemplateInputKind::Generative{declaration_instruction : UUID::PLACEHOLDER}
+                kind: TemplateInputKind::Generative{decl_span, declaration_instruction : UUID::PLACEHOLDER}
             });
         } else {
             self.ports.alloc(Port{
                 name,
                 name_span,
-                decl_span : Span::new_overarching(type_span, name_span),
+                decl_span,
                 is_input,
                 interface : self.current_interface,
                 declaration_instruction : UUID::PLACEHOLDER
@@ -223,7 +226,7 @@ pub fn gather_initial_file_data(mut builder : FileBuilder) {
                             span,
                             errors,
                             resolved_globals,
-                            template_arguments : FlatAlloc::new(), // TODO
+                            template_arguments : ctx.template_inputs,
                             after_initial_parse_cp,
                             after_flatten_cp : None
                         },

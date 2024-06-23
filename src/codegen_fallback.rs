@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{concrete_type::ConcreteType, flattening::{Instruction, Module}, instantiation::{InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem, WireID, CALCULATE_LATENCY_LATER}, linker::{get_builtin_type, TypeUUID}, value::Value};
+use crate::{concrete_type::ConcreteType, flattening::{DeclarationPortInfo, Instruction, Module}, instantiation::{InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem, WireID, CALCULATE_LATENCY_LATER}, linker::{get_builtin_type, TypeUUID}, value::Value};
 
 fn get_type_name_size(id : TypeUUID) -> u64 {
     if id == get_builtin_type("int") {
@@ -136,7 +136,7 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
 
             if let Instruction::Declaration(wire_decl) = &self.md.instructions[w.original_instruction] {
                 // Don't print named inputs and outputs, already did that in interface
-                if wire_decl.is_input_port.is_some() {
+                if let DeclarationPortInfo::RegularPort { is_input: _ } = wire_decl.is_port {
                     continue;
                 }
             }

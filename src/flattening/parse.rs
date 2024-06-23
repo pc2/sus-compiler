@@ -164,6 +164,7 @@ struct FlatteningContext<'l, 'errs> {
     errors : &'errs ErrorCollector<'l>,
 
     ports_to_visit : UUIDRangeIter<PortIDMarker>,
+    template_inputs_to_visit : UUIDRangeIter<TemplateIDMarker>,
 
     local_variable_context : LocalVariableContext<'l, FlatID>
 }
@@ -379,50 +380,67 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         inst_id
     }
     
-    fn flatten_declaration<const ALLOW_MODULES : bool>(&mut self, declaration_context : DeclarationContext, read_only : bool, declaration_itself_is_not_written_to : bool, cursor : &mut Cursor) -> FlatID {
+    fn flatten_declaration<const ALLOW_MODULES : bool>(&mut self, declaration_context : DeclarationContext, mut read_only : bool, declaration_itself_is_not_written_to : bool, cursor : &mut Cursor) -> FlatID {
         let whole_declaration_span = cursor.span();
         cursor.go_down(kind!("declaration"), |cursor| {
             // Extra inputs and outputs declared in the body of the module
-            let io_kw = cursor.optional_field(field!("io_port_modifiers")).then(|| cursor.kind_span());
+            let io_kw = cursor.optional_keyword(field!("io_port_modifiers")).map(|(k, span)| {
+                match k {
+                    kw!("input") => (true, span),
+                    kw!("output") => (false, span),
+                    _ => cursor.could_not_match(),
+                }
+            });
 
-            let is_input_port = match declaration_context {
+            // State or Generative
+            let declaration_modifiers = cursor.optional_keyword(field!("declaration_modifiers"));
+
+            // Still gets overwritten 
+            let mut is_port = match declaration_context {
                 DeclarationContext::Input | DeclarationContext::Output => {
                     if let Some((_, io_span)) = io_kw {
                         self.errors.error(io_span, "Cannot redeclare 'input' or 'output' on functional syntax IO");
                     }
-                    Some(declaration_context == DeclarationContext::Input)
+                    DeclarationPortInfo::RegularPort { is_input: declaration_context == DeclarationContext::Input }
                 }
                 DeclarationContext::ForLoopGenerative => {
                     if let Some((_, io_span)) = io_kw {
                         self.errors.error(io_span, "Cannot declare 'input' or 'output' to the iterator of a for loop");
                     }
-                    None
+                    DeclarationPortInfo::NotPort
                 }
                 DeclarationContext::PlainWire => {
                     match io_kw {
-                        Some((kw!("input"), _)) => Some(true),
-                        Some((kw!("output"), _)) => Some(false),
-                        None => None,
-                        Some((_, _)) => cursor.could_not_match(),
+                        Some((is_input, _)) => DeclarationPortInfo::RegularPort { is_input },
+                        None => DeclarationPortInfo::NotPort,
                     }
                 }
             };
 
-            // State or Generative
-            let declaration_modifiers = cursor.optional_field(field!("declaration_modifiers")).then(|| cursor.kind_span());
+            if is_port.implies_read_only() {
+                read_only = true;
+            }
             
             let identifier_type = match declaration_context {
                 DeclarationContext::Input | DeclarationContext::Output | DeclarationContext::PlainWire => {
                     match declaration_modifiers {
                         Some((kw!("state"), modifier_span)) => {
-                            if is_input_port == Some(true) {
+                            if is_port.as_regular_port() == Some(true) {
                                 self.errors.error(modifier_span, "Inputs cannot be decorated with 'state'");
                             }
                             IdentifierType::State
                         }
                         Some((kw!("gen"), modifier_span)) => {
-                            if is_input_port.is_some() {
-                                self.errors.error(modifier_span, "Cannot make an input or output generative");
+                            match is_port {
+                                DeclarationPortInfo::NotPort => {}
+                                DeclarationPortInfo::RegularPort { is_input : true } => {
+                                    // AHA! Generative input
+                                    is_port = DeclarationPortInfo::GenerativeInput
+                                }
+                                DeclarationPortInfo::RegularPort { is_input : false } => {
+                                    self.errors.error(modifier_span, "Cannot make generative outputs. This is because it could interfere with inference of generic types and generative inputs");
+                                }
+                                DeclarationPortInfo::GenerativeInput => unreachable!("Can't have been GenerativeInput here already, because it only gets converted to that here"), 
                             }
                             IdentifierType::Generative
                         }
@@ -482,7 +500,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 typ : FullType::new_unset(),
                 read_only,
                 declaration_itself_is_not_written_to,
-                is_input_port,
+                is_port,
                 identifier_type,
                 name : name.to_owned(),
                 name_span,
@@ -492,11 +510,21 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 documentation
             }));
 
-            if is_input_port.is_some() {
-                let this_port_id = self.ports_to_visit.next().unwrap();
-                let port = &mut self.working_on.ports[this_port_id];
-                assert_eq!(port.name_span, name_span);
-                port.declaration_instruction = decl_id;
+            match is_port {
+                DeclarationPortInfo::NotPort => {},
+                DeclarationPortInfo::RegularPort { is_input:_ } => {
+                    let this_port_id = self.ports_to_visit.next().unwrap();
+                    let port = &mut self.working_on.ports[this_port_id];
+                    assert_eq!(port.name_span, name_span);
+                    port.declaration_instruction = decl_id;
+                }
+                DeclarationPortInfo::GenerativeInput => {
+                    let this_template_id = self.template_inputs_to_visit.next().unwrap();
+
+                    let TemplateInputKind::Generative { decl_span, declaration_instruction } = &mut self.working_on.link_info.template_arguments[this_template_id].kind else {unreachable!()};
+
+                    *declaration_instruction = decl_id;
+                }
             }
 
             decl_id
@@ -1081,7 +1109,22 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         cursor.go_down(kind!("module"), |cursor| {
             let name_span = cursor.field_span(field!("name"), kind!("identifier"));
             if cursor.optional_field(field!("template_declaration_arguments")) {
-                self.name_resolver.errors.error(cursor.span(), "Template Decl Args");
+                cursor.list(kind!("template_declaration_arguments"), |cursor| {
+                    cursor.go_down(kind!("template_declaration_type"), |cursor| {
+                        // Already covered in initialization
+                        cursor.field(field!("name"));
+                        let default_type = cursor.optional_field(field!("default_value")).then(|| {
+                            self.flatten_type(cursor)
+                        });
+
+                        let claimed_type_id = self.template_inputs_to_visit.next().unwrap();
+
+                        let TemplateInputKind::Type{default_value} = &mut self.working_on.link_info.template_arguments[claimed_type_id].kind else {unreachable!()};
+
+                        *default_value = default_type;
+                    });
+                    self.name_resolver.errors.todo(cursor.span(), "Template Type Arguments");
+                })
             }
             let module_name = &self.name_resolver.file_text[name_span];
             println!("TREE SITTER module! {module_name}");
@@ -1111,6 +1154,7 @@ pub fn flatten<'cursor_linker, 'errs>(linker : *mut Linker, module_uuid : Module
 
         let mut context = FlatteningContext {
             ports_to_visit : modules.working_on.ports.id_range().into_iter(),
+            template_inputs_to_visit : modules.working_on.link_info.template_arguments.id_range().into_iter(),
             errors : name_resolver.errors,
             modules, 
             types, 
@@ -1123,6 +1167,7 @@ pub fn flatten<'cursor_linker, 'errs>(linker : *mut Linker, module_uuid : Module
         
         // Make sure all ports have been visited
         assert!(context.ports_to_visit.is_empty());
+        assert!(context.template_inputs_to_visit.is_empty());
     });
 }
 

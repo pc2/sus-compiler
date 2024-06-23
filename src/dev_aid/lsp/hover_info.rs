@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use lsp_types::{LanguageString, MarkedString};
 
 use crate::{
-    abstract_type::DomainType, flattening::{FlatID, IdentifierType, InterfaceToDomainMap, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, LinkInfo, Linker, NameElem}, parser::Documentation
+    abstract_type::DomainType, flattening::{DeclarationPortInfo, FlatID, IdentifierType, InterfaceToDomainMap, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, LinkInfo, Linker, NameElem}, parser::Documentation
 };
 
 use super::tree_walk::{InModule, LocationInfo};
@@ -77,8 +77,10 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             if let Some(ds) = &domain_str {
                 details_vec.push(ds);
             }
-            if let Some(is_input) = decl.is_input_port {
-                details_vec.push(if is_input {"input"} else {"output"});
+            match decl.is_port {
+                DeclarationPortInfo::RegularPort { is_input } => details_vec.push(if is_input {"input"} else {"output"}),
+                DeclarationPortInfo::NotPort => {},
+                DeclarationPortInfo::GenerativeInput => details_vec.push("input") // "gen" in "input gen" is covered by decl.identifier_type
             }
 
             match decl.identifier_type {

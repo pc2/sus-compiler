@@ -156,7 +156,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     WireReferenceRoot::LocalDecl(decl_id, _) => {
                         let decl = self.working_on.instructions[decl_id].unwrap_wire_declaration();
                         if decl.read_only {
-                            self.errors.error(conn.to_span, "Cannot assign to read-only declaration")
+                            self.errors.error(conn.to_span, format!("'{}' is read-only", decl.name))
                                 .info_obj_same_file(decl);
                         }
                         (decl, self.errors.file)
@@ -168,7 +168,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     WireReferenceRoot::SubModulePort(port) => {
                         let r = self.get_decl_of_module_port(port.port, port.submodule_decl);
 
-                        if !r.0.is_input_port.unwrap() {
+                        if !r.0.is_port.as_regular_port().unwrap() {
                             self.errors.error(conn.to_span, "Cannot assign to a submodule output port")
                             .info_obj_different_file(r.0, r.1);
                         }
