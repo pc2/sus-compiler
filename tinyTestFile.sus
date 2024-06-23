@@ -12,7 +12,7 @@ module test<T> : ::int::<beep = 20 > 3; BEEP = int::<;>> ab {
 }
 
 module use_test {
-	test::<MY_INPUT = 3;> test_mod
+	test::<3;> test_mod
 
 
 }

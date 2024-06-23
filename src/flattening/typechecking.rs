@@ -62,7 +62,7 @@ impl<'l, 'errs> DerefMut for TypeCheckingContext<'l, 'errs> {
 
 impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     fn get_decl_of_module_port<'s>(&'s self, port : PortID, submodule_instr : FlatID) -> (&'s Declaration, FileUUID) {
-        let submodule_id = self.working_on.instructions[submodule_instr].unwrap_submodule().module_uuid;
+        let submodule_id = self.working_on.instructions[submodule_instr].unwrap_submodule().module_ref.id;
         let module = &self.modules[submodule_id];
         let decl = module.get_port_decl(port);
         (decl, module.link_info.file)
@@ -71,7 +71,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     fn get_type_of_port(&self, port : PortID, submodule_instr : FlatID) -> FullType {
         let (decl, _file) = self.get_decl_of_module_port(port, submodule_instr);
         let submodule_inst = self.working_on.instructions[submodule_instr].unwrap_submodule();
-        let submodule_module = &self.modules[submodule_inst.module_uuid];
+        let submodule_module = &self.modules[submodule_inst.module_ref.id];
         let port_interface = submodule_module.ports[port].interface;
         let port_local_domain = submodule_inst.local_interface_domains[port_interface];
         FullType {
@@ -216,7 +216,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     fn typecheck_visit_instruction(&mut self, instr_id : FlatID) {
         match &self.working_on.instructions[instr_id] {
             Instruction::SubModule(sm) => {
-                let md = &self.modules[sm.module_uuid];
+                let md = &self.modules[sm.module_ref.id];
                 let local_interface_domains = md.interfaces.iter().map(|_| self.type_checker.new_unknown_domain_id()).collect();
 
                 let Instruction::SubModule(sm) = &mut self.working_on.instructions[instr_id] else {unreachable!()};
@@ -349,7 +349,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 BestName::ExistingInterface => self.modules.working_on.interfaces[id].name.clone(),
                 BestName::SubModule(sm_instr, sm_interface) => {
                     let sm = self.working_on.instructions[sm_instr].unwrap_submodule();
-                    let md = &self.modules[sm.module_uuid];
+                    let md = &self.modules[sm.module_ref.id];
                     format!("{}_{}", sm.get_name(&md), md.interfaces[sm_interface].name)
                 }
                 BestName::NamedWire(decl_id) => self.working_on.instructions[decl_id].unwrap_wire_declaration().name.clone(),

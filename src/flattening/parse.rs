@@ -5,15 +5,15 @@ use std::{ops::{Deref, DerefMut}, str::FromStr};
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 use crate::{
-    arena_alloc::{UUIDRange, UUIDRangeIter, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, ResolvedName, Resolver, TypeUUIDMarker, WorkingOnResolver}, parser::Cursor, value::Value
+    arena_alloc::{UUIDRange, UUIDRangeIter, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, Resolver, TypeUUIDMarker, WorkingOnResolver}, parser::Cursor, value::Value
 };
 
 use super::name_context::LocalVariableContext;
 use super::*;
 
-enum LocalOrGlobal<'l> {
+enum LocalOrGlobal {
     Local(FlatID),
-    Global(ResolvedName<'l>, FlatAlloc<Option<TemplateArg>, TemplateIDMarker>, Option<BracketSpan>),
+    Global(NameElem, Span, FlatAlloc<Option<TemplateArg>, TemplateIDMarker>, Option<BracketSpan>),
     // Error is already handled
     NotFound(Span)
 }
@@ -23,7 +23,7 @@ enum PartialWireReference {
     /// Means the error has already been reported
     Error,
     /// A module that is implicitly declared in a function call. 
-    GlobalModuleName(ModuleUUID, Span),
+    GlobalModuleName(GlobalReference<ModuleUUID>),
     /// Partial result, waiting for a port to be grabbed
     ModuleButNoPort(FlatID, Span),
     /// A module with an interface specified
@@ -37,21 +37,21 @@ impl PartialWireReference {
         match self {
             PartialWireReference::Error => None, // Error already reported
             PartialWireReference::ModuleButNoPort(submod_decl, span) => {
-                let md_uuid = ctx.working_on.instructions[submod_decl].unwrap_submodule().module_uuid;
+                let md_uuid = ctx.working_on.instructions[submod_decl].unwrap_submodule().module_ref.id;
                 ctx.errors
                     .error(span, "cannot operate on modules directly. Should use ports instead")
                     .info_obj(&ctx.modules[md_uuid]);
                 None
             },
-            PartialWireReference::GlobalModuleName(md_uuid, span) => {
-                let md = &ctx.modules[md_uuid];
+            PartialWireReference::GlobalModuleName(md_ref) => {
+                let md = &ctx.modules[md_ref.id];
                 ctx.errors
-                    .error(span, format!("Expected a Wire Reference, but found module '{}' instead", md.link_info.name))
+                    .error(md_ref.span, format!("Expected a Wire Reference, but found module '{}' instead", md.link_info.name))
                     .info_obj(md);
                 None
             }
             PartialWireReference::ModuleWithInterface { submodule_decl: submod_decl, submodule_name_span:_, interface, interface_name_span } => {
-                let md_uuid = ctx.working_on.instructions[submod_decl].unwrap_submodule().module_uuid;
+                let md_uuid = ctx.working_on.instructions[submod_decl].unwrap_submodule().module_ref.id;
                 let md = &ctx.modules[md_uuid];
                 let interf = &md.interfaces[interface];
                 ctx.errors
@@ -192,7 +192,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         let name_specification = cursor.optional_field_span(field!("name"), kind!("identifier"));
                         cursor.field(field!("arg"));
                         let typ = self.flatten_type(cursor);
-                        TemplateArg{name_specification, whole_span, typ : TemplateArgType::Type(typ)}
+                        TemplateArg{name_specification, whole_span, kind : TemplateArgKind::Type(typ)}
                     })
                 }
                 kind!("template_value_param") => {
@@ -200,7 +200,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         let name_specification = cursor.optional_field_span(field!("name"), kind!("identifier"));
                         cursor.field(field!("arg"));
                         let expr = self.flatten_expr(cursor);
-                        TemplateArg{name_specification, whole_span, typ : TemplateArgType::Value(expr)}
+                        TemplateArg{name_specification, whole_span, kind : TemplateArgKind::Value(expr)}
                     })
                 }
                 _ => cursor.could_not_match()
@@ -208,10 +208,10 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
 
-    fn collect_template_args(&self, global : &ResolvedName, template_argument_list : Vec<TemplateArg>) -> FlatAlloc<Option<TemplateArg>, TemplateIDMarker> {
+    fn collect_template_args(&self, name_elem : NameElem, template_argument_list : Vec<TemplateArg>) -> FlatAlloc<Option<TemplateArg>, TemplateIDMarker> {
         let empty_template : FlatAlloc<TemplateInput, TemplateIDMarker> = FlatAlloc::new();
     
-        let template_info = match global.name_elem {
+        let template_info = match name_elem {
             NameElem::Module(md_id) => {
                 &self.modules[md_id].link_info.template_arguments
             },
@@ -229,7 +229,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 let target_name = &self.name_resolver.file_text[name_span];
     
                 let Some(named_index) = template_info.find(|_, template_input| template_input.name == target_name) else {
-                    let info = global.get_linking_error_location();
+                    let info = self.name_resolver.get_linking_error_location(name_elem);
                     let err_ref = self.errors.error(name_span, format!("No template argument of name '{target_name}' on '{}'", info.full_name));
                     if let Some(pos) = info.location {
                         err_ref.info(pos, format!("'{}' declared here", info.full_name));
@@ -239,7 +239,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 named_index
             } else {
                 let Some(index) = index_iter.next() else {
-                    let info = global.get_linking_error_location();
+                    let info = self.name_resolver.get_linking_error_location(name_elem);
                     let err_ref = self.errors.error(given_arg.whole_span, format!("Too many template arguments! '{}' only requires {} template arguments", info.full_name, template_info.len()));
                     if let Some(pos) = info.location {
                         err_ref.info(pos, format!("'{}' declared here", info.full_name));
@@ -303,10 +303,10 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
             // Global identifier
             let [name_span] = name_path.as_slice() else {todo!("Namespaces")};
-            if let Some(found_global) = self.name_resolver.resolve_global(*name_span) {
-                let template_arg_map = self.collect_template_args(&found_global, template_args);
+            if let Some((found_global, found_global_span)) = self.name_resolver.resolve_global(*name_span) {
+                let template_arg_map = self.collect_template_args(found_global, template_args);
 
-                LocalOrGlobal::Global(found_global, template_arg_map, template_args_whole_span)
+                LocalOrGlobal::Global(found_global, found_global_span, template_arg_map, template_args_whole_span)
             } else {
                 LocalOrGlobal::NotFound(*name_span)
             }
@@ -330,11 +330,12 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         if kind == kind!("template_global") {
             match self.flatten_local_or_template_global(true, cursor) {
                 LocalOrGlobal::Local(_) => unreachable!(),
-                LocalOrGlobal::Global(resolved_global, template_args, template_span) => {
-                    if let Some(typ_id) = resolved_global.expect_type() {
-                        WrittenType::Named(resolved_global.span, typ_id)
+                LocalOrGlobal::Global(resolved_global, resolved_global_span, template_args, template_span) => {
+                    if let NameElem::Type(typ_id) = resolved_global {
+                        WrittenType::Named(GlobalReference { span: resolved_global_span, id: typ_id, template_args, template_span})
                     } else {
-                        WrittenType::Error(resolved_global.span)
+                        self.name_resolver.not_expected_global_error(resolved_global, resolved_global_span, "Type");
+                        WrittenType::Error(resolved_global_span)
                     }
                 }
                 LocalOrGlobal::NotFound(name_span) => WrittenType::Error(name_span) // Already covered
@@ -350,14 +351,14 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         if kind == kind!("template_global") {
             match self.flatten_local_or_template_global(true, cursor) {
                 LocalOrGlobal::Local(_) => unreachable!(),
-                LocalOrGlobal::Global(resolved_global, template_args, template_span) => {
-                    match &resolved_global.name_elem {
-                        NameElem::Type(typ_id) => ModuleOrWrittenType::WrittenType(WrittenType::Named(resolved_global.span, *typ_id)),
-                        NameElem::Module(md) if ALLOW_MODULES => ModuleOrWrittenType::Module(resolved_global.span, *md),
+                LocalOrGlobal::Global(resolved_global, resolved_global_span, template_args, template_span) => {
+                    match &resolved_global {
+                        NameElem::Type(typ_id) => ModuleOrWrittenType::WrittenType(WrittenType::Named(GlobalReference { span: resolved_global_span, id: *typ_id, template_args, template_span })),
+                        NameElem::Module(md_id) if ALLOW_MODULES => ModuleOrWrittenType::Module(GlobalReference { span: resolved_global_span, id: *md_id, template_args, template_span }),
                         _ => {
                             let accepted_text = if ALLOW_MODULES {"Type or Module"} else {"Type"};
-                            resolved_global.not_expected_global_error(accepted_text);
-                            ModuleOrWrittenType::WrittenType(WrittenType::Error(resolved_global.span))
+                            self.name_resolver.not_expected_global_error(resolved_global, resolved_global_span, accepted_text);
+                            ModuleOrWrittenType::WrittenType(WrittenType::Error(resolved_global_span))
                         }
                     }
                 }
@@ -476,7 +477,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 ModuleOrWrittenType::WrittenType(typ) => {
                     typ
                 }
-                ModuleOrWrittenType::Module(span, module_uuid) => {
+                ModuleOrWrittenType::Module(module_ref) => {
                     assert!(ALLOW_MODULES);
                     if let Some((_, span)) = span_latency_specifier {
                         self.errors.error(span, "Cannot add latency specifier to module instances");
@@ -484,8 +485,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     let name = &self.name_resolver.file_text[name_span];
                     return self.alloc_declaration(name, whole_declaration_span, Instruction::SubModule(SubModuleInstance{
                         name : Some((name.to_owned(), name_span)),
-                        module_uuid,
-                        module_name_span: span,
+                        module_ref,
                         declaration_runtime_depth : DECL_DEPTH_LATER,
                         local_interface_domains : FlatAlloc::new(),
                         documentation
@@ -521,7 +521,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 DeclarationPortInfo::GenerativeInput => {
                     let this_template_id = self.template_inputs_to_visit.next().unwrap();
 
-                    let TemplateInputKind::Generative { decl_span, declaration_instruction } = &mut self.working_on.link_info.template_arguments[this_template_id].kind else {unreachable!()};
+                    let TemplateInputKind::Generative { decl_span:_, declaration_instruction } = &mut self.working_on.link_info.template_arguments[this_template_id].kind else {unreachable!()};
 
                     *declaration_instruction = decl_id;
                 }
@@ -603,12 +603,12 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         let outer_span = cursor.span();
         match self.flatten_wire_reference(cursor) {
             PartialWireReference::Error => None,
-            PartialWireReference::GlobalModuleName(module_uuid, module_name_span) => {
+            PartialWireReference::GlobalModuleName(module_ref) => {
                 let documentation = cursor.extract_gathered_comments();
+                let interface_span = module_ref.span;
                 let submodule_decl = self.working_on.instructions.alloc(Instruction::SubModule(SubModuleInstance{
                     name : None,
-                    module_uuid,
-                    module_name_span,
+                    module_ref,
                     declaration_runtime_depth : DECL_DEPTH_LATER,
                     local_interface_domains : FlatAlloc::new(),
                     documentation
@@ -617,7 +617,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     submodule_decl,
                     submodule_interface : Module::MAIN_INTERFACE_ID,
                     name_span : None,
-                    interface_span : module_name_span
+                    interface_span
                 })
             }
             PartialWireReference::ModuleButNoPort(submodule_decl, name_span) => {
@@ -646,7 +646,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
     fn get_interface_reference(&self, interface_reference : &ModuleInterfaceReference) -> (&Module, &Interface) {
         let submodule = self.working_on.instructions[interface_reference.submodule_decl].unwrap_submodule();
-        let md = &self.modules[submodule.module_uuid];
+        let md = &self.modules[submodule.module_ref.id];
         let interface = &md.interfaces[interface_reference.submodule_interface];
         (md, interface)
     }
@@ -738,17 +738,17 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         Instruction::Wire(_) | Instruction::Write(_) | Instruction::IfStatement(_) | Instruction::ForStatement(_) | Instruction::FuncCall(_) => unreachable!()
                     }
                 }
-                LocalOrGlobal::Global(global, template_args, template_args_span) => {
-                    match global.name_elem {
+                LocalOrGlobal::Global(name_elem, span, template_args, template_span) => {
+                    match name_elem {
                         NameElem::Constant(cst) => {
                             let root = WireReferenceRoot::NamedConstant(cst, expr_span);
                             PartialWireReference::WireReference(WireReference{root, path : Vec::new()})
                         }
                         NameElem::Module(md_id) => {
-                            PartialWireReference::GlobalModuleName(md_id, expr_span)
+                            PartialWireReference::GlobalModuleName(GlobalReference { span, id: md_id, template_args, template_span })
                         }
                         NameElem::Type(_) => {
-                            global.not_expected_global_error("named wire: local or constant");
+                            self.name_resolver.not_expected_global_error(name_elem, span, "named wire: local or constant");
                             PartialWireReference::Error
                         },
                     }
@@ -767,8 +767,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 
                 // only unpack the subexpr after flattening the idx, so we catch all errors
                 match &mut flattened_arr_expr {
-                    PartialWireReference::ModuleButNoPort(_, sp) | PartialWireReference::GlobalModuleName(_, sp) | PartialWireReference::ModuleWithInterface { submodule_decl:_, submodule_name_span:_, interface:_, interface_name_span:sp }=> {
-                        sp.debug();
+                    PartialWireReference::ModuleButNoPort(_, _) | PartialWireReference::GlobalModuleName(_) | PartialWireReference::ModuleWithInterface { submodule_decl:_, submodule_name_span:_, interface:_, interface_name_span:_ }=> {
                         todo!("Module Arrays")
                     }
                     PartialWireReference::Error => {}
@@ -788,8 +787,8 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
                 match flattened_arr_expr {
                     PartialWireReference::Error => PartialWireReference::Error,
-                    PartialWireReference::GlobalModuleName(_md_id, span) => {
-                        self.errors.error(span, "Ports or interfaces can only be accessed on modules that have been explicitly declared. Declare this submodule on its own line");
+                    PartialWireReference::GlobalModuleName(md_ref) => {
+                        self.errors.error(md_ref.span, "Ports or interfaces can only be accessed on modules that have been explicitly declared. Declare this submodule on its own line");
                         PartialWireReference::Error
                     }
                     PartialWireReference::ModuleWithInterface { submodule_decl:_, submodule_name_span, interface:_, interface_name_span } => {
@@ -801,7 +800,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     PartialWireReference::ModuleButNoPort(submodule_decl, submodule_name_span) => {
                         let submodule = self.working_on.instructions[submodule_decl].unwrap_submodule();
 
-                        let submod = &self.modules[submodule.module_uuid];
+                        let submod = &self.modules[submodule.module_ref.id];
 
                         match submod.get_port_or_interface_by_name(port_name_span, &self.name_resolver.file_text, self.errors) {
                             Some(PortOrInterface::Port(port)) => {

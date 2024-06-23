@@ -179,7 +179,7 @@ impl Module {
 
     pub fn get_instruction_span(&self, instr_id : FlatID) -> Span {
         match &self.instructions[instr_id] {
-            Instruction::SubModule(sm) => sm.module_name_span,
+            Instruction::SubModule(sm) => sm.module_ref.span,
             Instruction::FuncCall(fc) => fc.whole_func_span,
             Instruction::Declaration(decl) => decl.decl_span,
             Instruction::Wire(w) => w.span,
@@ -413,24 +413,32 @@ impl WireSource {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
+pub struct GlobalReference<ID> {
+    pub span: Span,
+    pub id: ID,
+    pub template_args: FlatAlloc<Option<TemplateArg>, TemplateIDMarker>,
+    pub template_span: Option<BracketSpan>
+}
+
+#[derive(Debug)]
 pub enum WrittenType {
     Error(Span),
-    Named(Span, TypeUUID),
+    Named(GlobalReference<TypeUUID>),
     Array(Span, Box<(WrittenType, FlatID, BracketSpan)>)
 }
 
 impl WrittenType {
     pub fn get_span(&self) -> Span {
         match self {
-            WrittenType::Error(span) | WrittenType::Named(span, _) | WrittenType::Array(span, _) => *span
+            WrittenType::Error(span) | WrittenType::Named(GlobalReference { span, ..}) | WrittenType::Array(span, _) => *span
         }
     }
 
     pub fn to_type(&self) -> AbstractType {
         match self {
             WrittenType::Error(_) => AbstractType::Error,
-            WrittenType::Named(_, id) => AbstractType::Named(*id),
+            WrittenType::Named(named_type) => AbstractType::Named(named_type.id),
             WrittenType::Array(_, arr_box) => {
                 let (elem_typ, _arr_idx, _br_span) = arr_box.deref();
                 AbstractType::Array(Box::new(elem_typ.to_type()))
@@ -440,7 +448,7 @@ impl WrittenType {
 
     pub fn for_each_generative_input<F : FnMut(FlatID)>(&self, mut f : F) {
         match self {
-            WrittenType::Error(_) | WrittenType::Named(_, _) => {}
+            WrittenType::Error(_) | WrittenType::Named(_) => {}
             WrittenType::Array(_span, arr_box) => {
                 f(arr_box.deref().1)
             }
@@ -452,8 +460,8 @@ impl WrittenType {
             WrittenType::Error(_) => {
                 "{error}".to_owned()
             }
-            WrittenType::Named(_, id) => {
-                linker_types[*id].get_full_name()
+            WrittenType::Named(named_type) => {
+                linker_types[named_type.id].get_full_name()
             }
             WrittenType::Array(_, sub) => sub.deref().0.to_string(linker_types) + "[]",
         }
@@ -522,13 +530,16 @@ pub enum TemplateInputKind {
     Generative{decl_span : Span, declaration_instruction : FlatID}
 }
 
+
+#[derive(Debug)]
 pub struct TemplateArg {
     pub name_specification : Option<Span>,
     pub whole_span : Span,
-    pub typ : TemplateArgType
+    pub kind : TemplateArgKind
 }
 
-pub enum TemplateArgType {
+#[derive(Debug)]
+pub enum TemplateArgKind {
     Type(WrittenType),
     Value(FlatID)
 }
@@ -536,8 +547,7 @@ pub enum TemplateArgType {
 
 #[derive(Debug)]
 pub struct SubModuleInstance {
-    pub module_uuid : ModuleUUID,
-    pub module_name_span : Span,
+    pub module_ref : GlobalReference<ModuleUUID>,
     /// Name is not always present in source code. Such as in inline function call syntax: my_mod(a, b, c)
     pub name : Option<(String, Span)>,
     pub declaration_runtime_depth : usize,
@@ -641,8 +651,8 @@ impl Instruction {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum ModuleOrWrittenType {
     WrittenType(WrittenType),
-    Module(Span, ModuleUUID)
+    Module(GlobalReference<ModuleUUID>)
 }

@@ -100,7 +100,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.gather_hover_infos(md, decl_id, decl.identifier_type.is_generative());
         }
         LocationInfo::InModule(_, md, _, InModule::NamedSubmodule(submod)) => {
-            let submodule = &linker.modules[submod.module_uuid];
+            let submodule = &linker.modules[submod.module_ref.id];
         
             // Declaration's documentation
             hover.documentation(&submod.documentation);

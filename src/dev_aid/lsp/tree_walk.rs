@@ -60,8 +60,8 @@ impl<'linker> From<LocationInfo<'linker>> for RefersTo {
                 result.global = Some(name_elem);
             }
             LocationInfo::Port(sm, md, p_id) => {
-                result.local = Some((sm.module_uuid, md.ports[p_id].declaration_instruction));
-                result.port = Some((sm.module_uuid, p_id))
+                result.local = Some((sm.module_ref.id, md.ports[p_id].declaration_instruction));
+                result.port = Some((sm.module_ref.id, p_id))
             }
             LocationInfo::Interface(md_id, _md, i_id, _interface) => {
                 result.interface = Some((md_id, i_id))
@@ -77,7 +77,7 @@ impl RefersTo {
             LocationInfo::InModule(md_id, _, obj, _) => self.local == Some((md_id, obj)),
             LocationInfo::Type(_) => false,
             LocationInfo::Global(ne) => self.global == Some(ne),
-            LocationInfo::Port(sm, _, p_id) => self.port == Some((sm.module_uuid, p_id)),
+            LocationInfo::Port(sm, _, p_id) => self.port == Some((sm.module_ref.id, p_id)),
             LocationInfo::Interface(md_id, _, i_id, _) => self.interface == Some((md_id, i_id))
         }
     }
@@ -159,7 +159,7 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
             WireReferenceRoot::SubModulePort(port) => {
                 if let Some(span) = port.port_name_span {
                     let sm_instruction = md.instructions[port.submodule_decl].unwrap_submodule();
-                    let submodule = &self.linker.modules[sm_instruction.module_uuid];
+                    let submodule = &self.linker.modules[sm_instruction.module_ref.id];
                     self.visit(span, LocationInfo::Port(sm_instruction, submodule, port.port));
 
                     // port_name_span being enabled means submodule_name_span is for sure
@@ -177,8 +177,8 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
             (self.visitor)(typ_expr_span, LocationInfo::Type(typ_expr));
             match typ_expr {
                 WrittenType::Error(_) => {}
-                WrittenType::Named(span, name_id) => {
-                    self.visit(*span, LocationInfo::Global(NameElem::Type(*name_id)));
+                WrittenType::Named(named_type) => {
+                    self.visit(named_type.span, LocationInfo::Global(NameElem::Type(named_type.id)));
                 }
                 WrittenType::Array(_, arr_box) => {
                     let (arr_content_typ, _size_id, _br_span) = arr_box.deref();
@@ -195,9 +195,9 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
             let submodule = md.instructions[submodule_instruction].unwrap_submodule();
             self.visit(submod_name_span, LocationInfo::InModule(md_id, md, submodule_instruction, InModule::NamedSubmodule(submodule)));
             if iref.interface_span != submod_name_span {
-                let submod_md = &self.linker.modules[submodule.module_uuid];
+                let submod_md = &self.linker.modules[submodule.module_ref.id];
                 let interface = &submod_md.interfaces[iref.submodule_interface];
-                self.visit(iref.interface_span, LocationInfo::Interface(submodule.module_uuid, submod_md, iref.submodule_interface, interface));
+                self.visit(iref.interface_span, LocationInfo::Interface(submodule.module_ref.id, submod_md, iref.submodule_interface, interface));
             }
         }
     }
@@ -217,7 +217,7 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
             for (id, inst) in &md.instructions {
                 match inst {
                     Instruction::SubModule(sm) => {
-                        self.visit(sm.module_name_span, LocationInfo::Global(NameElem::Module(sm.module_uuid)));
+                        self.visit(sm.module_ref.span, LocationInfo::Global(NameElem::Module(sm.module_ref.id)));
                         if let Some((_sm_name, sm_name_span)) = &sm.name {
                             self.visit(*sm_name_span, LocationInfo::InModule(md_id, md, id, InModule::NamedSubmodule(sm)));
                         }

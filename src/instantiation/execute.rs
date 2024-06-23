@@ -9,7 +9,7 @@ use std::ops::{Deref, Index, IndexMut};
 use num::BigInt;
 
 use crate::{
-    abstract_type::DomainType, arena_alloc::UUIDRange, concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, file_position::Span, flattening::{BinaryOperator, Declaration, FlatID, FlatIDRange, IdentifierType, Instruction, UnaryOperator, WireInstance, WireReference, WireReferencePathElement, WireReferenceRoot, WireSource, WriteModifiers, WrittenType}, linker::NamedConstant, util::add_to_small_set, value::{compute_binary_op, compute_unary_op, TypedValue, Value}
+    abstract_type::DomainType, arena_alloc::UUIDRange, concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, file_position::Span, flattening::{BinaryOperator, Declaration, FlatID, FlatIDRange, IdentifierType, Instruction, TemplateArgKind, UnaryOperator, WireInstance, WireReference, WireReferencePathElement, WireReferenceRoot, WireSource, WriteModifiers, WrittenType}, linker::NamedConstant, util::add_to_small_set, value::{compute_binary_op, compute_unary_op, TypedValue, Value}
 };
 
 use super::*;
@@ -100,8 +100,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn concretize_type(&self, typ : &WrittenType) -> ExecutionResult<ConcreteType> {
         Ok(match typ {
             WrittenType::Error(_) => caught_by_typecheck!("Error Type"),
-            WrittenType::Named(_, id) => {
-                ConcreteType::Named(*id)
+            WrittenType::Named(named_type) => {
+                ConcreteType::Named(named_type.id)
             }
             WrittenType::Array(_, arr_box) => {
                 let (arr_content_typ, arr_size_wire, _bracket_span) = arr_box.deref();
@@ -424,7 +424,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             self.md.get_instruction_span(original_instruction);
             let instance_to_add : SubModuleOrWire = match instr {
                 Instruction::SubModule(submodule) => {
-                    let sub_module = &self.linker.modules[submodule.module_uuid];
+                    let sub_module = &self.linker.modules[submodule.module_ref.id];
                     
                     let name = if let Some((name, _span)) = &submodule.name {
                         name.clone()
@@ -433,7 +433,28 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     };
                     let port_map = FlatAlloc::new_nones(sub_module.ports.len());
                     let interface_call_sites = sub_module.interfaces.iter().map(|_| Vec::new()).collect();
-                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule { original_instruction, instance : None, port_map, interface_call_sites, name, module_uuid : submodule.module_uuid}))
+                    let mut template_args = FlatAlloc::with_capacity(submodule.module_ref.template_args.len());
+                    
+                    for (_id, v) in &submodule.module_ref.template_args {
+                        template_args.alloc(match v {
+                            Some(arg) => {
+                                match &arg.kind {
+                                    TemplateArgKind::Type(typ) => ConcreteTemplateArg::Type(self.concretize_type(typ)?),
+                                    TemplateArgKind::Value(v) => ConcreteTemplateArg::Value(self.generation_state.get_generation_value(*v)?.clone()),
+                                }
+                            }
+                            None => ConcreteTemplateArg::NotProvided
+                        });
+                    }
+                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule {
+                        original_instruction,
+                        instance : None,
+                        port_map,
+                        interface_call_sites,
+                        name,
+                        module_uuid : submodule.module_ref.id,
+                        template_args
+                    }))
                 }
                 Instruction::Declaration(wire_decl) => {
                     self.instantiate_declaration(wire_decl, original_instruction)?

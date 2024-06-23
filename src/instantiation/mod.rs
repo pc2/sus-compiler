@@ -8,7 +8,7 @@ mod latency_count;
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, value::{TypedValue, Value}
+    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, TemplateIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, value::{TypedValue, Value}
 };
 
 use self::latency_algorithm::SpecifiedLatency;
@@ -89,13 +89,22 @@ pub struct UsedPort {
 }
 
 #[derive(Debug)]
+pub enum ConcreteTemplateArg {
+    Type(ConcreteType),
+    Value(TypedValue),
+    NotProvided,
+    Errored
+}
+
+#[derive(Debug)]
 pub struct SubModule {
     pub original_instruction : FlatID,
     pub instance : Option<Rc<InstantiatedModule>>,
     pub port_map : FlatAlloc<Option<UsedPort>, PortIDMarker>,
     pub interface_call_sites : FlatAlloc<Vec<Span>, DomainIDMarker>,
     pub name : String,
-    pub module_uuid : ModuleUUID
+    pub module_uuid : ModuleUUID,
+    pub template_args : FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>
 }
 
 #[derive(Debug)]
@@ -273,7 +282,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         (Some(_concrete_port), None) => {
                             // Port is enabled, but not used
                             let source_code_port = &sub_module.ports[port_id];
-                            self.errors.warn(submod_obj.module_name_span, format!("Unused port '{}'", source_code_port.name))
+                            self.errors.warn(submod_obj.module_ref.span, format!("Unused port '{}'", source_code_port.name))
                                 .info_obj_different_file(source_code_port, sub_module.link_info.file)
                                 .info_obj_same_file(submod_obj);
                         }
@@ -309,7 +318,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 }
                 sm.instance = Some(instance);
             } else {
-                self.errors.error(submod_obj.module_name_span, "Error instantiating submodule");
+                self.errors.error(submod_obj.module_ref.span, "Error instantiating submodule");
                 success = false;
             };
         }
