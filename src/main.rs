@@ -36,26 +36,24 @@ use config::{config, parse_args};
 use flattening::Module;
 use codegen_fallback::gen_verilog_code;
 use dev_aid::ariadne_interface::*;
-use linker::Linker;
 
-fn codegen_to_file(linker : &Linker, md : &Module) -> Option<()> {
-    let Some(inst) = md.instantiations.instantiate(md, linker) else {
-        println!("Instantiating error: {}", md.link_info.name);
-
-        return None;
-    };
-    println!("Instantiating success: {}", md.link_info.name);
-
-
+fn codegen_to_file(md : &Module) {
     let module_name = md.link_info.name.deref();
-
-    //println!("Generating Verilog for {module_name}:");
-    // gen_ctx.to_circt();
-    let code = gen_verilog_code(md, &inst, true);
-
     let mut out_file = File::create(format!("verilog_output/{module_name}.v")).unwrap();
-    write!(out_file, "{}", code).unwrap();
-    Some(())
+    md.instantiations.for_each_instance(|inst| {
+        if inst.errors.did_error {
+            println!("Instantiating error: {}<{:?}>", md.link_info.name, md.link_info.template_arguments);
+            return; // Continue
+        }
+
+        println!("Instantiating success: {}<{:?}>", md.link_info.name, md.link_info.template_arguments);
+    
+        //println!("Generating Verilog for {module_name}:");
+        // gen_ctx.to_circt();
+        let code = gen_verilog_code(md, &inst, true);
+    
+        write!(out_file, "{}", code).unwrap();
+    });
 }
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
@@ -76,7 +74,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     
     if config.codegen {
         for (_id, md) in &linker.modules {
-            codegen_to_file(&linker, md);
+            codegen_to_file(md);
         }
     }
 

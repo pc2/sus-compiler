@@ -475,7 +475,7 @@ const DECL_DEPTH_LATER : usize = usize::MAX;
 pub enum DeclarationPortInfo {
     NotPort,
     RegularPort{is_input : bool},
-    GenerativeInput
+    GenerativeInput(TemplateID)
 }
 
 impl DeclarationPortInfo {
@@ -490,7 +490,7 @@ impl DeclarationPortInfo {
         match self {
             DeclarationPortInfo::NotPort => false,
             DeclarationPortInfo::RegularPort { is_input } => *is_input,
-            DeclarationPortInfo::GenerativeInput => true,
+            DeclarationPortInfo::GenerativeInput(_) => true,
         }
     }
 }

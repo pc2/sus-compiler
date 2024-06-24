@@ -573,6 +573,12 @@ impl<T : Debug, IndexMarker> Debug for FlatAlloc<T, IndexMarker> {
     }
 }
 
+impl<T : Clone, IndexMarker> Clone for FlatAlloc<T, IndexMarker> {
+    fn clone(&self) -> Self {
+        Self { data: self.data.clone(), _ph: PhantomData }
+    }
+}
+
 #[derive(Debug)]
 pub struct FlatAllocIter<'a, T, IndexMarker : UUIDMarker> {
     iter : Enumerate<std::slice::Iter<'a, T>>,

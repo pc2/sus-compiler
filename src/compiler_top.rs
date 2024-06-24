@@ -2,7 +2,7 @@
 use tree_sitter::Parser;
 
 use crate::{
-    config::config, debug::SpanDebugger, errors::ErrorStore, file_position::FileText, flattening::{flatten_all_modules, gather_initial_file_data, typecheck_all_modules, Module}, linker::{FileData, FileUUID, Linker}
+    arena_alloc::FlatAlloc, config::config, debug::SpanDebugger, errors::ErrorStore, file_position::FileText, flattening::{flatten_all_modules, gather_initial_file_data, typecheck_all_modules, Module}, linker::{FileData, FileUUID, Linker}
 };
 
 pub fn add_file(text : String, linker : &mut Linker) -> FileUUID {
@@ -78,7 +78,10 @@ pub fn recompile_all(linker : &mut Linker) {
         // Currently this is all modules
         let span_debug_message = format!("instantiating {}", &md.link_info.name);
         let mut span_debugger = SpanDebugger::new(&span_debug_message, &linker.files[md.link_info.file].file_text);
-        let _inst = md.instantiations.instantiate(md, linker);
+        // Can immediately instantiate modules that have no template args
+        if md.link_info.template_arguments.is_empty() {
+            let _inst = md.instantiations.instantiate(md, linker, FlatAlloc::new());
+        }
         span_debugger.defuse();
     }
 }

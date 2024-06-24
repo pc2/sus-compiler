@@ -8,7 +8,7 @@ mod latency_count;
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, TemplateIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, value::{TypedValue, Value}
+    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, SubModuleInstance, TemplateIDMarker, TemplateInput, UnaryOperator}, linker::{LinkInfo, Linker, ModuleUUID}, value::{TypedValue, Value}
 };
 
 use self::latency_algorithm::SpecifiedLatency;
@@ -88,12 +88,11 @@ pub struct UsedPort {
     pub name_refs : Vec<Span>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ConcreteTemplateArg {
     Type(ConcreteType),
     Value(TypedValue),
-    NotProvided,
-    Errored
+    NotProvided
 }
 
 #[derive(Debug)]
@@ -173,12 +172,12 @@ impl InstantiationList {
         Self{cache : RefCell::new(Vec::new())}
     }
 
-    pub fn instantiate(&self, md : &Module, linker : &Linker) -> Option<Rc<InstantiatedModule>> {
+    pub fn instantiate(&self, md : &Module, linker : &Linker, template_args : FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>) -> Option<Rc<InstantiatedModule>> {
         let mut cache_borrow = self.cache.borrow_mut();
         
         // Temporary, no template arguments yet
         if cache_borrow.is_empty() {
-            let result = perform_instantiation(md, linker);
+            let result = perform_instantiation(md, linker, template_args);
 
             if config().debug_print_module_contents {
                 println!("[[Instantiated {}]]", &result.name);
@@ -240,11 +239,39 @@ struct InstantiationContext<'fl, 'l> {
     interface_ports : FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     errors : ErrorCollector<'l>,
 
+    template_args : FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>,
     md : &'fl Module,
     linker : &'l Linker,
 }
 
+fn check_all_template_args_valid(errors : &ErrorCollector, span : Span, target_link_info : &LinkInfo, template_args : &FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>) -> bool {
+    let mut not_found_list : Vec<&TemplateInput> = Vec::new();
+    for (id, arg) in &target_link_info.template_arguments {
+        match &template_args[id] {
+            ConcreteTemplateArg::Type(_) => {}
+            ConcreteTemplateArg::Value(_) => {}
+            ConcreteTemplateArg::NotProvided => {
+                not_found_list.push(arg);
+            }
+        }
+    }
+    if !not_found_list.is_empty() {
+        let mut uncovered_ports_list = String::new();
+        for v in &not_found_list {
+            use std::fmt::Write;
+            write!(uncovered_ports_list, "'{}', ", v.name);
+        }
+        uncovered_ports_list.truncate(uncovered_ports_list.len() - 2); // Cut off last comma
+        let err_ref = errors.error(span, format!("Could not instantiate {} because the template arguments {uncovered_ports_list} were missing and no default was provided", target_link_info.get_full_name()));
+        for v in &not_found_list {
+            err_ref.info((v.name_span, target_link_info.file), format!("'{}' defined here", v.name));
+        }
+        false
+    } else {true}
+}
+
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
+
     fn extract(self) -> InstantiatedModule {
         InstantiatedModule {
             name : self.name,
@@ -259,12 +286,18 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn instantiate_submodules(&mut self) -> bool {
         let mut success = true;
         for (_sm_id, sm) in &mut self.submodules {
-            let submod_obj = self.md.instructions[sm.original_instruction].unwrap_submodule();
+            let submod_instr = self.md.instructions[sm.original_instruction].unwrap_submodule();
             let sub_module = &self.linker.modules[sm.module_uuid];
-            if let Some(instance) = sub_module.instantiations.instantiate(sub_module, self.linker) {
+
+            if !check_all_template_args_valid(&self.errors, submod_instr.module_ref.span, &sub_module.link_info, &sm.template_args) {
+                success = false;
+                continue;
+            };
+
+            if let Some(instance) = sub_module.instantiations.instantiate(sub_module, self.linker, sm.template_args.clone()) {
                 for (port_id, concrete_port) in &instance.interface_ports {
                     let connecting_wire = &sm.port_map[port_id];
-
+            
                     match (concrete_port, connecting_wire) {
                         (None, None) => {} // Invalid port not connected, good!
                         (None, Some(connecting_wire)) => {
@@ -276,15 +309,15 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             for span in &connecting_wire.name_refs {
                                 self.errors.error(*span, format!("Port '{}' is used, but the instantiated module has this port disabled", source_code_port.name))
                                     .info_obj_different_file(source_code_port, sub_module.link_info.file)
-                                    .info_obj_same_file(submod_obj);
+                                    .info_obj_same_file(submod_instr);
                             }
                         }
                         (Some(_concrete_port), None) => {
                             // Port is enabled, but not used
                             let source_code_port = &sub_module.ports[port_id];
-                            self.errors.warn(submod_obj.module_ref.span, format!("Unused port '{}'", source_code_port.name))
+                            self.errors.warn(submod_instr.module_ref.span, format!("Unused port '{}'", source_code_port.name))
                                 .info_obj_different_file(source_code_port, sub_module.link_info.file)
-                                .info_obj_same_file(submod_obj);
+                                .info_obj_same_file(submod_instr);
                         }
                         (Some(concrete_port), Some(connecting_wire)) => {
                             let wire = &mut self.wires[connecting_wire.maps_to_wire];
@@ -300,14 +333,14 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             if instance.interface_ports[representative_port].is_none() {
                                 for span in interface_references {
                                     self.errors.error(*span, format!("The interface '{interface_name}' is disabled in this submodule instance"))
-                                        .info_obj_same_file(self.md.instructions[sm.original_instruction].unwrap_submodule())
+                                        .info_obj_same_file(submod_instr)
                                         .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
                                 }
                             }
                         } else {
                             for span in interface_references {
                                 self.errors.todo(*span, format!("Using empty interface '{interface_name}' (This is a TODO with Actions etc)"))
-                                    .info_obj_same_file(self.md.instructions[sm.original_instruction].unwrap_submodule())
+                                    .info_obj_same_file(submod_instr)
                                     .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
                             }
                         }
@@ -316,9 +349,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         }
                     }
                 }
+
                 sm.instance = Some(instance);
             } else {
-                self.errors.error(submod_obj.module_ref.span, "Error instantiating submodule");
+                self.errors.error(submod_instr.module_ref.span, "Error instantiating submodule");
                 success = false;
             };
         }
@@ -326,7 +360,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
 }
 
-fn perform_instantiation(md : &Module, linker : &Linker) -> InstantiatedModule {
+fn perform_instantiation(md : &Module, linker : &Linker, template_args : FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>) -> InstantiatedModule {
     let mut context = InstantiationContext{
         name : md.link_info.name.clone(),
         generation_state : GenerationState{md, generation_state: md.instructions.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect()},
@@ -334,6 +368,7 @@ fn perform_instantiation(md : &Module, linker : &Linker) -> InstantiatedModule {
         submodules : FlatAlloc::new(),
         interface_ports : FlatAlloc::new_nones(md.ports.len()),
         errors : ErrorCollector::new_empty(md.link_info.file, &linker.files),
+        template_args,
         md,
         linker : linker
     };

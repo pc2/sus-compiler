@@ -80,7 +80,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             match decl.is_port {
                 DeclarationPortInfo::RegularPort { is_input } => details_vec.push(if is_input {"input"} else {"output"}),
                 DeclarationPortInfo::NotPort => {},
-                DeclarationPortInfo::GenerativeInput => details_vec.push("input") // "gen" in "input gen" is covered by decl.identifier_type
+                DeclarationPortInfo::GenerativeInput(_) => details_vec.push("input") // "gen" in "input gen" is covered by decl.identifier_type
             }
 
             match decl.identifier_type {

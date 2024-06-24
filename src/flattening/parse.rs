@@ -435,13 +435,14 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                             match is_port {
                                 DeclarationPortInfo::NotPort => {}
                                 DeclarationPortInfo::RegularPort { is_input : true } => {
+                                    let this_template_id = self.template_inputs_to_visit.next().unwrap();
                                     // AHA! Generative input
-                                    is_port = DeclarationPortInfo::GenerativeInput
+                                    is_port = DeclarationPortInfo::GenerativeInput(this_template_id)
                                 }
                                 DeclarationPortInfo::RegularPort { is_input : false } => {
                                     self.errors.error(modifier_span, "Cannot make generative outputs. This is because it could interfere with inference of generic types and generative inputs");
                                 }
-                                DeclarationPortInfo::GenerativeInput => unreachable!("Can't have been GenerativeInput here already, because it only gets converted to that here"), 
+                                DeclarationPortInfo::GenerativeInput(_) => unreachable!("Can't have been GenerativeInput here already, because it only gets converted to that here"), 
                             }
                             IdentifierType::Generative
                         }
@@ -518,9 +519,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     assert_eq!(port.name_span, name_span);
                     port.declaration_instruction = decl_id;
                 }
-                DeclarationPortInfo::GenerativeInput => {
-                    let this_template_id = self.template_inputs_to_visit.next().unwrap();
-
+                DeclarationPortInfo::GenerativeInput(this_template_id) => {
                     let TemplateInputKind::Generative { decl_span:_, declaration_instruction } = &mut self.working_on.link_info.template_arguments[this_template_id].kind else {unreachable!()};
 
                     *declaration_instruction = decl_id;

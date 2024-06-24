@@ -23,7 +23,12 @@ pub type ExecutionResult<T> = Result<T, (Span, String)>;
 
 impl<'fl> GenerationState<'fl> {
     fn span_of(&self, v : FlatID) -> Span {
-        self.md.instructions[v].unwrap_wire().span
+        let instr = &self.md.instructions[v];
+        match instr {
+            Instruction::Declaration(d) => d.name_span,
+            Instruction::Wire(w) => w.span,
+            _ => unreachable!()
+        }
     }
 
     fn write_gen_variable(&self, mut target : &mut Value, conn_path : &[WireReferencePathElement], to_write : Value) -> ExecutionResult<()> {
@@ -46,7 +51,7 @@ impl<'fl> GenerationState<'fl> {
     fn get_generation_value(&self, v : FlatID) -> ExecutionResult<&TypedValue> {
         if let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] {
             if let Value::Unset | Value::Error = &vv.value {
-                Err((self.span_of(v), format!("This variable is set but it's {vv:?}!")))
+                Err((self.span_of(v), format!("This variable is set but it's {:?}!", vv.value)))
             } else {
                 Ok(vv)
             }
