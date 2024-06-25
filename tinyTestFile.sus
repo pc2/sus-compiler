@@ -78,3 +78,35 @@ module testTinyTestMod {
 	tinyTestMod::<beep = 4;> b
 	tinyTestMod::<beep = 3;> c
 }
+
+
+
+module tree_add {
+	input gen int WIDTH
+
+	input int[WIDTH] values
+	output int sum
+
+	if WIDTH == 1 {
+		sum = values[0]
+	} else {
+		gen int HALF_WIDTH = WIDTH / 2
+		tree_add::<HALF_WIDTH;> left
+		tree_add::<HALF_WIDTH;> right
+
+		for int i in 0..HALF_WIDTH {
+			left.values[i] = values[i]
+			right.values[i] = values[i+HALF_WIDTH]
+		}
+
+		if WIDTH % 2 == 0 {
+			sum = left.sum + right.sum
+		} else {
+			sum = left.sum + right.sum + values[WIDTH - 1]
+		}
+	}
+}
+
+module make_tree_add {
+	tree_add::<139;> tr
+}

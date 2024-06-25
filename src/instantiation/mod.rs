@@ -166,34 +166,35 @@ impl InstantiationList {
     }
 
     pub fn instantiate(&self, md : &Module, linker : &Linker, template_args : FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>) -> Option<Rc<InstantiatedModule>> {
-        let mut cache_borrow = self.cache.borrow_mut();
+        let cache_borrow = self.cache.borrow();
         
         // Temporary, no template arguments yet
-        match cache_borrow.entry(template_args) {
-            std::collections::hash_map::Entry::Occupied(occ) => {
-                let instance_rc = occ.get();
-                if !instance_rc.errors.did_error {
-                    Some(instance_rc.clone())
-                } else {
-                    None
+        let instance = if let Some(found) = cache_borrow.get(&template_args) {
+            found.clone()
+        } else {
+            std::mem::drop(cache_borrow);
+
+            let result = perform_instantiation(md, linker, &template_args);
+    
+            if config().debug_print_module_contents {
+                println!("[[Instantiated {}]]", result.name);
+                for (id, w) in &result.wires {
+                    println!("{id:?} -> {w:?}");
+                }
+                for (id, sm) in &result.submodules {
+                    println!("SubModule {id:?}: {sm:?}");
                 }
             }
-            std::collections::hash_map::Entry::Vacant(vac) => {
-                let t_args = vac.key();
-                let result = perform_instantiation(md, linker, t_args);
-    
-                if config().debug_print_module_contents {
-                    println!("[[Instantiated {}]]", result.name);
-                    for (id, w) in &result.wires {
-                        println!("{id:?} -> {w:?}");
-                    }
-                    for (id, sm) in &result.submodules {
-                        println!("SubModule {id:?}: {sm:?}");
-                    }
-                }
-    
-                Some(vac.insert(Rc::new(result)).clone())
-            }
+
+            let result_ref = Rc::new(result);
+            assert!(self.cache.borrow_mut().insert(template_args, result_ref.clone()).is_none());
+            result_ref
+        };
+
+        if !instance.errors.did_error {
+            Some(instance.clone())
+        } else {
+            None
         }
     }
 

@@ -121,7 +121,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Arbitrary single-clock full flow
 - [ ] Arbitrary multi-clock full flow
 - [x] Generative Code
-- [ ] Generative Parameters
+- [x] Generative Parameters
 - [ ] Type Templates
 
 ### Language Features
@@ -147,7 +147,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Generative Conditions
 - [x] Generative For Loops
 - [ ] Generative While Loops
-- [ ] Generative Parameters
+- [x] Generative Parameters
 - [x] Multi-Interface Syntax
 - [ ] Native Module integration syntax
 - [ ] Intrinsic Modules
