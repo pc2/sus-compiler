@@ -1,7 +1,7 @@
 
 use std::ops::{Deref, Index};
 
-use crate::{abstract_type::AbstractType, errors::ErrorCollector, file_position::Span, flattening::{BinaryOperator, UnaryOperator}, linker::{get_builtin_type, Linkable, NamedType, TypeUUID}, value::Value};
+use crate::{abstract_type::AbstractType, errors::ErrorCollector, file_position::Span, flattening::{BinaryOperator, UnaryOperator}, linker::{get_builtin_type, NamedType, TypeUUID}, value::Value};
 
 pub const BOOL_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("bool"));
 pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("int"));
@@ -91,18 +91,6 @@ impl ConcreteType {
     pub fn unwrap_value(&self) -> &Value {
         let ConcreteType::Value(v) = self else {unreachable!("unwrap_value")};
         v
-    }
-    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec) -> String {
-        match self {
-            ConcreteType::Named(name) => linker_types[*name].get_full_name(),
-            ConcreteType::Array(arr_box) => {
-                let (elem_typ, arr_size) = arr_box.deref();
-                format!("{}[{}]", elem_typ.to_string(linker_types), arr_size.unwrap_value().unwrap_integer())
-            }
-            ConcreteType::Value(v) => format!("{{concrete_type_{v}}}"),
-            ConcreteType::Unknown => format!("{{concrete_type_unknown}}"),
-            ConcreteType::Error => format!("{{concrete_type_error}}"),
-        }
     }
     pub fn down_array(&self) -> &ConcreteType {
         let ConcreteType::Array(arr_box) = self else {unreachable!("Must be an array!")};

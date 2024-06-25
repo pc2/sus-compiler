@@ -8,7 +8,7 @@ mod latency_count;
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, SubModuleInstance, TemplateIDMarker, TemplateInput, UnaryOperator}, linker::{LinkInfo, Linker, ModuleUUID}, value::{TypedValue, Value}
+    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, template::{check_all_template_args_valid, ConcreteTemplateArg, TemplateIDMarker}, value::{TypedValue, Value}
 };
 
 use self::latency_algorithm::SpecifiedLatency;
@@ -88,13 +88,6 @@ pub struct UsedPort {
     pub name_refs : Vec<Span>
 }
 
-#[derive(Debug, Clone)]
-pub enum ConcreteTemplateArg {
-    Type(ConcreteType),
-    Value(TypedValue),
-    NotProvided
-}
-
 #[derive(Debug)]
 pub struct SubModule {
     pub original_instruction : FlatID,
@@ -125,6 +118,7 @@ pub struct InstantiatedModule {
     pub wires : FlatAlloc<RealWire, WireIDMarker>,
     pub submodules : FlatAlloc<SubModule, SubModuleIDMarker>,
     pub generation_state : FlatAlloc<SubModuleOrWire, FlatIDMarker>,
+    pub template_args : FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>
 }
 
 #[derive(Debug, Clone)]
@@ -244,34 +238,7 @@ struct InstantiationContext<'fl, 'l> {
     linker : &'l Linker,
 }
 
-fn check_all_template_args_valid(errors : &ErrorCollector, span : Span, target_link_info : &LinkInfo, template_args : &FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>) -> bool {
-    let mut not_found_list : Vec<&TemplateInput> = Vec::new();
-    for (id, arg) in &target_link_info.template_arguments {
-        match &template_args[id] {
-            ConcreteTemplateArg::Type(_) => {}
-            ConcreteTemplateArg::Value(_) => {}
-            ConcreteTemplateArg::NotProvided => {
-                not_found_list.push(arg);
-            }
-        }
-    }
-    if !not_found_list.is_empty() {
-        let mut uncovered_ports_list = String::new();
-        for v in &not_found_list {
-            use std::fmt::Write;
-            write!(uncovered_ports_list, "'{}', ", v.name);
-        }
-        uncovered_ports_list.truncate(uncovered_ports_list.len() - 2); // Cut off last comma
-        let err_ref = errors.error(span, format!("Could not instantiate {} because the template arguments {uncovered_ports_list} were missing and no default was provided", target_link_info.get_full_name()));
-        for v in &not_found_list {
-            err_ref.info((v.name_span, target_link_info.file), format!("'{}' defined here", v.name));
-        }
-        false
-    } else {true}
-}
-
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
-
     fn extract(self) -> InstantiatedModule {
         InstantiatedModule {
             name : self.name,
@@ -279,7 +246,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             submodules : self.submodules,
             interface_ports : self.interface_ports,
             generation_state : self.generation_state.generation_state,
-            errors : self.errors.into_storage()
+            errors : self.errors.into_storage(),
+            template_args : self.template_args
         }
     }
 

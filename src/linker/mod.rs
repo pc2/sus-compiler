@@ -7,7 +7,7 @@ use std::{collections::{HashMap, HashSet}, cell::RefCell};
 use tree_sitter::Tree;
 
 use crate::{
-    abstract_type::{DomainType, FullType}, arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, errors::{CompileError, ErrorCollector, ErrorInfo, ErrorLevel, ErrorStore}, file_position::{FileText, Span, SpanFile}, flattening::{Module, TemplateIDMarker, TemplateInput}, parser::Documentation, util::{const_str_position, const_str_position_in_tuples}, value::{TypedValue, Value}
+    abstract_type::{DomainType, FullType}, arena_alloc::{ArenaAllocator, FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, errors::{CompileError, ErrorCollector, ErrorInfo, ErrorLevel, ErrorStore}, file_position::{FileText, Span, SpanFile}, flattening::Module, parser::Documentation, template::{TemplateIDMarker, TemplateInput}, util::{const_str_position, const_str_position_in_tuples}, value::{TypedValue, Value}
 };
 
 use self::checkpoint::CheckPoint;
@@ -98,7 +98,6 @@ pub trait Linkable {
     fn get_span_file(&self) -> Option<SpanFile> {
         self.get_link_info().map(|l| (l.span, l.file))
     }
-    fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo>;
 }
 
 #[derive(Debug)]
@@ -144,11 +143,6 @@ impl Linkable for NamedConstant {
             NamedConstant::Builtin{name:_, val:_} => None
         }
     }
-    fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo> {
-        match self {
-            NamedConstant::Builtin{name:_, val:_} => None
-        }
-    }
 }
 
 impl Linkable for NamedType {
@@ -161,11 +155,6 @@ impl Linkable for NamedType {
         LinkingErrorLocation { named_type: "Builtin Type", full_name : self.get_full_name(), location: None }
     }
     fn get_link_info(&self) -> Option<&LinkInfo> {
-        match self {
-            NamedType::Builtin(_) => None,
-        }
-    }
-    fn get_link_info_mut(&mut self) -> Option<&mut LinkInfo> {
         match self {
             NamedType::Builtin(_) => None,
         }

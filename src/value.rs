@@ -13,30 +13,6 @@ pub enum Value {
     Error
 }
 
-impl std::fmt::Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Value::Bool(b) => b.fmt(f),
-            Value::Integer(i) => i.fmt(f),
-            Value::Array(arr_box) => {
-                f.write_str("[")?;
-                let mut iter = arr_box.iter();
-                if let Some(v) = iter.next() {
-                    v.fmt(f)?;
-
-                    for v in iter {
-                        f.write_str(", ")?;
-                        v.fmt(f)?;
-                    }
-                }
-                f.write_str("]")
-            }
-            Value::Unset => f.write_str("{value_unset}"),
-            Value::Error => f.write_str("{value_error}"),
-        }
-    }
-}
-
 impl Value {
     pub fn get_type_of_constant(&self) -> FullType {
         FullType {
@@ -120,24 +96,6 @@ impl Value {
     pub fn unwrap_bool(&self) -> bool {
         let Self::Bool(b) = self else {panic!("{:?} is not a bool!", self)};
         *b
-    }
-
-    pub fn to_string(&self) -> String {
-        match self {
-            Value::Bool(b) => if *b {"1'b1"} else {"1'b0"}.to_owned(),
-            Value::Integer(v) => v.to_string(),
-            Value::Array(arr_box) => {
-                let mut result = "[".to_owned();
-                for v in arr_box.iter() {
-                    result.push_str(&v.to_string());
-                    result.push_str(", ");
-                }
-                result.push(']');
-                result
-            }
-            Value::Unset => "Value::Unset".to_owned(),
-            Value::Error => "Value::Error".to_owned(),
-        }
     }
 }
 

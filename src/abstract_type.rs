@@ -1,6 +1,6 @@
-use std::{cell::RefCell, ops::{Deref, Index}};
+use std::{cell::RefCell, ops::Deref};
 
-use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span, SpanFile}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, Interface, UnaryOperator}, linker::{get_builtin_type, Linkable, NamedType, Resolver, TypeUUID, TypeUUIDMarker}};
+use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span, SpanFile}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, Interface, UnaryOperator}, linker::{get_builtin_type, NamedType, Resolver, TypeUUID, TypeUUIDMarker}};
 
 /// This contains only the information that can be easily type-checked. 
 /// 
@@ -16,20 +16,6 @@ pub enum AbstractType {
 }
 
 impl AbstractType {
-    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec) -> String {
-        match self {
-            AbstractType::Error => {
-                "{error}".to_owned()
-            }
-            AbstractType::Unknown => {
-                "{unknown}".to_owned()
-            }
-            AbstractType::Named(id) => {
-                linker_types[*id].get_full_name()
-            }
-            AbstractType::Array(sub) => sub.deref().to_string(linker_types) + "[]",
-        }
-    }
     pub fn contains_error_or_unknown<const CHECK_ERROR : bool, const CHECK_UNKNOWN : bool>(&self) -> bool {
         match self {
             AbstractType::Error => CHECK_ERROR,

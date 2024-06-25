@@ -4,14 +4,14 @@ mod initialization;
 mod typechecking;
 mod parse;
 
-use std::ops::{Deref, Index};
+use std::ops::Deref;
 
 pub use parse::flatten_all_modules;
 pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
 
 use crate::{
-    abstract_type::{AbstractType, FullType}, arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, Linkable, ModuleUUID, NamedType, TypeUUID}, parser::Documentation, pretty_print_many_spans, value::Value
+    abstract_type::{AbstractType, FullType}, arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID, TypeUUID}, parser::Documentation, pretty_print_many_spans, template::{GlobalReference, TemplateID, TemplateInputKind}, value::Value
 };
 
 
@@ -31,11 +31,6 @@ pub struct DomainIDMarker;
 impl UUIDMarker for DomainIDMarker {const DISPLAY_NAME : &'static str = "port_";}
 /// Interfaces are also indexed using DomainIDs. But in general, these refer to (clock/latency counting) domains
 pub type DomainID = UUID<DomainIDMarker>;
-
-pub struct TemplateIDMarker;
-impl UUIDMarker for TemplateIDMarker {const DISPLAY_NAME : &'static str = "template_arg_";}
-pub type TemplateID = UUID<TemplateIDMarker>;
-
 
 /// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage. 
 /// 
@@ -414,14 +409,6 @@ impl WireSource {
 }
 
 #[derive(Debug)]
-pub struct GlobalReference<ID> {
-    pub span: Span,
-    pub id: ID,
-    pub template_args: FlatAlloc<Option<TemplateArg>, TemplateIDMarker>,
-    pub template_span: Option<BracketSpan>
-}
-
-#[derive(Debug)]
 pub enum WrittenType {
     Error(Span),
     Named(GlobalReference<TypeUUID>),
@@ -452,18 +439,6 @@ impl WrittenType {
             WrittenType::Array(_span, arr_box) => {
                 f(arr_box.deref().1)
             }
-        }
-    }
-
-    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec) -> String {
-        match self {
-            WrittenType::Error(_) => {
-                "{error}".to_owned()
-            }
-            WrittenType::Named(named_type) => {
-                linker_types[named_type.id].get_full_name()
-            }
-            WrittenType::Array(_, sub) => sub.deref().0.to_string(linker_types) + "[]",
         }
     }
 }
@@ -514,36 +489,6 @@ pub struct Declaration {
     pub latency_specifier : Option<FlatID>,
     pub documentation : Documentation
 }
-
-
-#[derive(Debug)]
-pub struct TemplateInput {
-    pub name : String,
-    pub name_span : Span,
-    pub kind : TemplateInputKind
-}
-
-#[derive(Debug)]
-pub enum TemplateInputKind {
-    /// TODO this isn't quite right, because WrittenType requires access to the instructions, and ostensibly types get executed beforehand. Look into it
-    Type{default_value : Option<WrittenType>},
-    Generative{decl_span : Span, declaration_instruction : FlatID}
-}
-
-
-#[derive(Debug)]
-pub struct TemplateArg {
-    pub name_specification : Option<Span>,
-    pub whole_span : Span,
-    pub kind : TemplateArgKind
-}
-
-#[derive(Debug)]
-pub enum TemplateArgKind {
-    Type(WrittenType),
-    Value(FlatID)
-}
-
 
 #[derive(Debug)]
 pub struct SubModuleInstance {
