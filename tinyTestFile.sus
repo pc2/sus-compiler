@@ -69,7 +69,7 @@ module stlFIFO {
 module tinyTestMod : -> int o {
 	input gen int beep
 
-	o = 3
+	o = beep
 }
 
 

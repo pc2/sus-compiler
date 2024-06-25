@@ -9,7 +9,7 @@ use std::ops::{Deref, Index, IndexMut};
 use num::BigInt;
 
 use crate::{
-    abstract_type::DomainType, arena_alloc::UUIDRange, concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, file_position::Span, flattening::{BinaryOperator, Declaration, FlatID, FlatIDRange, IdentifierType, Instruction, UnaryOperator, WireInstance, WireReference, WireReferencePathElement, WireReferenceRoot, WireSource, WriteModifiers, WrittenType}, linker::NamedConstant, template::TemplateArgKind, util::add_to_small_set, value::{compute_binary_op, compute_unary_op, TypedValue, Value}
+    abstract_type::DomainType, arena_alloc::UUIDRange, concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, file_position::Span, flattening::{BinaryOperator, Declaration, DeclarationPortInfo, FlatID, FlatIDRange, IdentifierType, Instruction, UnaryOperator, WireInstance, WireReference, WireReferencePathElement, WireReferenceRoot, WireSource, WriteModifiers, WrittenType}, linker::NamedConstant, template::TemplateArgKind, util::add_to_small_set, value::{compute_binary_op, compute_unary_op, TypedValue, Value}
 };
 
 use super::*;
@@ -390,8 +390,16 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         let typ = self.concretize_type(&wire_decl.typ_expr)?;
         
         Ok(if wire_decl.identifier_type == IdentifierType::Generative {
-            let initial_value = self.get_initial_typed_val(typ);
-            SubModuleOrWire::CompileTimeValue(initial_value)
+            let value = if let DeclarationPortInfo::GenerativeInput(template_id) = wire_decl.is_port {
+                match &self.template_args[template_id] {
+                    ConcreteTemplateArg::Type(_) => caught_by_typecheck!(),
+                    ConcreteTemplateArg::Value(v) => v.clone(),
+                    ConcreteTemplateArg::NotProvided => unreachable!("All template parameters must be set")
+                }
+            } else {
+                self.get_initial_typed_val(typ)
+            };
+            SubModuleOrWire::CompileTimeValue(value)
         } else {
             let source = if wire_decl.read_only {
                 RealWireDataSource::ReadOnly
