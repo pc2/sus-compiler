@@ -579,6 +579,20 @@ impl<T : Clone, IndexMarker> Clone for FlatAlloc<T, IndexMarker> {
     }
 }
 
+impl<T : PartialEq, IndexMarker> PartialEq for FlatAlloc<T, IndexMarker> {
+    fn eq(&self, other: &Self) -> bool {
+        self.data == other.data
+    }
+}
+impl<T : Eq, IndexMarker> Eq for FlatAlloc<T, IndexMarker> {}
+
+impl<T : Hash, IndexMarker> std::hash::Hash for FlatAlloc<T, IndexMarker> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.data.hash(state);
+    }
+}
+
+
 #[derive(Debug)]
 pub struct FlatAllocIter<'a, T, IndexMarker : UUIDMarker> {
     iter : Enumerate<std::slice::Iter<'a, T>>,

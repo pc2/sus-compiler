@@ -373,9 +373,12 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         let inst_id = self.working_on.instructions.alloc(new_instr);
 
         if let Err(conflict) = self.local_variable_context.add_declaration(name, inst_id) {
-            self.errors
-                .error(span, "This declaration conflicts with a previous declaration in the same scope")
-                .info_obj_same_file(self.working_on.instructions[conflict].unwrap_wire_declaration());
+            let err_ref = self.errors.error(span, "This declaration conflicts with a previous declaration in the same scope");
+            match &self.working_on.instructions[conflict] {
+                Instruction::SubModule(sm) => {err_ref.info_obj_same_file(sm);}
+                Instruction::Declaration(d) => {err_ref.info_obj_same_file(d);}
+                _ => unreachable!()
+            }
         }
 
         inst_id

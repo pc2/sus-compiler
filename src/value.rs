@@ -4,7 +4,7 @@ use num::BigInt;
 
 use crate::{abstract_type::{AbstractType, FullType, DomainType, BOOL_TYPE, INT_TYPE}, concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, flattening::{BinaryOperator, UnaryOperator}};
 
-#[derive(Debug,Clone,PartialEq,Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
     Bool(bool),
     Integer(BigInt),
@@ -160,7 +160,7 @@ pub fn compute_binary_op(left : &TypedValue, op : BinaryOperator, right : &Typed
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TypedValue {
     pub value : Value,
     pub typ : ConcreteType

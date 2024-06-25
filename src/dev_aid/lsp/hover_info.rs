@@ -33,7 +33,7 @@ impl<'l> HoverCollector<'l> {
     }
 
     fn gather_hover_infos(&mut self, md: &Module, id: FlatID, is_generative : bool) {
-        md.instantiations.for_each_instance(|inst| {
+        md.instantiations.for_each_instance(|_template_args, inst| {
             if is_generative {
                 let value_str = match &inst.generation_state[id] {
                     SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => unreachable!(),

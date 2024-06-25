@@ -8,7 +8,7 @@ module test<T> : ::int::<beep = 20 > 3; BEEP = int::<;>> ab {
 
 	beep = 3
 
-	FIFO::<;> badoop
+	stlFIFO::<BITWIDTH = 4;> badoop
 }
 
 module use_test {
@@ -63,4 +63,18 @@ module stlFIFO {
 	int space_remaining = (read_to_push.o - write_addr) % DEPTH
 	bool r = space_remaining > ALMOST_FULL_THRESHOLD
 	ready = offset_backwards(r)
+}
+
+
+module tinyTestMod : -> int o {
+	input gen int beep
+
+	o = 3
+}
+
+
+module testTinyTestMod {
+	tinyTestMod::<beep = 3;> a
+	tinyTestMod::<beep = 4;> b
+	tinyTestMod::<beep = 3;> c
 }

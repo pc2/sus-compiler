@@ -38,14 +38,12 @@ use config::{config, parse_args};
 use flattening::Module;
 use codegen_fallback::gen_verilog_code;
 use dev_aid::ariadne_interface::*;
-use linker::Linker;
-use to_string::pretty_print_concrete_instance;
 
-fn codegen_to_file(linker : &Linker, md : &Module) {
+fn codegen_to_file(md : &Module) {
     let module_name = md.link_info.name.deref();
     let mut out_file = File::create(format!("verilog_output/{module_name}.v")).unwrap();
-    md.instantiations.for_each_instance(|inst| {
-        let inst_name = pretty_print_concrete_instance(linker, &md.link_info, &inst.template_args);
+    md.instantiations.for_each_instance(|_template_args, inst| {
+        let inst_name = &inst.name;
         if inst.errors.did_error {
             println!("Instantiating error: {inst_name}");
             return; // Continue
@@ -57,7 +55,7 @@ fn codegen_to_file(linker : &Linker, md : &Module) {
         // gen_ctx.to_circt();
         let code = gen_verilog_code(md, &inst, true);
     
-        write!(out_file, "{}", code).unwrap();
+        write!(out_file, "// {inst_name}\n{code}").unwrap();
     });
 }
 
@@ -79,7 +77,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     
     if config.codegen {
         for (_id, md) in &linker.modules {
-            codegen_to_file(&linker, md);
+            codegen_to_file(md);
         }
     }
 

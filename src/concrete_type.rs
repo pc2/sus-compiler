@@ -6,7 +6,7 @@ use crate::{abstract_type::AbstractType, errors::ErrorCollector, file_position::
 pub const BOOL_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("bool"));
 pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("int"));
 
-#[derive(Debug,Clone,PartialEq,Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteType {
     Named(TypeUUID),
     Value(Value),

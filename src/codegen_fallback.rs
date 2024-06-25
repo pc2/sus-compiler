@@ -114,7 +114,7 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
 
     fn write_verilog_code(&mut self) -> Result<(), std::fmt::Error> {
         // First output the interface of the module
-        writeln!(self.program_text, "module {}(", self.md.link_info.name)?;
+        writeln!(self.program_text, "module {}(", mangle(&self.instance.name))?;
         writeln!(self.program_text, "\tinput clk,")?;
         for (_id, port) in self.instance.interface_ports.iter_valids() {
             let port_wire = &self.instance.wires[port.wire];
@@ -186,7 +186,7 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
         // Output all submodules
         for (_id, sm) in &self.instance.submodules {
             let sm_inst : &InstantiatedModule = sm.instance.as_ref().expect("Invalid submodules are impossible to remain by the time codegen happens");
-            let sm_instance_name = &sm_inst.name;
+            let sm_instance_name = mangle(&sm_inst.name);
             let sm_name = &sm.name;
             writeln!(self.program_text, "{sm_instance_name} {sm_name}(")?;
             writeln!(self.program_text, "\t.clk(clk),")?;
@@ -236,7 +236,7 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
             }
         }
 
-        writeln!(self.program_text, "endmodule")?;
+        writeln!(self.program_text, "endmodule\n")?;
 
         Ok(())
     }
@@ -249,4 +249,15 @@ pub fn gen_verilog_code(md : &Module, instance : &InstantiatedModule, use_latenc
     ctx.write_verilog_code().unwrap();
 
     program_text
+}
+
+pub fn mangle(str : &str) -> String {
+    let mut result = String::with_capacity(str.len());
+    for c in str.chars() {
+        if c.is_whitespace() || c == ':' {continue}
+        result.push(if c.is_alphanumeric() {
+            c
+        } else {'_'});
+    }
+    result
 }

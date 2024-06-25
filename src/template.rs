@@ -44,7 +44,7 @@ pub enum TemplateArgKind {
     Value(FlatID)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteTemplateArg {
     Type(ConcreteType),
     Value(TypedValue),
