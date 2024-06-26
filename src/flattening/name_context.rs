@@ -1,12 +1,11 @@
 
-
-pub struct LocalVariableContext<'file, IdT: Copy> {
-    local_stack : Vec<(&'file str, IdT)>,
+pub struct LocalVariableContext<'file, Obj: Copy> {
+    local_stack : Vec<(&'file str, Obj)>,
     current_frame_starts_at : usize
 }
 
-impl<'file, IdT: Copy> LocalVariableContext<'file, IdT> {
-    pub fn get_declaration_for(&self, name : &'file str) -> Option<IdT> {
+impl<'file, Obj: Copy> LocalVariableContext<'file, Obj> {
+    pub fn get_declaration_for(&self, name : &'file str) -> Option<Obj> {
         for (decl_name, unique_id) in self.local_stack.iter().rev() {
             if *decl_name == name {
                 return Some(*unique_id);
@@ -14,7 +13,7 @@ impl<'file, IdT: Copy> LocalVariableContext<'file, IdT> {
         }
         None
     }
-    pub fn add_declaration(&mut self, new_local_name : &'file str, new_local_unique_id : IdT) -> Result<(), IdT> { // Returns conflicting signal declaration
+    pub fn add_declaration(&mut self, new_local_name : &'file str, new_local_unique_id : Obj) -> Result<(), Obj> { // Returns conflicting signal declaration
         for (existing_local_name, existing_local_id) in &self.local_stack {
             if new_local_name == *existing_local_name {
                 return Err(*existing_local_id)

@@ -411,6 +411,7 @@ impl WireSource {
 #[derive(Debug)]
 pub enum WrittenType {
     Error(Span),
+    Template(Span, TemplateID),
     Named(GlobalReference<TypeUUID>),
     Array(Span, Box<(WrittenType, FlatID, BracketSpan)>)
 }
@@ -418,13 +419,14 @@ pub enum WrittenType {
 impl WrittenType {
     pub fn get_span(&self) -> Span {
         match self {
-            WrittenType::Error(span) | WrittenType::Named(GlobalReference { span, ..}) | WrittenType::Array(span, _) => *span
+            WrittenType::Error(span) | WrittenType::Template(span, ..) | WrittenType::Named(GlobalReference { span, ..}) | WrittenType::Array(span, _) => *span
         }
     }
 
     pub fn to_type(&self) -> AbstractType {
         match self {
             WrittenType::Error(_) => AbstractType::Error,
+            WrittenType::Template(_, template_id) => AbstractType::Template(*template_id),
             WrittenType::Named(named_type) => AbstractType::Named(named_type.id),
             WrittenType::Array(_, arr_box) => {
                 let (elem_typ, _arr_idx, _br_span) = arr_box.deref();
@@ -435,7 +437,7 @@ impl WrittenType {
 
     pub fn for_each_generative_input<F : FnMut(FlatID)>(&self, mut f : F) {
         match self {
-            WrittenType::Error(_) | WrittenType::Named(_) => {}
+            WrittenType::Error(_) | WrittenType::Named(_) | WrittenType::Template(_, _) => {}
             WrittenType::Array(_span, arr_box) => {
                 f(arr_box.deref().1)
             }

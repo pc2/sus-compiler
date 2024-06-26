@@ -1,4 +1,4 @@
-use crate::{abstract_type::AbstractType, arena_alloc::FlatAlloc, concrete_type::ConcreteType, flattening::WrittenType, linker::{LinkInfo, Linker, NamedType, TypeUUID}, template::{ConcreteTemplateArg, TemplateIDMarker}, value::Value};
+use crate::{abstract_type::AbstractType, arena_alloc::FlatAlloc, concrete_type::ConcreteType, flattening::WrittenType, linker::{LinkInfo, Linker, NamedType, TypeUUID}, template::{ConcreteTemplateArg, ConcreteTemplateArgs, TemplateIDMarker, TemplateInputs}, value::Value};
 
 use std::{fmt::{Display, Formatter}, ops::Index};
 
@@ -6,8 +6,29 @@ use std::fmt::Write;
 use crate::linker::Linkable;
 use std::ops::Deref;
 
+pub fn map_to_type_names(template_inputs : &TemplateInputs) -> FlatAlloc<String, TemplateIDMarker> {
+    template_inputs.iter().map(|(_id, v)| v.name.clone()).collect()
+}
+
+impl WrittenType {
+    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec, template_names : &FlatAlloc<String, TemplateIDMarker>) -> String {
+        match self {
+            WrittenType::Error(_) => {
+                "{error}".to_owned()
+            }
+            WrittenType::Template(_, id) => {
+                template_names[*id].clone()
+            }
+            WrittenType::Named(named_type) => {
+                linker_types[named_type.id].get_full_name()
+            }
+            WrittenType::Array(_, sub) => sub.deref().0.to_string(linker_types, template_names) + "[]",
+        }
+    }
+}
+
 impl AbstractType {
-    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec) -> String {
+    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec, template_names : &FlatAlloc<String, TemplateIDMarker>) -> String {
         match self {
             AbstractType::Error => {
                 "{error}".to_owned()
@@ -15,10 +36,13 @@ impl AbstractType {
             AbstractType::Unknown => {
                 "{unknown}".to_owned()
             }
+            AbstractType::Template(id) => {
+                template_names[*id].clone()
+            }
             AbstractType::Named(id) => {
                 linker_types[*id].get_full_name()
             }
-            AbstractType::Array(sub) => sub.deref().to_string(linker_types) + "[]",
+            AbstractType::Array(sub) => sub.deref().to_string(linker_types, template_names) + "[]",
         }
     }
 }
@@ -34,20 +58,6 @@ impl ConcreteType {
             ConcreteType::Value(v) => format!("{{concrete_type_{v}}}"),
             ConcreteType::Unknown => format!("{{concrete_type_unknown}}"),
             ConcreteType::Error => format!("{{concrete_type_error}}"),
-        }
-    }
-}
-
-impl WrittenType {
-    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec) -> String {
-        match self {
-            WrittenType::Error(_) => {
-                "{error}".to_owned()
-            }
-            WrittenType::Named(named_type) => {
-                linker_types[named_type.id].get_full_name()
-            }
-            WrittenType::Array(_, sub) => sub.deref().0.to_string(linker_types) + "[]",
         }
     }
 }
@@ -96,7 +106,7 @@ impl Value {
     }
 }
 
-pub fn pretty_print_concrete_instance(linker : &Linker, link_info : &LinkInfo, template_args : &FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>) -> String {
+pub fn pretty_print_concrete_instance(linker : &Linker, link_info : &LinkInfo, template_args : &ConcreteTemplateArgs) -> String {
     assert!(link_info.template_arguments.len() == template_args.len());
 
     let mut result = link_info.get_full_name();

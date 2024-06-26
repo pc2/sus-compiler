@@ -2,7 +2,7 @@
 use std::ops::Deref;
 
 use crate::{
-    file_position::Span, flattening::{Declaration, DomainID, FlatID, Instruction, Interface, Module, ModuleInterfaceReference, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource, WrittenType}, linker::{FileData, FileUUID, Linker, ModuleUUID, NameElem}
+    file_position::Span, flattening::{Declaration, DomainID, FlatID, Instruction, Interface, Module, ModuleInterfaceReference, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource, WrittenType}, linker::{FileData, FileUUID, LinkInfo, Linker, ModuleUUID, NameElem}
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -15,7 +15,7 @@ pub enum InModule<'linker> {
 #[derive(Clone, Copy, Debug)]
 pub enum LocationInfo<'linker> {
     InModule(ModuleUUID, &'linker Module, FlatID, InModule<'linker>),
-    Type(&'linker WrittenType),
+    Type(&'linker WrittenType, &'linker LinkInfo),
     Global(NameElem),
     /// The contained module only refers to the module on which the port is defined
     /// No reference to the module in which the reference was found is provided
@@ -55,7 +55,7 @@ impl<'linker> From<LocationInfo<'linker>> for RefersTo {
                     InModule::Temporary(_) => {}
                 }
             }
-            LocationInfo::Type(_) => {}
+            LocationInfo::Type(_, _) => {}
             LocationInfo::Global(name_elem) => {
                 result.global = Some(name_elem);
             }
@@ -75,7 +75,7 @@ impl RefersTo {
     pub fn refers_to_same_as(&self, info : LocationInfo) -> bool {
         match info {
             LocationInfo::InModule(md_id, _, obj, _) => self.local == Some((md_id, obj)),
-            LocationInfo::Type(_) => false,
+            LocationInfo::Type(_, _) => false,
             LocationInfo::Global(ne) => self.global == Some(ne),
             LocationInfo::Port(sm, _, p_id) => self.port == Some((sm.module_ref.id, p_id)),
             LocationInfo::Interface(md_id, _, i_id, _) => self.interface == Some((md_id, i_id))
@@ -171,19 +171,22 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
         }
     }
 
-    fn walk_type(&mut self, typ_expr : &'linker WrittenType) {
+    fn walk_type(&mut self, typ_expr : &'linker WrittenType, link_info : &'linker LinkInfo) {
         let typ_expr_span = typ_expr.get_span();
         if !(self.should_prune)(typ_expr_span) {
-            (self.visitor)(typ_expr_span, LocationInfo::Type(typ_expr));
+            (self.visitor)(typ_expr_span, LocationInfo::Type(typ_expr, link_info));
             match typ_expr {
                 WrittenType::Error(_) => {}
+                WrittenType::Template(span, link_info) => {
+                    // TODO
+                }
                 WrittenType::Named(named_type) => {
                     self.visit(named_type.span, LocationInfo::Global(NameElem::Type(named_type.id)));
                 }
                 WrittenType::Array(_, arr_box) => {
                     let (arr_content_typ, _size_id, _br_span) = arr_box.deref();
 
-                    self.walk_type(arr_content_typ)
+                    self.walk_type(arr_content_typ, link_info)
                 }
             }
         }
@@ -223,7 +226,7 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
                         }
                     }
                     Instruction::Declaration(decl) => {
-                        self.walk_type(&decl.typ_expr);
+                        self.walk_type(&decl.typ_expr, &md.link_info);
                         if decl.declaration_itself_is_not_written_to {
                             self.visit(decl.name_span, LocationInfo::InModule(md_id, md, id, InModule::NamedLocal(decl)));
                         }

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, ops::Deref};
 
-use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span, SpanFile}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, Interface, UnaryOperator}, linker::{get_builtin_type, NamedType, Resolver, TypeUUID, TypeUUIDMarker}};
+use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span, SpanFile}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, Interface, UnaryOperator}, linker::{get_builtin_type, NamedType, Resolver, TypeUUID, TypeUUIDMarker}, template::{TemplateID, TemplateIDMarker, TemplateInputs}, to_string::map_to_type_names};
 
 /// This contains only the information that can be easily type-checked. 
 /// 
@@ -11,6 +11,7 @@ use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span
 pub enum AbstractType {
     Error,
     Unknown,
+    Template(TemplateID),
     Named(TypeUUID),
     Array(Box<AbstractType>)
 }
@@ -20,6 +21,7 @@ impl AbstractType {
         match self {
             AbstractType::Error => CHECK_ERROR,
             AbstractType::Unknown => CHECK_UNKNOWN,
+            AbstractType::Template(_id) => false,
             AbstractType::Named(_id) => false,
             AbstractType::Array(arr_box) => {
                 arr_box.deref().contains_error_or_unknown::<CHECK_ERROR, CHECK_UNKNOWN>()
@@ -114,16 +116,23 @@ impl BestName {
 /// 'x U 'y -> 'x = 'y
 pub struct TypeUnifier<'linker, 'errs> {
     pub linker_types : Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>,
+    template_type_names : FlatAlloc<String, TemplateIDMarker>,
     domain_substitutor : RefCell<FlatAlloc<DomainTypeSubstitution, DomainIDMarker>>,
     errors : &'errs ErrorCollector<'linker>,
     pub final_domains : FlatAlloc<BestName, DomainIDMarker>,
 }
 
 impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
-    pub fn new(linker_types : Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>, errors : &'errs ErrorCollector<'linker>, interfaces : &FlatAlloc<Interface, DomainIDMarker>) -> Self {
+    pub fn new(linker_types : Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>, template_inputs : &TemplateInputs, errors : &'errs ErrorCollector<'linker>, interfaces : &FlatAlloc<Interface, DomainIDMarker>) -> Self {
         let domains = interfaces.iter().map(|(_id, interface)| DomainTypeSubstitution::KnownDomain { name: interface.name.clone() }).collect();
         let final_domains = interfaces.iter().map(|(_id, _interface)| BestName::ExistingInterface).collect();
-        Self {linker_types, errors, domain_substitutor : RefCell::new(domains), final_domains}
+        Self {
+            linker_types,
+            template_type_names : map_to_type_names(template_inputs),
+            errors,
+            domain_substitutor : RefCell::new(domains),
+            final_domains
+        }
     }
 
     // ===== Types =====
@@ -131,6 +140,7 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
     fn type_compare(&self, expected : &AbstractType, found : &AbstractType) -> bool {
         match (expected, found) {
             (AbstractType::Named(exp), AbstractType::Named(fnd)) => exp == fnd,
+            (AbstractType::Template(t), AbstractType::Template(t2)) => t == t2,
             (AbstractType::Array(exp), AbstractType::Array(fnd)) => {
                 self.type_compare(&exp.deref(), &fnd.deref())
             }
@@ -142,8 +152,8 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
 
     pub fn typecheck_abstr(&self, found : &AbstractType, span : Span, expected : &AbstractType, context : &str, declared_here : Option<SpanFile>) {
         if !self.type_compare(expected, found) {
-            let expected_name = expected.to_string(&self.linker_types);
-            let found_name = found.to_string(&self.linker_types);
+            let expected_name = expected.to_string(&self.linker_types, &self.template_type_names);
+            let found_name = found.to_string(&self.linker_types, &self.template_type_names);
             let err_ref = self.errors.error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
             if let Some(declared_here) = declared_here {
                 err_ref.info(declared_here, "Declared here");
@@ -201,7 +211,7 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
 
     pub fn typecheck_is_array_abstr(&self, arr_type : &AbstractType, arr_span : Span) -> AbstractType {
         let AbstractType::Array(arr_element_type) = arr_type else {
-            let arr_type_name = arr_type.to_string(&self.linker_types);
+            let arr_type_name = arr_type.to_string(&self.linker_types, &self.template_type_names);
             self.errors.error(arr_span, format!("Typing Error: Attempting to index into this, but it is not of array type, instead found a {arr_type_name}"));
             return AbstractType::Error;
         };
@@ -372,7 +382,7 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
             }
         }
         if typ.typ.contains_error_or_unknown::<true, true>() {
-            self.errors.error(span, format!("Unresolved Type: {}", typ.typ.to_string(&self.linker_types)));
+            self.errors.error(span, format!("Unresolved Type: {}", typ.typ.to_string(&self.linker_types, &self.template_type_names)));
         }
     }
 }

@@ -11,7 +11,7 @@ pub type TemplateID = UUID<TemplateIDMarker>;
 pub struct GlobalReference<ID> {
     pub span: Span,
     pub id: ID,
-    pub template_args: FlatAlloc<Option<TemplateArg>, TemplateIDMarker>,
+    pub template_args: TemplateArgs,
     pub template_span: Option<BracketSpan>
 }
 
@@ -51,7 +51,11 @@ pub enum ConcreteTemplateArg {
     NotProvided
 }
 
-pub fn check_all_template_args_valid(errors : &ErrorCollector, span : Span, target_link_info : &LinkInfo, template_args : &FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>) -> bool {
+pub type TemplateArgs = FlatAlloc<Option<TemplateArg>, TemplateIDMarker>;
+pub type TemplateInputs = FlatAlloc<TemplateInput, TemplateIDMarker>;
+pub type ConcreteTemplateArgs = FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>;
+
+pub fn check_all_template_args_valid(errors : &ErrorCollector, span : Span, target_link_info : &LinkInfo, template_args : &ConcreteTemplateArgs) -> bool {
     let mut not_found_list : Vec<&TemplateInput> = Vec::new();
     for (id, arg) in &target_link_info.template_arguments {
         match &template_args[id] {

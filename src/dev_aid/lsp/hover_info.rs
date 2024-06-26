@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use lsp_types::{LanguageString, MarkedString};
 
 use crate::{
-    abstract_type::DomainType, flattening::{DeclarationPortInfo, FlatID, IdentifierType, InterfaceToDomainMap, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, LinkInfo, Linker, NameElem}, parser::Documentation
+    abstract_type::DomainType, flattening::{DeclarationPortInfo, FlatID, IdentifierType, InterfaceToDomainMap, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, LinkInfo, Linker, NameElem}, parser::Documentation, to_string::map_to_type_names
 };
 
 use super::tree_walk::{InModule, LocationInfo};
@@ -89,7 +89,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 IdentifierType::Generative => {details_vec.push("gen")}
             }
 
-            let typ_str = decl.typ.typ.to_string(&linker.types);
+            let typ_str = decl.typ.typ.to_string(&linker.types, &map_to_type_names(&md.link_info.template_arguments));
             details_vec.push(&typ_str);
 
             details_vec.push(&decl.name);
@@ -126,12 +126,12 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     }
                 }
             };
-            details_vec.push(Cow::Owned(wire.typ.typ.to_string(&linker.types)));
+            details_vec.push(Cow::Owned(wire.typ.typ.to_string(&linker.types, &map_to_type_names(&md.link_info.template_arguments))));
             hover.sus_code(details_vec.join(" "));
             hover.gather_hover_infos(md, id, wire.typ.domain.is_generative());
         }
-        LocationInfo::Type(typ) => {
-            hover.sus_code(typ.to_type().to_string(&linker.types));
+        LocationInfo::Type(typ, link_info) => {
+            hover.sus_code(typ.to_type().to_string(&linker.types, &map_to_type_names(&link_info.template_arguments)));
         }
         LocationInfo::Global(global) => {
             if let Some(link_info) = linker.get_link_info(global) {

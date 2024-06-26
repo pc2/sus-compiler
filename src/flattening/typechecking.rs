@@ -18,7 +18,7 @@ pub fn typecheck_all_modules(linker : &mut Linker) {
         with_module_editing_context(linker_ptr, module_uuid, |modules, types, constants, name_resolver| {
             let mut context = TypeCheckingContext{
                 errors : name_resolver.errors,
-                type_checker : TypeUnifier::new(types, name_resolver.errors, &modules.working_on.interfaces),
+                type_checker : TypeUnifier::new(types, &modules.working_on.link_info.template_arguments, name_resolver.errors, &modules.working_on.interfaces),
                 constants,
                 runtime_condition_stack : Vec::new(),
                 modules,

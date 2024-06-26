@@ -8,7 +8,7 @@ mod latency_count;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, template::{check_all_template_args_valid, ConcreteTemplateArg, TemplateIDMarker}, to_string::pretty_print_concrete_instance, value::{TypedValue, Value}
+    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, template::{check_all_template_args_valid, ConcreteTemplateArgs}, to_string::pretty_print_concrete_instance, value::{TypedValue, Value}
 };
 
 use self::latency_algorithm::SpecifiedLatency;
@@ -96,7 +96,7 @@ pub struct SubModule {
     pub interface_call_sites : FlatAlloc<Vec<Span>, DomainIDMarker>,
     pub name : String,
     pub module_uuid : ModuleUUID,
-    pub template_args : FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>
+    pub template_args : ConcreteTemplateArgs
 }
 
 #[derive(Debug)]
@@ -157,7 +157,7 @@ pub enum RealWireRefRoot {
 
 #[derive(Debug)]
 pub struct InstantiationList {
-    cache : RefCell<HashMap<FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>, Rc<InstantiatedModule>>>
+    cache : RefCell<HashMap<ConcreteTemplateArgs, Rc<InstantiatedModule>>>
 }
 
 impl InstantiationList {
@@ -165,7 +165,7 @@ impl InstantiationList {
         Self{cache : RefCell::new(HashMap::new())}
     }
 
-    pub fn instantiate(&self, md : &Module, linker : &Linker, template_args : FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>) -> Option<Rc<InstantiatedModule>> {
+    pub fn instantiate(&self, md : &Module, linker : &Linker, template_args : ConcreteTemplateArgs) -> Option<Rc<InstantiatedModule>> {
         let cache_borrow = self.cache.borrow();
         
         // Temporary, no template arguments yet
@@ -213,7 +213,7 @@ impl InstantiationList {
 
     // Also passes over invalid instances. Instance validity should not be assumed!
     // Only used for things like syntax highlighting
-    pub fn for_each_instance<F : FnMut(&FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>, &InstantiatedModule)>(&self, mut f : F) {
+    pub fn for_each_instance<F : FnMut(&ConcreteTemplateArgs, &InstantiatedModule)>(&self, mut f : F) {
         let borrow = self.cache.borrow();
         for (k, v) in borrow.iter() {
             f(k, v.as_ref())
@@ -236,7 +236,7 @@ struct InstantiationContext<'fl, 'l> {
     interface_ports : FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     errors : ErrorCollector<'l>,
 
-    template_args : &'fl FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>,
+    template_args : &'fl ConcreteTemplateArgs,
     md : &'fl Module,
     linker : &'l Linker,
 }
@@ -330,7 +330,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
 }
 
-fn perform_instantiation(md : &Module, linker : &Linker, template_args : &FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>) -> InstantiatedModule {
+fn perform_instantiation(md : &Module, linker : &Linker, template_args : &ConcreteTemplateArgs) -> InstantiatedModule {
     let mut context = InstantiationContext{
         name : pretty_print_concrete_instance(linker, &md.link_info, template_args),
         generation_state : GenerationState{md, generation_state: md.instructions.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect()},

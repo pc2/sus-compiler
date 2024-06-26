@@ -3,7 +3,7 @@ use sus_proc_macro::{field, kind, kw};
 
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUID}, errors::ErrorCollector, file_position::FileText, flattening::Module, instantiation::InstantiationList, linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals}, parser::Cursor, template::{TemplateIDMarker, TemplateInput}
+    arena_alloc::{FlatAlloc, UUID}, errors::ErrorCollector, file_position::FileText, flattening::Module, instantiation::InstantiationList, linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals}, parser::Cursor, template::{TemplateInput, TemplateInputs}
 };
 
 use super::*;
@@ -12,7 +12,7 @@ struct ModuleInitializationContext<'linker> {
     ports : FlatAlloc<Port, PortIDMarker>,
     interfaces : FlatAlloc<Interface, DomainIDMarker>,
     current_interface : DomainID,
-    template_inputs : FlatAlloc<TemplateInput, TemplateIDMarker>,
+    template_inputs : TemplateInputs,
     file_text : &'linker FileText
 }
 

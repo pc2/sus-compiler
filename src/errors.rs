@@ -2,7 +2,7 @@
 
 use std::cell::RefCell;
 
-use crate::{arena_alloc::ArenaAllocator, file_position::{Span, SpanFile}, flattening::{Declaration, Interface, Module, Port, SubModuleInstance}, linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker, LinkInfo}};
+use crate::{arena_alloc::ArenaAllocator, file_position::{Span, SpanFile}, flattening::{Declaration, Instruction, Interface, Module, Port, SubModuleInstance}, linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker, LinkInfo}, template::TemplateInput};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ErrorLevel {
@@ -193,6 +193,22 @@ impl ErrorInfoObject for SubModuleInstance {
         } else {
             (self.module_ref.span, "Used here".to_owned())
         }
+    }
+}
+
+impl ErrorInfoObject for Instruction {
+    fn make_info(&self, file_data : &FileData) -> (Span, String) {
+        match self {
+            Instruction::SubModule(sm) => sm.make_info(file_data),
+            Instruction::Declaration(decl) => decl.make_info(file_data),
+            _ => unreachable!("At least there shouldn't be cases where we're referring to something other than SubModule or Declaration")
+        }
+    }
+}
+
+impl ErrorInfoObject for TemplateInput {
+    fn make_info(&self, _file_data : &FileData) -> (Span, String) {
+        (self.name_span, format!("{} declared here", self.name))
     }
 }
 

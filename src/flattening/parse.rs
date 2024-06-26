@@ -5,15 +5,22 @@ use std::{ops::{Deref, DerefMut}, str::FromStr};
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 use crate::{
-    arena_alloc::{UUIDRange, UUIDRangeIter, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, Resolver, TypeUUIDMarker, WorkingOnResolver}, parser::Cursor, template::{TemplateArg, TemplateArgKind, TemplateIDMarker, TemplateInput}, value::Value
+    arena_alloc::{UUIDRange, UUIDRangeIter, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, Resolver, TypeUUIDMarker, WorkingOnResolver}, parser::Cursor, template::{TemplateArg, TemplateArgKind, TemplateArgs, TemplateIDMarker, TemplateInputs}, value::Value
 };
 
 use super::name_context::LocalVariableContext;
 use super::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NamedLocal {
+    Declaration(FlatID),
+    SubModule(FlatID),
+    TemplateType(TemplateID),
+}
+
 enum LocalOrGlobal {
-    Local(FlatID),
-    Global(NameElem, Span, FlatAlloc<Option<TemplateArg>, TemplateIDMarker>, Option<BracketSpan>),
+    Local(Span, NamedLocal),
+    Global(NameElem, Span, TemplateArgs, Option<BracketSpan>),
     // Error is already handled
     NotFound(Span)
 }
@@ -154,6 +161,10 @@ enum DeclarationContext {
     PlainWire
 }
 
+use crate::template::TemplateID;
+
+use super::FlatID;
+
 struct FlatteningContext<'l, 'errs> {
     modules : WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>,
     #[allow(dead_code)]
@@ -166,7 +177,7 @@ struct FlatteningContext<'l, 'errs> {
     ports_to_visit : UUIDRangeIter<PortIDMarker>,
     template_inputs_to_visit : UUIDRangeIter<TemplateIDMarker>,
 
-    local_variable_context : LocalVariableContext<'l, FlatID>
+    local_variable_context : LocalVariableContext<'l, NamedLocal>
 }
 
 impl<'l, 'errs> Deref for FlatteningContext<'l, 'errs> {
@@ -208,8 +219,8 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
 
-    fn collect_template_args(&self, name_elem : NameElem, template_argument_list : Vec<TemplateArg>) -> FlatAlloc<Option<TemplateArg>, TemplateIDMarker> {
-        let empty_template : FlatAlloc<TemplateInput, TemplateIDMarker> = FlatAlloc::new();
+    fn collect_template_args(&self, name_elem : NameElem, template_argument_list : Vec<TemplateArg>) -> TemplateArgs {
+        let empty_template = TemplateInputs::new();
     
         let template_info = match name_elem {
             NameElem::Module(md_id) => {
@@ -219,7 +230,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             NameElem::Type(_ty) => &empty_template, //TODO
         };
     
-        let mut resulting_template_arguments : FlatAlloc<Option<TemplateArg>, TemplateIDMarker> = FlatAlloc::new_nones(template_info.len());
+        let mut resulting_template_arguments : TemplateArgs = FlatAlloc::new_nones(template_info.len());
     
         let mut index_iter = template_info.id_range().iter();
     
@@ -261,9 +272,10 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         resulting_template_arguments
     }
 
-    fn flatten_local_or_template_global(&mut self, mut must_be_global : bool, cursor : &mut Cursor) -> LocalOrGlobal {
+    fn flatten_local_or_template_global(&mut self, cursor : &mut Cursor) -> LocalOrGlobal {
         let total_span = cursor.span();
-
+        
+        let mut must_be_global = false;
         cursor.go_down(kind!("template_global"), |cursor| {
             must_be_global |= cursor.optional_field(field!("is_global_path"));
 
@@ -297,7 +309,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 let [local_name] = name_path.as_slice() else {unreachable!()};
                 let name_text = &self.name_resolver.file_text[*local_name];
                 if let Some(decl_id) = self.local_variable_context.get_declaration_for(name_text) {
-                    return LocalOrGlobal::Local(decl_id);
+                    return LocalOrGlobal::Local(*local_name, decl_id);
                 }
             }
 
@@ -326,37 +338,28 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 
     fn flatten_type(&mut self, cursor : &mut Cursor) -> WrittenType {
-        let (kind, span) = cursor.kind_span();
-        if kind == kind!("template_global") {
-            match self.flatten_local_or_template_global(true, cursor) {
-                LocalOrGlobal::Local(_) => unreachable!(),
-                LocalOrGlobal::Global(resolved_global, resolved_global_span, template_args, template_span) => {
-                    if let NameElem::Type(typ_id) = resolved_global {
-                        WrittenType::Named(GlobalReference { span: resolved_global_span, id: typ_id, template_args, template_span})
-                    } else {
-                        self.name_resolver.not_expected_global_error(resolved_global, resolved_global_span, "Type");
-                        WrittenType::Error(resolved_global_span)
-                    }
-                }
-                LocalOrGlobal::NotFound(name_span) => WrittenType::Error(name_span) // Already covered
-            }
-        } else if kind == kind!("array_type") {
-            self.flatten_array_type(span, cursor)
-        } else {cursor.could_not_match()}
+        let ModuleOrWrittenType::WrittenType(wr_typ) = self.flatten_module_or_type::<false>(cursor) else {unreachable!("Can't not be type")};
+        wr_typ
     }
 
     fn flatten_module_or_type<const ALLOW_MODULES : bool>(&mut self, cursor : &mut Cursor) -> ModuleOrWrittenType {
+        let accepted_text = if ALLOW_MODULES {"Type or Module"} else {"Type"};
         let (kind, span) = cursor.kind_span();
         // Only difference is that 
         if kind == kind!("template_global") {
-            match self.flatten_local_or_template_global(true, cursor) {
-                LocalOrGlobal::Local(_) => unreachable!(),
+            match self.flatten_local_or_template_global(cursor) {
+                LocalOrGlobal::Local(span, NamedLocal::Declaration(instr)) | LocalOrGlobal::Local(span, NamedLocal::SubModule(instr)) => {
+                    self.errors.error(span, format!("This is not a {accepted_text}, it is a local variable instead!"))
+                        .info_obj_same_file(&self.working_on.instructions[instr]);
+                    
+                    ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
+                }
+                LocalOrGlobal::Local(span, NamedLocal::TemplateType(template_id)) => ModuleOrWrittenType::WrittenType(WrittenType::Template(span, template_id)),
                 LocalOrGlobal::Global(resolved_global, resolved_global_span, template_args, template_span) => {
                     match &resolved_global {
                         NameElem::Type(typ_id) => ModuleOrWrittenType::WrittenType(WrittenType::Named(GlobalReference { span: resolved_global_span, id: *typ_id, template_args, template_span })),
                         NameElem::Module(md_id) if ALLOW_MODULES => ModuleOrWrittenType::Module(GlobalReference { span: resolved_global_span, id: *md_id, template_args, template_span }),
                         _ => {
-                            let accepted_text = if ALLOW_MODULES {"Type or Module"} else {"Type"};
                             self.name_resolver.not_expected_global_error(resolved_global, resolved_global_span, accepted_text);
                             ModuleOrWrittenType::WrittenType(WrittenType::Error(resolved_global_span))
                         }
@@ -369,19 +372,16 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         } else {cursor.could_not_match()}
     }
 
-    fn alloc_declaration(&mut self, name : &'l str, span : Span, new_instr : Instruction) -> FlatID {
-        let inst_id = self.working_on.instructions.alloc(new_instr);
-
-        if let Err(conflict) = self.local_variable_context.add_declaration(name, inst_id) {
-            let err_ref = self.errors.error(span, "This declaration conflicts with a previous declaration in the same scope");
-            match &self.working_on.instructions[conflict] {
-                Instruction::SubModule(sm) => {err_ref.info_obj_same_file(sm);}
-                Instruction::Declaration(d) => {err_ref.info_obj_same_file(d);}
-                _ => unreachable!()
+    fn alloc_local_name(&mut self, name_span : Span, named_local : NamedLocal) {
+        if let Err(conflict) = self.local_variable_context.add_declaration(&self.name_resolver.file_text[name_span], named_local) {
+            let err_ref = self.errors.error(name_span, "This declaration conflicts with a previous declaration in the same scope");
+            
+            match conflict {
+                NamedLocal::Declaration(decl_id) => {err_ref.info_obj_same_file(self.working_on.instructions[decl_id].unwrap_wire_declaration());}
+                NamedLocal::SubModule(submod_id) => {err_ref.info_obj_same_file(self.working_on.instructions[submod_id].unwrap_submodule());}
+                NamedLocal::TemplateType(template_id) => {err_ref.info_obj_same_file(&self.working_on.link_info.template_arguments[template_id]);}
             }
         }
-
-        inst_id
     }
     
     fn flatten_declaration<const ALLOW_MODULES : bool>(&mut self, declaration_context : DeclarationContext, mut read_only : bool, declaration_itself_is_not_written_to : bool, cursor : &mut Cursor) -> FlatID {
@@ -487,19 +487,24 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         self.errors.error(span, "Cannot add latency specifier to module instances");
                     }
                     let name = &self.name_resolver.file_text[name_span];
-                    return self.alloc_declaration(name, whole_declaration_span, Instruction::SubModule(SubModuleInstance{
+
+                    let submod_id = self.working_on.instructions.alloc(Instruction::SubModule(SubModuleInstance{
                         name : Some((name.to_owned(), name_span)),
                         module_ref,
                         declaration_runtime_depth : DECL_DEPTH_LATER,
                         local_interface_domains : FlatAlloc::new(),
                         documentation
-                    }))
+                    }));
+
+                    self.alloc_local_name(name_span, NamedLocal::SubModule(submod_id));
+
+                    return submod_id
                 }
             };
 
             let name = &self.name_resolver.file_text[name_span];
 
-            let decl_id = self.alloc_declaration(name, whole_declaration_span, Instruction::Declaration(Declaration{
+            let decl_id = self.working_on.instructions.alloc(Instruction::Declaration(Declaration{
                 typ_expr,
                 typ : FullType::new_unset(),
                 read_only,
@@ -513,6 +518,8 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 latency_specifier : span_latency_specifier.map(|(ls, _)| ls),
                 documentation
             }));
+
+            self.alloc_local_name(name_span, NamedLocal::Declaration(decl_id));
 
             match is_port {
                 DeclarationPortInfo::NotPort => {},
@@ -729,15 +736,18 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     fn flatten_wire_reference(&mut self, cursor : &mut Cursor) -> PartialWireReference {
         let (kind, expr_span) = cursor.kind_span();
         if kind == kind!("template_global") {
-            match self.flatten_local_or_template_global(false, cursor) {
-                LocalOrGlobal::Local(decl_id) => {
-                    match &self.working_on.instructions[decl_id] {
-                        Instruction::SubModule(_) => PartialWireReference::ModuleButNoPort(decl_id, expr_span),
-                        Instruction::Declaration(_) => {
+            match self.flatten_local_or_template_global(cursor) {
+                LocalOrGlobal::Local(span, named_obj) => {
+                    match named_obj {
+                        NamedLocal::Declaration(decl_id) => {
                             let root = WireReferenceRoot::LocalDecl(decl_id, expr_span);
                             PartialWireReference::WireReference(WireReference{root, path : Vec::new()})
                         }
-                        Instruction::Wire(_) | Instruction::Write(_) | Instruction::IfStatement(_) | Instruction::ForStatement(_) | Instruction::FuncCall(_) => unreachable!()
+                        NamedLocal::SubModule(submod_id) => PartialWireReference::ModuleButNoPort(submod_id, expr_span),
+                        NamedLocal::TemplateType(template_id) => {
+                            self.errors.error(span, format!("Expected a value, but instead found template type '{}'", self.working_on.link_info.template_arguments[template_id].name));
+                            PartialWireReference::Error
+                        }
                     }
                 }
                 LocalOrGlobal::Global(name_elem, span, template_args, template_span) => {
@@ -1120,11 +1130,15 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
                         let claimed_type_id = self.template_inputs_to_visit.next().unwrap();
 
-                        let TemplateInputKind::Type{default_value} = &mut self.working_on.link_info.template_arguments[claimed_type_id].kind else {unreachable!()};
+                        let selected_arg = &mut self.working_on.link_info.template_arguments[claimed_type_id];
+                        let TemplateInputKind::Type{default_value} = &mut selected_arg.kind else {unreachable!()};
 
                         *default_value = default_type;
+
+                        let name_span = selected_arg.name_span;
+
+                        self.alloc_local_name(name_span, NamedLocal::TemplateType(claimed_type_id));
                     });
-                    self.name_resolver.errors.todo(cursor.span(), "Template Type Arguments");
                 })
             }
             let module_name = &self.name_resolver.file_text[name_span];

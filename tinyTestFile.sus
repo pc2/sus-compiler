@@ -100,13 +100,43 @@ module tree_add {
 		}
 
 		if WIDTH % 2 == 0 {
-			sum = left.sum + right.sum
+			reg sum = left.sum + right.sum
 		} else {
-			sum = left.sum + right.sum + values[WIDTH - 1]
+			reg sum = left.sum + right.sum + values[WIDTH - 1]
 		}
 	}
 }
 
 module make_tree_add {
-	tree_add::<139;> tr
+	gen int SIZE = 255
+
+	int[SIZE] vs
+
+	for int i in 0..SIZE {
+		vs[i] = i
+	}
+
+	tree_add::<SIZE;> tr
+
+	tr.values = vs
+
+	output int beep = tr.sum
+}
+
+
+module replicate<T> {
+	input gen int NUM_REPLS
+
+	input T data
+
+	output T[NUM_REPLS] result
+
+	for int i in 0..NUM_REPLS {
+		result[i] = data
+	} 
+}
+
+module use_replicate {
+	replicate::<NUM_REPLS = 50; T = bool> a
+	replicate::<NUM_REPLS = 20; T = int[30]> b
 }

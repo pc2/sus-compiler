@@ -292,7 +292,7 @@ fn handle_request(method : &str, params : serde_json::Value, file_cache : &mut L
                         goto_definition_list.push((submod_decl.name.as_ref().unwrap().1, md.link_info.file))
                     }
                     LocationInfo::InModule(_, _, _, InModule::Temporary(_)) => {}
-                    LocationInfo::Type(_) => {}
+                    LocationInfo::Type(_, _) => {}
                     LocationInfo::Global(id) => {
                         if let Some(link_info) = file_cache.linker.get_link_info(id) {
                             goto_definition_list.push((link_info.name_span, link_info.file));

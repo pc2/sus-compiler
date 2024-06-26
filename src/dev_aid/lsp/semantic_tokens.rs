@@ -127,7 +127,7 @@ fn walk_name_color(file : &FileData, linker : &Linker) -> Vec<(Span, IDEIdentifi
                 IDEIdentifierType::Interface
             }
             LocationInfo::InModule(_md_id, _, _, InModule::Temporary(_)) => {return}
-            LocationInfo::Type(_) => {return}
+            LocationInfo::Type(_, _) => {return}
             LocationInfo::Global(g) => {
                 match g {
                     NameElem::Module(_) => IDEIdentifierType::Interface,
