@@ -1,7 +1,7 @@
 
 use lsp_types::{Position, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities, WorkDoneProgressOptions};
 
-use crate::{abstract_type::DomainType, dev_aid::lsp::to_position, file_position::Span, flattening::{DomainID, IdentifierType}, linker::{FileData, FileUUID, Linker, NameElem}};
+use crate::{abstract_type::DomainType, dev_aid::lsp::to_position, file_position::Span, flattening::{DomainID, IdentifierType}, linker::{FileData, FileUUID, Linker, NameElem}, template::TemplateInputKind};
 
 use super::tree_walk::{self, InModule, LocationInfo};
 
@@ -128,6 +128,12 @@ fn walk_name_color(file : &FileData, linker : &Linker) -> Vec<(Span, IDEIdentifi
             }
             LocationInfo::InModule(_md_id, _, _, InModule::Temporary(_)) => {return}
             LocationInfo::Type(_, _) => {return}
+            LocationInfo::TemplateInput(_id, _link_info, _, template_arg) => {
+                match &template_arg.kind {
+                    TemplateInputKind::Type { .. } => IDEIdentifierType::Type,
+                    TemplateInputKind::Generative { .. } => IDEIdentifierType::Generative,
+                }
+            }
             LocationInfo::Global(g) => {
                 match g {
                     NameElem::Module(_) => IDEIdentifierType::Interface,

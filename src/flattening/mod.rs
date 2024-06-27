@@ -11,7 +11,7 @@ pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
 
 use crate::{
-    abstract_type::{AbstractType, FullType}, arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID, TypeUUID}, parser::Documentation, pretty_print_many_spans, template::{GlobalReference, TemplateID, TemplateInputKind}, value::Value
+    abstract_type::{AbstractType, FullType}, arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID, TypeUUID}, parser::Documentation, template::{GlobalReference, TemplateID, TemplateInputKind}, value::Value
 };
 
 
@@ -80,75 +80,6 @@ impl Module {
         let flat_port = self.ports[port].declaration_instruction;
 
         self.instructions[flat_port].unwrap_wire_declaration()
-    }
-
-    pub fn make_port_info_fmt(&self, port_id : PortID, file_text : &FileText, result : &mut String) {
-        use std::fmt::Write;
-        let port = &self.ports[port_id];
-        let port_direction = if port.is_input {"input"} else {"output"};
-        writeln!(result, "{port_direction} {}", &file_text[port.decl_span]).unwrap()
-    }
-    pub fn make_port_info_string(&self, port_id : PortID, file_text : &FileText) -> String {
-        let mut r = String::new(); self.make_port_info_fmt(port_id, file_text, &mut r); r
-    }
-
-    pub fn make_interface_info_fmt(&self, interface_id : DomainID, file_text : &FileText, result : &mut String) {
-        for (port_id, port) in &self.ports {
-            if port.interface == interface_id {
-                self.make_port_info_fmt(port_id, file_text, result);
-            }
-        }
-    }
-    pub fn make_interface_info_string(&self, interface_id : DomainID, file_text : &FileText) -> String {
-        let mut r = String::new(); self.make_interface_info_fmt(interface_id, file_text, &mut r); r
-    }
-
-    pub fn make_all_ports_info_string(&self, file_text : &FileText, local_domains : Option<InterfaceToDomainMap>) -> String {
-        use std::fmt::Write;
-
-        let mut interface_iter = self.interfaces.iter();
-        if !self.main_interface_used {
-            interface_iter.next();
-        }
-
-        let mut type_args : Vec<&str> = Vec::new();
-        let mut temporary_gen_input_builder = String::new();
-        for (_id, t) in &self.link_info.template_arguments {
-            match &t.kind {
-                TemplateInputKind::Type { default_value:_ } => type_args.push(&t.name),
-                TemplateInputKind::Generative { decl_span, declaration_instruction:_ } => writeln!(temporary_gen_input_builder, "input gen {}", &file_text[*decl_span]).unwrap(), 
-            }
-        }
-
-        let mut result = format!("module {}<{}>:\n", self.link_info.get_full_name(), type_args.join(", "));
-        result.push_str(&temporary_gen_input_builder);
-
-        for (interface_id, interface) in interface_iter {
-            if let Some(domain_map) = &local_domains {
-                writeln!(result, "{}: {{{}}}", &interface.name, domain_map.get_submodule_interface_domain(interface_id).name).unwrap();
-            } else {
-                writeln!(result, "{}:", &interface.name).unwrap();
-            }
-            self.make_interface_info_fmt(interface_id, file_text, &mut result);
-        }
-
-        result
-    }
-
-    pub fn print_flattened_module(&self, file_text : &FileText) {
-        println!("[[{}]]:", self.link_info.name);
-        println!("Interface:");
-        for (port_id, port) in &self.ports {
-            println!("    {} -> {:?}", self.make_port_info_string(port_id, file_text), port);
-        }
-        println!("Instructions:");
-        let mut spans_print = Vec::new();
-        for (id, inst) in &self.instructions {
-            println!("    {id:?}: {inst:?}");
-            let span = self.get_instruction_span(id);
-            spans_print.push((format!("{id:?}"), span.into_range()));
-        }
-        pretty_print_many_spans(file_text.file_text.clone(), &spans_print);
     }
 
     /// Get a port by the given name. Reports non existing ports errors
@@ -451,13 +382,13 @@ const DECL_DEPTH_LATER : usize = usize::MAX;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeclarationPortInfo {
     NotPort,
-    RegularPort{is_input : bool},
+    RegularPort{is_input : bool, port_id : PortID},
     GenerativeInput(TemplateID)
 }
 
 impl DeclarationPortInfo {
     pub fn as_regular_port(&self) -> Option<bool> {
-        if let DeclarationPortInfo::RegularPort{is_input} = self {
+        if let DeclarationPortInfo::RegularPort{is_input, port_id:_} = self {
             Some(*is_input)
         } else {
             None
@@ -466,7 +397,7 @@ impl DeclarationPortInfo {
     pub fn implies_read_only(&self) -> bool {
         match self {
             DeclarationPortInfo::NotPort => false,
-            DeclarationPortInfo::RegularPort { is_input } => *is_input,
+            DeclarationPortInfo::RegularPort { is_input, port_id:_ } => *is_input,
             DeclarationPortInfo::GenerativeInput(_) => true,
         }
     }

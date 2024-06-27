@@ -405,7 +405,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     if let Some((_, io_span)) = io_kw {
                         self.errors.error(io_span, "Cannot redeclare 'input' or 'output' on functional syntax IO");
                     }
-                    DeclarationPortInfo::RegularPort { is_input: declaration_context == DeclarationContext::Input }
+                    DeclarationPortInfo::RegularPort { is_input: declaration_context == DeclarationContext::Input, port_id:UUID::PLACEHOLDER }
                 }
                 DeclarationContext::ForLoopGenerative => {
                     if let Some((_, io_span)) = io_kw {
@@ -415,7 +415,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
                 DeclarationContext::PlainWire => {
                     match io_kw {
-                        Some((is_input, _)) => DeclarationPortInfo::RegularPort { is_input },
+                        Some((is_input, _)) => DeclarationPortInfo::RegularPort { is_input, port_id:UUID::PLACEHOLDER },
                         None => DeclarationPortInfo::NotPort,
                     }
                 }
@@ -437,12 +437,11 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         Some((kw!("gen"), modifier_span)) => {
                             match is_port {
                                 DeclarationPortInfo::NotPort => {}
-                                DeclarationPortInfo::RegularPort { is_input : true } => {
-                                    let this_template_id = self.template_inputs_to_visit.next().unwrap();
+                                DeclarationPortInfo::RegularPort { is_input : true, port_id : _ } => {
                                     // AHA! Generative input
-                                    is_port = DeclarationPortInfo::GenerativeInput(this_template_id)
+                                    is_port = DeclarationPortInfo::GenerativeInput(UUID::PLACEHOLDER)
                                 }
-                                DeclarationPortInfo::RegularPort { is_input : false } => {
+                                DeclarationPortInfo::RegularPort { is_input : false, port_id : _ } => {
                                     self.errors.error(modifier_span, "Cannot make generative outputs. This is because it could interfere with inference of generic types and generative inputs");
                                 }
                                 DeclarationPortInfo::GenerativeInput(_) => unreachable!("Can't have been GenerativeInput here already, because it only gets converted to that here"), 
@@ -462,6 +461,12 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     IdentifierType::Generative
                 }
             };
+
+            match &mut is_port {
+                DeclarationPortInfo::NotPort => {}
+                DeclarationPortInfo::RegularPort { is_input:_, port_id } => {*port_id = self.ports_to_visit.next().unwrap();}
+                DeclarationPortInfo::GenerativeInput(template_id) => {*template_id = self.template_inputs_to_visit.next().unwrap();}
+            }
 
             cursor.field(field!("type"));
             let decl_span = Span::new_overarching(cursor.span(), whole_declaration_span.empty_span_at_end());
@@ -523,9 +528,8 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
             match is_port {
                 DeclarationPortInfo::NotPort => {},
-                DeclarationPortInfo::RegularPort { is_input:_ } => {
-                    let this_port_id = self.ports_to_visit.next().unwrap();
-                    let port = &mut self.working_on.ports[this_port_id];
+                DeclarationPortInfo::RegularPort { is_input:_, port_id } => {
+                    let port = &mut self.working_on.ports[port_id];
                     assert_eq!(port.name_span, name_span);
                     port.declaration_instruction = decl_id;
                 }

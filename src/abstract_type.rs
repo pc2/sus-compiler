@@ -56,13 +56,6 @@ impl DomainType {
     pub fn new_unset() -> DomainType {
         DomainType::Physical(DomainID::PLACEHOLDER)
     }
-    pub fn physical_to_string(physical_id : DomainID, interfaces : &FlatAlloc<Interface, DomainIDMarker>) -> String {
-        if let Some(interf) = interfaces.get(physical_id) {
-            format!("{{{}}}", interf.name)
-        } else {
-            format!("{{unnamed domain {}}}", physical_id.get_hidden_value())
-        }
-    }
 }
 
 #[derive(Debug, Clone)]

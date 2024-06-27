@@ -140,3 +140,39 @@ module use_replicate {
 	replicate::<NUM_REPLS = 50; T = bool> a
 	replicate::<NUM_REPLS = 20; T = int[30]> b
 }
+
+module permute_t<T> {
+	input gen int SIZE
+
+	input gen int[SIZE] SOURCES
+
+	interface permute : T[SIZE] d_in -> T[SIZE] d_out
+
+	for int i in 0..SIZE {
+		d_out[i] = d_in[SOURCES[i]]
+	}
+}
+/*
+module use_permute {
+	gen int[8] indices
+
+	indices[0] = 3
+	indices[1] = 2
+	indices[2] = 4
+	indices[3] = 5
+	indices[4] = 1
+	indices[5] = 2
+	indices[6] = 7
+	indices[7] = 6
+
+
+	gen int[2] inArr
+
+	inArr[0] = 2387
+	inArr[1] = 786823
+
+	permute_t::<SIZE = 8, SOURCES = indices; int> permut
+
+	int[8] beep = permut.permute(inArr)
+}
+*/

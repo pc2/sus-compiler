@@ -1,4 +1,4 @@
-use crate::{abstract_type::AbstractType, arena_alloc::FlatAlloc, concrete_type::ConcreteType, flattening::WrittenType, linker::{LinkInfo, Linker, NamedType, TypeUUID}, template::{ConcreteTemplateArg, ConcreteTemplateArgs, TemplateIDMarker, TemplateInputs}, value::Value};
+use crate::{abstract_type::{AbstractType, DomainType}, arena_alloc::FlatAlloc, concrete_type::ConcreteType, file_position::FileText, flattening::{DomainID, DomainIDMarker, Interface, InterfaceToDomainMap, Module, PortID, WrittenType}, linker::{LinkInfo, Linker, NamedType, TypeUUID}, pretty_print_many_spans, template::{ConcreteTemplateArg, ConcreteTemplateArgs, TemplateID, TemplateIDMarker, TemplateInputKind, TemplateInputs}, value::Value};
 
 use std::{fmt::{Display, Formatter}, ops::Index};
 
@@ -10,14 +10,29 @@ pub fn map_to_type_names(template_inputs : &TemplateInputs) -> FlatAlloc<String,
     template_inputs.iter().map(|(_id, v)| v.name.clone()).collect()
 }
 
+pub trait TemplateNameGetter {
+    fn get_template_name(&self, id : TemplateID) -> &str;
+}
+
+impl TemplateNameGetter for FlatAlloc<String, TemplateIDMarker> {
+    fn get_template_name(&self, id : TemplateID) -> &str {
+        &self[id]
+    }
+}
+impl TemplateNameGetter for TemplateInputs {
+    fn get_template_name(&self, id : TemplateID) -> &str {
+        &self[id].name
+    }
+}
+
 impl WrittenType {
-    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec, template_names : &FlatAlloc<String, TemplateIDMarker>) -> String {
+    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>, TemplateVec : TemplateNameGetter>(&self, linker_types : &TypVec, template_names : &TemplateVec) -> String {
         match self {
             WrittenType::Error(_) => {
                 "{error}".to_owned()
             }
             WrittenType::Template(_, id) => {
-                template_names[*id].clone()
+                template_names.get_template_name(*id).to_owned()
             }
             WrittenType::Named(named_type) => {
                 linker_types[named_type.id].get_full_name()
@@ -28,7 +43,7 @@ impl WrittenType {
 }
 
 impl AbstractType {
-    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>>(&self, linker_types : &TypVec, template_names : &FlatAlloc<String, TemplateIDMarker>) -> String {
+    pub fn to_string<TypVec : Index<TypeUUID, Output = NamedType>, TemplateVec : TemplateNameGetter>(&self, linker_types : &TypVec, template_names : &TemplateVec) -> String {
         match self {
             AbstractType::Error => {
                 "{error}".to_owned()
@@ -37,7 +52,7 @@ impl AbstractType {
                 "{unknown}".to_owned()
             }
             AbstractType::Template(id) => {
-                template_names[*id].clone()
+                template_names.get_template_name(*id).to_owned()
             }
             AbstractType::Named(id) => {
                 linker_types[*id].get_full_name()
@@ -103,6 +118,89 @@ impl Value {
             Value::Unset => "Value::Unset".to_owned(),
             Value::Error => "Value::Error".to_owned(),
         }
+    }
+}
+
+impl DomainType {
+    pub fn physical_to_string(physical_id : DomainID, interfaces : &FlatAlloc<Interface, DomainIDMarker>) -> String {
+        if let Some(interf) = interfaces.get(physical_id) {
+            format!("{{{}}}", interf.name)
+        } else {
+            format!("{{unnamed domain {}}}", physical_id.get_hidden_value())
+        }
+    }
+}
+
+impl Module {
+
+
+    pub fn make_port_info_fmt(&self, port_id : PortID, file_text : &FileText, result : &mut String) {
+        use std::fmt::Write;
+        let port = &self.ports[port_id];
+        let port_direction = if port.is_input {"input"} else {"output"};
+        writeln!(result, "{port_direction} {}", &file_text[port.decl_span]).unwrap()
+    }
+    pub fn make_port_info_string(&self, port_id : PortID, file_text : &FileText) -> String {
+        let mut r = String::new(); self.make_port_info_fmt(port_id, file_text, &mut r); r
+    }
+
+    pub fn make_interface_info_fmt(&self, interface_id : DomainID, file_text : &FileText, result : &mut String) {
+        for (port_id, port) in &self.ports {
+            if port.interface == interface_id {
+                self.make_port_info_fmt(port_id, file_text, result);
+            }
+        }
+    }
+    pub fn make_interface_info_string(&self, interface_id : DomainID, file_text : &FileText) -> String {
+        let mut r = String::new(); self.make_interface_info_fmt(interface_id, file_text, &mut r); r
+    }
+
+    pub fn make_all_ports_info_string(&self, file_text : &FileText, local_domains : Option<InterfaceToDomainMap>) -> String {
+        use std::fmt::Write;
+
+        let mut interface_iter = self.interfaces.iter();
+        if !self.main_interface_used {
+            interface_iter.next();
+        }
+
+        let mut type_args : Vec<&str> = Vec::new();
+        let mut temporary_gen_input_builder = String::new();
+        for (_id, t) in &self.link_info.template_arguments {
+            match &t.kind {
+                TemplateInputKind::Type { default_value:_ } => type_args.push(&t.name),
+                TemplateInputKind::Generative { decl_span, declaration_instruction:_ } => writeln!(temporary_gen_input_builder, "input gen {}", &file_text[*decl_span]).unwrap(), 
+            }
+        }
+
+        let mut result = format!("module {}<{}>:\n", self.link_info.get_full_name(), type_args.join(", "));
+        result.push_str(&temporary_gen_input_builder);
+
+        for (interface_id, interface) in interface_iter {
+            if let Some(domain_map) = &local_domains {
+                writeln!(result, "{}: {{{}}}", &interface.name, domain_map.get_submodule_interface_domain(interface_id).name).unwrap();
+            } else {
+                writeln!(result, "{}:", &interface.name).unwrap();
+            }
+            self.make_interface_info_fmt(interface_id, file_text, &mut result);
+        }
+
+        result
+    }
+
+    pub fn print_flattened_module(&self, file_text : &FileText) {
+        println!("[[{}]]:", self.link_info.name);
+        println!("Interface:");
+        for (port_id, port) in &self.ports {
+            println!("    {} -> {:?}", self.make_port_info_string(port_id, file_text), port);
+        }
+        println!("Instructions:");
+        let mut spans_print = Vec::new();
+        for (id, inst) in &self.instructions {
+            println!("    {id:?}: {inst:?}");
+            let span = self.get_instruction_span(id);
+            spans_print.push((format!("{id:?}"), span.into_range()));
+        }
+        pretty_print_many_spans(file_text.file_text.clone(), &spans_print);
     }
 }
 

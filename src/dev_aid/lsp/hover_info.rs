@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use lsp_types::{LanguageString, MarkedString};
 
 use crate::{
-    abstract_type::DomainType, flattening::{DeclarationPortInfo, FlatID, IdentifierType, InterfaceToDomainMap, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, LinkInfo, Linker, NameElem}, parser::Documentation, to_string::map_to_type_names
+    abstract_type::DomainType, flattening::{DeclarationPortInfo, FlatID, IdentifierType, InterfaceToDomainMap, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, LinkInfo, Linker, NameElem}, parser::Documentation, template::TemplateInputKind
 };
 
 use super::tree_walk::{InModule, LocationInfo};
@@ -78,7 +78,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 details_vec.push(ds);
             }
             match decl.is_port {
-                DeclarationPortInfo::RegularPort { is_input } => details_vec.push(if is_input {"input"} else {"output"}),
+                DeclarationPortInfo::RegularPort { is_input, port_id:_ } => details_vec.push(if is_input {"input"} else {"output"}),
                 DeclarationPortInfo::NotPort => {},
                 DeclarationPortInfo::GenerativeInput(_) => details_vec.push("input") // "gen" in "input gen" is covered by decl.identifier_type
             }
@@ -89,7 +89,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 IdentifierType::Generative => {details_vec.push("gen")}
             }
 
-            let typ_str = decl.typ.typ.to_string(&linker.types, &map_to_type_names(&md.link_info.template_arguments));
+            let typ_str = decl.typ.typ.to_string(&linker.types, &md.link_info.template_arguments);
             details_vec.push(&typ_str);
 
             details_vec.push(&decl.name);
@@ -126,12 +126,30 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     }
                 }
             };
-            details_vec.push(Cow::Owned(wire.typ.typ.to_string(&linker.types, &map_to_type_names(&md.link_info.template_arguments))));
+            details_vec.push(Cow::Owned(wire.typ.typ.to_string(&linker.types, &md.link_info.template_arguments)));
             hover.sus_code(details_vec.join(" "));
             hover.gather_hover_infos(md, id, wire.typ.domain.is_generative());
         }
         LocationInfo::Type(typ, link_info) => {
-            hover.sus_code(typ.to_type().to_string(&linker.types, &map_to_type_names(&link_info.template_arguments)));
+            hover.sus_code(typ.to_type().to_string(&linker.types, &link_info.template_arguments));
+        }
+        LocationInfo::TemplateInput(in_obj, link_info, _template_id, template_arg) => {
+            match &template_arg.kind {
+                TemplateInputKind::Type { default_value } => {
+                    if let Some(default_typ) = default_value {
+                        hover.monospace(format!("type param '{}' = {}", template_arg.name, default_typ.to_string(&linker.types, &link_info.template_arguments)));
+                    } else {
+                        hover.monospace(format!("type param '{}'", template_arg.name));
+                    }
+                }
+                TemplateInputKind::Generative { decl_span:_, declaration_instruction } => {
+                    let NameElem::Module(md_id) = in_obj else {todo!("Non-module template args")};
+                    let md = &linker.modules[md_id];
+                    let decl = md.instructions[*declaration_instruction].unwrap_wire_declaration();
+                    hover.sus_code(format!("input gen {} {}", template_arg.name, decl.typ_expr.to_string(&linker.types, &link_info.template_arguments)));
+                    hover.gather_hover_infos(md, *declaration_instruction, true);
+                }
+            }
         }
         LocationInfo::Global(global) => {
             if let Some(link_info) = linker.get_link_info(global) {
