@@ -293,11 +293,14 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
 
     // ===== Both =====
     
-    pub fn typecheck_and_generative<const MUST_BE_GENERATIVE : bool>(&self, found : &FullType, span : Span, expected : &AbstractType, context : &str) {
-        self.typecheck_abstr(&found.typ, span, &expected, context, None);
+    pub fn typecheck_and_generative<const MUST_BE_GENERATIVE : bool>(&self, found : &FullType, span : Span, expected : &AbstractType, context : &str, declared_here : Option<SpanFile>) {
+        self.typecheck_abstr(&found.typ, span, &expected, context, declared_here);
 
         if MUST_BE_GENERATIVE && found.domain != DomainType::Generative {
-            self.errors.error(span, format!("A generative value is required in {context}"));
+            let err_ref = self.errors.error(span, format!("A generative value is required in {context}"));
+            if let Some(span_file) = declared_here {
+                err_ref.info(span_file, "Declared here");
+            }
         }
     }
 

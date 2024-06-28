@@ -3,7 +3,7 @@ use sus_proc_macro::{field, kind, kw};
 
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUID}, errors::ErrorCollector, file_position::FileText, flattening::Module, instantiation::InstantiationList, linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals}, parser::Cursor, template::{TemplateInput, TemplateInputs}
+    arena_alloc::{FlatAlloc, UUID}, errors::ErrorCollector, file_position::FileText, flattening::Module, instantiation::InstantiationList, linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals}, parser::Cursor, template::{GenerativeTemplateInputKind, TemplateInput, TemplateInputs, TypeTemplateInputKind}
 };
 
 use super::*;
@@ -27,7 +27,7 @@ impl<'linker> ModuleInitializationContext<'linker> {
                     self.template_inputs.alloc(TemplateInput{
                         name,
                         name_span,
-                        kind: TemplateInputKind::Type{default_value : None} // UNSET, gets overwritten in Flattening
+                        kind: TemplateInputKind::Type(TypeTemplateInputKind{default_value : None}) // UNSET, gets overwritten in Flattening
                     });
                 });
             });
@@ -175,7 +175,7 @@ impl<'linker> ModuleInitializationContext<'linker> {
             self.template_inputs.alloc(TemplateInput {
                 name,
                 name_span,
-                kind: TemplateInputKind::Generative{decl_span, declaration_instruction : UUID::PLACEHOLDER}
+                kind: TemplateInputKind::Generative(GenerativeTemplateInputKind{decl_span, declaration_instruction : UUID::PLACEHOLDER})
             });
         } else {
             self.ports.alloc(Port{

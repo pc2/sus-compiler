@@ -130,8 +130,8 @@ fn walk_name_color(file : &FileData, linker : &Linker) -> Vec<(Span, IDEIdentifi
             LocationInfo::Type(_, _) => {return}
             LocationInfo::TemplateInput(_id, _link_info, _, template_arg) => {
                 match &template_arg.kind {
-                    TemplateInputKind::Type { .. } => IDEIdentifierType::Type,
-                    TemplateInputKind::Generative { .. } => IDEIdentifierType::Generative,
+                    TemplateInputKind::Type(_) => IDEIdentifierType::Type,
+                    TemplateInputKind::Generative(_) => IDEIdentifierType::Generative,
                 }
             }
             LocationInfo::Global(g) => {

@@ -24,12 +24,35 @@ pub struct TemplateInput {
 }
 
 #[derive(Debug)]
-pub enum TemplateInputKind {
-    /// TODO this isn't quite right, because WrittenType requires access to the instructions, and ostensibly types get executed beforehand. Look into it
-    Type{default_value : Option<WrittenType>},
-    Generative{decl_span : Span, declaration_instruction : FlatID}
+pub struct GenerativeTemplateInputKind {
+    pub decl_span : Span,
+    pub declaration_instruction : FlatID
 }
 
+#[derive(Debug)]
+/// TODO this isn't quite right, because WrittenType requires access to the instructions, and ostensibly types get executed beforehand. Look into it
+pub struct TypeTemplateInputKind {
+    pub default_value : Option<WrittenType>
+}
+
+#[derive(Debug)]
+pub enum TemplateInputKind {
+    Type(TypeTemplateInputKind),
+    Generative(GenerativeTemplateInputKind)
+}
+
+impl TemplateInputKind {
+    #[track_caller]
+    pub fn unwrap_type(&self) -> &TypeTemplateInputKind {
+        let Self::Type(t) = self else {unreachable!("TemplateInputKind::unwrap_type on {self:?}")};
+        t
+    }
+    #[track_caller]
+    pub fn unwrap_value(&self) -> &GenerativeTemplateInputKind {
+        let Self::Generative(v) = self else {unreachable!("TemplateInputKind::unwrap_value on {self:?}")};
+        v
+    }
+}
 
 #[derive(Debug)]
 pub struct TemplateArg {

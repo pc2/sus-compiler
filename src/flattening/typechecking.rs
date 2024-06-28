@@ -2,7 +2,7 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-    abstract_type::{BestName, DomainType, TypeUnifier, BOOL_TYPE, INT_TYPE}, debug::SpanDebugger, errors::ErrorCollector, file_position::SpanFile, linker::{with_module_editing_context, ConstantUUIDMarker, FileUUID, Linkable, Linker, ModuleUUIDMarker, NamedConstant, Resolver, WorkingOnResolver}
+    abstract_type::{BestName, DomainType, TypeUnifier, BOOL_TYPE, INT_TYPE}, debug::SpanDebugger, errors::ErrorCollector, file_position::SpanFile, linker::{with_module_editing_context, ConstantUUIDMarker, FileUUID, Linkable, Linker, ModuleUUIDMarker, NameElem, NamedConstant, Resolver, WorkingOnResolver}, template::TemplateArgKind
 };
 
 use super::*;
@@ -61,6 +61,14 @@ impl<'l, 'errs> DerefMut for TypeCheckingContext<'l, 'errs> {
 }
 
 impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
+    fn get_link_info<ID : Into<NameElem>>(&self, id : ID) -> Option<&LinkInfo> {
+        let ne : NameElem = id.into();
+        match ne {
+            NameElem::Module(md_id) => Some(&self.modules[md_id].link_info),
+            NameElem::Type(_) | NameElem::Constant(_) => None, // TODO all globals should have link_info
+        }
+    }
+
     fn get_decl_of_module_port<'s>(&'s self, port : PortID, submodule_instr : FlatID) -> (&'s Declaration, FileUUID) {
         let submodule_id = self.working_on.instructions[submodule_instr].unwrap_submodule().module_ref.id;
         let module = &self.modules[submodule_id];
@@ -213,9 +221,51 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     }
 
+    fn typecheck_template_global<ID : Copy+Into<NameElem>>(&self, global_ref : &GlobalReference<ID>) {
+        let Some(link_info) = self.get_link_info(global_ref.id) else {return}; // TODO all objects should have link_info
+        let ne : NameElem = global_ref.id.into();
+        let NameElem::Module(md_id) = ne else {todo!("TODO Move Instructions to link_info too")};
+        let target_instructions = &self.modules[md_id].instructions;
+
+        for (template_id, value) in global_ref.template_args.iter_valids() {
+            match &value.kind {
+                TemplateArgKind::Type(typ) => {
+                    self.typecheck_written_type(typ);
+                }
+                TemplateArgKind::Value(val) => {
+                    let template_input = link_info.template_arguments[template_id].kind.unwrap_value();
+                    let template_input_decl = target_instructions[template_input.declaration_instruction].unwrap_wire_declaration();
+                    let declared_here = Some((template_input_decl.name_span, self.errors.file));
+                    let val_wire = self.working_on.instructions[*val].unwrap_wire();
+                    let target_abstract_type = template_input_decl.typ_expr.to_type_with_substitute(&global_ref.template_args);
+                    self.type_checker.typecheck_and_generative::<true>(&val_wire.typ, val_wire.span, &target_abstract_type, "generative template argument", declared_here);
+                }
+            }
+        }
+    }
+
+    fn typecheck_written_type(&self, wr_typ : &WrittenType) {
+        match wr_typ {
+            WrittenType::Error(_) => {}
+            WrittenType::Template(_, _) => {}
+            WrittenType::Named(global_ref) => {
+                self.typecheck_template_global(global_ref);
+            }
+            WrittenType::Array(_, arr_box) => {
+                let (content_typ, arr_idx, _bracket_span) = arr_box.deref();
+
+                self.typecheck_written_type(content_typ);
+
+                let idx_wire = self.working_on.instructions[*arr_idx].unwrap_wire();
+                self.type_checker.typecheck_and_generative::<true>(&idx_wire.typ, idx_wire.span, &INT_TYPE, "array size", None);
+            }
+        }
+    }
+
     fn typecheck_visit_instruction(&mut self, instr_id : FlatID) {
         match &self.working_on.instructions[instr_id] {
             Instruction::SubModule(sm) => {
+                self.typecheck_template_global(&sm.module_ref);
                 let md = &self.modules[sm.module_ref.id];
                 let local_interface_domains = md.interfaces.iter().map(|_| self.type_checker.new_unknown_domain_id()).collect();
 
@@ -225,13 +275,10 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             Instruction::Declaration(decl) => {
                 if let Some(latency_spec) = decl.latency_specifier {
                     let latency_spec_wire = self.working_on.instructions[latency_spec].unwrap_wire();
-                    self.type_checker.typecheck_and_generative::<true>(&latency_spec_wire.typ, latency_spec_wire.span, &INT_TYPE, "latency specifier");
+                    self.type_checker.typecheck_and_generative::<true>(&latency_spec_wire.typ, latency_spec_wire.span, &INT_TYPE, "latency specifier", None);
                 }
 
-                decl.typ_expr.for_each_generative_input(|param_id| {
-                    let wire = self.working_on.instructions[param_id].unwrap_wire();
-                    self.type_checker.typecheck_and_generative::<true>(&wire.typ, wire.span, &INT_TYPE, "array size");
-                });
+                self.typecheck_written_type(&decl.typ_expr);
 
                 let typ = decl.typ_expr.to_type();
                 let Instruction::Declaration(decl) = &mut self.modules.working_on.instructions[instr_id] else {unreachable!()};
@@ -242,15 +289,16 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
             Instruction::IfStatement(stm) => {
                 let wire = &self.working_on.instructions[stm.condition].unwrap_wire();
-                self.type_checker.typecheck_and_generative::<false>(&wire.typ, wire.span, &BOOL_TYPE, "if statement condition");
+                self.type_checker.typecheck_and_generative::<false>(&wire.typ, wire.span, &BOOL_TYPE, "if statement condition", None);
             }
             Instruction::ForStatement(stm) => {
                 let loop_var = &self.working_on.instructions[stm.loop_var_decl].unwrap_wire_declaration();
                 let start = &self.working_on.instructions[stm.start].unwrap_wire();
                 let end = &self.working_on.instructions[stm.end].unwrap_wire();
 
-                self.type_checker.typecheck_and_generative::<true>(&start.typ, start.span, &loop_var.typ.typ, "for loop start");
-                self.type_checker.typecheck_and_generative::<true>(&end.typ, end.span, &loop_var.typ.typ, "for loop end");
+                let declared_here = Some((loop_var.decl_span, self.errors.file));
+                self.type_checker.typecheck_and_generative::<true>(&start.typ, start.span, &loop_var.typ.typ, "for loop start", declared_here);
+                self.type_checker.typecheck_and_generative::<true>(&end.typ, end.span, &loop_var.typ.typ, "for loop end", declared_here);
             }
             Instruction::Wire(w) => {
                 let result_typ = match &w.source {

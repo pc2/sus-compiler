@@ -153,7 +153,7 @@ module permute_t<T> {
 	}
 }
 
-module use_permute<CheckT> {
+module use_permute {
 	gen int[8] indices
 
 	indices[0] = 3
@@ -174,8 +174,4 @@ module use_permute<CheckT> {
 	permute_t::<SIZE = 8, SOURCES = indices; T = int> permut
 
 	int[8] beep = permut.permute(indices)
-}
-
-module use_use_permute {
-	use_permute::<; bool[3][17]> b
 }

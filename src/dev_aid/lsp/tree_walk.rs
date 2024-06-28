@@ -2,7 +2,7 @@
 use std::ops::Deref;
 
 use crate::{
-    file_position::Span, flattening::{Declaration, DeclarationPortInfo, DomainID, FlatID, Instruction, Interface, Module, ModuleInterfaceReference, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource, WrittenType}, linker::{FileData, FileUUID, LinkInfo, Linker, ModuleUUID, NameElem}, template::{GlobalReference, TemplateArgKind, TemplateID, TemplateInput, TemplateInputKind}
+    file_position::Span, flattening::{Declaration, DeclarationPortInfo, DomainID, FlatID, Instruction, Interface, Module, ModuleInterfaceReference, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource, WrittenType}, linker::{FileData, FileUUID, LinkInfo, Linker, ModuleUUID, NameElem}, template::{GenerativeTemplateInputKind, GlobalReference, TemplateArgKind, TemplateID, TemplateInput, TemplateInputKind, TypeTemplateInputKind}
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -68,8 +68,8 @@ impl<'linker> From<LocationInfo<'linker>> for RefersTo {
             LocationInfo::Type(_, _) => {}
             LocationInfo::TemplateInput(obj, _link_info, template_id, template_arg) => {
                 match &template_arg.kind {
-                    TemplateInputKind::Type { default_value:_ } => {}
-                    TemplateInputKind::Generative { decl_span:_, declaration_instruction } => {
+                    TemplateInputKind::Type(TypeTemplateInputKind { default_value:_ }) => {}
+                    TemplateInputKind::Generative(GenerativeTemplateInputKind { decl_span:_, declaration_instruction }) => {
                         let NameElem::Module(md_id) = obj else {unreachable!()}; // TODO, local names in types? 
                         result.local = Some((md_id, *declaration_instruction));
                     }
@@ -249,7 +249,7 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
             self.visit(md.link_info.name_span, LocationInfo::Global(NameElem::Module(md_id)));
 
             for (template_id, template_arg) in &md.link_info.template_arguments {
-                if let TemplateInputKind::Type{default_value} = &template_arg.kind {
+                if let TemplateInputKind::Type(TypeTemplateInputKind{default_value}) = &template_arg.kind {
                     self.visit(template_arg.name_span, LocationInfo::TemplateInput(NameElem::Module(md_id), &md.link_info, template_id, template_arg));
 
                     if let Some(default_val) = default_value {

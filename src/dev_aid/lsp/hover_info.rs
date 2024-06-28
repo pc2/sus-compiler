@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use lsp_types::{LanguageString, MarkedString};
 
 use crate::{
-    abstract_type::DomainType, flattening::{DeclarationPortInfo, FlatID, IdentifierType, InterfaceToDomainMap, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, LinkInfo, Linker, NameElem}, parser::Documentation, template::TemplateInputKind
+    abstract_type::DomainType, flattening::{DeclarationPortInfo, FlatID, IdentifierType, InterfaceToDomainMap, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, LinkInfo, Linker, NameElem}, parser::Documentation, template::{GenerativeTemplateInputKind, TemplateInputKind, TypeTemplateInputKind}
 };
 
 use super::tree_walk::{InModule, LocationInfo};
@@ -135,14 +135,14 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
         }
         LocationInfo::TemplateInput(in_obj, link_info, _template_id, template_arg) => {
             match &template_arg.kind {
-                TemplateInputKind::Type { default_value } => {
+                TemplateInputKind::Type(TypeTemplateInputKind { default_value }) => {
                     if let Some(default_typ) = default_value {
                         hover.monospace(format!("type param '{}' = {}", template_arg.name, default_typ.to_string(&linker.types, &link_info.template_arguments)));
                     } else {
                         hover.monospace(format!("type param '{}'", template_arg.name));
                     }
                 }
-                TemplateInputKind::Generative { decl_span:_, declaration_instruction } => {
+                TemplateInputKind::Generative(GenerativeTemplateInputKind { decl_span:_, declaration_instruction }) => {
                     let NameElem::Module(md_id) = in_obj else {todo!("Non-module template args")};
                     let md = &linker.modules[md_id];
                     let decl = md.instructions[*declaration_instruction].unwrap_wire_declaration();

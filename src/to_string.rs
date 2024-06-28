@@ -1,4 +1,4 @@
-use crate::{abstract_type::{AbstractType, DomainType}, arena_alloc::FlatAlloc, concrete_type::ConcreteType, file_position::FileText, flattening::{DomainID, DomainIDMarker, Interface, InterfaceToDomainMap, Module, PortID, WrittenType}, linker::{LinkInfo, Linker, NamedType, TypeUUID}, pretty_print_many_spans, template::{ConcreteTemplateArg, ConcreteTemplateArgs, TemplateID, TemplateIDMarker, TemplateInputKind, TemplateInputs}, value::Value};
+use crate::{abstract_type::{AbstractType, DomainType}, arena_alloc::FlatAlloc, concrete_type::ConcreteType, file_position::FileText, flattening::{DomainID, DomainIDMarker, Interface, InterfaceToDomainMap, Module, PortID, WrittenType}, linker::{LinkInfo, Linker, NamedType, TypeUUID}, pretty_print_many_spans, template::{ConcreteTemplateArg, ConcreteTemplateArgs, GenerativeTemplateInputKind, TemplateID, TemplateIDMarker, TemplateInputKind, TemplateInputs, TypeTemplateInputKind}, value::Value};
 
 use std::{fmt::{Display, Formatter}, ops::Index};
 
@@ -167,8 +167,8 @@ impl Module {
         let mut temporary_gen_input_builder = String::new();
         for (_id, t) in &self.link_info.template_arguments {
             match &t.kind {
-                TemplateInputKind::Type { default_value:_ } => type_args.push(&t.name),
-                TemplateInputKind::Generative { decl_span, declaration_instruction:_ } => writeln!(temporary_gen_input_builder, "input gen {}", &file_text[*decl_span]).unwrap(), 
+                TemplateInputKind::Type(TypeTemplateInputKind { default_value:_ }) => type_args.push(&t.name),
+                TemplateInputKind::Generative(GenerativeTemplateInputKind { decl_span, declaration_instruction:_ }) => writeln!(temporary_gen_input_builder, "input gen {}", &file_text[*decl_span]).unwrap(), 
             }
         }
 
