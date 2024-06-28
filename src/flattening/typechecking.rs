@@ -75,7 +75,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         let port_interface = submodule_module.ports[port].interface;
         let port_local_domain = submodule_inst.local_interface_domains[port_interface];
         FullType {
-            typ : decl.typ_expr.to_type(),
+            typ : decl.typ_expr.to_type_with_substitute(&submodule_inst.module_ref.template_args),
             domain : DomainType::Physical(port_local_domain)
         }
     }

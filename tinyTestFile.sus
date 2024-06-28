@@ -152,8 +152,8 @@ module permute_t<T> {
 		d_out[i] = d_in[SOURCES[i]]
 	}
 }
-/*
-module use_permute {
+
+module use_permute<CheckT> {
 	gen int[8] indices
 
 	indices[0] = 3
@@ -166,13 +166,16 @@ module use_permute {
 	indices[7] = 6
 
 
-	gen int[2] inArr
+	int[2] inArr
 
 	inArr[0] = 2387
 	inArr[1] = 786823
 
-	permute_t::<SIZE = 8, SOURCES = indices; int> permut
+	permute_t::<SIZE = 8, SOURCES = indices; T = int> permut
 
-	int[8] beep = permut.permute(inArr)
+	int[8] beep = permut.permute(indices)
 }
-*/
+
+module use_use_permute {
+	use_permute::<; bool[3][17]> b
+}

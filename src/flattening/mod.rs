@@ -11,7 +11,7 @@ pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
 
 use crate::{
-    abstract_type::{AbstractType, FullType}, arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID, TypeUUID}, parser::Documentation, template::{GlobalReference, TemplateID, TemplateInputKind}, value::Value
+    abstract_type::{AbstractType, FullType}, arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID, TypeUUID}, parser::Documentation, template::{GlobalReference, TemplateArgs, TemplateID, TemplateInputKind}, value::Value
 };
 
 
@@ -362,6 +362,23 @@ impl WrittenType {
             WrittenType::Array(_, arr_box) => {
                 let (elem_typ, _arr_idx, _br_span) = arr_box.deref();
                 AbstractType::Array(Box::new(elem_typ.to_type()))
+            }
+        }
+    }
+
+    pub fn to_type_with_substitute(&self, template_args : &TemplateArgs) -> AbstractType {
+        match self {
+            WrittenType::Error(_) => AbstractType::Error,
+            WrittenType::Template(_, template_id) => {
+                let Some(type_arg) = &template_args[*template_id] else {return AbstractType::Error}; // Could not infer the type, though this is a TODO
+                let target_typ = type_arg.kind.unwrap_type();
+
+                target_typ.to_type()
+            }
+            WrittenType::Named(named_type) => AbstractType::Named(named_type.id),
+            WrittenType::Array(_, arr_box) => {
+                let (elem_typ, _arr_idx, _br_span) = arr_box.deref();
+                AbstractType::Array(Box::new(elem_typ.to_type_with_substitute(template_args)))
             }
         }
     }

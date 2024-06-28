@@ -44,6 +44,19 @@ pub enum TemplateArgKind {
     Value(FlatID)
 }
 
+impl TemplateArgKind {
+    #[track_caller]
+    pub fn unwrap_type(&self) -> &WrittenType {
+        let Self::Type(t) = self else {unreachable!("TemplateArgKind::unwrap_type on {self:?}")};
+        t
+    }
+    #[track_caller]
+    pub fn unwrap_value(&self) -> FlatID {
+        let Self::Value(v) = self else {unreachable!("TemplateArgKind::unwrap_value on {self:?}")};
+        *v
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteTemplateArg {
     Type(ConcreteType),
