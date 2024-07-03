@@ -366,6 +366,10 @@
             "named": true
           },
           {
+            "type": "domain_statement",
+            "named": true
+          },
+          {
             "type": "for_statement",
             "named": true
           },
@@ -513,6 +517,22 @@
         "types": [
           {
             "type": "declaration",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "domain_statement",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
             "named": true
           }
         ]
@@ -827,6 +847,16 @@
     "type": "interface_statement",
     "named": true,
     "fields": {
+      "block": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
       "interface_ports": {
         "multiple": false,
         "required": false,
@@ -903,16 +933,6 @@
         "types": [
           {
             "type": "block",
-            "named": true
-          }
-        ]
-      },
-      "interface_ports": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "interface_ports",
             "named": true
           }
         ]
@@ -1431,6 +1451,10 @@
   },
   {
     "type": "^",
+    "named": false
+  },
+  {
+    "type": "domain",
     "named": false
   },
   {

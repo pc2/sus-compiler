@@ -49,27 +49,9 @@ module.exports = grammar({
             'module',
             field('name', $.identifier),
             optional(field('template_declaration_arguments', $.template_declaration_arguments)),
-            optional(field('interface_ports', $.interface_ports)),
             field('block', $.block)
         ),
         
-        interface_ports: $ => seq(
-            ':',
-            optional($._linebreak),
-            choice(
-                seq(
-                    field('inputs', $.declaration_list),
-                    optional($._interface_ports_output)
-                ),
-                $._interface_ports_output
-            ),
-        ),
-        _interface_ports_output: $ => seq(
-            '->',
-            optional($._linebreak),
-            field('outputs', $.declaration_list)
-        ),
-
         // Template Declaration
 
         template_declaration_arguments: $ => seq(
@@ -99,15 +81,10 @@ module.exports = grammar({
                 $.assign_left_side,
                 $.if_statement,
                 $.for_statement,
+                $.domain_statement,
                 $.interface_statement
             )),
             '}'
-        ),
-        
-        interface_statement: $ => seq(
-            'interface',
-            field('name', $.identifier),
-            optional(field('interface_ports', $.interface_ports))
         ),
 
         decl_assign_statement: $ => seq(
@@ -131,6 +108,7 @@ module.exports = grammar({
         if_statement: $ => seq(
             'if',
             field('condition', $._expression),
+            //optional(field('conditional_bindings', $.interface_ports)),
             field('then_block', $.block),
             optional(seq(
                 'else',
@@ -148,6 +126,38 @@ module.exports = grammar({
             '..',
             field('to', $._expression),
             field('block', $.block)
+        ),
+
+        // Interfaces
+
+        domain_statement: $ => seq(
+            'domain',
+            field('name', $.identifier),
+        ),
+        
+        interface_statement: $ => seq(
+            //field('interface_kind', choice('action', 'query', 'trigger')),
+            'interface',
+            field('name', $.identifier),
+            optional(field('interface_ports', $.interface_ports)),
+            optional(field('block', $.block))
+        ),
+
+        interface_ports: $ => seq(
+            ':',
+            optional($._linebreak),
+            choice(
+                seq(
+                    field('inputs', $.declaration_list),
+                    optional($._interface_ports_output)
+                ),
+                $._interface_ports_output
+            ),
+        ),
+        _interface_ports_output: $ => seq(
+            '->',
+            optional($._linebreak),
+            field('outputs', $.declaration_list)
         ),
 
         // Declarations
@@ -285,7 +295,7 @@ module.exports = grammar({
             sepSeq($.template_value_param, $._comma),
             ';',
             sepSeq($.template_type_param, $._comma),
-            prec(11, '>')
+            '>'
         ),
         identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
         number: $ => /\d[\d_]*/,
