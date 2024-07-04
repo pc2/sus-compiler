@@ -1,4 +1,4 @@
-use crate::{abstract_type::{AbstractType, DomainType}, arena_alloc::FlatAlloc, concrete_type::ConcreteType, file_position::FileText, flattening::{DomainID, DomainIDMarker, Interface, InterfaceToDomainMap, Module, PortID, WrittenType}, linker::{LinkInfo, Linker, NamedType, TypeUUID}, pretty_print_many_spans, template::{ConcreteTemplateArg, ConcreteTemplateArgs, GenerativeTemplateInputKind, TemplateID, TemplateIDMarker, TemplateInputKind, TemplateInputs, TypeTemplateInputKind}, value::Value};
+use crate::{abstract_type::{AbstractType, DomainType}, arena_alloc::FlatAlloc, concrete_type::ConcreteType, file_position::FileText, flattening::{DomainID, DomainIDMarker, DomainInfo, Interface, InterfaceToDomainMap, Module, PortID, WrittenType}, linker::{LinkInfo, Linker, NamedType, TypeUUID}, pretty_print_many_spans, template::{ConcreteTemplateArg, ConcreteTemplateArgs, GenerativeTemplateInputKind, TemplateID, TemplateIDMarker, TemplateInputKind, TemplateInputs, TypeTemplateInputKind}, value::Value};
 
 use std::{fmt::{Display, Formatter}, ops::Index};
 
@@ -122,8 +122,8 @@ impl Value {
 }
 
 impl DomainType {
-    pub fn physical_to_string(physical_id : DomainID, interfaces : &FlatAlloc<Interface, DomainIDMarker>) -> String {
-        if let Some(interf) = interfaces.get(physical_id) {
+    pub fn physical_to_string(physical_id : DomainID, domains : &FlatAlloc<DomainInfo, DomainIDMarker>) -> String {
+        if let Some(interf) = domains.get(physical_id) {
             format!("{{{}}}", interf.name)
         } else {
             format!("{{unnamed domain {}}}", physical_id.get_hidden_value())
@@ -132,8 +132,6 @@ impl DomainType {
 }
 
 impl Module {
-
-
     pub fn make_port_info_fmt(&self, port_id : PortID, file_text : &FileText, result : &mut String) {
         use std::fmt::Write;
         let port = &self.ports[port_id];
@@ -144,24 +142,17 @@ impl Module {
         let mut r = String::new(); self.make_port_info_fmt(port_id, file_text, &mut r); r
     }
 
-    pub fn make_interface_info_fmt(&self, interface_id : DomainID, file_text : &FileText, result : &mut String) {
-        for (port_id, port) in &self.ports {
-            if port.interface == interface_id {
-                self.make_port_info_fmt(port_id, file_text, result);
-            }
+    pub fn make_interface_info_fmt(&self, interface : &Interface, file_text : &FileText, result : &mut String) {
+        for port_id in interface.all_ports() {
+            self.make_port_info_fmt(port_id, file_text, result);
         }
     }
-    pub fn make_interface_info_string(&self, interface_id : DomainID, file_text : &FileText) -> String {
-        let mut r = String::new(); self.make_interface_info_fmt(interface_id, file_text, &mut r); r
+    pub fn make_interface_info_string(&self, interface : &Interface, file_text : &FileText) -> String {
+        let mut r = String::new(); self.make_interface_info_fmt(interface, file_text, &mut r); r
     }
 
     pub fn make_all_ports_info_string(&self, file_text : &FileText, local_domains : Option<InterfaceToDomainMap>) -> String {
         use std::fmt::Write;
-
-        let mut interface_iter = self.interfaces.iter();
-        if !self.main_interface_used {
-            interface_iter.next();
-        }
 
         let mut type_args : Vec<&str> = Vec::new();
         let mut temporary_gen_input_builder = String::new();
@@ -175,13 +166,19 @@ impl Module {
         let mut result = format!("module {}<{}>:\n", self.link_info.get_full_name(), type_args.join(", "));
         result.push_str(&temporary_gen_input_builder);
 
-        for (interface_id, interface) in interface_iter {
+        for (domain_id, domain) in &self.domains {
             if let Some(domain_map) = &local_domains {
-                writeln!(result, "{}: {{{}}}", &interface.name, domain_map.get_submodule_interface_domain(interface_id).name).unwrap();
+                writeln!(result, "domain {}: {{{}}}", &domain.name, domain_map.local_domain_to_global_domain(domain_id).name).unwrap();
             } else {
-                writeln!(result, "{}:", &interface.name).unwrap();
+                writeln!(result, "domain {}:", &domain.name).unwrap();
             }
-            self.make_interface_info_fmt(interface_id, file_text, &mut result);
+
+            // TODO interfaces
+            for (port_id, port) in &self.ports {
+                if port.domain == domain_id {
+                    self.make_port_info_fmt(port_id, file_text, &mut result);
+                }
+            }
         }
 
         result

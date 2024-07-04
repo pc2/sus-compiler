@@ -9,11 +9,12 @@ Inserting latency registers on every path that requires them is an incredibly te
 ### Examples
 #### Inference of latencies on ports
 ```Verilog
-module example_md : 
-	int[4] factors,
-	int add_to ->
-	int product, 
-	int total {
+module example_md {
+    interface example_md :
+        int[4] factors,
+        int add_to ->
+        int product, 
+        int total
 
 	reg int mul0 = factors[0] * factors[1]
 	reg int mul1 = factors[2] * factors[3]
@@ -26,7 +27,8 @@ module example_md :
 
 #### Automatic insertion of registers
 ```Verilog
-module pow17 : int i -> int o {
+module pow17 {
+    interface pow17 : int i -> int o 
 	    int i2  = i * i
 	reg int i4  = i2 * i2
 	    int i8  = i4 * i4
@@ -38,8 +40,8 @@ module pow17 : int i -> int o {
 
 #### Latency Specifiers
 ```Verilog
-module module_taking_time : 
-	int i'0 -> int o'5 {
+module module_taking_time {
+	interface module_taking_time : int i'0 -> int o'5
 	o = i
 }
 ```
@@ -102,7 +104,8 @@ We are given a directed graph of all wires and how they combinatorially depend o
 Example: 
 ```Verilog
 // timeline is omitted here, not important
-module Accumulator : int term, bool done -> int total_out {
+module Accumulator {
+    interface Accumulator : int term, bool done -> int total_out 
     state int total
 
     int new_total = total + term
@@ -127,7 +130,8 @@ On the edges are noted the minimum latency offsets in black. These are given. Th
 Sadly, while it appears reasonable to think it's possible to assign a determinable latency. Observe this contrived example:
 
 ```Verilog
-module NonDeterminableLatency : int a, int b -> int x, int y {
+module NonDeterminableLatency {
+    interface NonDeterminableLatency : int a, int b -> int x, int y 
     reg int a_d = a
     int t = a_d + b
     reg reg reg int a_dd = a
@@ -151,7 +155,8 @@ To this problem I only really see three options:
 
 Simply solve the above module by explicitly specifying latencies to the two inputs:
 ```Verilog
-module LatencySpecified : int a'0, int b'1 -> int x, int y {
+module LatencySpecified {
+    interface LatencySpecified : int a'0, int b'1 -> int x, int y 
     reg int a_d = a
     int t = a_d + b
     reg reg reg int a_dd = a

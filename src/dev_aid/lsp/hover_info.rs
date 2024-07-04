@@ -70,7 +70,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             let mut details_vec : Vec<&str> = Vec::with_capacity(5);
             let domain_str = if md.is_multi_domain() {
                 if let DomainType::Physical(ph) = decl.typ.domain {
-                    Some(DomainType::physical_to_string(ph, &md.interfaces))
+                    Some(DomainType::physical_to_string(ph, &md.domains))
                 } else {None}
             } else {None};
 
@@ -122,7 +122,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 DomainType::Generative => {details_vec.push(Cow::Borrowed("gen"))}
                 DomainType::Physical(ph) => {
                     if md.is_multi_domain() {
-                        details_vec.push(Cow::Owned(DomainType::physical_to_string(ph, &md.interfaces)))
+                        details_vec.push(Cow::Owned(DomainType::physical_to_string(ph, &md.domains)))
                     }
                 }
             };
@@ -168,8 +168,8 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
         LocationInfo::Port(_sm, md, port_id) => {
             hover.sus_code(md.make_port_info_string(port_id, &linker.files[md.link_info.file].file_text));
         }
-        LocationInfo::Interface(_md_uuid, md, interface_id, _) => {
-            hover.sus_code(md.make_interface_info_string(interface_id, &linker.files[md.link_info.file].file_text));
+        LocationInfo::Interface(_md_uuid, md, _, interface) => {
+            hover.sus_code(md.make_interface_info_string(interface, &linker.files[md.link_info.file].file_text));
         }
     };
 

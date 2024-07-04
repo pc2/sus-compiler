@@ -20,7 +20,7 @@ const TOKEN_TYPES : [SemanticTokenType; 8] = [
 
 fn get_semantic_token_type_from_ide_token(tok : IDEIdentifierType) -> u32 {
     match tok {
-        IDEIdentifierType::Local { is_state : _, interface } => interface % NUM_INTERFACE_DISTINGUISHERS,
+        IDEIdentifierType::Local { is_state : _, domain: interface } => interface % NUM_INTERFACE_DISTINGUISHERS,
         IDEIdentifierType::Generative => NUM_INTERFACE_DISTINGUISHERS, // ENUM_MEMBER
         IDEIdentifierType::Constant => NUM_INTERFACE_DISTINGUISHERS, // ENUM_MEMBER
         IDEIdentifierType::Interface => NUM_INTERFACE_DISTINGUISHERS+1, // FUNCTION
@@ -36,7 +36,7 @@ const TOKEN_MODIFIERS : [SemanticTokenModifier; 2] = [
 // Produces a bitset with 'modifier bits'
 fn get_modifiers_for_token(tok : IDEIdentifierType) -> u32 {
     match tok {
-        IDEIdentifierType::Local { is_state: true, interface:_ } => 1, // ASYNC
+        IDEIdentifierType::Local { is_state: true, domain:_ } => 1, // ASYNC
         IDEIdentifierType::Generative => 2, // MODIFICATION
         _other => 0
     }
@@ -94,7 +94,7 @@ fn convert_to_semantic_tokens(file_data : &FileData, ide_tokens : &mut[(Span, ID
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 enum IDEIdentifierType {
-    Local{is_state : bool, interface : u32},
+    Local{is_state : bool, domain : u32},
     Generative,
     Type,
     Interface,
@@ -102,14 +102,13 @@ enum IDEIdentifierType {
 }
 
 impl IDEIdentifierType {
-    fn make_local(is_state : bool, domain : DomainID, main_interface_used : bool) -> IDEIdentifierType {
-        let offset = if main_interface_used {0} else {1};
-        IDEIdentifierType::Local { is_state, interface: (domain.get_hidden_value() - offset) as u32 }
+    fn make_local(is_state : bool, domain : DomainID) -> IDEIdentifierType {
+        IDEIdentifierType::Local { is_state, domain: domain.get_hidden_value() as u32 }
     }
-    fn from_identifier_typ(t : IdentifierType, domain : DomainType, main_interface_used : bool) -> IDEIdentifierType {
+    fn from_identifier_typ(t : IdentifierType, domain : DomainType) -> IDEIdentifierType {
         match t {
-            IdentifierType::Local => Self::make_local(false, domain.unwrap_physical(), main_interface_used),
-            IdentifierType::State =>  Self::make_local(true, domain.unwrap_physical(), main_interface_used),
+            IdentifierType::Local => Self::make_local(false, domain.unwrap_physical()),
+            IdentifierType::State =>  Self::make_local(true, domain.unwrap_physical()),
             IdentifierType::Generative => IDEIdentifierType::Generative
         }
     }
@@ -120,8 +119,8 @@ fn walk_name_color(file : &FileData, linker : &Linker) -> Vec<(Span, IDEIdentifi
 
     tree_walk::visit_all(linker, file, |span, item| {
         result.push((span, match item {
-            LocationInfo::InModule(_md_id, md, _, InModule::NamedLocal(decl)) => {
-                IDEIdentifierType::from_identifier_typ(decl.identifier_type, decl.typ.domain, md.main_interface_used)
+            LocationInfo::InModule(_md_id, _md, _, InModule::NamedLocal(decl)) => {
+                IDEIdentifierType::from_identifier_typ(decl.identifier_type, decl.typ.domain)
             }
             LocationInfo::InModule(_md_id, _, _, InModule::NamedSubmodule(_)) => {
                 IDEIdentifierType::Interface
@@ -142,8 +141,8 @@ fn walk_name_color(file : &FileData, linker : &Linker) -> Vec<(Span, IDEIdentifi
                 }
             }
             LocationInfo::Port(_, md, port_id) => {
-                let interface = md.ports[port_id].interface;
-                IDEIdentifierType::make_local(false, interface, md.main_interface_used)
+                let interface = md.ports[port_id].domain;
+                IDEIdentifierType::make_local(false, interface)
             }
             LocationInfo::Interface(_, _, _, _) => {
                 IDEIdentifierType::Interface

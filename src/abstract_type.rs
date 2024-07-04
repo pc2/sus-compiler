@@ -1,6 +1,6 @@
 use std::{cell::RefCell, ops::Deref};
 
-use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span, SpanFile}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, Interface, UnaryOperator}, linker::{get_builtin_type, NamedType, Resolver, TypeUUID, TypeUUIDMarker}, template::{TemplateID, TemplateIDMarker, TemplateInputs}, to_string::map_to_type_names};
+use crate::{arena_alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span, SpanFile}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, UnaryOperator}, linker::{get_builtin_type, NamedType, Resolver, TypeUUID, TypeUUIDMarker}, template::{TemplateID, TemplateIDMarker, TemplateInputs}, to_string::map_to_type_names};
 
 /// This contains only the information that can be easily type-checked. 
 /// 
@@ -86,7 +86,7 @@ enum DomainTypeSubstitution {
 }
 
 pub enum BestName {
-    ExistingInterface,
+    NamedDomain,
     SubModule(FlatID, DomainID),
     NamedWire(FlatID),
     UnnamedWire
@@ -94,7 +94,7 @@ pub enum BestName {
 impl BestName {
     fn strength(&self) -> i8 {
         match self {
-            BestName::ExistingInterface => 3,
+            BestName::NamedDomain => 3,
             BestName::SubModule(_, _) => 2,
             BestName::NamedWire(_) => 1,
             BestName::UnnamedWire => 0
@@ -116,9 +116,9 @@ pub struct TypeUnifier<'linker, 'errs> {
 }
 
 impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
-    pub fn new(linker_types : Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>, template_inputs : &TemplateInputs, errors : &'errs ErrorCollector<'linker>, interfaces : &FlatAlloc<Interface, DomainIDMarker>) -> Self {
-        let domains = interfaces.iter().map(|(_id, interface)| DomainTypeSubstitution::KnownDomain { name: interface.name.clone() }).collect();
-        let final_domains = interfaces.iter().map(|(_id, _interface)| BestName::ExistingInterface).collect();
+    pub fn new(linker_types : Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>, template_inputs : &TemplateInputs, errors : &'errs ErrorCollector<'linker>, domain_names : &FlatAlloc<String, DomainIDMarker>) -> Self {
+        let domains = domain_names.iter().map(|(_id, name)| DomainTypeSubstitution::KnownDomain { name: name.clone() }).collect();
+        let final_domains = domain_names.iter().map(|(_id, _interface)| BestName::NamedDomain).collect();
         Self {
             linker_types,
             template_type_names : map_to_type_names(template_inputs),

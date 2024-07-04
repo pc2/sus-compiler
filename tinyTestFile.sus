@@ -1,5 +1,6 @@
 
-module test<T> : ::int::<beep = 20 > 3; BEEP = int::<;>> ab {
+module test<T> {
+    interface test : ::int::<beep = 20 > 3; BEEP = int::<;>> ab 
 	input gen int MY_INPUT
 
 	MY_INPUT = 3
@@ -8,7 +9,7 @@ module test<T> : ::int::<beep = 20 > 3; BEEP = int::<;>> ab {
 
 	beep = 3
 
-	stlFIFO::<BITWIDTH = 4;> badoop
+	FIFO::<BITWIDTH = 4;> badoop
 }
 
 module use_test {
@@ -17,59 +18,11 @@ module use_test {
 
 }
 
-module stlFIFO {
-	input gen int BITWIDTH// = 20
-	input gen int DEPTH// = 512
-	// The FIFO may still receive data for 5 cycles after ready is de-asserted
-	input gen int ALMOST_FULL_THRESHOLD// = 5
-	
-	state bool[BITWIDTH][DEPTH] mem
-	state int read_addr
-	state int write_addr
 
-	initial read_addr = 0
-	initial write_addr = 0
-
-	interface push : bool push'ALMOST_FULL_THRESHOLD, bool[BITWIDTH] data_in
-	
-	output bool ready'0
-
-	interface pop : bool pop -> bool data_valid, bool[BITWIDTH] data_out
-	
-	cross_int write_to_pop
-	write_to_pop.i = write_addr
-
-	cross_int read_to_push
-	read_to_push.i = read_addr
-
-	cross_memory mem_to_pop
-	mem_to_pop.i = mem
-
-	if pop {
-		data_valid = read_addr != write_to_pop.o
-		if data_valid {
-			// Add some pipelining registers, just because we can
-			reg reg data_out = mem_to_pop.o[read_addr]
-			read_addr = (read_addr + 1) % DEPTH
-		}
-	}
-
-	if push {
-		mem[write_addr] = data_in
-		write_addr = (write_addr + 1) % DEPTH
-	}
-	
-	// Wrapping subtract
-	int space_remaining = (read_to_push.o - write_addr) % DEPTH
-	bool r = space_remaining > ALMOST_FULL_THRESHOLD
-	ready = offset_backwards(r)
-}
-
-
-module tinyTestMod : -> int o {
+module tinyTestMod {
 	input gen int beep
 
-	o = beep
+	output int o = beep
 }
 
 
@@ -175,3 +128,28 @@ module use_permute {
 
 	int[8] beep = permut.permute(indices)
 }
+
+module instruction_decoder {
+	interface from : bool[32] instr
+	interface is_jump
+	interface is_load
+	interface is_arith
+	
+}
+
+module run_instruction {
+    interface run_instruction : bool[32] instr 
+	instruction_decoder decoder
+	decoder.from(instr)
+
+	if decoder.is_jump() : int target_addr {
+		// ...
+	}
+	if decoder.is_load() : int reg_to, int addr {
+		// ...
+	}
+	if decoder.is_arith() : int reg_a, int reg_b, Operator op {
+		// ...
+	}
+}
+

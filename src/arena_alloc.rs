@@ -490,6 +490,10 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
         let uuid = self.data.len();
         UUID(uuid, PhantomData)
     }
+    pub fn last_id(&self) -> UUID<IndexMarker> {
+        assert!(self.data.len() >= 1, "Can't get last_id on empty FlatAlloc");
+        UUID(self.data.len() - 1, PhantomData)
+    }
     pub fn alloc(&mut self, value : T) -> UUID<IndexMarker> {
         let uuid = self.data.len();
         self.data.push(value);

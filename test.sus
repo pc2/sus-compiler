@@ -1,16 +1,19 @@
 
-module multiply : int a, int b -> int r {
+module multiply {
+    interface multiply : int a, int b -> int r 
 	r = a * b
 }
 
 // test
-module contains_submodule : int a, int b, int c -> int r {
+module contains_submodule {
+    interface contains_submodule : int a, int b, int c -> int r 
     int tmp = multiply(a, b)
 	reg r = tmp + c
 }
 
 template<int Size>     
-module ExactlyOne : bool[Size] inputs -> bool exactlyOne {
+module ExactlyOne {
+    interface ExactlyOne : bool[Size] inputs -> bool exactlyOne 
 	if Size == 0 {
 		exactlyOne = false
 	} else if Size == 1 {
@@ -29,7 +32,8 @@ module ExactlyOne : bool[Size] inputs -> bool exactlyOne {
 }
 
 
-module parallel_mul_add_reg : int a, int b -> int p, int q {
+module parallel_mul_add_reg {
+    interface parallel_mul_add_reg : int a, int b -> int p, int q 
     reg int a2 = a * a
 	reg int a3 = a * a2 + 3
 	reg p = a * a3
@@ -54,7 +58,8 @@ module parallel_mul_add_reg : int a, int b -> int p, int q {
 */
 
 timeline (v v _ -> _) .. (_ _ v -> v)
-module mul_add : int a, int b, int c -> int result {
+module mul_add {
+    interface mul_add : int a, int b, int c -> int result 
 	reg int tmp = a * b
 	result = tmp + c
 }
@@ -63,7 +68,8 @@ module mul_add : int a, int b, int c -> int result {
 
 
 /* a module to test the syntax */
-module MultiplyAdd : i32 a, i32 b, i32 c -> i32 result {
+module MultiplyAdd {
+    interface MultiplyAdd : i32 a, i32 b, i32 c -> i32 result 
 	// temporary variable
 	i32 tmp = a * b
 	result = tmp + cooo * 30 + 5
@@ -82,7 +88,8 @@ module MultiplyAdd : i32 a, i32 b, i32 c -> i32 result {
 	@
 }
 
-module beep : i32 a {
+module beep {
+    interface beep : i32 a 
 	state i32 beep
 
 	beep = 5
@@ -92,7 +99,8 @@ module beep : i32 a {
 }
 
 timeline (a -> r) .. (/ -> r)
-module dwiogo : bool[512] data -> bool[256] out {
+module dwiogo {
+    interface dwiogo : bool[512] data -> bool[256] out 
     state bool[256] save = data[256:511]
 	out = data[0:255]
 	#
@@ -102,7 +110,8 @@ module dwiogo : bool[512] data -> bool[256] out {
 
 
 timeline (v, true -> v) .. (/, false -> v) .. (/, false -> v) .. (/, false -> v)
-module packer : bool[256] data /* v _ _ _ */, bool valid -> bool[64] o { /* v v v v */
+module packer {
+    interface packer : bool[256] data /* v _ _ _ */, bool valid -> bool[64] o  /* v v v v */
     state bool[192] save = data[64:256]
 	state int part
 	initial part = 3
@@ -118,28 +127,34 @@ module packer : bool[256] data /* v _ _ _ */, bool valid -> bool[64] o { /* v v 
 }
 
 
-module multiply_add_old : i32 a, i32 b, i32 c -> i32 result, double double_result {
+module multiply_add_old {
+    interface multiply_add_old : i32 a, i32 b, i32 c -> i32 result, double double_result 
 	i32 tmp = a * b
 	reg result = tmp + c
 	reg double_result = cvt_to_double(result)
 }
 
-module exists : hello a -> int result {
+module exists {
+    interface exists : hello a -> int result 
 
 }
 
-module hello : int a -> int b {}
+module hello {
+    interface hello : int a -> int b }
 
-module test_exists : -> int result {
+module test_exists {
+    interface test_exists : -> int result 
 	int x = exists(5)
 	int b = doesnt_exist(3)
 }
 
-module exists : duplicate a {
+module exists {
+    interface exists : duplicate a 
 	// Should be a duplicate of previous exists
 }
 
-module use_other_file : int a -> int r {
+module use_other_file {
+    interface use_other_file : int a -> int r 
 	r = hello_from_the_other_side(a)
 }
 
@@ -163,17 +178,11 @@ module test_hs {
 	}
 }
 
-module b: HandShake hs -> {	
-	if hs.event {
-	
-	}
-}
-
-module example_md : 
-	int[4] factors,
-	int add_to ->
-	int product, 
-	int total {
+module example_md {
+	interface example_md : int[4] factors,
+		int add_to ->
+		int product, 
+		int total
 
 	reg int mul0 = factors[0] * factors[1]
 	reg int mul1 = factors[2] * factors[3]
@@ -184,9 +193,8 @@ module example_md :
 
 
 // (a*b) + c
-module multiply_add : 
-	int a, int b, int c -> 
-	int total {
+module multiply_add {
+	interface multiply_add : int a, int b, int c -> int total
 
 	reg int tmp = a * b
 	total = tmp + c
@@ -197,7 +205,8 @@ module test_pow17 {
 	int a = pow17(2)
 }
 
-module pow17 : int i -> int o {
+module pow17 {
+    interface pow17 : int i -> int o 
 	    int i2  = i   * i
 	reg int i4  = i2  * i2
 	    int i8  = i4  * i4
@@ -206,7 +215,8 @@ module pow17 : int i -> int o {
 }
 
 
-module fibonnaci : -> int num {
+module fibonnaci {
+    interface fibonnaci : -> int num 
 	state int cur = 1
 	state int prev = 0
 
@@ -216,10 +226,8 @@ module fibonnaci : -> int num {
 	cur = num
 }
 
-module blur2 : 
-	int data,
-	bool first -> 
-	int blurred {
+module blur2 {
+	interface blur2 : int data, bool first -> int blurred
 	
 	state int prev
 
@@ -241,13 +249,15 @@ module blur2 :
 }
 
 
-module Tree_Multiply : int[4] values -> int total {
+module Tree_Multiply {
+    interface Tree_Multiply : int[4] values -> int total 
 	reg int a = values[0] * values[1]
 	reg int b = values[2] * values[3]
 	reg total = a * b
 }
 
-module Accumulator : int term, bool done -> int total {
+module Accumulator {
+    interface Accumulator : int term, bool done -> int total 
     state int tot
 	initial tot = 0
 
@@ -262,7 +272,8 @@ module Accumulator : int term, bool done -> int total {
 
 
 //timeline (a, true -> /) | (a, false -> /) .. (a, false -> r)* .. (a, true -> r)
-module blur : int a, bool done -> int result {
+module blur {
+    interface blur : int a, bool done -> int result 
 	state bool working
 	initial working = false
 	state int prev
@@ -277,7 +288,8 @@ module blur : int a, bool done -> int result {
 
 
 //timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
-module Unpack4 : int[4] packed -> int out_stream {
+module Unpack4 {
+    interface Unpack4 : int[4] packed -> int out_stream 
 	gen int INITIAL = 0
 	gen int A = 1
 	
@@ -305,7 +317,8 @@ module Unpack4 : int[4] packed -> int out_stream {
     }
 }
 
-module generative : int i -> int o, int o2 {
+module generative {
+    interface generative : int i -> int o, int o2 
 	gen int x = 5
 	gen int[x] ys
 
@@ -328,8 +341,8 @@ module generative : int i -> int o, int o2 {
 	o2 = a[a[0]]
 }
 
-module add_indices_to_array : 
-	int[10] values -> int[10] added_values {
+module add_indices_to_array {
+	interface add_indices_to_array : int[10] values -> int[10] added_values
 
 	for int i in 0..10 {
 		int t = values[i]
@@ -337,7 +350,8 @@ module add_indices_to_array :
 	}
 }
 
-module assignment_producer : -> int v'0, int o'0, bool j'0 {}
+module assignment_producer {
+    interface assignment_producer : -> int v'0, int o'0, bool j'0 }
 
 module test_various_assignments {
 	state int[3] st
@@ -346,7 +360,8 @@ module test_various_assignments {
 }
 
 //timeline (bs -> /, true) | (bs -> v, false)
-module first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros {
+module first_bit_idx_6 {
+    interface first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros 
 	if bits[0] {
 		first = 0
 		all_zeros = false
@@ -378,12 +393,14 @@ module first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros {
 
 }
 
-module multiply_add_with_latencies : int a'0, int b'0, int c'0 -> int r'0 {
+module multiply_add_with_latencies {
+    interface multiply_add_with_latencies : int a'0, int b'0, int c'0 -> int r'0 
     int tmp'1 = multiply(a, b)
 	reg r = tmp + c
 }
 
-module first_bit_idx_24 : bool[24] bits -> int first {
+module first_bit_idx_24 {
+    interface first_bit_idx_24 : bool[24] bits -> int first 
 	int[4] offsets
 	bool[4] was_nonzeros
 
@@ -399,13 +416,15 @@ module first_bit_idx_24 : bool[24] bits -> int first {
 	}
 }
 
-module permute : bool[128] mbf, int selected_permutation -> bool[128] permuted_mbf {
+module permute {
+    interface permute : bool[128] mbf, int selected_permutation -> bool[128] permuted_mbf 
 	// cvt_to_double
 	permuted_mbf = mbf
 }
 
 //timeline (X, [false24], true -> /, false) | (X, vs, true -> X, true) .. (/, /, false -> X, true)*
-module permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid {
+module permute24 {
+    interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid 
 	state bool[128] stored_mbf
 	state bool[24] stored_valid_permutes = 000000000000000000000000
 
@@ -429,16 +448,19 @@ module permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[12
 
 
 
-module test_single_wire : int a -> int o {
+module test_single_wire {
+    interface test_single_wire : int a -> int o 
 	o = a
 }
 
-module disjoint_ports : int a, int b, int c -> int result {
+module disjoint_ports {
+    interface disjoint_ports : int a, int b, int c -> int result 
 	reg result = a + b
 	// don't touch c
 }
 
-module undeteriminable_input_latency : int a, int b -> int x, int y {
+module undeteriminable_input_latency {
+    interface undeteriminable_input_latency : int a, int b -> int x, int y 
 	reg int a_d = a
 	int t = a_d + b
     reg reg reg int a_dd = a
@@ -447,7 +469,8 @@ module undeteriminable_input_latency : int a, int b -> int x, int y {
     y = t
 }
 
-module specified_input_latency : int a'0, int b'1 -> int x, int y {
+module specified_input_latency {
+    interface specified_input_latency : int a'0, int b'1 -> int x, int y 
 	reg int a_d = a
     int t = a_d + b
     reg reg reg int a_dd = a
@@ -456,7 +479,8 @@ module specified_input_latency : int a'0, int b'1 -> int x, int y {
     y = t
 }
 
-module determinable_input_latency : int a, int b -> int x, int y {
+module determinable_input_latency {
+    interface determinable_input_latency : int a, int b -> int x, int y 
 	reg int a_d = a
     int t = a_d + b
     reg reg int a_dd = a
@@ -466,7 +490,8 @@ module determinable_input_latency : int a, int b -> int x, int y {
 }
 
 // This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible. 
-module determinable_because_no_input_output_ports : int a -> int x {
+module determinable_because_no_input_output_ports {
+    interface determinable_because_no_input_output_ports : int a -> int x 
 	reg int a_d = a
     int t = a_d
     reg reg reg int a_dd = a
@@ -475,12 +500,14 @@ module determinable_because_no_input_output_ports : int a -> int x {
 }
 
 // This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible. 
-module conflicting_latency_declarations : int a'0 -> int x'1 {
+module conflicting_latency_declarations {
+    interface conflicting_latency_declarations : int a'0 -> int x'1 
 	reg int nio = a
 	reg x = nio
 }
 
-module bad_cycle : int a -> int r {
+module bad_cycle {
+    interface bad_cycle : int a -> int r 
 	state int state_reg
 	initial state_reg = 0
 
@@ -489,13 +516,13 @@ module bad_cycle : int a -> int r {
 	reg state_reg = state_reg + a
 }
 
-module module_taking_time : 
-	int i'0 -> int o'5 {
+module module_taking_time {
+	interface module_taking_time : int i'0 -> int o'5
 	o = i
 }
 
-module matrix_vector_mul : 
-	int[30][20] mat, int[20] vec -> int[30] result {
+module matrix_vector_mul {
+	interface matrix_vector_mul : int[30][20] mat, int[20] vec -> int[30] result
 	
 	for int row in 0..30 {
 		int[20] row_products
@@ -506,7 +533,8 @@ module matrix_vector_mul :
 	}
 }
 
-module bad_cycle2 : int a -> int r {
+module bad_cycle2 {
+    interface bad_cycle2 : int a -> int r 
 	state int test
 	initial test = 0
 
@@ -515,18 +543,21 @@ module bad_cycle2 : int a -> int r {
 	r = test
 }
 
-module module_taking_a_lot_of_time : int data_in'0 -> int data_out'200 {
+module module_taking_a_lot_of_time {
+    interface module_taking_a_lot_of_time : int data_in'0 -> int data_out'200 
 	data_out = data_in
 }
 
 
-/*extern*/ module offset_latency : int i'0 -> int o'-5 {
+/*extern*/ module offset_latency {
+    interface offset_latency : int i'0 -> int o'-5 
 
 }
 
 
 
-module good_cycle : int a -> int r {
+module good_cycle {
+    interface good_cycle : int a -> int r 
 	state int test
 	initial test = 0
 	
@@ -536,26 +567,30 @@ module good_cycle : int a -> int r {
 	r = new_test
 }
 
-module input_only : int i {
+module input_only {
+    interface input_only : int i 
 	state int loop
 	initial loop = 0
 	loop = loop + i
 }
 
-module multiple_inputs_only : int i, int i2 {
+module multiple_inputs_only {
+    interface multiple_inputs_only : int i, int i2 
 	state int loop
 	initial loop = 0
 	loop = loop + i + i2
 }
 
-module output_only : -> int o {
+module output_only {
+    interface output_only : -> int o 
 	state int loop
 	initial loop = 0
 	loop = loop + 1
 	reg o = loop
 }
 
-module multiple_outputs_only : -> int o, int o2 {
+module multiple_outputs_only {
+    interface multiple_outputs_only : -> int o, int o2 
 	state int loop
 	initial loop = 0
 	loop = loop + 1
@@ -565,7 +600,8 @@ module multiple_outputs_only : -> int o, int o2 {
 
 
 // Test submodule comment
-module submodule : int a, int b -> int r {
+module submodule {
+    interface submodule : int a, int b -> int r 
 	r = a * b
 }
 
@@ -580,7 +616,8 @@ comment
 # Test Title
 
 */
-module contains_submodule_submodule : int a, int b, int c -> int r {
+module contains_submodule_submodule {
+    interface contains_submodule_submodule : int a, int b, int c -> int r 
 	// Temp val
     int tmp = submodule(a, b)
 	doNothing()
@@ -588,7 +625,8 @@ module contains_submodule_submodule : int a, int b, int c -> int r {
 }
 
 
-module xor : bool x1, bool x2 -> bool y {
+module xor {
+    interface xor : bool x1, bool x2 -> bool y 
 	bool w1 = !x1
 	bool w2 = !x2
 
@@ -600,7 +638,8 @@ module xor : bool x1, bool x2 -> bool y {
 
 
 
-module fizz_buzz : int v -> int fb {
+module fizz_buzz {
+    interface fizz_buzz : int v -> int fb 
 	gen int FIZZ = 15
 	gen int BUZZ = 11
 	gen int FIZZ_BUZZ = 1511
@@ -619,7 +658,8 @@ module fizz_buzz : int v -> int fb {
 	}
 }
 
-module fizz_buzz_gen : int v -> int fb {
+module fizz_buzz_gen {
+    interface fizz_buzz_gen : int v -> int fb 
 	gen int FIZZ = 15
 	gen int BUZZ = 11
 	gen int FIZZ_BUZZ = 1511
@@ -648,14 +688,16 @@ module fizz_buzz_gen : int v -> int fb {
 	fb = lut[v]
 }
 
-module mbf_dual : bool[128] mbf -> bool[128] dual {
+module mbf_dual {
+    interface mbf_dual : bool[128] mbf -> bool[128] dual 
 	for int i in 0..128 {
 		dual[i] = !mbf[127-i]
 	}
 }
 
 
-module monotonize_down : bool[16] mbf -> bool[16] mtDown {
+module monotonize_down {
+    interface monotonize_down : bool[16] mbf -> bool[16] mtDown 
 	bool[16] mbf2
 	bool[16] mbf4
 	bool[16] mbf8
@@ -693,23 +735,29 @@ module monotonize_down : bool[16] mbf -> bool[16] mtDown {
 	}
 }
 
-module my_mod : int i -> bool a, bool b {
+module my_mod {
+    interface my_mod : int i -> bool a, bool b 
 	a = i == 3
 	b = i == 5
 }
 
-module use_my_mod : -> bool either {
+module use_my_mod {
+    interface use_my_mod : -> bool either 
 	bool x, bool y = my_mod(3)
 
 	either = x | y
 }
 
 // Main module documentation
-module submodule_named_ports : int port_a, int port_b -> int port_c {
+module submodule_named_ports {
+    interface submodule_named_ports : int port_a, int port_b -> int port_c 
 	port_c = port_a + port_b
+
+	
 }
 
-module use_submodule_named_ports : int i -> int o {
+module use_submodule_named_ports {
+    interface use_submodule_named_ports : int i -> int o 
 // Test submodule documentation
 	submodule_named_ports sm
 
@@ -722,7 +770,8 @@ module use_submodule_named_ports : int i -> int o {
 	o = sm.port_c
 }
 
-module contains_submodule_submodule : int a, int b, int c -> int r {
+module contains_submodule_submodule {
+    interface contains_submodule_submodule : int a, int b, int c -> int r 
 	// Temp val
     int tmp = submodule(a, b)
 	doNothing()
@@ -748,7 +797,8 @@ module cross_memory {
 	o[0][0] = true
 }
 
-module offset_backwards : bool i'0 -> bool o'-5 {
+module offset_backwards {
+    interface offset_backwards : bool i'0 -> bool o'-5 
 	o = true
 }
 
@@ -770,55 +820,8 @@ module dual_port_mem {
 	}
 }
 
-module FIFO {
-	gen int BITWIDTH = 20
-	gen int DEPTH = 512
-	// The FIFO may still receive data for 5 cycles after ready is de-asserted
-	gen int ALMOST_FULL_THRESHOLD = 5
-	
-	state bool[BITWIDTH][DEPTH] mem
-	state int read_addr
-	state int write_addr
-
-	initial read_addr = 0
-	initial write_addr = 0
-
-	interface push : bool push'ALMOST_FULL_THRESHOLD, bool[BITWIDTH] data_in
-	
-	output bool ready'0
-
-	interface pop : bool pop -> bool data_valid, bool[BITWIDTH] data_out
-	
-	cross_int write_to_pop
-	write_to_pop.i = write_addr
-
-	cross_int read_to_push
-	read_to_push.i = read_addr
-
-	cross_memory mem_to_pop
-	mem_to_pop.i = mem
-
-	if pop {
-		data_valid = read_addr != write_to_pop.o
-		if data_valid {
-			// Add some pipelining registers, just because we can
-			reg reg data_out = mem_to_pop.o[read_addr]
-			read_addr = (read_addr + 1) % DEPTH
-		}
-	}
-
-	if push {
-		mem[write_addr] = data_in
-		write_addr = (write_addr + 1) % DEPTH
-	}
-	
-	// Wrapping subtract
-	int space_remaining = (read_to_push.o - write_addr) % DEPTH
-	bool r = space_remaining > ALMOST_FULL_THRESHOLD
-	ready = offset_backwards(r)
-}
-
-module use_fifo : -> int o {
+module use_fifo {
+    interface use_fifo : -> int o 
 	FIFO fiii
 
 	bool[20] data
@@ -828,7 +831,8 @@ module use_fifo : -> int o {
 	//bool ready = fiii.push(valid, data2)
 }
 
-module test_separated_domain : int main {
+module test_separated_domain {
+    interface test_separated_domain : int main 
 	int domain2
 
 	int domain3
@@ -841,7 +845,7 @@ module test_separated_domain : int main {
 
 	int domain5
 
-
+	int::<MIN = 0, MAX = 199;> my_int
 }
 
 module no_port_module {}
@@ -904,7 +908,8 @@ module sequenceDownFrom {
 	}
 }
 
-module sumUpTo : bool start {
+module sumUpTo {
+    interface sumUpTo : bool start 
 
 	sequenceDownFrom sdf
 

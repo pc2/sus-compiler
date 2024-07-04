@@ -18,7 +18,7 @@ pub fn typecheck_all_modules(linker : &mut Linker) {
         with_module_editing_context(linker_ptr, module_uuid, |modules, types, constants, name_resolver| {
             let mut context = TypeCheckingContext{
                 errors : name_resolver.errors,
-                type_checker : TypeUnifier::new(types, &modules.working_on.link_info.template_arguments, name_resolver.errors, &modules.working_on.interfaces),
+                type_checker : TypeUnifier::new(types, &modules.working_on.link_info.template_arguments, name_resolver.errors, &modules.working_on.domain_names),
                 constants,
                 runtime_condition_stack : Vec::new(),
                 modules,
@@ -80,7 +80,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         let (decl, _file) = self.get_decl_of_module_port(port, submodule_instr);
         let submodule_inst = self.working_on.instructions[submodule_instr].unwrap_submodule();
         let submodule_module = &self.modules[submodule_inst.module_ref.id];
-        let port_interface = submodule_module.ports[port].interface;
+        let port_interface = submodule_module.ports[port].domain;
         let port_local_domain = submodule_inst.local_interface_domains[port_interface];
         FullType {
             typ : decl.typ_expr.to_type_with_substitute(&submodule_inst.module_ref.template_args),
@@ -267,7 +267,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             Instruction::SubModule(sm) => {
                 self.typecheck_template_global(&sm.module_ref);
                 let md = &self.modules[sm.module_ref.id];
-                let local_interface_domains = md.interfaces.iter().map(|_| self.type_checker.new_unknown_domain_id()).collect();
+                let local_interface_domains = md.domain_names.iter().map(|_| self.type_checker.new_unknown_domain_id()).collect();
 
                 let Instruction::SubModule(sm) = &mut self.working_on.instructions[instr_id] else {unreachable!()};
                 sm.local_interface_domains = local_interface_domains;
@@ -365,7 +365,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     fn typecheck(&mut self) {
         for (_id, port) in &self.modules.working_on.ports {
             let Instruction::Declaration(decl) = &mut self.modules.working_on.instructions[port.declaration_instruction] else {unreachable!()};
-            decl.typ.domain = DomainType::Physical(port.interface);
+            decl.typ.domain = DomainType::Physical(port.domain);
         }
 
         for elem_id in self.working_on.instructions.id_range() {
@@ -392,20 +392,19 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
         }
 
-        let resulting_domain_infos = self.type_checker.final_domains.iter().map(|(id, best_name)| {
+        self.modules.working_on.domains = self.type_checker.final_domains.iter().map(|(id, best_name)| {
             DomainInfo { name: match *best_name {
-                BestName::ExistingInterface => self.modules.working_on.interfaces[id].name.clone(),
-                BestName::SubModule(sm_instr, sm_interface) => {
+                BestName::NamedDomain => self.modules.working_on.domain_names[id].clone(),
+                BestName::SubModule(sm_instr, sm_domain) => {
                     let sm = self.working_on.instructions[sm_instr].unwrap_submodule();
-                    let md = &self.modules[sm.module_ref.id];
-                    format!("{}_{}", sm.get_name(&md), md.interfaces[sm_interface].name)
+                    sm.module_ref.span.debug();
+                    let sm_md = &self.modules[sm.module_ref.id];
+                    format!("{}_{}", sm.get_name(&sm_md), sm_md.domain_names[sm_domain])
                 }
                 BestName::NamedWire(decl_id) => self.working_on.instructions[decl_id].unwrap_wire_declaration().name.clone(),
                 BestName::UnnamedWire => format!("domain_{}", id.get_hidden_value())
             }}
         }).collect();
-
-        self.modules.working_on.domains = resulting_domain_infos;
     }
     
     /* 

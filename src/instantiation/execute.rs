@@ -297,7 +297,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             } else {
                 RealWireDataSource::OutPort { sub_module_id, port_id }
             };
-            let domain = submodule_instruction.local_interface_domains[port_data.interface];
+            let domain = submodule_instruction.local_interface_domains[port_data.domain];
             let new_wire = self.wires.alloc(RealWire {
                 source,
                 original_instruction : submod_instance.original_instruction,
@@ -499,8 +499,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 }
                 Instruction::FuncCall(fc) => {
                     let submod_id = self.generation_state[fc.interface_reference.submodule_decl].unwrap_submodule_instance();
-                    let original_submod_instr = &self.md.instructions[fc.interface_reference.submodule_decl].unwrap_submodule();
-                    let domain = original_submod_instr.local_interface_domains[fc.interface_reference.submodule_interface];
+                    let original_submod_instr = self.md.instructions[fc.interface_reference.submodule_decl].unwrap_submodule();
+                    let submod_md = &self.linker.modules[original_submod_instr.module_ref.id];
+                    let submod_interface_domain = submod_md.interfaces[fc.interface_reference.submodule_interface].domain;
+                    let domain = original_submod_instr.local_interface_domains[submod_interface_domain];
+                    
                     add_to_small_set(&mut self.submodules[submod_id].interface_call_sites[fc.interface_reference.submodule_interface], fc.interface_reference.interface_span);
                     for (port, arg) in std::iter::zip(fc.func_call_inputs.iter(), fc.arguments.iter()) {
                         let from = self.get_wire_or_constant_as_wire(*arg, domain);

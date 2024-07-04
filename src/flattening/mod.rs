@@ -27,8 +27,12 @@ pub type PortID = UUID<PortIDMarker>;
 
 pub type PortIDRange = UUIDRange<PortIDMarker>;
 
+pub struct InterfaceIDMarker;
+impl UUIDMarker for InterfaceIDMarker {const DISPLAY_NAME : &'static str = "interface_";}
+pub type InterfaceID = UUID<InterfaceIDMarker>;
+
 pub struct DomainIDMarker;
-impl UUIDMarker for DomainIDMarker {const DISPLAY_NAME : &'static str = "port_";}
+impl UUIDMarker for DomainIDMarker {const DISPLAY_NAME : &'static str = "domain_";}
 /// Interfaces are also indexed using DomainIDs. But in general, these refer to (clock/latency counting) domains
 pub type DomainID = UUID<DomainIDMarker>;
 
@@ -43,30 +47,30 @@ pub type DomainID = UUID<DomainIDMarker>;
 ///     2.2: Typecheck: Add typ variables to everything. [Declaration::typ], [WireInstance::typ] and [SubModuleInstance::local_interface_domains] are set in this stage. 
 /// 
 /// 3. Instantiation: Actually run generative code and instantiate modules. 
+/// 
+///     3.1: Execution
+///     
+///     3.2: Concrete Typecheck, Latency Counting
 #[derive(Debug)]
 pub struct Module {
-    /// Created by Stage 1: Initialization
+    /// Created in Stage 1: Initialization
     pub link_info : LinkInfo,
 
-    /// Created by Stage 1: Initialization
+    /// Created in Stage 1: Initialization
     /// 
     /// [Port::declaration_instruction] are set in Stage 2: Flattening
     pub ports : FlatAlloc<Port, PortIDMarker>,
-    
-    /// Created by Stage 1: Initialization
-    pub main_interface_used : bool,
 
-    /// Created by Stage 1: Initialization
-    /// 
-    /// Every interface is a distinct Domain, but domains need not be attached to an interface
-    pub interfaces : FlatAlloc<Interface, DomainIDMarker>,
+    /// Created in Stage 1: Initialization
+    pub domain_names : FlatAlloc<String, DomainIDMarker>,
 
-    /// Created in Stage 2: Flattening and Typechecking
+    /// Created in Stage 1: Initialization
+    pub interfaces : FlatAlloc<Interface, InterfaceIDMarker>,
+
+    /// Created in Stage 2: Flattening. type data is filled out during Typechecking
     pub instructions : FlatAlloc<Instruction, FlatIDMarker>,
 
-    /// Created in Stage 2: Flattening and Typechecking
-    /// 
-    /// Every interface is a distinct Domain, but domains need not be attached to an interface
+    /// Created in Stage 2: Typechecking
     pub domains : FlatAlloc<DomainInfo, DomainIDMarker>,
 
     /// Created in Stage 3: Instantiation
@@ -74,7 +78,9 @@ pub struct Module {
 }
 
 impl Module {
-    pub const MAIN_INTERFACE_ID : DomainID = DomainID::from_hidden_value(0);
+    pub fn get_main_interface(&self) -> Option<(InterfaceID, &Interface)> {
+        self.interfaces.iter().find(|(_, interf)| interf.name == self.link_info.name)
+    }
 
     pub fn get_port_decl(&self, port : PortID) -> &Declaration {
         let flat_port = self.ports[port].declaration_instruction;
@@ -123,7 +129,7 @@ impl Module {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PortOrInterface {
     Port(PortID),
-    Interface(DomainID)
+    Interface(InterfaceID)
 }
 
 #[derive(Debug)]
@@ -138,7 +144,7 @@ pub struct InterfaceToDomainMap<'linker> {
 }
 
 impl<'linker> InterfaceToDomainMap<'linker> {
-    pub fn get_submodule_interface_domain(&self, domain : DomainID) -> &'linker DomainInfo {
+    pub fn local_domain_to_global_domain(&self, domain : DomainID) -> &'linker DomainInfo {
         let local_domain = self.local_domain_map[domain];
         &self.domains[local_domain]
     }
@@ -172,7 +178,7 @@ pub struct Port {
     pub name_span : Span,
     pub decl_span : Span,
     pub is_input : bool,
-    pub interface : DomainID,
+    pub domain : DomainID,
     /// This is only set after flattening is done. Initially just [UUID::PLACEHOLDER]
     pub declaration_instruction : FlatID
 }
@@ -181,8 +187,17 @@ pub struct Port {
 pub struct Interface {
     pub name_span : Span,
     pub name : String,
+    /// All the interface's ports have this domain too
+    pub domain : DomainID,
     pub func_call_inputs : PortIDRange,
     pub func_call_outputs : PortIDRange
+}
+
+impl Interface {
+    pub fn all_ports(&self) -> PortIDRange {
+        assert_eq!(self.func_call_inputs.1, self.func_call_outputs.0);
+        UUIDRange(self.func_call_inputs.0, self.func_call_outputs.1)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -463,7 +478,7 @@ impl SubModuleInstance {
 #[derive(Debug)]
 pub struct ModuleInterfaceReference {
     pub submodule_decl : FlatID,
-    pub submodule_interface : DomainID,
+    pub submodule_interface : InterfaceID,
 
     /// If this is None, that means the submodule was declared implicitly. Hence it could also be used at compiletime
     pub name_span : Option<Span>,

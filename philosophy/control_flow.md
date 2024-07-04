@@ -25,7 +25,8 @@ In practice, the biggest difference between these variants is that the code with
 
 #### Example
 ```verilog
-module m : int a, bool b -> int c {
+module m {
+    interface m : int a, bool b -> int c 
     if a == 5 {
         c = 4
     } else if b {
@@ -96,7 +97,8 @@ The `for` statement only comes in its generative form. It's used to generate rep
 
 #### Example
 ```verilog
-module add_stuff_to_indices : int[10] values -> int[10] added_values {
+module add_stuff_to_indices {
+    interface add_stuff_to_indices : int[10] values -> int[10] added_values 
 	int[5] arr
 	for int i in 0..10 {
 		int t = values[i]
@@ -121,7 +123,8 @@ It comes in two variants: standalone `first` and `if first`.
 
 #### Examples
 ```verilog
-module first_enabled_bit : bool[10] values -> bool[10] is_first_bit {
+module first_enabled_bit {
+    interface first_enabled_bit : bool[10] values -> bool[10] is_first_bit 
     chain bool found = false
 	for int i in 0..10 {
         if values[i] {
@@ -143,7 +146,8 @@ module first_enabled_bit : bool[10] values -> bool[10] is_first_bit {
 With `if first` we can merge both `else` blocks. 
 
 ```verilog
-module first_enabled_bit : bool[10] values -> bool[10] is_first_bit {
+module first_enabled_bit {
+    interface first_enabled_bit : bool[10] values -> bool[10] is_first_bit 
     chain bool found = false
 	for int i in 0..10 {
         if first values[i] in found {
@@ -160,7 +164,8 @@ module first_enabled_bit : bool[10] values -> bool[10] is_first_bit {
 Often with uses of `first` one also wants to have a case where the condition never was valid. 
 
 ```verilog
-module first_enabled_bit_index : bool[10] values -> int first_bit, bool all_zero {
+module first_enabled_bit_index {
+    interface first_enabled_bit_index : bool[10] values -> int first_bit, bool all_zero 
     chain bool found = false
 	for int i in 0..10 {
 		if first values[i] in found {

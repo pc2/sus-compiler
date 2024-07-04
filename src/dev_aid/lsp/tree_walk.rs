@@ -2,7 +2,7 @@
 use std::ops::Deref;
 
 use crate::{
-    file_position::Span, flattening::{Declaration, DeclarationPortInfo, DomainID, FlatID, Instruction, Interface, Module, ModuleInterfaceReference, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource, WrittenType}, linker::{FileData, FileUUID, LinkInfo, Linker, ModuleUUID, NameElem}, template::{GenerativeTemplateInputKind, GlobalReference, TemplateArgKind, TemplateID, TemplateInput, TemplateInputKind, TypeTemplateInputKind}
+    file_position::Span, flattening::{Declaration, DeclarationPortInfo, FlatID, Instruction, Interface, InterfaceID, Module, ModuleInterfaceReference, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource, WrittenType}, linker::{FileData, FileUUID, LinkInfo, Linker, ModuleUUID, NameElem}, template::{GenerativeTemplateInputKind, GlobalReference, TemplateArgKind, TemplateID, TemplateInput, TemplateInputKind, TypeTemplateInputKind}
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -21,7 +21,7 @@ pub enum LocationInfo<'linker> {
     /// The contained module only refers to the module on which the port is defined
     /// No reference to the module in which the reference was found is provided
     Port(&'linker SubModuleInstance, &'linker Module, PortID),
-    Interface(ModuleUUID, &'linker Module, DomainID, &'linker Interface)
+    Interface(ModuleUUID, &'linker Module, InterfaceID, &'linker Interface)
 }
 
 /// Permits really efficient [RefersTo::refers_to_same_as] [LocationInfo] checking
@@ -30,7 +30,7 @@ pub struct RefersTo {
     pub local : Option<(ModuleUUID, FlatID)>,
     pub global : Option<NameElem>,
     pub port : Option<(ModuleUUID, PortID)>,
-    pub interface : Option<(ModuleUUID, DomainID)>,
+    pub interface : Option<(ModuleUUID, InterfaceID)>,
     pub template_input : Option<(NameElem, TemplateID)>
 }
 
@@ -258,10 +258,7 @@ impl<'linker, Visitor : FnMut(Span, LocationInfo<'linker>), Pruner : Fn(Span) ->
                 }
             }
 
-            let mut interface_iter = md.interfaces.iter();
-            // Skip main interface
-            interface_iter.next();
-            for (interface_id, interface) in interface_iter {
+            for (interface_id, interface) in &md.interfaces {
                 self.visit(interface.name_span, LocationInfo::Interface(md_id, md, interface_id, interface));
             }
 

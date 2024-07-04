@@ -35,7 +35,7 @@ enum PartialWireReference {
     /// Partial result, waiting for a port to be grabbed
     ModuleButNoPort(FlatID, Span),
     /// A module with an interface specified
-    ModuleWithInterface{submodule_decl : FlatID, submodule_name_span : Span, interface : DomainID, interface_name_span : Span},
+    ModuleWithInterface{submodule_decl : FlatID, submodule_name_span : Span, interface : InterfaceID, interface_name_span : Span},
     /// It's ready for use higher up
     WireReference(WireReference),
 }
@@ -673,9 +673,18 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
 
+    fn get_main_interface(&self, submodule_decl : FlatID) -> Option<(InterfaceID, &Interface)> {
+        let sm = self.working_on.instructions[submodule_decl].unwrap_submodule();
+
+        let md = &self.modules[sm.module_ref.id];
+
+        md.get_main_interface()
+    }
+
     /// Produces a new [SubModuleInstance] if a global was passed, or a reference to the existing instance if it's referenced by name
     fn get_or_alloc_module(&mut self, cursor : &mut Cursor) -> Option<ModuleInterfaceReference> {
         let outer_span = cursor.span();
+
         match self.flatten_wire_reference(cursor) {
             PartialWireReference::Error => None,
             PartialWireReference::GlobalModuleName(module_ref) => {
@@ -690,7 +699,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }));
                 Some(ModuleInterfaceReference{
                     submodule_decl,
-                    submodule_interface : Module::MAIN_INTERFACE_ID,
+                    submodule_interface : self.get_main_interface(submodule_decl)?.0,
                     name_span : None,
                     interface_span
                 })
@@ -698,7 +707,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             PartialWireReference::ModuleButNoPort(submodule_decl, name_span) => {
                 Some(ModuleInterfaceReference{
                     submodule_decl,
-                    submodule_interface : Module::MAIN_INTERFACE_ID,
+                    submodule_interface : self.get_main_interface(submodule_decl)?.0,
                     name_span : Some(name_span),
                     interface_span : name_span
                 })
@@ -1073,6 +1082,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         self.flatten_interface_ports(cursor);
                     }
                 });
+            } else if kind == kind!("domain_statement") {
+                // Skip, because we already covered domains in initialization. 
+                // TODO synchronous & async clocks
             } else {
                 cursor.could_not_match()
             }

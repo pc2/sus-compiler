@@ -48,7 +48,7 @@ pub fn update_file(text : String, file_id : FileUUID, linker : &mut Linker) {
 pub fn recompile_all(linker : &mut Linker) {
     // First reset all modules back to post-gather_initial_file_data
     for (_, md) in &mut linker.modules {
-        let Module { link_info, ports:_, main_interface_used:_, interfaces:_, domains:_, instructions, instantiations } = md;
+        let Module { link_info, instructions, instantiations, .. } = md;
         link_info.reset_to(link_info.after_initial_parse_cp);
         link_info.after_flatten_cp = None;
         instructions.clear();

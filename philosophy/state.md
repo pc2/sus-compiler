@@ -16,7 +16,8 @@ Generating the whole state machine is a combinatorial endeavour however, and a t
 ### Summing module
 ```Verilog
 timeline (X, false -> /)* .. (X, true -> T)
-module Accumulator : int term, bool done -> int total {
+module Accumulator {
+    interface Accumulator : int term, bool done -> int total 
     state int tot := 0 // Initial value, not a real assignment
 
     int new_tot = tot + term
@@ -69,7 +70,8 @@ The previous example was quite simple though, with the code's active state machi
 
 ```Verilog
 timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
-module Unpack4<T> : T[4] packed -> T out_stream {
+module Unpack4<T> {
+    interface Unpack4 : T[4] packed -> T out_stream 
     state int st := 0 // Initial value, not a real assignment
     state T[3] stored_packed
 

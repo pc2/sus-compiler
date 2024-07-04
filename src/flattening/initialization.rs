@@ -10,15 +10,17 @@ use super::*;
 
 struct ModuleInitializationContext<'linker> {
     ports : FlatAlloc<Port, PortIDMarker>,
-    interfaces : FlatAlloc<Interface, DomainIDMarker>,
-    current_interface : DomainID,
+    interfaces : FlatAlloc<Interface, InterfaceIDMarker>,
+    domains : FlatAlloc<String, DomainIDMarker>,
     template_inputs : TemplateInputs,
     file_text : &'linker FileText
 }
 
 impl<'linker> ModuleInitializationContext<'linker> {
-    fn gather_initial_module(&mut self, cursor : &mut Cursor) {
+    fn gather_initial_module(&mut self, cursor : &mut Cursor) -> (Span, String) {
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
+        let name = self.file_text[name_span].to_owned();
+        self.domains.alloc(name.clone());
         if cursor.optional_field(field!("template_declaration_arguments")) {
             cursor.list(kind!("template_declaration_arguments"), |cursor| {
                 cursor.go_down(kind!("template_declaration_type"), |cursor| {
@@ -33,11 +35,10 @@ impl<'linker> ModuleInitializationContext<'linker> {
             });
         }
 
-        self.gather_func_call_ports(name_span, cursor);
-        assert!(self.interfaces.len() == 1); // Therefore the first interface is [Module::MAIN_INTERFACE_ID]
-
         cursor.field(field!("block"));
         self.gather_all_ports_in_block(cursor);
+
+        (name_span, name)
     }
 
     fn gather_ports_in_if_stmt(&mut self, cursor : &mut Cursor) {
@@ -86,6 +87,13 @@ impl<'linker> ModuleInitializationContext<'linker> {
     fn gather_all_ports_in_block(&mut self, cursor : &mut Cursor) {
         cursor.list(kind!("block"), |cursor| {
             match cursor.kind() {
+                kind!("domain_statement") => {
+                    cursor.go_down_no_check(|cursor| {
+                        let domain_name_span = cursor.field_span(field!("name"), kind!("identifier"));
+                        let name = &self.file_text[domain_name_span];
+                        self.domains.alloc(name.to_owned())
+                    });
+                }
                 kind!("interface_statement") => {
                     cursor.go_down_no_check(|cursor| {
                         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
@@ -123,25 +131,30 @@ impl<'linker> ModuleInitializationContext<'linker> {
     }
 
     fn gather_func_call_ports(&mut self, interface_name_span : Span, cursor : &mut Cursor) {
-        let mut func_call_inputs = PortIDRange::empty();
-        let mut func_call_outputs = PortIDRange::empty();
-        
-        self.current_interface = self.interfaces.get_next_alloc_id();
-
-        if cursor.optional_field(field!("interface_ports")) {
+        let ports = if cursor.optional_field(field!("interface_ports")) {
             cursor.go_down(kind!("interface_ports"), |cursor| {
-                if cursor.optional_field(field!("inputs")) {
-                    func_call_inputs = self.gather_decl_names_in_list(true, cursor);
-                }
-                if cursor.optional_field(field!("outputs")) {
-                    func_call_outputs = self.gather_decl_names_in_list(false, cursor);
-                }
+                (cursor.optional_field(field!("inputs")).then(|| {
+                    self.gather_decl_names_in_list(true, cursor)
+                }),
+                cursor.optional_field(field!("outputs")).then(|| {
+                    self.gather_decl_names_in_list(false, cursor)
+                }))
             })
-        }
+        } else {(None, None)};
+
+        let (func_call_inputs, func_call_outputs) = match ports {
+            (None, None) => (UUIDRange::empty(), UUIDRange::empty()),
+            (None, Some(fouts)) => (UUIDRange(fouts.0, fouts.0), fouts),
+            (Some(fins), None) => (fins, UUIDRange(fins.1, fins.1)),
+            (Some(fins), Some(fouts)) => (fins, fouts)
+        };
+        // All ports are consecutive
+        assert_eq!(func_call_inputs.1, func_call_outputs.0);
 
         self.interfaces.alloc(Interface{
             func_call_inputs,
             func_call_outputs,
+            domain : self.domains.last_id(),
             name_span: interface_name_span,
             name: self.file_text[interface_name_span].to_owned()
         });
@@ -183,8 +196,8 @@ impl<'linker> ModuleInitializationContext<'linker> {
                 name_span,
                 decl_span,
                 is_input,
-                interface : self.current_interface,
-                declaration_instruction : UUID::PLACEHOLDER
+                domain : self.domains.last_id(),
+                declaration_instruction : FlatID::PLACEHOLDER
             });
         }
     }
@@ -202,27 +215,23 @@ pub fn gather_initial_file_data(mut builder : FileBuilder) {
                     let mut ctx = ModuleInitializationContext {
                         ports: FlatAlloc::new(),
                         interfaces: FlatAlloc::new(),
-                        current_interface: DomainID::PLACEHOLDER,
+                        domains: FlatAlloc::new(),
                         template_inputs : FlatAlloc::new(),
                         file_text: builder.file_text,
                     };
 
-                    ctx.gather_initial_module(cursor);
+                    let (name_span, name) = ctx.gather_initial_module(cursor);
 
                     let resolved_globals = ResolvedGlobals::empty();
                     let errors = parsing_errors.into_storage();
                     let after_initial_parse_cp = CheckPoint::checkpoint(&errors, &resolved_globals);
 
-                    let main_interface = &ctx.interfaces[Module::MAIN_INTERFACE_ID];
-                    
-                    let main_interface_used = ctx.ports.iter().any(|(_, p)| p.interface == Module::MAIN_INTERFACE_ID);
-
                     let md = Module{
                         link_info : LinkInfo {
                             documentation: cursor.extract_gathered_comments(),
                             file: builder.file_id,
-                            name : main_interface.name.clone(),
-                            name_span : main_interface.name_span,
+                            name,
+                            name_span,
                             span,
                             errors,
                             resolved_globals,
@@ -230,9 +239,9 @@ pub fn gather_initial_file_data(mut builder : FileBuilder) {
                             after_initial_parse_cp,
                             after_flatten_cp : None
                         },
-                        main_interface_used,
                         instructions : FlatAlloc::new(),
                         ports : ctx.ports,
+                        domain_names : ctx.domains,
                         domains : FlatAlloc::new(),
                         interfaces : ctx.interfaces,
                         instantiations: InstantiationList::new()

@@ -8,7 +8,7 @@ mod latency_count;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, FlatIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, template::{check_all_template_args_valid, ConcreteTemplateArgs}, to_string::pretty_print_concrete_instance, value::{TypedValue, Value}
+    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, FlatIDMarker, InterfaceIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, template::{check_all_template_args_valid, ConcreteTemplateArgs}, to_string::pretty_print_concrete_instance, value::{TypedValue, Value}
 };
 
 use self::latency_algorithm::SpecifiedLatency;
@@ -93,7 +93,7 @@ pub struct SubModule {
     pub original_instruction : FlatID,
     pub instance : Option<Rc<InstantiatedModule>>,
     pub port_map : FlatAlloc<Option<UsedPort>, PortIDMarker>,
-    pub interface_call_sites : FlatAlloc<Vec<Span>, DomainIDMarker>,
+    pub interface_call_sites : FlatAlloc<Vec<Span>, InterfaceIDMarker>,
     pub name : String,
     pub module_uuid : ModuleUUID,
     pub template_args : ConcreteTemplateArgs
@@ -314,8 +314,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                                     .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
                             }
                         }
-                        if sub_module.ports.iter().any(|(port_id, port)| port.interface == interface_id && instance.interface_ports[port_id].is_none()) {
+                        if sm_interface.all_ports().iter().any(|port_id| instance.interface_ports[port_id].is_none()) {
                             // We say an interface is invalid if it has an invalid port. 
+                            todo!("Invalid Interfaces");
                         }
                     }
                 }
