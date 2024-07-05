@@ -3,7 +3,7 @@ use sus_proc_macro::{field, kind, kw};
 
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUID}, errors::ErrorCollector, file_position::FileText, flattening::Module, instantiation::InstantiationList, linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals}, parser::Cursor, template::{GenerativeTemplateInputKind, TemplateInput, TemplateInputs, TypeTemplateInputKind}
+    arena_alloc::{FlatAlloc, UUID}, errors::ErrorCollector, file_position::FileText, flattening::Module, instantiation::InstantiationList, linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals}, parser::Cursor, template::{GenerativeTemplateInputKind, TemplateInput, TemplateInputKind, TemplateInputs, TypeTemplateInputKind}
 };
 
 use super::*;

@@ -196,11 +196,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         let mut any_invalid_port = false;
         for (port_id, p) in self.interface_ports.iter_valids() {
             if !p.is_input {
-                let RealWireDataSource::Multiplexer{is_state:_, sources} = &self.wires[p.wire].source else {unreachable!()};
-                if sources.is_empty() {
+                let port_wire = &self.wires[p.wire];
+                let RealWireDataSource::Multiplexer{is_state:_, sources} = &port_wire.source else {unreachable!()};
+                if sources.is_empty() && port_wire.absolute_latency == CALCULATE_LATENCY_LATER {
                     any_invalid_port = true;
                     let port = &self.md.ports[port_id];
-                    self.errors.error(port.name_span, format!("Output port '{}' is never written to. ", port.name));
+                    self.errors.error(port.name_span, format!("Pre-emptive error because latency-unspecified '{}' is never written to. \n(This is because work-in-progress code would get a lot of latency counting errors while unfinished)", port.name));
                 }
             }
         }

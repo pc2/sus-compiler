@@ -1,6 +1,8 @@
 
 use std::ops::{Deref, DerefMut};
 
+use walk::for_each_generative_input_in_template_args;
+
 use crate::{
     abstract_type::{BestName, DomainType, TypeUnifier, BOOL_TYPE, INT_TYPE}, debug::SpanDebugger, errors::ErrorCollector, file_position::SpanFile, linker::{with_module_editing_context, ConstantUUIDMarker, FileUUID, Linkable, Linker, ModuleUUIDMarker, NameElem, NamedConstant, Resolver, WorkingOnResolver}, template::TemplateArgKind
 };
@@ -449,6 +451,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         let mut instruction_fanins : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.working_on.instructions.iter().map(|_| Vec::new()).collect();
         
         for (inst_id, inst) in self.working_on.instructions.iter() {
+            let mut collector_func = |id| instruction_fanins[inst_id].push(id);
             match inst {
                 Instruction::Write(conn) => {
                     if let Some(flat_root) = conn.to.root.get_root_flat() {
@@ -456,17 +459,19 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         WireReferencePathElement::for_each_dependency(&conn.to.path, |idx_wire| instruction_fanins[flat_root].push(idx_wire));
                     }
                 }
-                Instruction::SubModule(_) => {} // TODO Dependencies should be added here if for example generative templates get added
+                Instruction::SubModule(sm) => {
+                    for_each_generative_input_in_template_args(&sm.module_ref.template_args, &mut collector_func);
+                }
                 Instruction::FuncCall(fc) => {
                     for a in &fc.arguments {
                         instruction_fanins[fc.interface_reference.submodule_decl].push(*a);
                     }
                 }
                 Instruction::Declaration(decl) => {
-                    decl.typ_expr.for_each_generative_input(|id| instruction_fanins[inst_id].push(id));
+                    decl.typ_expr.for_each_generative_input(&mut collector_func);
                 }
                 Instruction::Wire(wire) => {
-                    wire.source.for_each_dependency(|id| instruction_fanins[inst_id].push(id));
+                    wire.source.for_each_dependency(collector_func);
                 }
                 Instruction::IfStatement(stm) => {
                     for id in UUIDRange(stm.then_start, stm.else_end) {

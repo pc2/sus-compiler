@@ -3,6 +3,7 @@ mod name_context;
 mod initialization;
 mod typechecking;
 mod parse;
+mod walk;
 
 use std::ops::Deref;
 
@@ -11,7 +12,7 @@ pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
 
 use crate::{
-    abstract_type::{AbstractType, FullType}, arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID, TypeUUID}, parser::Documentation, template::{GlobalReference, TemplateArgs, TemplateID, TemplateInputKind}, value::Value
+    abstract_type::{AbstractType, FullType}, arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID, TypeUUID}, parser::Documentation, template::{GlobalReference, TemplateArgs, TemplateID}, value::Value
 };
 
 
@@ -329,26 +330,6 @@ pub enum WireSource {
 }
 
 impl WireSource {
-    /// Enumerates all instructions that this instruction depends on. This includes (maybe compiletime) wires, and submodules. 
-    pub fn for_each_dependency<F : FnMut(FlatID)>(&self, mut func : F) {
-        match self {
-            WireSource::WireRef(wire_ref) => {
-                match &wire_ref.root {
-                    WireReferenceRoot::LocalDecl(decl_id, _) => func(*decl_id),
-                    WireReferenceRoot::NamedConstant(_, _) => {}
-                    WireReferenceRoot::SubModulePort(submod_port) => func(submod_port.submodule_decl),
-                }
-                for p in &wire_ref.path {
-                    match p {
-                        WireReferencePathElement::ArrayAccess { idx, bracket_span:_ } => func(*idx),
-                    }
-                }
-            }
-            &WireSource::UnaryOp { op:_, right } => {func(right)}
-            &WireSource::BinaryOp { op:_, left, right } => {func(left); func(right)},
-            WireSource::Constant(_) => {}
-        }
-    }
     pub const fn new_error() -> WireSource {
         WireSource::Constant(Value::Error)
     }
@@ -394,15 +375,6 @@ impl WrittenType {
             WrittenType::Array(_, arr_box) => {
                 let (elem_typ, _arr_idx, _br_span) = arr_box.deref();
                 AbstractType::Array(Box::new(elem_typ.to_type_with_substitute(template_args)))
-            }
-        }
-    }
-
-    pub fn for_each_generative_input<F : FnMut(FlatID)>(&self, mut f : F) {
-        match self {
-            WrittenType::Error(_) | WrittenType::Named(_) | WrittenType::Template(_, _) => {}
-            WrittenType::Array(_span, arr_box) => {
-                f(arr_box.deref().1)
             }
         }
     }
