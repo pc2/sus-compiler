@@ -414,7 +414,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 RealWireDataSource::ReadOnly
             } else {
                 let is_state = if wire_decl.identifier_type == IdentifierType::State {
-                    Some(Value::Unset)
+                    Some(self.get_initial_val(&typ))
                 } else {
                     None
                 };
@@ -443,7 +443,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         let mut instruction_range = block_range.into_iter();
         while let Some(original_instruction) = instruction_range.next() {
             let instr = &self.md.instructions[original_instruction];
-            self.md.get_instruction_span(original_instruction);
+            self.md.get_instruction_span(original_instruction).debug();
             let instance_to_add : SubModuleOrWire = match instr {
                 Instruction::SubModule(submodule) => {
                     let sub_module = &self.linker.modules[submodule.module_ref.id];
