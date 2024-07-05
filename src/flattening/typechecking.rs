@@ -107,7 +107,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     }
 
-    fn get_type_of_wire_reference(&self, wire_ref : &WireReference, wire_ref_span : Span) -> FullType {
+    fn get_type_of_wire_reference(&self, wire_ref : &WireReference) -> FullType {
         let mut write_to_type = match &wire_ref.root {
             WireReferenceRoot::LocalDecl(id, _) => {
                 let decl_root = self.working_on.instructions[*id].unwrap_wire_declaration();
@@ -121,14 +121,6 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 self.get_type_of_port(port.port, port.submodule_decl)
             }
         };
-
-        if let Some(condition_domain) = self.get_current_condition_domain() {
-            write_to_type.domain = self.type_checker.combine_domains::<false, _>(&write_to_type.domain, &DomainType::Physical(condition_domain.0), |wire_ref_domain_name, condition_domain_name| {
-                let wire_ref_domain_name = wire_ref_domain_name.unwrap();
-                self.errors.error(wire_ref_span, format!("Attempting to access a wire from domain '{wire_ref_domain_name}' within a condition in domain '{condition_domain_name}'"))
-                    .info_same_file(condition_domain.1, format!("This condition has domain '{condition_domain_name}'"));
-            })
-        }
 
         for p in &wire_ref.path {
             match p {
@@ -264,6 +256,25 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     }
 
+    /// TODO: writes to declarations that are in same scope need not be checked as such. 
+    /// 
+    /// This allows to work with temporaries of a different domain within an if statement
+    /// 
+    /// Which could allow for a little more encapsulation in certain circumstances
+    /// 
+    /// Also, this meshes with the thing where we only add condition wires to writes that go
+    /// outside of a condition block
+    fn join_with_condition(&self, ref_domain : &DomainType, span : Span) {
+        if let Some(condition_domain) = self.get_current_condition_domain() {
+            // Just check that 
+            self.type_checker.combine_domains::<false, _>(ref_domain, &DomainType::Physical(condition_domain.0), |wire_ref_domain_name, condition_domain_name| {
+                let wire_ref_domain_name = wire_ref_domain_name.unwrap();
+                self.errors.error(span, format!("Attempting to write to a wire from domain '{wire_ref_domain_name}' within a condition in domain '{condition_domain_name}'"))
+                    .info_same_file(condition_domain.1, format!("This condition has domain '{condition_domain_name}'"));
+            });
+        }
+    }
+
     fn typecheck_visit_instruction(&mut self, instr_id : FlatID) {
         match &self.working_on.instructions[instr_id] {
             Instruction::SubModule(sm) => {
@@ -298,14 +309,13 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 let start = &self.working_on.instructions[stm.start].unwrap_wire();
                 let end = &self.working_on.instructions[stm.end].unwrap_wire();
 
-                let declared_here = Some((loop_var.decl_span, self.errors.file));
-                self.type_checker.typecheck_and_generative::<true>(&start.typ, start.span, &loop_var.typ.typ, "for loop start", declared_here);
-                self.type_checker.typecheck_and_generative::<true>(&end.typ, end.span, &loop_var.typ.typ, "for loop end", declared_here);
+                self.type_checker.typecheck_and_generative::<true>(&start.typ, start.span, &loop_var.typ.typ, "for loop start", None);
+                self.type_checker.typecheck_and_generative::<true>(&end.typ, end.span, &loop_var.typ.typ, "for loop end", None);
             }
             Instruction::Wire(w) => {
                 let result_typ = match &w.source {
                     WireSource::WireRef(from_wire) => {
-                        self.get_type_of_wire_reference(from_wire, w.span)
+                        self.get_type_of_wire_reference(from_wire)
                     }
                     &WireSource::UnaryOp{op, right} => {
                         let right_wire = self.working_on.instructions[right].unwrap_wire();
@@ -333,17 +343,22 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     // Typecheck the value with target type
                     let from_wire = self.working_on.instructions[*arg].unwrap_wire();
 
-                    from_wire.span.debug();
+                    self.join_with_condition(&write_to_type.domain, from_wire.span.debug());
                     self.type_checker.typecheck_write_to(&from_wire.typ, from_wire.span, &write_to_type, "function argument", Some(declared_here));
                 }
             }
             Instruction::Write(conn) => {
                 // Typecheck digging down into write side
-                let mut write_to_type = self.get_type_of_wire_reference(&conn.to, conn.to_span);
+                let mut write_to_type = self.get_type_of_wire_reference(&conn.to);
+
+                self.join_with_condition(&write_to_type.domain, conn.to_span.debug());
+        
                 let declared_here = self.get_wire_ref_declaration_point(&conn.to.root);
 
                 let write_context = match conn.write_modifiers {
-                    WriteModifiers::Connection { num_regs:_, regs_span:_ } => "connection",
+                    WriteModifiers::Connection { num_regs:_, regs_span:_ } => {
+                        "connection"
+                    },
                     WriteModifiers::Initial { initial_kw_span:_ } => {
                         write_to_type.domain = DomainType::Generative;
                         "initial value"
@@ -371,7 +386,6 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
 
         for elem_id in self.working_on.instructions.id_range() {
-            println!("{elem_id:?}: {:?}", &self.type_checker);
             self.control_flow_visit_instruction(elem_id);
             self.typecheck_visit_instruction(elem_id);
         }

@@ -930,3 +930,158 @@ module templateModule<abc> {
 
 }
 */
+
+module test<T> {
+    interface test : ::int::<beep = 20 > 3; BEEP = int::<;>> ab 
+	input gen int MY_INPUT
+
+	MY_INPUT = 3
+
+	input int beep
+
+	beep = 3
+
+	FIFO::<BITWIDTH = 4;> badoop
+}
+
+module use_test {
+	test::<3;> test_mod
+
+
+}
+
+
+module tinyTestMod {
+	input gen int beep
+
+	output int o = beep
+}
+
+
+module testTinyTestMod {
+	tinyTestMod::<beep = 3;> a
+	tinyTestMod::<beep = 4;> b
+	tinyTestMod::<beep = 3;> c
+}
+
+
+
+module tree_add {
+	input gen int WIDTH
+
+	input int[WIDTH] values
+	output int sum
+
+	if WIDTH == 1 {
+		sum = values[0]
+	} else {
+		gen int HALF_WIDTH = WIDTH / 2
+		tree_add::<HALF_WIDTH;> left
+		tree_add::<HALF_WIDTH;> right
+
+		for int i in 0..HALF_WIDTH {
+			left.values[i] = values[i]
+			right.values[i] = values[i+HALF_WIDTH]
+		}
+
+		if WIDTH % 2 == 0 {
+			reg sum = left.sum + right.sum
+		} else {
+			reg sum = left.sum + right.sum + values[WIDTH - 1]
+		}
+	}
+}
+
+module make_tree_add {
+	gen int SIZE = 255
+
+	int[SIZE] vs
+
+	for int i in 0..SIZE {
+		vs[i] = i
+	}
+
+	tree_add::<SIZE;> tr
+
+	tr.values = vs
+
+	output int beep = tr.sum
+}
+
+
+module replicate<T> {
+	input gen int NUM_REPLS
+
+	input T data
+
+	output T[NUM_REPLS] result
+
+	for int i in 0..NUM_REPLS {
+		result[i] = data
+	} 
+}
+
+module use_replicate {
+	replicate::<NUM_REPLS = 50; T = bool> a
+	replicate::<NUM_REPLS = 20; T = int[30]> b
+}
+
+module permute_t<T> {
+	input gen int SIZE
+
+	input gen int[SIZE] SOURCES
+
+	interface permute : T[SIZE] d_in -> T[SIZE] d_out
+
+	for int i in 0..SIZE {
+		d_out[i] = d_in[SOURCES[i]]
+	}
+}
+
+module use_permute {
+	gen int[8] indices
+
+	indices[0] = 3
+	indices[1] = 2
+	indices[2] = 4
+	indices[3] = 5
+	indices[4] = 1
+	indices[5] = 2
+	indices[6] = 7
+	indices[7] = 6
+
+
+	int[2] inArr
+
+	inArr[0] = 2387
+	inArr[1] = 786823
+
+	permute_t::<SIZE = 8, SOURCES = indices; T = int> permut
+
+	int[8] beep = permut.permute(indices)
+}
+
+module instruction_decoder {
+	interface from : bool[32] instr
+	interface is_jump
+	interface is_load
+	interface is_arith
+	
+}
+
+module run_instruction {
+    interface run_instruction : bool[32] instr 
+	instruction_decoder decoder
+	decoder.from(instr)
+
+	if decoder.is_jump() : int target_addr {
+		// ...
+	}
+	if decoder.is_load() : int reg_to, int addr {
+		// ...
+	}
+	if decoder.is_arith() : int reg_a, int reg_b, Operator op {
+		// ...
+	}
+}
+

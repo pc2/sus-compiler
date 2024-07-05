@@ -180,7 +180,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             match target {
                 LatencyMeaning::Wire(wire_id) => {
                     self.iter_sources_with_min_latency(&self.wires[*wire_id].source, |from, delta_latency| {
-                        assert!(self.wires[from].domain == domain_id);
+                        assert_eq!(self.wires[from].domain, domain_id);
                         fanins.push_to_last_group(FanInOut{other : latency_node_mapper.map_wire_to_latency_node[from], delta_latency});
                     });
                 }
