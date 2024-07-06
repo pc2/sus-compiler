@@ -1,0 +1,132 @@
+
+
+
+module use_BitSerialMatrixMultiply {
+    gen int[10][10] MATRIX
+
+    for int X in 0..10 {
+        for int Y in 0..10 {
+            // Try 1/4 random-ish number generation
+            if ((X + Y) * 7 + ((X+1)*10) / (Y+1)) % 4 == 0 {
+                MATRIX[X][Y] = (X + 2*Y)
+            } else {
+                MATRIX[X][Y] = 0
+            }
+        }
+    }
+
+    BitSerialMatrixMultiply::<WIDTH = 10, HEIGHT = 10, MATRIX = MATRIX;> bsm
+}
+
+
+
+module BitSerialMatrixMultiply {
+    input gen int WIDTH
+    input gen int HEIGHT
+    
+    // 32 right now, because ints are't sized yet. 
+    gen int INT_BITWIDTH = 32
+
+    input gen int[WIDTH][HEIGHT] MATRIX
+
+    BitSerialMatrixMultiplyState::<WIDTH, HEIGHT, MATRIX;> bsm_state
+
+    interface BitSerialMatrixMultiply : bool start, int[WIDTH] values -> int[WIDTH] result
+
+    state bool[WIDTH][INT_BITWIDTH] split_into_bits
+
+    FixedSizeIterator::<UP_TO = INT_BITWIDTH;> iter
+
+    // This is above start, so start has write priority on split_into_bits. TODO shift down once we have `overwrite`
+    if iter.valid {
+        // It's a shift register
+        for int BIT in 0..INT_BITWIDTH-1 {
+            split_into_bits[BIT] = split_into_bits[BIT + 1]
+        }
+
+        bsm_state.feed(true, split_into_bits[0])
+    } else {
+        bsm_state.feed(false, split_into_bits[0])
+    }
+
+    if iter.last {
+        result = LatencyOffset::<INT_BITWIDTH;int[WIDTH]>(bsm_state.result_vector)
+    }
+
+    if start {
+        iter.start(true)
+
+        // initialize split_into_bits
+        for int I in 0..WIDTH {
+            bool[INT_BITWIDTH] value_bits = IntToBits(values[I])
+
+            for int BIT in 0..INT_BITWIDTH {
+                split_into_bits[BIT][I] = value_bits[BIT]
+            }
+        }
+    } else {
+        iter.start(false)
+    }
+}
+
+module BitSerialMatrixMultiplyState {
+    input gen int WIDTH
+    input gen int HEIGHT
+
+    input gen int[WIDTH][HEIGHT] MATRIX
+
+    interface feed : bool feed, bool[WIDTH] vector_bits
+
+    interface finish : bool finish -> state int[HEIGHT] result_vector
+
+    for int Y in 0..HEIGHT {
+        initial result_vector[Y] = 0
+
+        BitSerialRow::<SIZE = WIDTH, WEIGHTS = MATRIX[Y];> row
+
+        if feed {
+            result_vector[Y] = result_vector[Y] * 2 + row(vector_bits)
+        }
+
+        if finish {
+            result_vector[Y] = 0
+        }
+    }
+}
+
+module BitSerialRow {
+    input gen int SIZE
+    input gen int[SIZE] WEIGHTS
+
+    interface BitSerialRow : bool[SIZE] bits'0 -> int row_total
+
+    gen int NONZERO_COUNT = 0
+    for int I in 0..SIZE {
+        if WEIGHTS[I] != 0 {NONZERO_COUNT = NONZERO_COUNT + 1}
+    }
+
+    if NONZERO_COUNT == 0 {
+        int zero'0 = 0
+        row_total = zero
+    } else {
+        int[NONZERO_COUNT] nonzero_weights
+        gen int CURRENT_NONZERO_COUNT = 0
+
+        for int I in 0..SIZE {
+            gen int CUR_WEIGHT = WEIGHTS[I]
+
+            if CUR_WEIGHT != 0 {
+                if bits[I] {
+                    nonzero_weights[CURRENT_NONZERO_COUNT] = WEIGHTS[I]
+                } else {
+                    nonzero_weights[CURRENT_NONZERO_COUNT] = 0
+                }
+
+                CURRENT_NONZERO_COUNT = CURRENT_NONZERO_COUNT + 1
+            }
+        }
+
+        row_total = TreeAdd::<NONZERO_COUNT;>(nonzero_weights)
+    }
+}
+

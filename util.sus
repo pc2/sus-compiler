@@ -1,0 +1,249 @@
+
+module DualPortMem<T> {
+	input gen int SIZE
+
+	state T[SIZE] mem
+
+	interface write : bool write, int addr, T data
+
+	if write {
+		mem[addr] = data
+	}
+
+	domain read
+	interface read : int read_addr -> T read_data
+
+	CrossDomain::<;T[SIZE]> cross_mem
+	cross_mem.in = mem
+	
+	read_data = cross_mem.out[read_addr]
+}
+
+module UseDualPortMem {
+	interface UseDualPortMem : 
+		bool do_write'0,
+		int addr'0,
+		bool[500] data'0 ->
+		bool[500] read_data'0
+		
+	DualPortMem::<SIZE = 128; bool[500]> mem
+
+	mem.write(do_write, addr, data)
+
+	read_data = mem.read(addr)
+}
+
+module FIFO<T> {
+	input gen int DEPTH
+	// The FIFO may still receive data for several cycles after ready is de-asserted
+	input gen int READY_SLACK
+
+	state T[DEPTH] mem
+	state int read_addr
+	state int write_addr
+
+	initial read_addr = 0
+	initial write_addr = 0
+
+	interface push : bool push'READY_SLACK, T data_in'READY_SLACK
+	
+	output bool ready'0
+
+	domain pop
+	interface pop : bool pop -> bool data_valid, T data_out
+	
+	CrossDomain::<;int> write_to_pop
+	write_to_pop.in = write_addr
+
+	CrossDomain::<;int> read_to_push
+	read_to_push.in = read_addr
+
+	CrossDomain::<;T[DEPTH]> mem_to_pop
+	mem_to_pop.in = mem
+
+	if pop {
+		data_valid = read_addr != write_to_pop.out
+		if data_valid {
+			// Add some pipelining registers, just because we can
+			reg reg data_out = mem_to_pop.out[read_addr]
+			read_addr = (read_addr + 1) % DEPTH
+		}
+	}
+
+	if push {
+		mem[write_addr] = data_in
+		write_addr = (write_addr + 1) % DEPTH
+	}
+	
+	// Wrapping subtract
+	int space_remaining = (read_to_push.out - write_addr) % DEPTH
+	gen int ALMOST_FULL_TRESHOLD = READY_SLACK + 1 // +1 for the latency reg we introduce here
+	reg bool r = space_remaining >  ALMOST_FULL_TRESHOLD
+	ready = LatencyOffset::<OFFSET = -ALMOST_FULL_TRESHOLD;bool>(r)
+}
+
+module example_FIFO {FIFO::<3, 5;int> f}
+
+
+/*
+	module use_Iterator {
+		Iterator myIter
+
+		int[10] myArr
+
+		interface start_iteration : bool do_start
+
+		if do_start {
+			myIter.start(true, 10)
+		}
+
+		int outVal
+		bool iter_valid, int value = myIter.iter()
+
+		if iter_valid {
+			outVal = myArr[value]
+		}
+	}
+*/
+module Iterator {
+	state int current_limit
+
+	interface iter : -> bool valid, state int value
+
+	interface start : bool start, int up_to
+
+	if start {
+		current_limit = up_to
+		value = 0
+	}
+
+	valid = value != current_limit
+	if valid {
+		value = value + 1
+	}
+}
+
+module FixedSizeIterator {
+	input gen int UP_TO
+	
+	interface iter : -> bool valid, state int value
+
+	output bool last
+
+	initial value = 0
+
+	interface start : bool start
+
+	if start {
+		value = 0
+	}
+
+	last = value == UP_TO - 1
+	valid = value != UP_TO
+	if valid {
+		value = value + 1
+	}
+}
+
+module SlowClockGenerator {
+	input gen int PERIOD
+
+	interface SlowClockGenerator : -> state int cur_value
+	
+	initial cur_value = 0
+
+	if cur_value == PERIOD-1 {
+		cur_value = 0
+	} else {
+		cur_value = cur_value + 1
+	}
+}
+
+module SplitAt<T> {
+	input gen int SIZE
+	input gen int SPLIT_POINT
+
+	interface SplitAt : T[SIZE] i -> T[SPLIT_POINT] left, T[SIZE - SPLIT_POINT] right
+
+	for int I in 0..SPLIT_POINT {
+		left[I] = i[I]
+	}
+	for int I in 0..SIZE - SPLIT_POINT {
+		right[I] = i[I+SPLIT_POINT]
+	}
+}
+
+// Temporary, to be replaced with slice syntax : result = vals[FROM +: OUT_SIZE]
+module Slice<T> {
+	input gen int SIZE
+	input gen int OUT_SIZE
+	input gen int FROM
+
+	interface Slice : T[SIZE] vals -> T[OUT_SIZE] result
+
+	for int I in 0..OUT_SIZE {
+		result[I] = vals[I + FROM]
+	}
+}
+
+module BitSelect {
+	input gen int SIZE
+
+	interface BitSelect : int selection -> bool[SIZE] bits
+
+	for int I in 0..SIZE {
+		bits[I] = false
+	}
+
+	bits[selection] = true
+}
+
+module PopCount {
+	input gen int WIDTH
+	
+	// Should be chosen based on what's most efficient for the target architecture
+	gen int BASE_CASE_SIZE = 5
+
+	interface PopCount : bool[WIDTH] bits -> int popcount
+
+
+	if WIDTH <= BASE_CASE_SIZE {
+		int[WIDTH] cvt
+		for int I in 0..WIDTH {
+			if bits[I] {
+				cvt[I] = 1
+			} else {
+				cvt[I] = 0
+			}
+		}
+		reg popcount = +cvt
+	} else {
+		gen int LEFT_WIDTH = WIDTH / 2
+		gen int RIGHT_WIDTH = WIDTH - LEFT_WIDTH
+
+		bool[LEFT_WIDTH] left_part, bool[RIGHT_WIDTH] right_part = SplitAt::<LEFT_WIDTH ;bool>(bits)
+
+		reg popcount = PopCount::<LEFT_WIDTH;>(left_part) + PopCount::<RIGHT_WIDTH;>(right_part)
+	}
+}
+
+
+module TreeAdd {
+	input gen int WIDTH
+
+	interface TreeAdd : int[WIDTH] values'0 -> int total
+
+	if WIDTH == 0 {
+		int zero'0 = 0 // Have to explicitly give it a latency count. Just because otherwise it can't figure it out
+		total = zero
+	} else if WIDTH == 1 {
+		total = values[0]
+	} else {
+		gen int LEFT_WIDTH = WIDTH / 2
+		gen int RIGHT_WIDTH = WIDTH - LEFT_WIDTH
+
+		int[LEFT_WIDTH] left_part, int[RIGHT_WIDTH] right_part = SplitAt::<WIDTH, LEFT_WIDTH;int>(values)
+
+		reg total = TreeAdd::<LEFT_WIDTH;>(left_part) + TreeAdd::<RIGHT_WIDTH;>(right_part)
+	}
+}
