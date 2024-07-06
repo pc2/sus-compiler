@@ -253,6 +253,17 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             &WireSource::BinaryOp{op, left, right} => {
                 let left_val = self.generation_state.get_generation_value(left)?;
                 let right_val = self.generation_state.get_generation_value(right)?;
+
+                match op {
+                    BinaryOperator::Divide | BinaryOperator::Modulo => {
+                        use num::Zero;
+                        if right_val.value.unwrap_integer().is_zero() {
+                            return Err((wire_inst.span, format!("Divide or Modulo by zero: {} / 0", left_val.unwrap_integer())));
+                        }
+                    }
+                    _ => {}
+                }
+
                 compute_binary_op(left_val, op, right_val)
             }
             WireSource::Constant(value) => TypedValue::from_value(value.clone())
