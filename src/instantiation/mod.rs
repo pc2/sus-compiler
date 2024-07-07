@@ -213,10 +213,10 @@ impl InstantiationList {
 
     // Also passes over invalid instances. Instance validity should not be assumed!
     // Only used for things like syntax highlighting
-    pub fn for_each_instance<F : FnMut(&ConcreteTemplateArgs, &InstantiatedModule)>(&self, mut f : F) {
+    pub fn for_each_instance<'s, F : FnMut(&ConcreteTemplateArgs, &Rc<InstantiatedModule>)>(&self, mut f : F) {
         let borrow = self.cache.borrow();
         for (k, v) in borrow.iter() {
-            f(k, v.as_ref())
+            f(k, &v)
         }
     }
 }

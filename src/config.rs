@@ -7,7 +7,8 @@ pub struct ConfigStruct {
     pub lsp_port : u16,
     pub codegen : bool,
     pub debug_print_module_contents : bool,
-    pub debug_print_latency_graph : bool
+    pub debug_print_latency_graph : bool,
+    pub codegen_module_and_dependencies_one_file : Option<String>
 }
 
 pub fn config() -> &'static ConfigStruct {
@@ -51,6 +52,9 @@ pub fn parse_args() -> Vec<PathBuf> {
                     "--debug-latency" => {
                         config.debug_print_latency_graph = true;
                     }
+                    "--module-and-dependencies" => {
+                        config.codegen_module_and_dependencies_one_file = Some(args.next().unwrap());
+                    }
                     other => {
                         panic!("Unknown option {other}");
                     }
@@ -87,5 +91,6 @@ static CONFIG : ConfigStructWrapper = ConfigStructWrapper{cf: UnsafeCell::new(Co
     lsp_debug_mode : false,
     debug_print_module_contents : false,
     codegen : false,
-    debug_print_latency_graph : false
+    debug_print_latency_graph : false,
+    codegen_module_and_dependencies_one_file: None
 })};
