@@ -338,7 +338,7 @@ fn perform_instantiation(md : &Module, linker : &Linker, template_args : &Concre
         generation_state : GenerationState{md, generation_state: md.instructions.map(|(_, _)| SubModuleOrWire::Unnasigned)},
         wires : FlatAlloc::new(),
         submodules : FlatAlloc::new(),
-        interface_ports : FlatAlloc::new_nones(md.ports.len()),
+        interface_ports : md.ports.map(|_| None),
         errors : ErrorCollector::new_empty(md.link_info.file, &linker.files),
         template_args,
         md,

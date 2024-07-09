@@ -258,7 +258,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             }
         };
     
-        let mut resulting_template_arguments : TemplateArgs = FlatAlloc::new_nones(target_link_info.template_arguments.len());
+        let mut resulting_template_arguments : TemplateArgs = target_link_info.template_arguments.map(|_| None);
     
         let mut value_index_iter = target_link_info.template_arguments.iter();
         let mut type_index_iter = target_link_info.template_arguments.iter();

@@ -445,9 +445,6 @@ impl<T, IndexMarker> FlatAlloc<Option<T>, IndexMarker> {
     pub fn iter_valids_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
         FlatOptionIteratorMut{ it: self.data.iter_mut().enumerate(), _ph: PhantomData }
     }
-    pub fn new_nones(size : usize) -> Self {
-        Self{data : (0..size).into_iter().map(|_| None).collect(), _ph : PhantomData}
-    }
 }
 
 impl<T, IndexMarker> Index<UUID<IndexMarker>> for FlatAlloc<T, IndexMarker> {

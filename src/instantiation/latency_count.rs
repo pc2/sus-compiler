@@ -3,7 +3,7 @@
 use std::{cmp::max, iter::zip};
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDRange},
+    arena_alloc::FlatAlloc,
     flattening::{FlatIDMarker, Instruction, WriteModifiers},
     instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}
 };
@@ -57,7 +57,9 @@ fn filter_unique_write_flats<'w>(writes : &'w [PathMuxSource<'w>], instructions 
 
 struct WireToLatencyMap {
     map_wire_to_latency_node : FlatAlloc<usize, WireIDMarker>,
-    domain_infos : FlatAlloc<LatencyDomainInfo, DomainIDMarker>
+    domain_infos : FlatAlloc<LatencyDomainInfo, DomainIDMarker>,
+    /// Wires that are ports point to the next port in the chain, to form a complete cycle. This binds all the ports togehter
+    next_port_chain : FlatAlloc<Option<(WireID, i64)>, WireIDMarker>
 }
 
 struct LatencyDomainInfo {
@@ -67,54 +69,8 @@ struct LatencyDomainInfo {
     output_ports : Vec<usize>
 }
 
-impl WireToLatencyMap {
-    fn compute(wires : &FlatAlloc<RealWire, WireIDMarker>, domains : UUIDRange<DomainIDMarker>, interface_ports : &FlatAlloc<Option<InstantiatedPort>, PortIDMarker>) -> Self {
-        const PLACEHOLDER : usize = usize::MAX;
-    
-        let mut map_wire_to_latency_node : FlatAlloc<usize, WireIDMarker> = wires.map(|_| PLACEHOLDER);
-        
-        let mut domain_infos : FlatAlloc<LatencyDomainInfo, DomainIDMarker> = domains.map(|domain| {
-            let mut latency_node_meanings = Vec::with_capacity(wires.len());
-            let mut initial_values = Vec::new();
-
-            for (w_id, w) in wires {
-                if w.domain == domain {
-                    let new_idx = latency_node_meanings.len();
-                    latency_node_meanings.push(w_id);
-                    debug_assert!(map_wire_to_latency_node[w_id] == PLACEHOLDER);
-                    map_wire_to_latency_node[w_id] = new_idx;
-    
-                    if w.absolute_latency != CALCULATE_LATENCY_LATER {
-                        initial_values.push(SpecifiedLatency { wire: new_idx, latency: w.absolute_latency });
-                    }
-                }
-            }
-    
-            LatencyDomainInfo{latency_node_meanings, initial_values, input_ports : Vec::new(), output_ports : Vec::new()}
-        });
-
-        for (_id, p) in interface_ports.iter_valids() {
-            let domain_to_edit = &mut domain_infos[p.domain];
-            let latency_node = map_wire_to_latency_node[p.wire];
-            if p.is_input {
-                &mut domain_to_edit.input_ports
-            } else {
-                &mut domain_to_edit.output_ports
-            }.push(latency_node);
-        }
-
-        // Every wire has been covered
-        debug_assert!(map_wire_to_latency_node.iter().all(|(_id, v)| *v != PLACEHOLDER));
-
-        Self {
-            map_wire_to_latency_node,
-            domain_infos
-        }
-    }
-}
-
 impl RealWireDataSource {
-    fn iter_sources_with_min_latency_no_ports<F : FnMut(WireID, i64)>(&self, mut f : F) {
+    fn iter_sources_with_min_latency<F : FnMut(WireID, i64)>(&self, mut f : F) {
         match self {
             RealWireDataSource::ReadOnly => {}
             RealWireDataSource::OutPort { .. } => {}
@@ -141,30 +97,95 @@ impl RealWireDataSource {
             RealWireDataSource::Constant { value: _ } => {}
         }
     }
-    fn iter_sources_with_min_latency<F : FnMut(WireID, i64)>(&self, other_wires_ctx : &InstantiationContext, mut f : F) {
-        match self {
-            RealWireDataSource::OutPort { sub_module_id, port_id } => {
-                let sub_mod = &other_wires_ctx.submodules[*sub_module_id];
-                let Some(inst) = &sub_mod.instance else {return}; // This module hasn't been instantiated yet
-                let this_output_port = inst.interface_ports[*port_id].as_ref().unwrap();
-                assert!(!this_output_port.is_input);
-
-                for (input_port_id, attached_wire) in sub_mod.port_map.iter_valids() {
-                    let input_port = inst.interface_ports[input_port_id].as_ref().unwrap(); // Non-present port should have been caught once the submodule was instantiated
-                    if !input_port.is_input {continue} // Skip other outputs
-                    if input_port.domain != this_output_port.domain {continue} // Skip ports of different interfaces
-
-                    f(attached_wire.maps_to_wire, this_output_port.absolute_latency - input_port.absolute_latency);
-                } 
-            }
-            _ => {
-                self.iter_sources_with_min_latency_no_ports(f);
-            }
-        }
-    }
 }
 
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
+    fn make_wire_to_latency_map(&self) -> WireToLatencyMap {
+        const PLACEHOLDER : usize = usize::MAX;
+    
+        let mut map_wire_to_latency_node : FlatAlloc<usize, WireIDMarker> = self.wires.map(|_| PLACEHOLDER);
+        
+        let mut domain_infos : FlatAlloc<LatencyDomainInfo, DomainIDMarker> = self.md.domains.id_range().map(|domain| {
+            let mut latency_node_meanings = Vec::with_capacity(self.wires.len());
+            let mut initial_values = Vec::new();
+
+            for (w_id, w) in &self.wires {
+                if w.domain == domain {
+                    let new_idx = latency_node_meanings.len();
+                    latency_node_meanings.push(w_id);
+                    debug_assert!(map_wire_to_latency_node[w_id] == PLACEHOLDER);
+                    map_wire_to_latency_node[w_id] = new_idx;
+    
+                    if w.absolute_latency != CALCULATE_LATENCY_LATER {
+                        initial_values.push(SpecifiedLatency { wire: new_idx, latency: w.absolute_latency });
+                    }
+                }
+            }
+    
+            LatencyDomainInfo{latency_node_meanings, initial_values, input_ports : Vec::new(), output_ports : Vec::new()}
+        });
+
+        for (_id, p) in self.interface_ports.iter_valids() {
+            let domain_to_edit = &mut domain_infos[p.domain];
+            let latency_node = map_wire_to_latency_node[p.wire];
+            if p.is_input {
+                &mut domain_to_edit.input_ports
+            } else {
+                &mut domain_to_edit.output_ports
+            }.push(latency_node);
+        }
+
+        let mut next_port_chain : FlatAlloc<Option<(WireID, i64)>, WireIDMarker> = self.wires.map(|_| None);
+
+        for (_sm_id, sm) in &self.submodules {
+            // Instances may not be valid (or may not exist yet due to inference)
+            let Some(instance) = &sm.instance else {continue};
+
+            for domain_id in self.linker.modules[sm.module_uuid].domain_names.id_range() {
+                struct Prev {
+                    first : (WireID, i64),
+                    prev : (WireID, i64)
+                }
+    
+                let mut prev : Option<Prev> = None;
+                for (port_id, port) in sm.port_map.iter_valids() {
+                    let Some(instance_port) = &instance.interface_ports[port_id] else {continue};
+                    if instance_port.domain != domain_id {continue}
+
+                    let port_ref = &mut next_port_chain[port.maps_to_wire];
+                    assert!(port_ref.is_none());
+    
+                    if let Some(prev) = &mut prev {
+                        *port_ref = Some((prev.prev.0, instance_port.absolute_latency - prev.prev.1));
+                        prev.prev = (port.maps_to_wire, instance_port.absolute_latency);
+                    } else {
+                        prev = Some(Prev {
+                            first: (port.maps_to_wire, instance_port.absolute_latency),
+                            prev: (port.maps_to_wire, instance_port.absolute_latency)
+                        });
+                    }
+                }
+                if let Some(prev) = prev {
+                    // If only one port, then we don't need to make any connection
+                    if prev.first.0 != prev.prev.0 {
+                        let port_ref = &mut next_port_chain[prev.first.0];
+                        assert!(port_ref.is_none());
+                        *port_ref = Some((prev.prev.0, prev.first.1 - prev.prev.1));
+                    }
+                }
+            }
+        }
+
+        // Every wire has been covered
+        debug_assert!(map_wire_to_latency_node.iter().all(|(_id, v)| *v != PLACEHOLDER));
+
+        WireToLatencyMap {
+            map_wire_to_latency_node,
+            domain_infos,
+            next_port_chain
+        }
+    }
+
     fn make_fanins(&self, latency_node_mapper : &WireToLatencyMap, latency_node_to_wire_map : &[WireID], domain_id : DomainID) -> ListOfLists<FanInOut> {
         let mut fanins : ListOfLists<FanInOut> = ListOfLists::new_with_groups_capacity(latency_node_to_wire_map.len());
         
@@ -172,10 +193,14 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         for wire_id in latency_node_to_wire_map {
             fanins.new_group();
 
-            self.wires[*wire_id].source.iter_sources_with_min_latency(&self, |from, delta_latency| {
+            self.wires[*wire_id].source.iter_sources_with_min_latency(|from, delta_latency| {
                 assert_eq!(self.wires[from].domain, domain_id);
                 fanins.push_to_last_group(FanInOut{other : latency_node_mapper.map_wire_to_latency_node[from], delta_latency});
             });
+
+            if let Some((from, delta_latency)) = latency_node_mapper.next_port_chain[*wire_id] {
+                fanins.push_to_last_group(FanInOut{other : latency_node_mapper.map_wire_to_latency_node[from], delta_latency})
+            }
         }
 
         fanins
@@ -198,8 +223,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
         if any_invalid_port {return} // Early exit so we don't flood WIP modules with "Node not reached by Latency Counting" errors
 
-        let latency_node_mapper = WireToLatencyMap::compute(&self.wires, self.md.domains.id_range(), &self.interface_ports);
-        
+        let latency_node_mapper = self.make_wire_to_latency_map();
+
         for (domain_id, domain_info) in &latency_node_mapper.domain_infos {
             let fanins = self.make_fanins(&latency_node_mapper, &domain_info.latency_node_meanings, domain_id);
             

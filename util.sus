@@ -223,7 +223,7 @@ module PopCount {
 
 		bool[LEFT_WIDTH] left_part, bool[RIGHT_WIDTH] right_part = SplitAt::<LEFT_WIDTH ;bool>(bits)
 
-		reg popcount = PopCount::<LEFT_WIDTH;>(left_part) + PopCount::<RIGHT_WIDTH;>(right_part)
+		reg reg popcount = PopCount::<LEFT_WIDTH;>(left_part) + PopCount::<RIGHT_WIDTH;>(right_part)
 	}
 }
 

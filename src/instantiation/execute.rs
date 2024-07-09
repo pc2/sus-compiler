@@ -464,7 +464,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     } else {
                         self.get_unique_name()
                     };
-                    let port_map = FlatAlloc::new_nones(sub_module.ports.len());
+                    let port_map = sub_module.ports.map(|_| None);
                     let interface_call_sites = sub_module.interfaces.map(|_| Vec::new());
                     let mut template_args = FlatAlloc::with_capacity(submodule.module_ref.template_args.len());
                     
