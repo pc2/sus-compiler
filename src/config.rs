@@ -52,7 +52,7 @@ pub fn parse_args() -> Vec<PathBuf> {
                     "--debug-latency" => {
                         config.debug_print_latency_graph = true;
                     }
-                    "--module-and-dependencies" => {
+                    "--standalone" => {
                         config.codegen_module_and_dependencies_one_file = Some(args.next().unwrap());
                     }
                     other => {

@@ -245,20 +245,26 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     self.report_error(&domain_info.latency_node_meanings, err);
                 }
             };
-            
-            // Compute needed_untils
-            for (latency_idx, wire_id) in domain_info.latency_node_meanings.iter().enumerate() {
-                let wire = &self.wires[*wire_id];
-                let mut needed_until = wire.absolute_latency;
-                for target_fanout in &fanouts[latency_idx] {
-                    let target_wire = &self.wires[domain_info.latency_node_meanings[target_fanout.other]];
-
-                    needed_until = max(needed_until, target_wire.absolute_latency);
-                }
-                self.wires[*wire_id].needed_until = needed_until;
-            }
         }
-            
+
+        // Compute needed_untils
+        for (_id, w) in &mut self.wires {
+            w.needed_until = w.absolute_latency;
+        }
+        let mut_wires_ref : *mut _ = &mut self.wires;
+        for (_id, w) in &self.wires {
+            w.source.iter_sources_with_min_latency(|other, _| {
+                // SAFETY: Need some unsafe code to modify needed_until while iterating through the wires
+                // We write to needed_until everywhere, and for the information we need we never read needed_until
+                unsafe{
+                    let nu = &mut (*mut_wires_ref)[other].needed_until;
+
+                    *nu = max(*nu, w.absolute_latency);
+                }
+            });
+        }
+        
+
         // Finally update interface absolute latencies
         for (_id, port) in self.interface_ports.iter_valids_mut() {
             port.absolute_latency = self.wires[port.wire].absolute_latency;
