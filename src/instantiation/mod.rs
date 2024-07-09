@@ -70,6 +70,7 @@ pub enum RealWireDataSource {
 #[derive(Debug)]
 pub struct RealWire {
     pub source : RealWireDataSource,
+    /// If it's a port of a module, then this must be the submodule
     pub original_instruction : FlatID,
     pub typ : ConcreteType,
     pub name : String,
@@ -105,7 +106,7 @@ pub struct InstantiatedPort {
     pub is_input : bool,
     pub absolute_latency : i64,
     pub typ : ConcreteType,
-    pub interface : DomainID
+    pub domain : DomainID
 }
 
 #[derive(Debug)]
@@ -334,7 +335,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 fn perform_instantiation(md : &Module, linker : &Linker, template_args : &ConcreteTemplateArgs) -> InstantiatedModule {
     let mut context = InstantiationContext{
         name : pretty_print_concrete_instance(linker, &md.link_info, template_args),
-        generation_state : GenerationState{md, generation_state: md.instructions.iter().map(|(_, _)| SubModuleOrWire::Unnasigned).collect()},
+        generation_state : GenerationState{md, generation_state: md.instructions.map(|(_, _)| SubModuleOrWire::Unnasigned)},
         wires : FlatAlloc::new(),
         submodules : FlatAlloc::new(),
         interface_ports : FlatAlloc::new_nones(md.ports.len()),

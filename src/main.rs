@@ -3,7 +3,6 @@
 #![cfg_attr(not(all(feature = "lsp")), allow(dead_code, unused_assignments, unused_variables))]
 
 mod util;
-mod block_vector;
 mod arena_alloc;
 
 mod file_position;
@@ -42,14 +41,6 @@ use dev_aid::ariadne_interface::*;
 use instantiation::InstantiatedModule;
 use linker::Linker;
 
-fn codegen_to_file(md : &Module) {
-    let module_name = md.link_info.name.deref();
-    let mut out_file = File::create(format!("verilog_output/{module_name}.v")).unwrap();
-    md.instantiations.for_each_instance(|_template_args, inst| {
-        codegen_instance(inst.as_ref(), md, &mut out_file)
-    });
-}
-
 fn codegen_instance(inst: &InstantiatedModule, md: &Module, out_file: &mut File) {
     let inst_name = &inst.name;
     if inst.errors.did_error {
@@ -63,6 +54,14 @@ fn codegen_instance(inst: &InstantiatedModule, md: &Module, out_file: &mut File)
     
     //println!("Generating Verilog for {module_name}:");
     // gen_ctx.to_circt();
+}
+
+fn codegen_to_file(md : &Module) {
+    let module_name = md.link_info.name.deref();
+    let mut out_file = File::create(format!("verilog_output/{module_name}.v")).unwrap();
+    md.instantiations.for_each_instance(|_template_args, inst| {
+        codegen_instance(inst.as_ref(), md, &mut out_file)
+    });
 }
 
 fn codegen_with_dependencies(linker : &Linker, md : &Module, file_name : &str) {

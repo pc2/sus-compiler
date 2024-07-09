@@ -2,9 +2,6 @@ use std::{
     cmp::Ordering, fmt::{Debug, Formatter, Result}, hash::{Hash, Hasher}, iter::Enumerate, marker::PhantomData, ops::{Index, IndexMut}
 };
 
-use crate::block_vector::{BlockVec, BlockVecIterMut, BlockVecIter};
-
-
 // TODO add custom niche for more efficient Options, wait until custom niches are stabilized (https://internals.rust-lang.org/t/nonmaxusize-and-niche-value-optimisation/19661)
 // Maybe use NonZeroUsize (https://doc.rust-lang.org/std/num/struct.NonZeroUsize.html)
 pub struct UUID<IndexMarker>(usize, PhantomData<IndexMarker>);
@@ -38,7 +35,7 @@ impl<IndexMarker : UUIDMarker> Debug for UUID<IndexMarker> {
     }
 }
 
-impl<IndexMarker : UUIDMarker> UUID<IndexMarker> {
+impl<IndexMarker> UUID<IndexMarker> {
     pub const fn from_hidden_value(v : usize) -> Self {
         UUID(v, PhantomData)
     }
@@ -107,6 +104,9 @@ impl<IndexMarker> UUIDRange<IndexMarker> {
     pub fn iter(&self) -> UUIDRangeIter<IndexMarker> {
         self.into_iter()
     }
+    pub fn map<OT, F : FnMut(UUID<IndexMarker>) -> OT>(&self, f : F) -> FlatAlloc<OT, IndexMarker> {
+        FlatAlloc { data: Vec::from_iter(self.iter().map(f)), _ph: PhantomData }
+    }
     pub fn len(&self) -> usize {
         self.1.0 - self.0.0
     }
@@ -165,7 +165,7 @@ pub struct ArenaAllocator<T, IndexMarker> {
     _ph : PhantomData<IndexMarker>
 }
 
-impl<T, IndexMarker : UUIDMarker> ArenaAllocator<T, IndexMarker> {
+impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
     pub fn new() -> Self {
         Self{data : Vec::new(), free_slots : Vec::new(), _ph : PhantomData}
     }
@@ -218,7 +218,7 @@ impl<T, IndexMarker : UUIDMarker> ArenaAllocator<T, IndexMarker> {
     }
 }
 
-impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ArenaAllocator<T, IndexMarker> {
+impl<T, IndexMarker> Index<UUID<IndexMarker>> for ArenaAllocator<T, IndexMarker> {
     type Output = T;
 
     fn index(&self, UUID(uuid, _): UUID<IndexMarker>) -> &Self::Output {
@@ -227,7 +227,7 @@ impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ArenaAllocator<T,
     }
 }
 
-impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for ArenaAllocator<T, IndexMarker> {
+impl<T, IndexMarker> IndexMut<UUID<IndexMarker>> for ArenaAllocator<T, IndexMarker> {
     fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
         assert!(self.data[uuid].is_some());
         self.data[uuid].as_mut().unwrap()
@@ -239,7 +239,7 @@ pub struct FlatOptionIterator<'a, T, IndexMarker> {
     _ph : PhantomData<IndexMarker>
 }
 
-impl<'a, T, IndexMarker : UUIDMarker> Iterator for FlatOptionIterator<'a, T, IndexMarker> {
+impl<'a, T, IndexMarker> Iterator for FlatOptionIterator<'a, T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -262,7 +262,7 @@ pub struct FlatOptionIteratorMut<'a, T, IndexMarker> {
     _ph : PhantomData<IndexMarker>
 }
 
-impl<'a, T, IndexMarker : UUIDMarker> Iterator for FlatOptionIteratorMut<'a, T, IndexMarker> {
+impl<'a, T, IndexMarker> Iterator for FlatOptionIteratorMut<'a, T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a mut T);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -280,7 +280,7 @@ impl<'a, T, IndexMarker : UUIDMarker> Iterator for FlatOptionIteratorMut<'a, T, 
     }
 }
 
-impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a ArenaAllocator<T, IndexMarker> {
+impl<'a, T, IndexMarker> IntoIterator for &'a ArenaAllocator<T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a T);
 
     type IntoIter = FlatOptionIterator<'a, T, IndexMarker>;
@@ -290,7 +290,7 @@ impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a ArenaAllocator<T, Ind
     }
 }
 
-impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a mut ArenaAllocator<T, IndexMarker> {
+impl<'a, T, IndexMarker> IntoIterator for &'a mut ArenaAllocator<T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a mut T);
 
     type IntoIter = FlatOptionIteratorMut<'a, T, IndexMarker>;
@@ -305,7 +305,7 @@ pub struct ArenaVector<T, IndexMarker> {
     _ph : PhantomData<IndexMarker>
 }
 
-impl<T, IndexMarker : UUIDMarker> ArenaVector<T, IndexMarker> {
+impl<T, IndexMarker> ArenaVector<T, IndexMarker> {
     pub fn new() -> Self {
         Self{data : Vec::new(), _ph : PhantomData}
     }
@@ -330,7 +330,7 @@ impl<T, IndexMarker : UUIDMarker> ArenaVector<T, IndexMarker> {
     }
 }
 
-impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ArenaVector<T, IndexMarker> {
+impl<T, IndexMarker> Index<UUID<IndexMarker>> for ArenaVector<T, IndexMarker> {
     type Output = T;
 
     fn index(&self, UUID(uuid, _): UUID<IndexMarker>) -> &Self::Output {
@@ -338,13 +338,13 @@ impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ArenaVector<T, In
     }
 }
 
-impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for ArenaVector<T, IndexMarker> {
+impl<T, IndexMarker> IndexMut<UUID<IndexMarker>> for ArenaVector<T, IndexMarker> {
     fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
         self.data[uuid].as_mut().unwrap()
     }
 }
 
-impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a ArenaVector<T, IndexMarker> {
+impl<'a, T, IndexMarker> IntoIterator for &'a ArenaVector<T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a T);
 
     type IntoIter = FlatOptionIterator<'a, T, IndexMarker>;
@@ -354,7 +354,7 @@ impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a ArenaVector<T, IndexM
     }
 }
 
-impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a mut ArenaVector<T, IndexMarker> {
+impl<'a, T, IndexMarker> IntoIterator for &'a mut ArenaVector<T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a mut T);
 
     type IntoIter = FlatOptionIteratorMut<'a, T, IndexMarker>;
@@ -364,122 +364,12 @@ impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a mut ArenaVector<T, In
     }
 }
 
-#[derive(Debug)]
-pub struct ListAllocator<T, IndexMarker : UUIDMarker> {
-    data : BlockVec<T>,
-    _ph : PhantomData<IndexMarker>
-}
-
-impl<T, IndexMarker : UUIDMarker> ListAllocator<T, IndexMarker> {
-    pub fn new() -> Self {
-        Self{data : BlockVec::new(), _ph : PhantomData}
-    }
-    // Allocation is const because it doesn't invalidate existing references
-    pub fn alloc(&self, v : T) -> UUID<IndexMarker> {
-        UUID(self.data.alloc(v), PhantomData)
-    }
-    pub fn get_next_alloc_id(&self) -> UUID<IndexMarker> {
-        UUID(self.data.len(), PhantomData)
-    }
-    pub fn id_range(&self) -> UUIDRange<IndexMarker> {
-        UUIDRange(UUID(0, PhantomData), UUID(self.data.len(), PhantomData))
-    }
-    pub fn iter<'a>(&'a self) -> ListAllocIterator<'a, T, IndexMarker> {
-        self.into_iter()
-    }
-    pub fn iter_mut<'a>(&'a mut self) -> ListAllocIteratorMut<'a, T, IndexMarker> {
-        self.into_iter()
-    }
-}
-
-impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for ListAllocator<T, IndexMarker> {
-    type Output = T;
-
-    fn index(&self, UUID(uuid, _): UUID<IndexMarker>) -> &Self::Output {
-        &self.data[uuid]
-    }
-}
-
-impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for ListAllocator<T, IndexMarker> {
-    fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
-        &mut self.data[uuid]
-    }
-}
-
-impl<T, IndexMarker : UUIDMarker> FromIterator<T> for ListAllocator<T, IndexMarker> {
-    fn from_iter<Iter: IntoIterator<Item = T>>(iter: Iter) -> Self {
-        Self { data: BlockVec::from_iter(iter), _ph: PhantomData }
-    }
-}
-
-pub struct ListAllocIterator<'a, T, IndexMarker> {
-    it: Enumerate<BlockVecIter<'a, T>>,
-    _ph : PhantomData<IndexMarker>
-}
-
-impl<'a, T, IndexMarker : UUIDMarker> Iterator for ListAllocIterator<'a, T, IndexMarker> {
-    type Item = (UUID<IndexMarker>, &'a T);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.it.next() {
-            None => {
-                return None;
-            },
-            Some((pos, val)) => {
-                return Some((UUID(pos, PhantomData), val));
-            }
-        }
-    }
-}
-
-pub struct ListAllocIteratorMut<'a, T, IndexMarker> {
-    it: Enumerate<BlockVecIterMut<'a, T>>,
-    _ph : PhantomData<IndexMarker>
-}
-
-impl<'a, T, IndexMarker : UUIDMarker> Iterator for ListAllocIteratorMut<'a, T, IndexMarker> {
-    type Item = (UUID<IndexMarker>, &'a mut T);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.it.next() {
-            None => {
-                return None;
-            },
-            Some((pos, val)) => {
-                return Some((UUID(pos, PhantomData), val));
-            }
-        }
-    }
-}
-
-impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a ListAllocator<T, IndexMarker> {
-    type Item = (UUID<IndexMarker>, &'a T);
-
-    type IntoIter = ListAllocIterator<'a, T, IndexMarker>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        ListAllocIterator{it : self.data.iter().enumerate(), _ph : PhantomData}
-    }
-}
-
-impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a mut ListAllocator<T, IndexMarker> {
-    type Item = (UUID<IndexMarker>, &'a mut T);
-
-    type IntoIter = ListAllocIteratorMut<'a, T, IndexMarker>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        ListAllocIteratorMut{it : self.data.iter_mut().enumerate(), _ph : PhantomData}
-    }
-}
-
-
-
 pub struct FlatAlloc<T, IndexMarker> {
     data : Vec<T>,
     _ph : PhantomData<IndexMarker>
 }
 
-impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
+impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub const fn new() -> Self {
         Self{data : Vec::new(), _ph : PhantomData}
     }
@@ -517,6 +407,9 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> FlatAllocIterMut<'a, T, IndexMarker> {
         self.into_iter()
     }
+    pub fn map<OT, F : FnMut((UUID<IndexMarker>, &T)) -> OT>(&self, f : F) -> FlatAlloc<OT, IndexMarker> {
+        FlatAlloc { data: Vec::from_iter(self.iter().map(f)), _ph: PhantomData }
+    }
     pub fn find<F : FnMut(UUID<IndexMarker>, &T) -> bool>(&self, mut predicate : F) -> Option<UUID<IndexMarker>> {
         self.iter().find(|(id, v)| predicate(*id, v)).map(|(id, _)| id)
     }
@@ -545,7 +438,7 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<T, IndexMarker> {
     }
 }
 
-impl<T, IndexMarker : UUIDMarker> FlatAlloc<Option<T>, IndexMarker> {
+impl<T, IndexMarker> FlatAlloc<Option<T>, IndexMarker> {
     pub fn iter_valids<'a>(&'a self) -> FlatOptionIterator<'a, T, IndexMarker> {
         FlatOptionIterator{ it: self.data.iter().enumerate(), _ph: PhantomData }
     }
@@ -557,7 +450,7 @@ impl<T, IndexMarker : UUIDMarker> FlatAlloc<Option<T>, IndexMarker> {
     }
 }
 
-impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for FlatAlloc<T, IndexMarker> {
+impl<T, IndexMarker> Index<UUID<IndexMarker>> for FlatAlloc<T, IndexMarker> {
     type Output = T;
 
     fn index(&self, UUID(uuid, _): UUID<IndexMarker>) -> &Self::Output {
@@ -565,7 +458,7 @@ impl<T, IndexMarker : UUIDMarker> Index<UUID<IndexMarker>> for FlatAlloc<T, Inde
     }
 }
 
-impl<T, IndexMarker : UUIDMarker> IndexMut<UUID<IndexMarker>> for FlatAlloc<T, IndexMarker> {
+impl<T, IndexMarker> IndexMut<UUID<IndexMarker>> for FlatAlloc<T, IndexMarker> {
     fn index_mut(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> &mut Self::Output {
         &mut self.data[uuid]
     }
@@ -598,12 +491,12 @@ impl<T : Hash, IndexMarker> std::hash::Hash for FlatAlloc<T, IndexMarker> {
 
 
 #[derive(Debug)]
-pub struct FlatAllocIter<'a, T, IndexMarker : UUIDMarker> {
+pub struct FlatAllocIter<'a, T, IndexMarker> {
     iter : Enumerate<std::slice::Iter<'a, T>>,
     _ph : PhantomData<IndexMarker>
 }
 
-impl<'a, T, IndexMarker : UUIDMarker> Iterator for FlatAllocIter<'a, T, IndexMarker> {
+impl<'a, T, IndexMarker> Iterator for FlatAllocIter<'a, T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -613,13 +506,13 @@ impl<'a, T, IndexMarker : UUIDMarker> Iterator for FlatAllocIter<'a, T, IndexMar
         self.iter.size_hint()
     }
 }
-impl<'a, T, IndexMarker : UUIDMarker> ExactSizeIterator for FlatAllocIter<'a, T, IndexMarker> {
+impl<'a, T, IndexMarker> ExactSizeIterator for FlatAllocIter<'a, T, IndexMarker> {
     fn len(&self) -> usize {
         self.iter.len()
     }
 }
 
-impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a FlatAlloc<T, IndexMarker> {
+impl<'a, T, IndexMarker> IntoIterator for &'a FlatAlloc<T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a T);
 
     type IntoIter = FlatAllocIter<'a, T, IndexMarker>;
@@ -630,12 +523,12 @@ impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a FlatAlloc<T, IndexMar
 }
 
 #[derive(Debug)]
-pub struct FlatAllocIterMut<'a, T, IndexMarker : UUIDMarker> {
+pub struct FlatAllocIterMut<'a, T, IndexMarker> {
     iter : Enumerate<std::slice::IterMut<'a, T>>,
     _ph : PhantomData<IndexMarker>
 }
 
-impl<'a, T, IndexMarker : UUIDMarker> Iterator for FlatAllocIterMut<'a, T, IndexMarker> {
+impl<'a, T, IndexMarker> Iterator for FlatAllocIterMut<'a, T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a mut T);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -645,24 +538,18 @@ impl<'a, T, IndexMarker : UUIDMarker> Iterator for FlatAllocIterMut<'a, T, Index
         self.iter.size_hint()
     }
 }
-impl<'a, T, IndexMarker : UUIDMarker> ExactSizeIterator for FlatAllocIterMut<'a, T, IndexMarker> {
+impl<'a, T, IndexMarker> ExactSizeIterator for FlatAllocIterMut<'a, T, IndexMarker> {
     fn len(&self) -> usize {
         self.iter.len()
     }
 }
 
-impl<'a, T, IndexMarker : UUIDMarker> IntoIterator for &'a mut FlatAlloc<T, IndexMarker> {
+impl<'a, T, IndexMarker> IntoIterator for &'a mut FlatAlloc<T, IndexMarker> {
     type Item = (UUID<IndexMarker>, &'a mut T);
 
     type IntoIter = FlatAllocIterMut<'a, T, IndexMarker>;
 
     fn into_iter(self) -> Self::IntoIter {
         FlatAllocIterMut{iter : self.data.iter_mut().enumerate(), _ph : PhantomData}
-    }
-}
-
-impl<'a, T, IndexMarker : UUIDMarker> FromIterator<T> for FlatAlloc<T, IndexMarker> {
-    fn from_iter<Iter: IntoIterator<Item = T>>(iter: Iter) -> Self {
-        Self { data: Vec::from_iter(iter), _ph: PhantomData }
     }
 }

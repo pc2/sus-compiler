@@ -7,7 +7,7 @@ use crate::linker::Linkable;
 use std::ops::Deref;
 
 pub fn map_to_type_names(template_inputs : &TemplateInputs) -> FlatAlloc<String, TemplateIDMarker> {
-    template_inputs.iter().map(|(_id, v)| v.name.clone()).collect()
+    template_inputs.map(|(_id, v)| v.name.clone())
 }
 
 pub trait TemplateNameGetter {

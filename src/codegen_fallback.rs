@@ -41,6 +41,9 @@ struct CodeGenerationContext<'g, 'out, Stream : std::fmt::Write> {
 }
 
 fn wire_name_with_latency(wire : &RealWire, absolute_latency : i64, use_latency : bool) -> String {
+    assert!(wire.absolute_latency <= absolute_latency);
+    assert!(wire.needed_until >= absolute_latency);
+    
     if use_latency && (wire.absolute_latency != absolute_latency) {
         format!("{}_D{}", wire.name, absolute_latency)
     } else {

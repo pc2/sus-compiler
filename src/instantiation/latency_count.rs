@@ -60,24 +60,8 @@ struct WireToLatencyMap {
     domain_infos : FlatAlloc<LatencyDomainInfo, DomainIDMarker>
 }
 
-/// A map from the latency nodes (usize) to the original objects that created them
-/// 
-/// Up for future reworking to add other things latency nodes can refer to. 
-/// Such as split latencies
-enum LatencyMeaning {
-    Wire(WireID)
-}
-
-impl LatencyMeaning {
-    #[track_caller]
-    fn unwrap_wire(&self) -> WireID {
-        let Self::Wire(w) = self;
-        *w
-    }
-}
-
 struct LatencyDomainInfo {
-    latency_node_meanings : Vec<LatencyMeaning>,
+    latency_node_meanings : Vec<WireID>,
     initial_values : Vec<SpecifiedLatency>,
     input_ports : Vec<usize>,
     output_ports : Vec<usize>
@@ -87,16 +71,16 @@ impl WireToLatencyMap {
     fn compute(wires : &FlatAlloc<RealWire, WireIDMarker>, domains : UUIDRange<DomainIDMarker>, interface_ports : &FlatAlloc<Option<InstantiatedPort>, PortIDMarker>) -> Self {
         const PLACEHOLDER : usize = usize::MAX;
     
-        let mut map_wire_to_latency_node : FlatAlloc<usize, WireIDMarker> = wires.iter().map(|_| PLACEHOLDER).collect();
+        let mut map_wire_to_latency_node : FlatAlloc<usize, WireIDMarker> = wires.map(|_| PLACEHOLDER);
         
-        let mut domain_infos : FlatAlloc<LatencyDomainInfo, DomainIDMarker> = domains.iter().map(|domain| {
+        let mut domain_infos : FlatAlloc<LatencyDomainInfo, DomainIDMarker> = domains.map(|domain| {
             let mut latency_node_meanings = Vec::with_capacity(wires.len());
             let mut initial_values = Vec::new();
 
             for (w_id, w) in wires {
                 if w.domain == domain {
                     let new_idx = latency_node_meanings.len();
-                    latency_node_meanings.push(LatencyMeaning::Wire(w_id));
+                    latency_node_meanings.push(w_id);
                     debug_assert!(map_wire_to_latency_node[w_id] == PLACEHOLDER);
                     map_wire_to_latency_node[w_id] = new_idx;
     
@@ -107,10 +91,10 @@ impl WireToLatencyMap {
             }
     
             LatencyDomainInfo{latency_node_meanings, initial_values, input_ports : Vec::new(), output_ports : Vec::new()}
-        }).collect();
+        });
 
         for (_id, p) in interface_ports.iter_valids() {
-            let domain_to_edit = &mut domain_infos[p.interface];
+            let domain_to_edit = &mut domain_infos[p.domain];
             let latency_node = map_wire_to_latency_node[p.wire];
             if p.is_input {
                 &mut domain_to_edit.input_ports
@@ -129,24 +113,11 @@ impl WireToLatencyMap {
     }
 }
 
-impl<'fl, 'l> InstantiationContext<'fl, 'l> {
-    fn iter_sources_with_min_latency<F : FnMut(WireID, i64)>(&self, wire_source : &RealWireDataSource, mut f : F) {
-        match wire_source {
+impl RealWireDataSource {
+    fn iter_sources_with_min_latency_no_ports<F : FnMut(WireID, i64)>(&self, mut f : F) {
+        match self {
             RealWireDataSource::ReadOnly => {}
-            RealWireDataSource::OutPort { sub_module_id, port_id } => {
-                let sub_mod = &self.submodules[*sub_module_id];
-                let Some(inst) = &sub_mod.instance else {return}; // This module hasn't been instantiated yet
-                let this_output_port = inst.interface_ports[*port_id].as_ref().unwrap();
-                assert!(!this_output_port.is_input);
-
-                for (input_port_id, attached_wire) in sub_mod.port_map.iter_valids() {
-                    let input_port = inst.interface_ports[input_port_id].as_ref().unwrap(); // Non-present port should have been caught once the submodule was instantiated
-                    if !input_port.is_input {continue} // Skip other outputs
-                    if input_port.interface != this_output_port.interface {continue} // Skip ports of different interfaces
-
-                    f(attached_wire.maps_to_wire, this_output_port.absolute_latency - input_port.absolute_latency);
-                } 
-            }
+            RealWireDataSource::OutPort { .. } => {}
             RealWireDataSource::Multiplexer { is_state: _, sources } => {
                 for s in sources {
                     f(s.from.from, s.from.num_regs);
@@ -170,21 +141,41 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             RealWireDataSource::Constant { value: _ } => {}
         }
     }
+    fn iter_sources_with_min_latency<F : FnMut(WireID, i64)>(&self, other_wires_ctx : &InstantiationContext, mut f : F) {
+        match self {
+            RealWireDataSource::OutPort { sub_module_id, port_id } => {
+                let sub_mod = &other_wires_ctx.submodules[*sub_module_id];
+                let Some(inst) = &sub_mod.instance else {return}; // This module hasn't been instantiated yet
+                let this_output_port = inst.interface_ports[*port_id].as_ref().unwrap();
+                assert!(!this_output_port.is_input);
 
-    fn make_fanins(&self, latency_node_mapper : &WireToLatencyMap, latency_node_to_wire_map : &[LatencyMeaning], domain_id : DomainID) -> ListOfLists<FanInOut> {
+                for (input_port_id, attached_wire) in sub_mod.port_map.iter_valids() {
+                    let input_port = inst.interface_ports[input_port_id].as_ref().unwrap(); // Non-present port should have been caught once the submodule was instantiated
+                    if !input_port.is_input {continue} // Skip other outputs
+                    if input_port.domain != this_output_port.domain {continue} // Skip ports of different interfaces
+
+                    f(attached_wire.maps_to_wire, this_output_port.absolute_latency - input_port.absolute_latency);
+                } 
+            }
+            _ => {
+                self.iter_sources_with_min_latency_no_ports(f);
+            }
+        }
+    }
+}
+
+impl<'fl, 'l> InstantiationContext<'fl, 'l> {
+    fn make_fanins(&self, latency_node_mapper : &WireToLatencyMap, latency_node_to_wire_map : &[WireID], domain_id : DomainID) -> ListOfLists<FanInOut> {
         let mut fanins : ListOfLists<FanInOut> = ListOfLists::new_with_groups_capacity(latency_node_to_wire_map.len());
         
         // Wire to wire Fanin
-        for target in latency_node_to_wire_map {
+        for wire_id in latency_node_to_wire_map {
             fanins.new_group();
-            match target {
-                LatencyMeaning::Wire(wire_id) => {
-                    self.iter_sources_with_min_latency(&self.wires[*wire_id].source, |from, delta_latency| {
-                        assert_eq!(self.wires[from].domain, domain_id);
-                        fanins.push_to_last_group(FanInOut{other : latency_node_mapper.map_wire_to_latency_node[from], delta_latency});
-                    });
-                }
-            }
+
+            self.wires[*wire_id].source.iter_sources_with_min_latency(&self, |from, delta_latency| {
+                assert_eq!(self.wires[from].domain, domain_id);
+                fanins.push_to_last_group(FanInOut{other : latency_node_mapper.map_wire_to_latency_node[from], delta_latency});
+            });
         }
 
         fanins
@@ -208,7 +199,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         if any_invalid_port {return} // Early exit so we don't flood WIP modules with "Node not reached by Latency Counting" errors
 
         let latency_node_mapper = WireToLatencyMap::compute(&self.wires, self.md.domains.id_range(), &self.interface_ports);
-
+        
         for (domain_id, domain_info) in &latency_node_mapper.domain_infos {
             let fanins = self.make_fanins(&latency_node_mapper, &domain_info.latency_node_meanings, domain_id);
             
@@ -218,7 +209,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             match solve_latencies(&fanins, &fanouts, &domain_info.input_ports, &domain_info.output_ports, domain_info.initial_values.clone()) {
                 Ok(latencies) => {
                     for (_id, (node, lat)) in zip(domain_info.latency_node_meanings.iter(), latencies.iter()).enumerate() {
-                        let wire = &mut self.wires[node.unwrap_wire()];
+                        let wire = &mut self.wires[*node];
                         wire.absolute_latency = *lat;
                         if *lat == CALCULATE_LATENCY_LATER {
                             let source_location = self.md.get_instruction_span(wire.original_instruction);
@@ -233,14 +224,14 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             
             // Compute needed_untils
             for (latency_idx, wire_id) in domain_info.latency_node_meanings.iter().enumerate() {
-                let wire = &self.wires[wire_id.unwrap_wire()];
+                let wire = &self.wires[*wire_id];
                 let mut needed_until = wire.absolute_latency;
                 for target_fanout in &fanouts[latency_idx] {
-                    let target_wire = &self.wires[domain_info.latency_node_meanings[target_fanout.other].unwrap_wire()];
-                    
+                    let target_wire = &self.wires[domain_info.latency_node_meanings[target_fanout.other]];
+
                     needed_until = max(needed_until, target_wire.absolute_latency);
                 }
-                self.wires[wire_id.unwrap_wire()].needed_until = needed_until;
+                self.wires[*wire_id].needed_until = needed_until;
             }
         }
             
@@ -250,13 +241,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
     }
 
-    fn gather_all_mux_inputs(&self, latency_node_meanings : &[LatencyMeaning], conflict_iter : &[SpecifiedLatency]) -> Vec<PathMuxSource<'_>> {
+    fn gather_all_mux_inputs(&self, latency_node_meanings : &[WireID], conflict_iter : &[SpecifiedLatency]) -> Vec<PathMuxSource<'_>> {
         let mut connection_list = Vec::new();
         for window in conflict_iter.windows(2) {
             let [from, to] = window else {unreachable!()};
-            let LatencyMeaning::Wire(from_wire_id) = latency_node_meanings[from.wire];
+            let from_wire_id = latency_node_meanings[from.wire];
             //let from_wire = &self.wires[from_wire_id];
-            let LatencyMeaning::Wire(to_wire_id) = latency_node_meanings[to.wire];
+            let to_wire_id = latency_node_meanings[to.wire];
             let to_wire = &self.wires[to_wire_id];
             let RealWireDataSource::Multiplexer { is_state:_, sources } = &to_wire.source else {continue}; // We can only name multiplexers
     
@@ -277,7 +268,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         connection_list
     }
 
-    fn report_error(&self, latency_node_meanings : &[LatencyMeaning], err: LatencyCountingError) {
+    fn report_error(&self, latency_node_meanings : &[WireID], err: LatencyCountingError) {
         match err {
             LatencyCountingError::NetPositiveLatencyCycle { conflict_path, net_roundtrip_latency } => {
                 let writes_involved = self.gather_all_mux_inputs(latency_node_meanings, &conflict_path);
@@ -311,13 +302,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
             LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
                 for port in bad_ports {
-                    let port_decl = self.md.instructions[self.wires[latency_node_meanings[port.0].unwrap_wire()].original_instruction].unwrap_wire_declaration();
+                    let port_decl = self.md.instructions[self.wires[latency_node_meanings[port.0]].original_instruction].unwrap_wire_declaration();
                     self.errors.error(port_decl.name_span, format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
                 }
             }
             LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path } => {
-                let start_wire = &self.wires[latency_node_meanings[conflict_path.first().unwrap().wire].unwrap_wire()];
-                let end_wire = &self.wires[latency_node_meanings[conflict_path.last().unwrap().wire].unwrap_wire()];
+                let start_wire = &self.wires[latency_node_meanings[conflict_path.first().unwrap().wire]];
+                let end_wire = &self.wires[latency_node_meanings[conflict_path.last().unwrap().wire]];
                 let start_decl = self.md.instructions[start_wire.original_instruction].unwrap_wire_declaration();
                 let end_decl = self.md.instructions[end_wire.original_instruction].unwrap_wire_declaration();
                 let end_latency_decl = self.md.instructions[end_decl.latency_specifier.unwrap()].unwrap_wire();

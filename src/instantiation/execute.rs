@@ -465,7 +465,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         self.get_unique_name()
                     };
                     let port_map = FlatAlloc::new_nones(sub_module.ports.len());
-                    let interface_call_sites = sub_module.interfaces.iter().map(|_| Vec::new()).collect();
+                    let interface_call_sites = sub_module.interfaces.map(|_| Vec::new());
                     let mut template_args = FlatAlloc::with_capacity(submodule.module_ref.template_args.len());
                     
                     for (_id, v) in &submodule.module_ref.template_args {
@@ -601,7 +601,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     is_input: port.is_input,
                     absolute_latency: CALCULATE_LATENCY_LATER,
                     typ: wire.typ.clone(),
-                    interface : wire.domain
+                    domain : wire.domain
                 })
             }
         }

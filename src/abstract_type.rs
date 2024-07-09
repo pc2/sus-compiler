@@ -117,8 +117,8 @@ pub struct TypeUnifier<'linker, 'errs> {
 
 impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
     pub fn new(linker_types : Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>, template_inputs : &TemplateInputs, errors : &'errs ErrorCollector<'linker>, domain_names : &FlatAlloc<String, DomainIDMarker>) -> Self {
-        let domains = domain_names.iter().map(|(_id, name)| DomainTypeSubstitution::KnownDomain { name: name.clone() }).collect();
-        let final_domains = domain_names.iter().map(|(_id, _interface)| BestName::NamedDomain).collect();
+        let domains = domain_names.map(|(_id, name)| DomainTypeSubstitution::KnownDomain { name: name.clone() });
+        let final_domains = domain_names.map(|(_id, _interface)| BestName::NamedDomain);
         Self {
             linker_types,
             template_type_names : map_to_type_names(template_inputs),

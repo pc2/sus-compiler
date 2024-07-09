@@ -1,0 +1,14 @@
+
+
+module testNeedUntil {
+
+	bool b'0
+
+
+	bool c
+
+
+	reg reg c = b
+
+}
+

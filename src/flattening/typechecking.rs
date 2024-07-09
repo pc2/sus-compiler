@@ -280,7 +280,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             Instruction::SubModule(sm) => {
                 self.typecheck_template_global(&sm.module_ref);
                 let md = &self.modules[sm.module_ref.id];
-                let local_interface_domains = md.domain_names.iter().map(|_| self.type_checker.new_unknown_domain_id()).collect();
+                let local_interface_domains = md.domain_names.map(|_| self.type_checker.new_unknown_domain_id());
 
                 let Instruction::SubModule(sm) = &mut self.working_on.instructions[instr_id] else {unreachable!()};
                 sm.local_interface_domains = local_interface_domains;
@@ -408,7 +408,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
         }
 
-        self.modules.working_on.domains = self.type_checker.final_domains.iter().map(|(id, best_name)| {
+        self.modules.working_on.domains = self.type_checker.final_domains.map(|(id, best_name)| {
             DomainInfo { name: match *best_name {
                 BestName::NamedDomain => self.modules.working_on.domain_names[id].clone(),
                 BestName::SubModule(sm_instr, sm_domain) => {
@@ -420,7 +420,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 BestName::NamedWire(decl_id) => self.working_on.instructions[decl_id].unwrap_wire_declaration().name.clone(),
                 BestName::UnnamedWire => format!("domain_{}", id.get_hidden_value())
             }}
-        }).collect();
+        });
     }
     
     /* 
@@ -429,7 +429,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     fn find_unused_variables(&self) {
         let instruction_fanins = self.make_fanins();
 
-        let mut is_instance_used_map : FlatAlloc<bool, FlatIDMarker> = self.working_on.instructions.iter().map(|_| false).collect();
+        let mut is_instance_used_map : FlatAlloc<bool, FlatIDMarker> = self.working_on.instructions.map(|_| false);
 
         let mut wire_to_explore_queue : Vec<FlatID> = Vec::new();
 
@@ -462,7 +462,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
     fn make_fanins(&self) -> FlatAlloc<Vec<UUID<FlatIDMarker>>, FlatIDMarker> {
         // Setup Wire Fanouts List for faster processing
-        let mut instruction_fanins : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.working_on.instructions.iter().map(|_| Vec::new()).collect();
+        let mut instruction_fanins : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.working_on.instructions.map(|_| Vec::new());
         
         for (inst_id, inst) in self.working_on.instructions.iter() {
             let mut collector_func = |id| instruction_fanins[inst_id].push(id);

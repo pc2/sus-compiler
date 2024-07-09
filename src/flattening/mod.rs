@@ -433,6 +433,7 @@ pub struct SubModuleInstance {
     /// Name is not always present in source code. Such as in inline function call syntax: my_mod(a, b, c)
     pub name : Option<(String, Span)>,
     pub declaration_runtime_depth : usize,
+    /// Maps each of the module's local domains to the domain that it is used in. 
     pub local_interface_domains : FlatAlloc<DomainID, DomainIDMarker>,
     pub documentation : Documentation
 }

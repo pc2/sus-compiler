@@ -1,10 +1,10 @@
 
 
 
-module use_BitSerialMatrixMultiply {
-    gen int[10][10] MATRIX
+module BitSerialMatrixMultiply {
+    gen int[10][15] MATRIX
 
-    for int X in 0..10 {
+    for int X in 0..15 {
         for int Y in 0..10 {
             // Try 1/4 random-ish number generation
             if ((X + Y) * 7 + ((X+1)*10) / (Y+1)) % 4 == 0 {
@@ -15,12 +15,14 @@ module use_BitSerialMatrixMultiply {
         }
     }
 
-    BitSerialMatrixMultiply::<WIDTH = 10, HEIGHT = 10, MATRIX = MATRIX;> bsm
+    interface BitSerialMatrixMultiply : bool start, int[10] values -> int[15] result
+
+    result = BitSerialMatrixMultiplyTemplate::<WIDTH = 10, HEIGHT = 15, MATRIX = MATRIX;>(start, values)
 }
 
 
 
-module BitSerialMatrixMultiply {
+module BitSerialMatrixMultiplyTemplate {
     input gen int WIDTH
     input gen int HEIGHT
     
@@ -31,7 +33,7 @@ module BitSerialMatrixMultiply {
 
     BitSerialMatrixMultiplyState::<WIDTH, HEIGHT, MATRIX;> bsm_state
 
-    interface BitSerialMatrixMultiply : bool start, int[WIDTH] values -> int[WIDTH] result
+    interface BitSerialMatrixMultiplyTemplate : bool start, int[WIDTH] values -> int[HEIGHT] result
 
     state bool[WIDTH][INT_BITWIDTH] split_into_bits
 
@@ -49,9 +51,7 @@ module BitSerialMatrixMultiply {
         bsm_state.feed(false, split_into_bits[0])
     }
 
-    if iter.last {
-        result = LatencyOffset::<INT_BITWIDTH;int[WIDTH]>(bsm_state.result_vector)
-    }
+    result = LatencyOffset::<INT_BITWIDTH;int[HEIGHT]>(bsm_state.finish(iter.last))
 
     if start {
         iter.start(true)
