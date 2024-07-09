@@ -73,7 +73,6 @@ impl RealWireDataSource {
     fn iter_sources_with_min_latency<F : FnMut(WireID, i64)>(&self, mut f : F) {
         match self {
             RealWireDataSource::ReadOnly => {}
-            RealWireDataSource::OutPort { .. } => {}
             RealWireDataSource::Multiplexer { is_state: _, sources } => {
                 for s in sources {
                     f(s.from.from, s.from.num_regs);

@@ -170,7 +170,7 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
                 RealWireDataSource::Constant { value } => {
                     writeln!(self.program_text, " = {};", value.to_string())?;
                 }
-                RealWireDataSource::ReadOnly | RealWireDataSource::OutPort { sub_module_id:_, port_id:_ } => {
+                RealWireDataSource::ReadOnly => {
                     writeln!(self.program_text, ";")?;
                 }
                 RealWireDataSource::Multiplexer{is_state, sources : _} => {
@@ -231,7 +231,6 @@ impl<'g, 'out, Stream : std::fmt::Write> CodeGenerationContext<'g, 'out, Stream>
                     writeln!(self.program_text, "end")?;
                 }
                 RealWireDataSource::ReadOnly => {}
-                RealWireDataSource::OutPort { sub_module_id:_, port_id:_ } => {}
                 RealWireDataSource::Select{root : _, path : _} => {}
                 RealWireDataSource::UnaryOp{op : _, right : _} => {}
                 RealWireDataSource::BinaryOp{op : _, left : _, right : _} => {}

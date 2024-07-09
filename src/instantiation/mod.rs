@@ -59,7 +59,6 @@ pub struct MultiplexerSource {
 #[derive(Debug)]
 pub enum RealWireDataSource {
     ReadOnly,
-    OutPort{sub_module_id : SubModuleID, port_id : PortID},
     Multiplexer{is_state : Option<Value>, sources : Vec<MultiplexerSource>},
     UnaryOp{op : UnaryOperator, right : WireID},
     BinaryOp{op : BinaryOperator, left : WireID, right : WireID},

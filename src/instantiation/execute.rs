@@ -306,7 +306,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             let source = if port_data.is_input {
                 RealWireDataSource::Multiplexer { is_state: None, sources: Vec::new() }
             } else {
-                RealWireDataSource::OutPort { sub_module_id, port_id }
+                RealWireDataSource::ReadOnly
             };
             let domain = submodule_instruction.local_interface_domains[port_data.domain];
             let new_wire = self.wires.alloc(RealWire {
