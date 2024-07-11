@@ -21,21 +21,21 @@ fn get_type_name_size(id: TypeUUID) -> u64 {
 
 /// Creates the Verilog variable declaration for tbis variable. 
 /// 
-/// IE for `int[15] myVar (reg)` it creates `reg[31:0] myVar[14:0]`
-fn typ_to_verilog_array(typ: &ConcreteType, prefix : &str, var_name: &str) -> String {
+/// IE for `int[15] myVar` it creates `logic[31:0] myVar[14:0]`
+fn typ_to_verilog_array(typ: &ConcreteType, var_name: &str) -> String {
     match typ {
         ConcreteType::Named(id) => {
             let sz = get_type_name_size(*id);
             if sz == 1 {
-                format!("{prefix} {var_name}")
+                format!("logic {var_name}")
             } else {
-                format!("{prefix}[{}:0] {var_name}", sz - 1)
+                format!("logic[{}:0] {var_name}", sz - 1)
             }
         }
         ConcreteType::Array(arr) => {
             let (content_typ, size) = arr.deref();
             let sz = size.unwrap_value().unwrap_integer();
-            let mut result = typ_to_verilog_array(content_typ, prefix, var_name);
+            let mut result = typ_to_verilog_array(content_typ, var_name);
             use std::fmt::Write;
             write!(result, "[{}:0]", sz - 1).unwrap();
             result
@@ -118,9 +118,9 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 let from = wire_name_with_latency(w, i, self.use_latency);
                 let to = wire_name_with_latency(w, i + 1, self.use_latency);
 
-                let var_decl = typ_to_verilog_array(&w.typ, "/*latency*/ reg", &to);
+                let var_decl = typ_to_verilog_array(&w.typ, &to);
 
-                writeln!(self.program_text, "{var_decl}; always @(posedge clk) begin {to} <= {from}; end")?;
+                writeln!(self.program_text, "/*latency*/ {var_decl}; always_ff @(posedge clk) begin {to} <= {from}; end")?;
             }
         }
         Ok(())
@@ -135,13 +135,14 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             let input_or_output = if port.is_input {
                 "input"
             } else {
-                "output /*mux_wire*/ reg"
+                "output"
             };
+            let wire_doc = port_wire.source.get_sv_info_doc();
             let wire_name = wire_name_self_latency(port_wire, self.use_latency);
-            let wire_decl = typ_to_verilog_array(&port_wire.typ, input_or_output, &wire_name);
+            let wire_decl = typ_to_verilog_array(&port_wire.typ, &wire_name);
             writeln!(
                 self.program_text,
-                "\t{wire_decl},"
+                "\t{wire_doc}{input_or_output} {wire_decl},"
             )?;
         }
         writeln!(self.program_text, ");\n")?;
@@ -161,31 +162,16 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 &self.md.instructions[w.original_instruction]
             {
                 // Don't print named inputs and outputs, already did that in interface
-                if let DeclarationPortInfo::RegularPort {
-                    is_input: _,
-                    port_id: _,
-                } = wire_decl.is_port
+                if let DeclarationPortInfo::RegularPort {..} = wire_decl.is_port
                 {
                     continue;
                 }
             }
-            let wire_or_reg = if let RealWireDataSource::Multiplexer {
-                is_state,
-                sources: _,
-            } = &w.source
-            {
-                if is_state.is_some() {
-                    "reg"
-                } else {
-                    "/*mux_wire*/ reg"
-                }
-            } else {
-                "wire"
-            };
+            let wire_or_reg = w.source.get_sv_info_doc();
 
             let wire_name = wire_name_self_latency(w, self.use_latency);
-            let wire_decl = typ_to_verilog_array(&w.typ, wire_or_reg, &wire_name);
-            write!(self.program_text, "{wire_decl}")?;
+            let wire_decl = typ_to_verilog_array(&w.typ, &wire_name);
+            write!(self.program_text, "{wire_or_reg}{wire_decl}")?;
 
             match &w.source {
                 RealWireDataSource::Select { root, path } => {
@@ -270,10 +256,10 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                     if is_state.is_some() {
                         writeln!(
                             self.program_text,
-                            "/*always_ff*/ always @(posedge clk) begin"
+                            "always_ff @(posedge clk) begin"
                         )?;
                     } else {
-                        writeln!(self.program_text, "/*always_comb*/ always @(*) begin")?;
+                        writeln!(self.program_text, "always_comb begin")?;
                         writeln!(self.program_text, "\t{output_name} <= 1'bX; // Combinatorial wires are not defined when not valid")?;
                     }
 
@@ -307,6 +293,16 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
         writeln!(self.program_text, "endmodule\n")?;
 
         Ok(())
+    }
+}
+
+impl RealWireDataSource {
+    fn get_sv_info_doc(&self) -> &str {
+        match self {
+            RealWireDataSource::Multiplexer {is_state : Some(_), sources: _} => "/*state*/ ",
+            RealWireDataSource::Multiplexer {is_state : None, sources: _} => "/*mux_wire*/ ",
+            _ => "",
+        }
     }
 }
 

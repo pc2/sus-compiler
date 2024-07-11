@@ -132,16 +132,16 @@ impl Value {
             Value::Bool(b) => if *b { "1'b1" } else { "1'b0" }.to_owned(),
             Value::Integer(v) => v.to_string(),
             Value::Array(arr_box) => {
-                let mut result = "[".to_owned();
+                let mut result = "'{".to_owned();
                 for v in arr_box.iter() {
                     result.push_str(&v.to_string());
                     result.push_str(", ");
                 }
-                result.push(']');
+                result.push('}');
                 result
             }
-            Value::Unset => "Value::Unset".to_owned(),
-            Value::Error => "Value::Error".to_owned(),
+            Value::Unset => "1'bX/*UNSET*/".to_owned(),
+            Value::Error => "1'bX/*ERROR*/".to_owned(),
         }
     }
 }

@@ -52,14 +52,14 @@ fn codegen_instance(inst: &InstantiatedModule, md: &Module, out_file: &mut File)
 
 fn codegen_to_file(md: &Module) {
     let module_name = md.link_info.name.deref();
-    let mut out_file = File::create(format!("verilog_output/{module_name}.v")).unwrap();
+    let mut out_file = File::create(format!("verilog_output/{module_name}.sv")).unwrap();
     md.instantiations.for_each_instance(|_template_args, inst| {
         codegen_instance(inst.as_ref(), md, &mut out_file)
     });
 }
 
 fn codegen_with_dependencies(linker: &Linker, md: &Module, file_name: &str) {
-    let mut out_file = File::create(format!("verilog_output/{file_name}.v")).unwrap();
+    let mut out_file = File::create(format!("verilog_output/{file_name}.sv")).unwrap();
 
     let mut top_level_instances: Vec<Rc<InstantiatedModule>> = Vec::new();
     md.instantiations.for_each_instance(|_template_args, inst| {
