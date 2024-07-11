@@ -12,9 +12,14 @@ pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
 
 use crate::{
-    abstract_type::{AbstractType, FullType}, arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, linker::{ConstantUUID, LinkInfo, ModuleUUID, TypeUUID}, parser::Documentation, template::{GlobalReference, TemplateArgs, TemplateID}, value::Value
+    arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, parser::Documentation, value::Value
 };
+use crate::linker::{ConstantUUID, LinkInfo, ModuleUUID, TypeUUID};
 
+use crate::typing::{
+    abstract_type::{AbstractType, FullType},
+    template::{GlobalReference, TemplateArgs, TemplateID},
+};
 
 pub struct FlatIDMarker;
 impl UUIDMarker for FlatIDMarker {const DISPLAY_NAME : &'static str = "obj_";}

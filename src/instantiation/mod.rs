@@ -8,7 +8,13 @@ mod latency_count;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, FlatIDMarker, InterfaceIDMarker, Module, PortID, PortIDMarker, UnaryOperator}, linker::{Linker, ModuleUUID}, template::{check_all_template_args_valid, ConcreteTemplateArgs}, to_string::pretty_print_concrete_instance, value::{TypedValue, Value}
+    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, linker::{Linker, ModuleUUID}, to_string::pretty_print_concrete_instance, value::{TypedValue, Value}
+};
+use crate::flattening::{BinaryOperator, DomainID, FlatID, FlatIDMarker, InterfaceIDMarker, Module, PortIDMarker, UnaryOperator};
+
+use crate::typing::{
+    concrete_type::ConcreteType,
+    template::{check_all_template_args_valid, ConcreteTemplateArgs},
 };
 
 use self::latency_algorithm::SpecifiedLatency;

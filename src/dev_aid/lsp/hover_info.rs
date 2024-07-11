@@ -3,8 +3,14 @@ use std::borrow::Cow;
 
 use lsp_types::{LanguageString, MarkedString};
 
-use crate::{
-    abstract_type::DomainType, flattening::{DeclarationPortInfo, FlatID, IdentifierType, InterfaceToDomainMap, Module}, instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER}, linker::{FileData, LinkInfo, Linker, NameElem}, parser::Documentation, template::{GenerativeTemplateInputKind, TemplateInputKind, TypeTemplateInputKind}
+use crate::parser::Documentation;
+use crate::instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER};
+use crate::linker::{FileData, LinkInfo, Linker, NameElem};
+use crate::flattening::{DeclarationPortInfo, FlatID, IdentifierType, InterfaceToDomainMap, Module};
+
+use crate::typing::{
+    abstract_type::DomainType,
+    template::{GenerativeTemplateInputKind, TemplateInputKind, TypeTemplateInputKind}
 };
 
 use super::tree_walk::{InModule, LocationInfo};

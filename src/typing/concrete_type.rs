@@ -1,7 +1,9 @@
 
 use std::ops::{Deref, Index};
 
-use crate::{abstract_type::AbstractType, errors::ErrorCollector, file_position::Span, flattening::{BinaryOperator, UnaryOperator}, linker::{get_builtin_type, NamedType, TypeUUID}, value::Value};
+use crate::{errors::ErrorCollector, file_position::Span, flattening::{BinaryOperator, UnaryOperator}, value::Value};
+use crate::linker::{get_builtin_type, NamedType, TypeUUID};
+use super::abstract_type::AbstractType;
 
 pub const BOOL_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("bool"));
 pub const INT_CONCRETE_TYPE : ConcreteType = ConcreteType::Named(get_builtin_type("int"));

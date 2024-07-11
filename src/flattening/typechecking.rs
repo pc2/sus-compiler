@@ -4,7 +4,13 @@ use std::ops::{Deref, DerefMut};
 use walk::for_each_generative_input_in_template_args;
 
 use crate::{
-    abstract_type::{BestName, DomainType, TypeUnifier, BOOL_TYPE, INT_TYPE}, debug::SpanDebugger, errors::ErrorCollector, file_position::SpanFile, linker::{with_module_editing_context, ConstantUUIDMarker, FileUUID, Linkable, Linker, ModuleUUIDMarker, NameElem, NamedConstant, Resolver, WorkingOnResolver}, template::TemplateArgKind
+    debug::SpanDebugger, errors::ErrorCollector, file_position::SpanFile,
+};
+use crate::linker::{with_module_editing_context, ConstantUUIDMarker, FileUUID, Linkable, Linker, ModuleUUIDMarker, NameElem, NamedConstant, Resolver, WorkingOnResolver};
+
+use crate::typing::{
+    abstract_type::{BestName, DomainType, TypeUnifier, BOOL_TYPE, INT_TYPE},
+    template::TemplateArgKind
 };
 
 use super::*;

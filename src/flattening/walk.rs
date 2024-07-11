@@ -1,4 +1,4 @@
-use crate::template::{TemplateArgKind, TemplateArgs};
+use crate::typing::template::{TemplateArgKind, TemplateArgs};
 
 use super::{FlatID, WireReferencePathElement, WireReferenceRoot, WireSource, WrittenType};
 

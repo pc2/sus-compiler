@@ -7,7 +7,15 @@ use std::{collections::{HashMap, HashSet}, cell::RefCell};
 use tree_sitter::Tree;
 
 use crate::{
-    abstract_type::{DomainType, FullType}, arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, concrete_type::ConcreteType, errors::{CompileError, ErrorCollector, ErrorInfo, ErrorLevel, ErrorStore}, file_position::{FileText, Span, SpanFile}, flattening::Module, parser::Documentation, template::TemplateInputs, util::{const_str_position, const_str_position_in_tuples}, value::{TypedValue, Value}
+    arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, file_position::{FileText, Span, SpanFile}, flattening::Module, parser::Documentation, util::{const_str_position, const_str_position_in_tuples}, value::{TypedValue, Value}
+};
+
+use crate::errors::{CompileError, ErrorCollector, ErrorInfo, ErrorLevel, ErrorStore};
+
+use crate::typing::{
+    abstract_type::{DomainType, FullType},
+    concrete_type::ConcreteType,
+    template::TemplateInputs,
 };
 
 use self::checkpoint::CheckPoint;

@@ -2,7 +2,10 @@
 
 use std::cell::RefCell;
 
-use crate::{arena_alloc::ArenaAllocator, file_position::{Span, SpanFile}, flattening::{Declaration, Instruction, Interface, Module, Port, SubModuleInstance}, linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker, LinkInfo}, template::TemplateInput};
+use crate::{arena_alloc::ArenaAllocator, file_position::{Span, SpanFile}, typing::template::TemplateInput};
+
+use crate::flattening::{Declaration, Instruction, Interface, Module, Port, SubModuleInstance};
+use crate::linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker, LinkInfo};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ErrorLevel {

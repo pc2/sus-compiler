@@ -2,7 +2,12 @@ use std::ops::Deref;
 
 use num::BigInt;
 
-use crate::{abstract_type::{AbstractType, FullType, DomainType, BOOL_TYPE, INT_TYPE}, concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, flattening::{BinaryOperator, UnaryOperator}};
+use crate::flattening::{BinaryOperator, UnaryOperator};
+
+use crate::typing::{
+    abstract_type::{AbstractType, FullType, DomainType, BOOL_TYPE, INT_TYPE},
+    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {

@@ -9,8 +9,10 @@ use lsp_types::{notification::*, request::Request, *};
 use semantic_tokens::{semantic_token_capabilities, make_semantic_tokens};
 
 use crate::{
-    arena_alloc::ArenaVector, compiler_top::{add_file, recompile_all, update_file}, config::config, errors::{CompileError, ErrorLevel}, file_position::{FileText, LineCol, Span, SpanFile}, flattening::{FlatID, Instruction}, linker::{FileData, FileUUID, FileUUIDMarker, Linker, ModuleUUID}
+    arena_alloc::ArenaVector, compiler_top::{add_file, recompile_all, update_file}, config::config, errors::{CompileError, ErrorLevel}, file_position::{FileText, LineCol, Span, SpanFile}
 };
+use crate::flattening::{FlatID, Instruction};
+use crate::linker::{FileData, FileUUID, FileUUIDMarker, Linker, ModuleUUID};
 
 use tree_walk::{get_selected_object, InModule, LocationInfo};
 

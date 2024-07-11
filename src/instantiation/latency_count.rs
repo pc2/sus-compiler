@@ -4,7 +4,7 @@ use std::{cmp::max, iter::zip};
 
 use crate::{
     arena_alloc::FlatAlloc,
-    flattening::{FlatIDMarker, Instruction, WriteModifiers},
+    flattening::{DomainIDMarker, FlatIDMarker, Instruction, WriteModifiers},
     instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}
 };
 

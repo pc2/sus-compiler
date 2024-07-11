@@ -6,11 +6,17 @@ use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 
 use crate::{
-    arena_alloc::{UUIDRange, UUIDRangeIter, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, Resolver, TypeUUIDMarker, WorkingOnResolver}, parser::Cursor, template::{GenerativeTemplateInputKind, TemplateArg, TemplateArgKind, TemplateArgs, TemplateIDMarker, TemplateInputKind, TypeTemplateInputKind}, value::Value
+    arena_alloc::{UUIDRange, UUIDRangeIter, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, parser::Cursor, value::Value
 };
+use crate::linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, Resolver, TypeUUIDMarker, WorkingOnResolver};
 
 use super::name_context::LocalVariableContext;
 use super::*;
+
+use crate::typing::template::{
+    TemplateID, GenerativeTemplateInputKind, TemplateArg, TemplateArgKind, TemplateArgs, TemplateIDMarker, TemplateInputKind, TypeTemplateInputKind
+};
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NamedLocal {
@@ -161,10 +167,6 @@ enum DeclarationContext {
     ForLoopGenerative,
     PlainWire
 }
-
-use crate::template::TemplateID;
-
-use super::FlatID;
 
 struct FlatteningContext<'l, 'errs> {
     modules : WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>,

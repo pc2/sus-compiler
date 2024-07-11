@@ -2,8 +2,11 @@
 use std::ops::Deref;
 
 use crate::{
-    file_position::Span, flattening::{Declaration, DeclarationPortInfo, FlatID, Instruction, Interface, InterfaceID, Module, ModuleInterfaceReference, PortID, SubModuleInstance, WireInstance, WireReference, WireReferenceRoot, WireSource, WrittenType}, linker::{FileData, FileUUID, LinkInfo, Linker, ModuleUUID, NameElem}, template::{GenerativeTemplateInputKind, GlobalReference, TemplateArgKind, TemplateID, TemplateInput, TemplateInputKind, TypeTemplateInputKind}
+    file_position::Span, linker::{FileData, FileUUID, LinkInfo, Linker, ModuleUUID, NameElem}
 };
+use crate::flattening::*;
+
+use crate::typing::template::{GenerativeTemplateInputKind, GlobalReference, TemplateArgKind, TemplateID, TemplateInput, TemplateInputKind, TypeTemplateInputKind};
 
 #[derive(Clone, Copy, Debug)]
 pub enum InModule<'linker> {

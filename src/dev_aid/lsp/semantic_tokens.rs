@@ -1,7 +1,12 @@
 
 use lsp_types::{Position, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities, WorkDoneProgressOptions};
 
-use crate::{abstract_type::DomainType, dev_aid::lsp::to_position, file_position::Span, flattening::{DomainID, IdentifierType}, linker::{FileData, FileUUID, Linker, NameElem}, template::TemplateInputKind};
+use crate::{dev_aid::lsp::to_position, file_position::Span, flattening::{DomainID, IdentifierType}, linker::{FileData, FileUUID, Linker, NameElem}};
+
+use crate::typing::{
+    abstract_type::DomainType, 
+    template::TemplateInputKind
+};
 
 use super::tree_walk::{self, InModule, LocationInfo};
 

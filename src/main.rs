@@ -1,7 +1,5 @@
 #![doc = include_str!("../README.md")]
 
-#![cfg_attr(not(all(feature = "lsp")), allow(dead_code, unused_assignments, unused_variables))]
-
 mod util;
 mod arena_alloc;
 
@@ -9,7 +7,7 @@ mod file_position;
 mod parser;
 mod errors;
 mod value;
-mod template;
+mod typing;
 mod to_string;
 mod flattening;
 mod instantiation;
@@ -20,9 +18,6 @@ mod config;
 mod codegen;
 
 mod codegen_fallback;
-
-mod concrete_type;
-mod abstract_type;
 
 mod dev_aid;
 mod linker;

@@ -1,4 +1,5 @@
-use crate::{arena_alloc::{FlatAlloc, UUIDMarker, UUID}, concrete_type::ConcreteType, errors::ErrorCollector, file_position::{BracketSpan, Span}, flattening::{FlatID, WrittenType}, linker::LinkInfo, value::TypedValue};
+use crate::{arena_alloc::{FlatAlloc, UUIDMarker, UUID}, errors::ErrorCollector, file_position::{BracketSpan, Span}, flattening::{FlatID, WrittenType}, linker::LinkInfo, value::TypedValue};
+use super::concrete_type::ConcreteType;
 
 
 pub struct TemplateIDMarker;
