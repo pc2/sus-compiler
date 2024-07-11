@@ -3,7 +3,7 @@ use crate::prelude::*;
 
 use std::ops::{Deref, Index};
 
-use crate::{file_position::Span, flattening::{BinaryOperator, UnaryOperator}, value::Value};
+use crate::{flattening::{BinaryOperator, UnaryOperator}, value::Value};
 use crate::linker::{get_builtin_type, NamedType};
 use super::abstract_type::AbstractType;
 

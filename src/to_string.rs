@@ -1,7 +1,7 @@
 
 use crate::prelude::*;
 
-use crate::{alloc::FlatAlloc, file_position::FileText, pretty_print_many_spans, value::Value};
+use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
 use crate::flattening::{DomainInfo, Interface, InterfaceToDomainMap, Module, WrittenType};
 use crate::linker::{LinkInfo, NamedType};

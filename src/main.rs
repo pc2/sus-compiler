@@ -14,9 +14,7 @@ mod debug;
 mod config;
 mod prelude;
 
-#[cfg(feature = "codegen")]
-mod codegen;
-
+//#[cfg(feature = "codegen")]
 mod codegen_fallback;
 
 mod dev_aid;
@@ -29,12 +27,14 @@ use std::io::Write;
 use std::ops::Deref;
 use std::error::Error;
 use std::fs::File;
+
+use prelude::*;
+
 use config::{config, parse_args};
 use flattening::Module;
 use codegen_fallback::gen_verilog_code;
 use dev_aid::ariadne_interface::*;
 use instantiation::InstantiatedModule;
-use linker::Linker;
 
 fn codegen_instance(inst: &InstantiatedModule, md: &Module, out_file: &mut File) {
     let inst_name = &inst.name;

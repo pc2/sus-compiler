@@ -4,9 +4,7 @@ use std::ops::Deref;
 use crate::prelude::*;
 use crate::flattening::*;
 
-use crate::{
-    file_position::Span, linker::{FileData, LinkInfo, NameElem}
-};
+use crate::linker::{FileData, LinkInfo, NameElem};
 
 use crate::typing::template::{GenerativeTemplateInputKind, GlobalReference, TemplateArgKind, TemplateInput, TemplateInputKind, TypeTemplateInputKind};
 
