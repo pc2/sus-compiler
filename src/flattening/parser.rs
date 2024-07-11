@@ -1,4 +1,3 @@
-
 use crate::prelude::*;
 
 use sus_proc_macro::{field, kind, kw};
@@ -8,7 +7,7 @@ use crate::{file_position::FileText, linker::Documentation};
 
 use std::num::NonZeroU16;
 
-pub fn get_readable_node_name(file_text : &FileText, kind : u16, span : Span) -> &str {
+pub fn get_readable_node_name(file_text: &FileText, kind: u16, span: Span) -> &str {
     if kind == kind!("identifier") {
         &file_text[span]
     } else if kind == kw!("\n") {
@@ -18,7 +17,7 @@ pub fn get_readable_node_name(file_text : &FileText, kind : u16, span : Span) ->
     }
 }
 
-fn print_current_node_indented<'ft>(file_text : &'ft FileText, cursor : &TreeCursor) -> &'ft str {
+fn print_current_node_indented<'ft>(file_text: &'ft FileText, cursor: &TreeCursor) -> &'ft str {
     let indent = "  ".repeat(cursor.depth() as usize);
     let n = cursor.node();
     let kind = n.kind_id();
@@ -33,15 +32,20 @@ fn print_current_node_indented<'ft>(file_text : &'ft FileText, cursor : &TreeCur
 }
 
 pub struct Cursor<'t> {
-    cursor : TreeCursor<'t>,
-    file_text : &'t FileText,
-    gathered_comments : Vec<Span>,
-    current_field_was_already_consumed : bool,
+    cursor: TreeCursor<'t>,
+    file_text: &'t FileText,
+    gathered_comments: Vec<Span>,
+    current_field_was_already_consumed: bool,
 }
 
 impl<'t> Cursor<'t> {
-    pub fn new_at_root(tree : &'t Tree, file_text : &'t FileText) -> Self {
-        Self{cursor : tree.walk(), file_text, gathered_comments : Vec::new(), current_field_was_already_consumed : false}
+    pub fn new_at_root(tree: &'t Tree, file_text: &'t FileText) -> Self {
+        Self {
+            cursor: tree.walk(),
+            file_text,
+            gathered_comments: Vec::new(),
+            current_field_was_already_consumed: false,
+        }
     }
 
     pub fn kind_span(&self) -> (u16, Span) {
@@ -66,7 +70,9 @@ impl<'t> Cursor<'t> {
         println!("Stack:");
         loop {
             print_current_node_indented(self.file_text, &self.cursor);
-            if !self.cursor.goto_parent() {break;}
+            if !self.cursor.goto_parent() {
+                break;
+            }
         }
         println!("Current node: {this_node_kind}, {this_node_span}");
     }
@@ -77,14 +83,14 @@ impl<'t> Cursor<'t> {
         panic!();
     }
 
-    /// The cursor advances to the next field, regardless if it is the requested field. If the found field is the requested field, the function is called. 
-    /// 
+    /// The cursor advances to the next field, regardless if it is the requested field. If the found field is the requested field, the function is called.
+    ///
     /// If no more fields are available, the cursor lands at the end of the siblings, and false is returned
-    /// 
+    ///
     /// If the found field is incorrect, false is returned
     #[must_use]
-    pub fn optional_field(&mut self, field_id : NonZeroU16) -> bool {
-        // If a previous call to field already found this field, then we must immediately skip it. 
+    pub fn optional_field(&mut self, field_id: NonZeroU16) -> bool {
+        // If a previous call to field already found this field, then we must immediately skip it.
         if self.current_field_was_already_consumed {
             if !self.cursor.goto_next_sibling() {
                 self.current_field_was_already_consumed = false;
@@ -112,45 +118,66 @@ impl<'t> Cursor<'t> {
     }
 
     #[must_use]
-    pub fn optional_keyword(&mut self, field_id : NonZeroU16) -> Option<(u16, Span)> {
+    pub fn optional_keyword(&mut self, field_id: NonZeroU16) -> Option<(u16, Span)> {
         self.optional_field(field_id).then(|| self.kind_span())
     }
 
-    /// The cursor advances to the next field and calls the given function. 
-    /// 
+    /// The cursor advances to the next field and calls the given function.
+    ///
     /// Panics if the next field doesn't exist or is not the requested field
     #[track_caller]
-    pub fn field(&mut self, field_id : NonZeroU16) {
+    pub fn field(&mut self, field_id: NonZeroU16) {
         if !self.optional_field(field_id) {
             self.print_stack();
-            panic!("Did not find required field '{}'", tree_sitter_sus::language().field_name_for_id(field_id.into()).unwrap());
+            panic!(
+                "Did not find required field '{}'",
+                tree_sitter_sus::language()
+                    .field_name_for_id(field_id.into())
+                    .unwrap()
+            );
         }
     }
 
     #[track_caller]
-    fn get_span_check_kind(&mut self, expected_kind : u16) -> Span {
+    fn get_span_check_kind(&mut self, expected_kind: u16) -> Span {
         let node = self.cursor.node();
         let kind = node.kind_id();
         let span = node.byte_range().into();
         if kind != expected_kind {
             self.print_stack();
-            panic!("Expected {}, Was {} instead", tree_sitter_sus::language().node_kind_for_id(expected_kind).unwrap(), node.kind());
+            panic!(
+                "Expected {}, Was {} instead",
+                tree_sitter_sus::language()
+                    .node_kind_for_id(expected_kind)
+                    .unwrap(),
+                node.kind()
+            );
         }
         span
     }
 
     #[track_caller]
-    fn assert_is_kind(&mut self, expected_kind : u16) {
+    fn assert_is_kind(&mut self, expected_kind: u16) {
         let node = self.cursor.node();
         let kind = node.kind_id();
         if kind != expected_kind {
             self.print_stack();
-            panic!("Expected {}, Was {} instead", tree_sitter_sus::language().node_kind_for_id(expected_kind).unwrap(), node.kind());
+            panic!(
+                "Expected {}, Was {} instead",
+                tree_sitter_sus::language()
+                    .node_kind_for_id(expected_kind)
+                    .unwrap(),
+                node.kind()
+            );
         }
     }
 
     #[track_caller]
-    pub fn optional_field_span(&mut self, field_id : NonZeroU16, expected_kind : u16) -> Option<Span> {
+    pub fn optional_field_span(
+        &mut self,
+        field_id: NonZeroU16,
+        expected_kind: u16,
+    ) -> Option<Span> {
         if self.optional_field(field_id) {
             Some(self.get_span_check_kind(expected_kind))
         } else {
@@ -159,20 +186,20 @@ impl<'t> Cursor<'t> {
     }
 
     #[track_caller]
-    pub fn field_span(&mut self, field_id : NonZeroU16, expected_kind : u16) -> Span {
+    pub fn field_span(&mut self, field_id: NonZeroU16, expected_kind: u16) -> Span {
         self.field(field_id);
 
         self.get_span_check_kind(expected_kind)
     }
 
     #[track_caller]
-    pub fn go_down<OT, F : FnOnce(&mut Self) -> OT>(&mut self, kind : u16, func : F) -> OT {
+    pub fn go_down<OT, F: FnOnce(&mut Self) -> OT>(&mut self, kind: u16, func: F) -> OT {
         self.assert_is_kind(kind);
 
         self.go_down_no_check(func)
     }
 
-    pub fn go_down_no_check<OT, F : FnOnce(&mut Self) -> OT>(&mut self, func : F) -> OT {
+    pub fn go_down_no_check<OT, F: FnOnce(&mut Self) -> OT>(&mut self, func: F) -> OT {
         if !self.cursor.goto_first_child() {
             self.print_stack();
             panic!("Could not go down this node!");
@@ -189,9 +216,9 @@ impl<'t> Cursor<'t> {
 
     // Some specialized functions for SUS Language
 
-    /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
+    /// Goes down the current node, checks it's kind, and then iterates through 'item' fields.
     #[track_caller]
-    pub fn list<F : FnMut(&mut Self)>(&mut self, parent_kind : u16, mut func : F) {
+    pub fn list<F: FnMut(&mut Self)>(&mut self, parent_kind: u16, mut func: F) {
         self.assert_is_kind(parent_kind);
 
         if self.cursor.goto_first_child() {
@@ -201,7 +228,12 @@ impl<'t> Cursor<'t> {
                         func(self);
                     } else {
                         self.print_stack();
-                        panic!("List did not only contain 'item' fields, found field '{}' instead!", tree_sitter_sus::language().field_name_for_id(found.into()).unwrap());
+                        panic!(
+                            "List did not only contain 'item' fields, found field '{}' instead!",
+                            tree_sitter_sus::language()
+                                .field_name_for_id(found.into())
+                                .unwrap()
+                        );
                     }
                 } else {
                     self.maybe_add_comment();
@@ -214,11 +246,15 @@ impl<'t> Cursor<'t> {
         }
     }
 
-    /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
-    /// 
+    /// Goes down the current node, checks it's kind, and then iterates through 'item' fields.
+    ///
     /// The function given should return OT, and from the valid outputs this function constructs a output list
     #[track_caller]
-    pub fn collect_list<OT, F : FnMut(&mut Self) -> OT>(&mut self, parent_kind : u16, mut func : F) -> Vec<OT> {
+    pub fn collect_list<OT, F: FnMut(&mut Self) -> OT>(
+        &mut self,
+        parent_kind: u16,
+        mut func: F,
+    ) -> Vec<OT> {
         let mut result = Vec::new();
 
         self.list(parent_kind, |cursor| {
@@ -231,7 +267,11 @@ impl<'t> Cursor<'t> {
 
     /// Goes down the current node, checks it's kind, and then selects the 'content' field. Useful for constructs like seq('[', field('content', $.expr), ']')
     #[track_caller]
-    pub fn go_down_content<OT, F : FnOnce(&mut Self) -> OT>(&mut self, parent_kind : u16, func : F) -> OT {
+    pub fn go_down_content<OT, F: FnOnce(&mut Self) -> OT>(
+        &mut self,
+        parent_kind: u16,
+        func: F,
+    ) -> OT {
         self.go_down(parent_kind, |self2| {
             self2.field(field!("content"));
             func(self2)
@@ -239,7 +279,7 @@ impl<'t> Cursor<'t> {
     }
 
     // Comment gathering
-    
+
     fn maybe_add_comment(&mut self) {
         let node = self.cursor.node();
         let kind = node.kind_id();
@@ -257,16 +297,15 @@ impl<'t> Cursor<'t> {
     pub fn extract_gathered_comments(&mut self) -> Documentation {
         let gathered = self.gathered_comments.clone().into_boxed_slice();
         self.gathered_comments.clear();
-        Documentation{gathered}
+        Documentation { gathered }
     }
     pub fn clear_gathered_comments(&mut self) {
         self.gathered_comments.clear()
     }
 
-
     // Error reporting
 
-    pub fn push_potential_node_error(&mut self, errors : &ErrorCollector) -> bool {
+    pub fn push_potential_node_error(&mut self, errors: &ErrorCollector) -> bool {
         let node = self.cursor.node();
         let is_error = node.is_error() || node.is_missing();
         if is_error {
@@ -284,13 +323,21 @@ impl<'t> Cursor<'t> {
             };
             let parent_node_name = parent_node.kind();
             errors
-                .error(span, format!("While parsing '{parent_node_name}', parser found a {error_type} {of_name}"))
-                .info_same_file(Span::from(parent_node.byte_range()), format!("Parent node '{parent_node_name}'"));
+                .error(
+                    span,
+                    format!(
+                        "While parsing '{parent_node_name}', parser found a {error_type} {of_name}"
+                    ),
+                )
+                .info_same_file(
+                    Span::from(parent_node.byte_range()),
+                    format!("Parent node '{parent_node_name}'"),
+                );
         }
         is_error
     }
 
-    pub fn report_all_decendant_errors(&mut self, errors : &ErrorCollector) {
+    pub fn report_all_decendant_errors(&mut self, errors: &ErrorCollector) {
         let mut depth = 0;
         assert!(self.cursor.goto_first_child());
         loop {
@@ -311,10 +358,14 @@ impl<'t> Cursor<'t> {
         }
     }
 
-
-    /// Goes down the current node, checks it's kind, and then iterates through 'item' fields. 
+    /// Goes down the current node, checks it's kind, and then iterates through 'item' fields.
     #[track_caller]
-    pub fn list_and_report_errors<F : FnMut(&mut Self)>(&mut self, parent_kind : u16, errors : &ErrorCollector, mut func : F) {
+    pub fn list_and_report_errors<F: FnMut(&mut Self)>(
+        &mut self,
+        parent_kind: u16,
+        errors: &ErrorCollector,
+        mut func: F,
+    ) {
         self.assert_is_kind(parent_kind);
         if self.cursor.goto_first_child() {
             loop {
@@ -324,7 +375,12 @@ impl<'t> Cursor<'t> {
                         func(self);
                     } else {
                         self.print_stack();
-                        panic!("List did not only contain 'item' fields, found field '{}' instead!", tree_sitter_sus::language().field_name_for_id(found.into()).unwrap());
+                        panic!(
+                            "List did not only contain 'item' fields, found field '{}' instead!",
+                            tree_sitter_sus::language()
+                                .field_name_for_id(found.into())
+                                .unwrap()
+                        );
                     }
                 } else {
                     self.maybe_add_comment();

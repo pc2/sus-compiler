@@ -1,18 +1,18 @@
 #![doc = include_str!("../README.md")]
 
-mod util;
 mod alloc;
+mod util;
 
-mod file_position;
+mod config;
+mod debug;
 mod errors;
-mod value;
-mod typing;
-mod to_string;
+mod file_position;
 mod flattening;
 mod instantiation;
-mod debug;
-mod config;
 mod prelude;
+mod to_string;
+mod typing;
+mod value;
 
 //#[cfg(feature = "codegen")]
 mod codegen_fallback;
@@ -22,18 +22,18 @@ mod linker;
 
 mod compiler_top;
 
-use std::rc::Rc;
-use std::io::Write;
-use std::ops::Deref;
 use std::error::Error;
 use std::fs::File;
+use std::io::Write;
+use std::ops::Deref;
+use std::rc::Rc;
 
 use prelude::*;
 
-use config::{config, parse_args};
-use flattening::Module;
 use codegen_fallback::gen_verilog_code;
+use config::{config, parse_args};
 use dev_aid::ariadne_interface::*;
+use flattening::Module;
 use instantiation::InstantiatedModule;
 
 fn codegen_instance(inst: &InstantiatedModule, md: &Module, out_file: &mut File) {
@@ -46,12 +46,11 @@ fn codegen_instance(inst: &InstantiatedModule, md: &Module, out_file: &mut File)
     let code = gen_verilog_code(md, &inst, true);
     write!(out_file, "// {inst_name}\n{code}").unwrap();
 
-    
     //println!("Generating Verilog for {module_name}:");
     // gen_ctx.to_circt();
 }
 
-fn codegen_to_file(md : &Module) {
+fn codegen_to_file(md: &Module) {
     let module_name = md.link_info.name.deref();
     let mut out_file = File::create(format!("verilog_output/{module_name}.v")).unwrap();
     md.instantiations.for_each_instance(|_template_args, inst| {
@@ -59,15 +58,17 @@ fn codegen_to_file(md : &Module) {
     });
 }
 
-fn codegen_with_dependencies(linker : &Linker, md : &Module, file_name : &str) {
+fn codegen_with_dependencies(linker: &Linker, md: &Module, file_name: &str) {
     let mut out_file = File::create(format!("verilog_output/{file_name}.v")).unwrap();
 
-    let mut top_level_instances : Vec<Rc<InstantiatedModule>> = Vec::new();
+    let mut top_level_instances: Vec<Rc<InstantiatedModule>> = Vec::new();
     md.instantiations.for_each_instance(|_template_args, inst| {
         top_level_instances.push(inst.clone());
     });
-    let mut to_process_queue : Vec<(&InstantiatedModule, &Module)> = top_level_instances.iter().map(|v| (v.as_ref(), md)).collect();
-
+    let mut to_process_queue: Vec<(&InstantiatedModule, &Module)> = top_level_instances
+        .iter()
+        .map(|v| (v.as_ref(), md))
+        .collect();
 
     let mut cur_idx = 0;
 
@@ -79,7 +80,10 @@ fn codegen_with_dependencies(linker : &Linker, md : &Module, file_name : &str) {
 
             // Skip duplicates
             // Yeah yeah I know O(n²) but this list shouldn't grow too big. Fix if needed
-            if to_process_queue.iter().any(|existing| std::ptr::eq(existing.0, new_inst)) {
+            if to_process_queue
+                .iter()
+                .any(|existing| std::ptr::eq(existing.0, new_inst))
+            {
                 continue;
             }
 
@@ -94,7 +98,7 @@ fn codegen_with_dependencies(linker : &Linker, md : &Module, file_name : &str) {
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let file_paths = parse_args();
-    
+
     let config = config();
 
     if config.use_lsp {
@@ -107,7 +111,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     let (linker, mut paths_arena) = compile_all(file_paths);
     print_all_errors(&linker, &mut paths_arena);
-    
+
     if config.codegen {
         for (_id, md) in &linker.modules {
             codegen_to_file(md);
@@ -115,7 +119,11 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     }
 
     if let Some(md_name) = &config.codegen_module_and_dependencies_one_file {
-        let md = linker.modules.iter().find(|(_, md)| &md.link_info.name == md_name).unwrap();
+        let md = linker
+            .modules
+            .iter()
+            .find(|(_, md)| &md.link_info.name == md_name)
+            .unwrap();
 
         codegen_with_dependencies(&linker, md.1, &format!("{md_name}_standalone"));
     }

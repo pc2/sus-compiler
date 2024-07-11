@@ -1,5 +1,3 @@
-
-
 pub const fn const_eq_str(a: &str, b: &str) -> bool {
     let a_bytes = a.as_bytes();
     let b_bytes = b.as_bytes();
@@ -19,8 +17,8 @@ pub const fn const_eq_str(a: &str, b: &str) -> bool {
     true
 }
 
-pub const fn const_str_position(v : &str, list : &[&str]) -> Option<usize> {
-    let mut i : usize = 0;
+pub const fn const_str_position(v: &str, list: &[&str]) -> Option<usize> {
+    let mut i: usize = 0;
 
     while i < list.len() {
         if const_eq_str(v, list[i]) {
@@ -32,8 +30,8 @@ pub const fn const_str_position(v : &str, list : &[&str]) -> Option<usize> {
 }
 
 #[allow(dead_code)]
-pub const fn const_str_position_in_tuples<T>(v : &str, list : &[(&str, T)]) -> Option<usize> {
-    let mut i : usize = 0;
+pub const fn const_str_position_in_tuples<T>(v: &str, list: &[(&str, T)]) -> Option<usize> {
+    let mut i: usize = 0;
 
     while i < list.len() {
         if const_eq_str(v, list[i].0) {
@@ -44,7 +42,7 @@ pub const fn const_str_position_in_tuples<T>(v : &str, list : &[(&str, T)]) -> O
     None
 }
 
-pub fn add_to_small_set<T : Eq>(set_vec : &mut Vec<T>, elem : T) {
+pub fn add_to_small_set<T: Eq>(set_vec: &mut Vec<T>, elem: T) {
     if !set_vec.contains(&elem) {
         set_vec.push(elem);
     }

@@ -1,25 +1,27 @@
-
 use crate::{alloc::UUIDRangeIter, prelude::*};
 
-use std::{ops::{Deref, DerefMut}, str::FromStr};
+use std::{
+    ops::{Deref, DerefMut},
+    str::FromStr,
+};
 
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 
-
-use crate::{
-    debug::SpanDebugger, value::Value
+use crate::linker::{
+    with_module_editing_context, NameElem, NameResolver, NamedConstant, NamedType, Resolver,
+    WorkingOnResolver,
 };
-use crate::linker::{with_module_editing_context, NameElem, NameResolver, NamedConstant, NamedType, Resolver, WorkingOnResolver};
+use crate::{debug::SpanDebugger, value::Value};
 
 use super::name_context::LocalVariableContext;
 use super::parser::Cursor;
 use super::*;
 
 use crate::typing::template::{
-    GenerativeTemplateInputKind, TemplateArg, TemplateArgKind, TemplateArgs, TemplateInputKind, TypeTemplateInputKind
+    GenerativeTemplateInputKind, TemplateArg, TemplateArgKind, TemplateArgs, TemplateInputKind,
+    TypeTemplateInputKind,
 };
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NamedLocal {
@@ -32,47 +34,78 @@ enum LocalOrGlobal {
     Local(Span, NamedLocal),
     Global(NameElem, Span, TemplateArgs, Option<BracketSpan>),
     // Error is already handled
-    NotFound(Span)
+    NotFound(Span),
 }
 
 #[derive(Debug)]
 enum PartialWireReference {
     /// Means the error has already been reported
     Error,
-    /// A module that is implicitly declared in a function call. 
+    /// A module that is implicitly declared in a function call.
     GlobalModuleName(GlobalReference<ModuleUUID>),
     /// Partial result, waiting for a port to be grabbed
     ModuleButNoPort(FlatID, Span),
     /// A module with an interface specified
-    ModuleWithInterface{submodule_decl : FlatID, submodule_name_span : Span, interface : InterfaceID, interface_name_span : Span},
+    ModuleWithInterface {
+        submodule_decl: FlatID,
+        submodule_name_span: Span,
+        interface: InterfaceID,
+        interface_name_span: Span,
+    },
     /// It's ready for use higher up
     WireReference(WireReference),
 }
 
 impl PartialWireReference {
-    fn expect_wireref(self, ctx : &FlatteningContext) -> Option<WireReference> {
+    fn expect_wireref(self, ctx: &FlatteningContext) -> Option<WireReference> {
         match self {
             PartialWireReference::Error => None, // Error already reported
             PartialWireReference::ModuleButNoPort(submod_decl, span) => {
-                let md_uuid = ctx.working_on.instructions[submod_decl].unwrap_submodule().module_ref.id;
+                let md_uuid = ctx.working_on.instructions[submod_decl]
+                    .unwrap_submodule()
+                    .module_ref
+                    .id;
                 ctx.errors
-                    .error(span, "cannot operate on modules directly. Should use ports instead")
+                    .error(
+                        span,
+                        "cannot operate on modules directly. Should use ports instead",
+                    )
                     .info_obj(&ctx.modules[md_uuid]);
                 None
-            },
+            }
             PartialWireReference::GlobalModuleName(md_ref) => {
                 let md = &ctx.modules[md_ref.id];
                 ctx.errors
-                    .error(md_ref.span, format!("Expected a Wire Reference, but found module '{}' instead", md.link_info.name))
+                    .error(
+                        md_ref.span,
+                        format!(
+                            "Expected a Wire Reference, but found module '{}' instead",
+                            md.link_info.name
+                        ),
+                    )
                     .info_obj(md);
                 None
             }
-            PartialWireReference::ModuleWithInterface { submodule_decl: submod_decl, submodule_name_span:_, interface, interface_name_span } => {
-                let md_uuid = ctx.working_on.instructions[submod_decl].unwrap_submodule().module_ref.id;
+            PartialWireReference::ModuleWithInterface {
+                submodule_decl: submod_decl,
+                submodule_name_span: _,
+                interface,
+                interface_name_span,
+            } => {
+                let md_uuid = ctx.working_on.instructions[submod_decl]
+                    .unwrap_submodule()
+                    .module_ref
+                    .id;
                 let md = &ctx.modules[md_uuid];
                 let interf = &md.interfaces[interface];
                 ctx.errors
-                    .error(interface_name_span, format!("Expected a port, but found module interface '{}' instead", &interf.name))
+                    .error(
+                        interface_name_span,
+                        format!(
+                            "Expected a port, but found module interface '{}' instead",
+                            &interf.name
+                        ),
+                    )
                     .info((interf.name_span, md.link_info.file), "Declared here");
                 None
             }
@@ -81,9 +114,8 @@ impl PartialWireReference {
     }
 }
 
-
 impl UnaryOperator {
-    pub fn from_kind_id(kind_id : u16) -> Self {
+    pub fn from_kind_id(kind_id: u16) -> Self {
         match kind_id {
             kw!("+") => UnaryOperator::Sum,
             kw!("*") => UnaryOperator::Product,
@@ -92,7 +124,7 @@ impl UnaryOperator {
             kw!("|") => UnaryOperator::Or,
             kw!("^") => UnaryOperator::Xor,
             kw!("!") => UnaryOperator::Not,
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
     pub fn op_text(&self) -> &'static str {
@@ -113,9 +145,8 @@ impl core::fmt::Display for UnaryOperator {
     }
 }
 
-
 impl BinaryOperator {
-    pub fn from_kind_id(kind_id : u16) -> Self {
+    pub fn from_kind_id(kind_id: u16) -> Self {
         match kind_id {
             kw!("&") => BinaryOperator::And,
             kw!("|") => BinaryOperator::Or,
@@ -133,7 +164,7 @@ impl BinaryOperator {
             kw!(">=") => BinaryOperator::GreaterEq,
             kw!("<") => BinaryOperator::Lesser,
             kw!("<=") => BinaryOperator::LesserEq,
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
     pub fn op_text(&self) -> &'static str {
@@ -168,22 +199,22 @@ enum DeclarationContext {
     Input,
     Output,
     ForLoopGenerative,
-    PlainWire
+    PlainWire,
 }
 
 struct FlatteningContext<'l, 'errs> {
-    modules : WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>,
+    modules: WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>,
     #[allow(dead_code)]
-    types : Resolver<'l, 'errs, TypeUUIDMarker, NamedType>,
+    types: Resolver<'l, 'errs, TypeUUIDMarker, NamedType>,
     #[allow(dead_code)]
-    constants : Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
-    name_resolver : NameResolver<'l, 'errs>,
-    errors : &'errs ErrorCollector<'l>,
+    constants: Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
+    name_resolver: NameResolver<'l, 'errs>,
+    errors: &'errs ErrorCollector<'l>,
 
-    ports_to_visit : UUIDRangeIter<PortIDMarker>,
-    template_inputs_to_visit : UUIDRangeIter<TemplateIDMarker>,
+    ports_to_visit: UUIDRangeIter<PortIDMarker>,
+    template_inputs_to_visit: UUIDRangeIter<TemplateIDMarker>,
 
-    local_variable_context : LocalVariableContext<'l, NamedLocal>
+    local_variable_context: LocalVariableContext<'l, NamedLocal>,
 }
 
 impl<'l, 'errs> Deref for FlatteningContext<'l, 'errs> {
@@ -206,72 +237,88 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 cursor.go_down(kind!("template_declaration_type"), |cursor| {
                     // Already covered in initialization
                     cursor.field(field!("name"));
-                    let default_type = cursor.optional_field(field!("default_value")).then(|| {
-                        self.flatten_type(cursor)
-                    });
-    
+                    let default_type = cursor
+                        .optional_field(field!("default_value"))
+                        .then(|| self.flatten_type(cursor));
+
                     let claimed_type_id = self.template_inputs_to_visit.next().unwrap();
-    
-                    let selected_arg = &mut self.working_on.link_info.template_arguments[claimed_type_id];
-                    let TemplateInputKind::Type(TypeTemplateInputKind{default_value}) = &mut selected_arg.kind else {unreachable!()};
-    
+
+                    let selected_arg =
+                        &mut self.working_on.link_info.template_arguments[claimed_type_id];
+                    let TemplateInputKind::Type(TypeTemplateInputKind { default_value }) =
+                        &mut selected_arg.kind
+                    else {
+                        unreachable!()
+                    };
+
                     *default_value = default_type;
-    
+
                     let name_span = selected_arg.name_span;
-    
+
                     self.alloc_local_name(name_span, NamedLocal::TemplateType(claimed_type_id));
                 });
             })
         }
     }
 
-    fn flatten_template_args(&mut self, cursor : &mut Cursor) -> Vec<TemplateArg> {
+    fn flatten_template_args(&mut self, cursor: &mut Cursor) -> Vec<TemplateArg> {
         cursor.collect_list(kind!("template_params"), |cursor| {
             let (outer_kind, whole_span) = cursor.kind_span();
             match outer_kind {
-                kind!("template_type_param") => {
-                    cursor.go_down_no_check(|cursor| {
-                        let name_specification = cursor.optional_field_span(field!("name"), kind!("identifier"));
-                        cursor.field(field!("arg"));
-                        let typ = self.flatten_type(cursor);
-                        TemplateArg{name_specification, whole_span, kind : TemplateArgKind::Type(typ)}
-                    })
-                }
-                kind!("template_value_param") => {
-                    cursor.go_down_no_check(|cursor| {
-                        let name_specification = cursor.optional_field_span(field!("name"), kind!("identifier"));
-                        cursor.field(field!("arg"));
-                        let expr = self.flatten_expr(cursor);
-                        TemplateArg{name_specification, whole_span, kind : TemplateArgKind::Value(expr)}
-                    })
-                }
-                _ => cursor.could_not_match()
+                kind!("template_type_param") => cursor.go_down_no_check(|cursor| {
+                    let name_specification =
+                        cursor.optional_field_span(field!("name"), kind!("identifier"));
+                    cursor.field(field!("arg"));
+                    let typ = self.flatten_type(cursor);
+                    TemplateArg {
+                        name_specification,
+                        whole_span,
+                        kind: TemplateArgKind::Type(typ),
+                    }
+                }),
+                kind!("template_value_param") => cursor.go_down_no_check(|cursor| {
+                    let name_specification =
+                        cursor.optional_field_span(field!("name"), kind!("identifier"));
+                    cursor.field(field!("arg"));
+                    let expr = self.flatten_expr(cursor);
+                    TemplateArg {
+                        name_specification,
+                        whole_span,
+                        kind: TemplateArgKind::Value(expr),
+                    }
+                }),
+                _ => cursor.could_not_match(),
             }
         })
     }
 
-    fn collect_template_args(&self, name_elem : NameElem, whole_span : Span, template_argument_list : Vec<TemplateArg>) -> TemplateArgs {
+    fn collect_template_args(
+        &self,
+        name_elem: NameElem,
+        whole_span: Span,
+        template_argument_list: Vec<TemplateArg>,
+    ) -> TemplateArgs {
         let target_link_info = match name_elem {
-            NameElem::Module(md_id) => {
-                &self.modules[md_id].link_info
-            },
+            NameElem::Module(md_id) => &self.modules[md_id].link_info,
             NameElem::Constant(_) | NameElem::Type(_) => {
                 if !template_argument_list.is_empty() {
-                    self.errors.todo(whole_span, "Types and Constants should get LinkInfo");
+                    self.errors
+                        .todo(whole_span, "Types and Constants should get LinkInfo");
                 };
-                return FlatAlloc::new()
+                return FlatAlloc::new();
             }
         };
-    
-        let mut resulting_template_arguments : TemplateArgs = target_link_info.template_arguments.map(|_| None);
-    
+
+        let mut resulting_template_arguments: TemplateArgs =
+            target_link_info.template_arguments.map(|_| None);
+
         let mut value_index_iter = target_link_info.template_arguments.iter();
         let mut type_index_iter = target_link_info.template_arguments.iter();
 
         let mut get_next_type_idx = || -> Option<TemplateID> {
             while let Some((idx, arg)) = type_index_iter.next() {
                 if let TemplateInputKind::Type(_) = &arg.kind {
-                    return Some(idx)
+                    return Some(idx);
                 }
             }
             None
@@ -279,27 +326,38 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         let mut get_next_value_idx = || -> Option<TemplateID> {
             while let Some((idx, arg)) = value_index_iter.next() {
                 if let TemplateInputKind::Generative(_) = &arg.kind {
-                    return Some(idx)
+                    return Some(idx);
                 }
             }
             None
         };
-    
+
         // Now that we have all arguments, we construct the map of TemplateID to TemplateArg
         for given_arg in template_argument_list {
             let template_idx = if let Some(name_span) = given_arg.name_specification {
                 let target_name = &self.name_resolver.file_text[name_span];
-    
-                let Some((named_index, input_on_obj)) = target_link_info.template_arguments.iter().find(|(_, template_input)| template_input.name == target_name) else {
+
+                let Some((named_index, input_on_obj)) = target_link_info
+                    .template_arguments
+                    .iter()
+                    .find(|(_, template_input)| template_input.name == target_name)
+                else {
                     let info = self.name_resolver.get_linking_error_location(name_elem);
-                    let err_ref = self.errors.error(name_span, format!("No template argument of name '{target_name}' on '{}'", info.full_name));
+                    let err_ref = self.errors.error(
+                        name_span,
+                        format!(
+                            "No template argument of name '{target_name}' on '{}'",
+                            info.full_name
+                        ),
+                    );
                     if let Some(pos) = info.location {
                         err_ref.info(pos, format!("'{}' declared here", info.full_name));
                     }
                     continue;
                 };
                 match (&input_on_obj.kind, &given_arg.kind) {
-                    (TemplateInputKind::Type(_), TemplateArgKind::Type(_)) | (TemplateInputKind::Generative(_), TemplateArgKind::Value(_)) => named_index, // OK
+                    (TemplateInputKind::Type(_), TemplateArgKind::Type(_))
+                    | (TemplateInputKind::Generative(_), TemplateArgKind::Value(_)) => named_index, // OK
                     (TemplateInputKind::Type(_), TemplateArgKind::Value(_)) => {
                         self.errors.error(name_span, format!("'{target_name}' is not a value. Place it behind the template ';'"))
                             .info((input_on_obj.name_span, target_link_info.file), "Declared here");
@@ -314,7 +372,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             } else {
                 let (index, kind) = match &given_arg.kind {
                     TemplateArgKind::Type(_) => (get_next_type_idx(), "type"),
-                    TemplateArgKind::Value(_) => (get_next_value_idx(), "generative")
+                    TemplateArgKind::Value(_) => (get_next_value_idx(), "generative"),
                 };
                 let Some(index) = index else {
                     let info = self.name_resolver.get_linking_error_location(name_elem);
@@ -326,12 +384,22 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 };
                 index
             };
-    
+
             let arg = &mut resulting_template_arguments[template_idx];
 
             if let Some(existing_arg) = arg {
-                self.errors.error(given_arg.name_specification.unwrap_or(given_arg.whole_span), "This template variable has already been set")
-                    .info_same_file(existing_arg.whole_span, format!("'{} has already been defined here'", target_link_info.template_arguments[template_idx].name));
+                self.errors
+                    .error(
+                        given_arg.name_specification.unwrap_or(given_arg.whole_span),
+                        "This template variable has already been set",
+                    )
+                    .info_same_file(
+                        existing_arg.whole_span,
+                        format!(
+                            "'{} has already been defined here'",
+                            target_link_info.template_arguments[template_idx].name
+                        ),
+                    );
             } else {
                 *arg = Some(given_arg);
             }
@@ -339,21 +407,27 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         resulting_template_arguments
     }
 
-    fn flatten_local_or_template_global(&mut self, cursor : &mut Cursor) -> LocalOrGlobal {
+    fn flatten_local_or_template_global(&mut self, cursor: &mut Cursor) -> LocalOrGlobal {
         let total_span = cursor.span();
-        
+
         let mut must_be_global = false;
         cursor.go_down(kind!("template_global"), |cursor| {
             must_be_global |= cursor.optional_field(field!("is_global_path"));
 
             let mut name_path = vec![cursor.field_span(field!("item"), kind!("identifier"))];
-            let mut template_args : Vec<TemplateArg> = Vec::new();
-            let mut template_args_whole_span : Option<BracketSpan> = None;
+            let mut template_args: Vec<TemplateArg> = Vec::new();
+            let mut template_args_whole_span: Option<BracketSpan> = None;
 
             while cursor.optional_field(field!("item")) {
                 let (kind, span) = cursor.kind_span();
                 if let Some(t_span) = &template_args_whole_span {
-                    self.errors.error(Span::new_overarching(t_span.outer_span().empty_span_at_end(), total_span.empty_span_at_end()), format!("Namespace must end after template arguments"));
+                    self.errors.error(
+                        Span::new_overarching(
+                            t_span.outer_span().empty_span_at_end(),
+                            total_span.empty_span_at_end(),
+                        ),
+                        format!("Namespace must end after template arguments"),
+                    );
                     break;
                 }
                 match kind {
@@ -363,17 +437,19 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     }
                     kind!("template_params") => {
                         must_be_global = true;
-                        
+
                         template_args = self.flatten_template_args(cursor);
                         template_args_whole_span = Some(BracketSpan::from_outer(span));
                     }
-                    _ => cursor.could_not_match()
+                    _ => cursor.could_not_match(),
                 }
             }
 
             // Possibly local
             if !must_be_global {
-                let [local_name] = name_path.as_slice() else {unreachable!()};
+                let [local_name] = name_path.as_slice() else {
+                    unreachable!()
+                };
                 let name_text = &self.name_resolver.file_text[*local_name];
                 if let Some(decl_id) = self.local_variable_context.get_declaration_for(name_text) {
                     return LocalOrGlobal::Local(*local_name, decl_id);
@@ -381,77 +457,158 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             }
 
             // Global identifier
-            let [name_span] = name_path.as_slice() else {todo!("Namespaces")};
-            if let Some((found_global, found_global_span)) = self.name_resolver.resolve_global(*name_span) {
-                let template_arg_map = self.collect_template_args(found_global, found_global_span, template_args);
+            let [name_span] = name_path.as_slice() else {
+                todo!("Namespaces")
+            };
+            if let Some((found_global, found_global_span)) =
+                self.name_resolver.resolve_global(*name_span)
+            {
+                let template_arg_map =
+                    self.collect_template_args(found_global, found_global_span, template_args);
 
-                LocalOrGlobal::Global(found_global, found_global_span, template_arg_map, template_args_whole_span)
+                LocalOrGlobal::Global(
+                    found_global,
+                    found_global_span,
+                    template_arg_map,
+                    template_args_whole_span,
+                )
             } else {
                 LocalOrGlobal::NotFound(*name_span)
             }
         })
     }
-    
-    fn flatten_array_type(&mut self, span : Span, cursor : &mut Cursor) -> WrittenType {
+
+    fn flatten_array_type(&mut self, span: Span, cursor: &mut Cursor) -> WrittenType {
         cursor.go_down(kind!("array_type"), |cursor| {
             cursor.field(field!("arr"));
             let array_element_type = self.flatten_type(cursor);
 
             cursor.field(field!("arr_idx"));
             let (array_size_wire_id, bracket_span) = self.flatten_array_bracket(cursor);
-            
-            WrittenType::Array(span, Box::new((array_element_type, array_size_wire_id, bracket_span)))
+
+            WrittenType::Array(
+                span,
+                Box::new((array_element_type, array_size_wire_id, bracket_span)),
+            )
         })
     }
 
-    fn flatten_type(&mut self, cursor : &mut Cursor) -> WrittenType {
-        let ModuleOrWrittenType::WrittenType(wr_typ) = self.flatten_module_or_type::<false>(cursor) else {unreachable!("Can't not be type")};
+    fn flatten_type(&mut self, cursor: &mut Cursor) -> WrittenType {
+        let ModuleOrWrittenType::WrittenType(wr_typ) = self.flatten_module_or_type::<false>(cursor)
+        else {
+            unreachable!("Can't not be type")
+        };
         wr_typ
     }
 
-    fn flatten_module_or_type<const ALLOW_MODULES : bool>(&mut self, cursor : &mut Cursor) -> ModuleOrWrittenType {
-        let accepted_text = if ALLOW_MODULES {"Type or Module"} else {"Type"};
+    fn flatten_module_or_type<const ALLOW_MODULES: bool>(
+        &mut self,
+        cursor: &mut Cursor,
+    ) -> ModuleOrWrittenType {
+        let accepted_text = if ALLOW_MODULES {
+            "Type or Module"
+        } else {
+            "Type"
+        };
         let (kind, span) = cursor.kind_span();
-        // Only difference is that 
+        // Only difference is that
         if kind == kind!("template_global") {
             match self.flatten_local_or_template_global(cursor) {
-                LocalOrGlobal::Local(span, NamedLocal::Declaration(instr)) | LocalOrGlobal::Local(span, NamedLocal::SubModule(instr)) => {
-                    self.errors.error(span, format!("This is not a {accepted_text}, it is a local variable instead!"))
+                LocalOrGlobal::Local(span, NamedLocal::Declaration(instr))
+                | LocalOrGlobal::Local(span, NamedLocal::SubModule(instr)) => {
+                    self.errors
+                        .error(
+                            span,
+                            format!(
+                                "This is not a {accepted_text}, it is a local variable instead!"
+                            ),
+                        )
                         .info_obj_same_file(&self.working_on.instructions[instr]);
-                    
+
                     ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
                 }
-                LocalOrGlobal::Local(span, NamedLocal::TemplateType(template_id)) => ModuleOrWrittenType::WrittenType(WrittenType::Template(span, template_id)),
-                LocalOrGlobal::Global(resolved_global, resolved_global_span, template_args, template_span) => {
-                    match &resolved_global {
-                        NameElem::Type(typ_id) => ModuleOrWrittenType::WrittenType(WrittenType::Named(GlobalReference { span: resolved_global_span, id: *typ_id, template_args, template_span })),
-                        NameElem::Module(md_id) if ALLOW_MODULES => ModuleOrWrittenType::Module(GlobalReference { span: resolved_global_span, id: *md_id, template_args, template_span }),
-                        _ => {
-                            self.name_resolver.not_expected_global_error(resolved_global, resolved_global_span, accepted_text);
-                            ModuleOrWrittenType::WrittenType(WrittenType::Error(resolved_global_span))
-                        }
-                    }
+                LocalOrGlobal::Local(span, NamedLocal::TemplateType(template_id)) => {
+                    ModuleOrWrittenType::WrittenType(WrittenType::Template(span, template_id))
                 }
-                LocalOrGlobal::NotFound(name_span) => ModuleOrWrittenType::WrittenType(WrittenType::Error(name_span)) // Already covered
+                LocalOrGlobal::Global(
+                    resolved_global,
+                    resolved_global_span,
+                    template_args,
+                    template_span,
+                ) => match &resolved_global {
+                    NameElem::Type(typ_id) => {
+                        ModuleOrWrittenType::WrittenType(WrittenType::Named(GlobalReference {
+                            span: resolved_global_span,
+                            id: *typ_id,
+                            template_args,
+                            template_span,
+                        }))
+                    }
+                    NameElem::Module(md_id) if ALLOW_MODULES => {
+                        ModuleOrWrittenType::Module(GlobalReference {
+                            span: resolved_global_span,
+                            id: *md_id,
+                            template_args,
+                            template_span,
+                        })
+                    }
+                    _ => {
+                        self.name_resolver.not_expected_global_error(
+                            resolved_global,
+                            resolved_global_span,
+                            accepted_text,
+                        );
+                        ModuleOrWrittenType::WrittenType(WrittenType::Error(resolved_global_span))
+                    }
+                },
+                LocalOrGlobal::NotFound(name_span) => {
+                    ModuleOrWrittenType::WrittenType(WrittenType::Error(name_span))
+                } // Already covered
             }
         } else if kind == kind!("array_type") {
             ModuleOrWrittenType::WrittenType(self.flatten_array_type(span, cursor))
-        } else {cursor.could_not_match()}
+        } else {
+            cursor.could_not_match()
+        }
     }
 
-    fn alloc_local_name(&mut self, name_span : Span, named_local : NamedLocal) {
-        if let Err(conflict) = self.local_variable_context.add_declaration(&self.name_resolver.file_text[name_span], named_local) {
-            let err_ref = self.errors.error(name_span, "This declaration conflicts with a previous declaration in the same scope");
-            
+    fn alloc_local_name(&mut self, name_span: Span, named_local: NamedLocal) {
+        if let Err(conflict) = self
+            .local_variable_context
+            .add_declaration(&self.name_resolver.file_text[name_span], named_local)
+        {
+            let err_ref = self.errors.error(
+                name_span,
+                "This declaration conflicts with a previous declaration in the same scope",
+            );
+
             match conflict {
-                NamedLocal::Declaration(decl_id) => {err_ref.info_obj_same_file(self.working_on.instructions[decl_id].unwrap_wire_declaration());}
-                NamedLocal::SubModule(submod_id) => {err_ref.info_obj_same_file(self.working_on.instructions[submod_id].unwrap_submodule());}
-                NamedLocal::TemplateType(template_id) => {err_ref.info_obj_same_file(&self.working_on.link_info.template_arguments[template_id]);}
+                NamedLocal::Declaration(decl_id) => {
+                    err_ref.info_obj_same_file(
+                        self.working_on.instructions[decl_id].unwrap_wire_declaration(),
+                    );
+                }
+                NamedLocal::SubModule(submod_id) => {
+                    err_ref.info_obj_same_file(
+                        self.working_on.instructions[submod_id].unwrap_submodule(),
+                    );
+                }
+                NamedLocal::TemplateType(template_id) => {
+                    err_ref.info_obj_same_file(
+                        &self.working_on.link_info.template_arguments[template_id],
+                    );
+                }
             }
         }
     }
-    
-    fn flatten_declaration<const ALLOW_MODULES : bool>(&mut self, declaration_context : DeclarationContext, mut read_only : bool, declaration_itself_is_not_written_to : bool, cursor : &mut Cursor) -> FlatID {
+
+    fn flatten_declaration<const ALLOW_MODULES: bool>(
+        &mut self,
+        declaration_context: DeclarationContext,
+        mut read_only: bool,
+        declaration_itself_is_not_written_to: bool,
+        cursor: &mut Cursor,
+    ) -> FlatID {
         let whole_declaration_span = cursor.span();
         cursor.go_down(kind!("declaration"), |cursor| {
             // Extra inputs and outputs declared in the body of the module
@@ -491,7 +648,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             if is_port.implies_read_only() {
                 read_only = true;
             }
-            
+
             let identifier_type = match declaration_context {
                 DeclarationContext::Input | DeclarationContext::Output | DeclarationContext::PlainWire => {
                     match declaration_modifiers {
@@ -538,9 +695,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             cursor.field(field!("type"));
             let decl_span = Span::new_overarching(cursor.span(), whole_declaration_span.empty_span_at_end());
             let typ_or_module_expr = self.flatten_module_or_type::<ALLOW_MODULES>(cursor);
-            
+
             let name_span = cursor.field_span(field!("name"), kind!("identifier"));
-    
+
             let span_latency_specifier = if cursor.optional_field(field!("latency_specifier")) {
                 cursor.go_down_content(kind!("latency_specifier"), 
                     |cursor| Some((self.flatten_expr(cursor), cursor.span()))
@@ -611,19 +768,25 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
 
-    fn flatten_array_bracket(&mut self, cursor : &mut Cursor) -> (FlatID, BracketSpan) {
+    fn flatten_array_bracket(&mut self, cursor: &mut Cursor) -> (FlatID, BracketSpan) {
         let bracket_span = BracketSpan::from_outer(cursor.span());
-        cursor.go_down_content(kind!("array_bracket_expression"), 
-            |cursor| (self.flatten_expr(cursor), bracket_span)
-        )
+        cursor.go_down_content(kind!("array_bracket_expression"), |cursor| {
+            (self.flatten_expr(cursor), bracket_span)
+        })
     }
 
-    fn alloc_error(&mut self, span : Span) -> FlatID {
-        self.working_on.instructions.alloc(Instruction::Wire(WireInstance{typ : FullType::new_unset(), span, source : WireSource::new_error()}))
+    fn alloc_error(&mut self, span: Span) -> FlatID {
+        self.working_on
+            .instructions
+            .alloc(Instruction::Wire(WireInstance {
+                typ: FullType::new_unset(),
+                span,
+                source: WireSource::new_error(),
+            }))
     }
 
     /// Returns the ID of the [FuncCallInstruction]
-    fn flatten_func_call(&mut self, cursor : &mut Cursor) -> Option<FlatID> {
+    fn flatten_func_call(&mut self, cursor: &mut Cursor) -> Option<FlatID> {
         let whole_func_span = cursor.span();
         cursor.go_down(kind!("func_call"), |cursor| {
             cursor.field(field!("name"));
@@ -636,12 +799,12 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             });
 
             let interface_reference = interface_reference?;
-            
+
             let (md, interface) = self.get_interface_reference(&interface_reference);
 
             let func_call_inputs = interface.func_call_inputs;
             let func_call_outputs = interface.func_call_outputs;
-            
+
             let arg_count = arguments.len();
             let expected_arg_count = func_call_inputs.len();
 
@@ -649,7 +812,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 if arg_count > expected_arg_count {
                     // Too many args, complain about excess args at the end
                     let excess_args_span = Span::new_overarching(self.working_on.instructions[arguments[expected_arg_count]].unwrap_wire().span, self.working_on.instructions[*arguments.last().unwrap()].unwrap_wire().span);
-                    
+
                     self.errors
                         .error(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."))
                         .info_obj(&(md, interface));
@@ -678,7 +841,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
 
-    fn get_main_interface(&self, submodule_decl : FlatID) -> Option<(InterfaceID, &Interface)> {
+    fn get_main_interface(&self, submodule_decl: FlatID) -> Option<(InterfaceID, &Interface)> {
         let sm = self.working_on.instructions[submodule_decl].unwrap_submodule();
 
         let md = &self.modules[sm.module_ref.id];
@@ -687,7 +850,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 
     /// Produces a new [SubModuleInstance] if a global was passed, or a reference to the existing instance if it's referenced by name
-    fn get_or_alloc_module(&mut self, cursor : &mut Cursor) -> Option<ModuleInterfaceReference> {
+    fn get_or_alloc_module(&mut self, cursor: &mut Cursor) -> Option<ModuleInterfaceReference> {
         let outer_span = cursor.span();
 
         match self.flatten_wire_reference(cursor) {
@@ -695,54 +858,66 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             PartialWireReference::GlobalModuleName(module_ref) => {
                 let documentation = cursor.extract_gathered_comments();
                 let interface_span = module_ref.span;
-                let submodule_decl = self.working_on.instructions.alloc(Instruction::SubModule(SubModuleInstance{
-                    name : None,
-                    module_ref,
-                    declaration_runtime_depth : DECL_DEPTH_LATER,
-                    local_interface_domains : FlatAlloc::new(),
-                    documentation
-                }));
-                Some(ModuleInterfaceReference{
+                let submodule_decl =
+                    self.working_on
+                        .instructions
+                        .alloc(Instruction::SubModule(SubModuleInstance {
+                            name: None,
+                            module_ref,
+                            declaration_runtime_depth: DECL_DEPTH_LATER,
+                            local_interface_domains: FlatAlloc::new(),
+                            documentation,
+                        }));
+                Some(ModuleInterfaceReference {
                     submodule_decl,
-                    submodule_interface : self.get_main_interface(submodule_decl)?.0,
-                    name_span : None,
-                    interface_span
+                    submodule_interface: self.get_main_interface(submodule_decl)?.0,
+                    name_span: None,
+                    interface_span,
                 })
             }
             PartialWireReference::ModuleButNoPort(submodule_decl, name_span) => {
-                Some(ModuleInterfaceReference{
+                Some(ModuleInterfaceReference {
                     submodule_decl,
-                    submodule_interface : self.get_main_interface(submodule_decl)?.0,
-                    name_span : Some(name_span),
-                    interface_span : name_span
+                    submodule_interface: self.get_main_interface(submodule_decl)?.0,
+                    name_span: Some(name_span),
+                    interface_span: name_span,
                 })
             }
-            PartialWireReference::ModuleWithInterface { submodule_decl, submodule_name_span, interface, interface_name_span } => {
-                Some(ModuleInterfaceReference{
-                    submodule_decl,
-                    submodule_interface : interface,
-                    name_span : Some(submodule_name_span),
-                    interface_span : interface_name_span
-                })
-            }
+            PartialWireReference::ModuleWithInterface {
+                submodule_decl,
+                submodule_name_span,
+                interface,
+                interface_name_span,
+            } => Some(ModuleInterfaceReference {
+                submodule_decl,
+                submodule_interface: interface,
+                name_span: Some(submodule_name_span),
+                interface_span: interface_name_span,
+            }),
             PartialWireReference::WireReference(_wire_ref) => {
-                self.errors
-                    .error(outer_span, "Function call syntax is only possible on modules or interfaces of modules");
+                self.errors.error(
+                    outer_span,
+                    "Function call syntax is only possible on modules or interfaces of modules",
+                );
                 None
             }
         }
     }
 
-    fn get_interface_reference(&self, interface_reference : &ModuleInterfaceReference) -> (&Module, &Interface) {
-        let submodule = self.working_on.instructions[interface_reference.submodule_decl].unwrap_submodule();
+    fn get_interface_reference(
+        &self,
+        interface_reference: &ModuleInterfaceReference,
+    ) -> (&Module, &Interface) {
+        let submodule =
+            self.working_on.instructions[interface_reference.submodule_decl].unwrap_submodule();
         let md = &self.modules[submodule.module_ref.id];
         let interface = &md.interfaces[interface_reference.submodule_interface];
         (md, interface)
     }
 
-    fn flatten_expr(&mut self, cursor : &mut Cursor) -> FlatID {
+    fn flatten_expr(&mut self, cursor: &mut Cursor) -> FlatID {
         let (kind, expr_span) = cursor.kind_span();
-        
+
         let source = if kind == kind!("number") {
             let text = &self.name_resolver.file_text[expr_span];
             WireSource::Constant(Value::Integer(BigInt::from_str(text).unwrap()))
@@ -750,11 +925,11 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("operator"));
                 let op = UnaryOperator::from_kind_id(cursor.kind());
-                
+
                 cursor.field(field!("right"));
                 let right = self.flatten_expr(cursor);
 
-                WireSource::UnaryOp{op, right}
+                WireSource::UnaryOp { op, right }
             })
         } else if kind == kind!("binary_op") {
             cursor.go_down_no_check(|cursor| {
@@ -767,7 +942,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 cursor.field(field!("right"));
                 let right = self.flatten_expr(cursor);
 
-                WireSource::BinaryOp{op, left, right}
+                WireSource::BinaryOp { op, left, right }
             })
         } else if kind == kind!("func_call") {
             if let Some(fc_id) = self.flatten_func_call(cursor) {
@@ -780,8 +955,8 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
 
                 if interface.func_call_outputs.len() >= 1 {
-                    WireSource::WireRef(WireReference::simple_port(PortInfo{
-                        submodule_name_span : fc.interface_reference.name_span,
+                    WireSource::WireRef(WireReference::simple_port(PortInfo {
+                        submodule_name_span: fc.interface_reference.name_span,
                         submodule_decl: fc.interface_reference.submodule_decl,
                         port: interface.func_call_outputs.0,
                         port_name_span: None,
@@ -796,7 +971,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 WireSource::new_error()
             }
         } else if kind == kind!("parenthesis_expression") {
-            return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| self.flatten_expr(cursor));
+            return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| {
+                self.flatten_expr(cursor)
+            });
         } else {
             if let Some(wr) = self.flatten_wire_reference(cursor).expect_wireref(self) {
                 WireSource::WireRef(wr)
@@ -805,76 +982,105 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             }
         };
 
-        let wire_instance = WireInstance{
-            typ : FullType::new_unset(),
+        let wire_instance = WireInstance {
+            typ: FullType::new_unset(),
             span: expr_span,
-            source
+            source,
         };
-        self.working_on.instructions.alloc(Instruction::Wire(wire_instance))
+        self.working_on
+            .instructions
+            .alloc(Instruction::Wire(wire_instance))
     }
 
-    fn flatten_wire_reference(&mut self, cursor : &mut Cursor) -> PartialWireReference {
+    fn flatten_wire_reference(&mut self, cursor: &mut Cursor) -> PartialWireReference {
         let (kind, expr_span) = cursor.kind_span();
         if kind == kind!("template_global") {
             match self.flatten_local_or_template_global(cursor) {
-                LocalOrGlobal::Local(span, named_obj) => {
-                    match named_obj {
-                        NamedLocal::Declaration(decl_id) => {
-                            let root = WireReferenceRoot::LocalDecl(decl_id, expr_span);
-                            PartialWireReference::WireReference(WireReference{root, path : Vec::new()})
-                        }
-                        NamedLocal::SubModule(submod_id) => PartialWireReference::ModuleButNoPort(submod_id, expr_span),
-                        NamedLocal::TemplateType(template_id) => {
-                            self.errors.error(span, format!("Expected a value, but instead found template type '{}'", self.working_on.link_info.template_arguments[template_id].name));
-                            PartialWireReference::Error
-                        }
+                LocalOrGlobal::Local(span, named_obj) => match named_obj {
+                    NamedLocal::Declaration(decl_id) => {
+                        let root = WireReferenceRoot::LocalDecl(decl_id, expr_span);
+                        PartialWireReference::WireReference(WireReference {
+                            root,
+                            path: Vec::new(),
+                        })
                     }
-                }
+                    NamedLocal::SubModule(submod_id) => {
+                        PartialWireReference::ModuleButNoPort(submod_id, expr_span)
+                    }
+                    NamedLocal::TemplateType(template_id) => {
+                        self.errors.error(
+                            span,
+                            format!(
+                                "Expected a value, but instead found template type '{}'",
+                                self.working_on.link_info.template_arguments[template_id].name
+                            ),
+                        );
+                        PartialWireReference::Error
+                    }
+                },
                 LocalOrGlobal::Global(name_elem, span, template_args, template_span) => {
                     match name_elem {
                         NameElem::Constant(cst) => {
                             let root = WireReferenceRoot::NamedConstant(cst, expr_span);
-                            PartialWireReference::WireReference(WireReference{root, path : Vec::new()})
+                            PartialWireReference::WireReference(WireReference {
+                                root,
+                                path: Vec::new(),
+                            })
                         }
                         NameElem::Module(md_id) => {
-                            PartialWireReference::GlobalModuleName(GlobalReference { span, id: md_id, template_args, template_span })
+                            PartialWireReference::GlobalModuleName(GlobalReference {
+                                span,
+                                id: md_id,
+                                template_args,
+                                template_span,
+                            })
                         }
                         NameElem::Type(_) => {
-                            self.name_resolver.not_expected_global_error(name_elem, span, "named wire: local or constant");
+                            self.name_resolver.not_expected_global_error(
+                                name_elem,
+                                span,
+                                "named wire: local or constant",
+                            );
                             PartialWireReference::Error
-                        },
+                        }
                     }
                 }
-                LocalOrGlobal::NotFound(_) => {
-                    PartialWireReference::Error
-                }
+                LocalOrGlobal::NotFound(_) => PartialWireReference::Error,
             }
         } else if kind == kind!("array_op") {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("arr"));
                 let mut flattened_arr_expr = self.flatten_wire_reference(cursor);
-                
+
                 cursor.field(field!("arr_idx"));
                 let (idx, bracket_span) = self.flatten_array_bracket(cursor);
-                
+
                 // only unpack the subexpr after flattening the idx, so we catch all errors
                 match &mut flattened_arr_expr {
-                    PartialWireReference::ModuleButNoPort(_, _) | PartialWireReference::GlobalModuleName(_) | PartialWireReference::ModuleWithInterface { submodule_decl:_, submodule_name_span:_, interface:_, interface_name_span:_ }=> {
+                    PartialWireReference::ModuleButNoPort(_, _)
+                    | PartialWireReference::GlobalModuleName(_)
+                    | PartialWireReference::ModuleWithInterface {
+                        submodule_decl: _,
+                        submodule_name_span: _,
+                        interface: _,
+                        interface_name_span: _,
+                    } => {
                         todo!("Module Arrays")
                     }
                     PartialWireReference::Error => {}
                     PartialWireReference::WireReference(wr) => {
-                        wr.path.push(WireReferencePathElement::ArrayAccess{idx, bracket_span});
+                        wr.path
+                            .push(WireReferencePathElement::ArrayAccess { idx, bracket_span });
                     }
                 }
-                
+
                 flattened_arr_expr
             })
         } else if kind == kind!("field_access") {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("left"));
                 let flattened_arr_expr = self.flatten_wire_reference(cursor);
-                
+
                 let port_name_span = cursor.field_span(field!("name"), kind!("identifier"));
 
                 match flattened_arr_expr {
@@ -920,22 +1126,53 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     }
                 }
             })
-        } else if kind == kind!("number") {self.errors.error(expr_span, "A constant is not a wire reference"); PartialWireReference::Error
-        } else if kind == kind!("unary_op") {self.errors.error(expr_span, "The result of an operator is not a wire reference"); PartialWireReference::Error
-        } else if kind == kind!("binary_op") {self.errors.error(expr_span, "The result of an operator is not a wire reference"); PartialWireReference::Error
-        } else if kind == kind!("func_call") {self.errors.error(expr_span, "A submodule call is not a wire reference"); PartialWireReference::Error
-        } else if kind == kind!("parenthesis_expression") {self.errors.error(expr_span, "Parentheses are not allowed within a wire reference"); PartialWireReference::Error
-        } else {cursor.could_not_match()}
+        } else if kind == kind!("number") {
+            self.errors
+                .error(expr_span, "A constant is not a wire reference");
+            PartialWireReference::Error
+        } else if kind == kind!("unary_op") {
+            self.errors.error(
+                expr_span,
+                "The result of an operator is not a wire reference",
+            );
+            PartialWireReference::Error
+        } else if kind == kind!("binary_op") {
+            self.errors.error(
+                expr_span,
+                "The result of an operator is not a wire reference",
+            );
+            PartialWireReference::Error
+        } else if kind == kind!("func_call") {
+            self.errors
+                .error(expr_span, "A submodule call is not a wire reference");
+            PartialWireReference::Error
+        } else if kind == kind!("parenthesis_expression") {
+            self.errors.error(
+                expr_span,
+                "Parentheses are not allowed within a wire reference",
+            );
+            PartialWireReference::Error
+        } else {
+            cursor.could_not_match()
+        }
     }
 
-    fn flatten_if_statement(&mut self, cursor : &mut Cursor) {
+    fn flatten_if_statement(&mut self, cursor: &mut Cursor) {
         cursor.go_down(kind!("if_statement"), |cursor| {
             cursor.field(field!("condition"));
             let condition = self.flatten_expr(cursor);
-            
-            let if_id = self.working_on.instructions.alloc(Instruction::IfStatement(IfStatement{condition, then_start : FlatID::PLACEHOLDER, then_end_else_start : FlatID::PLACEHOLDER, else_end : FlatID::PLACEHOLDER}));
+
+            let if_id = self
+                .working_on
+                .instructions
+                .alloc(Instruction::IfStatement(IfStatement {
+                    condition,
+                    then_start: FlatID::PLACEHOLDER,
+                    then_end_else_start: FlatID::PLACEHOLDER,
+                    else_end: FlatID::PLACEHOLDER,
+                }));
             let then_start = self.working_on.instructions.get_next_alloc_id();
-            
+
             cursor.field(field!("then_block"));
             self.flatten_code(cursor);
 
@@ -948,15 +1185,21 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
             };
             let else_end = self.working_on.instructions.get_next_alloc_id();
-            
-            let Instruction::IfStatement(if_stmt) = &mut self.working_on.instructions[if_id] else {unreachable!()};
+
+            let Instruction::IfStatement(if_stmt) = &mut self.working_on.instructions[if_id] else {
+                unreachable!()
+            };
             if_stmt.then_start = then_start;
             if_stmt.then_end_else_start = then_end_else_start;
             if_stmt.else_end = else_end;
         })
     }
 
-    fn flatten_assign_function_call(&mut self, to : Vec<(Option<(WireReference, WriteModifiers)>, Span)>, cursor : &mut Cursor) {
+    fn flatten_assign_function_call(
+        &mut self,
+        to: Vec<(Option<(WireReference, WriteModifiers)>, Span)>,
+        cursor: &mut Cursor,
+    ) {
         let func_call_span = cursor.span();
         let to_iter = if let Some(fc_id) = self.flatten_func_call(cursor) {
             let fc = self.working_on.instructions[fc_id].unwrap_func_call();
@@ -971,7 +1214,8 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             let num_targets = to.len();
             if num_targets != num_func_outputs {
                 if num_targets > num_func_outputs {
-                    let excess_results_span = Span::new_overarching(to[num_func_outputs].1, to.last().unwrap().1);
+                    let excess_results_span =
+                        Span::new_overarching(to[num_func_outputs].1, to.last().unwrap().1);
                     self.errors
                         .error(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."))
                         .info_obj(&(md, interface));
@@ -985,18 +1229,28 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             let mut to_iter = to.into_iter();
             for port in outputs {
                 if let Some((Some((to, write_modifiers)), to_span)) = to_iter.next() {
-                    let from = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{
-                        typ: FullType::new_unset(),
-                        span: func_call_span,
-                        source: WireSource::WireRef(WireReference::simple_port(PortInfo{
-                            port,
-                            port_name_span: None,
-                            is_input: false,
-                            submodule_name_span,
-                            submodule_decl
-                        }))
-                    }));
-                    self.working_on.instructions.alloc(Instruction::Write(Write{from, to, to_span, write_modifiers}));
+                    let from =
+                        self.working_on
+                            .instructions
+                            .alloc(Instruction::Wire(WireInstance {
+                                typ: FullType::new_unset(),
+                                span: func_call_span,
+                                source: WireSource::WireRef(WireReference::simple_port(PortInfo {
+                                    port,
+                                    port_name_span: None,
+                                    is_input: false,
+                                    submodule_name_span,
+                                    submodule_decl,
+                                })),
+                            }));
+                    self.working_on
+                        .instructions
+                        .alloc(Instruction::Write(Write {
+                            from,
+                            to,
+                            to_span,
+                            write_modifiers,
+                        }));
                 }
             }
             to_iter
@@ -1005,20 +1259,34 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         };
         for leftover_to in to_iter {
             if let (Some((to, write_modifiers)), to_span) = leftover_to {
-                let err_id = self.working_on.instructions.alloc(Instruction::Wire(WireInstance{typ : FullType::new_unset(), span : func_call_span, source : WireSource::new_error()}));
-                self.working_on.instructions.alloc(Instruction::Write(Write{from: err_id, to, to_span, write_modifiers}));
+                let err_id = self
+                    .working_on
+                    .instructions
+                    .alloc(Instruction::Wire(WireInstance {
+                        typ: FullType::new_unset(),
+                        span: func_call_span,
+                        source: WireSource::new_error(),
+                    }));
+                self.working_on
+                    .instructions
+                    .alloc(Instruction::Write(Write {
+                        from: err_id,
+                        to,
+                        to_span,
+                        write_modifiers,
+                    }));
             }
         }
     }
 
-    fn flatten_code(&mut self, cursor : &mut Cursor) {
+    fn flatten_code(&mut self, cursor: &mut Cursor) {
         let old_frame = self.local_variable_context.new_frame();
-        
+
         self.flatten_code_keep_context(cursor);
 
         self.local_variable_context.pop_frame(old_frame);
     }
-    fn flatten_code_keep_context(&mut self, cursor : &mut Cursor) {
+    fn flatten_code_keep_context(&mut self, cursor: &mut Cursor) {
         cursor.clear_gathered_comments(); // Clear comments at the start of a block
         cursor.list(kind!("block"), |cursor| {
             let kind = cursor.kind();
@@ -1028,16 +1296,16 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 cursor.go_down_no_check(|cursor| {
                     cursor.field(field!("assign_left"));
                     let to = self.flatten_assignment_left_side(cursor);
-                    
+
                     cursor.field(field!("assign_value"));
 
                     let (node_kind, span) = cursor.kind_span();
-                    
+
                     if node_kind == kind!("func_call") {
                         self.flatten_assign_function_call(to, cursor);
                     } else {
                         let read_side = self.flatten_expr(cursor);
-                        
+
                         if to.len() != 1 {
                             self.errors.error(span, format!("Non-function assignments must output exactly 1 output instead of {}", to.len()));
                         }
@@ -1061,7 +1329,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
                     cursor.field(field!("to"));
                     let end = self.flatten_expr(cursor);
-                    
+
                     let for_id = self.working_on.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: FlatIDRange::PLACEHOLDER}));
 
                     let code_start = self.working_on.instructions.get_next_alloc_id();
@@ -1069,7 +1337,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     cursor.field(field!("block"));
                     // We already started a new local_variable_context to include the loop var
                     self.flatten_code_keep_context(cursor);
-                    
+
                     let code_end = self.working_on.instructions.get_next_alloc_id();
 
                     let Instruction::ForStatement(for_stmt) = &mut self.working_on.instructions[for_id] else {unreachable!()};
@@ -1097,7 +1365,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         });
     }
 
-    fn flatten_write_modifiers(&self, cursor : &mut Cursor) -> WriteModifiers {
+    fn flatten_write_modifiers(&self, cursor: &mut Cursor) -> WriteModifiers {
         if cursor.optional_field(field!("write_modifiers")) {
             let modifiers_span = cursor.span();
             let mut initial_count = 0;
@@ -1113,12 +1381,20 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
             });
             match (initial_count, reg_count) {
-                (0, num_regs) => WriteModifiers::Connection{num_regs, regs_span : modifiers_span},
-                (1, 0) => WriteModifiers::Initial{initial_kw_span : modifiers_span},
-                _other => unreachable!()
+                (0, num_regs) => WriteModifiers::Connection {
+                    num_regs,
+                    regs_span: modifiers_span,
+                },
+                (1, 0) => WriteModifiers::Initial {
+                    initial_kw_span: modifiers_span,
+                },
+                _other => unreachable!(),
             }
         } else {
-            WriteModifiers::Connection { num_regs: 0, regs_span: cursor.span().empty_span_at_front()}
+            WriteModifiers::Connection {
+                num_regs: 0,
+                regs_span: cursor.span().empty_span_at_front(),
+            }
         }
     }
 
@@ -1126,25 +1402,46 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     /// Two cases:
     /// - Left side of assignment:
     ///     No modules, Yes write modifiers, Only assignable expressions
-    fn flatten_assignment_left_side(&mut self, cursor : &mut Cursor) -> Vec<(Option<(WireReference, WriteModifiers)>, Span)> {
+    fn flatten_assignment_left_side(
+        &mut self,
+        cursor: &mut Cursor,
+    ) -> Vec<(Option<(WireReference, WriteModifiers)>, Span)> {
         cursor.collect_list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
                 let write_modifiers = self.flatten_write_modifiers(cursor);
-                
+
                 cursor.field(field!("expr_or_decl"));
                 let (kind, span) = cursor.kind_span();
 
-                (if kind == kind!("declaration") {
-                    let root = self.flatten_declaration::<false>(DeclarationContext::PlainWire, false, true, cursor);
-                    let flat_root_decl = self.working_on.instructions[root].unwrap_wire_declaration();
-                    Some((WireReference{root : WireReferenceRoot::LocalDecl(root, flat_root_decl.name_span), path: Vec::new()}, write_modifiers))
-                } else { // It's _expression
-                    if let Some(wire_ref) = self.flatten_wire_reference(cursor).expect_wireref(self) {
-                        Some((wire_ref, write_modifiers))
+                (
+                    if kind == kind!("declaration") {
+                        let root = self.flatten_declaration::<false>(
+                            DeclarationContext::PlainWire,
+                            false,
+                            true,
+                            cursor,
+                        );
+                        let flat_root_decl =
+                            self.working_on.instructions[root].unwrap_wire_declaration();
+                        Some((
+                            WireReference {
+                                root: WireReferenceRoot::LocalDecl(root, flat_root_decl.name_span),
+                                path: Vec::new(),
+                            },
+                            write_modifiers,
+                        ))
                     } else {
-                        None
-                    }
-                }, span)
+                        // It's _expression
+                        if let Some(wire_ref) =
+                            self.flatten_wire_reference(cursor).expect_wireref(self)
+                        {
+                            Some((wire_ref, write_modifiers))
+                        } else {
+                            None
+                        }
+                    },
+                    span,
+                )
             })
         })
     }
@@ -1152,7 +1449,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     /// See [Self::flatten_assignment_left_side]
     /// - Standalone declarations:
     ///     Yes modules, No write modifiers, Yes expressions (-> single expressions)
-    fn flatten_standalone_decls(&mut self, cursor : &mut Cursor) {
+    fn flatten_standalone_decls(&mut self, cursor: &mut Cursor) {
         let mut is_first_item = true;
         cursor.list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
@@ -1164,7 +1461,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 if let Some(span) = cursor.optional_field_span(field!("write_modifiers"), kind!("write_modifiers")) {
                     self.errors.error(span, "No write modifiers are allowed on non-assigned to declarations or expressions");
                 }
-                
+
                 cursor.field(field!("expr_or_decl"));
                 let (kind, span) = cursor.kind_span();
 
@@ -1182,13 +1479,18 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
 
-    fn flatten_declaration_list(&mut self, declaration_context : DeclarationContext, read_only : bool, cursor : &mut Cursor) {
+    fn flatten_declaration_list(
+        &mut self,
+        declaration_context: DeclarationContext,
+        read_only: bool,
+        cursor: &mut Cursor,
+    ) {
         cursor.list(kind!("declaration_list"), |cursor| {
             let _ = self.flatten_declaration::<false>(declaration_context, read_only, true, cursor);
         });
     }
 
-    fn flatten_interface_ports(&mut self, cursor : &mut Cursor) {
+    fn flatten_interface_ports(&mut self, cursor: &mut Cursor) {
         cursor.go_down(kind!("interface_ports"), |cursor| {
             if cursor.optional_field(field!("inputs")) {
                 self.flatten_declaration_list(DeclarationContext::Input, true, cursor)
@@ -1199,7 +1501,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
 
-    fn flatten_module(&mut self, cursor : &mut Cursor) {
+    fn flatten_module(&mut self, cursor: &mut Cursor) {
         cursor.go_down(kind!("module"), |cursor| {
             let name_span = cursor.field_span(field!("name"), kind!("identifier"));
             self.flatten_template_inputs(cursor);
@@ -1209,65 +1511,81 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             if cursor.optional_field(field!("interface_ports")) {
                 self.flatten_interface_ports(cursor);
             }
-            
+
             cursor.field(field!("block"));
             self.flatten_code(cursor);
         })
     }
 }
 
-/// This method flattens all given code into a simple set of assignments, operators and submodules. 
-/// It already does basic type checking and assigns a type to every wire. 
-/// The Generating Structure of the code is not yet executed. 
+/// This method flattens all given code into a simple set of assignments, operators and submodules.
+/// It already does basic type checking and assigns a type to every wire.
+/// The Generating Structure of the code is not yet executed.
 /// It is template-preserving
-/// 
-/// Separate 'md lifetime for the module. 
-/// For some reason if it has the same lifetime as the linker ('l), 
-/// then the compiler thinks we could store cursor elements in the module, which would be bad? 
-/// Don't fully understand this, but separating the lifetimes makes it work. 
-pub fn flatten<'cursor_linker, 'errs>(linker : *mut Linker, module_uuid : ModuleUUID, cursor : &mut Cursor) {
-    with_module_editing_context(linker, module_uuid, |modules, types, constants, name_resolver| {
-        println!("Flattening {}", modules.working_on.link_info.name);
+///
+/// Separate 'md lifetime for the module.
+/// For some reason if it has the same lifetime as the linker ('l),
+/// then the compiler thinks we could store cursor elements in the module, which would be bad?
+/// Don't fully understand this, but separating the lifetimes makes it work.
+pub fn flatten<'cursor_linker, 'errs>(
+    linker: *mut Linker,
+    module_uuid: ModuleUUID,
+    cursor: &mut Cursor,
+) {
+    with_module_editing_context(
+        linker,
+        module_uuid,
+        |modules, types, constants, name_resolver| {
+            println!("Flattening {}", modules.working_on.link_info.name);
 
-        let mut context = FlatteningContext {
-            ports_to_visit : modules.working_on.ports.id_range().into_iter(),
-            template_inputs_to_visit : modules.working_on.link_info.template_arguments.id_range().into_iter(),
-            errors : name_resolver.errors,
-            modules, 
-            types, 
-            constants,
-            name_resolver,
-            local_variable_context : LocalVariableContext::new_initial()
-        };
-        
-        context.flatten_module(cursor);
-        
-        // Make sure all ports have been visited
-        assert!(context.ports_to_visit.is_empty());
-        assert!(context.template_inputs_to_visit.is_empty());
-    });
+            let mut context = FlatteningContext {
+                ports_to_visit: modules.working_on.ports.id_range().into_iter(),
+                template_inputs_to_visit: modules
+                    .working_on
+                    .link_info
+                    .template_arguments
+                    .id_range()
+                    .into_iter(),
+                errors: name_resolver.errors,
+                modules,
+                types,
+                constants,
+                name_resolver,
+                local_variable_context: LocalVariableContext::new_initial(),
+            };
+
+            context.flatten_module(cursor);
+
+            // Make sure all ports have been visited
+            assert!(context.ports_to_visit.is_empty());
+            assert!(context.template_inputs_to_visit.is_empty());
+        },
+    );
 }
 
-/// Flattens all modules in the project. 
-/// 
-/// Requires that first, all modules have been initialized. 
-pub fn flatten_all_modules(linker : &mut Linker) {
-    let linker_ptr : *mut Linker = linker;
+/// Flattens all modules in the project.
+///
+/// Requires that first, all modules have been initialized.
+pub fn flatten_all_modules(linker: &mut Linker) {
+    let linker_ptr: *mut Linker = linker;
     for (_file_id, file) in &linker.files {
         let mut span_debugger = SpanDebugger::new("flatten_all_modules", &file.file_text);
         let mut associated_value_iter = file.associated_values.iter();
 
         let mut cursor = Cursor::new_at_root(&file.tree, &file.file_text);
 
-        cursor.list(kind!("source_file"), |cursor| {
-            match cursor.kind() {
-                kind!("module") => {
-                    let Some(NameElem::Module(module_uuid)) = associated_value_iter.next() else {unreachable!()};
+        cursor.list(kind!("source_file"), |cursor| match cursor.kind() {
+            kind!("module") => {
+                let Some(NameElem::Module(module_uuid)) = associated_value_iter.next() else {
+                    unreachable!()
+                };
 
-                    flatten(linker_ptr, *module_uuid, cursor);
-                }
-                other => todo!("{}", tree_sitter_sus::language().node_kind_for_id(other).unwrap())
+                flatten(linker_ptr, *module_uuid, cursor);
             }
+            other => todo!(
+                "{}",
+                tree_sitter_sus::language().node_kind_for_id(other).unwrap()
+            ),
         });
         span_debugger.defuse();
     }

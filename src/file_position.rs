@@ -1,9 +1,12 @@
-use std::{fmt::Display, ops::{Index, Range}};
+use std::{
+    fmt::Display,
+    ops::{Index, Range},
+};
 
 use crate::prelude::FileUUID;
 
 // Span is defined as byte-byte idx. Start inclusive, end exclusive
-#[derive(Clone,Copy,Debug,PartialEq,Eq,Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Span(usize, usize);
 
 impl From<Range<usize>> for Span {
@@ -21,22 +24,22 @@ impl Span {
         *self
     }
 
-    /// Only really used for having a span with the maximum size. 
-    pub const MAX_POSSIBLE_SPAN : Span = Span(0, usize::MAX);
+    /// Only really used for having a span with the maximum size.
+    pub const MAX_POSSIBLE_SPAN: Span = Span(0, usize::MAX);
 
     pub fn into_range(&self) -> Range<usize> {
         self.debug();
         self.0..self.1
     }
     #[track_caller]
-    pub fn new_overarching(left : Span, right : Span) -> Span {
+    pub fn new_overarching(left: Span, right: Span) -> Span {
         left.debug();
         right.debug();
         assert!(left.0 <= right.0);
         assert!(left.1 <= right.1);
         Span(left.0, right.1).debug()
     }
-    pub fn contains_pos(&self, pos : usize) -> bool {
+    pub fn contains_pos(&self, pos: usize) -> bool {
         self.debug();
         pos >= self.0 && pos <= self.1
     }
@@ -73,14 +76,16 @@ impl Display for Span {
     }
 }
 
-#[derive(Clone,Copy,Debug,PartialEq,Eq,Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct BracketSpan(Span);
 
 impl BracketSpan {
-    pub fn from_outer(span : Span) -> Self {Self(span.debug())}
+    pub fn from_outer(span: Span) -> Self {
+        Self(span.debug())
+    }
     pub fn inner_span(&self) -> Span {
         self.0.debug();
-        Span(self.0.0 + 1, self.0.1 - 1).debug()
+        Span(self.0 .0 + 1, self.0 .1 - 1).debug()
     }
     pub fn outer_span(&self) -> Span {
         self.0.debug();
@@ -88,18 +93,18 @@ impl BracketSpan {
     }
     pub fn open_bracket(&self) -> Span {
         self.0.debug();
-        Span(self.0.0, self.0.0+1).debug()
+        Span(self.0 .0, self.0 .0 + 1).debug()
     }
     pub fn close_bracket(&self) -> Span {
         self.0.debug();
-        Span(self.0.1 - 1, self.0.1).debug()
+        Span(self.0 .1 - 1, self.0 .1).debug()
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct LineCol {
-    pub line : usize,
-    pub col : usize
+    pub line: usize,
+    pub col: usize,
 }
 impl PartialOrd for LineCol {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -112,17 +117,15 @@ impl Ord for LineCol {
     }
 }
 
-
 pub type SpanFile = (Span, FileUUID);
 
-
 pub struct FileText {
-    pub file_text : String,
-    lines_start_at : Vec<usize>
+    pub file_text: String,
+    lines_start_at: Vec<usize>,
 }
 
 impl FileText {
-    pub fn new(file_text : String) -> Self {
+    pub fn new(file_text: String) -> Self {
         let mut lines_start_at = Vec::new();
 
         lines_start_at.push(0);
@@ -132,27 +135,33 @@ impl FileText {
             }
         }
 
-        FileText{file_text, lines_start_at}
+        FileText {
+            file_text,
+            lines_start_at,
+        }
     }
     /// Errors when byte is outside of file
-    pub fn byte_to_linecol(&self, byte_pos : usize) -> LineCol {
+    pub fn byte_to_linecol(&self, byte_pos: usize) -> LineCol {
         assert!(byte_pos <= self.file_text.len());
         let line = match self.lines_start_at.binary_search(&byte_pos) {
             Ok(exact_newline) => exact_newline,
-            Err(before_newline) => before_newline - 1
+            Err(before_newline) => before_newline - 1,
         };
         let text_before = &self.file_text[self.lines_start_at[line]..byte_pos];
 
-        LineCol{line, col : text_before.chars().count()}
+        LineCol {
+            line,
+            col: text_before.chars().count(),
+        }
     }
-    /// Clamps the linecol to be within the file, so cannot error. 
-    pub fn linecol_to_byte_clamp(&self, linecol : LineCol) -> usize {
-        let line_end = if linecol.line+1 < self.lines_start_at.len() {
-            self.lines_start_at[linecol.line+1] - 1
-        } else if linecol.line+1 == self.lines_start_at.len() {
+    /// Clamps the linecol to be within the file, so cannot error.
+    pub fn linecol_to_byte_clamp(&self, linecol: LineCol) -> usize {
+        let line_end = if linecol.line + 1 < self.lines_start_at.len() {
+            self.lines_start_at[linecol.line + 1] - 1
+        } else if linecol.line + 1 == self.lines_start_at.len() {
             self.file_text.len()
         } else {
-            return self.file_text.len()
+            return self.file_text.len();
         };
         let line_start = self.lines_start_at[linecol.line];
         let line_text = &self.file_text[line_start..line_end];
@@ -167,12 +176,12 @@ impl FileText {
         }
         line_end
     }
-    pub fn get_span_linecol_range(&self, span : Span) -> Range<LineCol> {
+    pub fn get_span_linecol_range(&self, span: Span) -> Range<LineCol> {
         span.debug();
         self.byte_to_linecol(span.0)..self.byte_to_linecol(span.1)
     }
 
-    pub fn is_span_valid(&self, span : Span) -> bool {
+    pub fn is_span_valid(&self, span: Span) -> bool {
         span.debug();
         span.1 <= self.file_text.len()
     }

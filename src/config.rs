@@ -1,20 +1,17 @@
 use std::{cell::UnsafeCell, env, ffi::OsStr, path::PathBuf};
 
-
 pub struct ConfigStruct {
-    pub use_lsp : bool,
-    pub lsp_debug_mode : bool,
-    pub lsp_port : u16,
-    pub codegen : bool,
-    pub debug_print_module_contents : bool,
-    pub debug_print_latency_graph : bool,
-    pub codegen_module_and_dependencies_one_file : Option<String>
+    pub use_lsp: bool,
+    pub lsp_debug_mode: bool,
+    pub lsp_port: u16,
+    pub codegen: bool,
+    pub debug_print_module_contents: bool,
+    pub debug_print_latency_graph: bool,
+    pub codegen_module_and_dependencies_one_file: Option<String>,
 }
 
 pub fn config() -> &'static ConfigStruct {
-    unsafe {
-        &*CONFIG.cf.get()
-    }
+    unsafe { &*CONFIG.cf.get() }
 }
 
 pub fn parse_args() -> Vec<PathBuf> {
@@ -22,10 +19,10 @@ pub fn parse_args() -> Vec<PathBuf> {
 
     let _executable_path = args.next();
 
-    let config = unsafe{&mut *CONFIG.cf.get()};
+    let config = unsafe { &mut *CONFIG.cf.get() };
 
-    let mut file_paths : Vec<PathBuf> = Vec::new();
-    
+    let mut file_paths: Vec<PathBuf> = Vec::new();
+
     while let Some(arg) = args.next() {
         if arg.starts_with("-") {
             if let Some((name, value)) = arg.split_once("=") {
@@ -53,7 +50,8 @@ pub fn parse_args() -> Vec<PathBuf> {
                         config.debug_print_latency_graph = true;
                     }
                     "--standalone" => {
-                        config.codegen_module_and_dependencies_one_file = Some(args.next().unwrap());
+                        config.codegen_module_and_dependencies_one_file =
+                            Some(args.next().unwrap());
                     }
                     other => {
                         panic!("Unknown option {other}");
@@ -80,17 +78,19 @@ pub fn parse_args() -> Vec<PathBuf> {
 }
 
 struct ConfigStructWrapper {
-    cf : UnsafeCell<ConfigStruct>
+    cf: UnsafeCell<ConfigStruct>,
 }
 
 unsafe impl Sync for ConfigStructWrapper {}
 
-static CONFIG : ConfigStructWrapper = ConfigStructWrapper{cf: UnsafeCell::new(ConfigStruct{
-    use_lsp : false,
-    lsp_port : 25000,
-    lsp_debug_mode : false,
-    debug_print_module_contents : false,
-    codegen : false,
-    debug_print_latency_graph : false,
-    codegen_module_and_dependencies_one_file: None
-})};
+static CONFIG: ConfigStructWrapper = ConfigStructWrapper {
+    cf: UnsafeCell::new(ConfigStruct {
+        use_lsp: false,
+        lsp_port: 25000,
+        lsp_debug_mode: false,
+        debug_print_module_contents: false,
+        codegen: false,
+        debug_print_latency_graph: false,
+        codegen_module_and_dependencies_one_file: None,
+    }),
+};

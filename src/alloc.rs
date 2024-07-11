@@ -1,5 +1,10 @@
 use std::{
-    cmp::Ordering, fmt::{Debug, Formatter, Result}, hash::{Hash, Hasher}, iter::Enumerate, marker::PhantomData, ops::{Index, IndexMut}
+    cmp::Ordering,
+    fmt::{Debug, Formatter, Result},
+    hash::{Hash, Hasher},
+    iter::Enumerate,
+    marker::PhantomData,
+    ops::{Index, IndexMut},
 };
 
 // TODO add custom niche for more efficient Options, wait until custom niches are stabilized (https://internals.rust-lang.org/t/nonmaxusize-and-niche-value-optimisation/19661)
@@ -25,10 +30,10 @@ impl<IndexMarker> Hash for UUID<IndexMarker> {
 }
 
 pub trait UUIDMarker {
-    const DISPLAY_NAME : &'static str;
+    const DISPLAY_NAME: &'static str;
 }
 
-impl<IndexMarker : UUIDMarker> Debug for UUID<IndexMarker> {
+impl<IndexMarker: UUIDMarker> Debug for UUID<IndexMarker> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.write_str(IndexMarker::DISPLAY_NAME)?;
         self.0.fmt(f)
@@ -36,7 +41,7 @@ impl<IndexMarker : UUIDMarker> Debug for UUID<IndexMarker> {
 }
 
 impl<IndexMarker> UUID<IndexMarker> {
-    pub const fn from_hidden_value(v : usize) -> Self {
+    pub const fn from_hidden_value(v: usize) -> Self {
         UUID(v, PhantomData)
     }
 
@@ -45,7 +50,7 @@ impl<IndexMarker> UUID<IndexMarker> {
     }
 
     // Used to temporarily write a uuid to a field that's not known yet, such as the extent of a if statement. Should be overwritten later
-    pub const PLACEHOLDER : Self = UUID(usize::MAX, PhantomData);
+    pub const PLACEHOLDER: Self = UUID(usize::MAX, PhantomData);
 }
 
 pub struct UUIDRange<IndexMarker>(pub UUID<IndexMarker>, pub UUID<IndexMarker>);
@@ -54,9 +59,9 @@ pub struct UUIDRange<IndexMarker>(pub UUID<IndexMarker>, pub UUID<IndexMarker>);
 pub struct UUIDRangeIter<IndexMarker>(UUID<IndexMarker>, UUID<IndexMarker>);
 
 impl<IndexMarker> UUIDRange<IndexMarker> {
-    pub const PLACEHOLDER : UUIDRange<IndexMarker> = UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER);
+    pub const PLACEHOLDER: UUIDRange<IndexMarker> = UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER);
 
-    pub fn new(from : UUID<IndexMarker>, to : UUID<IndexMarker>) -> Self {
+    pub fn new(from: UUID<IndexMarker>, to: UUID<IndexMarker>) -> Self {
         Self(from, to)
     }
     pub fn empty() -> Self {
@@ -65,27 +70,30 @@ impl<IndexMarker> UUIDRange<IndexMarker> {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
-    pub fn contains(&self, id : UUID<IndexMarker>) -> bool {
-        self.0.0 >= id.0 && self.1.0 < id.0
+    pub fn contains(&self, id: UUID<IndexMarker>) -> bool {
+        self.0 .0 >= id.0 && self.1 .0 < id.0
     }
     pub fn iter(&self) -> UUIDRangeIter<IndexMarker> {
         self.into_iter()
     }
-    pub fn map<OT, F : FnMut(UUID<IndexMarker>) -> OT>(&self, f : F) -> FlatAlloc<OT, IndexMarker> {
-        FlatAlloc { data: Vec::from_iter(self.iter().map(f)), _ph: PhantomData }
+    pub fn map<OT, F: FnMut(UUID<IndexMarker>) -> OT>(&self, f: F) -> FlatAlloc<OT, IndexMarker> {
+        FlatAlloc {
+            data: Vec::from_iter(self.iter().map(f)),
+            _ph: PhantomData,
+        }
     }
     pub fn len(&self) -> usize {
-        self.1.0 - self.0.0
+        self.1 .0 - self.0 .0
     }
     pub fn first(&self) -> Option<UUID<IndexMarker>> {
-        (self.0.0 < self.1.0).then_some(self.0)
+        (self.0 .0 < self.1 .0).then_some(self.0)
     }
     pub fn last(&self) -> Option<UUID<IndexMarker>> {
-        (self.0.0 < self.1.0).then_some(UUID(self.1.0-1, PhantomData))
+        (self.0 .0 < self.1 .0).then_some(UUID(self.1 .0 - 1, PhantomData))
     }
 }
 
-impl<IndexMarker : UUIDMarker> Debug for UUIDRange<IndexMarker> {
+impl<IndexMarker: UUIDMarker> Debug for UUIDRange<IndexMarker> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.write_str(IndexMarker::DISPLAY_NAME)?;
         self.0.fmt(f)?;
@@ -127,11 +135,11 @@ impl<IndexMarker> Iterator for UUIDRangeIter<IndexMarker> {
     type Item = UUID<IndexMarker>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.0.0 == self.1.0 {
+        if self.0 .0 == self.1 .0 {
             None
         } else {
-            let result = UUID(self.0.0, PhantomData);
-            self.0.0 += 1;
+            let result = UUID(self.0 .0, PhantomData);
+            self.0 .0 += 1;
             Some(result)
         }
     }
@@ -143,68 +151,76 @@ impl<IndexMarker> Iterator for UUIDRangeIter<IndexMarker> {
 
 impl<IndexMarker> ExactSizeIterator for UUIDRangeIter<IndexMarker> {
     fn len(&self) -> usize {
-        self.1.0 - self.0.0
+        self.1 .0 - self.0 .0
     }
 }
 
 impl<IndexMarker> UUIDRangeIter<IndexMarker> {
-    pub fn skip_to(&mut self, to : UUID<IndexMarker>) {
-        assert!(to.0 >= self.0.0);
-        assert!(to.0 <= self.1.0);
+    pub fn skip_to(&mut self, to: UUID<IndexMarker>) {
+        assert!(to.0 >= self.0 .0);
+        assert!(to.0 <= self.1 .0);
         self.0 = to;
     }
     pub fn len(&self) -> usize {
-        self.1.0 - self.0.0
+        self.1 .0 - self.0 .0
     }
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 }
 
-
-
 #[derive(Default)]
 pub struct ArenaAllocator<T, IndexMarker> {
-    data : Vec<Option<T>>,
-    free_slots : Vec<usize>,
-    _ph : PhantomData<IndexMarker>
+    data: Vec<Option<T>>,
+    free_slots: Vec<usize>,
+    _ph: PhantomData<IndexMarker>,
 }
 
 impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
     pub fn new() -> Self {
-        Self{data : Vec::new(), free_slots : Vec::new(), _ph : PhantomData}
+        Self {
+            data: Vec::new(),
+            free_slots: Vec::new(),
+            _ph: PhantomData,
+        }
     }
-    pub fn alloc(&mut self, v : T) -> UUID<IndexMarker> {
-        UUID(if let Some(empty_slot) = self.free_slots.pop() {
-            assert!(self.data[empty_slot].is_none());
-            self.data[empty_slot] = Some(v);
-            empty_slot
-        } else {
-            let l = self.data.len();
-            self.data.push(Some(v));
-            l
-        }, PhantomData)
+    pub fn alloc(&mut self, v: T) -> UUID<IndexMarker> {
+        UUID(
+            if let Some(empty_slot) = self.free_slots.pop() {
+                assert!(self.data[empty_slot].is_none());
+                self.data[empty_slot] = Some(v);
+                empty_slot
+            } else {
+                let l = self.data.len();
+                self.data.push(Some(v));
+                l
+            },
+            PhantomData,
+        )
     }
     pub fn reserve(&mut self) -> UUID<IndexMarker> {
-        UUID(if let Some(empty_slot) = self.free_slots.pop() {
-            assert!(self.data[empty_slot].is_none());
-            self.data[empty_slot] = None;
-            empty_slot
-        } else {
-            let l = self.data.len();
-            self.data.push(None);
-            l
-        }, PhantomData)
+        UUID(
+            if let Some(empty_slot) = self.free_slots.pop() {
+                assert!(self.data[empty_slot].is_none());
+                self.data[empty_slot] = None;
+                empty_slot
+            } else {
+                let l = self.data.len();
+                self.data.push(None);
+                l
+            },
+            PhantomData,
+        )
     }
-    pub fn revert_to_reservation(&mut self, UUID(uuid, _) : UUID<IndexMarker>) {
+    pub fn revert_to_reservation(&mut self, UUID(uuid, _): UUID<IndexMarker>) {
         assert!(self.data[uuid].is_some());
         self.data[uuid] = None;
     }
-    pub fn alloc_reservation(&mut self, UUID(uuid, _) : UUID<IndexMarker>, v : T) {
+    pub fn alloc_reservation(&mut self, UUID(uuid, _): UUID<IndexMarker>, v: T) {
         assert!(self.data[uuid].is_none());
         self.data[uuid] = Some(v);
     }
-    pub fn free(&mut self, UUID(uuid, _) : UUID<IndexMarker>) -> T {
+    pub fn free(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> T {
         self.free_slots.push(uuid);
         std::mem::replace(&mut self.data[uuid], None).unwrap()
     }
@@ -218,8 +234,13 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn find<F : FnMut(UUID<IndexMarker>, &T) -> bool>(&self, mut predicate : F) -> Option<UUID<IndexMarker>> {
-        self.iter().find(|(id, v)| predicate(*id, v)).map(|(id, _)| id)
+    pub fn find<F: FnMut(UUID<IndexMarker>, &T) -> bool>(
+        &self,
+        mut predicate: F,
+    ) -> Option<UUID<IndexMarker>> {
+        self.iter()
+            .find(|(id, v)| predicate(*id, v))
+            .map(|(id, _)| id)
     }
 }
 
@@ -241,7 +262,7 @@ impl<T, IndexMarker> IndexMut<UUID<IndexMarker>> for ArenaAllocator<T, IndexMark
 
 pub struct FlatOptionIterator<'a, T, IndexMarker> {
     it: Enumerate<std::slice::Iter<'a, Option<T>>>,
-    _ph : PhantomData<IndexMarker>
+    _ph: PhantomData<IndexMarker>,
 }
 
 impl<'a, T, IndexMarker> Iterator for FlatOptionIterator<'a, T, IndexMarker> {
@@ -252,8 +273,8 @@ impl<'a, T, IndexMarker> Iterator for FlatOptionIterator<'a, T, IndexMarker> {
             match self.it.next() {
                 None => {
                     return None;
-                },
-                Some((_pos, None)) => {},
+                }
+                Some((_pos, None)) => {}
                 Some((pos, Some(val))) => {
                     return Some((UUID(pos, PhantomData), val));
                 }
@@ -264,7 +285,7 @@ impl<'a, T, IndexMarker> Iterator for FlatOptionIterator<'a, T, IndexMarker> {
 
 pub struct FlatOptionIteratorMut<'a, T, IndexMarker> {
     it: Enumerate<std::slice::IterMut<'a, Option<T>>>,
-    _ph : PhantomData<IndexMarker>
+    _ph: PhantomData<IndexMarker>,
 }
 
 impl<'a, T, IndexMarker> Iterator for FlatOptionIteratorMut<'a, T, IndexMarker> {
@@ -275,8 +296,8 @@ impl<'a, T, IndexMarker> Iterator for FlatOptionIteratorMut<'a, T, IndexMarker> 
             match self.it.next() {
                 None => {
                     return None;
-                },
-                Some((_pos, None)) => {},
+                }
+                Some((_pos, None)) => {}
                 Some((pos, Some(val))) => {
                     return Some((UUID(pos, PhantomData), val));
                 }
@@ -291,7 +312,10 @@ impl<'a, T, IndexMarker> IntoIterator for &'a ArenaAllocator<T, IndexMarker> {
     type IntoIter = FlatOptionIterator<'a, T, IndexMarker>;
 
     fn into_iter(self) -> Self::IntoIter {
-        FlatOptionIterator{it : self.data.iter().enumerate(), _ph : PhantomData}
+        FlatOptionIterator {
+            it: self.data.iter().enumerate(),
+            _ph: PhantomData,
+        }
     }
 }
 
@@ -301,27 +325,33 @@ impl<'a, T, IndexMarker> IntoIterator for &'a mut ArenaAllocator<T, IndexMarker>
     type IntoIter = FlatOptionIteratorMut<'a, T, IndexMarker>;
 
     fn into_iter(self) -> Self::IntoIter {
-        FlatOptionIteratorMut{it : self.data.iter_mut().enumerate(), _ph : PhantomData}
+        FlatOptionIteratorMut {
+            it: self.data.iter_mut().enumerate(),
+            _ph: PhantomData,
+        }
     }
 }
 
 pub struct ArenaVector<T, IndexMarker> {
-    data : Vec<Option<T>>,
-    _ph : PhantomData<IndexMarker>
+    data: Vec<Option<T>>,
+    _ph: PhantomData<IndexMarker>,
 }
 
 impl<T, IndexMarker> ArenaVector<T, IndexMarker> {
     pub fn new() -> Self {
-        Self{data : Vec::new(), _ph : PhantomData}
+        Self {
+            data: Vec::new(),
+            _ph: PhantomData,
+        }
     }
-    pub fn insert(&mut self, UUID(uuid, _) : UUID<IndexMarker>, value : T) {
+    pub fn insert(&mut self, UUID(uuid, _): UUID<IndexMarker>, value: T) {
         while uuid >= self.data.len() {
             self.data.push(None);
         }
         assert!(self.data[uuid].is_none());
         self.data[uuid] = Some(value);
     }
-    pub fn remove(&mut self, UUID(uuid, _) : UUID<IndexMarker>) {
+    pub fn remove(&mut self, UUID(uuid, _): UUID<IndexMarker>) {
         self.data[uuid] = None;
     }
     pub fn iter<'a>(&'a self) -> FlatOptionIterator<'a, T, IndexMarker> {
@@ -330,8 +360,13 @@ impl<T, IndexMarker> ArenaVector<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn find<F : FnMut(UUID<IndexMarker>, &T) -> bool>(&self, mut predicate : F) -> Option<UUID<IndexMarker>> {
-        self.iter().find(|(id, v)| predicate(*id, v)).map(|(id, _)| id)
+    pub fn find<F: FnMut(UUID<IndexMarker>, &T) -> bool>(
+        &self,
+        mut predicate: F,
+    ) -> Option<UUID<IndexMarker>> {
+        self.iter()
+            .find(|(id, v)| predicate(*id, v))
+            .map(|(id, _)| id)
     }
 }
 
@@ -355,7 +390,10 @@ impl<'a, T, IndexMarker> IntoIterator for &'a ArenaVector<T, IndexMarker> {
     type IntoIter = FlatOptionIterator<'a, T, IndexMarker>;
 
     fn into_iter(self) -> Self::IntoIter {
-        FlatOptionIterator{it : self.data.iter().enumerate(), _ph : PhantomData}
+        FlatOptionIterator {
+            it: self.data.iter().enumerate(),
+            _ph: PhantomData,
+        }
     }
 }
 
@@ -365,21 +403,30 @@ impl<'a, T, IndexMarker> IntoIterator for &'a mut ArenaVector<T, IndexMarker> {
     type IntoIter = FlatOptionIteratorMut<'a, T, IndexMarker>;
 
     fn into_iter(self) -> Self::IntoIter {
-        FlatOptionIteratorMut{it : self.data.iter_mut().enumerate(), _ph : PhantomData}
+        FlatOptionIteratorMut {
+            it: self.data.iter_mut().enumerate(),
+            _ph: PhantomData,
+        }
     }
 }
 
 pub struct FlatAlloc<T, IndexMarker> {
-    data : Vec<T>,
-    _ph : PhantomData<IndexMarker>
+    data: Vec<T>,
+    _ph: PhantomData<IndexMarker>,
 }
 
 impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub const fn new() -> Self {
-        Self{data : Vec::new(), _ph : PhantomData}
+        Self {
+            data: Vec::new(),
+            _ph: PhantomData,
+        }
     }
-    pub fn with_capacity(cap : usize) -> Self {
-        Self{data : Vec::with_capacity(cap), _ph : PhantomData}
+    pub fn with_capacity(cap: usize) -> Self {
+        Self {
+            data: Vec::with_capacity(cap),
+            _ph: PhantomData,
+        }
     }
     pub fn get_next_alloc_id(&self) -> UUID<IndexMarker> {
         let uuid = self.data.len();
@@ -389,7 +436,7 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
         assert!(self.data.len() >= 1, "Can't get last_id on empty FlatAlloc");
         UUID(self.data.len() - 1, PhantomData)
     }
-    pub fn alloc(&mut self, value : T) -> UUID<IndexMarker> {
+    pub fn alloc(&mut self, value: T) -> UUID<IndexMarker> {
         let uuid = self.data.len();
         self.data.push(value);
         UUID(uuid, PhantomData)
@@ -412,17 +459,32 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> FlatAllocIterMut<'a, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn map<OT, F : FnMut((UUID<IndexMarker>, &T)) -> OT>(&self, f : F) -> FlatAlloc<OT, IndexMarker> {
-        FlatAlloc { data: Vec::from_iter(self.iter().map(f)), _ph: PhantomData }
+    pub fn map<OT, F: FnMut((UUID<IndexMarker>, &T)) -> OT>(
+        &self,
+        f: F,
+    ) -> FlatAlloc<OT, IndexMarker> {
+        FlatAlloc {
+            data: Vec::from_iter(self.iter().map(f)),
+            _ph: PhantomData,
+        }
     }
-    pub fn find<F : FnMut(UUID<IndexMarker>, &T) -> bool>(&self, mut predicate : F) -> Option<UUID<IndexMarker>> {
-        self.iter().find(|(id, v)| predicate(*id, v)).map(|(id, _)| id)
+    pub fn find<F: FnMut(UUID<IndexMarker>, &T) -> bool>(
+        &self,
+        mut predicate: F,
+    ) -> Option<UUID<IndexMarker>> {
+        self.iter()
+            .find(|(id, v)| predicate(*id, v))
+            .map(|(id, _)| id)
     }
-    pub fn range_since(&self, id : UUID<IndexMarker>) -> UUIDRange<IndexMarker> {
+    pub fn range_since(&self, id: UUID<IndexMarker>) -> UUIDRange<IndexMarker> {
         UUIDRange(id, UUID(self.data.len(), PhantomData))
     }
     /// TODO replace once get_many_mut stabilizes
-    pub fn get2_mut(&mut self, id_a : UUID<IndexMarker>, id_b : UUID<IndexMarker>) -> Option<(&mut T, &mut T)> {
+    pub fn get2_mut(
+        &mut self,
+        id_a: UUID<IndexMarker>,
+        id_b: UUID<IndexMarker>,
+    ) -> Option<(&mut T, &mut T)> {
         match id_b.0.cmp(&id_a.0) {
             Ordering::Equal => None,
             Ordering::Less => {
@@ -435,20 +497,26 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
             }
         }
     }
-    pub fn get(&self, id : UUID<IndexMarker>) -> Option<&T> {
+    pub fn get(&self, id: UUID<IndexMarker>) -> Option<&T> {
         self.data.get(id.0)
     }
-    pub fn get_mut(&mut self, id : UUID<IndexMarker>) -> Option<&mut T> {
+    pub fn get_mut(&mut self, id: UUID<IndexMarker>) -> Option<&mut T> {
         self.data.get_mut(id.0)
     }
 }
 
 impl<T, IndexMarker> FlatAlloc<Option<T>, IndexMarker> {
     pub fn iter_valids<'a>(&'a self) -> FlatOptionIterator<'a, T, IndexMarker> {
-        FlatOptionIterator{ it: self.data.iter().enumerate(), _ph: PhantomData }
+        FlatOptionIterator {
+            it: self.data.iter().enumerate(),
+            _ph: PhantomData,
+        }
     }
     pub fn iter_valids_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
-        FlatOptionIteratorMut{ it: self.data.iter_mut().enumerate(), _ph: PhantomData }
+        FlatOptionIteratorMut {
+            it: self.data.iter_mut().enumerate(),
+            _ph: PhantomData,
+        }
     }
 }
 
@@ -466,36 +534,38 @@ impl<T, IndexMarker> IndexMut<UUID<IndexMarker>> for FlatAlloc<T, IndexMarker> {
     }
 }
 
-impl<T : Debug, IndexMarker> Debug for FlatAlloc<T, IndexMarker> {
+impl<T: Debug, IndexMarker> Debug for FlatAlloc<T, IndexMarker> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         self.data.fmt(f)
     }
 }
 
-impl<T : Clone, IndexMarker> Clone for FlatAlloc<T, IndexMarker> {
+impl<T: Clone, IndexMarker> Clone for FlatAlloc<T, IndexMarker> {
     fn clone(&self) -> Self {
-        Self { data: self.data.clone(), _ph: PhantomData }
+        Self {
+            data: self.data.clone(),
+            _ph: PhantomData,
+        }
     }
 }
 
-impl<T : PartialEq, IndexMarker> PartialEq for FlatAlloc<T, IndexMarker> {
+impl<T: PartialEq, IndexMarker> PartialEq for FlatAlloc<T, IndexMarker> {
     fn eq(&self, other: &Self) -> bool {
         self.data == other.data
     }
 }
-impl<T : Eq, IndexMarker> Eq for FlatAlloc<T, IndexMarker> {}
+impl<T: Eq, IndexMarker> Eq for FlatAlloc<T, IndexMarker> {}
 
-impl<T : Hash, IndexMarker> std::hash::Hash for FlatAlloc<T, IndexMarker> {
+impl<T: Hash, IndexMarker> std::hash::Hash for FlatAlloc<T, IndexMarker> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.data.hash(state);
     }
 }
 
-
 #[derive(Debug)]
 pub struct FlatAllocIter<'a, T, IndexMarker> {
-    iter : Enumerate<std::slice::Iter<'a, T>>,
-    _ph : PhantomData<IndexMarker>
+    iter: Enumerate<std::slice::Iter<'a, T>>,
+    _ph: PhantomData<IndexMarker>,
 }
 
 impl<'a, T, IndexMarker> Iterator for FlatAllocIter<'a, T, IndexMarker> {
@@ -520,14 +590,17 @@ impl<'a, T, IndexMarker> IntoIterator for &'a FlatAlloc<T, IndexMarker> {
     type IntoIter = FlatAllocIter<'a, T, IndexMarker>;
 
     fn into_iter(self) -> Self::IntoIter {
-        FlatAllocIter{iter : self.data.iter().enumerate(), _ph : PhantomData}
+        FlatAllocIter {
+            iter: self.data.iter().enumerate(),
+            _ph: PhantomData,
+        }
     }
 }
 
 #[derive(Debug)]
 pub struct FlatAllocIterMut<'a, T, IndexMarker> {
-    iter : Enumerate<std::slice::IterMut<'a, T>>,
-    _ph : PhantomData<IndexMarker>
+    iter: Enumerate<std::slice::IterMut<'a, T>>,
+    _ph: PhantomData<IndexMarker>,
 }
 
 impl<'a, T, IndexMarker> Iterator for FlatAllocIterMut<'a, T, IndexMarker> {
@@ -552,6 +625,9 @@ impl<'a, T, IndexMarker> IntoIterator for &'a mut FlatAlloc<T, IndexMarker> {
     type IntoIter = FlatAllocIterMut<'a, T, IndexMarker>;
 
     fn into_iter(self) -> Self::IntoIter {
-        FlatAllocIterMut{iter : self.data.iter_mut().enumerate(), _ph : PhantomData}
+        FlatAllocIterMut {
+            iter: self.data.iter_mut().enumerate(),
+            _ph: PhantomData,
+        }
     }
 }

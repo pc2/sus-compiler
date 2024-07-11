@@ -1,0 +1,14 @@
+edition = "2021"
+# fn_single_line = true
+hard_tabs = false
+max_width = 100
+reorder_imports = true
+# merge_imports = true
+reorder_modules = true
+# space_after_colon = true
+# space_before_colon = true
+# spaces_around_ranges = false
+# trailing_semicolon = true
+# type_punctuation_density = "Wide"
+use_field_init_shorthand = true
+
