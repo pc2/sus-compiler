@@ -1,6 +1,6 @@
 use std::{fmt::Display, ops::{Index, Range}};
 
-use crate::linker::FileUUID;
+use crate::prelude::FileUUID;
 
 // Span is defined as byte-byte idx. Start inclusive, end exclusive
 #[derive(Clone,Copy,Debug,PartialEq,Eq,Hash)]

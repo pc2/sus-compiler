@@ -1,7 +1,9 @@
 
+use crate::prelude::*;
+
 use lsp_types::{Position, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities, WorkDoneProgressOptions};
 
-use crate::{dev_aid::lsp::to_position, file_position::Span, flattening::{DomainID, IdentifierType}, linker::{FileData, FileUUID, Linker, NameElem}};
+use crate::{dev_aid::lsp::to_position, flattening::IdentifierType, linker::{FileData, NameElem}};
 
 use crate::typing::{
     abstract_type::DomainType, 

@@ -1,6 +1,8 @@
 use crate::typing::template::{TemplateArgKind, TemplateArgs};
 
-use super::{FlatID, WireReferencePathElement, WireReferenceRoot, WireSource, WrittenType};
+use crate::prelude::*;
+
+use super::{WireReferencePathElement, WireReferenceRoot, WireSource, WrittenType};
 
 
 impl WireSource {

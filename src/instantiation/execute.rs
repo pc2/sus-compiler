@@ -6,10 +6,12 @@
 
 use std::ops::{Deref, Index, IndexMut};
 
+use crate::prelude::*;
+
 use num::BigInt;
 
 use crate::{
-    alloc::UUIDRange, file_position::Span, linker::NamedConstant, util::add_to_small_set
+    linker::NamedConstant, util::add_to_small_set
 };
 use crate::value::{compute_binary_op, compute_unary_op, TypedValue, Value};
 use crate::flattening::*;
@@ -533,8 +535,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     continue;
                 }
                 Instruction::IfStatement(stm) => {
-                    let then_range = UUIDRange(stm.then_start, stm.then_end_else_start);
-                    let else_range = UUIDRange(stm.then_end_else_start, stm.else_end);
+                    let then_range = FlatIDRange::new(stm.then_start, stm.then_end_else_start);
+                    let else_range = FlatIDRange::new(stm.then_end_else_start, stm.else_end);
                     let if_condition_wire = self.md.instructions[stm.condition].unwrap_wire();
                     match if_condition_wire.typ.domain {
                         DomainType::Generative => {

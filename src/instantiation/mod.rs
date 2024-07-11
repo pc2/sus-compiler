@@ -5,12 +5,14 @@ mod list_of_lists;
 mod typecheck;
 mod latency_count;
 
+use crate::prelude::*;
+
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    alloc::{FlatAlloc, UUIDMarker, UUID}, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, linker::{Linker, ModuleUUID}, to_string::pretty_print_concrete_instance, value::{TypedValue, Value}
+    config, errors::{CompileError, ErrorStore}, to_string::pretty_print_concrete_instance, value::{TypedValue, Value}
 };
-use crate::flattening::{BinaryOperator, DomainID, FlatID, FlatIDMarker, InterfaceIDMarker, Module, PortIDMarker, UnaryOperator};
+use crate::flattening::{BinaryOperator, Module, UnaryOperator};
 
 use crate::typing::{
     concrete_type::ConcreteType,
@@ -18,14 +20,6 @@ use crate::typing::{
 };
 
 use self::latency_algorithm::SpecifiedLatency;
-
-pub struct WireIDMarker;
-impl UUIDMarker for WireIDMarker {const DISPLAY_NAME : &'static str = "wire_";}
-pub type WireID = UUID<WireIDMarker>;
-
-pub struct SubModuleIDMarker;
-impl UUIDMarker for SubModuleIDMarker {const DISPLAY_NAME : &'static str = "submodule_";}
-pub type SubModuleID = UUID<SubModuleIDMarker>;
 
 // Temporary value before proper latency is given
 pub const CALCULATE_LATENCY_LATER : i64 = i64::MIN;

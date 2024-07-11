@@ -3,16 +3,16 @@ mod semantic_tokens;
 mod tree_walk;
 mod hover_info;
 
+use crate::prelude::*;
+
 use std::{collections::HashMap, error::Error, ffi::OsStr, net::SocketAddr};
 use hover_info::hover;
 use lsp_types::{notification::*, request::Request, *};
 use semantic_tokens::{semantic_token_capabilities, make_semantic_tokens};
 
 use crate::{
-    alloc::ArenaVector, compiler_top::{add_file, recompile_all, update_file}, config::config, errors::{CompileError, ErrorLevel}, file_position::{FileText, LineCol, Span, SpanFile}
+    alloc::ArenaVector, compiler_top::{add_file, recompile_all, update_file}, config::config, errors::{CompileError, ErrorLevel}, file_position::{FileText, LineCol}, flattening::Instruction, linker::FileData
 };
-use crate::flattening::{FlatID, Instruction};
-use crate::linker::{FileData, FileUUID, FileUUIDMarker, Linker, ModuleUUID};
 
 use tree_walk::{get_selected_object, InModule, LocationInfo};
 

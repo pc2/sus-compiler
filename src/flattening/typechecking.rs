@@ -1,12 +1,12 @@
 
+use crate::prelude::*;
+
 use std::ops::{Deref, DerefMut};
 
 use walk::for_each_generative_input_in_template_args;
 
-use crate::{
-    debug::SpanDebugger, errors::ErrorCollector, file_position::SpanFile,
-};
-use crate::linker::{with_module_editing_context, ConstantUUIDMarker, FileUUID, Linkable, Linker, ModuleUUIDMarker, NameElem, NamedConstant, Resolver, WorkingOnResolver};
+use crate::debug::SpanDebugger;
+use crate::linker::{with_module_editing_context, Linkable, NameElem, NamedConstant, Resolver, WorkingOnResolver};
 
 use crate::typing::{
     abstract_type::{BestName, DomainType, TypeUnifier, BOOL_TYPE, INT_TYPE},
@@ -466,7 +466,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     }
 
-    fn make_fanins(&self) -> FlatAlloc<Vec<UUID<FlatIDMarker>>, FlatIDMarker> {
+    fn make_fanins(&self) -> FlatAlloc<Vec<FlatID>, FlatIDMarker> {
         // Setup Wire Fanouts List for faster processing
         let mut instruction_fanins : FlatAlloc<Vec<FlatID>, FlatIDMarker> = self.working_on.instructions.map(|_| Vec::new());
         
@@ -494,7 +494,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     wire.source.for_each_dependency(collector_func);
                 }
                 Instruction::IfStatement(stm) => {
-                    for id in UUIDRange(stm.then_start, stm.else_end) {
+                    for id in FlatIDRange::new(stm.then_start, stm.else_end) {
                         if let Instruction::Write(conn) = &self.working_on.instructions[id] {
                             if let Some(flat_root) = conn.to.root.get_root_flat() {
                                 instruction_fanins[flat_root].push(stm.condition);

@@ -6,6 +6,8 @@ mod flatten;
 mod walk;
 mod parser;
 
+use crate::prelude::*;
+
 use std::ops::Deref;
 
 pub use flatten::flatten_all_modules;
@@ -13,35 +15,14 @@ pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
 
 use crate::{
-    alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, value::Value
+    file_position::FileText, instantiation::InstantiationList, value::Value
 };
-use crate::linker::{ConstantUUID, LinkInfo, ModuleUUID, TypeUUID, Documentation};
+use crate::linker::{LinkInfo, Documentation};
 
 use crate::typing::{
     abstract_type::{AbstractType, FullType},
-    template::{GlobalReference, TemplateArgs, TemplateID},
+    template::{GlobalReference, TemplateArgs},
 };
-
-pub struct FlatIDMarker;
-impl UUIDMarker for FlatIDMarker {const DISPLAY_NAME : &'static str = "obj_";}
-pub type FlatID = UUID<FlatIDMarker>;
-
-pub type FlatIDRange = UUIDRange<FlatIDMarker>;
-
-pub struct PortIDMarker;
-impl UUIDMarker for PortIDMarker {const DISPLAY_NAME : &'static str = "port_";}
-pub type PortID = UUID<PortIDMarker>;
-
-pub type PortIDRange = UUIDRange<PortIDMarker>;
-
-pub struct InterfaceIDMarker;
-impl UUIDMarker for InterfaceIDMarker {const DISPLAY_NAME : &'static str = "interface_";}
-pub type InterfaceID = UUID<InterfaceIDMarker>;
-
-pub struct DomainIDMarker;
-impl UUIDMarker for DomainIDMarker {const DISPLAY_NAME : &'static str = "domain_";}
-/// Interfaces are also indexed using DomainIDs. But in general, these refer to (clock/latency counting) domains
-pub type DomainID = UUID<DomainIDMarker>;
 
 /// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage. 
 /// 
@@ -203,7 +184,7 @@ pub struct Interface {
 impl Interface {
     pub fn all_ports(&self) -> PortIDRange {
         assert_eq!(self.func_call_inputs.1, self.func_call_outputs.0);
-        UUIDRange(self.func_call_inputs.0, self.func_call_outputs.1)
+        PortIDRange::new(self.func_call_inputs.0, self.func_call_outputs.1)
     }
 }
 

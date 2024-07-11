@@ -1,21 +1,23 @@
 
+use crate::{alloc::UUIDRangeIter, prelude::*};
 
 use std::{ops::{Deref, DerefMut}, str::FromStr};
 
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 
+
 use crate::{
-    alloc::{UUIDRange, UUIDRangeIter, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, value::Value
+    debug::SpanDebugger, value::Value
 };
-use crate::linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, Resolver, TypeUUIDMarker, WorkingOnResolver};
+use crate::linker::{with_module_editing_context, NameElem, NameResolver, NamedConstant, NamedType, Resolver, WorkingOnResolver};
 
 use super::name_context::LocalVariableContext;
 use super::parser::Cursor;
 use super::*;
 
 use crate::typing::template::{
-    TemplateID, GenerativeTemplateInputKind, TemplateArg, TemplateArgKind, TemplateArgs, TemplateIDMarker, TemplateInputKind, TypeTemplateInputKind
+    GenerativeTemplateInputKind, TemplateArg, TemplateArgKind, TemplateArgs, TemplateInputKind, TypeTemplateInputKind
 };
 
 
@@ -470,7 +472,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     if let Some((_, io_span)) = io_kw {
                         self.errors.error(io_span, "Cannot redeclare 'input' or 'output' on functional syntax IO");
                     }
-                    DeclarationPortInfo::RegularPort { is_input: declaration_context == DeclarationContext::Input, port_id:UUID::PLACEHOLDER }
+                    DeclarationPortInfo::RegularPort { is_input: declaration_context == DeclarationContext::Input, port_id: PortID::PLACEHOLDER }
                 }
                 DeclarationContext::ForLoopGenerative => {
                     if let Some((_, io_span)) = io_kw {
@@ -480,7 +482,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
                 DeclarationContext::PlainWire => {
                     match io_kw {
-                        Some((is_input, _)) => DeclarationPortInfo::RegularPort { is_input, port_id:UUID::PLACEHOLDER },
+                        Some((is_input, _)) => DeclarationPortInfo::RegularPort { is_input, port_id: PortID::PLACEHOLDER },
                         None => DeclarationPortInfo::NotPort,
                     }
                 }
@@ -504,7 +506,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                                 DeclarationPortInfo::NotPort => {}
                                 DeclarationPortInfo::RegularPort { is_input : true, port_id : _ } => {
                                     // AHA! Generative input
-                                    is_port = DeclarationPortInfo::GenerativeInput(UUID::PLACEHOLDER)
+                                    is_port = DeclarationPortInfo::GenerativeInput(TemplateID::PLACEHOLDER)
                                 }
                                 DeclarationPortInfo::RegularPort { is_input : false, port_id : _ } => {
                                     self.errors.error(modifier_span, "Cannot make generative outputs. This is because it could interfere with inference of generic types and generative inputs");
@@ -931,7 +933,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             cursor.field(field!("condition"));
             let condition = self.flatten_expr(cursor);
             
-            let if_id = self.working_on.instructions.alloc(Instruction::IfStatement(IfStatement{condition, then_start : UUID::PLACEHOLDER, then_end_else_start : UUID::PLACEHOLDER, else_end : UUID::PLACEHOLDER}));
+            let if_id = self.working_on.instructions.alloc(Instruction::IfStatement(IfStatement{condition, then_start : FlatID::PLACEHOLDER, then_end_else_start : FlatID::PLACEHOLDER, else_end : FlatID::PLACEHOLDER}));
             let then_start = self.working_on.instructions.get_next_alloc_id();
             
             cursor.field(field!("then_block"));
@@ -1060,7 +1062,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     cursor.field(field!("to"));
                     let end = self.flatten_expr(cursor);
                     
-                    let for_id = self.working_on.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER)}));
+                    let for_id = self.working_on.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: FlatIDRange::PLACEHOLDER}));
 
                     let code_start = self.working_on.instructions.get_next_alloc_id();
 
@@ -1072,7 +1074,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
                     let Instruction::ForStatement(for_stmt) = &mut self.working_on.instructions[for_id] else {unreachable!()};
 
-                    for_stmt.loop_body = UUIDRange(code_start, code_end);
+                    for_stmt.loop_body = FlatIDRange::new(code_start, code_end);
 
                     self.local_variable_context.pop_frame(loop_var_decl_frame);
                 })

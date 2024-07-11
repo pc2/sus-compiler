@@ -2,9 +2,10 @@
 
 use std::{cmp::max, iter::zip};
 
+use crate::prelude::*;
+
 use crate::{
-    alloc::FlatAlloc,
-    flattening::{DomainIDMarker, FlatIDMarker, Instruction, WriteModifiers},
+    flattening::{Instruction, WriteModifiers},
     instantiation::latency_algorithm::{convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError}
 };
 

@@ -1,11 +1,13 @@
 
 use std::borrow::Cow;
 
+use crate::prelude::*;
+
 use lsp_types::{LanguageString, MarkedString};
 
 use crate::instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER};
-use crate::linker::{FileData, LinkInfo, Linker, NameElem, Documentation};
-use crate::flattening::{DeclarationPortInfo, FlatID, IdentifierType, InterfaceToDomainMap, Module};
+use crate::linker::{FileData, LinkInfo, NameElem, Documentation};
+use crate::flattening::{DeclarationPortInfo, IdentifierType, InterfaceToDomainMap, Module};
 
 use crate::typing::{
     abstract_type::DomainType,

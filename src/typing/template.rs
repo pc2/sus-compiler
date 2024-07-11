@@ -1,12 +1,8 @@
-use crate::{alloc::{FlatAlloc, UUIDMarker, UUID}, errors::ErrorCollector, file_position::{BracketSpan, Span}, flattening::{FlatID, WrittenType}, linker::LinkInfo, value::TypedValue};
+
+use crate::prelude::*;
+
+use crate::{flattening::WrittenType, linker::LinkInfo, value::TypedValue};
 use super::concrete_type::ConcreteType;
-
-
-pub struct TemplateIDMarker;
-impl UUIDMarker for TemplateIDMarker {const DISPLAY_NAME : &'static str = "template_arg_";}
-pub type TemplateID = UUID<TemplateIDMarker>;
-
-
 
 #[derive(Debug)]
 pub struct GlobalReference<ID> {

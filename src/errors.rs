@@ -1,11 +1,12 @@
 
+use crate::prelude::*;
 
 use std::cell::RefCell;
 
-use crate::{alloc::ArenaAllocator, file_position::{Span, SpanFile}, typing::template::TemplateInput};
+use crate::{alloc::ArenaAllocator, typing::template::TemplateInput};
 
 use crate::flattening::{Declaration, Instruction, Interface, Module, Port, SubModuleInstance};
-use crate::linker::{checkpoint::ErrorCheckpoint, FileData, FileUUID, FileUUIDMarker, LinkInfo};
+use crate::linker::{checkpoint::ErrorCheckpoint, FileData, LinkInfo};
 
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum ErrorLevel {

@@ -1,9 +1,12 @@
+
+use crate::prelude::*;
+
 use std::{cell::RefCell, ops::Deref};
 
-use crate::{alloc::FlatAlloc, errors::ErrorCollector, file_position::{Span, SpanFile}, to_string::map_to_type_names};
-use crate::linker::{get_builtin_type, NamedType, Resolver, TypeUUID, TypeUUIDMarker};
-use crate::flattening::{BinaryOperator, DomainID, DomainIDMarker, FlatID, UnaryOperator};
-use super::template::{TemplateID, TemplateIDMarker, TemplateInputs};
+use crate::to_string::map_to_type_names;
+use crate::linker::{get_builtin_type, NamedType, Resolver};
+use crate::flattening::{BinaryOperator, UnaryOperator};
+use super::template::TemplateInputs;
 
 /// This contains only the information that can be easily type-checked. 
 /// 

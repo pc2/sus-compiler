@@ -3,6 +3,8 @@
 
 use std::ops::Index;
 
+use crate::alloc::{UUIDMarker, UUID};
+
 use self::checkpoint::ResolvedGlobalsCheckpoint;
 
 use super::*;

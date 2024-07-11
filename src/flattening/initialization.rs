@@ -1,9 +1,10 @@
 
 use sus_proc_macro::{field, kind, kw};
 
+use crate::prelude::*;
 
 use crate::{
-    alloc::{FlatAlloc, UUID}, errors::ErrorCollector, file_position::FileText, flattening::Module, instantiation::InstantiationList
+    file_position::FileText, flattening::Module, instantiation::InstantiationList
 };
 use crate::linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals};
 
@@ -147,9 +148,9 @@ impl<'linker> ModuleInitializationContext<'linker> {
         } else {(None, None)};
 
         let (func_call_inputs, func_call_outputs) = match ports {
-            (None, None) => (UUIDRange::empty(), UUIDRange::empty()),
-            (None, Some(fouts)) => (UUIDRange(fouts.0, fouts.0), fouts),
-            (Some(fins), None) => (fins, UUIDRange(fins.1, fins.1)),
+            (None, None) => (PortIDRange::empty(), PortIDRange::empty()),
+            (None, Some(fouts)) => (PortIDRange::new(fouts.0, fouts.0), fouts),
+            (Some(fins), None) => (fins, PortIDRange::new(fins.1, fins.1)),
             (Some(fins), Some(fouts)) => (fins, fouts)
         };
         // All ports are consecutive
@@ -192,7 +193,7 @@ impl<'linker> ModuleInitializationContext<'linker> {
             self.template_inputs.alloc(TemplateInput {
                 name,
                 name_span,
-                kind: TemplateInputKind::Generative(GenerativeTemplateInputKind{decl_span, declaration_instruction : UUID::PLACEHOLDER})
+                kind: TemplateInputKind::Generative(GenerativeTemplateInputKind{decl_span, declaration_instruction : FlatID::PLACEHOLDER})
             });
         } else {
             self.ports.alloc(Port{

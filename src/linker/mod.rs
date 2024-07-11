@@ -2,15 +2,17 @@ pub mod checkpoint;
 mod resolver;
 pub use resolver::*;
 
+use crate::prelude::*;
+
 use std::{collections::{HashMap, HashSet}, cell::RefCell};
 
 use tree_sitter::Tree;
 
 use crate::{
-    alloc::{ArenaAllocator, UUIDMarker, UUID}, file_position::{FileText, Span, SpanFile}, flattening::Module, util::{const_str_position, const_str_position_in_tuples}, value::{TypedValue, Value}
+    alloc::ArenaAllocator, file_position::FileText, flattening::Module, util::{const_str_position, const_str_position_in_tuples}, value::{TypedValue, Value}
 };
 
-use crate::errors::{CompileError, ErrorCollector, ErrorInfo, ErrorLevel, ErrorStore};
+use crate::errors::{CompileError, ErrorInfo, ErrorLevel, ErrorStore};
 
 use crate::typing::{
     abstract_type::{DomainType, FullType},
@@ -19,22 +21,6 @@ use crate::typing::{
 };
 
 use self::checkpoint::CheckPoint;
-
-pub struct ModuleUUIDMarker;
-impl UUIDMarker for ModuleUUIDMarker {const DISPLAY_NAME : &'static str = "module_";}
-pub type ModuleUUID = UUID<ModuleUUIDMarker>;
-
-pub struct TypeUUIDMarker;
-impl UUIDMarker for TypeUUIDMarker {const DISPLAY_NAME : &'static str = "type_";}
-pub type TypeUUID = UUID<TypeUUIDMarker>;
-
-pub struct ConstantUUIDMarker;
-impl UUIDMarker for ConstantUUIDMarker {const DISPLAY_NAME : &'static str = "constant_";}
-pub type ConstantUUID = UUID<ConstantUUIDMarker>;
-
-pub struct FileUUIDMarker;
-impl UUIDMarker for FileUUIDMarker {const DISPLAY_NAME : &'static str = "file_";}
-pub type FileUUID = UUID<FileUUIDMarker>;
 
 const BUILTIN_TYPES : [&'static str; 2] = [
     "bool",

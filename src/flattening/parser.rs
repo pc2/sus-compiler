@@ -1,8 +1,10 @@
 
+use crate::prelude::*;
+
 use sus_proc_macro::{field, kind, kw};
 use tree_sitter::{Tree, TreeCursor};
 
-use crate::{errors::ErrorCollector, file_position::{FileText, Span}, linker::Documentation};
+use crate::{file_position::FileText, linker::Documentation};
 
 use std::num::NonZeroU16;
 

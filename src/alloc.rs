@@ -50,6 +50,41 @@ impl<IndexMarker> UUID<IndexMarker> {
 
 pub struct UUIDRange<IndexMarker>(pub UUID<IndexMarker>, pub UUID<IndexMarker>);
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct UUIDRangeIter<IndexMarker>(UUID<IndexMarker>, UUID<IndexMarker>);
+
+impl<IndexMarker> UUIDRange<IndexMarker> {
+    pub const PLACEHOLDER : UUIDRange<IndexMarker> = UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER);
+
+    pub fn new(from : UUID<IndexMarker>, to : UUID<IndexMarker>) -> Self {
+        Self(from, to)
+    }
+    pub fn empty() -> Self {
+        UUIDRange(UUID(0, PhantomData), UUID(0, PhantomData))
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    pub fn contains(&self, id : UUID<IndexMarker>) -> bool {
+        self.0.0 >= id.0 && self.1.0 < id.0
+    }
+    pub fn iter(&self) -> UUIDRangeIter<IndexMarker> {
+        self.into_iter()
+    }
+    pub fn map<OT, F : FnMut(UUID<IndexMarker>) -> OT>(&self, f : F) -> FlatAlloc<OT, IndexMarker> {
+        FlatAlloc { data: Vec::from_iter(self.iter().map(f)), _ph: PhantomData }
+    }
+    pub fn len(&self) -> usize {
+        self.1.0 - self.0.0
+    }
+    pub fn first(&self) -> Option<UUID<IndexMarker>> {
+        (self.0.0 < self.1.0).then_some(self.0)
+    }
+    pub fn last(&self) -> Option<UUID<IndexMarker>> {
+        (self.0.0 < self.1.0).then_some(UUID(self.1.0-1, PhantomData))
+    }
+}
+
 impl<IndexMarker : UUIDMarker> Debug for UUIDRange<IndexMarker> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.write_str(IndexMarker::DISPLAY_NAME)?;
@@ -85,36 +120,6 @@ impl<IndexMarker> IntoIterator for UUIDRange<IndexMarker> {
 
     fn into_iter(self) -> Self::IntoIter {
         UUIDRangeIter(self.0, self.1)
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UUIDRangeIter<IndexMarker>(UUID<IndexMarker>, UUID<IndexMarker>);
-
-impl<IndexMarker> UUIDRange<IndexMarker> {
-    pub fn empty() -> Self {
-        UUIDRange(UUID(0, PhantomData), UUID(0, PhantomData))
-    }
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-    pub fn contains(&self, id : UUID<IndexMarker>) -> bool {
-        self.0.0 >= id.0 && self.1.0 < id.0
-    }
-    pub fn iter(&self) -> UUIDRangeIter<IndexMarker> {
-        self.into_iter()
-    }
-    pub fn map<OT, F : FnMut(UUID<IndexMarker>) -> OT>(&self, f : F) -> FlatAlloc<OT, IndexMarker> {
-        FlatAlloc { data: Vec::from_iter(self.iter().map(f)), _ph: PhantomData }
-    }
-    pub fn len(&self) -> usize {
-        self.1.0 - self.0.0
-    }
-    pub fn first(&self) -> Option<UUID<IndexMarker>> {
-        (self.0.0 < self.1.0).then_some(self.0)
-    }
-    pub fn last(&self) -> Option<UUID<IndexMarker>> {
-        (self.0.0 < self.1.0).then_some(UUID(self.1.0-1, PhantomData))
     }
 }
 

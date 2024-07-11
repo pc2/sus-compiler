@@ -1,8 +1,10 @@
 
+use crate::prelude::*;
+
 use tree_sitter::Parser;
 
 use crate::{
-    alloc::FlatAlloc, config::config, debug::SpanDebugger, errors::ErrorStore, file_position::FileText, linker::{FileData, FileUUID, Linker}
+    config::config, debug::SpanDebugger, errors::ErrorStore, file_position::FileText, linker::FileData
 };
 
 use crate::flattening::{flatten_all_modules, gather_initial_file_data, typecheck_all_modules, Module};
