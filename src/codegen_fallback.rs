@@ -19,22 +19,28 @@ fn get_type_name_size(id: TypeUUID) -> u64 {
     }
 }
 
-fn typ_to_verilog_array(typ: &ConcreteType) -> String {
+/// Creates the Verilog variable declaration for tbis variable. 
+/// 
+/// IE for `int[15] myVar (reg)` it creates `reg[31:0] myVar[14:0]`
+fn typ_to_verilog_array(typ: &ConcreteType, prefix : &str, var_name: &str) -> String {
     match typ {
         ConcreteType::Named(id) => {
             let sz = get_type_name_size(*id);
             if sz == 1 {
-                String::new()
+                format!("{prefix} {var_name}")
             } else {
-                format!("[{}:0]", sz - 1)
+                format!("{prefix}[{}:0] {var_name}", sz - 1)
             }
         }
         ConcreteType::Array(arr) => {
-            let (sub_typ, size) = arr.deref();
+            let (content_typ, size) = arr.deref();
             let sz = size.unwrap_value().unwrap_integer();
-            typ_to_verilog_array(sub_typ) + &format!("[{}:0]", sz - 1)
+            let mut result = typ_to_verilog_array(content_typ, prefix, var_name);
+            use std::fmt::Write;
+            write!(result, "[{}:0]", sz - 1).unwrap();
+            result
         }
-        &ConcreteType::Value(_) | ConcreteType::Unknown | ConcreteType::Error => unreachable!(),
+        ConcreteType::Value(_) | ConcreteType::Unknown | ConcreteType::Error => unreachable!(),
     }
 }
 
@@ -104,7 +110,6 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 
     fn add_latency_registers(&mut self, w: &RealWire) -> Result<(), std::fmt::Error> {
         if self.use_latency {
-            let type_str = typ_to_verilog_array(&w.typ);
 
             // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
             assert!(w.absolute_latency != CALCULATE_LATENCY_LATER);
@@ -113,7 +118,9 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 let from = wire_name_with_latency(w, i, self.use_latency);
                 let to = wire_name_with_latency(w, i + 1, self.use_latency);
 
-                writeln!(self.program_text, "/*latency*/ reg{type_str} {to}; always @(posedge clk) begin {to} <= {from}; end")?;
+                let var_decl = typ_to_verilog_array(&w.typ, "/*latency*/ reg", &to);
+
+                writeln!(self.program_text, "{var_decl}; always @(posedge clk) begin {to} <= {from}; end")?;
             }
         }
         Ok(())
@@ -130,11 +137,11 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             } else {
                 "output /*mux_wire*/ reg"
             };
-            let wire_typ = typ_to_verilog_array(&port_wire.typ);
             let wire_name = wire_name_self_latency(port_wire, self.use_latency);
+            let wire_decl = typ_to_verilog_array(&port_wire.typ, input_or_output, &wire_name);
             writeln!(
                 self.program_text,
-                "\t{input_or_output}{wire_typ} {wire_name},"
+                "\t{wire_decl},"
             )?;
         }
         writeln!(self.program_text, ");\n")?;
@@ -177,8 +184,8 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             };
 
             let wire_name = wire_name_self_latency(w, self.use_latency);
-            let type_str = typ_to_verilog_array(&w.typ);
-            write!(self.program_text, "{wire_or_reg}{type_str} {wire_name}")?;
+            let wire_decl = typ_to_verilog_array(&w.typ, wire_or_reg, &wire_name);
+            write!(self.program_text, "{wire_decl}")?;
 
             match &w.source {
                 RealWireDataSource::Select { root, path } => {
