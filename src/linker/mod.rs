@@ -7,7 +7,7 @@ use std::{collections::{HashMap, HashSet}, cell::RefCell};
 use tree_sitter::Tree;
 
 use crate::{
-    arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, file_position::{FileText, Span, SpanFile}, flattening::Module, parser::Documentation, util::{const_str_position, const_str_position_in_tuples}, value::{TypedValue, Value}
+    arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, file_position::{FileText, Span, SpanFile}, flattening::Module, util::{const_str_position, const_str_position_in_tuples}, value::{TypedValue, Value}
 };
 
 use crate::errors::{CompileError, ErrorCollector, ErrorInfo, ErrorLevel, ErrorStore};
@@ -61,6 +61,26 @@ pub const fn get_builtin_constant(name : &'static str) -> ConstantUUID {
         ConstantUUID::from_hidden_value(is_constant)
     } else {
         unreachable!()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Documentation {
+    pub gathered : Box<[Span]>
+}
+
+impl Documentation {
+    pub fn to_string(&self, file_text : &FileText) -> String {
+        let mut total_length = self.gathered.len().saturating_sub(1);
+        for s in self.gathered.iter() {
+            total_length += s.size();
+        }
+        let mut result = String::with_capacity(total_length);
+        for s in self.gathered.iter() {
+            result.push_str(&file_text[*s]);
+            result.push('\n');
+        }
+        result
     }
 }
 

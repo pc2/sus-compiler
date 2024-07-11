@@ -3,9 +3,8 @@ use std::borrow::Cow;
 
 use lsp_types::{LanguageString, MarkedString};
 
-use crate::parser::Documentation;
 use crate::instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER};
-use crate::linker::{FileData, LinkInfo, Linker, NameElem};
+use crate::linker::{FileData, LinkInfo, Linker, NameElem, Documentation};
 use crate::flattening::{DeclarationPortInfo, FlatID, IdentifierType, InterfaceToDomainMap, Module};
 
 use crate::typing::{

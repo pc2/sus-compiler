@@ -2,19 +2,20 @@
 mod name_context;
 mod initialization;
 mod typechecking;
-mod parse;
+mod flatten;
 mod walk;
+mod parser;
 
 use std::ops::Deref;
 
-pub use parse::flatten_all_modules;
+pub use flatten::flatten_all_modules;
 pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, parser::Documentation, value::Value
+    arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, value::Value
 };
-use crate::linker::{ConstantUUID, LinkInfo, ModuleUUID, TypeUUID};
+use crate::linker::{ConstantUUID, LinkInfo, ModuleUUID, TypeUUID, Documentation};
 
 use crate::typing::{
     abstract_type::{AbstractType, FullType},

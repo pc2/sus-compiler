@@ -4,7 +4,6 @@ mod util;
 mod arena_alloc;
 
 mod file_position;
-mod parser;
 mod errors;
 mod value;
 mod typing;

@@ -2,7 +2,7 @@
 use sus_proc_macro::{field, kind, kw};
 use tree_sitter::{Tree, TreeCursor};
 
-use crate::{errors::ErrorCollector, file_position::{FileText, Span}};
+use crate::{errors::ErrorCollector, file_position::{FileText, Span}, linker::Documentation};
 
 use std::num::NonZeroU16;
 
@@ -28,26 +28,6 @@ fn print_current_node_indented<'ft>(file_text : &'ft FileText, cursor : &TreeCur
         println!("{indent} {node_name} [{cursor_span}]");
     }
     node_name
-}
-
-#[derive(Debug, Clone)]
-pub struct Documentation {
-    gathered : Box<[Span]>
-}
-
-impl Documentation {
-    pub fn to_string(&self, file_text : &FileText) -> String {
-        let mut total_length = self.gathered.len().saturating_sub(1);
-        for s in self.gathered.iter() {
-            total_length += s.size();
-        }
-        let mut result = String::with_capacity(total_length);
-        for s in self.gathered.iter() {
-            result.push_str(&file_text[*s]);
-            result.push('\n');
-        }
-        result
-    }
 }
 
 pub struct Cursor<'t> {
