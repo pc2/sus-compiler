@@ -1,5 +1,5 @@
 
-use crate::{arena_alloc::FlatAlloc, file_position::FileText, pretty_print_many_spans, value::Value};
+use crate::{alloc::FlatAlloc, file_position::FileText, pretty_print_many_spans, value::Value};
 
 use crate::flattening::{DomainID, DomainIDMarker, DomainInfo, Interface, InterfaceToDomainMap, Module, PortID, WrittenType};
 use crate::linker::{LinkInfo, Linker, NamedType, TypeUUID};

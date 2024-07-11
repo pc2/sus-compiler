@@ -9,7 +9,7 @@ use std::ops::{Deref, Index, IndexMut};
 use num::BigInt;
 
 use crate::{
-    arena_alloc::UUIDRange, file_position::Span, linker::NamedConstant, util::add_to_small_set
+    alloc::UUIDRange, file_position::Span, linker::NamedConstant, util::add_to_small_set
 };
 use crate::value::{compute_binary_op, compute_unary_op, TypedValue, Value};
 use crate::flattening::*;

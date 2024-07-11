@@ -3,7 +3,7 @@ use sus_proc_macro::{field, kind, kw};
 
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUID}, errors::ErrorCollector, file_position::FileText, flattening::Module, instantiation::InstantiationList
+    alloc::{FlatAlloc, UUID}, errors::ErrorCollector, file_position::FileText, flattening::Module, instantiation::InstantiationList
 };
 use crate::linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals};
 

@@ -2,7 +2,7 @@
 use std::{ops::Range, path::PathBuf};
 
 use crate::{
-    arena_alloc::ArenaVector, compiler_top::{add_file, recompile_all}, config::config, errors::{CompileError, ErrorLevel},
+    alloc::ArenaVector, compiler_top::{add_file, recompile_all}, config::config, errors::{CompileError, ErrorLevel},
 };
 use crate::linker::{FileUUID, FileUUIDMarker, Linker};
 

@@ -8,7 +8,7 @@ mod latency_count;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUID}, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, linker::{Linker, ModuleUUID}, to_string::pretty_print_concrete_instance, value::{TypedValue, Value}
+    alloc::{FlatAlloc, UUIDMarker, UUID}, config, errors::{CompileError, ErrorCollector, ErrorStore}, file_position::{BracketSpan, Span}, linker::{Linker, ModuleUUID}, to_string::pretty_print_concrete_instance, value::{TypedValue, Value}
 };
 use crate::flattening::{BinaryOperator, DomainID, FlatID, FlatIDMarker, InterfaceIDMarker, Module, PortIDMarker, UnaryOperator};
 

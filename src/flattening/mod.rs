@@ -13,7 +13,7 @@ pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
 
 use crate::{
-    arena_alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, value::Value
+    alloc::{FlatAlloc, UUIDMarker, UUIDRange, UUID}, errors::ErrorCollector, file_position::{BracketSpan, FileText, Span}, instantiation::InstantiationList, value::Value
 };
 use crate::linker::{ConstantUUID, LinkInfo, ModuleUUID, TypeUUID, Documentation};
 

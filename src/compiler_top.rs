@@ -2,7 +2,7 @@
 use tree_sitter::Parser;
 
 use crate::{
-    arena_alloc::FlatAlloc, config::config, debug::SpanDebugger, errors::ErrorStore, file_position::FileText, linker::{FileData, FileUUID, Linker}
+    alloc::FlatAlloc, config::config, debug::SpanDebugger, errors::ErrorStore, file_position::FileText, linker::{FileData, FileUUID, Linker}
 };
 
 use crate::flattening::{flatten_all_modules, gather_initial_file_data, typecheck_all_modules, Module};

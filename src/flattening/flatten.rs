@@ -6,7 +6,7 @@ use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 
 use crate::{
-    arena_alloc::{UUIDRange, UUIDRangeIter, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, value::Value
+    alloc::{UUIDRange, UUIDRangeIter, UUID}, debug::SpanDebugger, errors::ErrorCollector, file_position::{BracketSpan, Span}, value::Value
 };
 use crate::linker::{with_module_editing_context, ConstantUUIDMarker, Linker, ModuleUUID, ModuleUUIDMarker, NameElem, NameResolver, NamedConstant, NamedType, Resolver, TypeUUIDMarker, WorkingOnResolver};
 

@@ -7,7 +7,7 @@ use std::{collections::{HashMap, HashSet}, cell::RefCell};
 use tree_sitter::Tree;
 
 use crate::{
-    arena_alloc::{ArenaAllocator, UUIDMarker, UUID}, file_position::{FileText, Span, SpanFile}, flattening::Module, util::{const_str_position, const_str_position_in_tuples}, value::{TypedValue, Value}
+    alloc::{ArenaAllocator, UUIDMarker, UUID}, file_position::{FileText, Span, SpanFile}, flattening::Module, util::{const_str_position, const_str_position_in_tuples}, value::{TypedValue, Value}
 };
 
 use crate::errors::{CompileError, ErrorCollector, ErrorInfo, ErrorLevel, ErrorStore};

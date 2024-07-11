@@ -1,7 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 mod util;
-mod arena_alloc;
+mod alloc;
 
 mod file_position;
 mod errors;
