@@ -127,22 +127,39 @@ impl Display for Value {
 }
 
 impl Value {
-    pub fn to_string(&self) -> String {
+    pub fn write_as_string(&self, result: &mut String) {
+        use std::fmt::Write;
         match self {
-            Value::Bool(b) => if *b { "1'b1" } else { "1'b0" }.to_owned(),
-            Value::Integer(v) => v.to_string(),
+            Value::Bool(b) => result.push_str(if *b { "1'b1" } else { "1'b0" }),
+            Value::Integer(v) => write!(result, "{v}").unwrap(),
             Value::Array(arr_box) => {
-                let mut result = "'{".to_owned();
-                for v in arr_box.iter() {
-                    result.push_str(&v.to_string());
-                    result.push_str(", ");
+                result.push_str("'{");
+
+                let starting_len = result.len();
+                let mut arr_box_iter = arr_box.iter();
+
+                if let Some(first) = arr_box_iter.next() {
+                    first.write_as_string(result);
+                    let delta_len = result.len() - starting_len;
+
+                    result.reserve((arr_box.len() - 1) * (delta_len + 4)); // Some extra margin for variation and the comma
+
+                    for remaining in arr_box_iter {
+                        result.push_str(", ");
+                        remaining.write_as_string(result);
+                    }
                 }
+
                 result.push('}');
-                result
             }
-            Value::Unset => "1'bX/*UNSET*/".to_owned(),
-            Value::Error => "1'bX/*ERROR*/".to_owned(),
+            Value::Unset => result.push_str("1'bX/*UNSET*/"),
+            Value::Error => result.push_str("1'bX/*ERROR*/"),
         }
+    }
+    pub fn to_string(&self) -> String {
+        let mut result = String::new();
+        self.write_as_string(&mut result);
+        result
     }
 }
 

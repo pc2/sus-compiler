@@ -19,8 +19,8 @@ fn get_type_name_size(id: TypeUUID) -> u64 {
     }
 }
 
-/// Creates the Verilog variable declaration for tbis variable. 
-/// 
+/// Creates the Verilog variable declaration for tbis variable.
+///
 /// IE for `int[15] myVar` it creates `logic[31:0] myVar[14:0]`
 fn typ_to_verilog_array(typ: &ConcreteType, var_name: &str) -> String {
     match typ {
@@ -110,7 +110,6 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 
     fn add_latency_registers(&mut self, w: &RealWire) -> Result<(), std::fmt::Error> {
         if self.use_latency {
-
             // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
             assert!(w.absolute_latency != CALCULATE_LATENCY_LATER);
             assert!(w.needed_until != CALCULATE_LATENCY_LATER);
@@ -120,7 +119,10 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 
                 let var_decl = typ_to_verilog_array(&w.typ, &to);
 
-                writeln!(self.program_text, "/*latency*/ {var_decl}; always_ff @(posedge clk) begin {to} <= {from}; end")?;
+                writeln!(
+                    self.program_text,
+                    "/*latency*/ {var_decl}; always_ff @(posedge clk) begin {to} <= {from}; end"
+                )?;
             }
         }
         Ok(())
@@ -129,22 +131,19 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
     fn write_verilog_code(&mut self) -> Result<(), std::fmt::Error> {
         // First output the interface of the module
         writeln!(self.program_text, "module {}(", mangle(&self.instance.name))?;
-        writeln!(self.program_text, "\tinput clk,")?;
+        write!(self.program_text, "\tinput clk")?;
         for (_id, port) in self.instance.interface_ports.iter_valids() {
             let port_wire = &self.instance.wires[port.wire];
-            let input_or_output = if port.is_input {
-                "input"
-            } else {
-                "output"
-            };
+            let input_or_output = if port.is_input { "input" } else { "output" };
             let wire_doc = port_wire.source.get_sv_info_doc();
             let wire_name = wire_name_self_latency(port_wire, self.use_latency);
             let wire_decl = typ_to_verilog_array(&port_wire.typ, &wire_name);
-            writeln!(
+            write!(
                 self.program_text,
-                "\t{wire_doc}{input_or_output} {wire_decl},"
+                ",\n\t{wire_doc}{input_or_output} {wire_decl}"
             )?;
         }
+        writeln!(self.program_text, "")?;
         writeln!(self.program_text, ");\n")?;
         for (_id, port) in self.instance.interface_ports.iter_valids() {
             let port_wire = &self.instance.wires[port.wire];
@@ -162,8 +161,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 &self.md.instructions[w.original_instruction]
             {
                 // Don't print named inputs and outputs, already did that in interface
-                if let DeclarationPortInfo::RegularPort {..} = wire_decl.is_port
-                {
+                if let DeclarationPortInfo::RegularPort { .. } = wire_decl.is_port {
                     continue;
                 }
             }
@@ -230,7 +228,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             let sm_instance_name = mangle(&sm_inst.name);
             let sm_name = &sm.name;
             writeln!(self.program_text, "{sm_instance_name} {sm_name}(")?;
-            writeln!(self.program_text, "\t.clk(clk),")?;
+            write!(self.program_text, "\t.clk(clk)")?;
             for (port_id, iport) in sm_inst.interface_ports.iter_valids() {
                 let port_name =
                     wire_name_self_latency(&sm_inst.wires[iport.wire], self.use_latency);
@@ -243,9 +241,9 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                     // Ports that are defined on the submodule, but not used by impl
                     String::new()
                 };
-                writeln!(self.program_text, "\t.{port_name}({wire_name}),")?;
+                write!(self.program_text, ",\n\t.{port_name}({wire_name})")?;
             }
-            writeln!(self.program_text, ");")?;
+            writeln!(self.program_text, "\n);")?;
         }
 
         // For multiplexers, output
@@ -254,10 +252,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     let output_name = wire_name_self_latency(w, self.use_latency);
                     if is_state.is_some() {
-                        writeln!(
-                            self.program_text,
-                            "always_ff @(posedge clk) begin"
-                        )?;
+                        writeln!(self.program_text, "always_ff @(posedge clk) begin")?;
                     } else {
                         writeln!(self.program_text, "always_comb begin")?;
                         writeln!(self.program_text, "\t{output_name} <= 1'bX; // Combinatorial wires are not defined when not valid")?;
@@ -299,8 +294,14 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 impl RealWireDataSource {
     fn get_sv_info_doc(&self) -> &str {
         match self {
-            RealWireDataSource::Multiplexer {is_state : Some(_), sources: _} => "/*state*/ ",
-            RealWireDataSource::Multiplexer {is_state : None, sources: _} => "/*mux_wire*/ ",
+            RealWireDataSource::Multiplexer {
+                is_state: Some(_),
+                sources: _,
+            } => "/*state*/ ",
+            RealWireDataSource::Multiplexer {
+                is_state: None,
+                sources: _,
+            } => "/*mux_wire*/ ",
             _ => "",
         }
     }
