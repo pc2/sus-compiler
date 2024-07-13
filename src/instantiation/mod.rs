@@ -3,6 +3,9 @@ mod latency_algorithm;
 mod latency_count;
 mod list_of_lists;
 mod typecheck;
+mod unique_names;
+
+use unique_names::UniqueNames;
 
 use crate::prelude::*;
 
@@ -271,6 +274,7 @@ struct InstantiationContext<'fl, 'l> {
     generation_state: GenerationState<'fl>,
     wires: FlatAlloc<RealWire, WireIDMarker>,
     submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+    unique_name_producer: UniqueNames,
 
     interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     errors: ErrorCollector<'l>,
@@ -412,6 +416,7 @@ fn perform_instantiation(
         submodules: FlatAlloc::new(),
         interface_ports: md.ports.map(|_| None),
         errors: ErrorCollector::new_empty(md.link_info.file, &linker.files),
+        unique_name_producer: UniqueNames::new(),
         template_args,
         md,
         linker,

@@ -412,22 +412,18 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             WireSource::Constant(value) => TypedValue::from_value(value.clone()),
         })
     }
-    fn get_unique_name(&self) -> String {
-        format!("_{}", self.wires.get_next_alloc_id().get_hidden_value())
-    }
     fn alloc_wire_for_const(
         &mut self,
         value: TypedValue,
         original_instruction: FlatID,
         domain: DomainID,
     ) -> WireID {
-        let name = self.get_unique_name();
         self.wires.alloc(RealWire {
             source: RealWireDataSource::Constant { value: value.value },
             original_instruction,
             domain,
             typ: value.typ,
-            name,
+            name: self.unique_name_producer.get_unique_name(""),
             absolute_latency: CALCULATE_LATENCY_LATER,
             needed_until: CALCULATE_LATENCY_LATER,
         })
@@ -483,7 +479,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 original_instruction: submod_instance.original_instruction,
                 domain,
                 typ: ConcreteType::Unknown,
-                name: format!("{}_{}", submod_instance.name, port_data.name),
+                name: self.unique_name_producer.get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
                 absolute_latency: CALCULATE_LATENCY_LATER,
                 needed_until: CALCULATE_LATENCY_LATER,
             });
@@ -561,9 +557,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 unreachable!("Constant cannot be non-compile-time");
             }
         };
-        let name = self.get_unique_name();
         Ok(self.wires.alloc(RealWire {
-            name,
+            name : self.unique_name_producer.get_unique_name(""),
             typ: ConcreteType::Unknown,
             original_instruction,
             domain,
@@ -582,7 +577,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         if let Some(condition) = condition {
             self.wires.alloc(RealWire {
                 typ: BOOL_CONCRETE_TYPE,
-                name: self.get_unique_name(),
+                name: self.unique_name_producer.get_unique_name(""),
                 original_instruction,
                 domain,
                 source: RealWireDataSource::BinaryOp {
@@ -664,7 +659,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 CALCULATE_LATENCY_LATER
             };
             let wire_id = self.wires.alloc(RealWire {
-                name: wire_decl.name.clone(),
+                name: self.unique_name_producer.get_unique_name(&wire_decl.name),
                 typ,
                 original_instruction,
                 domain: wire_decl.typ.domain.unwrap_physical(),
@@ -689,11 +684,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::SubModule(submodule) => {
                     let sub_module = &self.linker.modules[submodule.module_ref.id];
 
-                    let name = if let Some((name, _span)) = &submodule.name {
-                        name.clone()
-                    } else {
-                        self.get_unique_name()
-                    };
+                    let name_origin = if let Some((name, _span)) = &submodule.name {name} else {""};
                     let port_map = sub_module.ports.map(|_| None);
                     let interface_call_sites = sub_module.interfaces.map(|_| Vec::new());
                     let mut template_args =
@@ -717,7 +708,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         instance: None,
                         port_map,
                         interface_call_sites,
-                        name,
+                        name : self.unique_name_producer.get_unique_name(name_origin),
                         module_uuid: submodule.module_ref.id,
                         template_args,
                     }))
@@ -807,7 +798,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             if !else_range.is_empty() {
                                 let else_condition_bool = self.wires.alloc(RealWire {
                                     typ: BOOL_CONCRETE_TYPE,
-                                    name: self.get_unique_name(),
+                                    name: self.unique_name_producer.get_unique_name(""),
                                     original_instruction,
                                     domain,
                                     source: RealWireDataSource::UnaryOp {
