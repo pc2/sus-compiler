@@ -593,30 +593,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
     }
 
-    pub fn get_initial_val(&self, typ: &ConcreteType) -> Value {
-        match typ {
-            ConcreteType::Named(_name) => Value::Unset,
-            ConcreteType::Array(arr) => {
-                let (arr_typ, arr_size) = arr.deref();
-                let arr_size = arr_size.unwrap_value().unwrap_usize();
-                let mut arr = Vec::new();
-                if arr_size > 0 {
-                    let content_typ = self.get_initial_val(arr_typ);
-                    arr.resize(arr_size as usize, content_typ);
-                }
-                Value::Array(arr.into_boxed_slice())
-            }
-            ConcreteType::Value(_) | ConcreteType::Unknown | ConcreteType::Error => unreachable!(),
-        }
-    }
-
-    pub fn get_initial_typed_val(&self, typ: ConcreteType) -> TypedValue {
-        TypedValue {
-            value: self.get_initial_val(&typ),
-            typ,
-        }
-    }
-
     fn instantiate_declaration(
         &mut self,
         wire_decl: &Declaration,
@@ -635,7 +611,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     }
                 }
             } else {
-                self.get_initial_typed_val(typ)
+                typ.get_initial_typed_val()
             };
             SubModuleOrWire::CompileTimeValue(value)
         } else {
@@ -643,7 +619,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 RealWireDataSource::ReadOnly
             } else {
                 let is_state = if wire_decl.identifier_type == IdentifierType::State {
-                    Some(self.get_initial_val(&typ))
+                    Some(typ.get_initial_val())
                 } else {
                     None
                 };

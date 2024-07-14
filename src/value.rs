@@ -224,3 +224,29 @@ impl TypedValue {
         self.value.unwrap_bool()
     }
 }
+
+impl ConcreteType {
+    pub fn get_initial_val(&self) -> Value {
+        match self {
+            ConcreteType::Named(_name) => Value::Unset,
+            ConcreteType::Array(arr) => {
+                let (arr_typ, arr_size) = arr.deref();
+                let arr_size = arr_size.unwrap_value().unwrap_usize();
+                let mut arr = Vec::new();
+                if arr_size > 0 {
+                    let content_typ = arr_typ.get_initial_val();
+                    arr.resize(arr_size as usize, content_typ);
+                }
+                Value::Array(arr.into_boxed_slice())
+            }
+            ConcreteType::Value(_) | ConcreteType::Unknown | ConcreteType::Error => unreachable!(),
+        }
+    }
+
+    pub fn get_initial_typed_val(self) -> TypedValue {
+        TypedValue {
+            value: self.get_initial_val(),
+            typ : self,
+        }
+    }
+}

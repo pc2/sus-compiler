@@ -255,7 +255,9 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                         writeln!(self.program_text, "always_ff @(posedge clk) begin")?;
                     } else {
                         writeln!(self.program_text, "always_comb begin")?;
-                        writeln!(self.program_text, "\t{output_name} <= 1'bX; // Combinatorial wires are not defined when not valid")?;
+                        let invalid_val = w.typ.get_initial_val();
+                        let invalid_val_text = invalid_val.to_string();
+                        writeln!(self.program_text, "\t{output_name} <= {invalid_val_text}; // Combinatorial wires are not defined when not valid")?;
                     }
 
                     for s in sources {
