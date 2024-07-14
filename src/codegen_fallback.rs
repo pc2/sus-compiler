@@ -22,24 +22,25 @@ fn get_type_name_size(id: TypeUUID) -> u64 {
 /// Creates the Verilog variable declaration for tbis variable.
 ///
 /// IE for `int[15] myVar` it creates `logic[31:0] myVar[14:0]`
-fn typ_to_verilog_array(typ: &ConcreteType, var_name: &str) -> String {
+fn typ_to_verilog_array(mut typ: &ConcreteType, var_name: &str) -> String {
+    let mut array_string = String::new();
+    while let ConcreteType::Array(arr) = typ {
+        let (content_typ, size) = arr.deref();
+        let sz = size.unwrap_value().unwrap_integer();
+        use std::fmt::Write;
+        write!(array_string, "[{}:0]", sz - 1).unwrap();
+        typ = content_typ;
+    }
     match typ {
         ConcreteType::Named(id) => {
             let sz = get_type_name_size(*id);
             if sz == 1 {
-                format!("logic {var_name}")
+                format!("logic {var_name}{array_string}")
             } else {
-                format!("logic[{}:0] {var_name}", sz - 1)
+                format!("logic[{}:0] {var_name}{array_string}", sz - 1)
             }
         }
-        ConcreteType::Array(arr) => {
-            let (content_typ, size) = arr.deref();
-            let sz = size.unwrap_value().unwrap_integer();
-            let mut result = typ_to_verilog_array(content_typ, var_name);
-            use std::fmt::Write;
-            write!(result, "[{}:0]", sz - 1).unwrap();
-            result
-        }
+        ConcreteType::Array(_) => unreachable!("All arrays have been used up already"),
         ConcreteType::Value(_) | ConcreteType::Unknown | ConcreteType::Error => unreachable!(),
     }
 }
@@ -251,14 +252,16 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             match &w.source {
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     let output_name = wire_name_self_latency(w, self.use_latency);
-                    if is_state.is_some() {
+                    let arrow_str = if is_state.is_some() {
                         writeln!(self.program_text, "always_ff @(posedge clk) begin")?;
+                        "<="
                     } else {
                         writeln!(self.program_text, "always_comb begin")?;
                         let invalid_val = w.typ.get_initial_val();
                         let invalid_val_text = invalid_val.to_string();
-                        writeln!(self.program_text, "\t{output_name} <= {invalid_val_text}; // Combinatorial wires are not defined when not valid")?;
-                    }
+                        writeln!(self.program_text, "\t{output_name} = {invalid_val_text}; // Combinatorial wires are not defined when not valid")?;
+                        "="
+                    };
 
                     for s in sources {
                         let path = self.wire_ref_path_to_string(&s.to_path, w.absolute_latency);
@@ -267,10 +270,10 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                             let cond_name = self.wire_name(cond, w.absolute_latency);
                             writeln!(
                                 self.program_text,
-                                "\tif({cond_name}) begin {output_name}{path} <= {from_name}; end"
+                                "\tif({cond_name}) begin {output_name}{path} {arrow_str} {from_name}; end"
                             )?;
                         } else {
-                            writeln!(self.program_text, "\t{output_name}{path} <= {from_name};")?;
+                            writeln!(self.program_text, "\t{output_name}{path} {arrow_str} {from_name};")?;
                         }
                     }
                     writeln!(self.program_text, "end")?;
