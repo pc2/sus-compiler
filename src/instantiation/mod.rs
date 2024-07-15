@@ -95,10 +95,6 @@ pub struct RealWire {
     pub domain: DomainID,
     /// Before latency counting, non i64::MIN values specify specified latency
     pub absolute_latency: i64,
-    /// Is used to add implicit registers to wires that are used longer than one cycle.
-    ///
-    /// If needed only the same cycle it is generated, then this is equal to [RealWire::absolute_latency].
-    pub needed_until: i64,
 }
 
 #[derive(Debug)]

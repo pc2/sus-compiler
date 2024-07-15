@@ -130,6 +130,25 @@ impl RealWireDataSource {
     }
 }
 
+impl InstantiatedModule {
+    /// Is used to add implicit registers to wires that are used longer than one cycle.
+    ///
+    /// If needed only the same cycle it is generated, then this is equal to [RealWire::absolute_latency].
+    pub fn compute_needed_untils(&self) -> FlatAlloc<i64, WireIDMarker> {
+        let mut result = self.wires.map(|(id, w)| w.absolute_latency);
+        
+        for (_id, w) in &self.wires {
+            w.source.iter_sources_with_min_latency(|other, _| {
+                let nu = &mut result[other];
+
+                *nu = max(*nu, w.absolute_latency);
+            });
+        }
+
+        result
+    }
+}
+
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn make_wire_to_latency_map(&self) -> WireToLatencyMap {
         const PLACEHOLDER: usize = usize::MAX;
@@ -336,23 +355,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     self.report_error(&domain_info.latency_node_meanings, err);
                 }
             };
-        }
-
-        // Compute needed_untils
-        for (_id, w) in &mut self.wires {
-            w.needed_until = w.absolute_latency;
-        }
-        let mut_wires_ref: *mut _ = &mut self.wires;
-        for (_id, w) in &self.wires {
-            w.source.iter_sources_with_min_latency(|other, _| {
-                // SAFETY: Need some unsafe code to modify needed_until while iterating through the wires
-                // We write to needed_until everywhere, and for the information we need we never read needed_until
-                unsafe {
-                    let nu = &mut (*mut_wires_ref)[other].needed_until;
-
-                    *nu = max(*nu, w.absolute_latency);
-                }
-            });
         }
 
         // Finally update interface absolute latencies

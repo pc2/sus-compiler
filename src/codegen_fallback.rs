@@ -51,11 +51,12 @@ struct CodeGenerationContext<'g, 'out, Stream: std::fmt::Write> {
     program_text: &'out mut Stream,
 
     use_latency: bool,
+
+    needed_untils : FlatAlloc<i64, WireIDMarker>
 }
 
 fn wire_name_with_latency(wire: &RealWire, absolute_latency: i64, use_latency: bool) -> String {
     assert!(wire.absolute_latency <= absolute_latency);
-    assert!(wire.needed_until >= absolute_latency);
 
     if use_latency && (wire.absolute_latency != absolute_latency) {
         format!("{}_D{}", wire.name, absolute_latency)
@@ -109,12 +110,12 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
         result
     }
 
-    fn add_latency_registers(&mut self, w: &RealWire) -> Result<(), std::fmt::Error> {
+    fn add_latency_registers(&mut self, wire_id: WireID, w: &RealWire) -> Result<(), std::fmt::Error> {
         if self.use_latency {
             // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
             assert!(w.absolute_latency != CALCULATE_LATENCY_LATER);
-            assert!(w.needed_until != CALCULATE_LATENCY_LATER);
-            for i in w.absolute_latency..w.needed_until {
+            assert!(self.needed_untils[wire_id] != CALCULATE_LATENCY_LATER);
+            for i in w.absolute_latency..self.needed_untils[wire_id] {
                 let from = wire_name_with_latency(w, i, self.use_latency);
                 let to = wire_name_with_latency(w, i + 1, self.use_latency);
 
@@ -148,11 +149,11 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
         writeln!(self.program_text, ");\n")?;
         for (_id, port) in self.instance.interface_ports.iter_valids() {
             let port_wire = &self.instance.wires[port.wire];
-            self.add_latency_registers(port_wire)?;
+            self.add_latency_registers(port.wire, port_wire)?;
         }
 
         // Then output all declarations, and the wires we can already assign
-        for (_id, w) in &self.instance.wires {
+        for (wire_id, w) in &self.instance.wires {
             // For better readability of output Verilog
             if self.can_inline(w) {
                 continue;
@@ -217,7 +218,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                     }
                 }
             }
-            self.add_latency_registers(w)?;
+            self.add_latency_registers(wire_id, w)?;
         }
 
         // Output all submodules
@@ -320,6 +321,7 @@ pub fn gen_verilog_code(md: &Module, instance: &InstantiatedModule, use_latency:
         instance,
         program_text: &mut program_text,
         use_latency,
+        needed_untils: instance.compute_needed_untils()
     };
     ctx.write_verilog_code().unwrap();
 

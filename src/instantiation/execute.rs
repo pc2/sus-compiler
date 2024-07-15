@@ -425,7 +425,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             typ: value.typ,
             name: self.unique_name_producer.get_unique_name(""),
             absolute_latency: CALCULATE_LATENCY_LATER,
-            needed_until: CALCULATE_LATENCY_LATER,
         })
     }
     fn get_wire_or_constant_as_wire(
@@ -481,7 +480,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 typ: ConcreteType::Unknown,
                 name: self.unique_name_producer.get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
                 absolute_latency: CALCULATE_LATENCY_LATER,
-                needed_until: CALCULATE_LATENCY_LATER,
             });
 
             let name_refs = if let Some(sp) = port_name_span {
@@ -564,7 +562,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             domain,
             source,
             absolute_latency: CALCULATE_LATENCY_LATER,
-            needed_until: CALCULATE_LATENCY_LATER,
         }))
     }
     fn extend_condition(
@@ -586,7 +583,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     right: additional_condition,
                 },
                 absolute_latency: CALCULATE_LATENCY_LATER,
-                needed_until: CALCULATE_LATENCY_LATER,
             })
         } else {
             additional_condition
@@ -641,7 +637,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 domain: wire_decl.typ.domain.unwrap_physical(),
                 source,
                 absolute_latency,
-                needed_until: CALCULATE_LATENCY_LATER,
             });
             SubModuleOrWire::Wire(wire_id)
         })
@@ -782,7 +777,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                                         right: condition_wire,
                                     },
                                     absolute_latency: CALCULATE_LATENCY_LATER,
-                                    needed_until: CALCULATE_LATENCY_LATER,
                                 });
                                 let else_cond = self.extend_condition(
                                     condition,
