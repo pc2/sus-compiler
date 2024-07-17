@@ -43,7 +43,12 @@ module.exports = grammar({
     rules: {
         // Top level structure
 
-        source_file: $ => newlineSepSeq($, $.module),
+        source_file: $ => newlineSepSeq($, $.source_obj),
+
+        source_obj: $ => seq(
+            optional(field('extern_marker', choice('__builtin__', 'extern'))),
+            field('object', $.module)
+        ),
 
         module: $ => seq(
             'module',

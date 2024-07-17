@@ -28,7 +28,7 @@
                   "name": "item",
                   "content": {
                     "type": "SYMBOL",
-                    "name": "module"
+                    "name": "source_obj"
                   }
                 },
                 {
@@ -45,7 +45,7 @@
                         "name": "item",
                         "content": {
                           "type": "SYMBOL",
-                          "name": "module"
+                          "name": "source_obj"
                         }
                       }
                     ]
@@ -69,6 +69,44 @@
               "type": "BLANK"
             }
           ]
+        }
+      ]
+    },
+    "source_obj": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "extern_marker",
+              "content": {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": "__builtin__"
+                  },
+                  {
+                    "type": "STRING",
+                    "value": "extern"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "FIELD",
+          "name": "object",
+          "content": {
+            "type": "SYMBOL",
+            "name": "module"
+          }
         }
       ]
     },
