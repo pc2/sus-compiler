@@ -135,7 +135,7 @@ impl InstantiatedModule {
     ///
     /// If needed only the same cycle it is generated, then this is equal to [RealWire::absolute_latency].
     pub fn compute_needed_untils(&self) -> FlatAlloc<i64, WireIDMarker> {
-        let mut result = self.wires.map(|(id, w)| w.absolute_latency);
+        let mut result = self.wires.map(|(_id, w)| w.absolute_latency);
         
         for (_id, w) in &self.wires {
             w.source.iter_sources_with_min_latency(|other, _| {

@@ -1,5 +1,6 @@
 use sus_proc_macro::{field, kind, kw};
 
+use crate::linker::IsExtern;
 use crate::prelude::*;
 
 use crate::linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals};
@@ -224,53 +225,70 @@ pub fn gather_initial_file_data(mut builder: FileBuilder) {
         kind!("source_file"),
         &builder.other_parsing_errors,
         |cursor| {
-            let (kind, span) = cursor.kind_span();
-            match kind {
-                kind!("module") => {
-                    let parsing_errors = ErrorCollector::new_empty(builder.file_id, builder.files);
-                    cursor.report_all_decendant_errors(&parsing_errors);
-                    cursor.go_down_no_check(|cursor| {
-                        let mut ctx = ModuleInitializationContext {
-                            ports: FlatAlloc::new(),
-                            interfaces: FlatAlloc::new(),
-                            domains: FlatAlloc::new(),
-                            template_inputs: FlatAlloc::new(),
-                            file_text: builder.file_text,
-                        };
+            cursor.go_down(kind!("source_obj"), |cursor| {
+                let extern_kw = cursor.optional_field(field!("extern_marker")).then(|| cursor.kind());
+                cursor.field(field!("object"));
 
-                        let (name_span, name) = ctx.gather_initial_module(cursor);
-
-                        let resolved_globals = ResolvedGlobals::empty();
-                        let errors = parsing_errors.into_storage();
-                        let after_initial_parse_cp =
-                            CheckPoint::checkpoint(&errors, &resolved_globals);
-
-                        let md = Module {
-                            link_info: LinkInfo {
-                                documentation: cursor.extract_gathered_comments(),
-                                file: builder.file_id,
-                                name,
-                                name_span,
-                                span,
-                                errors,
-                                resolved_globals,
-                                template_arguments: ctx.template_inputs,
-                                after_initial_parse_cp,
-                                after_flatten_cp: None,
-                            },
-                            instructions: FlatAlloc::new(),
-                            ports: ctx.ports,
-                            domain_names: ctx.domains,
-                            domains: FlatAlloc::new(),
-                            interfaces: ctx.interfaces,
-                            instantiations: InstantiationList::new(),
-                        };
-
-                        builder.add_module(md);
-                    });
+                let (kind, span) = cursor.kind_span();
+                match kind {
+                    kind!("module") => {
+                        let parsing_errors = ErrorCollector::new_empty(builder.file_id, builder.files);
+                        cursor.report_all_decendant_errors(&parsing_errors);
+                        cursor.go_down_no_check(|cursor| {
+                            initialize_module(&mut builder, extern_kw, parsing_errors, span, cursor);
+                        });
+                    }
+                    _other => cursor.could_not_match(),
                 }
-                _other => cursor.could_not_match(),
-            }
+            });
         },
     );
+}
+
+fn initialize_module(builder: &mut FileBuilder, extern_kw : Option<u16>, parsing_errors: ErrorCollector, span: Span, cursor: &mut Cursor) {
+    let mut ctx = ModuleInitializationContext {
+        ports: FlatAlloc::new(),
+        interfaces: FlatAlloc::new(),
+        domains: FlatAlloc::new(),
+        template_inputs: FlatAlloc::new(),
+        file_text: builder.file_text,
+    };
+
+    let (name_span, name) = ctx.gather_initial_module(cursor);
+
+    let resolved_globals = ResolvedGlobals::empty();
+    let errors = parsing_errors.into_storage();
+    let after_initial_parse_cp =
+        CheckPoint::checkpoint(&errors, &resolved_globals);
+
+    let is_extern = match extern_kw {
+        None => IsExtern::Normal,
+        Some(kw!("extern")) => IsExtern::Extern,
+        Some(kw!("__builtin__")) => IsExtern::Builtin,
+        Some(_) => cursor.could_not_match()
+    };
+
+    let md = Module {
+        link_info: LinkInfo {
+            documentation: cursor.extract_gathered_comments(),
+            file: builder.file_id,
+            name,
+            name_span,
+            span,
+            errors,
+            is_extern,
+            resolved_globals,
+            template_arguments: ctx.template_inputs,
+            after_initial_parse_cp,
+            after_flatten_cp: None,
+        },
+        instructions: FlatAlloc::new(),
+        ports: ctx.ports,
+        domain_names: ctx.domains,
+        domains: FlatAlloc::new(),
+        interfaces: ctx.interfaces,
+        instantiations: InstantiationList::new(),
+    };
+
+    builder.add_module(md);
 }

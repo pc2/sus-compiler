@@ -73,6 +73,13 @@ impl Documentation {
 }
 
 #[derive(Debug)]
+pub enum IsExtern {
+    Normal,
+    Extern,
+    Builtin
+}
+
+#[derive(Debug)]
 pub struct LinkInfo {
     pub file: FileUUID,
     pub span: Span,
@@ -81,6 +88,7 @@ pub struct LinkInfo {
     pub documentation: Documentation,
     pub errors: ErrorStore,
     pub resolved_globals: ResolvedGlobals,
+    pub is_extern : IsExtern,
 
     pub template_arguments: TemplateInputs,
 

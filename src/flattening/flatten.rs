@@ -1574,18 +1574,26 @@ pub fn flatten_all_modules(linker: &mut Linker) {
 
         let mut cursor = Cursor::new_at_root(&file.tree, &file.file_text);
 
-        cursor.list(kind!("source_file"), |cursor| match cursor.kind() {
-            kind!("module") => {
-                let Some(NameElem::Module(module_uuid)) = associated_value_iter.next() else {
-                    unreachable!()
-                };
-
-                flatten(linker_ptr, *module_uuid, cursor);
-            }
-            other => todo!(
-                "{}",
-                tree_sitter_sus::language().node_kind_for_id(other).unwrap()
-            ),
+        cursor.list(kind!("source_file"), |cursor| {
+            cursor.go_down(kind!("source_obj"), |cursor| {
+                // Skip because we covered it in initialization. 
+                let _ = cursor.optional_field(field!("extern_marker"));
+                
+                cursor.field(field!("object"));
+                match cursor.kind() {
+                    kind!("module") => {
+                        let Some(NameElem::Module(module_uuid)) = associated_value_iter.next() else {
+                            unreachable!()
+                        };
+                        
+                        flatten(linker_ptr, *module_uuid, cursor);
+                    }
+                    other => todo!(
+                        "{}",
+                        tree_sitter_sus::language().node_kind_for_id(other).unwrap()
+                    ),
+                }
+            });
         });
         span_debugger.defuse();
     }

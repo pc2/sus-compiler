@@ -150,11 +150,12 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Generative For Loops
 - [ ] Generative While Loops
 - [x] Generative Parameters
+- [ ] Generative Default Arguments
 - [x] Type Parameters
 - [ ] Generative Asserts
 - [x] Multi-Interface Syntax
-- [ ] Native Module integration syntax
-- [ ] Intrinsic Modules
+- [x] Native Module integration syntax
+- [x] Intrinsic Modules
 - [x] Can Parse FIFO implementation
 - [ ] Clock Domain Crossings
 - [ ] Rhythm Syntax
@@ -187,10 +188,10 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Indeterminable port latency
 - [x] Latency Counting uses latency specifiers
 - [x] Latency for output-only modules
-- [x] Latency Counting is invariant across arbitrary algorithm starting nodes
+- [x] Latency Counting is invariant across arbitrary algorithm starting nodes (not quite, some starting nodes may error. But those that don't are equivalent!)
 - [x] Integrate into Verilog generation
-- [ ] Latency cuts
-- [ ] Latency Offset
+- [x] Latency cuts
+- [x] Latency Offset
 - [ ] Latency Cuts & Latency Counting for "disjoint Input-Output blocks"
 - [ ] Split Latencies
 

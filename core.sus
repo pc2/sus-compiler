@@ -1,26 +1,21 @@
 
 // Compiler Intrinsic
-module LatencyOffset<T> {
+__builtin__ module LatencyOffset<T> {
     input gen int OFFSET
     interface LatencyOffset : T in'0 -> T out'OFFSET
-
-    // action start : (bool do_start) {
-    // }
-    // query pop : (bool do_pop), -> bool valid, T data {}
-    // trigger iter : -> bool valid
 }
 
 // Compiler Intrinsic
-module CrossDomain<T> {
+__builtin__ module CrossDomain<T> {
     interface in_domain : T in'0
     domain out
-    interface out_domain : T out'0
+    interface out_domain : -> T out'0
 }
 
-module IntToBits {
+__builtin__ module IntToBits {
     interface IntToBits : int value'0 -> bool[32] bits'0
 }
 
-module BitsToInt {
+__builtin__ module BitsToInt {
     interface IntToBits : bool[32] bits'0 -> int value'0
 }

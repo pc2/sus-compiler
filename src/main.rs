@@ -119,11 +119,15 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     }
 
     if let Some(md_name) = &config.codegen_module_and_dependencies_one_file {
-        let md = linker
+        let Some(md) = linker
             .modules
             .iter()
-            .find(|(_, md)| &md.link_info.name == md_name)
-            .unwrap();
+            .find(|(_, md)| &md.link_info.name == md_name) else {
+            
+            let mut err_lock = std::io::stderr().lock();
+            writeln!(err_lock, "Unknown module {md_name}").unwrap();
+            std::process::exit(1);
+        };
 
         codegen_with_dependencies(&linker, md.1, &format!("{md_name}_standalone"));
     }
