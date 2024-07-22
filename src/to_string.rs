@@ -152,8 +152,8 @@ impl Value {
 
                 result.push('}');
             }
-            Value::Unset => result.push_str("1'bX/*UNSET*/"),
-            Value::Error => result.push_str("1'bX/*ERROR*/"),
+            Value::Unset => result.push_str("'x/*UNSET*/"),
+            Value::Error => result.push_str("'x/*ERROR*/"),
         }
     }
     pub fn to_string(&self) -> String {
