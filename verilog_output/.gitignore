@@ -4,6 +4,3 @@
 *.vh
 # Any build directories created by Verilator or other tools
 **/
-*.out
-*.vcd
-*.fst

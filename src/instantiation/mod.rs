@@ -33,7 +33,7 @@ pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
 pub struct ConnectFrom {
     pub num_regs: i64,
     pub from: WireID,
-    pub condition: Option<WireID>,
+    pub condition: Box<[ConditionStackElem]>,
     pub original_connection: FlatID,
 }
 
@@ -265,12 +265,21 @@ struct GenerationState<'fl> {
     md: &'fl Module,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConditionStackElem {
+    pub condition_wire : WireID,
+    pub inverse : bool
+}
+
 struct InstantiationContext<'fl, 'l> {
     name: String,
     generation_state: GenerationState<'fl>,
     wires: FlatAlloc<RealWire, WireIDMarker>,
     submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+
+    // Used for Execution
     unique_name_producer: UniqueNames,
+    condition_stack : Vec<ConditionStackElem>,
 
     interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     errors: ErrorCollector<'l>,
@@ -408,6 +417,7 @@ fn perform_instantiation(
             md,
             generation_state: md.instructions.map(|(_, _)| SubModuleOrWire::Unnasigned),
         },
+        condition_stack: Vec::new(),
         wires: FlatAlloc::new(),
         submodules: FlatAlloc::new(),
         interface_ports: md.ports.map(|_| None),

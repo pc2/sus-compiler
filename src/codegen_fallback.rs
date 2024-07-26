@@ -323,15 +323,13 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                     for s in sources {
                         let path = self.wire_ref_path_to_string(&s.to_path, w.absolute_latency);
                         let from_name = self.wire_name(s.from.from, w.absolute_latency);
-                        if let Some(cond) = s.from.condition {
-                            let cond_name = self.wire_name(cond, w.absolute_latency);
-                            writeln!(
-                                self.program_text,
-                                "\tif({cond_name}) begin {output_name}{path} {arrow_str} {from_name}; end"
-                            ).unwrap();
-                        } else {
-                            writeln!(self.program_text, "\t{output_name}{path} {arrow_str} {from_name};").unwrap();
+                        self.program_text.write_char('\t').unwrap();
+                        for cond in s.from.condition.iter() {
+                            let cond_name = self.wire_name(cond.condition_wire, w.absolute_latency);
+                            let invert = if cond.inverse {"!"} else {""};
+                            write!(self.program_text, "if({invert}{cond_name}) ").unwrap();
                         }
+                        writeln!(self.program_text, "{output_name}{path} {arrow_str} {from_name};").unwrap();
                     }
                     writeln!(self.program_text, "end").unwrap();
                 }

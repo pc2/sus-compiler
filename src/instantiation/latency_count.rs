@@ -109,8 +109,8 @@ impl RealWireDataSource {
                 for s in sources {
                     f(s.from.from, s.from.num_regs);
                     RealWirePathElem::for_each_wire_in_path(&s.to_path, |w| f(w, s.from.num_regs));
-                    if let Some(c) = s.from.condition {
-                        f(c, s.from.num_regs);
+                    for elem in s.from.condition.iter() {
+                        f(elem.condition_wire, s.from.num_regs);
                     }
                 }
             }

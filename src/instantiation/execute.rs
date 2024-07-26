@@ -16,7 +16,7 @@ use crate::{linker::NamedConstant, util::add_to_small_set};
 
 use crate::typing::{
     abstract_type::DomainType,
-    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
+    concrete_type::{ConcreteType, INT_CONCRETE_TYPE},
     template::{ConcreteTemplateArg, TemplateArgKind},
 };
 
@@ -250,12 +250,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         from: WireID,
         num_regs: i64,
         original_instruction: FlatID,
-        condition: Option<WireID>,
     ) {
         let from = ConnectFrom {
             num_regs,
             from,
-            condition,
+            condition : self.condition_stack.clone().into_boxed_slice(),
             original_connection: original_instruction,
         };
 
@@ -276,7 +275,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         write_modifiers: &WriteModifiers,
         conn_from: FlatID,
         original_connection: FlatID,
-        condition: Option<WireID>,
     ) -> ExecutionResult<()> {
         match write_modifiers {
             WriteModifiers::Connection {
@@ -297,7 +295,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         from,
                         *num_regs,
                         original_connection,
-                        condition,
                     );
                 }
                 RealWireRefRoot::Generative(target_decl) => {
@@ -564,30 +561,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             absolute_latency: CALCULATE_LATENCY_LATER,
         }))
     }
-    fn extend_condition(
-        &mut self,
-        condition: Option<WireID>,
-        additional_condition: WireID,
-        original_instruction: FlatID,
-        domain: DomainID,
-    ) -> WireID {
-        if let Some(condition) = condition {
-            self.wires.alloc(RealWire {
-                typ: BOOL_CONCRETE_TYPE,
-                name: self.unique_name_producer.get_unique_name(""),
-                original_instruction,
-                domain,
-                source: RealWireDataSource::BinaryOp {
-                    op: BinaryOperator::And,
-                    left: condition,
-                    right: additional_condition,
-                },
-                absolute_latency: CALCULATE_LATENCY_LATER,
-            })
-        } else {
-            additional_condition
-        }
-    }
 
     fn instantiate_declaration(
         &mut self,
@@ -645,7 +618,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn instantiate_code_block(
         &mut self,
         block_range: FlatIDRange,
-        condition: Option<WireID>,
     ) -> ExecutionResult<()> {
         let mut instruction_range = block_range.into_iter();
         while let Some(original_instruction) = instruction_range.next() {
@@ -703,7 +675,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         &conn.write_modifiers,
                         conn.from,
                         original_instruction,
-                        condition,
                     )?;
                     continue;
                 }
@@ -735,7 +706,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             from,
                             0,
                             original_instruction,
-                            condition,
                         );
                     }
 
@@ -754,38 +724,20 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             } else {
                                 else_range
                             };
-                            self.instantiate_code_block(run_range, condition)?;
+                            self.instantiate_code_block(run_range)?;
                         }
-                        DomainType::Physical(domain) => {
+                        DomainType::Physical(_domain) => {
                             let condition_wire = self.generation_state[stm.condition].unwrap_wire();
-                            let then_cond = self.extend_condition(
-                                condition,
-                                condition_wire,
-                                original_instruction,
-                                domain,
-                            );
-                            self.instantiate_code_block(then_range, Some(then_cond))?;
+                            self.condition_stack.push(ConditionStackElem{condition_wire, inverse : false});
+                            self.instantiate_code_block(then_range)?;
 
                             if !else_range.is_empty() {
-                                let else_condition_bool = self.wires.alloc(RealWire {
-                                    typ: BOOL_CONCRETE_TYPE,
-                                    name: self.unique_name_producer.get_unique_name(""),
-                                    original_instruction,
-                                    domain,
-                                    source: RealWireDataSource::UnaryOp {
-                                        op: UnaryOperator::Not,
-                                        right: condition_wire,
-                                    },
-                                    absolute_latency: CALCULATE_LATENCY_LATER,
-                                });
-                                let else_cond = self.extend_condition(
-                                    condition,
-                                    else_condition_bool,
-                                    original_instruction,
-                                    domain,
-                                );
-                                self.instantiate_code_block(else_range, Some(else_cond))?;
+                                self.condition_stack.last_mut().unwrap().inverse = true;
+                                self.instantiate_code_block(else_range)?;
                             }
+
+                            // Get rid of the condition
+                            let _ = self.condition_stack.pop().unwrap();
                         }
                     }
                     instruction_range.skip_to(stm.else_end);
@@ -822,7 +774,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         };
                         *v = TypedValue::make_integer(current_val.clone());
                         current_val += 1;
-                        self.instantiate_code_block(stm.loop_body, condition)?;
+                        self.instantiate_code_block(stm.loop_body)?;
                     }
 
                     instruction_range.skip_to(stm.loop_body.1);
@@ -851,7 +803,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
 
     pub fn execute_module(&mut self) -> ExecutionResult<()> {
-        let result = self.instantiate_code_block(self.md.instructions.id_range(), None);
+        let result = self.instantiate_code_block(self.md.instructions.id_range());
         self.make_interface();
         result
     }
