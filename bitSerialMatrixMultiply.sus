@@ -1,16 +1,17 @@
 
 // Just a wrapper to reduce IOs for small FPGA synthesis. Barely enough logic to make the optimizer not optimize it out. The proper one requires too many IOs
 module BitSerialMatrixMultiplyTinyIO {
-    interface BitSerialMatrixMultiplyTinyIO : bool start, bool rst, int value, int addr -> int result
+    interface BitSerialMatrixMultiplyTinyIO : bool start, int value -> bool finish, int result
 
     BitSerialMatrixMultiply bsmm
 
     state int[10] stored_values
-    stored_values[addr] = value
-    int[15] r = bsmm(start, stored_values)
-    bsmm.rst = rst
+    state int last_value_use_as_addr
+    last_value_use_as_addr = value
+    stored_values[last_value_use_as_addr] = value
+    finish, int[15] r = bsmm(start, stored_values)
 
-    result = r[addr]
+    result = r[last_value_use_as_addr]
 }
 
 
@@ -30,11 +31,10 @@ module BitSerialMatrixMultiply {
     
     BitSerialMatrixMultiplyTemplate::<WIDTH = 10, HEIGHT = 15, MATRIX = MATRIX;> bsmm
 
-    interface BitSerialMatrixMultiply : bool start, int[10] values -> int[15] result
-    input bool rst
+    interface BitSerialMatrixMultiply : bool start, int[10] values -> bool finish'36, int[15] result'36
+    finish = start
 
     result = bsmm(start, values)
-    bsmm.rst = rst
 }
 
 
@@ -51,7 +51,6 @@ module BitSerialMatrixMultiplyTemplate {
     BitSerialMatrixMultiplyState::<WIDTH, HEIGHT, MATRIX;> bsm_state
 
     interface BitSerialMatrixMultiplyTemplate : bool start, int[WIDTH] values -> int[HEIGHT] result
-    input bool rst
 
     state bool[WIDTH][INT_BITWIDTH] split_into_bits
 
@@ -60,22 +59,21 @@ module BitSerialMatrixMultiplyTemplate {
     // Explicitly not use value
     int _ = iter.value
 
-    iter.rst = rst
-
     // This is above start, so start has write priority on split_into_bits. TODO shift down once we have `overwrite`
     if iter.valid {
         // It's a shift register
-        for int BIT in 0..INT_BITWIDTH-1 {
-            split_into_bits[BIT] = split_into_bits[BIT + 1]
+        for int BIT in 1..INT_BITWIDTH {
+            split_into_bits[BIT] = split_into_bits[BIT - 1]
         }
 
-        bsm_state.feed(true, split_into_bits[0])
+        bsm_state.feed(true, split_into_bits[INT_BITWIDTH-1])
     } else {
-        bsm_state.feed(false, split_into_bits[0])
+        bsm_state.feed(false, split_into_bits[INT_BITWIDTH-1])
     }
 
-    result = LatencyOffset::<INT_BITWIDTH;int[HEIGHT]>(bsm_state.finish(iter.last))
+    result = LatencyOffset::<INT_BITWIDTH+1;int[HEIGHT]>(bsm_state.result_vector)
 
+    bsm_state.start(start)
     iter.start(start)
     if start {
         // initialize split_into_bits
@@ -95,20 +93,20 @@ module BitSerialMatrixMultiplyState {
 
     input gen int[WIDTH][HEIGHT] MATRIX
 
+    interface start : bool start
+
     interface feed : bool feed, bool[WIDTH] vector_bits
 
-    interface finish : bool finish -> state int[HEIGHT] result_vector
+    output state int[HEIGHT] result_vector
 
     for int Y in 0..HEIGHT {
-        initial result_vector[Y] = 0
-
         BitSerialRow::<SIZE = WIDTH, WEIGHTS = MATRIX[Y];> row
 
         if feed {
             result_vector[Y] = result_vector[Y] * 2 + row(vector_bits)
         }
 
-        if finish {
+        if start {
             result_vector[Y] = 0
         }
     }

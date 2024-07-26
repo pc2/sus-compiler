@@ -134,13 +134,10 @@ module FixedSizeIterator {
 
 	interface start : bool start
 
-	input bool rst
-
-
 	last = value == UP_TO - 1
 	valid = value != UP_TO
 
-	if start | rst {
+	if start {
 		value = 0
 	} else {
 		if valid {

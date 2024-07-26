@@ -34,7 +34,7 @@ pub fn mangle(str: &str) -> String {
 
 /// Creates the Verilog variable declaration for tbis variable.
 ///
-/// IE for `int[15] myVar` it creates `logic[31:0] myVar[14:0]`
+/// IE for `int[15] myVar` it creates `[31:0] myVar[14:0]`
 fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
     let mut array_string = String::new();
     while let ConcreteType::Array(arr) = typ {
@@ -48,9 +48,9 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
         ConcreteType::Named(id) => {
             let sz = get_type_name_size(*id);
             if sz == 1 {
-                format!("logic{array_string} {var_name}")
+                format!("{array_string} {var_name}")
             } else {
-                format!("logic{array_string}[{}:0] {var_name}", sz - 1)
+                format!("{array_string}[{}:0] {var_name}", sz - 1)
             }
         }
         ConcreteType::Array(_) => unreachable!("All arrays have been used up already"),
@@ -62,7 +62,11 @@ fn wire_name_with_latency(wire: &RealWire, absolute_latency: i64, use_latency: b
     assert!(wire.absolute_latency <= absolute_latency);
 
     if use_latency && (wire.absolute_latency != absolute_latency) {
-        Cow::Owned(format!("{}_D{}", wire.name, absolute_latency))
+        if absolute_latency < 0 {
+            Cow::Owned(format!("_{}_N{}", wire.name, -absolute_latency))
+        } else {
+            Cow::Owned(format!("_{}_D{}", wire.name, absolute_latency))
+        }
     } else {
         Cow::Borrowed(&wire.name)
     }
@@ -137,7 +141,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 
                 writeln!(
                     self.program_text,
-                    "/*latency*/ {var_decl}; always_ff @(posedge clk) begin {to} <= {from}; end"
+                    "/*latency*/ logic {var_decl}; always_ff @(posedge clk) begin {to} <= {from}; end"
                 ).unwrap();
             }
         }
@@ -173,12 +177,12 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
         for (_id, port) in self.instance.interface_ports.iter_valids() {
             let port_wire = &self.instance.wires[port.wire];
             let input_or_output = if port.is_input { "input" } else { "output" };
-            let wire_doc = port_wire.source.get_sv_info_doc();
+            let wire_doc = port_wire.source.wire_or_reg();
             let wire_name = wire_name_self_latency(port_wire, self.use_latency);
             let wire_decl = typ_to_declaration(&port_wire.typ, &wire_name);
             write!(
                 self.program_text,
-                ",\n{comment_text}\t{wire_doc}{input_or_output} {wire_decl}"
+                ",\n{comment_text}\t{input_or_output} {wire_doc} {wire_decl}"
             ).unwrap();
         }
         write!(self.program_text, "\n{comment_text});\n\n").unwrap();
@@ -223,11 +227,11 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                     continue;
                 }
             }
-            let wire_or_reg = w.source.get_sv_info_doc();
+            let wire_or_reg = w.source.wire_or_reg();
         
             let wire_name = wire_name_self_latency(w, self.use_latency);
             let wire_decl = typ_to_declaration(&w.typ, &wire_name);
-            write!(self.program_text, "{wire_or_reg}{wire_decl}").unwrap();
+            write!(self.program_text, "{wire_or_reg} {wire_decl}").unwrap();
         
             match &w.source {
                 RealWireDataSource::Select { root, path } => {
@@ -412,17 +416,17 @@ impl Module {
 }
 
 impl RealWireDataSource {
-    fn get_sv_info_doc(&self) -> &str {
+    fn wire_or_reg(&self) -> &str {
         match self {
             RealWireDataSource::Multiplexer {
                 is_state: Some(_),
                 sources: _,
-            } => "/*state*/ ",
+            } => "/*state*/ logic",
             RealWireDataSource::Multiplexer {
                 is_state: None,
                 sources: _,
-            } => "/*mux_wire*/ ",
-            _ => "",
+            } => "/*mux_wire*/ logic",
+            _ => "wire",
         }
     }
 }
