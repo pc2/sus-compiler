@@ -47,9 +47,9 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
         ConcreteType::Named(id) => {
             let sz = get_type_name_size(*id);
             if sz == 1 {
-                format!("logic {var_name}{array_string}")
+                format!("logic{array_string} {var_name}")
             } else {
-                format!("logic[{}:0] {var_name}{array_string}", sz - 1)
+                format!("logic{array_string}[{}:0] {var_name}", sz - 1)
             }
         }
         ConcreteType::Array(_) => unreachable!("All arrays have been used up already"),
@@ -91,6 +91,10 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             },
             _other => false,
         }
+    }
+
+    fn can_inline_assign(&self, wire: &RealWire) -> bool {
+        
     }
 
     fn operation_to_string(&self, wire: &RealWire) -> String {
