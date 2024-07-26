@@ -1,4 +1,17 @@
 
+// Just a wrapper to reduce IOs for small FPGA synthesis. Barely enough logic to make the optimizer not optimize it out. The proper one requires too many IOs
+module BitSerialMatrixMultiplyTinyIO {
+    interface BitSerialMatrixMultiplyTinyIO : bool start, bool rst, int value, int addr -> int result
+
+    BitSerialMatrixMultiply bsmm
+
+    state int[10] stored_values
+    stored_values[addr] = value
+    int[15] r = bsmm(start, stored_values)
+    bsmm.rst = rst
+
+    result = r[addr]
+}
 
 
 module BitSerialMatrixMultiply {
@@ -14,10 +27,14 @@ module BitSerialMatrixMultiply {
             }
         }
     }
+    
+    BitSerialMatrixMultiplyTemplate::<WIDTH = 10, HEIGHT = 15, MATRIX = MATRIX;> bsmm
 
     interface BitSerialMatrixMultiply : bool start, int[10] values -> int[15] result
+    input bool rst
 
-    result = BitSerialMatrixMultiplyTemplate::<WIDTH = 10, HEIGHT = 15, MATRIX = MATRIX;>(start, values)
+    result = bsmm(start, values)
+    bsmm.rst = rst
 }
 
 
@@ -34,10 +51,16 @@ module BitSerialMatrixMultiplyTemplate {
     BitSerialMatrixMultiplyState::<WIDTH, HEIGHT, MATRIX;> bsm_state
 
     interface BitSerialMatrixMultiplyTemplate : bool start, int[WIDTH] values -> int[HEIGHT] result
+    input bool rst
 
     state bool[WIDTH][INT_BITWIDTH] split_into_bits
 
     FixedSizeIterator::<UP_TO = INT_BITWIDTH;> iter
+
+    // Explicitly not use value
+    int _ = iter.value
+
+    iter.rst = rst
 
     // This is above start, so start has write priority on split_into_bits. TODO shift down once we have `overwrite`
     if iter.valid {
@@ -53,9 +76,8 @@ module BitSerialMatrixMultiplyTemplate {
 
     result = LatencyOffset::<INT_BITWIDTH;int[HEIGHT]>(bsm_state.finish(iter.last))
 
+    iter.start(start)
     if start {
-        iter.start(true)
-
         // initialize split_into_bits
         for int I in 0..WIDTH {
             bool[INT_BITWIDTH] value_bits = IntToBits(values[I])
@@ -64,8 +86,6 @@ module BitSerialMatrixMultiplyTemplate {
                 split_into_bits[BIT][I] = value_bits[BIT]
             }
         }
-    } else {
-        iter.start(false)
     }
 }
 
