@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ops::Deref;
 
 use crate::linker::IsExtern;
@@ -57,17 +58,17 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
     }
 }
 
-fn wire_name_with_latency(wire: &RealWire, absolute_latency: i64, use_latency: bool) -> String {
+fn wire_name_with_latency(wire: &RealWire, absolute_latency: i64, use_latency: bool) -> Cow<str> {
     assert!(wire.absolute_latency <= absolute_latency);
 
     if use_latency && (wire.absolute_latency != absolute_latency) {
-        format!("{}_D{}", wire.name, absolute_latency)
+        Cow::Owned(format!("{}_D{}", wire.name, absolute_latency))
     } else {
-        wire.name.to_string()
+        Cow::Borrowed(&wire.name)
     }
 }
 
-fn wire_name_self_latency(wire: &RealWire, use_latency: bool) -> String {
+fn wire_name_self_latency(wire: &RealWire, use_latency: bool) -> Cow<str> {
     wire_name_with_latency(wire, wire.absolute_latency, use_latency)
 }
 
@@ -93,18 +94,15 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
         }
     }
 
-    fn can_inline_assign(&self, wire: &RealWire) -> bool {
-        
-    }
-
-    fn operation_to_string(&self, wire: &RealWire) -> String {
+    fn operation_to_string(&self, wire: &'g RealWire) -> Cow<'g, str> {
+        assert!(self.can_inline(wire));
         match &wire.source {
-            RealWireDataSource::Constant { value } => value.to_string(),
+            RealWireDataSource::Constant { value } => value.inline_constant_to_string(),
             _other => unreachable!(),
         }
     }
 
-    fn wire_name(&self, wire_id: WireID, requested_latency: i64) -> String {
+    fn wire_name(&self, wire_id: WireID, requested_latency: i64) -> Cow<'g, str> {
         let wire = &self.instance.wires[wire_id];
         if self.can_inline(wire) {
             self.operation_to_string(wire)
@@ -193,6 +191,23 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
         }
     }
 
+    /// Pass a `to` parameter to say to what the constant should be assigned.  
+    fn write_constant(&mut self, to : &str, value : &Value) {
+        match value {
+            Value::Bool(_) | Value::Integer(_) | Value::Unset => {
+                let v_str = value.inline_constant_to_string();
+                write!(self.program_text, "{to} = {v_str};\n").unwrap();
+            }
+            Value::Array(arr) => {
+                for (idx, v) in arr.iter().enumerate() {
+                    let new_to = format!("{to}[{idx}]");
+                    self.write_constant(&new_to, v);
+                }
+            }
+            Value::Error => unreachable!("Error values should never have reached codegen!"),
+        }
+    }
+
     fn write_wire_declarations(&mut self) {
         for (wire_id, w) in &self.instance.wires {
             // For better readability of output Verilog
@@ -238,7 +253,10 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                     ).unwrap();
                 }
                 RealWireDataSource::Constant { value } => {
-                    writeln!(self.program_text, " = {};", value.to_string()).unwrap();
+                    // Trivial constants (bools & ints) should have been inlined already
+                    // So appearences of this are always arrays or other compound types
+                    writeln!(self.program_text, ";").unwrap();
+                    self.write_constant(&wire_name, value);
                 }
                 RealWireDataSource::ReadOnly => {
                     writeln!(self.program_text, ";").unwrap();
@@ -249,13 +267,8 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 } => {
                     writeln!(self.program_text, ";").unwrap();
                     if let Some(initial_value) = is_state {
-                        if initial_value.is_valid() {
-                            let initial_value_str = initial_value.to_string();
-                            writeln!(
-                                self.program_text,
-                                "initial {wire_name} = {initial_value_str};"
-                            ).unwrap();
-                        }
+                        let to = format!("initial {wire_name}");
+                        self.write_constant(&to, initial_value);
                     }
                 }
             }
@@ -283,7 +296,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                     )
                 } else {
                     // Ports that are defined on the submodule, but not used by impl
-                    String::new()
+                    Cow::Borrowed("")
                 };
                 write!(self.program_text, ",\n\t.{port_name}({wire_name})").unwrap();
             }
@@ -300,10 +313,10 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                         writeln!(self.program_text, "always_ff @(posedge clk) begin").unwrap();
                         "<="
                     } else {
-                        writeln!(self.program_text, "always_comb begin").unwrap();
+                        writeln!(self.program_text, "always_comb begin\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesys tool doesn't generate latches").unwrap();
                         let invalid_val = w.typ.get_initial_val();
-                        let invalid_val_text = invalid_val.to_string();
-                        writeln!(self.program_text, "\t{output_name} = {invalid_val_text}; // Combinatorial wires are not defined when not valid").unwrap();
+                        let tabbed_name = format!("\t{output_name}");
+                        self.write_constant(&tabbed_name, &invalid_val);
                         "="
                     };
     
@@ -368,6 +381,24 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 
     fn write_endmodule(&mut self) {
         writeln!(self.program_text, "endmodule\n").unwrap();
+    }
+}
+
+impl Value {
+    fn inline_constant_to_string(&self) -> Cow<str> {
+        match self {
+            Value::Bool(b) => {
+                Cow::Borrowed(if *b { "1'b1" } else { "1'b0" })
+            }
+            Value::Integer(v) => {
+                Cow::Owned(format!("{v}"))
+            }
+            Value::Unset => {
+                Cow::Borrowed("'x")
+            }
+            Value::Array(_) => unreachable!("Not an inline constant!"),
+            Value::Error => unreachable!("Error values should never have reached codegen!"),
+        }
     }
 }
 
