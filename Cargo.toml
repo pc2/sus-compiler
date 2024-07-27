@@ -5,11 +5,15 @@ authors = ["VonTum <lennart.vanhirtum@gmail.com>"]
 edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/pc2/sus-compiler"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+keywords = ["sus", "fpga", "vlsi", "verilog", "hdl"]
+categories = ["compilers", "text-processing"]
+readme = "README.md"
 
 [workspace]
-members = ["sus_proc_macro"]
+members = [
+    "sus-proc-macro",
+    "tree-sitter-sus"
+]
 
 [dependencies]
 # console = "0.15.7" # for terminal colors
@@ -17,11 +21,11 @@ members = ["sus_proc_macro"]
 ariadne = "0.4.1" # for nice errors
 num = "*"
 
-sus_proc_macro = {path = "sus_proc_macro"}
-
 # Tree sitter
 tree-sitter = "~0.22.2"
-tree-sitter-sus = {path = "tree-sitter-sus"}
+tree-sitter-sus = {version = "~0.0.2", path = "./tree-sitter-sus"}
+
+sus-proc-macro = {version = "~0.0.1", path = "./sus-proc-macro"}
 
 # calyx-ir = {version = "0.6.1", optional = true}
 # calyx-opt = {version = "0.6.1", optional = true}
@@ -39,6 +43,8 @@ serde_json = {version = "1.0.97", optional = true}
 serde = {version = "1.0.156", optional = true}
 
 [features]
+default = ["lsp"]
+
 lsp = ["lsp-server", "lsp-types", "serde_json", "serde"]
 # codegen = ["calyx-ir", "calyx-opt", "calyx-backend"]
 # codegen = ["moore-circt-sys", "moore-circt"]

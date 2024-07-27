@@ -37,6 +37,8 @@ pub fn add_file(text: String, linker: &mut Linker) -> FileUUID {
     file_id
 }
 
+// When lsp is not used, this gives a warning
+#[allow(dead_code)]
 pub fn update_file(text: String, file_id: FileUUID, linker: &mut Linker) {
     let file_data = linker.remove_everything_in_file(file_id);
 
