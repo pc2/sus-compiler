@@ -1,5 +1,6 @@
 [package]
 name = "tree-sitter-sus"
+authors = ["Lennart Van Hirtum <lennart.vanhirtum@gmail.com>"]
 description = "sus grammar for the tree-sitter parsing library"
 version = "0.0.1"
 keywords = ["incremental", "parsing", "sus"]
@@ -7,6 +8,8 @@ categories = ["parsing", "text-editors"]
 repository = "https://github.com/tree-sitter/tree-sitter-sus"
 edition = "2021"
 license = "GPL-3.0-or-later"
+homepage = "https://github.com/pc2/sus-compiler"
+readme = "README.md"
 
 build = "bindings/rust/build.rs"
 include = [
