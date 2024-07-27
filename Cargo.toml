@@ -1,5 +1,6 @@
 [package]
 name = "sus_compiler"
+description = "Compiler for the SUS Hardware Design Language"
 version = "0.0.1"
 authors = ["VonTum <lennart.vanhirtum@gmail.com>"]
 edition = "2021"
