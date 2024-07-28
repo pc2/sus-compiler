@@ -1,5 +1,7 @@
 use std::{cell::UnsafeCell, env, ffi::OsStr, path::PathBuf};
 
+use clap::{Arg, Command};
+
 pub struct ConfigStruct {
     pub use_lsp: bool,
     pub lsp_debug_mode: bool,
@@ -15,56 +17,87 @@ pub fn config() -> &'static ConfigStruct {
 }
 
 pub fn parse_args() -> Vec<PathBuf> {
-    let mut args = env::args();
-
-    let _executable_path = args.next();
+    let matches = Command::new("SUS Compiler")
+        .version(env!("CARGO_PKG_VERSION"))
+        .author(env!("CARGO_PKG_AUTHORS"))
+        .about("The compiler for the SUS Hardware Design Language. This compiler takes in .sus files, and produces equivalent SystemVerilog files")
+        .arg(Arg::new("socket")
+            .long("socket")
+            .takes_value(true)
+            .default_value("25000")
+            .help("Set the LSP TCP socket port")
+            .validator(|socket_int : &str| {
+                match u16::from_str_radix(socket_int, 10) {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err("Must be a valid port 0-65535")
+                }
+            })
+            .requires("lsp"))
+        .arg(Arg::new("lsp")
+            .long("lsp")
+            .help("Enable LSP mode"))
+        .arg(Arg::new("lsp-debug")
+            .long("lsp-debug")
+            .hide(true)
+            .help("Enable LSP debug mode")
+            .requires("lsp"))
+        .arg(Arg::new("codegen")
+            .long("codegen")
+            .help("Enable code generation for all modules. This creates a file named [ModuleName].sv per module."))
+        .arg(Arg::new("debug")
+            .long("debug")
+            .hide(true)
+            .help("Print debug information about the module contents"))
+        .arg(Arg::new("debug-latency")
+            .long("debug-latency")
+            .hide(true)
+            .help("Print latency graph for debugging"))
+        .arg(Arg::new("standalone")
+            .long("standalone")
+            .takes_value(true)
+            .help("Generate standalone code with all dependencies in one file of the module specified. "))
+        .arg(Arg::new("files")
+            .multiple_values(true)
+            .help(".sus Files")
+            .validator(|file_path_str : &str| {
+                let file_path = PathBuf::from(file_path_str);
+                if !file_path.exists() {
+                    Err("File does not exist")
+                } else if !file_path.is_file() {
+                    Err("Is a directory")
+                } else if file_path.extension() != Some(OsStr::new("sus")) {
+                    Err("Source files must end in .sus")
+                } else {
+                    Ok(())
+                }
+            }))
+        .get_matches();
 
     let config = unsafe { &mut *CONFIG.cf.get() };
 
-    let mut file_paths: Vec<PathBuf> = Vec::new();
+    if let Some(socket) = matches.value_of("socket") {
+        config.lsp_port = u16::from_str_radix(socket, 10).unwrap();
+    }
 
-    while let Some(arg) = args.next() {
-        if arg.starts_with("-") {
-            if let Some((name, value)) = arg.split_once("=") {
-                match name {
-                    "--socket" => {
-                        config.lsp_port = u16::from_str_radix(value, 10).unwrap();
-                    }
-                    other => panic!("Unknown option {other}"),
-                }
-            } else {
-                match arg.as_str() {
-                    "--lsp" => {
-                        config.use_lsp = true;
-                    }
-                    "--lsp-debug" => {
-                        config.lsp_debug_mode = true;
-                    }
-                    "--codegen" => {
-                        config.codegen = true;
-                    }
-                    "--debug" => {
-                        config.debug_print_module_contents = true;
-                    }
-                    "--debug-latency" => {
-                        config.debug_print_latency_graph = true;
-                    }
-                    "--standalone" => {
-                        config.codegen_module_and_dependencies_one_file =
-                            Some(args.next().unwrap());
-                    }
-                    other => {
-                        panic!("Unknown option {other}");
-                    }
-                }
-            }
-        } else {
-            file_paths.push(PathBuf::from(arg));
+    config.use_lsp = matches.is_present("lsp");
+    config.lsp_debug_mode = matches.is_present("lsp-debug");
+    config.codegen = matches.is_present("codegen");
+    config.debug_print_module_contents = matches.is_present("debug");
+    config.debug_print_latency_graph = matches.is_present("debug-latency");
+
+    if let Some(standalone) = matches.value_of("standalone") {
+        config.codegen_module_and_dependencies_one_file = Some(standalone.to_string());
+    }
+
+    let mut file_paths: Vec<PathBuf> = Vec::new();
+    if let Some(files) = matches.values_of("files") {
+        for file in files {
+            file_paths.push(PathBuf::from(file));
         }
     }
 
-    // For debugging
-    if file_paths.len() == 0 {
+    // For debugging, if no files are provided
+    if file_paths.is_empty() {
         for file in std::fs::read_dir(".").unwrap() {
             let file_path = file.unwrap().path();
             if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
@@ -76,6 +109,7 @@ pub fn parse_args() -> Vec<PathBuf> {
 
     file_paths
 }
+
 
 struct ConfigStructWrapper {
     cf: UnsafeCell<ConfigStruct>,
