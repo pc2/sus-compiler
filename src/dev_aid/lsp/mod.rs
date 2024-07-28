@@ -576,7 +576,7 @@ fn main_loop(
     for msg in &connection.receiver {
         match msg {
             lsp_server::Message::Request(req) => {
-                if req.method.as_str() == request::Shutdown::METHOD {
+                if connection.handle_shutdown(&req)? {
                     println!("Shutdown request");
                     return Ok(());
                 }
