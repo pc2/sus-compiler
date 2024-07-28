@@ -1,14 +1,15 @@
 [package]
 name = "sus_compiler"
 description = "Compiler for the SUS Hardware Design Language"
-version = "0.0.1"
-authors = ["VonTum <lennart.vanhirtum@gmail.com>"]
+version = "0.0.2"
+authors = ["Lennart Van Hirtum <lennart.vanhirtum@gmail.com>"]
 edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/pc2/sus-compiler"
 keywords = ["sus", "fpga", "vlsi", "verilog", "hdl"]
 categories = ["compilers", "text-processing"]
 readme = "README.md"
+rust-version = "1.78"
 
 [workspace]
 members = [
