@@ -1,14 +1,14 @@
 # SUS Language
 
-SUS is a new RTL Hardware Design Language, like Verilog or VHDL, whose main focus is making High Performance Computing FPGA Accelerator development easier, without sacrificing any design freedom at the altar of abstraction. 
+SUS is a new RTL Hardware Design Language, similar to Verilog or VHDL, that focuses on simplifying the development of high-performance computing FPGA accelerators, without sacrificing any design freedom at the altar of abstraction. 
 
 ## Installation
-Installation is done through [Rust](https://www.rust-lang.org/)'s package manager cargo ([installation info](https://doc.rust-lang.org/cargo/getting-started/installation.html)). 
+Installation is done through [Rust](https://www.rust-lang.org/)'s package manager cargo ([cargo installation info](https://doc.rust-lang.org/cargo/getting-started/installation.html)). 
 ```bash
 cargo install sus_compiler
 ```
 
-To use the accompanying VSCode Extension for Syntax Highlighting and code suggestions ([sus-lsp](https://github.com/pc2/sus-lsp)), install [SUS Hardware Design Language](https://marketplace.visualstudio.com/items?itemName=LennartVanHirtum.sus-lsp) through the VSCode Extension Explorer, or use the F1 installation command: 
+To use the accompanying VSCode Extension for Syntax Highlighting and Code Suggestions ([sus-lsp](https://github.com/pc2/sus-lsp)), install [SUS Hardware Design Language](https://marketplace.visualstudio.com/items?itemName=LennartVanHirtum.sus-lsp) through the VSCode Extension Explorer, or use the F1 installation command:
 ```
 ext install LennartVanHirtum.sus-lsp
 ```
