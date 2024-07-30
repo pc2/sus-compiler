@@ -522,7 +522,8 @@ module module_taking_time {
 }
 
 module matrix_vector_mul {
-	interface matrix_vector_mul : int[30][20] mat, int[20] vec -> int[30] result
+	interface matrix_vector_mul : 
+		int[30][20] mat, int[20] vec -> int[30] result
 	
 	for int row in 0..30 {
 		int[20] row_products
@@ -636,13 +637,15 @@ module xor {
 	y = w3 | w4
 }
 
-
+module use_xor {
+	bool b = xor(true, false)
+}
 
 module fizz_buzz {
     interface fizz_buzz : int v -> int fb 
-	gen int FIZZ = 15
-	gen int BUZZ = 11
-	gen int FIZZ_BUZZ = 1511
+	gen int FIZZ = 888
+	gen int BUZZ = 555
+	gen int FIZZ_BUZZ = 888555
 	
 	bool fizz = v % 3 == 0
 	bool buzz = v % 5 == 0
@@ -660,9 +663,9 @@ module fizz_buzz {
 
 module fizz_buzz_gen {
     interface fizz_buzz_gen : int v -> int fb 
-	gen int FIZZ = 15
-	gen int BUZZ = 11
-	gen int FIZZ_BUZZ = 1511
+	gen int FIZZ = 888
+	gen int BUZZ = 555
+	gen int FIZZ_BUZZ = 888555
 	gen int TABLE_SIZE = 256
 
 	gen int[TABLE_SIZE] lut

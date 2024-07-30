@@ -13,6 +13,8 @@ To use the accompanying VSCode Extension for Syntax Highlighting and Code Sugges
 ext install LennartVanHirtum.sus-lsp
 ```
 
+For an example project to tinker with, see [VonTum/BitSerialMatrixMultiply](https://github.com/VonTum/BitSerialMatrixMultiply). 
+
 ## Core philosophy
 
 SUS is meant to be a direct competitor to Synthesizeable Verilog and VHDL. Its main goal is to be an intuitive and thin syntax for building netlists, such that traditional synthesis tools can still be used to analyze the resulting hardware. SUS shall impose no paradigm on the hardware designer, such as requiring specific communication protocols or iteration constructs. In other words, SUS is not there to abstract away complexity, but rather to make the inherent complexity of hardware design more manageable.

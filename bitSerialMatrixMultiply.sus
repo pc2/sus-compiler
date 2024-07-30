@@ -42,11 +42,10 @@ module BitSerialMatrixMultiply {
 module BitSerialMatrixMultiplyTemplate {
     input gen int WIDTH
     input gen int HEIGHT
+    input gen int[WIDTH][HEIGHT] MATRIX
     
     // 32 right now, because ints are't sized yet. 
     gen int INT_BITWIDTH = 32
-
-    input gen int[WIDTH][HEIGHT] MATRIX
 
     BitSerialMatrixMultiplyState::<WIDTH, HEIGHT, MATRIX;> bsm_state
 
@@ -59,7 +58,7 @@ module BitSerialMatrixMultiplyTemplate {
     // Explicitly not use value
     int _ = iter.value
 
-    // This is above start, so start has write priority on split_into_bits. TODO shift down once we have `overwrite`
+    // This is above start, so start has write priority on split_into_bits. 
     if iter.valid {
         // It's a shift register
         for int BIT in 1..INT_BITWIDTH {

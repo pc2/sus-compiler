@@ -85,40 +85,38 @@ module FIFO<T> {
 module example_FIFO {FIFO::<3, 5;int> f}
 
 
-/*
-	module use_Iterator {
-		Iterator myIter
 
-		int[10] myArr
+module use_Iterator {
+	interface start_iteration : bool do_start
+	input int[10] myArr
+	output int outVal
 
-		interface start_iteration : bool do_start
+	Iterator arrayStream
 
-		if do_start {
-			myIter.start(true, 10)
-		}
+	// if do_start {arrayStream.start(10)}
+	arrayStream.start(do_start, 10)
 
-		int outVal
-		bool iter_valid, int value = myIter.iter()
-
-		if iter_valid {
-			outVal = myArr[value]
-		}
+	// if arrayIter.iter() : int value {...}
+	bool iter_valid, int value = arrayStream.iter()
+	if iter_valid {
+		outVal = myArr[value]
 	}
-*/
-module Iterator {
-	state int current_limit
+}
 
+module Iterator {
+	// action
+	interface start : bool start, int up_to
+	// trigger
 	interface iter : -> bool valid, state int value
 
-	interface start : bool start, int up_to
+	state int current_limit
+
+	valid = value != current_limit
 
 	if start {
 		current_limit = up_to
 		value = 0
-	}
-
-	valid = value != current_limit
-	if valid {
+	} else if valid {
 		value = value + 1
 	}
 }
@@ -174,6 +172,16 @@ module SplitAt<T> {
 	}
 }
 
+module Abs {
+	interface Abs : int a -> int o
+
+	if a < 0 {
+		o = -a
+	} else {
+		o = a
+	}
+}
+
 // Temporary, to be replaced with slice syntax : result = vals[FROM +: OUT_SIZE]
 module Slice<T> {
 	input gen int SIZE
@@ -185,6 +193,12 @@ module Slice<T> {
 	for int I in 0..OUT_SIZE {
 		result[I] = vals[I + FROM]
 	}
+}
+
+module useSlice {
+	int[20] arr
+
+	int[5] subArr = Slice::<SIZE = 20, OUT_SIZE = 5, FROM = 3; int>(arr)
 }
 
 module BitSelect {
@@ -235,7 +249,8 @@ module TreeAdd {
 	interface TreeAdd : int[WIDTH] values'0 -> int total
 
 	if WIDTH == 0 {
-		int zero'0 = 0 // Have to explicitly give it a latency count. Just because otherwise it can't figure it out
+		// Have to explicitly give zero a latency count. Otherwise total's latency can't be determined. 
+		int zero'0 = 0
 		total = zero
 	} else if WIDTH == 1 {
 		total = values[0]
@@ -245,6 +260,7 @@ module TreeAdd {
 
 		int[LEFT_WIDTH] left_part, int[RIGHT_WIDTH] right_part = SplitAt::<WIDTH, LEFT_WIDTH;int>(values)
 
+		// Can add pipelining registers here too. Latency Counting will figure it out.
 		reg total = TreeAdd::<LEFT_WIDTH;>(left_part) + TreeAdd::<RIGHT_WIDTH;>(right_part)
 	}
 }
