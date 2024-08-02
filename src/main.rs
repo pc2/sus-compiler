@@ -14,7 +14,6 @@ mod to_string;
 mod typing;
 mod value;
 
-//#[cfg(feature = "codegen")]
 mod codegen_fallback;
 
 mod dev_aid;
@@ -22,7 +21,8 @@ mod linker;
 
 mod compiler_top;
 
-use std::error::Error;
+use std::path::PathBuf;
+use std::{error::Error, fs};
 use std::fs::File;
 use std::io::Write;
 use std::ops::Deref;
@@ -45,22 +45,26 @@ fn codegen_instance(inst: &InstantiatedModule, md: &Module, out_file: &mut File)
     println!("Instantiating success: {inst_name}");
     let code = gen_verilog_code(md, &inst, true);
     write!(out_file, "// {inst_name}\n{code}").unwrap();
+}
 
-    //println!("Generating Verilog for {module_name}:");
-    // gen_ctx.to_circt();
+fn make_output_file(name : &str) -> File {
+    let mut path = PathBuf::new();
+    path.push("verilog_output");
+    fs::create_dir_all(&path).unwrap();
+    path.push(name);
+    path.set_extension("sv");
+    File::create(path).unwrap()
 }
 
 fn codegen_to_file(md: &Module) {
-    let module_name = md.link_info.name.deref();
-    let mut out_file = File::create(format!("verilog_output/{module_name}.sv")).unwrap();
+    let mut out_file = make_output_file(md.link_info.name.deref());
     md.instantiations.for_each_instance(|_template_args, inst| {
         codegen_instance(inst.as_ref(), md, &mut out_file)
     });
 }
 
 fn codegen_with_dependencies(linker: &Linker, md: &Module, file_name: &str) {
-    let mut out_file = File::create(format!("verilog_output/{file_name}.sv")).unwrap();
-
+    let mut out_file = make_output_file(file_name);
     let mut top_level_instances: Vec<Rc<InstantiatedModule>> = Vec::new();
     md.instantiations.for_each_instance(|_template_args, inst| {
         top_level_instances.push(inst.clone());
