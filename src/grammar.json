@@ -28,7 +28,7 @@
                   "name": "item",
                   "content": {
                     "type": "SYMBOL",
-                    "name": "source_obj"
+                    "name": "global_object"
                   }
                 },
                 {
@@ -45,7 +45,7 @@
                         "name": "item",
                         "content": {
                           "type": "SYMBOL",
-                          "name": "source_obj"
+                          "name": "global_object"
                         }
                       }
                     ]
@@ -72,7 +72,7 @@
         }
       ]
     },
-    "source_obj": {
+    "global_object": {
       "type": "SEQ",
       "members": [
         {
@@ -100,19 +100,6 @@
             }
           ]
         },
-        {
-          "type": "FIELD",
-          "name": "object",
-          "content": {
-            "type": "SYMBOL",
-            "name": "global_object"
-          }
-        }
-      ]
-    },
-    "global_object": {
-      "type": "SEQ",
-      "members": [
         {
           "type": "FIELD",
           "name": "object_type",

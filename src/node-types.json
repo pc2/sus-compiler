@@ -763,6 +763,20 @@
           }
         ]
       },
+      "extern_marker": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "__builtin__",
+            "named": false
+          },
+          {
+            "type": "extern",
+            "named": false
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
@@ -1062,36 +1076,6 @@
       "item": {
         "multiple": true,
         "required": false,
-        "types": [
-          {
-            "type": "source_obj",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
-    "type": "source_obj",
-    "named": true,
-    "fields": {
-      "extern_marker": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "__builtin__",
-            "named": false
-          },
-          {
-            "type": "extern",
-            "named": false
-          }
-        ]
-      },
-      "object": {
-        "multiple": false,
-        "required": true,
         "types": [
           {
             "type": "global_object",

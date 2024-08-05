@@ -43,14 +43,10 @@ module.exports = grammar({
     rules: {
         // Top level structure
 
-        source_file: $ => newlineSepSeq($, $.source_obj),
-
-        source_obj: $ => seq(
-            optional(field('extern_marker', choice('__builtin__', 'extern'))),
-            field('object', $.global_object)
-        ),
+        source_file: $ => newlineSepSeq($, $.global_object),
 
         global_object: $ => seq(
+            optional(field('extern_marker', choice('__builtin__', 'extern'))),
             // Because we want to reuse our "generative code", we parse them under the same umbrella. 
             // Their differences are their semantic meaning, and therefore what constructs are allowed in each
             // For instance, modules have no restrictions
