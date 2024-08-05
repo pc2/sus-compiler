@@ -47,11 +47,16 @@ module.exports = grammar({
 
         source_obj: $ => seq(
             optional(field('extern_marker', choice('__builtin__', 'extern'))),
-            field('object', $.module)
+            field('object', $.global_object)
         ),
 
-        module: $ => seq(
-            'module',
+        global_object: $ => seq(
+            // Because we want to reuse our "generative code", we parse them under the same umbrella. 
+            // Their differences are their semantic meaning, and therefore what constructs are allowed in each
+            // For instance, modules have no restrictions
+            // Functions cannot contain state or modules
+            // Struct defines types, and cannot contain non-generative operations. (Only non-generative declarations are allowed, these define the fields)
+            field('object_type', choice('module', 'function', 'struct')),
             field('name', $.identifier),
             optional(field('template_declaration_arguments', $.template_declaration_arguments)),
             field('block', $.block)
@@ -141,11 +146,10 @@ module.exports = grammar({
         ),
         
         interface_statement: $ => seq(
-            //field('interface_kind', choice('action', 'query', 'trigger')),
-            'interface',
+            'interface',//field('interface_kind', choice('action', 'query', 'trigger')),
             field('name', $.identifier),
             optional(field('interface_ports', $.interface_ports)),
-            optional(field('block', $.block))
+            //optional(field('block', $.block))
         ),
 
         interface_ports: $ => seq(

@@ -750,6 +750,60 @@
     }
   },
   {
+    "type": "global_object",
+    "named": true,
+    "fields": {
+      "block": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "object_type": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "function",
+            "named": false
+          },
+          {
+            "type": "module",
+            "named": false
+          },
+          {
+            "type": "struct",
+            "named": false
+          }
+        ]
+      },
+      "template_declaration_arguments": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "template_declaration_arguments",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "if_statement",
     "named": true,
     "fields": {
@@ -847,16 +901,6 @@
     "type": "interface_statement",
     "named": true,
     "fields": {
-      "block": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "block",
-            "named": true
-          }
-        ]
-      },
       "interface_ports": {
         "multiple": false,
         "required": false,
@@ -917,42 +961,6 @@
           },
           {
             "type": "unary_op",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
-    "type": "module",
-    "named": true,
-    "fields": {
-      "block": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "block",
-            "named": true
-          }
-        ]
-      },
-      "name": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      },
-      "template_declaration_arguments": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "template_declaration_arguments",
             "named": true
           }
         ]
@@ -1086,7 +1094,7 @@
         "required": true,
         "types": [
           {
-            "type": "module",
+            "type": "global_object",
             "named": true
           }
         ]
@@ -1504,6 +1512,10 @@
     "named": false
   },
   {
+    "type": "function",
+    "named": false
+  },
+  {
     "type": "gen",
     "named": false
   },
@@ -1557,6 +1569,10 @@
   },
   {
     "type": "state",
+    "named": false
+  },
+  {
+    "type": "struct",
     "named": false
   },
   {

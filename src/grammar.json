@@ -105,17 +105,34 @@
           "name": "object",
           "content": {
             "type": "SYMBOL",
-            "name": "module"
+            "name": "global_object"
           }
         }
       ]
     },
-    "module": {
+    "global_object": {
       "type": "SEQ",
       "members": [
         {
-          "type": "STRING",
-          "value": "module"
+          "type": "FIELD",
+          "name": "object_type",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "module"
+              },
+              {
+                "type": "STRING",
+                "value": "function"
+              },
+              {
+                "type": "STRING",
+                "value": "struct"
+              }
+            ]
+          }
         },
         {
           "type": "FIELD",
@@ -653,22 +670,6 @@
               "content": {
                 "type": "SYMBOL",
                 "name": "interface_ports"
-              }
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "FIELD",
-              "name": "block",
-              "content": {
-                "type": "SYMBOL",
-                "name": "block"
               }
             },
             {
