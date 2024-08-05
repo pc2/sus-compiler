@@ -13,7 +13,16 @@ To use the accompanying VSCode Extension for Syntax Highlighting and Code Sugges
 ext install LennartVanHirtum.sus-lsp
 ```
 
+## Learning SUS
+
+To get started with learning SUS, have a look at [this talk](https://www.youtube.com/watch?v=jJvtZvcimyM). In 40 minutes it goes over most language features through examples. Because further development will make this outdated rather quickly, a changelog is provided below to keep track. 
+
 For an example project to tinker with, see [VonTum/BitSerialMatrixMultiply](https://github.com/VonTum/BitSerialMatrixMultiply). 
+
+To get in touch, feel free to join our [Discord](https://discord.gg/ZCgzjbrppz). 
+
+#### Changelog since Talk
+- Nothing yet
 
 ## Core philosophy
 
@@ -34,8 +43,8 @@ Finally, an important consideration of SUS is the user interface. SUS comes with
 - Clock Domain Crossing safety
 - A built-in syntax for pipelining that does not impose structural constraints
 - Syntactic sugar for common constructs like valid signals, resets and submodule communication
-- In-IDE compilation errors and synthesis information
-- Hardware Generators
+- In-IDE compilation errors & warnings
+- Metaprogramming for hardware generation
 - Formal Verification Integration[^todo]
 - Moving some[^timing] timing constraints to the source file
 
@@ -235,7 +244,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [ ] Clock Tracking for SubModules
 
 ### Fun projects to do in SUS
-- [ ] Bit-Serial Matrix Multiply
+- [x] Bit-Serial Matrix Multiply
 - [ ] Dedekind Kernel Port
 - [ ] Sparse Matrix Multiply
 - [ ] RISC-V CPU
