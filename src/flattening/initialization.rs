@@ -77,15 +77,14 @@ impl<'linker> ModuleInitializationContext<'linker> {
                 if cursor.kind() == kind!("declaration") {
                     let whole_decl_span = cursor.span();
                     cursor.go_down_no_check(|cursor| {
-                        if cursor.optional_field(field!("io_port_modifiers")) {
-                            let is_input = match cursor.kind() {
+                        let is_input = cursor.optional_field(field!("io_port_modifiers")).then(|| {
+                            match cursor.kind() {
                                 kw!("input") => true,
                                 kw!("output") => false,
                                 _ => cursor.could_not_match(),
-                            };
-
-                            self.finish_gather_decl(is_input, whole_decl_span, cursor);
-                        }
+                            }
+                        });
+                        self.finish_gather_decl(is_input, whole_decl_span, cursor);
                     });
                 }
             });
@@ -178,13 +177,15 @@ impl<'linker> ModuleInitializationContext<'linker> {
             cursor.go_down(kind!("declaration"), |cursor| {
                 // Skip fields if they exist
                 let _ = cursor.optional_field(field!("io_port_modifiers"));
-                self.finish_gather_decl(is_input, whole_decl_span, cursor);
+                self.finish_gather_decl(Some(is_input), whole_decl_span, cursor);
             });
         });
         self.ports.range_since(list_start_at)
     }
 
-    fn finish_gather_decl(&mut self, is_input: bool, whole_decl_span: Span, cursor: &mut Cursor) {
+    fn finish_gather_decl(&mut self, is_input: Option<bool>, whole_decl_span: Span, cursor: &mut Cursor) {
+        if is_input.is_none() {return}; // TODO early return now
+
         // If generative input it's a template arg
         let is_gen = if cursor.optional_field(field!("declaration_modifiers")) {
             cursor.kind() == kw!("gen")
@@ -207,14 +208,16 @@ impl<'linker> ModuleInitializationContext<'linker> {
                 }),
             });
         } else {
-            self.ports.alloc(Port {
-                name,
-                name_span,
-                decl_span,
-                is_input,
-                domain: self.domains.last_id(),
-                declaration_instruction: FlatID::PLACEHOLDER,
-            });
+            if let Some(is_input) = is_input {
+                self.ports.alloc(Port {
+                    name,
+                    name_span,
+                    decl_span,
+                    is_input,
+                    domain: self.domains.last_id(),
+                    declaration_instruction: FlatID::PLACEHOLDER,
+                });
+            }
         }
     }
 }
@@ -225,21 +228,27 @@ pub fn gather_initial_file_data(mut builder: FileBuilder) {
         kind!("source_file"),
         &builder.other_parsing_errors,
         |cursor| {
-            cursor.go_down(kind!("source_obj"), |cursor| {
-                let extern_kw = cursor.optional_field(field!("extern_marker")).then(|| cursor.kind());
-                cursor.field(field!("object"));
+            let parsing_errors = ErrorCollector::new_empty(builder.file_id, builder.files);
+            cursor.report_all_decendant_errors(&parsing_errors);
 
-                let (kind, span) = cursor.kind_span();
-                match kind {
-                    kind!("module") => {
-                        let parsing_errors = ErrorCollector::new_empty(builder.file_id, builder.files);
-                        cursor.report_all_decendant_errors(&parsing_errors);
-                        cursor.go_down_no_check(|cursor| {
-                            initialize_module(&mut builder, extern_kw, parsing_errors, span, cursor);
-                        });
+            cursor.go_down(kind!("global_object"), |cursor| {
+                let span = cursor.span();
+                let extern_kw = cursor.optional_field(field!("extern_marker")).then(|| cursor.kind());
+                cursor.field(field!("object_type"));
+                let global_obj_kind = match cursor.kind() {
+                    kw!("module") => {
+                        GlobalObjectKind::Module
                     }
-                    _other => cursor.could_not_match(),
-                }
+                    kw!("function") => {
+                        GlobalObjectKind::Functions
+                    }
+                    kw!("struct") => {
+                        GlobalObjectKind::Struct
+                    }
+                    _other => cursor.could_not_match()
+                };
+                
+                initialize_module(&mut builder, extern_kw, parsing_errors, span, cursor);
             });
         },
     );

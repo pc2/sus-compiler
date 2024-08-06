@@ -612,7 +612,8 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         let whole_declaration_span = cursor.span();
         cursor.go_down(kind!("declaration"), |cursor| {
             // Extra inputs and outputs declared in the body of the module
-            let io_kw = cursor.optional_keyword(field!("io_port_modifiers")).map(|(k, span)| {
+            let io_kw = cursor.optional_field(field!("io_port_modifiers")).then(|| {
+                let (k, span) = cursor.kind_span();
                 match k {
                     kw!("input") => (true, span),
                     kw!("output") => (false, span),
@@ -621,7 +622,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             });
 
             // State or Generative
-            let declaration_modifiers = cursor.optional_keyword(field!("declaration_modifiers"));
+            let declaration_modifiers = cursor.optional_field(field!("declaration_modifiers")).then(|| cursor.kind_span());
 
             // Still gets overwritten 
             let mut is_port = match declaration_context {
@@ -1502,19 +1503,17 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 
     fn flatten_module(&mut self, cursor: &mut Cursor) {
-        cursor.go_down(kind!("module"), |cursor| {
-            let name_span = cursor.field_span(field!("name"), kind!("identifier"));
-            self.flatten_template_inputs(cursor);
-            let module_name = &self.name_resolver.file_text[name_span];
-            println!("TREE SITTER module! {module_name}");
-            // Interface is allocated in self
-            if cursor.optional_field(field!("interface_ports")) {
-                self.flatten_interface_ports(cursor);
-            }
+        let name_span = cursor.field_span(field!("name"), kind!("identifier"));
+        self.flatten_template_inputs(cursor);
+        let module_name = &self.name_resolver.file_text[name_span];
+        println!("TREE SITTER module! {module_name}");
+        // Interface is allocated in self
+        if cursor.optional_field(field!("interface_ports")) {
+            self.flatten_interface_ports(cursor);
+        }
 
-            cursor.field(field!("block"));
-            self.flatten_code(cursor);
-        })
+        cursor.field(field!("block"));
+        self.flatten_code(cursor);
     }
 }
 
@@ -1575,24 +1574,17 @@ pub fn flatten_all_modules(linker: &mut Linker) {
         let mut cursor = Cursor::new_at_root(&file.tree, &file.file_text);
 
         cursor.list(kind!("source_file"), |cursor| {
-            cursor.go_down(kind!("source_obj"), |cursor| {
+            cursor.go_down(kind!("global_object"), |cursor| {
                 // Skip because we covered it in initialization. 
                 let _ = cursor.optional_field(field!("extern_marker"));
+                // Skip because we know this from initialization. 
+                cursor.field(field!("object_type"));
                 
-                cursor.field(field!("object"));
-                match cursor.kind() {
-                    kind!("module") => {
-                        let Some(NameElem::Module(module_uuid)) = associated_value_iter.next() else {
-                            unreachable!()
-                        };
-                        
-                        flatten(linker_ptr, *module_uuid, cursor);
-                    }
-                    other => todo!(
-                        "{}",
-                        tree_sitter_sus::language().node_kind_for_id(other).unwrap()
-                    ),
-                }
+                let Some(NameElem::Module(module_uuid)) = associated_value_iter.next() else {
+                    unreachable!()
+                };
+                
+                flatten(linker_ptr, *module_uuid, cursor);
             });
         });
         span_debugger.defuse();

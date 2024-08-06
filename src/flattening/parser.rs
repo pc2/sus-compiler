@@ -117,11 +117,6 @@ impl<'t> Cursor<'t> {
         }
     }
 
-    #[must_use]
-    pub fn optional_keyword(&mut self, field_id: NonZeroU16) -> Option<(u16, Span)> {
-        self.optional_field(field_id).then(|| self.kind_span())
-    }
-
     /// The cursor advances to the next field and calls the given function.
     ///
     /// Panics if the next field doesn't exist or is not the requested field

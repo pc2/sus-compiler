@@ -21,6 +21,13 @@ use crate::typing::{
     template::{GlobalReference, TemplateArgs},
 };
 
+#[derive(Debug)]
+pub enum GlobalObjectKind {
+    Module,
+    Functions,
+    Struct
+}
+
 /// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage.
 ///
 /// 1. Initialization: initial name resolution and port discovery. The Module objects themselves are constructed.
