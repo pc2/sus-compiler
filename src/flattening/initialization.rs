@@ -223,7 +223,7 @@ impl<'linker> ModuleInitializationContext<'linker> {
 }
 
 pub fn gather_initial_file_data(mut builder: FileBuilder) {
-    let mut cursor = Cursor::new_at_root(builder.tree, builder.file_text);
+    let mut cursor = Cursor::new_at_root(builder.tree, &builder.file_data.file_text);
     cursor.list_and_report_errors(
         kind!("source_file"),
         &builder.other_parsing_errors,
@@ -260,7 +260,7 @@ fn initialize_module(builder: &mut FileBuilder, extern_kw : Option<u16>, parsing
         interfaces: FlatAlloc::new(),
         domains: FlatAlloc::new(),
         template_inputs: FlatAlloc::new(),
-        file_text: builder.file_text,
+        file_text: &builder.file_data.file_text,
     };
 
     let (name_span, name) = ctx.gather_initial_module(cursor);

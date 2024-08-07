@@ -23,7 +23,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
         println!("{ctx_info_string}");
         let mut span_debugger = SpanDebugger::new(
             &ctx_info_string,
-            &linker.files[module.link_info.file].file_text,
+            &linker.files[module.link_info.file],
         );
 
         with_module_editing_context(

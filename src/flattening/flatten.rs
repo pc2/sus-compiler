@@ -1568,7 +1568,7 @@ pub fn flatten<'cursor_linker, 'errs>(
 pub fn flatten_all_modules(linker: &mut Linker) {
     let linker_ptr: *mut Linker = linker;
     for (_file_id, file) in &linker.files {
-        let mut span_debugger = SpanDebugger::new("flatten_all_modules", &file.file_text);
+        let mut span_debugger = SpanDebugger::new("flatten_all_modules", file);
         let mut associated_value_iter = file.associated_values.iter();
 
         let mut cursor = Cursor::new_at_root(&file.tree, &file.file_text);

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, ops::Range};
 
-use crate::{file_position::FileText, pretty_print_spans_in_reverse_order};
+use crate::{linker::FileData, pretty_print_spans_in_reverse_order};
 
 /// Many duplicates will be produced, and filtering them out in the code itself is inefficient. Therefore just keep a big buffer and deduplicate as needed
 const SPAN_TOUCH_HISTORY_SIZE: usize = 256;
@@ -37,7 +37,7 @@ thread_local! {
         });
 }
 
-fn print_most_recent_spans(file_text: String) {
+fn print_most_recent_spans(file_data: &FileData) {
     let spans_to_print: Vec<Range<usize>> = SPANS_HISTORY.with_borrow_mut(|history| {
         assert!(history.in_use);
 
@@ -65,7 +65,7 @@ fn print_most_recent_spans(file_text: String) {
     });
 
     println!("Panic unwinding. Printing the last {} spans. BEWARE: These spans may not correspond to this file, thus incorrect spans are possible!", spans_to_print.len());
-    pretty_print_spans_in_reverse_order(file_text, spans_to_print);
+    pretty_print_spans_in_reverse_order(file_data, spans_to_print);
 }
 
 /// Print the last [NUM_SPANS_TO_PRINT] touched spans on panic to aid in debugging
@@ -79,12 +79,12 @@ fn print_most_recent_spans(file_text: String) {
 /// Maybe future work can remove dependency on Linker lifetime with some unsafe code.
 pub struct SpanDebugger<'text> {
     context: &'text str,
-    file_text: &'text FileText,
+    file_data: &'text FileData,
     defused: bool,
 }
 
 impl<'text> SpanDebugger<'text> {
-    pub fn new(context: &'text str, file_text: &'text FileText) -> Self {
+    pub fn new(context: &'text str, file_text: &'text FileData) -> Self {
         SPANS_HISTORY.with_borrow_mut(|history| {
             assert!(!history.in_use);
             history.in_use = true;
@@ -93,7 +93,7 @@ impl<'text> SpanDebugger<'text> {
 
         Self {
             context,
-            file_text,
+            file_data: file_text,
             defused: false,
         }
     }
@@ -112,7 +112,7 @@ impl<'text> Drop for SpanDebugger<'text> {
     fn drop(&mut self) {
         if !self.defused {
             println!("Panic happened in Span-guarded context: {}", self.context);
-            print_most_recent_spans(self.file_text.file_text.clone())
+            print_most_recent_spans(self.file_data)
         }
     }
 }

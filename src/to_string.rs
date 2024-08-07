@@ -3,7 +3,7 @@ use crate::prelude::*;
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
 use crate::flattening::{DomainInfo, Interface, InterfaceToDomainMap, Module, WrittenType};
-use crate::linker::{LinkInfo, NamedType};
+use crate::linker::{FileData, LinkInfo, NamedType};
 use crate::typing::{
     abstract_type::{AbstractType, DomainType},
     concrete_type::ConcreteType,
@@ -229,13 +229,13 @@ impl Module {
         result
     }
 
-    pub fn print_flattened_module(&self, file_text: &FileText) {
+    pub fn print_flattened_module(&self, file_data: &FileData) {
         println!("[[{}]]:", self.link_info.name);
         println!("Interface:");
         for (port_id, port) in &self.ports {
             println!(
                 "    {} -> {:?}",
-                self.make_port_info_string(port_id, file_text),
+                self.make_port_info_string(port_id, &file_data.file_text),
                 port
             );
         }
@@ -246,7 +246,7 @@ impl Module {
             let span = self.get_instruction_span(id);
             spans_print.push((format!("{id:?}"), span.into_range()));
         }
-        pretty_print_many_spans(file_text.file_text.clone(), &spans_print);
+        pretty_print_many_spans(file_data, &spans_print);
     }
 }
 

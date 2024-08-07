@@ -1,21 +1,49 @@
 use std::{ops::Range, path::PathBuf};
 
+use crate::linker::FileData;
 use crate::prelude::*;
 
 use crate::{
     alloc::ArenaVector,
-    compiler_top::{add_file, recompile_all},
     config::config,
     errors::{CompileError, ErrorLevel},
 };
 
 use ariadne::*;
 
+
+impl Cache<FileUUID> for (&Linker, &mut ArenaVector<Source<String>, FileUUIDMarker>) {
+    type Storage = String;
+
+    fn fetch(&mut self, id: &FileUUID) -> Result<&Source, Box<dyn std::fmt::Debug + '_>> {
+        Ok(&self.1[*id])
+    }
+    fn display<'a>(&self, id: &'a FileUUID) -> Option<Box<dyn std::fmt::Display + 'a>> {
+        Some(Box::new(self.0.files[*id].file_identifier.clone()))
+    }
+}
+
+struct NamedSource<'s> {
+    source : Source, 
+    name : &'s str
+}
+
+impl Cache<()> for NamedSource<'_> {
+    type Storage = String;
+
+    fn fetch(&mut self, _id: &()) -> Result<&Source, Box<dyn std::fmt::Debug + '_>> {
+        Ok(&self.source)
+    }
+    fn display<'a>(&self, _id: &'a ()) -> Option<Box<dyn std::fmt::Display + 'a>> {
+        Some(Box::new(self.name.to_owned()))
+    }
+}
+
 pub fn compile_all(
     file_paths: Vec<PathBuf>,
-) -> (Linker, ArenaVector<(PathBuf, Source), FileUUIDMarker>) {
+) -> (Linker, ArenaVector<Source, FileUUIDMarker>) {
     let mut linker = Linker::new();
-    let mut paths_arena: ArenaVector<(PathBuf, Source), FileUUIDMarker> = ArenaVector::new();
+    let mut file_sources: ArenaVector<Source, FileUUIDMarker> = ArenaVector::new();
     for file_path in file_paths {
         let file_text = match std::fs::read_to_string(&file_path) {
             Ok(file_text) => file_text,
@@ -26,14 +54,14 @@ pub fn compile_all(
         };
 
         let source = Source::from(file_text.clone());
-        let uuid = add_file(file_text, &mut linker);
+        let uuid = linker.add_file(file_path.to_string_lossy().into_owned(), file_text);
 
-        paths_arena.insert(uuid, (file_path, source));
+        file_sources.insert(uuid, source);
     }
 
-    recompile_all(&mut linker);
+    linker.recompile_all();
 
-    (linker, paths_arena)
+    (linker, file_sources)
 }
 
 pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
@@ -77,33 +105,25 @@ pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
     report.finish().eprint(file_cache).unwrap();
 }
 
-impl Cache<FileUUID> for ArenaVector<(PathBuf, Source<String>), FileUUIDMarker> {
-    type Storage = String;
-
-    fn fetch(&mut self, id: &FileUUID) -> Result<&Source, Box<dyn std::fmt::Debug + '_>> {
-        Ok(&self[*id].1)
-    }
-    fn display<'a>(&self, id: &'a FileUUID) -> Option<Box<dyn std::fmt::Display + 'a>> {
-        let text: String = self[*id].0.to_string_lossy().into_owned();
-        Some(Box::new(text))
-    }
-}
-
 pub fn print_all_errors(
     linker: &Linker,
-    paths_arena: &mut ArenaVector<(PathBuf, Source), FileUUIDMarker>,
+    ariadne_sources: &mut ArenaVector<Source, FileUUIDMarker>,
 ) {
+    let mut source_cache = (linker, ariadne_sources);
     for (file_uuid, _f) in &linker.files {
         linker.for_all_errors_in_file(file_uuid, |err| {
-            pretty_print_error(err, file_uuid, linker, paths_arena);
+            pretty_print_error(err, file_uuid, linker, &mut source_cache);
         });
     }
 }
 
-pub fn pretty_print_spans_in_reverse_order(file_text: String, spans: Vec<Range<usize>>) {
-    let text_len = file_text.len();
-    let mut source = Source::from(file_text);
-
+pub fn pretty_print_spans_in_reverse_order(file_data : &FileData, spans: Vec<Range<usize>>) {
+    let text_len = file_data.file_text.len();
+    let mut source = NamedSource{
+        source : Source::from(file_data.file_text.file_text.clone()),
+        name : &file_data.file_identifier
+    };
+    
     for span in spans.into_iter().rev() {
         // If span not in file, just don't print it. This happens.
         if span.end > text_len {
@@ -130,9 +150,12 @@ pub fn pretty_print_spans_in_reverse_order(file_text: String, spans: Vec<Range<u
     }
 }
 
-pub fn pretty_print_many_spans(file_text: String, spans: &[(String, Range<usize>)]) {
-    let text_len = file_text.len();
-    let mut source = Source::from(file_text);
+pub fn pretty_print_many_spans(file_data: &FileData, spans: &[(String, Range<usize>)]) {
+    let text_len = file_data.file_text.len();
+    let mut source = NamedSource{
+        source : Source::from(file_data.file_text.file_text.clone()),
+        name : &file_data.file_identifier
+    };
 
     let config = Config::default()
         .with_index_type(IndexType::Byte)

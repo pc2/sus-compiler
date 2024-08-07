@@ -10,8 +10,6 @@ use semantic_tokens::{make_semantic_tokens, semantic_token_capabilities};
 use std::{collections::HashMap, error::Error, ffi::OsStr, net::SocketAddr};
 
 use crate::{
-    alloc::ArenaVector,
-    compiler_top::{add_file, recompile_all, update_file},
     config::config,
     errors::{CompileError, ErrorLevel},
     file_position::{FileText, LineCol},
@@ -42,31 +40,33 @@ fn span_to_lsp_range(file_text: &FileText, ch_sp: Span) -> lsp_types::Range {
         end: to_position(rng.end),
     }
 }
-fn cvt_location_list(location_vec: Vec<SpanFile>, file_cache: &LoadedFileCache) -> Vec<Location> {
+fn cvt_location_list(location_vec: Vec<SpanFile>, linker: &Linker) -> Vec<Location> {
     location_vec
         .into_iter()
-        .map(|(span, file)| {
-            let uri = file_cache.uris[file].clone();
-            let range = span_to_lsp_range(&file_cache.linker.files[file].file_text, span);
+        .map(|(span, file_id)| {
+            let file = &linker.files[file_id];
+            let uri = Url::parse(&file.file_identifier).unwrap();
+            let range = span_to_lsp_range(&file.file_text, span);
             Location { uri, range }
         })
         .collect()
 }
 fn cvt_location_list_of_lists(
     location_vec: Vec<(FileUUID, Vec<Span>)>,
-    file_cache: &LoadedFileCache,
+    linker: &Linker,
 ) -> Vec<Location> {
     let mut result_len = 0;
     for (_f, v) in &location_vec {
         result_len += v.len();
     }
     let mut result = Vec::with_capacity(result_len);
-    for (file, vec) in location_vec {
-        let uri = &file_cache.uris[file];
+    for (file_id, vec) in location_vec {
+        let file = &linker.files[file_id];
+        let uri = Url::parse(&file.file_identifier).unwrap();
         for span in vec {
-            let range = span_to_lsp_range(&file_cache.linker.files[file].file_text, span);
+            let range = span_to_lsp_range(&file.file_text, span);
             result.push(Location {
-                uri: uri.clone(),
+                uri : uri.clone(),
                 range,
             })
         }
@@ -74,35 +74,29 @@ fn cvt_location_list_of_lists(
     result
 }
 
-struct LoadedFileCache {
-    linker: Linker,
-    uris: ArenaVector<Url, FileUUIDMarker>,
-}
-
-impl LoadedFileCache {
-    fn new(linker: Linker, uris: ArenaVector<Url, FileUUIDMarker>) -> Self {
-        Self { linker, uris }
+impl Linker {
+    fn find_file(&self, file_identifier: &str) -> Option<FileUUID> {
+        self.files.find(|_uuid, file| file.file_identifier == file_identifier)
     }
     fn find_uri(&self, uri: &Url) -> Option<FileUUID> {
-        self.uris.find(|_uuid, uri_found| uri_found == uri)
+        self.find_file(uri.as_str())
     }
-    fn update_text(&mut self, uri: Url, new_file_text: String) {
+    fn update_text(&mut self, uri: &Url, new_file_text: String) {
         if let Some(found_file_uuid) = self.find_uri(&uri) {
-            update_file(new_file_text, found_file_uuid, &mut self.linker);
+            self.update_file(new_file_text, found_file_uuid);
         } else {
-            let file_uuid = add_file(new_file_text, &mut self.linker);
-            self.uris.insert(file_uuid, uri.clone());
+            let _ = self.add_file(uri.to_string(), new_file_text);
         }
 
-        recompile_all(&mut self.linker);
+        self.recompile_all();
     }
     fn ensure_contains_file(&mut self, uri: &Url) -> FileUUID {
         if let Some(found) = self.find_uri(uri) {
             found
         } else {
             let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
-            let file_uuid = add_file(file_text, &mut self.linker);
-            recompile_all(&mut self.linker);
+            let file_uuid = self.add_file(uri.to_string(), file_text);
+            self.recompile_all();
             file_uuid
         }
     }
@@ -111,7 +105,7 @@ impl LoadedFileCache {
         text_pos: &lsp_types::TextDocumentPositionParams,
     ) -> (FileUUID, usize) {
         let file_id = self.ensure_contains_file(&text_pos.text_document.uri);
-        let file_data = &self.linker.files[file_id];
+        let file_data = &self.files[file_id];
 
         let position = file_data
             .file_text
@@ -125,8 +119,7 @@ impl LoadedFileCache {
 fn convert_diagnostic(
     err: &CompileError,
     main_file_text: &FileText,
-    linker: &Linker,
-    uris: &ArenaVector<Url, FileUUIDMarker>,
+    linker: &Linker
 ) -> Diagnostic {
     assert!(
         main_file_text.is_span_valid(err.position),
@@ -141,19 +134,19 @@ fn convert_diagnostic(
     };
     let mut related_info = Vec::new();
     for info in &err.infos {
-        let info_file_text = &linker.files[info.file].file_text;
-        let file_name = uris[info.file].to_string();
+        let info_file = &linker.files[info.file];
         let info_span = info.position;
         assert!(
-            info_file_text.is_span_valid(info_span),
-            "bad info in {file_name}:\n{}; in err: {}.\nSpan is {info_span}, but file length is {}",
+            info_file.file_text.is_span_valid(info_span),
+            "bad info in {}:\n{}; in err: {}.\nSpan is {info_span}, but file length is {}",
+            info_file.file_identifier,
             info.info,
             err.reason,
-            info_file_text.len()
+            info_file.file_text.len()
         );
-        let info_pos = span_to_lsp_range(info_file_text, info_span);
+        let info_pos = span_to_lsp_range(&info_file.file_text, info_span);
         let location = Location {
-            uri: uris[info.file].clone(),
+            uri: Url::parse(&info_file.file_identifier).unwrap(),
             range: info_pos,
         };
         related_info.push(DiagnosticRelatedInformation {
@@ -174,22 +167,21 @@ fn convert_diagnostic(
 
 fn push_all_errors(
     connection: &lsp_server::Connection,
-    file_cache: &LoadedFileCache,
+    linker: &Linker,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
-    for (file_id, file_data) in &file_cache.linker.files {
+    for (file_id, file_data) in &linker.files {
         let mut diag_vec: Vec<Diagnostic> = Vec::new();
 
-        file_cache.linker.for_all_errors_in_file(file_id, |err| {
+        linker.for_all_errors_in_file(file_id, |err| {
             diag_vec.push(convert_diagnostic(
                 err,
                 &file_data.file_text,
-                &file_cache.linker,
-                &file_cache.uris,
+                &linker
             ));
         });
 
         let params = &PublishDiagnosticsParams {
-            uri: file_cache.uris[file_id].clone(),
+            uri: Url::parse(&file_data.file_identifier).unwrap(),
             diagnostics: diag_vec,
             version: None,
         };
@@ -205,9 +197,8 @@ fn push_all_errors(
     Ok(())
 }
 
-fn initialize_all_files(init_params: &InitializeParams) -> LoadedFileCache {
+fn initialize_all_files(init_params: &InitializeParams) -> Linker {
     let mut linker = Linker::new();
-    let mut uris = ArenaVector::new();
 
     if let Some(workspace_folder) = &init_params.workspace_folders {
         for folder in workspace_folder {
@@ -219,15 +210,14 @@ fn initialize_all_files(init_params: &InitializeParams) -> LoadedFileCache {
                 let file_path = file.unwrap().path();
                 if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
                     let file_text = std::fs::read_to_string(&file_path).unwrap();
-                    let file_uuid = add_file(file_text, &mut linker);
-                    uris.insert(file_uuid, Url::from_file_path(&file_path).unwrap());
+                    let file_identifier : String = Url::from_file_path(&file_path).unwrap().into();
+                    let _ = linker.add_file(file_identifier, file_text);
                 }
             }
         }
     }
-    let mut result = LoadedFileCache::new(linker, uris);
-    recompile_all(&mut result.linker);
-    result
+    linker.recompile_all();
+    linker
 }
 
 fn gather_completions(linker: &Linker, file_id: FileUUID, position: usize) -> Vec<CompletionItem> {
@@ -351,7 +341,7 @@ fn gather_all_references_across_all_files(
 fn handle_request(
     method: &str,
     params: serde_json::Value,
-    file_cache: &mut LoadedFileCache,
+    linker: &mut Linker,
 ) -> Result<serde_json::Value, serde_json::Error> {
     match method {
         request::HoverRequest::METHOD => {
@@ -360,17 +350,17 @@ fn handle_request(
             println!("HoverRequest");
 
             let (file_uuid, pos) =
-                file_cache.location_in_file(&params.text_document_position_params);
-            let file_data = &file_cache.linker.files[file_uuid];
+                linker.location_in_file(&params.text_document_position_params);
+            let file_data = &linker.files[file_uuid];
             let mut hover_list: Vec<MarkedString> = Vec::new();
 
             let range = if let Some((location, info)) =
-                get_selected_object(&file_cache.linker, file_uuid, pos)
+                get_selected_object(linker, file_uuid, pos)
             {
                 if config().lsp_debug_mode {
                     hover_list.push(MarkedString::String(format!("{info:?}")))
                 } else {
-                    hover_list = hover(info, &file_cache.linker, file_data);
+                    hover_list = hover(info, linker, file_data);
                 }
                 Some(span_to_lsp_range(&file_data.file_text, location))
             } else {
@@ -387,11 +377,11 @@ fn handle_request(
             println!("GotoDefinition");
 
             let (file_uuid, pos) =
-                file_cache.location_in_file(&params.text_document_position_params);
+                linker.location_in_file(&params.text_document_position_params);
 
             let mut goto_definition_list: Vec<SpanFile> = Vec::new();
 
-            if let Some((_location, info)) = get_selected_object(&file_cache.linker, file_uuid, pos)
+            if let Some((_location, info)) = get_selected_object(linker, file_uuid, pos)
             {
                 match info {
                     LocationInfo::InModule(_md_id, md, _decl_id, InModule::NamedLocal(decl)) => {
@@ -410,7 +400,7 @@ fn handle_request(
                         goto_definition_list.push((template_arg.name_span, link_info.file))
                     }
                     LocationInfo::Global(id) => {
-                        if let Some(link_info) = file_cache.linker.get_link_info(id) {
+                        if let Some(link_info) = linker.get_link_info(id) {
                             goto_definition_list.push((link_info.name_span, link_info.file));
                         }
                     }
@@ -425,7 +415,7 @@ fn handle_request(
 
             serde_json::to_value(GotoDefinitionResponse::Array(cvt_location_list(
                 goto_definition_list,
-                file_cache,
+                linker,
             )))
         }
         request::SemanticTokensFullRequest::METHOD => {
@@ -433,11 +423,11 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("SemanticTokensFullRequest");
 
-            let uuid = file_cache.ensure_contains_file(&params.text_document.uri);
+            let uuid = linker.ensure_contains_file(&params.text_document.uri);
 
             serde_json::to_value(SemanticTokensResult::Tokens(make_semantic_tokens(
                 uuid,
-                &file_cache.linker,
+                linker,
             )))
         }
         request::DocumentHighlightRequest::METHOD => {
@@ -445,10 +435,10 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("DocumentHighlight");
 
-            let (file_id, pos) = file_cache.location_in_file(&params.text_document_position_params);
-            let file_data = &file_cache.linker.files[file_id];
+            let (file_id, pos) = linker.location_in_file(&params.text_document_position_params);
+            let file_data = &linker.files[file_id];
 
-            let ref_locations = gather_all_references_in_one_file(&file_cache.linker, file_id, pos);
+            let ref_locations = gather_all_references_in_one_file(linker, file_id, pos);
 
             let result: Vec<DocumentHighlight> = ref_locations
                 .into_iter()
@@ -464,33 +454,33 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("FindAllReferences");
 
-            let (file_id, pos) = file_cache.location_in_file(&params.text_document_position);
+            let (file_id, pos) = linker.location_in_file(&params.text_document_position);
 
             let ref_locations =
-                gather_all_references_across_all_files(&file_cache.linker, file_id, pos);
+                gather_all_references_across_all_files(linker, file_id, pos);
 
-            serde_json::to_value(cvt_location_list_of_lists(ref_locations, file_cache))
+            serde_json::to_value(cvt_location_list_of_lists(ref_locations, linker))
         }
         request::Rename::METHOD => {
             let params: RenameParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("Rename");
 
-            let (file_id, pos) = file_cache.location_in_file(&params.text_document_position);
+            let (file_id, pos) = linker.location_in_file(&params.text_document_position);
 
             let ref_locations_lists =
-                gather_all_references_across_all_files(&file_cache.linker, file_id, pos);
+                gather_all_references_across_all_files(linker, file_id, pos);
 
             let changes: HashMap<_, _> = ref_locations_lists
                 .into_iter()
                 .map(|(file, spans)| {
-                    let file_text = &file_cache.linker.files[file].file_text;
+                    let file_data = &linker.files[file];
                     (
-                        file_cache.uris[file].clone(),
+                        Url::parse(&file_data.file_identifier).unwrap(),
                         spans
                             .into_iter()
                             .map(|span| TextEdit {
-                                range: span_to_lsp_range(file_text, span),
+                                range: span_to_lsp_range(&file_data.file_text, span),
                                 new_text: params.new_name.clone(),
                             })
                             .collect(),
@@ -511,10 +501,10 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("Completion");
 
-            let (file_uuid, position) = file_cache.location_in_file(&params.text_document_position);
+            let (file_uuid, position) = linker.location_in_file(&params.text_document_position);
 
             serde_json::to_value(&CompletionResponse::Array(gather_completions(
-                &file_cache.linker,
+                linker,
                 file_uuid,
                 position,
             )))
@@ -529,7 +519,7 @@ fn handle_request(
 fn handle_notification(
     connection: &lsp_server::Connection,
     notification: lsp_server::Notification,
-    file_cache: &mut LoadedFileCache,
+    linker: &mut Linker,
     initialize_params: &InitializeParams,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
     match notification.method.as_str() {
@@ -542,15 +532,15 @@ fn handle_notification(
             let only_change = content_change_iter.next().unwrap();
             assert!(content_change_iter.next().is_none());
             assert!(only_change.range.is_none());
-            file_cache.update_text(params.text_document.uri, only_change.text);
+            linker.update_text(&params.text_document.uri, only_change.text);
 
-            push_all_errors(connection, &file_cache)?;
+            push_all_errors(connection, &linker)?;
         }
         notification::DidChangeWatchedFiles::METHOD => {
             println!("Workspace Files modified");
-            *file_cache = initialize_all_files(initialize_params);
+            *linker = initialize_all_files(initialize_params);
 
-            push_all_errors(&connection, &file_cache)?;
+            push_all_errors(&connection, &linker)?;
         }
         other => {
             println!("got notification: {other:?}");

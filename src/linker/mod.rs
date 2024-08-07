@@ -194,6 +194,7 @@ impl Linkable for NamedType {
 }
 
 pub struct FileData {
+    pub file_identifier: String,
     pub file_text: FileText,
     pub parsing_errors: ErrorStore,
     /// In source file order
@@ -441,7 +442,7 @@ impl Linker {
         f(FileBuilder {
             file_id,
             tree: &file_data.tree,
-            file_text: &file_data.file_text,
+            file_data: &file_data,
             files: &self.files,
             other_parsing_errors: &other_parsing_errors,
             associated_values: &mut associated_values,
@@ -461,7 +462,7 @@ impl Linker {
 pub struct FileBuilder<'linker> {
     pub file_id: FileUUID,
     pub tree: &'linker Tree,
-    pub file_text: &'linker FileText,
+    pub file_data: &'linker FileData,
     pub files: &'linker ArenaAllocator<FileData, FileUUIDMarker>,
     pub other_parsing_errors: &'linker ErrorCollector<'linker>,
     associated_values: &'linker mut Vec<NameElem>,
