@@ -263,4 +263,4 @@ In this example, we create a memory block with a read port and a write port. Thi
 ![Architecture of the SUS Compiler](philosophy/images/susArchitecture.png)
 
 ## Long Term Strategy
-[https://www.youtube.com/watch?v=XZ3w_jec1v8]("The Economics of Programming Languages" by Evan Czaplicki (Strange Loop 2023))
+["The Economics of Programming Languages" by Evan Czaplicki (Strange Loop 2023)](https://www.youtube.com/watch?v=XZ3w_jec1v8)
