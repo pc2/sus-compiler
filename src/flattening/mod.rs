@@ -24,7 +24,7 @@ use crate::typing::{
 #[derive(Debug)]
 pub enum GlobalObjectKind {
     Module,
-    Functions,
+    Function,
     Struct
 }
 
@@ -132,6 +132,27 @@ impl Module {
         self.domains.len() > 1
     }
 }
+
+#[derive(Debug)]
+pub struct StructType {
+    /// Created in Stage 1: Initialization
+    pub link_info : LinkInfo,
+    
+    /// Created in Stage 1: Initialization
+    ///
+    /// [StructField::declaration_instruction] are set in Stage 2: Flattening
+    fields: FlatAlloc<StructField, FieldIDMarker>,
+}
+
+#[derive(Debug)]
+pub struct StructField {
+    pub name: String,
+    pub name_span: Span,
+    pub decl_span: Span,
+    /// This is only set after flattening is done. Initially just [UUID::PLACEHOLDER]
+    pub declaration_instruction: FlatID,
+}
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PortOrInterface {

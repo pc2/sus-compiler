@@ -69,6 +69,13 @@ impl UUIDMarker for DomainIDMarker {
 /// Interfaces are also indexed using DomainIDs. But in general, these refer to (clock/latency counting) domains
 pub type DomainID = UUID<DomainIDMarker>;
 
+pub struct FieldIDMarker;
+impl UUIDMarker for FieldIDMarker {
+    const DISPLAY_NAME: &'static str = "field_";
+}
+pub type FieldID = UUID<FieldIDMarker>;
+
+
 pub struct TemplateIDMarker;
 impl UUIDMarker for TemplateIDMarker {
     const DISPLAY_NAME: &'static str = "template_arg_";

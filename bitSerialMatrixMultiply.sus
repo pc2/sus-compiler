@@ -101,12 +101,10 @@ module BitSerialMatrixMultiplyState {
     for int Y in 0..HEIGHT {
         BitSerialRow::<SIZE = WIDTH, WEIGHTS = MATRIX[Y];> row
 
-        if feed {
-            result_vector[Y] = result_vector[Y] * 2 + row(vector_bits)
-        }
-
         if start {
             result_vector[Y] = 0
+        } else if feed {
+            result_vector[Y] = result_vector[Y] * 2 + row(vector_bits)
         }
     }
 }

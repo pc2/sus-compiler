@@ -14,16 +14,22 @@ use crate::typing::template::{
 use super::parser::Cursor;
 use super::*;
 
-struct ModuleInitializationContext<'linker> {
+struct InitializationContext<'linker> {
+    template_inputs: TemplateInputs,
+
+    // module-only stuff
     ports: FlatAlloc<Port, PortIDMarker>,
     interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
     domains: FlatAlloc<String, DomainIDMarker>,
-    template_inputs: TemplateInputs,
+    
+    // struct-only stuff
+    fields: FlatAlloc<StructField, FieldIDMarker>,
+
     file_text: &'linker FileText,
 }
 
-impl<'linker> ModuleInitializationContext<'linker> {
-    fn gather_initial_module(&mut self, cursor: &mut Cursor) -> (Span, String) {
+impl<'linker> InitializationContext<'linker> {
+    fn gather_initial_global_object(&mut self, cursor: &mut Cursor) -> (Span, String) {
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
         let name = self.file_text[name_span].to_owned();
         self.domains.alloc(name.clone());
@@ -184,10 +190,8 @@ impl<'linker> ModuleInitializationContext<'linker> {
     }
 
     fn finish_gather_decl(&mut self, is_input: Option<bool>, whole_decl_span: Span, cursor: &mut Cursor) {
-        if is_input.is_none() {return}; // TODO early return now
-
         // If generative input it's a template arg
-        let is_gen = if cursor.optional_field(field!("declaration_modifiers")) {
+        let is_generative = if cursor.optional_field(field!("declaration_modifiers")) {
             cursor.kind() == kw!("gen")
         } else {
             false
@@ -198,17 +202,19 @@ impl<'linker> ModuleInitializationContext<'linker> {
         let decl_span = Span::new_overarching(type_span, whole_decl_span.empty_span_at_end());
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
         let name = self.file_text[name_span].to_owned();
-        if is_gen {
-            self.template_inputs.alloc(TemplateInput {
-                name,
-                name_span,
-                kind: TemplateInputKind::Generative(GenerativeTemplateInputKind {
-                    decl_span,
-                    declaration_instruction: FlatID::PLACEHOLDER,
-                }),
-            });
-        } else {
-            if let Some(is_input) = is_input {
+
+        match (is_generative, is_input) {
+            (true, Some(true)) => {
+                self.template_inputs.alloc(TemplateInput {
+                    name,
+                    name_span,
+                    kind: TemplateInputKind::Generative(GenerativeTemplateInputKind {
+                        decl_span,
+                        declaration_instruction: FlatID::PLACEHOLDER,
+                    }),
+                });
+            }
+            (false, Some(is_input)) => {
                 self.ports.alloc(Port {
                     name,
                     name_span,
@@ -218,6 +224,15 @@ impl<'linker> ModuleInitializationContext<'linker> {
                     declaration_instruction: FlatID::PLACEHOLDER,
                 });
             }
+            (false, None) => {
+                self.fields.alloc(StructField{
+                    name: name.clone(),
+                    name_span,
+                    decl_span,
+                    declaration_instruction: FlatID::PLACEHOLDER
+                });
+            }
+            _other => {}
         }
     }
 }
@@ -231,73 +246,87 @@ pub fn gather_initial_file_data(mut builder: FileBuilder) {
             let parsing_errors = ErrorCollector::new_empty(builder.file_id, builder.files);
             cursor.report_all_decendant_errors(&parsing_errors);
 
+            let span = cursor.span();
             cursor.go_down(kind!("global_object"), |cursor| {
-                let span = cursor.span();
-                let extern_kw = cursor.optional_field(field!("extern_marker")).then(|| cursor.kind());
-                cursor.field(field!("object_type"));
-                let global_obj_kind = match cursor.kind() {
-                    kw!("module") => {
-                        GlobalObjectKind::Module
-                    }
-                    kw!("function") => {
-                        GlobalObjectKind::Functions
-                    }
-                    kw!("struct") => {
-                        GlobalObjectKind::Struct
-                    }
-                    _other => cursor.could_not_match()
-                };
-                
-                initialize_module(&mut builder, extern_kw, parsing_errors, span, cursor);
+                initialize_global_object(&mut builder, parsing_errors, span, cursor);
             });
         },
     );
 }
 
-fn initialize_module(builder: &mut FileBuilder, extern_kw : Option<u16>, parsing_errors: ErrorCollector, span: Span, cursor: &mut Cursor) {
-    let mut ctx = ModuleInitializationContext {
+fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorCollector, span: Span, cursor: &mut Cursor) {
+    let is_extern = match cursor.optional_field(field!("extern_marker")).then(|| cursor.kind()) {
+        None => IsExtern::Normal,
+        Some(kw!("extern")) => IsExtern::Extern,
+        Some(kw!("__builtin__")) => IsExtern::Builtin,
+        Some(_) => cursor.could_not_match()
+    };
+    
+    cursor.field(field!("object_type"));
+    let global_obj_kind = match cursor.kind() {
+        kw!("module") => {
+            GlobalObjectKind::Module
+        }
+        kw!("function") => {
+            GlobalObjectKind::Function
+        }
+        kw!("struct") => {
+            GlobalObjectKind::Struct
+        }
+        _other => cursor.could_not_match()
+    };
+    
+    let mut ctx = InitializationContext {
         ports: FlatAlloc::new(),
         interfaces: FlatAlloc::new(),
         domains: FlatAlloc::new(),
         template_inputs: FlatAlloc::new(),
+        fields: FlatAlloc::new(),
         file_text: &builder.file_data.file_text,
     };
 
-    let (name_span, name) = ctx.gather_initial_module(cursor);
+    let (name_span, name) = ctx.gather_initial_global_object(cursor);
 
     let resolved_globals = ResolvedGlobals::empty();
     let errors = parsing_errors.into_storage();
     let after_initial_parse_cp =
         CheckPoint::checkpoint(&errors, &resolved_globals);
 
-    let is_extern = match extern_kw {
-        None => IsExtern::Normal,
-        Some(kw!("extern")) => IsExtern::Extern,
-        Some(kw!("__builtin__")) => IsExtern::Builtin,
-        Some(_) => cursor.could_not_match()
+    let link_info = LinkInfo {
+        documentation: cursor.extract_gathered_comments(),
+        file: builder.file_id,
+        name,
+        name_span,
+        span,
+        errors,
+        is_extern,
+        resolved_globals,
+        template_arguments: ctx.template_inputs,
+        after_initial_parse_cp,
+        after_flatten_cp: None,
     };
 
-    let md = Module {
-        link_info: LinkInfo {
-            documentation: cursor.extract_gathered_comments(),
-            file: builder.file_id,
-            name,
-            name_span,
-            span,
-            errors,
-            is_extern,
-            resolved_globals,
-            template_arguments: ctx.template_inputs,
-            after_initial_parse_cp,
-            after_flatten_cp: None,
-        },
-        instructions: FlatAlloc::new(),
-        ports: ctx.ports,
-        domain_names: ctx.domains,
-        domains: FlatAlloc::new(),
-        interfaces: ctx.interfaces,
-        instantiations: InstantiationList::new(),
-    };
+    match global_obj_kind {
+        GlobalObjectKind::Module | GlobalObjectKind::Function => {
+            let md = Module {
+                link_info,
+                instructions: FlatAlloc::new(),
+                ports: ctx.ports,
+                domain_names: ctx.domains,
+                domains: FlatAlloc::new(),
+                interfaces: ctx.interfaces,
+                instantiations: InstantiationList::new(),
+            };
 
-    builder.add_module(md);
+            builder.add_module(md);
+        }
+        GlobalObjectKind::Struct => {
+            let typ = StructType {
+                link_info,
+                fields: ctx.fields
+            };
+
+            builder.add_type(typ);
+        }
+    }
 }

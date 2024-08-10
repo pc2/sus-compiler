@@ -4,3 +4,20 @@ extern module TestExtern {
 
 	output int in_b'5
 }
+
+struct Matrix<T> {
+	input gen int WIDTH
+	input gen int HEIGHT
+
+	T[WIDTH][HEIGHT] data
+}
+
+struct float {}
+
+module ModUsingFloat {
+	input float beep
+
+	output float boop
+
+	boop = beep
+}

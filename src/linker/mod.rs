@@ -21,6 +21,8 @@ use crate::{
 
 use crate::errors::{CompileError, ErrorInfo, ErrorLevel, ErrorStore};
 
+use crate::flattening::StructType;
+
 use crate::typing::{
     abstract_type::{DomainType, FullType},
     concrete_type::ConcreteType,
@@ -151,6 +153,7 @@ impl NamedConstant {
 #[derive(Debug)]
 pub enum NamedType {
     Builtin(&'static str),
+    Struct(StructType)
 }
 
 impl Linkable for NamedConstant {
@@ -174,21 +177,37 @@ impl Linkable for NamedConstant {
 }
 
 impl Linkable for NamedType {
-    fn get_name(&self) -> &'static str {
+    fn get_name(&self) -> &str {
         match self {
             NamedType::Builtin(name) => name,
+            NamedType::Struct(s) => &s.link_info.name
         }
     }
     fn get_linking_error_location(&self) -> LinkingErrorLocation {
-        LinkingErrorLocation {
-            named_type: "Builtin Type",
-            full_name: self.get_full_name(),
-            location: None,
+        
+        match self {
+            NamedType::Builtin(_) => {
+                LinkingErrorLocation {
+                    named_type: "Builtin Type",
+                    full_name: self.get_full_name(),
+                    location: None,
+                }
+            }
+            NamedType::Struct(typ) => {
+                LinkingErrorLocation {
+                    named_type: "Struct",
+                    full_name: typ.link_info.get_full_name(),
+                    location: Some((typ.link_info.name_span, typ.link_info.file)),
+                }
+            }
         }
     }
     fn get_link_info(&self) -> Option<&LinkInfo> {
         match self {
             NamedType::Builtin(_) => None,
+            NamedType::Struct(typ) => {
+                Some(&typ.link_info)
+            }
         }
     }
 }
@@ -500,5 +519,12 @@ impl<'linker> FileBuilder<'linker> {
         let new_module_uuid = NameElem::Module(self.modules.alloc(md));
         self.associated_values.push(new_module_uuid);
         self.add_name(module_name, new_module_uuid);
+    }
+
+    pub fn add_type(&mut self, typ: StructType) {
+        let type_name = typ.link_info.name.clone();
+        let new_type_uuid = NameElem::Type(self.types.alloc(NamedType::Struct(typ)));
+        self.associated_values.push(new_type_uuid);
+        self.add_name(type_name, new_type_uuid);
     }
 }

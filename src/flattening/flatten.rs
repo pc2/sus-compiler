@@ -1580,11 +1580,17 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                 // Skip because we know this from initialization. 
                 cursor.field(field!("object_type"));
                 
-                let Some(NameElem::Module(module_uuid)) = associated_value_iter.next() else {
-                    unreachable!()
-                };
-                
-                flatten(linker_ptr, *module_uuid, cursor);
+                match associated_value_iter.next().expect("Iterator cannot be exhausted") {
+                    NameElem::Module(module_uuid) => {
+                        flatten(linker_ptr, *module_uuid, cursor);
+                    }
+                    NameElem::Type(type_uuid) => {
+                        println!("TODO Type flattening")
+                    }
+                    NameElem::Constant(const_uuid) => {
+                        println!("TODO Constant flattening")
+                    }
+                }
             });
         });
         span_debugger.defuse();

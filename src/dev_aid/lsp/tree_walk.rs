@@ -441,7 +441,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                     self.walk_module(md_id);
                 }
                 NameElem::Type(_) => {
-                    todo!()
+                    println!("TODO: tree_walk::walk_file of NameElem::Type")
                 }
                 NameElem::Constant(_) => {
                     todo!()

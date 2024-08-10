@@ -54,3 +54,12 @@ lsp = ["lsp-server", "lsp-types", "serde_json", "serde"]
 
 [profile.release]
 debug = true
+
+[profile.smol]
+debug = false
+strip = true
+opt-level = 'z'
+codegen-units = 1
+lto = true
+panic = 'abort'
+inherits = "release"
