@@ -79,7 +79,7 @@ impl<'linker> From<LocationInfo<'linker>> for RefersTo {
             LocationInfo::Type(_, _) => {}
             LocationInfo::TemplateInput(obj, _link_info, template_id, template_arg) => {
                 match &template_arg.kind {
-                    TemplateInputKind::Type(TypeTemplateInputKind { default_value: _ }) => {}
+                    TemplateInputKind::Type(TypeTemplateInputKind {}) => {}
                     TemplateInputKind::Generative(GenerativeTemplateInputKind {
                         decl_span: _,
                         declaration_instruction,
@@ -362,7 +362,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
             );
 
             for (template_id, template_arg) in &md.link_info.template_arguments {
-                if let TemplateInputKind::Type(TypeTemplateInputKind { default_value }) =
+                if let TemplateInputKind::Type(TypeTemplateInputKind {}) =
                     &template_arg.kind
                 {
                     self.visit(
@@ -374,10 +374,6 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                             template_arg,
                         ),
                     );
-
-                    if let Some(default_val) = default_value {
-                        self.walk_type(NameElem::Module(md_id), &md.link_info, default_val)
-                    }
                 }
             }
 

@@ -1,9 +1,8 @@
 use crate::{alloc::UUIDRangeIter, prelude::*};
 
-use std::{
-    ops::{Deref, DerefMut},
-    str::FromStr,
-};
+use std::
+    str::FromStr
+;
 
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
@@ -20,7 +19,6 @@ use super::*;
 
 use crate::typing::template::{
     GenerativeTemplateInputKind, TemplateArg, TemplateArgKind, TemplateArgs, TemplateInputKind,
-    TypeTemplateInputKind,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,7 +59,7 @@ impl PartialWireReference {
         match self {
             PartialWireReference::Error => None, // Error already reported
             PartialWireReference::ModuleButNoPort(submod_decl, span) => {
-                let md_uuid = ctx.working_on.instructions[submod_decl]
+                let md_uuid = ctx.modules.working_on.instructions[submod_decl]
                     .unwrap_submodule()
                     .module_ref
                     .id;
@@ -92,7 +90,7 @@ impl PartialWireReference {
                 interface,
                 interface_name_span,
             } => {
-                let md_uuid = ctx.working_on.instructions[submod_decl]
+                let md_uuid = ctx.modules.working_on.instructions[submod_decl]
                     .unwrap_submodule()
                     .module_ref
                     .id;
@@ -217,19 +215,6 @@ struct FlatteningContext<'l, 'errs> {
     local_variable_context: LocalVariableContext<'l, NamedLocal>,
 }
 
-impl<'l, 'errs> Deref for FlatteningContext<'l, 'errs> {
-    type Target = WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.modules
-    }
-}
-impl<'l, 'errs> DerefMut for FlatteningContext<'l, 'errs> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.modules
-    }
-}
-
 impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     fn flatten_template_inputs(&mut self, cursor: &mut Cursor) {
         if cursor.optional_field(field!("template_declaration_arguments")) {
@@ -237,21 +222,10 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 cursor.go_down(kind!("template_declaration_type"), |cursor| {
                     // Already covered in initialization
                     cursor.field(field!("name"));
-                    let default_type = cursor
-                        .optional_field(field!("default_value"))
-                        .then(|| self.flatten_type(cursor));
 
                     let claimed_type_id = self.template_inputs_to_visit.next().unwrap();
 
-                    let selected_arg =
-                        &mut self.working_on.link_info.template_arguments[claimed_type_id];
-                    let TemplateInputKind::Type(TypeTemplateInputKind { default_value }) =
-                        &mut selected_arg.kind
-                    else {
-                        unreachable!()
-                    };
-
-                    *default_value = default_type;
+                    let selected_arg = &self.modules.working_on.link_info.template_arguments[claimed_type_id];
 
                     let name_span = selected_arg.name_span;
 
@@ -523,7 +497,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                                 "This is not a {accepted_text}, it is a local variable instead!"
                             ),
                         )
-                        .info_obj_same_file(&self.working_on.instructions[instr]);
+                        .info_obj_same_file(&self.modules.working_on.instructions[instr]);
 
                     ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
                 }
@@ -585,17 +559,17 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             match conflict {
                 NamedLocal::Declaration(decl_id) => {
                     err_ref.info_obj_same_file(
-                        self.working_on.instructions[decl_id].unwrap_wire_declaration(),
+                        self.modules.working_on.instructions[decl_id].unwrap_wire_declaration(),
                     );
                 }
                 NamedLocal::SubModule(submod_id) => {
                     err_ref.info_obj_same_file(
-                        self.working_on.instructions[submod_id].unwrap_submodule(),
+                        self.modules.working_on.instructions[submod_id].unwrap_submodule(),
                     );
                 }
                 NamedLocal::TemplateType(template_id) => {
                     err_ref.info_obj_same_file(
-                        &self.working_on.link_info.template_arguments[template_id],
+                        &self.modules.working_on.link_info.template_arguments[template_id],
                     );
                 }
             }
@@ -718,7 +692,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     }
                     let name = &self.name_resolver.file_text[name_span];
 
-                    let submod_id = self.working_on.instructions.alloc(Instruction::SubModule(SubModuleInstance{
+                    let submod_id = self.modules.working_on.instructions.alloc(Instruction::SubModule(SubModuleInstance{
                         name : Some((name.to_owned(), name_span)),
                         module_ref,
                         declaration_runtime_depth : DECL_DEPTH_LATER,
@@ -734,7 +708,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
             let name = &self.name_resolver.file_text[name_span];
 
-            let decl_id = self.working_on.instructions.alloc(Instruction::Declaration(Declaration{
+            let decl_id = self.modules.working_on.instructions.alloc(Instruction::Declaration(Declaration{
                 typ_expr,
                 typ : FullType::new_unset(),
                 read_only,
@@ -751,20 +725,6 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
             self.alloc_local_name(name_span, NamedLocal::Declaration(decl_id));
 
-            match is_port {
-                DeclarationPortInfo::NotPort => {},
-                DeclarationPortInfo::RegularPort { is_input:_, port_id } => {
-                    let port = &mut self.working_on.ports[port_id];
-                    assert_eq!(port.name_span, name_span);
-                    port.declaration_instruction = decl_id;
-                }
-                DeclarationPortInfo::GenerativeInput(this_template_id) => {
-                    let TemplateInputKind::Generative(GenerativeTemplateInputKind { decl_span:_, declaration_instruction }) = &mut self.working_on.link_info.template_arguments[this_template_id].kind else {unreachable!()};
-
-                    *declaration_instruction = decl_id;
-                }
-            }
-
             decl_id
         })
     }
@@ -777,7 +737,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 
     fn alloc_error(&mut self, span: Span) -> FlatID {
-        self.working_on
+        self.modules.working_on
             .instructions
             .alloc(Instruction::Wire(WireInstance {
                 typ: FullType::new_unset(),
@@ -812,7 +772,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             if arg_count != expected_arg_count {
                 if arg_count > expected_arg_count {
                     // Too many args, complain about excess args at the end
-                    let excess_args_span = Span::new_overarching(self.working_on.instructions[arguments[expected_arg_count]].unwrap_wire().span, self.working_on.instructions[*arguments.last().unwrap()].unwrap_wire().span);
+                    let excess_args_span = Span::new_overarching(self.modules.working_on.instructions[arguments[expected_arg_count]].unwrap_wire().span, self.modules.working_on.instructions[*arguments.last().unwrap()].unwrap_wire().span);
 
                     self.errors
                         .error(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."))
@@ -831,7 +791,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
             }
 
-            Some(self.working_on.instructions.alloc(Instruction::FuncCall(FuncCallInstruction{
+            Some(self.modules.working_on.instructions.alloc(Instruction::FuncCall(FuncCallInstruction{
                 interface_reference,
                 arguments,
                 func_call_inputs,
@@ -843,7 +803,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 
     fn get_main_interface(&self, submodule_decl: FlatID) -> Option<(InterfaceID, &Interface)> {
-        let sm = self.working_on.instructions[submodule_decl].unwrap_submodule();
+        let sm = self.modules.working_on.instructions[submodule_decl].unwrap_submodule();
 
         let md = &self.modules[sm.module_ref.id];
 
@@ -860,7 +820,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 let documentation = cursor.extract_gathered_comments();
                 let interface_span = module_ref.span;
                 let submodule_decl =
-                    self.working_on
+                    self.modules.working_on
                         .instructions
                         .alloc(Instruction::SubModule(SubModuleInstance {
                             name: None,
@@ -910,7 +870,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         interface_reference: &ModuleInterfaceReference,
     ) -> (&Module, &Interface) {
         let submodule =
-            self.working_on.instructions[interface_reference.submodule_decl].unwrap_submodule();
+            self.modules.working_on.instructions[interface_reference.submodule_decl].unwrap_submodule();
         let md = &self.modules[submodule.module_ref.id];
         let interface = &md.interfaces[interface_reference.submodule_interface];
         (md, interface)
@@ -947,7 +907,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             })
         } else if kind == kind!("func_call") {
             if let Some(fc_id) = self.flatten_func_call(cursor) {
-                let fc = self.working_on.instructions[fc_id].unwrap_func_call();
+                let fc = self.modules.working_on.instructions[fc_id].unwrap_func_call();
                 let (md, interface) = self.get_interface_reference(&fc.interface_reference);
                 if interface.func_call_outputs.len() != 1 {
                     self.errors
@@ -988,8 +948,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             span: expr_span,
             source,
         };
-        self.working_on
-            .instructions
+        self.modules.working_on.instructions
             .alloc(Instruction::Wire(wire_instance))
     }
 
@@ -1013,7 +972,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                             span,
                             format!(
                                 "Expected a value, but instead found template type '{}'",
-                                self.working_on.link_info.template_arguments[template_id].name
+                                self.modules.working_on.link_info.template_arguments[template_id].name
                             ),
                         );
                         PartialWireReference::Error
@@ -1097,7 +1056,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         PartialWireReference::Error
                     }
                     PartialWireReference::ModuleButNoPort(submodule_decl, submodule_name_span) => {
-                        let submodule = self.working_on.instructions[submodule_decl].unwrap_submodule();
+                        let submodule = self.modules.working_on.instructions[submodule_decl].unwrap_submodule();
 
                         let submod = &self.modules[submodule.module_ref.id];
 
@@ -1164,6 +1123,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             let condition = self.flatten_expr(cursor);
 
             let if_id = self
+                .modules
                 .working_on
                 .instructions
                 .alloc(Instruction::IfStatement(IfStatement {
@@ -1172,12 +1132,12 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     then_end_else_start: FlatID::PLACEHOLDER,
                     else_end: FlatID::PLACEHOLDER,
                 }));
-            let then_start = self.working_on.instructions.get_next_alloc_id();
+            let then_start = self.modules.working_on.instructions.get_next_alloc_id();
 
             cursor.field(field!("then_block"));
             self.flatten_code(cursor);
 
-            let then_end_else_start = self.working_on.instructions.get_next_alloc_id();
+            let then_end_else_start = self.modules.working_on.instructions.get_next_alloc_id();
             if cursor.optional_field(field!("else_block")) {
                 if cursor.kind() == kind!("if_statement") {
                     self.flatten_if_statement(cursor); // Chained if statements
@@ -1185,9 +1145,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     self.flatten_code(cursor)
                 }
             };
-            let else_end = self.working_on.instructions.get_next_alloc_id();
+            let else_end = self.modules.working_on.instructions.get_next_alloc_id();
 
-            let Instruction::IfStatement(if_stmt) = &mut self.working_on.instructions[if_id] else {
+            let Instruction::IfStatement(if_stmt) = &mut self.modules.working_on.instructions[if_id] else {
                 unreachable!()
             };
             if_stmt.then_start = then_start;
@@ -1203,7 +1163,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     ) {
         let func_call_span = cursor.span();
         let to_iter = if let Some(fc_id) = self.flatten_func_call(cursor) {
-            let fc = self.working_on.instructions[fc_id].unwrap_func_call();
+            let fc = self.modules.working_on.instructions[fc_id].unwrap_func_call();
 
             let (md, interface) = self.get_interface_reference(&fc.interface_reference);
             let outputs = interface.func_call_outputs;
@@ -1231,7 +1191,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             for port in outputs {
                 if let Some((Some((to, write_modifiers)), to_span)) = to_iter.next() {
                     let from =
-                        self.working_on
+                        self.modules.working_on
                             .instructions
                             .alloc(Instruction::Wire(WireInstance {
                                 typ: FullType::new_unset(),
@@ -1244,7 +1204,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                                     submodule_decl,
                                 })),
                             }));
-                    self.working_on
+                    self.modules.working_on
                         .instructions
                         .alloc(Instruction::Write(Write {
                             from,
@@ -1261,6 +1221,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         for leftover_to in to_iter {
             if let (Some((to, write_modifiers)), to_span) = leftover_to {
                 let err_id = self
+                    .modules
                     .working_on
                     .instructions
                     .alloc(Instruction::Wire(WireInstance {
@@ -1268,7 +1229,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         span: func_call_span,
                         source: WireSource::new_error(),
                     }));
-                self.working_on
+                self.modules.working_on
                     .instructions
                     .alloc(Instruction::Write(Write {
                         from: err_id,
@@ -1311,7 +1272,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                             self.errors.error(span, format!("Non-function assignments must output exactly 1 output instead of {}", to.len()));
                         }
                         if let Some((Some((to, write_modifiers)), to_span)) = to.into_iter().next() {
-                            self.working_on.instructions.alloc(Instruction::Write(Write{from: read_side, to, to_span, write_modifiers}));
+                            self.modules.working_on.instructions.alloc(Instruction::Write(Write{from: read_side, to, to_span, write_modifiers}));
                         }
                     }
                 });
@@ -1331,17 +1292,17 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     cursor.field(field!("to"));
                     let end = self.flatten_expr(cursor);
 
-                    let for_id = self.working_on.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: FlatIDRange::PLACEHOLDER}));
+                    let for_id = self.modules.working_on.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: FlatIDRange::PLACEHOLDER}));
 
-                    let code_start = self.working_on.instructions.get_next_alloc_id();
+                    let code_start = self.modules.working_on.instructions.get_next_alloc_id();
 
                     cursor.field(field!("block"));
                     // We already started a new local_variable_context to include the loop var
                     self.flatten_code_keep_context(cursor);
 
-                    let code_end = self.working_on.instructions.get_next_alloc_id();
+                    let code_end = self.modules.working_on.instructions.get_next_alloc_id();
 
-                    let Instruction::ForStatement(for_stmt) = &mut self.working_on.instructions[for_id] else {unreachable!()};
+                    let Instruction::ForStatement(for_stmt) = &mut self.modules.working_on.instructions[for_id] else {unreachable!()};
 
                     for_stmt.loop_body = FlatIDRange::new(code_start, code_end);
 
@@ -1423,7 +1384,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                             cursor,
                         );
                         let flat_root_decl =
-                            self.working_on.instructions[root].unwrap_wire_declaration();
+                            self.modules.working_on.instructions[root].unwrap_wire_declaration();
                         Some((
                             WireReference {
                                 root: WireReferenceRoot::LocalDecl(root, flat_root_decl.name_span),
@@ -1503,6 +1464,11 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 
     fn flatten_module(&mut self, cursor: &mut Cursor) {
+        // Skip because we covered it in initialization. 
+        let _ = cursor.optional_field(field!("extern_marker"));
+        // Skip because we know this from initialization. 
+        cursor.field(field!("object_type"));
+        
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
         self.flatten_template_inputs(cursor);
         let module_name = &self.name_resolver.file_text[name_span];
@@ -1555,6 +1521,26 @@ pub fn flatten<'cursor_linker, 'errs>(
 
             context.flatten_module(cursor);
 
+            // Set all declaration_instruction values
+            for (decl_id, instr) in &context.modules.working_on.instructions {
+                if let Instruction::Declaration(decl) = instr {
+                    match decl.is_port {
+                        DeclarationPortInfo::NotPort => {},
+                        DeclarationPortInfo::RegularPort { is_input:_, port_id } => {
+                            let port = &mut context.modules.working_on.ports[port_id];
+                            assert_eq!(port.name_span, decl.name_span);
+                            port.declaration_instruction = decl_id;
+                        }
+                        DeclarationPortInfo::GenerativeInput(this_template_id) => {
+                            let TemplateInputKind::Generative(GenerativeTemplateInputKind { decl_span:_, declaration_instruction }) = 
+                                &mut context.modules.working_on.link_info.template_arguments[this_template_id].kind else {unreachable!()};
+        
+                            *declaration_instruction = decl_id;
+                        }
+                    }
+                }
+            }
+
             // Make sure all ports have been visited
             assert!(context.ports_to_visit.is_empty());
             assert!(context.template_inputs_to_visit.is_empty());
@@ -1575,11 +1561,6 @@ pub fn flatten_all_modules(linker: &mut Linker) {
 
         cursor.list(kind!("source_file"), |cursor| {
             cursor.go_down(kind!("global_object"), |cursor| {
-                // Skip because we covered it in initialization. 
-                let _ = cursor.optional_field(field!("extern_marker"));
-                // Skip because we know this from initialization. 
-                cursor.field(field!("object_type"));
-                
                 match associated_value_iter.next().expect("Iterator cannot be exhausted") {
                     NameElem::Module(module_uuid) => {
                         flatten(linker_ptr, *module_uuid, cursor);

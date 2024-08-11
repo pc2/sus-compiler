@@ -21,14 +21,12 @@ pub struct TemplateInput {
 #[derive(Debug)]
 pub struct GenerativeTemplateInputKind {
     pub decl_span: Span,
+    /// Set at the end of Flattening
     pub declaration_instruction: FlatID,
 }
 
 #[derive(Debug)]
-/// TODO this isn't quite right, because WrittenType requires access to the instructions, and ostensibly types get executed beforehand. Look into it
-pub struct TypeTemplateInputKind {
-    pub default_value: Option<WrittenType>,
-}
+pub struct TypeTemplateInputKind {}
 
 #[derive(Debug)]
 pub enum TemplateInputKind {

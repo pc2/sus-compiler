@@ -179,16 +179,8 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
         }
         LocationInfo::TemplateInput(in_obj, link_info, _template_id, template_arg) => {
             match &template_arg.kind {
-                TemplateInputKind::Type(TypeTemplateInputKind { default_value }) => {
-                    if let Some(default_typ) = default_value {
-                        hover.monospace(format!(
-                            "type param '{}' = {}",
-                            template_arg.name,
-                            default_typ.to_string(&linker.types, &link_info.template_arguments)
-                        ));
-                    } else {
-                        hover.monospace(format!("type param '{}'", template_arg.name));
-                    }
+                TemplateInputKind::Type(TypeTemplateInputKind {  }) => {
+                    hover.monospace(format!("type param '{}'", template_arg.name));
                 }
                 TemplateInputKind::Generative(GenerativeTemplateInputKind {
                     decl_span: _,

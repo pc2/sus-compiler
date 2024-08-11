@@ -41,9 +41,7 @@ impl<'linker> InitializationContext<'linker> {
                     self.template_inputs.alloc(TemplateInput {
                         name,
                         name_span,
-                        kind: TemplateInputKind::Type(TypeTemplateInputKind {
-                            default_value: None,
-                        }), // UNSET, gets overwritten in Flattening
+                        kind: TemplateInputKind::Type(TypeTemplateInputKind {}),
                     });
                 });
             });

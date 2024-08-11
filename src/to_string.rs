@@ -183,7 +183,7 @@ impl Module {
         let mut temporary_gen_input_builder = String::new();
         for (_id, t) in &self.link_info.template_arguments {
             match &t.kind {
-                TemplateInputKind::Type(TypeTemplateInputKind { default_value: _ }) => {
+                TemplateInputKind::Type(TypeTemplateInputKind {  }) => {
                     type_args.push(&t.name)
                 }
                 TemplateInputKind::Generative(GenerativeTemplateInputKind {
