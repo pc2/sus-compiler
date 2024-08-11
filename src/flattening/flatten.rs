@@ -1,3 +1,4 @@
+use crate::alloc::{ArenaAllocator, UUIDRange};
 use crate::{alloc::UUIDRangeIter, prelude::*};
 
 use std::
@@ -8,8 +9,7 @@ use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 
 use crate::linker::{
-    with_module_editing_context, NameElem, NameResolver, NamedConstant, NamedType, Resolver,
-    WorkingOnResolver,
+    make_resolvers, FileData, NameElem, NameResolver, NamedConstant, NamedType, Resolver
 };
 use crate::{debug::SpanDebugger, value::Value};
 
@@ -59,7 +59,7 @@ impl PartialWireReference {
         match self {
             PartialWireReference::Error => None, // Error already reported
             PartialWireReference::ModuleButNoPort(submod_decl, span) => {
-                let md_uuid = ctx.modules.working_on.instructions[submod_decl]
+                let md_uuid = ctx.instructions[submod_decl]
                     .unwrap_submodule()
                     .module_ref
                     .id;
@@ -90,7 +90,7 @@ impl PartialWireReference {
                 interface,
                 interface_name_span,
             } => {
-                let md_uuid = ctx.modules.working_on.instructions[submod_decl]
+                let md_uuid = ctx.instructions[submod_decl]
                     .unwrap_submodule()
                     .module_ref
                     .id;
@@ -201,13 +201,16 @@ enum DeclarationContext {
 }
 
 struct FlatteningContext<'l, 'errs> {
-    modules: WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>,
+    modules: Resolver<'l, 'errs, ModuleUUIDMarker, Module>,
     #[allow(dead_code)]
     types: Resolver<'l, 'errs, TypeUUIDMarker, NamedType>,
     #[allow(dead_code)]
     constants: Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
     name_resolver: NameResolver<'l, 'errs>,
     errors: &'errs ErrorCollector<'l>,
+
+    working_on_link_info: &'l LinkInfo,
+    instructions: FlatAlloc<Instruction, FlatIDMarker>,
 
     ports_to_visit: UUIDRangeIter<PortIDMarker>,
     template_inputs_to_visit: UUIDRangeIter<TemplateIDMarker>,
@@ -225,7 +228,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
                     let claimed_type_id = self.template_inputs_to_visit.next().unwrap();
 
-                    let selected_arg = &self.modules.working_on.link_info.template_arguments[claimed_type_id];
+                    let selected_arg = &self.working_on_link_info.template_arguments[claimed_type_id];
 
                     let name_span = selected_arg.name_span;
 
@@ -497,7 +500,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                                 "This is not a {accepted_text}, it is a local variable instead!"
                             ),
                         )
-                        .info_obj_same_file(&self.modules.working_on.instructions[instr]);
+                        .info_obj_same_file(&self.instructions[instr]);
 
                     ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
                 }
@@ -559,17 +562,17 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             match conflict {
                 NamedLocal::Declaration(decl_id) => {
                     err_ref.info_obj_same_file(
-                        self.modules.working_on.instructions[decl_id].unwrap_wire_declaration(),
+                        self.instructions[decl_id].unwrap_wire_declaration(),
                     );
                 }
                 NamedLocal::SubModule(submod_id) => {
                     err_ref.info_obj_same_file(
-                        self.modules.working_on.instructions[submod_id].unwrap_submodule(),
+                        self.instructions[submod_id].unwrap_submodule(),
                     );
                 }
                 NamedLocal::TemplateType(template_id) => {
                     err_ref.info_obj_same_file(
-                        &self.modules.working_on.link_info.template_arguments[template_id],
+                        &self.working_on_link_info.template_arguments[template_id],
                     );
                 }
             }
@@ -692,7 +695,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     }
                     let name = &self.name_resolver.file_text[name_span];
 
-                    let submod_id = self.modules.working_on.instructions.alloc(Instruction::SubModule(SubModuleInstance{
+                    let submod_id = self.instructions.alloc(Instruction::SubModule(SubModuleInstance{
                         name : Some((name.to_owned(), name_span)),
                         module_ref,
                         declaration_runtime_depth : DECL_DEPTH_LATER,
@@ -708,7 +711,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
             let name = &self.name_resolver.file_text[name_span];
 
-            let decl_id = self.modules.working_on.instructions.alloc(Instruction::Declaration(Declaration{
+            let decl_id = self.instructions.alloc(Instruction::Declaration(Declaration{
                 typ_expr,
                 typ : FullType::new_unset(),
                 read_only,
@@ -737,13 +740,11 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 
     fn alloc_error(&mut self, span: Span) -> FlatID {
-        self.modules.working_on
-            .instructions
-            .alloc(Instruction::Wire(WireInstance {
-                typ: FullType::new_unset(),
-                span,
-                source: WireSource::new_error(),
-            }))
+        self.instructions.alloc(Instruction::Wire(WireInstance {
+            typ: FullType::new_unset(),
+            span,
+            source: WireSource::new_error(),
+        }))
     }
 
     /// Returns the ID of the [FuncCallInstruction]
@@ -772,7 +773,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             if arg_count != expected_arg_count {
                 if arg_count > expected_arg_count {
                     // Too many args, complain about excess args at the end
-                    let excess_args_span = Span::new_overarching(self.modules.working_on.instructions[arguments[expected_arg_count]].unwrap_wire().span, self.modules.working_on.instructions[*arguments.last().unwrap()].unwrap_wire().span);
+                    let excess_args_span = Span::new_overarching(self.instructions[arguments[expected_arg_count]].unwrap_wire().span, self.instructions[*arguments.last().unwrap()].unwrap_wire().span);
 
                     self.errors
                         .error(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."))
@@ -791,7 +792,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
             }
 
-            Some(self.modules.working_on.instructions.alloc(Instruction::FuncCall(FuncCallInstruction{
+            Some(self.instructions.alloc(Instruction::FuncCall(FuncCallInstruction{
                 interface_reference,
                 arguments,
                 func_call_inputs,
@@ -803,7 +804,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 
     fn get_main_interface(&self, submodule_decl: FlatID) -> Option<(InterfaceID, &Interface)> {
-        let sm = self.modules.working_on.instructions[submodule_decl].unwrap_submodule();
+        let sm = self.instructions[submodule_decl].unwrap_submodule();
 
         let md = &self.modules[sm.module_ref.id];
 
@@ -820,15 +821,13 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 let documentation = cursor.extract_gathered_comments();
                 let interface_span = module_ref.span;
                 let submodule_decl =
-                    self.modules.working_on
-                        .instructions
-                        .alloc(Instruction::SubModule(SubModuleInstance {
-                            name: None,
-                            module_ref,
-                            declaration_runtime_depth: DECL_DEPTH_LATER,
-                            local_interface_domains: FlatAlloc::new(),
-                            documentation,
-                        }));
+                    self.instructions.alloc(Instruction::SubModule(SubModuleInstance {
+                        name: None,
+                        module_ref,
+                        declaration_runtime_depth: DECL_DEPTH_LATER,
+                        local_interface_domains: FlatAlloc::new(),
+                        documentation,
+                    }));
                 Some(ModuleInterfaceReference {
                     submodule_decl,
                     submodule_interface: self.get_main_interface(submodule_decl)?.0,
@@ -870,7 +869,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         interface_reference: &ModuleInterfaceReference,
     ) -> (&Module, &Interface) {
         let submodule =
-            self.modules.working_on.instructions[interface_reference.submodule_decl].unwrap_submodule();
+            self.instructions[interface_reference.submodule_decl].unwrap_submodule();
         let md = &self.modules[submodule.module_ref.id];
         let interface = &md.interfaces[interface_reference.submodule_interface];
         (md, interface)
@@ -907,7 +906,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             })
         } else if kind == kind!("func_call") {
             if let Some(fc_id) = self.flatten_func_call(cursor) {
-                let fc = self.modules.working_on.instructions[fc_id].unwrap_func_call();
+                let fc = self.instructions[fc_id].unwrap_func_call();
                 let (md, interface) = self.get_interface_reference(&fc.interface_reference);
                 if interface.func_call_outputs.len() != 1 {
                     self.errors
@@ -948,7 +947,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             span: expr_span,
             source,
         };
-        self.modules.working_on.instructions
+        self.instructions
             .alloc(Instruction::Wire(wire_instance))
     }
 
@@ -972,7 +971,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                             span,
                             format!(
                                 "Expected a value, but instead found template type '{}'",
-                                self.modules.working_on.link_info.template_arguments[template_id].name
+                                self.working_on_link_info.template_arguments[template_id].name
                             ),
                         );
                         PartialWireReference::Error
@@ -1056,7 +1055,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         PartialWireReference::Error
                     }
                     PartialWireReference::ModuleButNoPort(submodule_decl, submodule_name_span) => {
-                        let submodule = self.modules.working_on.instructions[submodule_decl].unwrap_submodule();
+                        let submodule = self.instructions[submodule_decl].unwrap_submodule();
 
                         let submod = &self.modules[submodule.module_ref.id];
 
@@ -1122,22 +1121,18 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             cursor.field(field!("condition"));
             let condition = self.flatten_expr(cursor);
 
-            let if_id = self
-                .modules
-                .working_on
-                .instructions
-                .alloc(Instruction::IfStatement(IfStatement {
-                    condition,
-                    then_start: FlatID::PLACEHOLDER,
-                    then_end_else_start: FlatID::PLACEHOLDER,
-                    else_end: FlatID::PLACEHOLDER,
-                }));
-            let then_start = self.modules.working_on.instructions.get_next_alloc_id();
+            let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement {
+                condition,
+                then_start: FlatID::PLACEHOLDER,
+                then_end_else_start: FlatID::PLACEHOLDER,
+                else_end: FlatID::PLACEHOLDER,
+            }));
+            let then_start = self.instructions.get_next_alloc_id();
 
             cursor.field(field!("then_block"));
             self.flatten_code(cursor);
 
-            let then_end_else_start = self.modules.working_on.instructions.get_next_alloc_id();
+            let then_end_else_start = self.instructions.get_next_alloc_id();
             if cursor.optional_field(field!("else_block")) {
                 if cursor.kind() == kind!("if_statement") {
                     self.flatten_if_statement(cursor); // Chained if statements
@@ -1145,9 +1140,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     self.flatten_code(cursor)
                 }
             };
-            let else_end = self.modules.working_on.instructions.get_next_alloc_id();
+            let else_end = self.instructions.get_next_alloc_id();
 
-            let Instruction::IfStatement(if_stmt) = &mut self.modules.working_on.instructions[if_id] else {
+            let Instruction::IfStatement(if_stmt) = &mut self.instructions[if_id] else {
                 unreachable!()
             };
             if_stmt.then_start = then_start;
@@ -1163,7 +1158,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     ) {
         let func_call_span = cursor.span();
         let to_iter = if let Some(fc_id) = self.flatten_func_call(cursor) {
-            let fc = self.modules.working_on.instructions[fc_id].unwrap_func_call();
+            let fc = self.instructions[fc_id].unwrap_func_call();
 
             let (md, interface) = self.get_interface_reference(&fc.interface_reference);
             let outputs = interface.func_call_outputs;
@@ -1191,27 +1186,23 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             for port in outputs {
                 if let Some((Some((to, write_modifiers)), to_span)) = to_iter.next() {
                     let from =
-                        self.modules.working_on
-                            .instructions
-                            .alloc(Instruction::Wire(WireInstance {
-                                typ: FullType::new_unset(),
-                                span: func_call_span,
-                                source: WireSource::WireRef(WireReference::simple_port(PortInfo {
-                                    port,
-                                    port_name_span: None,
-                                    is_input: false,
-                                    submodule_name_span,
-                                    submodule_decl,
-                                })),
-                            }));
-                    self.modules.working_on
-                        .instructions
-                        .alloc(Instruction::Write(Write {
-                            from,
-                            to,
-                            to_span,
-                            write_modifiers,
+                        self.instructions.alloc(Instruction::Wire(WireInstance {
+                            typ: FullType::new_unset(),
+                            span: func_call_span,
+                            source: WireSource::WireRef(WireReference::simple_port(PortInfo {
+                                port,
+                                port_name_span: None,
+                                is_input: false,
+                                submodule_name_span,
+                                submodule_decl,
+                            })),
                         }));
+                    self.instructions.alloc(Instruction::Write(Write {
+                        from,
+                        to,
+                        to_span,
+                        write_modifiers,
+                    }));
                 }
             }
             to_iter
@@ -1220,23 +1211,17 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         };
         for leftover_to in to_iter {
             if let (Some((to, write_modifiers)), to_span) = leftover_to {
-                let err_id = self
-                    .modules
-                    .working_on
-                    .instructions
-                    .alloc(Instruction::Wire(WireInstance {
-                        typ: FullType::new_unset(),
-                        span: func_call_span,
-                        source: WireSource::new_error(),
-                    }));
-                self.modules.working_on
-                    .instructions
-                    .alloc(Instruction::Write(Write {
-                        from: err_id,
-                        to,
-                        to_span,
-                        write_modifiers,
-                    }));
+                let err_id = self.instructions.alloc(Instruction::Wire(WireInstance {
+                    typ: FullType::new_unset(),
+                    span: func_call_span,
+                    source: WireSource::new_error(),
+                }));
+                self.instructions.alloc(Instruction::Write(Write {
+                    from: err_id,
+                    to,
+                    to_span,
+                    write_modifiers,
+                }));
             }
         }
     }
@@ -1272,7 +1257,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                             self.errors.error(span, format!("Non-function assignments must output exactly 1 output instead of {}", to.len()));
                         }
                         if let Some((Some((to, write_modifiers)), to_span)) = to.into_iter().next() {
-                            self.modules.working_on.instructions.alloc(Instruction::Write(Write{from: read_side, to, to_span, write_modifiers}));
+                            self.instructions.alloc(Instruction::Write(Write{from: read_side, to, to_span, write_modifiers}));
                         }
                     }
                 });
@@ -1292,17 +1277,17 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     cursor.field(field!("to"));
                     let end = self.flatten_expr(cursor);
 
-                    let for_id = self.modules.working_on.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: FlatIDRange::PLACEHOLDER}));
+                    let for_id = self.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: FlatIDRange::PLACEHOLDER}));
 
-                    let code_start = self.modules.working_on.instructions.get_next_alloc_id();
+                    let code_start = self.instructions.get_next_alloc_id();
 
                     cursor.field(field!("block"));
                     // We already started a new local_variable_context to include the loop var
                     self.flatten_code_keep_context(cursor);
 
-                    let code_end = self.modules.working_on.instructions.get_next_alloc_id();
+                    let code_end = self.instructions.get_next_alloc_id();
 
-                    let Instruction::ForStatement(for_stmt) = &mut self.modules.working_on.instructions[for_id] else {unreachable!()};
+                    let Instruction::ForStatement(for_stmt) = &mut self.instructions[for_id] else {unreachable!()};
 
                     for_stmt.loop_body = FlatIDRange::new(code_start, code_end);
 
@@ -1384,7 +1369,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                             cursor,
                         );
                         let flat_root_decl =
-                            self.modules.working_on.instructions[root].unwrap_wire_declaration();
+                            self.instructions[root].unwrap_wire_declaration();
                         Some((
                             WireReference {
                                 root: WireReferenceRoot::LocalDecl(root, flat_root_decl.name_span),
@@ -1463,7 +1448,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         })
     }
 
-    fn flatten_module(&mut self, cursor: &mut Cursor) {
+    fn flatten_global(&mut self, cursor: &mut Cursor) {
         // Skip because we covered it in initialization. 
         let _ = cursor.optional_field(field!("extern_marker"));
         // Skip because we know this from initialization. 
@@ -1483,77 +1468,13 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 }
 
-/// This method flattens all given code into a simple set of assignments, operators and submodules.
-/// It already does basic type checking and assigns a type to every wire.
-/// The Generating Structure of the code is not yet executed.
-/// It is template-preserving
-///
-/// Separate 'md lifetime for the module.
-/// For some reason if it has the same lifetime as the linker ('l),
-/// then the compiler thinks we could store cursor elements in the module, which would be bad?
-/// Don't fully understand this, but separating the lifetimes makes it work.
-pub fn flatten<'cursor_linker, 'errs>(
-    linker: *mut Linker,
-    module_uuid: ModuleUUID,
-    cursor: &mut Cursor,
-) {
-    with_module_editing_context(
-        linker,
-        module_uuid,
-        |modules, types, constants, name_resolver| {
-            println!("Flattening {}", modules.working_on.link_info.name);
-
-            let mut context = FlatteningContext {
-                ports_to_visit: modules.working_on.ports.id_range().into_iter(),
-                template_inputs_to_visit: modules
-                    .working_on
-                    .link_info
-                    .template_arguments
-                    .id_range()
-                    .into_iter(),
-                errors: name_resolver.errors,
-                modules,
-                types,
-                constants,
-                name_resolver,
-                local_variable_context: LocalVariableContext::new_initial(),
-            };
-
-            context.flatten_module(cursor);
-
-            // Set all declaration_instruction values
-            for (decl_id, instr) in &context.modules.working_on.instructions {
-                if let Instruction::Declaration(decl) = instr {
-                    match decl.is_port {
-                        DeclarationPortInfo::NotPort => {},
-                        DeclarationPortInfo::RegularPort { is_input:_, port_id } => {
-                            let port = &mut context.modules.working_on.ports[port_id];
-                            assert_eq!(port.name_span, decl.name_span);
-                            port.declaration_instruction = decl_id;
-                        }
-                        DeclarationPortInfo::GenerativeInput(this_template_id) => {
-                            let TemplateInputKind::Generative(GenerativeTemplateInputKind { decl_span:_, declaration_instruction }) = 
-                                &mut context.modules.working_on.link_info.template_arguments[this_template_id].kind else {unreachable!()};
-        
-                            *declaration_instruction = decl_id;
-                        }
-                    }
-                }
-            }
-
-            // Make sure all ports have been visited
-            assert!(context.ports_to_visit.is_empty());
-            assert!(context.template_inputs_to_visit.is_empty());
-        },
-    );
-}
-
 /// Flattens all modules in the project.
 ///
 /// Requires that first, all modules have been initialized.
 pub fn flatten_all_modules(linker: &mut Linker) {
-    let linker_ptr: *mut Linker = linker;
-    for (_file_id, file) in &linker.files {
+    let linker_files : *const ArenaAllocator<FileData, FileUUIDMarker> = &linker.files;
+    // SAFETy we won't be touching the files anywere. This is just to get the compiler to stop complaining about linker going into the closure. 
+    for (_file_id, file) in unsafe{&*linker_files} {
         let mut span_debugger = SpanDebugger::new("flatten_all_modules", file);
         let mut associated_value_iter = file.associated_values.iter();
 
@@ -1561,15 +1482,76 @@ pub fn flatten_all_modules(linker: &mut Linker) {
 
         cursor.list(kind!("source_file"), |cursor| {
             cursor.go_down(kind!("global_object"), |cursor| {
-                match associated_value_iter.next().expect("Iterator cannot be exhausted") {
+                let file_obj = *associated_value_iter.next().expect("Iterator cannot be exhausted");
+                let (obj_link_info_mut, ports_to_visit) = match file_obj {
                     NameElem::Module(module_uuid) => {
-                        flatten(linker_ptr, *module_uuid, cursor);
+                        let md = &mut linker.modules[module_uuid];
+                        (&mut md.link_info, md.ports.id_range().into_iter())
                     }
                     NameElem::Type(type_uuid) => {
-                        println!("TODO Type flattening")
+                        let NamedType::Struct(typ) = &mut linker.types[type_uuid] else {unreachable!("Must have LinkInfo")};
+                        (&mut typ.link_info, UUIDRange::empty().into_iter())
                     }
                     NameElem::Constant(const_uuid) => {
-                        println!("TODO Constant flattening")
+                        todo!("TODO Constant flattening")
+                    }
+                };
+
+                let errors_globals = obj_link_info_mut.take_errors_globals_for_editing(&linker.files);
+                let template_inputs_to_visit = obj_link_info_mut.template_arguments.id_range().into_iter();
+
+                let (modules, types, constants, name_resolver) = make_resolvers(linker, &file.file_text, &errors_globals);
+
+                let mut context = FlatteningContext {
+                    ports_to_visit,
+                    template_inputs_to_visit,
+                    errors: name_resolver.errors,
+                    working_on_link_info: linker.get_link_info(file_obj).unwrap(),
+                    instructions: FlatAlloc::new(),
+                    modules,
+                    types,
+                    constants,
+                    name_resolver,
+                    local_variable_context: LocalVariableContext::new_initial(),
+                };
+
+                context.flatten_global(cursor);
+    
+                // Make sure all ports have been visited
+                assert!(context.ports_to_visit.is_empty());
+                assert!(context.template_inputs_to_visit.is_empty());
+
+                match file_obj {
+                    NameElem::Module(module_uuid) => {
+                        let instructions = context.instructions;
+                        let md = &mut linker.modules[module_uuid];
+                        md.instructions = instructions;
+                        // Set all declaration_instruction values
+                        for (decl_id, instr) in &md.instructions {
+                            if let Instruction::Declaration(decl) = instr {
+                                match decl.is_port {
+                                    DeclarationPortInfo::NotPort => {},
+                                    DeclarationPortInfo::RegularPort { is_input:_, port_id } => {
+                                        let port = &mut md.ports[port_id];
+                                        assert_eq!(port.name_span, decl.name_span);
+                                        port.declaration_instruction = decl_id;
+                                    }
+                                    DeclarationPortInfo::GenerativeInput(this_template_id) => {
+                                        let TemplateInputKind::Generative(GenerativeTemplateInputKind { decl_span:_, declaration_instruction }) = 
+                                            &mut md.link_info.template_arguments[this_template_id].kind else {unreachable!()};
+                    
+                                        *declaration_instruction = decl_id;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    NameElem::Type(type_uuid) => {
+                        let NamedType::Struct(typ) = &mut linker.types[type_uuid] else {unreachable!("Must have LinkInfo")};
+                        println!("TODO Struct Flattening")
+                    }
+                    NameElem::Constant(const_uuid) => {
+                        todo!("TODO Constant flattening")
                     }
                 }
             });

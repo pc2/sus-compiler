@@ -55,9 +55,6 @@ impl<IndexMarker> UUID<IndexMarker> {
 
 pub struct UUIDRange<IndexMarker>(pub UUID<IndexMarker>, pub UUID<IndexMarker>);
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UUIDRangeIter<IndexMarker>(UUID<IndexMarker>, UUID<IndexMarker>);
-
 impl<IndexMarker> UUIDRange<IndexMarker> {
     pub const PLACEHOLDER: UUIDRange<IndexMarker> = UUIDRange(UUID::PLACEHOLDER, UUID::PLACEHOLDER);
 
@@ -130,6 +127,9 @@ impl<IndexMarker> IntoIterator for UUIDRange<IndexMarker> {
         UUIDRangeIter(self.0, self.1)
     }
 }
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct UUIDRangeIter<IndexMarker>(UUID<IndexMarker>, UUID<IndexMarker>);
 
 impl<IndexMarker> Iterator for UUIDRangeIter<IndexMarker> {
     type Item = UUID<IndexMarker>;

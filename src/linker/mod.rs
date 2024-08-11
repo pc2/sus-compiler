@@ -296,8 +296,29 @@ impl Linker {
     pub fn get_link_info(&self, global: NameElem) -> Option<&LinkInfo> {
         match global {
             NameElem::Module(md_id) => Some(&self.modules[md_id].link_info),
-            NameElem::Type(_) => {
-                None // Can't define types yet
+            NameElem::Type(typ_id) => {
+                match &self.types[typ_id] {
+                    NamedType::Builtin(_) => None,
+                    NamedType::Struct(st) => Some(&st.link_info),
+                }
+            }
+            NameElem::Constant(_) => {
+                None // Can't define constants yet
+            }
+        }
+    }
+    pub fn get_link_info_mut<'l>(
+        modules: &'l mut ArenaAllocator<Module, ModuleUUIDMarker>,
+        types: &'l mut ArenaAllocator<NamedType, TypeUUIDMarker>,
+        global: NameElem
+    ) -> Option<&'l mut LinkInfo> {
+        match global {
+            NameElem::Module(md_id) => Some(&mut modules[md_id].link_info),
+            NameElem::Type(typ_id) => {
+                match &mut types[typ_id] {
+                    NamedType::Builtin(_) => None,
+                    NamedType::Struct(st) => Some(&mut st.link_info),
+                }
             }
             NameElem::Constant(_) => {
                 None // Can't define constants yet

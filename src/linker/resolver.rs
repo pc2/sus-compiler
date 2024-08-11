@@ -179,11 +179,7 @@ pub fn with_module_editing_context<
     let file: &FileData = &linker.files[md.link_info.file];
 
     // Extract errors and resolved_globals for easier editing
-    let errors_a = md
-        .link_info
-        .errors
-        .take_for_editing(md.link_info.file, &linker.files);
-    let resolved_globals_a = RefCell::new(md.link_info.resolved_globals.take());
+    let (errors_a, resolved_globals_a) = md.link_info.take_errors_globals_for_editing(&linker.files);
 
     let errors = &errors_a;
     let resolved_globals = &resolved_globals_a;
@@ -211,14 +207,53 @@ pub fn with_module_editing_context<
         },
     );
 
-    // Store errors and resolved_globals back into module
-    assert!(md.link_info.resolved_globals.is_untouched());
-    assert!(md.link_info.errors.is_untouched());
-    md.link_info.resolved_globals = resolved_globals_a.into_inner();
+    md.link_info.reabsorb_errors_globals((errors_a, resolved_globals_a));
+}
 
-    md.link_info.errors = errors_a.into_storage();
-    md.link_info.after_flatten_cp = Some(CheckPoint::checkpoint(
-        &md.link_info.errors,
-        &md.link_info.resolved_globals,
-    ));
+pub fn make_resolvers<'linker, 'errors>(linker: &'linker Linker, file_text: &'linker FileText, (errors, resolved_globals): &'errors (ErrorCollector<'linker>, RefCell<ResolvedGlobals>)) -> (
+    Resolver<'linker, 'errors, ModuleUUIDMarker, Module>,
+    Resolver<'linker, 'errors, TypeUUIDMarker, NamedType>,
+    Resolver<'linker, 'errors, ConstantUUIDMarker, NamedConstant>,
+    NameResolver<'linker, 'errors>
+) {
+    (Resolver {
+        arr: &linker.modules,
+        resolved_globals,
+    },
+    Resolver {
+        arr: &linker.types,
+        resolved_globals,
+    },
+    Resolver {
+        arr: &linker.constants,
+        resolved_globals,
+    },
+    NameResolver {
+        file_text,
+        linker: linker as *const Linker,
+        errors,
+        resolved_globals,
+    })
+}
+
+impl LinkInfo {
+    pub fn take_errors_globals_for_editing<'linker>(&mut self, files: &'linker ArenaAllocator<FileData, FileUUIDMarker>) -> (ErrorCollector<'linker>, RefCell<ResolvedGlobals>) {
+        let errors = self.errors.take_for_editing(self.file, files);
+        let resolved_globals = RefCell::new(self.resolved_globals.take());
+
+        (errors, resolved_globals)
+    }
+
+    pub fn reabsorb_errors_globals(&mut self, (errors, resolved_globals): (ErrorCollector, RefCell<ResolvedGlobals>)) {
+        // Store errors and resolved_globals back into module
+        assert!(self.resolved_globals.is_untouched());
+        assert!(self.errors.is_untouched());
+        self.resolved_globals = resolved_globals.into_inner();
+
+        self.errors = errors.into_storage();
+        self.after_flatten_cp = Some(CheckPoint::checkpoint(
+            &self.errors,
+            &self.resolved_globals,
+        ));
+    }
 }
