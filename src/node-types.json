@@ -1105,20 +1105,6 @@
     "type": "template_declaration_type",
     "named": true,
     "fields": {
-      "default_value": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "array_type",
-            "named": true
-          },
-          {
-            "type": "template_global",
-            "named": true
-          }
-        ]
-      },
       "name": {
         "multiple": false,
         "required": true,
