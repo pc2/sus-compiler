@@ -142,6 +142,9 @@ pub struct StructType {
     ///
     /// [StructField::declaration_instruction] are set in Stage 2: Flattening
     fields: FlatAlloc<StructField, FieldIDMarker>,
+
+    /// Created in Stage 2: Flattening. type data is filled out during Typechecking
+    pub instructions: FlatAlloc<Instruction, FlatIDMarker>,
 }
 
 #[derive(Debug)]
@@ -430,6 +433,7 @@ const DECL_DEPTH_LATER: usize = usize::MAX;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeclarationPortInfo {
     NotPort,
+    StructField { field_id : FieldID },
     RegularPort { is_input: bool, port_id: PortID },
     GenerativeInput(TemplateID),
 }
@@ -449,6 +453,7 @@ impl DeclarationPortInfo {
     pub fn implies_read_only(&self) -> bool {
         match self {
             DeclarationPortInfo::NotPort => false,
+            DeclarationPortInfo::StructField { field_id:_ } => false,
             DeclarationPortInfo::RegularPort {
                 is_input,
                 port_id: _,

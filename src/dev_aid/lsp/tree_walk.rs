@@ -59,6 +59,7 @@ impl<'linker> From<LocationInfo<'linker>> for RefersTo {
                     let decl = md.instructions[flat_id].unwrap_wire_declaration();
                     match decl.is_port {
                         DeclarationPortInfo::NotPort => {}
+                        DeclarationPortInfo::StructField { field_id:_ } => {}
                         DeclarationPortInfo::RegularPort {
                             is_input: _,
                             port_id,

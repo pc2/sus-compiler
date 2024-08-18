@@ -101,7 +101,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     is_input,
                     port_id: _,
                 } => details_vec.push(if is_input { "input" } else { "output" }),
-                DeclarationPortInfo::NotPort => {}
+                DeclarationPortInfo::NotPort | DeclarationPortInfo::StructField { field_id:_ } => {}
                 DeclarationPortInfo::GenerativeInput(_) => details_vec.push("input"), // "gen" in "input gen" is covered by decl.identifier_type
             }
 

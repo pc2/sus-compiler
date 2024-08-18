@@ -1,4 +1,4 @@
-use crate::alloc::{ArenaAllocator, UUIDRange};
+use crate::alloc::{ArenaAllocator, UUIDRange, UUID};
 use crate::{alloc::UUIDRangeIter, prelude::*};
 
 use std::
@@ -194,10 +194,10 @@ impl core::fmt::Display for BinaryOperator {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DeclarationContext {
-    Input,
-    Output,
+    IO{is_input : bool},
     ForLoopGenerative,
     PlainWire,
+    StructField
 }
 
 struct FlatteningContext<'l, 'errs> {
@@ -212,10 +212,13 @@ struct FlatteningContext<'l, 'errs> {
     working_on_link_info: &'l LinkInfo,
     instructions: FlatAlloc<Instruction, FlatIDMarker>,
 
+    fields_to_visit: UUIDRangeIter<FieldIDMarker>,
     ports_to_visit: UUIDRangeIter<PortIDMarker>,
     template_inputs_to_visit: UUIDRangeIter<TemplateIDMarker>,
 
     local_variable_context: LocalVariableContext<'l, NamedLocal>,
+
+    default_declaration_context: DeclarationContext
 }
 
 impl<'l, 'errs> FlatteningContext<'l, 'errs> {
@@ -603,11 +606,11 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
             // Still gets overwritten 
             let mut is_port = match declaration_context {
-                DeclarationContext::Input | DeclarationContext::Output => {
+                DeclarationContext::IO{is_input} => {
                     if let Some((_, io_span)) = io_kw {
                         self.errors.error(io_span, "Cannot redeclare 'input' or 'output' on functional syntax IO");
                     }
-                    DeclarationPortInfo::RegularPort { is_input: declaration_context == DeclarationContext::Input, port_id: PortID::PLACEHOLDER }
+                    DeclarationPortInfo::RegularPort { is_input, port_id: PortID::PLACEHOLDER }
                 }
                 DeclarationContext::ForLoopGenerative => {
                     if let Some((_, io_span)) = io_kw {
@@ -621,14 +624,16 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         None => DeclarationPortInfo::NotPort,
                     }
                 }
+                DeclarationContext::StructField => {
+                    if let Some((_, io_span)) = io_kw {
+                        self.errors.error(io_span, "Cannot declare 'input' or 'output' in a struct");
+                    }
+                    DeclarationPortInfo::StructField { field_id: UUID::PLACEHOLDER }
+                }
             };
 
-            if is_port.implies_read_only() {
-                read_only = true;
-            }
-
             let identifier_type = match declaration_context {
-                DeclarationContext::Input | DeclarationContext::Output | DeclarationContext::PlainWire => {
+                DeclarationContext::IO{is_input:_} | DeclarationContext::PlainWire | DeclarationContext::StructField => {
                     match declaration_modifiers {
                         Some((kw!("state"), modifier_span)) => {
                             if is_port.as_regular_port() == Some(true) {
@@ -639,7 +644,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         Some((kw!("gen"), modifier_span)) => {
                             match is_port {
                                 DeclarationPortInfo::NotPort => {}
-                                DeclarationPortInfo::RegularPort { is_input : true, port_id : _ } => {
+                                DeclarationPortInfo::RegularPort { is_input : true, port_id : _ } | DeclarationPortInfo::StructField { field_id:_ }=> {
                                     // AHA! Generative input
                                     is_port = DeclarationPortInfo::GenerativeInput(TemplateID::PLACEHOLDER)
                                 }
@@ -666,6 +671,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
             match &mut is_port {
                 DeclarationPortInfo::NotPort => {}
+                DeclarationPortInfo::StructField { field_id } => {*field_id = self.fields_to_visit.next().unwrap();}
                 DeclarationPortInfo::RegularPort { is_input:_, port_id } => {*port_id = self.ports_to_visit.next().unwrap();}
                 DeclarationPortInfo::GenerativeInput(template_id) => {*template_id = self.template_inputs_to_visit.next().unwrap();}
             }
@@ -710,6 +716,10 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             };
 
             let name = &self.name_resolver.file_text[name_span];
+
+            if is_port.implies_read_only() {
+                read_only = true;
+            }
 
             let decl_id = self.instructions.alloc(Instruction::Declaration(Declaration{
                 typ_expr,
@@ -1363,7 +1373,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 (
                     if kind == kind!("declaration") {
                         let root = self.flatten_declaration::<false>(
-                            DeclarationContext::PlainWire,
+                            self.default_declaration_context,
                             false,
                             true,
                             cursor,
@@ -1413,7 +1423,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 let (kind, span) = cursor.kind_span();
 
                 if kind == kind!("declaration") {
-                    let _ = self.flatten_declaration::<true>(DeclarationContext::PlainWire, false, true, cursor);
+                    let _ = self.flatten_declaration::<true>(self.default_declaration_context, false, true, cursor);
                 } else { // It's _expression
                     if kind == kind!("func_call") {
                         self.flatten_assign_function_call(Vec::new(), cursor);
@@ -1440,10 +1450,10 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     fn flatten_interface_ports(&mut self, cursor: &mut Cursor) {
         cursor.go_down(kind!("interface_ports"), |cursor| {
             if cursor.optional_field(field!("inputs")) {
-                self.flatten_declaration_list(DeclarationContext::Input, true, cursor)
+                self.flatten_declaration_list(DeclarationContext::IO{is_input:true}, true, cursor)
             }
             if cursor.optional_field(field!("outputs")) {
-                self.flatten_declaration_list(DeclarationContext::Output, false, cursor)
+                self.flatten_declaration_list(DeclarationContext::IO{is_input:false}, false, cursor)
             }
         })
     }
@@ -1473,7 +1483,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 /// Requires that first, all modules have been initialized.
 pub fn flatten_all_modules(linker: &mut Linker) {
     let linker_files : *const ArenaAllocator<FileData, FileUUIDMarker> = &linker.files;
-    // SAFETy we won't be touching the files anywere. This is just to get the compiler to stop complaining about linker going into the closure. 
+    // SAFETY we won't be touching the files anywere. This is just to get the compiler to stop complaining about linker going into the closure. 
     for (_file_id, file) in unsafe{&*linker_files} {
         let mut span_debugger = SpanDebugger::new("flatten_all_modules", file);
         let mut associated_value_iter = file.associated_values.iter();
@@ -1483,14 +1493,14 @@ pub fn flatten_all_modules(linker: &mut Linker) {
         cursor.list(kind!("source_file"), |cursor| {
             cursor.go_down(kind!("global_object"), |cursor| {
                 let file_obj = *associated_value_iter.next().expect("Iterator cannot be exhausted");
-                let (obj_link_info_mut, ports_to_visit) = match file_obj {
+                let (obj_link_info_mut, ports_to_visit, fields_to_visit, default_declaration_context) = match file_obj {
                     NameElem::Module(module_uuid) => {
                         let md = &mut linker.modules[module_uuid];
-                        (&mut md.link_info, md.ports.id_range().into_iter())
+                        (&mut md.link_info, md.ports.id_range().into_iter(), UUIDRange::empty().into_iter(), DeclarationContext::PlainWire)
                     }
                     NameElem::Type(type_uuid) => {
                         let NamedType::Struct(typ) = &mut linker.types[type_uuid] else {unreachable!("Must have LinkInfo")};
-                        (&mut typ.link_info, UUIDRange::empty().into_iter())
+                        (&mut typ.link_info, UUIDRange::empty().into_iter(), typ.fields.id_range().into_iter(), DeclarationContext::StructField)
                     }
                     NameElem::Constant(const_uuid) => {
                         todo!("TODO Constant flattening")
@@ -1504,6 +1514,8 @@ pub fn flatten_all_modules(linker: &mut Linker) {
 
                 let mut context = FlatteningContext {
                     ports_to_visit,
+                    fields_to_visit,
+                    default_declaration_context,
                     template_inputs_to_visit,
                     errors: name_resolver.errors,
                     working_on_link_info: linker.get_link_info(file_obj).unwrap(),
@@ -1521,13 +1533,13 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                 assert!(context.ports_to_visit.is_empty());
                 assert!(context.template_inputs_to_visit.is_empty());
 
+                let instructions = context.instructions;
+                
                 match file_obj {
                     NameElem::Module(module_uuid) => {
-                        let instructions = context.instructions;
                         let md = &mut linker.modules[module_uuid];
-                        md.instructions = instructions;
                         // Set all declaration_instruction values
-                        for (decl_id, instr) in &md.instructions {
+                        for (decl_id, instr) in &instructions {
                             if let Instruction::Declaration(decl) = instr {
                                 match decl.is_port {
                                     DeclarationPortInfo::NotPort => {},
@@ -1542,13 +1554,36 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                     
                                         *declaration_instruction = decl_id;
                                     }
+                                    DeclarationPortInfo::StructField { field_id:_ } => unreachable!("No Struct fields in Modules")
                                 }
                             }
                         }
+                        md.instructions = instructions;
                     }
                     NameElem::Type(type_uuid) => {
                         let NamedType::Struct(typ) = &mut linker.types[type_uuid] else {unreachable!("Must have LinkInfo")};
-                        println!("TODO Struct Flattening")
+                        
+                        // Set all declaration_instruction values
+                        for (decl_id, instr) in &instructions {
+                            if let Instruction::Declaration(decl) = instr {
+                                match decl.is_port {
+                                    DeclarationPortInfo::NotPort => {assert!(decl.identifier_type == IdentifierType::Generative, "If a variable isn't generative, then it MUST be a struct field")}
+                                    DeclarationPortInfo::StructField { field_id } => {
+                                        let field = &mut typ.fields[field_id];
+                                        assert_eq!(field.name_span, decl.name_span);
+                                        field.declaration_instruction = decl_id;
+                                    }
+                                    DeclarationPortInfo::RegularPort { is_input:_, port_id:_ } => {unreachable!("No ports in structs")}
+                                    DeclarationPortInfo::GenerativeInput(this_template_id) => {
+                                        let TemplateInputKind::Generative(GenerativeTemplateInputKind { decl_span:_, declaration_instruction }) = 
+                                            &mut typ.link_info.template_arguments[this_template_id].kind else {unreachable!()};
+                    
+                                        *declaration_instruction = decl_id;
+                                    }
+                                }
+                            }
+                        }
+                        typ.instructions = instructions;
                     }
                     NameElem::Constant(const_uuid) => {
                         todo!("TODO Constant flattening")

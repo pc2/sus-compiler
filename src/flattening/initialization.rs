@@ -321,7 +321,8 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
         GlobalObjectKind::Struct => {
             let typ = StructType {
                 link_info,
-                fields: ctx.fields
+                fields: ctx.fields,
+                instructions: FlatAlloc::new()
             };
 
             builder.add_type(typ);
