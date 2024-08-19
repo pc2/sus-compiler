@@ -68,9 +68,9 @@ There's a few categories of HDLs as I see it nowadays. I shall visit them in tur
 These languages were originally designed as Hardware *Description* Languages, meant to describe exactly how hand-drawn hardware components function. Later on a "Synthesizeable Subset" was created from these languages to actually create hardware from them. The issue is, these old languages still carry this simulation-first core design. The feature-set that's actually available for synthesis is rather small, and common constructs like pipelining routinely introduce bugs. Even things like what inputs and outputs mean are left vague. 
 
 #### High Level Synthesis: [BlueSpec](https://bluespec.com), [Intel OneAPI](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html), [Xilinx Vitis](https://www.xilinx.com/products/design-tools/vitis.html)
-This approach attempts to generate hardware from an imperative description in an existing software language, usually C++. They rely on control flow analysis and a clever compiler to turn this description into hardware that actually performs the operation. The core issue with these is an over-reliance on such compiler smarts. This usually means fiddling with compiler directives until the compiler actually outputs the hardware you originally had in mind. In some cases, it may not even be possible to express the hardware you intend because the compiler designers didn't provide it. The final nail is that optimization on such generated hardware is nigh-impossible. The powerful synthesis tools like Intel Quartus and Vivado with their timing analyzers are unuseable. The tradeoff is inefficient use of resources and lower clock speeds.
+This approach attempts to generate hardware from an imperative description in an existing software language, usually C++. They rely on control flow analysis and a clever compiler to turn this description into hardware that actually performs the operation. The core issue with these is an over-reliance on such compiler smarts. This usually means fiddling with compiler directives until the compiler actually outputs the hardware you originally had in mind. In some cases, it may not even be possible to express the hardware you intend because the compiler designers didn't provide it. This means ptimization on such generated hardware is often impossible. The powerful synthesis tools like Intel Quartus and Vivado with their timing analyzers are unuseable. The tradeoff is inefficient use of resources and lower clock speeds.
 
-One final thing that must be said about the corporate HLS flows, is that the promise of 'portability' is absolute bogus. These systems are simply more attempts to build walled gardens around their respective platforms. This is evident from Intel's deprecation of the more open OpenCL frontend they used to have, in favor of their platform-locked Intel OneAPI. (Which, funnily enough, is just a thin wrapper around the old OpenCL codebase). If I sound salty, it is because I am. 
+A final thing that must be said about the corporate HLS flows, is that the promise of 'portability' is absolute bogus. These systems are simply more attempts to build walled gardens around their respective platforms. This is evident from Intel's deprecation of the more open OpenCL frontend they used to have, in favor of their platform-locked Intel OneAPI. (Which, funnily enough, is just a thin wrapper around the old OpenCL codebase). If I sound salty, it is because I am. 
 
 #### Embedded Languages such as [Chisel](https://www.chisel-lang.org/) and [SpinalHDL](https://github.com/SpinalHDL/SpinalHDL):
 If one is being pedantic, they actually shouldn't actually be called "languages" per se, but rather hardware construction libraries within an existing software language; usually Scala. There is a solid argument to be made for this style though. Why invent a new meta-language for the generation of hardware when there's widely-used software languages already out there? My main arguments against this approach are written below, but they can be summed up as the language designers having made the tradeoff of reducing development time on the compiler sacrificing the useability of the final product. 
@@ -181,8 +181,9 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Intrinsic Modules
 - [x] Can Parse FIFO implementation
 - [ ] Clock Domain Crossings
-- [ ] Rhythm Syntax
+- ~~[ ] Rhythm Syntax~~
 - [ ] Interface Generator Syntax
+- [ ] Standard Library Bundled with compiler
 
 ### Performance, Linking and Name Resolution
 - [ ] Namespaces
@@ -233,6 +234,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Renaming
 - [x] Basic code completion
 - [ ] Port code completion
+- [ ] Struct field code completion
 - [ ] Per-Line Resource Utilization Reporting
 
 ### Code Generation
@@ -248,6 +250,8 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [ ] Dedekind Kernel Port
 - [ ] Sparse Matrix Multiply
 - [ ] RISC-V CPU
+- [ ] Enigma Machine
+- [ ] Enigma Code Breaking
 
 ### Safety through Interface Asserts (PDL-style asserts)
 - [ ] btor2?

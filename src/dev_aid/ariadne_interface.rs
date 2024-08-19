@@ -1,5 +1,6 @@
 use std::{ops::Range, path::PathBuf};
 
+use crate::compiler_top::LinkerExtraFileInfoManager;
 use crate::linker::FileData;
 use crate::prelude::*;
 
@@ -39,11 +40,41 @@ impl Cache<()> for NamedSource<'_> {
     }
 }
 
+pub struct FileSourcesManager {
+    pub file_sources: ArenaVector<Source, FileUUIDMarker>
+}
+
+impl LinkerExtraFileInfoManager for FileSourcesManager {
+    fn convert_filename(&self, path : &PathBuf) -> String {
+        path.to_string_lossy().into_owned()
+    }
+
+    fn on_file_added(&mut self, file_id : FileUUID, linker : &Linker) {
+        let source = Source::from(linker.files[file_id].file_text.file_text.clone());
+
+        self.file_sources.insert(file_id, source);
+    }
+
+    fn on_file_updated(&mut self, file_id : FileUUID, linker : &Linker) {
+        let source = Source::from(linker.files[file_id].file_text.file_text.clone());
+        
+        self.file_sources[file_id] = source;
+    }
+
+    fn before_file_remove(&mut self, file_id : FileUUID, _linker : &Linker) {
+        self.file_sources.remove(file_id)
+    }
+}
+
 pub fn compile_all(
     file_paths: Vec<PathBuf>,
-) -> (Linker, ArenaVector<Source, FileUUIDMarker>) {
+) -> (Linker, FileSourcesManager) {
     let mut linker = Linker::new();
-    let mut file_sources: ArenaVector<Source, FileUUIDMarker> = ArenaVector::new();
+    let mut file_source_manager = FileSourcesManager{
+        file_sources: ArenaVector::new()
+    };
+    linker.add_standard_library(&mut file_source_manager);
+
     for file_path in file_paths {
         let file_text = match std::fs::read_to_string(&file_path) {
             Ok(file_text) => file_text,
@@ -53,15 +84,12 @@ pub fn compile_all(
             }
         };
 
-        let source = Source::from(file_text.clone());
-        let uuid = linker.add_file(file_path.to_string_lossy().into_owned(), file_text);
-
-        file_sources.insert(uuid, source);
+        linker.add_file(file_path.to_string_lossy().into_owned(), file_text, &mut file_source_manager);
     }
 
     linker.recompile_all();
 
-    (linker, file_sources)
+    (linker, file_source_manager)
 }
 
 pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(

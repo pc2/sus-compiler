@@ -2,12 +2,12 @@ mod hover_info;
 mod semantic_tokens;
 mod tree_walk;
 
-use crate::prelude::*;
+use crate::{compiler_top::LinkerExtraFileInfoManager, prelude::*};
 
 use hover_info::hover;
 use lsp_types::{notification::*, request::Request, *};
 use semantic_tokens::{make_semantic_tokens, semantic_token_capabilities};
-use std::{collections::HashMap, error::Error, ffi::OsStr, net::SocketAddr};
+use std::{collections::HashMap, error::Error, net::SocketAddr, path::PathBuf};
 
 use crate::{
     config::config,
@@ -75,27 +75,20 @@ fn cvt_location_list_of_lists(
 }
 
 impl Linker {
-    fn find_file(&self, file_identifier: &str) -> Option<FileUUID> {
-        self.files.find(|_uuid, file| file.file_identifier == file_identifier)
-    }
     fn find_uri(&self, uri: &Url) -> Option<FileUUID> {
         self.find_file(uri.as_str())
     }
-    fn update_text(&mut self, uri: &Url, new_file_text: String) {
-        if let Some(found_file_uuid) = self.find_uri(&uri) {
-            self.update_file(new_file_text, found_file_uuid);
-        } else {
-            let _ = self.add_file(uri.to_string(), new_file_text);
-        }
+    fn update_text(&mut self, uri: &Url, new_file_text: String, manager : &mut LSPFileManager) {
+        self.add_or_update_file(uri.as_str(), new_file_text, manager);
 
         self.recompile_all();
     }
-    fn ensure_contains_file(&mut self, uri: &Url) -> FileUUID {
+    fn ensure_contains_file(&mut self, uri: &Url, manager : &mut LSPFileManager) -> FileUUID {
         if let Some(found) = self.find_uri(uri) {
             found
         } else {
             let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
-            let file_uuid = self.add_file(uri.to_string(), file_text);
+            let file_uuid = self.add_file(uri.to_string(), file_text, manager);
             self.recompile_all();
             file_uuid
         }
@@ -103,8 +96,9 @@ impl Linker {
     fn location_in_file(
         &mut self,
         text_pos: &lsp_types::TextDocumentPositionParams,
+        manager : &mut LSPFileManager,
     ) -> (FileUUID, usize) {
-        let file_id = self.ensure_contains_file(&text_pos.text_document.uri);
+        let file_id = self.ensure_contains_file(&text_pos.text_document.uri, manager);
         let file_data = &self.files[file_id];
 
         let position = file_data
@@ -115,7 +109,7 @@ impl Linker {
     }
 }
 
-// Requires that token_positions.len() == tokens.len() + 1 to include EOF token
+/// Requires that token_positions.len() == tokens.len() + 1 to include EOF token
 fn convert_diagnostic(
     err: &CompileError,
     main_file_text: &FileText,
@@ -197,27 +191,29 @@ fn push_all_errors(
     Ok(())
 }
 
-fn initialize_all_files(init_params: &InitializeParams) -> Linker {
+struct LSPFileManager {}
+
+impl LinkerExtraFileInfoManager for LSPFileManager {
+    fn convert_filename(&self, path : &PathBuf) -> String {
+        Url::from_file_path(path).unwrap().into()
+    }
+}
+
+fn initialize_all_files(init_params: &InitializeParams) -> (Linker, LSPFileManager) {
     let mut linker = Linker::new();
+    let mut manager = LSPFileManager{};
+
+    linker.add_standard_library(&mut manager);
 
     if let Some(workspace_folder) = &init_params.workspace_folders {
         for folder in workspace_folder {
-            let Ok(path) = folder.uri.to_file_path() else {
-                continue;
-            };
+            let Ok(path) = folder.uri.to_file_path() else {continue};
 
-            for file in std::fs::read_dir(path).unwrap() {
-                let file_path = file.unwrap().path();
-                if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
-                    let file_text = std::fs::read_to_string(&file_path).unwrap();
-                    let file_identifier : String = Url::from_file_path(&file_path).unwrap().into();
-                    let _ = linker.add_file(file_identifier, file_text);
-                }
-            }
+            linker.add_all_files_in_directory(&path, &mut manager);
         }
     }
     linker.recompile_all();
-    linker
+    (linker, manager)
 }
 
 fn gather_completions(linker: &Linker, file_id: FileUUID, position: usize) -> Vec<CompletionItem> {
@@ -342,6 +338,7 @@ fn handle_request(
     method: &str,
     params: serde_json::Value,
     linker: &mut Linker,
+    manager : &mut LSPFileManager,
 ) -> Result<serde_json::Value, serde_json::Error> {
     match method {
         request::HoverRequest::METHOD => {
@@ -350,7 +347,7 @@ fn handle_request(
             println!("HoverRequest");
 
             let (file_uuid, pos) =
-                linker.location_in_file(&params.text_document_position_params);
+                linker.location_in_file(&params.text_document_position_params, manager);
             let file_data = &linker.files[file_uuid];
             let mut hover_list: Vec<MarkedString> = Vec::new();
 
@@ -377,7 +374,7 @@ fn handle_request(
             println!("GotoDefinition");
 
             let (file_uuid, pos) =
-                linker.location_in_file(&params.text_document_position_params);
+                linker.location_in_file(&params.text_document_position_params, manager);
 
             let mut goto_definition_list: Vec<SpanFile> = Vec::new();
 
@@ -423,7 +420,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("SemanticTokensFullRequest");
 
-            let uuid = linker.ensure_contains_file(&params.text_document.uri);
+            let uuid = linker.ensure_contains_file(&params.text_document.uri, manager);
 
             serde_json::to_value(SemanticTokensResult::Tokens(make_semantic_tokens(
                 uuid,
@@ -435,7 +432,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("DocumentHighlight");
 
-            let (file_id, pos) = linker.location_in_file(&params.text_document_position_params);
+            let (file_id, pos) = linker.location_in_file(&params.text_document_position_params, manager);
             let file_data = &linker.files[file_id];
 
             let ref_locations = gather_all_references_in_one_file(linker, file_id, pos);
@@ -454,7 +451,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("FindAllReferences");
 
-            let (file_id, pos) = linker.location_in_file(&params.text_document_position);
+            let (file_id, pos) = linker.location_in_file(&params.text_document_position, manager);
 
             let ref_locations =
                 gather_all_references_across_all_files(linker, file_id, pos);
@@ -466,7 +463,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("Rename");
 
-            let (file_id, pos) = linker.location_in_file(&params.text_document_position);
+            let (file_id, pos) = linker.location_in_file(&params.text_document_position, manager);
 
             let ref_locations_lists =
                 gather_all_references_across_all_files(linker, file_id, pos);
@@ -501,7 +498,7 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("Completion");
 
-            let (file_uuid, position) = linker.location_in_file(&params.text_document_position);
+            let (file_uuid, position) = linker.location_in_file(&params.text_document_position, manager);
 
             serde_json::to_value(&CompletionResponse::Array(gather_completions(
                 linker,
@@ -520,6 +517,7 @@ fn handle_notification(
     connection: &lsp_server::Connection,
     notification: lsp_server::Notification,
     linker: &mut Linker,
+    manager: &mut LSPFileManager,
     initialize_params: &InitializeParams,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
     match notification.method.as_str() {
@@ -532,13 +530,13 @@ fn handle_notification(
             let only_change = content_change_iter.next().unwrap();
             assert!(content_change_iter.next().is_none());
             assert!(only_change.range.is_none());
-            linker.update_text(&params.text_document.uri, only_change.text);
+            linker.update_text(&params.text_document.uri, only_change.text, manager);
 
             push_all_errors(connection, &linker)?;
         }
         notification::DidChangeWatchedFiles::METHOD => {
             println!("Workspace Files modified");
-            *linker = initialize_all_files(initialize_params);
+            (*linker, *manager) = initialize_all_files(initialize_params);
 
             push_all_errors(&connection, &linker)?;
         }
@@ -558,9 +556,9 @@ fn main_loop(
 
     let initialize_params: InitializeParams = serde_json::from_value(initialize_params).unwrap();
 
-    let mut file_cache = initialize_all_files(&initialize_params);
+    let (mut linker, mut manager) = initialize_all_files(&initialize_params);
 
-    push_all_errors(&connection, &file_cache)?;
+    push_all_errors(&connection, &linker)?;
 
     println!("starting LSP main loop");
     for msg in &connection.receiver {
@@ -571,7 +569,7 @@ fn main_loop(
                     return Ok(());
                 }
 
-                let response_value = handle_request(&req.method, req.params, &mut file_cache);
+                let response_value = handle_request(&req.method, req.params, &mut linker, &mut manager);
 
                 let result = response_value.unwrap();
                 let response = lsp_server::Response {
@@ -590,10 +588,16 @@ fn main_loop(
                 handle_notification(
                     &connection,
                     notification,
-                    &mut file_cache,
+                    &mut linker,
+                    &mut manager,
                     &initialize_params,
                 )?;
             }
+        }
+
+        println!("All loaded files:");
+        for (_id, file) in &linker.files {
+            println!("File: {}", &file.file_identifier);
         }
     }
     Ok(())

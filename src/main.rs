@@ -118,7 +118,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     }
 
     let (linker, mut paths_arena) = compile_all(file_paths);
-    print_all_errors(&linker, &mut paths_arena);
+    print_all_errors(&linker, &mut paths_arena.file_sources);
 
     if config.codegen {
         for (_id, md) in &linker.modules {

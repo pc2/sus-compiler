@@ -6,7 +6,7 @@ use crate::prelude::*;
 
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet}, path::PathBuf,
 };
 
 use tree_sitter::Tree;
@@ -276,6 +276,7 @@ impl Linker {
                 .insert(name.into(), NamespaceElement::Global(new_obj_id));
             assert!(already_exisits.is_none());
         }
+
 
         // Add builtins
         for name in BUILTIN_TYPES {

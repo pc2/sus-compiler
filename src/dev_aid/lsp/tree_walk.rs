@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use crate::flattening::*;
+use crate::linker::NamedType;
 use crate::prelude::*;
 
 use crate::linker::{FileData, LinkInfo, NameElem};
@@ -354,29 +355,33 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
         }
     }
 
+    fn walk_name_and_template_arguments(&mut self, name_elem : NameElem, link_info: &'linker LinkInfo) {
+        self.visit(
+            link_info.name_span,
+            LocationInfo::Global(name_elem),
+        );
+
+        for (template_id, template_arg) in &link_info.template_arguments {
+            if let TemplateInputKind::Type(TypeTemplateInputKind {}) =
+                &template_arg.kind
+            {
+                self.visit(
+                    template_arg.name_span,
+                    LocationInfo::TemplateInput(
+                        name_elem,
+                        &link_info,
+                        template_id,
+                        template_arg,
+                    ),
+                );
+            }
+        }
+    }
+
     fn walk_module(&mut self, md_id: ModuleUUID) {
         let md = &self.linker.modules[md_id];
         if !(self.should_prune)(md.link_info.span) {
-            self.visit(
-                md.link_info.name_span,
-                LocationInfo::Global(NameElem::Module(md_id)),
-            );
-
-            for (template_id, template_arg) in &md.link_info.template_arguments {
-                if let TemplateInputKind::Type(TypeTemplateInputKind {}) =
-                    &template_arg.kind
-                {
-                    self.visit(
-                        template_arg.name_span,
-                        LocationInfo::TemplateInput(
-                            NameElem::Module(md_id),
-                            &md.link_info,
-                            template_id,
-                            template_arg,
-                        ),
-                    );
-                }
-            }
+            self.walk_name_and_template_arguments(NameElem::Module(md_id), &md.link_info);
 
             for (interface_id, interface) in &md.interfaces {
                 self.visit(
@@ -431,14 +436,23 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
         }
     }
 
+    fn walk_struct(&mut self, typ_id: TypeUUID) {
+        let NamedType::Struct(typ) = &self.linker.types[typ_id] else {unreachable!("TODO remove Builtin Type")};
+        if !(self.should_prune)(typ.link_info.span) {
+            self.walk_name_and_template_arguments(NameElem::Type(typ_id), &typ.link_info);
+
+            println!("TODO struct instructions")
+        }
+    }
+
     fn walk_file(&mut self, file: &'linker FileData) {
         for global in &file.associated_values {
             match *global {
                 NameElem::Module(md_id) => {
                     self.walk_module(md_id);
                 }
-                NameElem::Type(_) => {
-                    println!("TODO: tree_walk::walk_file of NameElem::Type")
+                NameElem::Type(typ_id) => {
+                    self.walk_struct(typ_id);
                 }
                 NameElem::Constant(_) => {
                     todo!()
