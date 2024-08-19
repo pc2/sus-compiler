@@ -1,9 +1,10 @@
+use crate::flattening::StructType;
 use crate::prelude::*;
 
 use std::ops::{Deref, Index};
 
 use super::abstract_type::AbstractType;
-use crate::linker::{get_builtin_type, NamedType};
+use crate::linker::get_builtin_type;
 use crate::{
     flattening::{BinaryOperator, UnaryOperator},
     value::Value,
@@ -129,7 +130,7 @@ impl ConcreteType {
             _ => false,
         }
     }
-    pub fn check_type<TypVec: Index<TypeUUID, Output = NamedType>>(
+    pub fn check_type<TypVec: Index<TypeUUID, Output = StructType>>(
         &self,
         source_type: &ConcreteType,
         span: Span,
@@ -148,7 +149,7 @@ impl ConcreteType {
         }
     }
 
-    pub fn check_or_update_type<TypVec: Index<TypeUUID, Output = NamedType>>(
+    pub fn check_or_update_type<TypVec: Index<TypeUUID, Output = StructType>>(
         &mut self,
         source_type: &ConcreteType,
         span: Span,
@@ -162,7 +163,7 @@ impl ConcreteType {
         }
     }
 
-    pub fn typecheck_concrete_unary_operator<TypVec: Index<TypeUUID, Output = NamedType>>(
+    pub fn typecheck_concrete_unary_operator<TypVec: Index<TypeUUID, Output = StructType>>(
         &mut self,
         op: UnaryOperator,
         input_typ: &ConcreteType,
@@ -174,7 +175,7 @@ impl ConcreteType {
 
         self.check_or_update_type(&expected, span, linker_types, errors);
     }
-    pub fn typecheck_concrete_binary_operator<TypVec: Index<TypeUUID, Output = NamedType>>(
+    pub fn typecheck_concrete_binary_operator<TypVec: Index<TypeUUID, Output = StructType>>(
         &mut self,
         op: BinaryOperator,
         left_typ: &ConcreteType,

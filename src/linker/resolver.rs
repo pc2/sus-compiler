@@ -164,7 +164,7 @@ impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
 pub fn with_module_editing_context<
     F: for<'linker, 'errs> FnOnce(
         WorkingOnResolver<'linker, 'errs, ModuleUUIDMarker, Module>,
-        Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>,
+        Resolver<'linker, 'errs, TypeUUIDMarker, StructType>,
         Resolver<'linker, 'errs, ConstantUUIDMarker, NamedConstant>,
         NameResolver<'linker, 'errs>,
     ),
@@ -212,7 +212,7 @@ pub fn with_module_editing_context<
 
 pub fn make_resolvers<'linker, 'errors>(linker: &'linker Linker, file_text: &'linker FileText, (errors, resolved_globals): &'errors (ErrorCollector<'linker>, RefCell<ResolvedGlobals>)) -> (
     Resolver<'linker, 'errors, ModuleUUIDMarker, Module>,
-    Resolver<'linker, 'errors, TypeUUIDMarker, NamedType>,
+    Resolver<'linker, 'errors, TypeUUIDMarker, StructType>,
     Resolver<'linker, 'errors, ConstantUUIDMarker, NamedConstant>,
     NameResolver<'linker, 'errors>
 ) {

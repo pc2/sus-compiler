@@ -6,7 +6,7 @@ use crate::prelude::*;
 
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet}, path::PathBuf,
+    collections::{HashMap, HashSet},
 };
 
 use tree_sitter::Tree;
@@ -36,7 +36,6 @@ const BUILTIN_TYPES: [&'static str; 2] = ["bool", "int"];
 const BUILTIN_CONSTANTS: [(&'static str, Value); 2] =
     [("true", Value::Bool(true)), ("false", Value::Bool(false))];
 
-// Goes together with Links::new
 pub const fn get_builtin_type(name: &'static str) -> TypeUUID {
     if let Some(is_type) = const_str_position(name, &BUILTIN_TYPES) {
         TypeUUID::from_hidden_value(is_type)
@@ -150,12 +149,6 @@ impl NamedConstant {
     }
 }
 
-#[derive(Debug)]
-pub enum NamedType {
-    Builtin(&'static str),
-    Struct(StructType)
-}
-
 impl Linkable for NamedConstant {
     fn get_name(&self) -> &'static str {
         match self {
@@ -176,39 +169,19 @@ impl Linkable for NamedConstant {
     }
 }
 
-impl Linkable for NamedType {
+impl Linkable for StructType {
     fn get_name(&self) -> &str {
-        match self {
-            NamedType::Builtin(name) => name,
-            NamedType::Struct(s) => &s.link_info.name
-        }
+        &self.link_info.name
     }
     fn get_linking_error_location(&self) -> LinkingErrorLocation {
-        
-        match self {
-            NamedType::Builtin(_) => {
-                LinkingErrorLocation {
-                    named_type: "Builtin Type",
-                    full_name: self.get_full_name(),
-                    location: None,
-                }
-            }
-            NamedType::Struct(typ) => {
-                LinkingErrorLocation {
-                    named_type: "Struct",
-                    full_name: typ.link_info.get_full_name(),
-                    location: Some((typ.link_info.name_span, typ.link_info.file)),
-                }
-            }
+        LinkingErrorLocation {
+            named_type: "Struct",
+            full_name: self.link_info.get_full_name(),
+            location: Some((self.link_info.name_span, self.link_info.file)),
         }
     }
     fn get_link_info(&self) -> Option<&LinkInfo> {
-        match self {
-            NamedType::Builtin(_) => None,
-            NamedType::Struct(typ) => {
-                Some(&typ.link_info)
-            }
-        }
+        Some(&self.link_info)
     }
 }
 
@@ -253,7 +226,7 @@ enum NamespaceElement {
 
 // Represents the fully linked set of all files. Incremental operations such as adding and removing files can be performed
 pub struct Linker {
-    pub types: ArenaAllocator<NamedType, TypeUUIDMarker>,
+    pub types: ArenaAllocator<StructType, TypeUUIDMarker>,
     pub modules: ArenaAllocator<Module, ModuleUUIDMarker>,
     pub constants: ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
     pub files: ArenaAllocator<FileData, FileUUIDMarker>,
@@ -277,12 +250,6 @@ impl Linker {
             assert!(already_exisits.is_none());
         }
 
-
-        // Add builtins
-        for name in BUILTIN_TYPES {
-            let id = result.types.alloc(NamedType::Builtin(name));
-            add_known_unique_name(&mut result, name.into(), NameElem::Type(id));
-        }
         for (name, val) in BUILTIN_CONSTANTS {
             let id = result.constants.alloc(NamedConstant::Builtin {
                 name,
@@ -297,12 +264,7 @@ impl Linker {
     pub fn get_link_info(&self, global: NameElem) -> Option<&LinkInfo> {
         match global {
             NameElem::Module(md_id) => Some(&self.modules[md_id].link_info),
-            NameElem::Type(typ_id) => {
-                match &self.types[typ_id] {
-                    NamedType::Builtin(_) => None,
-                    NamedType::Struct(st) => Some(&st.link_info),
-                }
-            }
+            NameElem::Type(typ_id) => Some(&self.types[typ_id].link_info),
             NameElem::Constant(_) => {
                 None // Can't define constants yet
             }
@@ -310,17 +272,12 @@ impl Linker {
     }
     pub fn get_link_info_mut<'l>(
         modules: &'l mut ArenaAllocator<Module, ModuleUUIDMarker>,
-        types: &'l mut ArenaAllocator<NamedType, TypeUUIDMarker>,
+        types: &'l mut ArenaAllocator<StructType, TypeUUIDMarker>,
         global: NameElem
     ) -> Option<&'l mut LinkInfo> {
         match global {
             NameElem::Module(md_id) => Some(&mut modules[md_id].link_info),
-            NameElem::Type(typ_id) => {
-                match &mut types[typ_id] {
-                    NamedType::Builtin(_) => None,
-                    NamedType::Struct(st) => Some(&mut st.link_info),
-                }
-            }
+            NameElem::Type(typ_id) => Some(&mut types[typ_id].link_info),
             NameElem::Constant(_) => {
                 None // Can't define constants yet
             }
@@ -510,7 +467,7 @@ pub struct FileBuilder<'linker> {
     global_namespace: &'linker mut HashMap<String, NamespaceElement>,
     modules: &'linker mut ArenaAllocator<Module, ModuleUUIDMarker>,
     #[allow(dead_code)]
-    types: &'linker mut ArenaAllocator<NamedType, TypeUUIDMarker>,
+    types: &'linker mut ArenaAllocator<StructType, TypeUUIDMarker>,
     #[allow(dead_code)]
     constants: &'linker mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
 }
@@ -545,7 +502,7 @@ impl<'linker> FileBuilder<'linker> {
 
     pub fn add_type(&mut self, typ: StructType) {
         let type_name = typ.link_info.name.clone();
-        let new_type_uuid = NameElem::Type(self.types.alloc(NamedType::Struct(typ)));
+        let new_type_uuid = NameElem::Type(self.types.alloc(typ));
         self.associated_values.push(new_type_uuid);
         self.add_name(type_name, new_type_uuid);
     }

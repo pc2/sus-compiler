@@ -2,8 +2,8 @@ use crate::prelude::*;
 
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
-use crate::flattening::{DomainInfo, Interface, InterfaceToDomainMap, Module, WrittenType};
-use crate::linker::{FileData, LinkInfo, NamedType};
+use crate::flattening::{DomainInfo, Interface, InterfaceToDomainMap, Module, StructType, WrittenType};
+use crate::linker::{FileData, LinkInfo};
 use crate::typing::{
     abstract_type::{AbstractType, DomainType},
     concrete_type::ConcreteType,
@@ -43,7 +43,7 @@ impl TemplateNameGetter for TemplateInputs {
 
 impl WrittenType {
     pub fn to_string<
-        TypVec: Index<TypeUUID, Output = NamedType>,
+        TypVec: Index<TypeUUID, Output = StructType>,
         TemplateVec: TemplateNameGetter,
     >(
         &self,
@@ -63,7 +63,7 @@ impl WrittenType {
 
 impl AbstractType {
     pub fn to_string<
-        TypVec: Index<TypeUUID, Output = NamedType>,
+        TypVec: Index<TypeUUID, Output = StructType>,
         TemplateVec: TemplateNameGetter,
     >(
         &self,
@@ -81,7 +81,7 @@ impl AbstractType {
 }
 
 impl ConcreteType {
-    pub fn to_string<TypVec: Index<TypeUUID, Output = NamedType>>(
+    pub fn to_string<TypVec: Index<TypeUUID, Output = StructType>>(
         &self,
         linker_types: &TypVec,
     ) -> String {

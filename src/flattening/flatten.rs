@@ -9,7 +9,7 @@ use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 
 use crate::linker::{
-    make_resolvers, FileData, NameElem, NameResolver, NamedConstant, NamedType, Resolver
+    make_resolvers, FileData, NameElem, NameResolver, NamedConstant, Resolver
 };
 use crate::{debug::SpanDebugger, value::Value};
 
@@ -203,7 +203,7 @@ enum DeclarationContext {
 struct FlatteningContext<'l, 'errs> {
     modules: Resolver<'l, 'errs, ModuleUUIDMarker, Module>,
     #[allow(dead_code)]
-    types: Resolver<'l, 'errs, TypeUUIDMarker, NamedType>,
+    types: Resolver<'l, 'errs, TypeUUIDMarker, StructType>,
     #[allow(dead_code)]
     constants: Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
     name_resolver: NameResolver<'l, 'errs>,
@@ -1499,7 +1499,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                         (&mut md.link_info, md.ports.id_range().into_iter(), UUIDRange::empty().into_iter(), DeclarationContext::PlainWire)
                     }
                     NameElem::Type(type_uuid) => {
-                        let NamedType::Struct(typ) = &mut linker.types[type_uuid] else {unreachable!("Must have LinkInfo")};
+                        let typ = &mut linker.types[type_uuid];
                         (&mut typ.link_info, UUIDRange::empty().into_iter(), typ.fields.id_range().into_iter(), DeclarationContext::StructField)
                     }
                     NameElem::Constant(const_uuid) => {
@@ -1561,7 +1561,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                         md.instructions = instructions;
                     }
                     NameElem::Type(type_uuid) => {
-                        let NamedType::Struct(typ) = &mut linker.types[type_uuid] else {unreachable!("Must have LinkInfo")};
+                        let typ = &mut linker.types[type_uuid];
                         
                         // Set all declaration_instruction values
                         for (decl_id, instr) in &instructions {

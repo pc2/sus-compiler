@@ -1,7 +1,6 @@
 use std::ops::Deref;
 
 use crate::flattening::*;
-use crate::linker::NamedType;
 use crate::prelude::*;
 
 use crate::linker::{FileData, LinkInfo, NameElem};
@@ -437,7 +436,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
     }
 
     fn walk_struct(&mut self, typ_id: TypeUUID) {
-        let NamedType::Struct(typ) = &self.linker.types[typ_id] else {unreachable!("TODO remove Builtin Type")};
+        let typ = &self.linker.types[typ_id];
         if !(self.should_prune)(typ.link_info.span) {
             self.walk_name_and_template_arguments(NameElem::Type(typ_id), &typ.link_info);
 

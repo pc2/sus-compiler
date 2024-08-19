@@ -3,8 +3,8 @@ use crate::prelude::*;
 use std::{cell::RefCell, ops::Deref};
 
 use super::template::TemplateInputs;
-use crate::flattening::{BinaryOperator, UnaryOperator};
-use crate::linker::{get_builtin_type, NamedType, Resolver};
+use crate::flattening::{BinaryOperator, StructType, UnaryOperator};
+use crate::linker::{get_builtin_type, Resolver};
 use crate::to_string::map_to_type_names;
 
 /// This contains only the information that can be easily type-checked.
@@ -122,7 +122,7 @@ impl BestName {
 ///
 /// 'x U 'y -> 'x = 'y
 pub struct TypeUnifier<'linker, 'errs> {
-    pub linker_types: Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>,
+    pub linker_types: Resolver<'linker, 'errs, TypeUUIDMarker, StructType>,
     template_type_names: FlatAlloc<String, TemplateIDMarker>,
     domain_substitutor: RefCell<FlatAlloc<DomainTypeSubstitution, DomainIDMarker>>,
     errors: &'errs ErrorCollector<'linker>,
@@ -131,7 +131,7 @@ pub struct TypeUnifier<'linker, 'errs> {
 
 impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
     pub fn new(
-        linker_types: Resolver<'linker, 'errs, TypeUUIDMarker, NamedType>,
+        linker_types: Resolver<'linker, 'errs, TypeUUIDMarker, StructType>,
         template_inputs: &TemplateInputs,
         errors: &'errs ErrorCollector<'linker>,
         domain_names: &FlatAlloc<String, DomainIDMarker>,

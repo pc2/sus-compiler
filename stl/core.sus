@@ -19,3 +19,11 @@ __builtin__ module IntToBits {
 __builtin__ module BitsToInt {
     interface IntToBits : bool[32] bits'0 -> int value'0
 }
+
+// For now these two must be in this order, because they're constants in the code. 
+
+__builtin__ struct bool {}
+
+__builtin__ struct int {}
+
+
