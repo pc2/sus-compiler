@@ -39,16 +39,18 @@ Finally, an important consideration of SUS is the user interface. SUS comes with
 
 #### What SUS gives you
 - A direct 1-to-1 mapping from code to netlist
-- Type safety with Bounded Integers[^todo]
-- Clock Domain Crossing safety
+- Hardware domain separation with explicit crossing primitives
 - A built-in syntax for pipelining that does not impose structural constraints
-- Syntactic sugar for common constructs like valid signals, resets and submodule communication
 - In-IDE compilation errors & warnings
 - Metaprogramming for hardware generation
-- Formal Verification Integration[^todo]
+
+##### Planned
+- Type safety with Bounded Integers
+- Multi-Clock modules
+- Formal Verification Integration
+- Syntactic sugar for common constructs like valid signals, resets and submodule communication
 - Moving some[^timing] timing constraints to the source file
 
-[^todo]: Not implemented yet
 [^timing]: Some timing constraints affect the cycle-by-cycle functioning of the design, such as the relative speeds of synchronous clocks and False/Multi-Cycle Path constraints. Because they affect the cycle-wise behaviour of the design, they should be provided as part of the language and incorporated in simulation. Of course, timing constraints like real clock speeds, edge patterns and external component timings still rightfully belong in the Timing Constraints file. It should not be possible to express SUS code that behaves differently between Simulation and Synthesis. 
 
 #### What SUS does not do
@@ -56,7 +58,7 @@ Finally, an important consideration of SUS is the user interface. SUS comes with
 - Runtime Iteration Constructs
 - Automatic Pipelining & Retiming
 
-Of course, while the language does not support such protocols directly in the syntax, as this would put unneccesary extra constraints on the output hardware, modules for handling them are[^todo] provided in the standard library. 
+Of course, while the language does not support such protocols directly in the syntax, as this would put unneccesary extra constraints on the output hardware, modules for handling them will be provided in the standard library. 
 
 #### Example of some SUS code in the SUS VSCode Language Server. 
 ![SUS LSP Example](philosophy/images/susLSPExample.png)
