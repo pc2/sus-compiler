@@ -221,7 +221,7 @@ struct FlatteningContext<'l, 'errs> {
     default_declaration_context: DeclarationContext
 }
 
-impl<'l, 'errs> FlatteningContext<'l, 'errs> {
+impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
     fn flatten_template_inputs(&mut self, cursor: &mut Cursor) {
         if cursor.optional_field(field!("template_declaration_arguments")) {
             cursor.list(kind!("template_declaration_arguments"), |cursor| {
@@ -241,189 +241,111 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         }
     }
 
-    fn flatten_template_args(&mut self, cursor: &mut Cursor) -> Vec<TemplateArg> {
-        cursor.collect_list(kind!("template_params"), |cursor| {
-            let (outer_kind, whole_span) = cursor.kind_span();
-            match outer_kind {
-                kind!("template_type_param") => cursor.go_down_no_check(|cursor| {
-                    let name_specification =
-                        cursor.optional_field_span(field!("name"), kind!("identifier"));
-                    cursor.field(field!("arg"));
-                    let typ = self.flatten_type(cursor);
-                    TemplateArg {
-                        name_specification,
-                        whole_span,
-                        kind: TemplateArgKind::Type(typ),
-                    }
-                }),
-                kind!("template_value_param") => cursor.go_down_no_check(|cursor| {
-                    let name_specification =
-                        cursor.optional_field_span(field!("name"), kind!("identifier"));
-                    cursor.field(field!("arg"));
-                    let expr = self.flatten_expr(cursor);
-                    TemplateArg {
-                        name_specification,
-                        whole_span,
-                        kind: TemplateArgKind::Value(expr),
-                    }
-                }),
-                _ => cursor.could_not_match(),
-            }
-        })
+    fn get_link_info_for(&self, found_global: NameElem) -> &'l LinkInfo {
+        let info : *const LinkInfo = match found_global {
+            NameElem::Module(md_id) => &self.modules[md_id].link_info,
+            NameElem::Type(typ_id) => &self.types[typ_id].link_info,
+            NameElem::Constant(_) => todo!("Constants don't have LinkInfo")
+        };
+        // SAFETY Can safely cast this away, because we can't touch anything in the Linker
+        unsafe{&*info}
     }
 
-    fn collect_template_args(
-        &self,
-        name_elem: NameElem,
-        whole_span: Span,
-        template_argument_list: Vec<TemplateArg>,
-    ) -> TemplateArgs {
-        let target_link_info = match name_elem {
-            NameElem::Module(md_id) => &self.modules[md_id].link_info,
-            NameElem::Constant(_) | NameElem::Type(_) => {
-                if !template_argument_list.is_empty() {
-                    self.errors
-                        .todo(whole_span, "Types and Constants should get LinkInfo");
-                };
-                return FlatAlloc::new();
-            }
-        };
+    fn flatten_template_args(&mut self, found_global: NameElem, has_template_args: bool, cursor: &mut Cursor) -> TemplateArgs {
+        if !has_template_args {return FlatAlloc::new();}
+        
+        let link_info = self.get_link_info_for(found_global);
+        let full_object_name = link_info.get_full_name();
 
-        let mut resulting_template_arguments: TemplateArgs =
-            target_link_info.template_arguments.map(|_| None);
+        let mut template_arg_map : FlatAlloc<Option<TemplateArg>, TemplateIDMarker> = link_info.template_arguments.map(|_| None);
+        
 
-        let mut value_index_iter = target_link_info.template_arguments.iter();
-        let mut type_index_iter = target_link_info.template_arguments.iter();
+        cursor.list(kind!("template_args"), |cursor| {
+            cursor.go_down(kind!("template_arg"), |cursor| {
+                let name_span =
+                    cursor.field_span(field!("name"), kind!("identifier"));
 
-        let mut get_next_type_idx = || -> Option<TemplateID> {
-            while let Some((idx, arg)) = type_index_iter.next() {
-                if let TemplateInputKind::Type(_) = &arg.kind {
-                    return Some(idx);
+                let name = &self.name_resolver.file_text[name_span];
+
+                let name_found = link_info.template_arguments.iter().find(|(_id, arg)| arg.name == name);
+                if name_found.is_none() {
+                    self.errors.error(name_span, format!("{name} is not a valid template argument of {full_object_name}"))
+                        .info_obj(link_info);
                 }
-            }
-            None
-        };
-        let mut get_next_value_idx = || -> Option<TemplateID> {
-            while let Some((idx, arg)) = value_index_iter.next() {
-                if let TemplateInputKind::Generative(_) = &arg.kind {
-                    return Some(idx);
-                }
-            }
-            None
-        };
 
-        // Now that we have all arguments, we construct the map of TemplateID to TemplateArg
-        for given_arg in template_argument_list {
-            let template_idx = if let Some(name_span) = given_arg.name_specification {
-                let target_name = &self.name_resolver.file_text[name_span];
-
-                let Some((named_index, input_on_obj)) = target_link_info
-                    .template_arguments
-                    .iter()
-                    .find(|(_, template_input)| template_input.name == target_name)
-                else {
-                    let info = self.name_resolver.get_linking_error_location(name_elem);
-                    let err_ref = self.errors.error(
-                        name_span,
-                        format!(
-                            "No template argument of name '{target_name}' on '{}'",
-                            info.full_name
-                        ),
-                    );
-                    if let Some(pos) = info.location {
-                        err_ref.info(pos, format!("'{}' declared here", info.full_name));
+                let template_arg = if cursor.optional_field(field!("val_arg")) {
+                    let expr = self.flatten_expr(cursor);
+                    TemplateArgKind::Value(expr)
+                } else if cursor.optional_field(field!("type_arg")) {
+                    let typ = self.flatten_type(cursor);
+                    TemplateArgKind::Type(typ)
+                } else {
+                    match self.local_variable_context.get_declaration_for(name) {
+                        Some(NamedLocal::TemplateType(t)) => TemplateArgKind::Type(WrittenType::Template(name_span, t)),
+                        Some(NamedLocal::Declaration(decl_id)) => {
+                            let wire_read_id = self.instructions.alloc(Instruction::Wire(WireInstance { 
+                                typ: FullType::new_unset(),
+                                span: name_span,
+                                source: WireSource::WireRef(WireReference::simple_var_read(decl_id, name_span)) 
+                            }));
+                            TemplateArgKind::Value(wire_read_id)
+                        }
+                        Some(NamedLocal::SubModule(_sm)) => {
+                            self.errors.error(name_span, format!("{name} does not name a Type or a Value. Local submodules are not allowed!"));
+                            return;
+                        }
+                        None => {
+                            self.errors.error(name_span, format!("{name} does not name a Type or a Value."));
+                            return;
+                        },
                     }
-                    continue;
                 };
-                match (&input_on_obj.kind, &given_arg.kind) {
-                    (TemplateInputKind::Type(_), TemplateArgKind::Type(_))
-                    | (TemplateInputKind::Generative(_), TemplateArgKind::Value(_)) => named_index, // OK
-                    (TemplateInputKind::Type(_), TemplateArgKind::Value(_)) => {
-                        self.errors.error(name_span, format!("'{target_name}' is not a value. Place it behind the template ';'"))
-                            .info((input_on_obj.name_span, target_link_info.file), "Declared here");
-                        continue;
-                    }
-                    (TemplateInputKind::Generative(_), TemplateArgKind::Type(_)) => {
-                        self.errors.error(name_span, format!("'{target_name}' is not a type. Place it before the template ';'"))
-                            .info((input_on_obj.name_span, target_link_info.file), "Declared here");
-                        continue;
+
+                if let Some((id, template_input)) = name_found {
+                    match (&template_input.kind, &template_arg) {
+                        (TemplateInputKind::Type(_), TemplateArgKind::Type(_)) 
+                        | (TemplateInputKind::Generative(_), TemplateArgKind::Value(_)) => {
+                            // Correct pairing
+                            if let Some(prev) = &template_arg_map[id] {
+                                self.errors.error(name_span, format!("'{name}' has already been defined previously"))
+                                    .info_same_file(prev.name_span, "Defined here previously");
+                            } else {
+                                template_arg_map[id] = Some(TemplateArg { name_span, kind: template_arg });
+                            }
+                        }
+                        (TemplateInputKind::Type(_), TemplateArgKind::Value(_)) => {
+                            self.errors.error(name_span, format!("'{name}' is not a value. `type` keyword cannot be used for values"))
+                                .info((template_input.name_span, link_info.file), "Declared here");
+                        }
+                        (TemplateInputKind::Generative(_), TemplateArgKind::Type(_)) => {
+                            self.errors.error(name_span, format!("'{name}' is not a type. To use template type arguments use the `type` keyword like `T: type int[123]`"))
+                                .info((template_input.name_span, link_info.file), "Declared here");
+                        }
                     }
                 }
-            } else {
-                let (index, kind) = match &given_arg.kind {
-                    TemplateArgKind::Type(_) => (get_next_type_idx(), "type"),
-                    TemplateArgKind::Value(_) => (get_next_value_idx(), "generative"),
-                };
-                let Some(index) = index else {
-                    let info = self.name_resolver.get_linking_error_location(name_elem);
-                    let err_ref = self.errors.error(given_arg.whole_span, format!("Too many template arguments! '{}' only requires {} {kind} template arguments", info.full_name, target_link_info.template_arguments.len()));
-                    if let Some(pos) = info.location {
-                        err_ref.info(pos, format!("'{}' declared here", info.full_name));
-                    }
-                    continue;
-                };
-                index
-            };
+            });
+        });
 
-            let arg = &mut resulting_template_arguments[template_idx];
-
-            if let Some(existing_arg) = arg {
-                self.errors
-                    .error(
-                        given_arg.name_specification.unwrap_or(given_arg.whole_span),
-                        "This template variable has already been set",
-                    )
-                    .info_same_file(
-                        existing_arg.whole_span,
-                        format!(
-                            "'{} has already been defined here'",
-                            target_link_info.template_arguments[template_idx].name
-                        ),
-                    );
-            } else {
-                *arg = Some(given_arg);
-            }
-        }
-        resulting_template_arguments
+        template_arg_map
     }
 
     fn flatten_local_or_template_global(&mut self, cursor: &mut Cursor) -> LocalOrGlobal {
-        let total_span = cursor.span();
-
-        let mut must_be_global = false;
         cursor.go_down(kind!("template_global"), |cursor| {
-            must_be_global |= cursor.optional_field(field!("is_global_path"));
+            let mut must_be_global = cursor.optional_field(field!("is_global_path"));
 
-            let mut name_path = vec![cursor.field_span(field!("item"), kind!("identifier"))];
-            let mut template_args: Vec<TemplateArg> = Vec::new();
-            let mut template_args_whole_span: Option<BracketSpan> = None;
-
-            while cursor.optional_field(field!("item")) {
+            let name_path = cursor.collect_list(kind!("namespace_list"), |cursor| {
                 let (kind, span) = cursor.kind_span();
-                if let Some(t_span) = &template_args_whole_span {
-                    self.errors.error(
-                        Span::new_overarching(
-                            t_span.outer_span().empty_span_at_end(),
-                            total_span.empty_span_at_end(),
-                        ),
-                        format!("Namespace must end after template arguments"),
-                    );
-                    break;
-                }
-                match kind {
-                    kind!("identifier") => {
-                        must_be_global = true;
-                        name_path.push(span);
-                    }
-                    kind!("template_params") => {
-                        must_be_global = true;
+                assert!(kind == kind!("identifier"));
+                span
+            });
 
-                        template_args = self.flatten_template_args(cursor);
-                        template_args_whole_span = Some(BracketSpan::from_outer(span));
-                    }
-                    _ => cursor.could_not_match(),
-                }
+            if name_path.len() > 1 {
+                must_be_global = true;
             }
+
+            let template_args_used = cursor.optional_field(field!("template_args"));
+
+            must_be_global |= template_args_used;
 
             // Possibly local
             if !must_be_global {
@@ -438,13 +360,14 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
             // Global identifier
             let [name_span] = name_path.as_slice() else {
-                todo!("Namespaces")
+                self.errors.todo(name_path[1], "Namespaces");
+                return LocalOrGlobal::NotFound(name_path[0]);
             };
-            if let Some((found_global, found_global_span)) =
-                self.name_resolver.resolve_global(*name_span)
-            {
-                let template_arg_map =
-                    self.collect_template_args(found_global, found_global_span, template_args);
+            if let Some((found_global, found_global_span)) = self.name_resolver.resolve_global(*name_span) {
+                // MUST Still be at field!("template_args")
+                let template_args_whole_span = template_args_used.then(|| BracketSpan::from_outer(cursor.span()));
+
+                let template_arg_map = self.flatten_template_args(found_global, template_args_used, cursor);
 
                 LocalOrGlobal::Global(
                     found_global,

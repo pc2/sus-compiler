@@ -1,4 +1,4 @@
-
+/*
 extern module TestExtern {
 	input int in_a'3
 
@@ -20,4 +20,11 @@ module ModUsingFloat {
 	output float boop
 
 	boop = beep
+}
+*/
+
+module testTemplate {
+	f(a < beeep >)
+
+	f(a < beeep >)
 }

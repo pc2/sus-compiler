@@ -290,6 +290,12 @@ impl WireReference {
             path: Vec::new(),
         }
     }
+    fn simple_var_read(id: FlatID, name_span: Span) -> WireReference {
+        WireReference{
+            root: WireReferenceRoot::LocalDecl(id, name_span),
+            path: Vec::new()
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -46,7 +46,7 @@ module BitSerialMatrixMultiplyTemplate {
     
     // 32 right now, because ints are't sized yet. 
     gen int INT_BITWIDTH = 32
-
+    
     BitSerialMatrixMultiplyState::<WIDTH, HEIGHT, MATRIX;> bsm_state
 
     interface BitSerialMatrixMultiplyTemplate : bool start, int[WIDTH] values -> int[HEIGHT] result
