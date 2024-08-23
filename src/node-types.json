@@ -982,6 +982,22 @@
     }
   },
   {
+    "type": "namespace_list",
+    "named": true,
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "parenthesis_expression",
     "named": true,
     "fields": {
@@ -1086,6 +1102,90 @@
     }
   },
   {
+    "type": "template_arg",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "type_arg": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "array_type",
+            "named": true
+          },
+          {
+            "type": "template_global",
+            "named": true
+          }
+        ]
+      },
+      "val_arg": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "array_op",
+            "named": true
+          },
+          {
+            "type": "binary_op",
+            "named": true
+          },
+          {
+            "type": "field_access",
+            "named": true
+          },
+          {
+            "type": "func_call",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "parenthesis_expression",
+            "named": true
+          },
+          {
+            "type": "template_global",
+            "named": true
+          },
+          {
+            "type": "unary_op",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "template_args",
+    "named": true,
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "template_arg",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "template_declaration_arguments",
     "named": true,
     "fields": {
@@ -1131,124 +1231,26 @@
           }
         ]
       },
-      "item": {
-        "multiple": true,
-        "required": true,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          },
-          {
-            "type": "template_params",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
-    "type": "template_params",
-    "named": true,
-    "fields": {
-      "item": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "template_type_param",
-            "named": true
-          },
-          {
-            "type": "template_value_param",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
-    "type": "template_type_param",
-    "named": true,
-    "fields": {
-      "arg": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "array_type",
-            "named": true
-          },
-          {
-            "type": "template_global",
-            "named": true
-          }
-        ]
-      },
-      "name": {
+      "template_args": {
         "multiple": false,
         "required": false,
         "types": [
           {
-            "type": "identifier",
+            "type": "template_args",
             "named": true
           }
         ]
       }
-    }
-  },
-  {
-    "type": "template_value_param",
-    "named": true,
-    "fields": {
-      "arg": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "array_op",
-            "named": true
-          },
-          {
-            "type": "binary_op",
-            "named": true
-          },
-          {
-            "type": "field_access",
-            "named": true
-          },
-          {
-            "type": "func_call",
-            "named": true
-          },
-          {
-            "type": "number",
-            "named": true
-          },
-          {
-            "type": "parenthesis_expression",
-            "named": true
-          },
-          {
-            "type": "template_global",
-            "named": true
-          },
-          {
-            "type": "unary_op",
-            "named": true
-          }
-        ]
-      },
-      "name": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "namespace_list",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -1362,6 +1364,10 @@
     "named": false
   },
   {
+    "type": "#(",
+    "named": false
+  },
+  {
     "type": "%",
     "named": false
   },
@@ -1419,10 +1425,6 @@
   },
   {
     "type": "::",
-    "named": false
-  },
-  {
-    "type": ";",
     "named": false
   },
   {
@@ -1543,6 +1545,10 @@
   },
   {
     "type": "struct",
+    "named": false
+  },
+  {
+    "type": "type",
     "named": false
   },
   {

@@ -33,8 +33,7 @@ const PREC = {
     additive: 6,
     multiplicative: 7,
     unary: 8,
-    postscript_op : 9,
-    namespace_path : 10
+    postscript_op : 9
 }
 
 module.exports = grammar({
@@ -267,37 +266,34 @@ module.exports = grammar({
 
         // Utilities
 
+        namespace_list: $ => sepSeq1($.identifier, '::'),
+
         // myFunc::<int, 2>
-        template_global: $ => prec(PREC.namespace_path, seq(
+        template_global: $ => seq(
             optional(field('is_global_path', '::')),
-            field('item', $.identifier),
-            repeat(seq(
-                '::',
-                field('item', choice($.identifier, $.template_params))
-            ))
-        )),
+            $.namespace_list,
+
+            // Template
+            optional(field('template_args', $.template_args))
+        ),
         
-        template_type_param : $ => seq(
+        template_args: $ => seq(
+            '#(',
+            sepSeq($.template_arg, $._comma),
+            ')'
+        ),
+
+        template_arg : $ => seq(
+            field('name', $.identifier),
             optional(seq(
-                field('name', $.identifier),
-                '='
+                ':',
+                choice(
+                    seq('type', field('type_arg', $._type)),
+                    field('val_arg', $._expression)
+                )
             )),
-            field('arg', $._type)
         ),
-        template_value_param : $ => seq(
-            optional(seq(
-                field('name', $.identifier),
-                '='
-            )),
-            field('arg', $._expression)
-        ),
-        template_params: $ => seq(
-            '<',
-            sepSeq($.template_value_param, $._comma),
-            ';',
-            sepSeq($.template_type_param, $._comma),
-            '>'
-        ),
+
         identifier: $ => /[\p{Alphabetic}_][\p{Alphabetic}_\p{Decimal_Number}]*/,
         number: $ => /\d[\d_]*/,
 
@@ -316,7 +312,6 @@ module.exports = grammar({
 
     conflicts: $ => [
         [$._type, $._expression], // Just because LR(1) is too weak to resolve 'ident[] a' vs 'type_name[]'. Tree sitter resolves this itself with more expensive GLR. NOT a precedence relation. 
-        //[$.binary_op, $.template_params]
     ],
 
     word: $=> $.identifier,

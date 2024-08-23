@@ -1,4 +1,3 @@
 tree-sitter generate &&
-tree-sitter parse ../tinyTestFile.sus &&
+tree-sitter parse ../tinyTestFile.sus
 head -n 16 src/parser.c
-
