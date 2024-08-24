@@ -1,183 +1,4 @@
 
-module multiply {
-    interface multiply : int a, int b -> int r 
-	r = a * b
-}
-
-// test
-module contains_submodule {
-    interface contains_submodule : int a, int b, int c -> int r 
-    int tmp = multiply(a, b)
-	reg r = tmp + c
-}
-
-template<int Size>     
-module ExactlyOne {
-    interface ExactlyOne : bool[Size] inputs -> bool exactlyOne 
-	if Size == 0 {
-		exactlyOne = false
-	} else if Size == 1 {
-	    exactlyOne = inputs[0]
-	} else {
-	    bool[Size] atLeastOnes
-		bool[Size] atLeastTwos
-		atLeastOnes[0] = inputs[0]
-		atLeastTwos[0] = false
-		for i in 1:Size {
-			atLeastOnes[i] = atLeastOnes[i-1] | inputs[i]
-			atLeastTwos[i] = atLeastTwos[i-1] | atLeastOnes[i-1] & inputs[i]
-		}
-		exactlyOne = atLeastOnes & !atLeastTwos
-	}
-}
-
-
-module parallel_mul_add_reg {
-    interface parallel_mul_add_reg : int a, int b -> int p, int q 
-    reg int a2 = a * a
-	reg int a3 = a * a2 + 3
-	reg p = a * a3
-
-	reg int b2 = b + b
-	reg int b3 = b + b2
-	reg q = b + b3
-
-	// UTF-8 Characters support
-	Lööwe 老虎
-
-	
-}
-
-
-/*
-    a
-	b
-	c
-	    tmp
-	    result
-*/
-
-timeline (v v _ -> _) .. (_ _ v -> v)
-module mul_add {
-    interface mul_add : int a, int b, int c -> int result 
-	reg int tmp = a * b
-	result = tmp + c
-}
-
-
-
-
-/* a module to test the syntax */
-module MultiplyAdd {
-    interface MultiplyAdd : i32 a, i32 b, i32 c -> i32 result 
-	// temporary variable
-	i32 tmp = a * b
-	result = tmp + cooo * 30 + 5
-	array_subscript = tmp
-	{
-		//[
-		beep boop
-	}
-	@
-	int[5] myVar
-	myVar[0] = 0
-	myVar[1] = 1
-	myVar[2] = 2
-	myVar[3] = 3
-	myVar[4] = 4
-	@
-}
-
-module beep {
-    interface beep : i32 a 
-	state i32 beep
-
-	beep = 5
-	# 
-	beep = a
-	
-}
-
-timeline (a -> r) .. (/ -> r)
-module dwiogo {
-    interface dwiogo : bool[512] data -> bool[256] out 
-    state bool[256] save = data[256:511]
-	out = data[0:255]
-	#
-	out = save
-}
-
-
-
-timeline (v, true -> v) .. (/, false -> v) .. (/, false -> v) .. (/, false -> v)
-module packer {
-    interface packer : bool[256] data /* v _ _ _ */, bool valid -> bool[64] o  /* v v v v */
-    state bool[192] save = data[64:256]
-	state int part
-	initial part = 3
-	if valid {
-		part = 0
-		o = data[0:64]
-	} else {
-		o = save[part*64 - 64:part*64]
-		if part < 3 {
-			part = part + 1
-		}
-	}
-}
-
-
-module multiply_add_old {
-    interface multiply_add_old : i32 a, i32 b, i32 c -> i32 result, double double_result 
-	i32 tmp = a * b
-	reg result = tmp + c
-	reg double_result = cvt_to_double(result)
-}
-
-module exists {
-    interface exists : hello a -> int result 
-
-}
-
-module hello {
-    interface hello : int a -> int b }
-
-module test_exists {
-    interface test_exists : -> int result 
-	int x = exists(5)
-	int b = doesnt_exist(3)
-}
-
-module exists {
-    interface exists : duplicate a 
-	// Should be a duplicate of previous exists
-}
-
-module use_other_file {
-    interface use_other_file : int a -> int r 
-	r = hello_from_the_other_side(a)
-}
-
-
-interface maemory_read : int addr -> bool[16] data
-
-//HandShake hs = hs_0
-
-module test_hs {
-	state int st = 5
-
-	gen if HA_HANDSHAKE {}
-	interface hs {
-
-		interface boop {
-
-		}
-	}
-	interface process : int[10] data -> int[9] data {
-	
-	}
-}
-
 module example_md {
 	interface example_md : int[4] factors,
 		int add_to ->
@@ -848,7 +669,7 @@ module test_separated_domain {
 
 	int domain5
 
-	int::<MIN = 0, MAX = 199;> my_int
+	int #(MIN: 0, MAX: 199) my_int
 }
 
 module no_port_module {}
@@ -925,18 +746,11 @@ module sumUpTo {
 		int idx = iter_index
 	}
 
-	int<t> beep
+	int beep
 }
 
-/* TODO
-module templateModule<abc> {
-
-}
-*/
-
-module test<T> {
-    interface test : ::int::<beep = 20 > 3; BEEP = int::<;>> ab 
-	input gen int MY_INPUT
+module test #(T, int MY_INPUT) {
+    interface test : ::int #(beep: 20 > 3, BEEP: int) ab 
 
 	MY_INPUT = 3
 
@@ -944,34 +758,30 @@ module test<T> {
 
 	beep = 3
 
-	FIFO::<BITWIDTH = 4;> badoop
+	FIFO #(BITWIDTH: 4) badoop
 }
 
 module use_test {
-	test::<3;> test_mod
+	test #(MY_INPUT: 3) test_mod
 
 
 }
 
 
-module tinyTestMod {
-	input gen int beep
-
+module tinyTestMod #(int beep) {
 	output int o = beep
 }
 
 
 module testTinyTestMod {
-	tinyTestMod::<beep = 3;> a
-	tinyTestMod::<beep = 4;> b
-	tinyTestMod::<beep = 3;> c
+	tinyTestMod #(beep: 3) a
+	tinyTestMod #(beep: 4) b
+	tinyTestMod #(beep: 3) c
 }
 
 
 
-module tree_add {
-	input gen int WIDTH
-
+module tree_add #(int WIDTH) {
 	input int[WIDTH] values
 	output int sum
 
@@ -979,8 +789,8 @@ module tree_add {
 		sum = values[0]
 	} else {
 		gen int HALF_WIDTH = WIDTH / 2
-		tree_add::<HALF_WIDTH;> left
-		tree_add::<HALF_WIDTH;> right
+		tree_add #(WIDTH: HALF_WIDTH) left
+		tree_add #(WIDTH: HALF_WIDTH) right
 
 		for int i in 0..HALF_WIDTH {
 			left.values[i] = values[i]
@@ -1004,7 +814,7 @@ module make_tree_add {
 		vs[i] = i
 	}
 
-	tree_add::<SIZE;> tr
+	tree_add #(WIDTH: SIZE) tr
 
 	tr.values = vs
 
@@ -1012,9 +822,7 @@ module make_tree_add {
 }
 
 
-module replicate<T> {
-	input gen int NUM_REPLS
-
+module replicate #(T, int NUM_REPLS) {
 	input T data
 
 	output T[NUM_REPLS] result
@@ -1025,15 +833,11 @@ module replicate<T> {
 }
 
 module use_replicate {
-	replicate::<NUM_REPLS = 50; T = bool> a
-	replicate::<NUM_REPLS = 20; T = int[30]> b
+	replicate #(NUM_REPLS: 50, T: type bool) a
+	replicate #(NUM_REPLS: 20, T: type int[30]) b
 }
 
-module permute_t<T> {
-	input gen int SIZE
-
-	input gen int[SIZE] SOURCES
-
+module permute_t #(T, int SIZE, int[SIZE] SOURCES) {
 	interface permute : T[SIZE] d_in -> T[SIZE] d_out
 
 	for int i in 0..SIZE {
@@ -1042,16 +846,16 @@ module permute_t<T> {
 }
 
 module use_permute {
-	gen int[8] indices
+	gen int[8] SOURCES
 
-	indices[0] = 3
-	indices[1] = 2
-	indices[2] = 4
-	indices[3] = 5
-	indices[4] = 1
-	indices[5] = 2
-	indices[6] = 7
-	indices[7] = 6
+	SOURCES[0] = 3
+	SOURCES[1] = 2
+	SOURCES[2] = 4
+	SOURCES[3] = 5
+	SOURCES[4] = 1
+	SOURCES[5] = 2
+	SOURCES[6] = 7
+	SOURCES[7] = 6
 
 
 	int[2] inArr
@@ -1059,9 +863,9 @@ module use_permute {
 	inArr[0] = 2387
 	inArr[1] = 786823
 
-	permute_t::<SIZE = 8, SOURCES = indices; T = int> permut
+	permute_t #(SIZE: 8, SOURCES, T: type int) permut
 
-	int[8] beep = permut.permute(indices)
+	int[8] beep = permut.permute(SOURCES)
 }
 
 module instruction_decoder {

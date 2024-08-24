@@ -1,6 +1,5 @@
 
-module DualPortMem<T> {
-	input gen int SIZE
+module DualPortMem #(T, int SIZE) {
 
 	state T[SIZE] mem
 
@@ -13,7 +12,7 @@ module DualPortMem<T> {
 	domain read
 	interface read : int read_addr -> T read_data
 
-	CrossDomain::<;T[SIZE]> cross_mem
+	CrossDomain #(T: type T[SIZE]) cross_mem
 	cross_mem.in = mem
 	
 	read_data = cross_mem.out[read_addr]
@@ -26,18 +25,19 @@ module UseDualPortMem {
 		bool[500] data'0 ->
 		bool[500] read_data'0
 		
-	DualPortMem::<SIZE = 128; bool[500]> mem
+	DualPortMem #(SIZE: 128, T: type bool[500]) mem
 
 	mem.write(do_write, addr, data)
 
 	read_data = mem.read(addr)
 }
 
-module FIFO<T> {
-	input gen int DEPTH
+module FIFO #(
+	T,
+	int DEPTH,
 	// The FIFO may still receive data for several cycles after ready is de-asserted
-	input gen int READY_SLACK
-
+	int READY_SLACK
+) {
 	state T[DEPTH] mem
 	state int read_addr
 	state int write_addr
@@ -52,13 +52,13 @@ module FIFO<T> {
 	domain pop
 	interface pop : bool pop -> bool data_valid, T data_out
 	
-	CrossDomain::<;int> write_to_pop
+	CrossDomain #(T: type int) write_to_pop
 	write_to_pop.in = write_addr
 
-	CrossDomain::<;int> read_to_push
+	CrossDomain #(T: type int) read_to_push
 	read_to_push.in = read_addr
 
-	CrossDomain::<;T[DEPTH]> mem_to_pop
+	CrossDomain #(T: type T[DEPTH]) mem_to_pop
 	mem_to_pop.in = mem
 
 	if pop {
@@ -79,10 +79,12 @@ module FIFO<T> {
 	int space_remaining = (read_to_push.out - write_addr) % DEPTH
 	gen int ALMOST_FULL_TRESHOLD = READY_SLACK + 1 // +1 for the latency reg we introduce here
 	reg bool r = space_remaining >  ALMOST_FULL_TRESHOLD
-	ready = LatencyOffset::<OFFSET = -ALMOST_FULL_TRESHOLD;bool>(r)
+	ready = LatencyOffset #(OFFSET: -ALMOST_FULL_TRESHOLD, T: type bool)(r)
 }
 
-module example_FIFO {FIFO::<3, 5;int> f}
+module example_FIFO {
+	FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+}
 
 
 
@@ -121,9 +123,7 @@ module Iterator {
 	}
 }
 
-module FixedSizeIterator {
-	input gen int UP_TO
-	
+module FixedSizeIterator #(int UP_TO) {
 	interface iter : -> bool valid, state int value
 
 	output bool last
@@ -144,9 +144,7 @@ module FixedSizeIterator {
 	}
 }
 
-module SlowClockGenerator {
-	input gen int PERIOD
-
+module SlowClockGenerator #(int PERIOD) {
 	interface SlowClockGenerator : -> state int cur_value
 	
 	initial cur_value = 0
@@ -158,10 +156,7 @@ module SlowClockGenerator {
 	}
 }
 
-module SplitAt<T> {
-	input gen int SIZE
-	input gen int SPLIT_POINT
-
+module SplitAt #(T, int SIZE, int SPLIT_POINT) {
 	interface SplitAt : T[SIZE] i -> T[SPLIT_POINT] left, T[SIZE - SPLIT_POINT] right
 
 	for int I in 0..SPLIT_POINT {
@@ -183,11 +178,7 @@ module Abs {
 }
 
 // Temporary, to be replaced with slice syntax : result = vals[FROM +: OUT_SIZE]
-module Slice<T> {
-	input gen int SIZE
-	input gen int OUT_SIZE
-	input gen int FROM
-
+module Slice #(T, int SIZE, int OUT_SIZE, int FROM) {
 	interface Slice : T[SIZE] vals -> T[OUT_SIZE] result
 
 	for int I in 0..OUT_SIZE {
@@ -198,12 +189,10 @@ module Slice<T> {
 module useSlice {
 	int[20] arr
 
-	int[5] subArr = Slice::<SIZE = 20, OUT_SIZE = 5, FROM = 3; int>(arr)
+	int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
 }
 
-module BitSelect {
-	input gen int SIZE
-
+module BitSelect #(int SIZE) {
 	interface BitSelect : int selection -> bool[SIZE] bits
 
 	for int I in 0..SIZE {
@@ -213,9 +202,7 @@ module BitSelect {
 	bits[selection] = true
 }
 
-module PopCount {
-	input gen int WIDTH
-	
+module PopCount #(int WIDTH) {
 	// Should be chosen based on what's most efficient for the target architecture
 	gen int BASE_CASE_SIZE = 5
 
@@ -236,16 +223,14 @@ module PopCount {
 		gen int LEFT_WIDTH = WIDTH / 2
 		gen int RIGHT_WIDTH = WIDTH - LEFT_WIDTH
 
-		bool[LEFT_WIDTH] left_part, bool[RIGHT_WIDTH] right_part = SplitAt::<LEFT_WIDTH ;bool>(bits)
+		bool[LEFT_WIDTH] left_part, bool[RIGHT_WIDTH] right_part = SplitAt #(SIZE: WIDTH, SPLIT_AT: LEFT_WIDTH, T: type bool)(bits)
 
-		reg reg popcount = PopCount::<LEFT_WIDTH;>(left_part) + PopCount::<RIGHT_WIDTH;>(right_part)
+		reg reg popcount = PopCount #(WIDTH: LEFT_WIDTH)(left_part) + PopCount #(WIDTH: RIGHT_WIDTH)(right_part)
 	}
 }
 
 
-module TreeAdd {
-	input gen int WIDTH
-
+module TreeAdd #(int WIDTH) {
 	interface TreeAdd : int[WIDTH] values'0 -> int total
 
 	if WIDTH == 0 {
@@ -258,9 +243,9 @@ module TreeAdd {
 		gen int LEFT_WIDTH = WIDTH / 2
 		gen int RIGHT_WIDTH = WIDTH - LEFT_WIDTH
 
-		int[LEFT_WIDTH] left_part, int[RIGHT_WIDTH] right_part = SplitAt::<WIDTH, LEFT_WIDTH;int>(values)
+		int[LEFT_WIDTH] left_part, int[RIGHT_WIDTH] right_part = SplitAt #(SIZE: WIDTH, SPLIT_AT: LEFT_WIDTH, T: type int)(values)
 
 		// Can add pipelining registers here too. Latency Counting will figure it out.
-		reg total = TreeAdd::<LEFT_WIDTH;>(left_part) + TreeAdd::<RIGHT_WIDTH;>(right_part)
+		reg total = TreeAdd #(WIDTH: LEFT_WIDTH)(left_part) + TreeAdd #(WIDTH: RIGHT_WIDTH)(right_part)
 	}
 }

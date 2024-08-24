@@ -102,7 +102,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     port_id: _,
                 } => details_vec.push(if is_input { "input" } else { "output" }),
                 DeclarationPortInfo::NotPort | DeclarationPortInfo::StructField { field_id:_ } => {}
-                DeclarationPortInfo::GenerativeInput(_) => details_vec.push("input"), // "gen" in "input gen" is covered by decl.identifier_type
+                DeclarationPortInfo::GenerativeInput(_) => details_vec.push("param"),
             }
 
             match decl.identifier_type {
@@ -180,7 +180,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
         LocationInfo::TemplateInput(in_obj, link_info, _template_id, template_arg) => {
             match &template_arg.kind {
                 TemplateInputKind::Type(TypeTemplateInputKind {  }) => {
-                    hover.monospace(format!("type param '{}'", template_arg.name));
+                    hover.monospace(format!("type {}", template_arg.name));
                 }
                 TemplateInputKind::Generative(GenerativeTemplateInputKind {
                     decl_span: _,
@@ -192,7 +192,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     let md = &linker.modules[md_id];
                     let decl = md.instructions[*declaration_instruction].unwrap_wire_declaration();
                     hover.sus_code(format!(
-                        "input gen {} {}",
+                        "param {} {}",
                         template_arg.name,
                         decl.typ_expr
                             .to_string(&linker.types, &link_info.template_arguments)

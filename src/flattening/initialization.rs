@@ -35,15 +35,36 @@ impl<'linker> InitializationContext<'linker> {
         self.domains.alloc(name.clone());
         if cursor.optional_field(field!("template_declaration_arguments")) {
             cursor.list(kind!("template_declaration_arguments"), |cursor| {
-                cursor.go_down(kind!("template_declaration_type"), |cursor| {
-                    let name_span = cursor.field_span(field!("name"), kind!("identifier"));
-                    let name = self.file_text[name_span].to_owned();
-                    self.template_inputs.alloc(TemplateInput {
-                        name,
-                        name_span,
-                        kind: TemplateInputKind::Type(TypeTemplateInputKind {}),
-                    });
-                });
+                let (kind, decl_span) = cursor.kind_span();
+                match kind {
+                    kind!("template_declaration_type") => cursor.go_down_no_check(|cursor| {
+                        let name_span = cursor.field_span(field!("name"), kind!("identifier"));
+                        let name = self.file_text[name_span].to_owned();
+                        self.template_inputs.alloc(TemplateInput {
+                            name,
+                            name_span,
+                            kind: TemplateInputKind::Type(TypeTemplateInputKind {}),
+                        });
+                    }),
+                    kind!("declaration") => cursor.go_down_no_check(|cursor| {
+                        let _ = cursor.optional_field(field!("io_port_modifiers"));
+                        let _ = cursor.optional_field(field!("declaration_modifiers"));
+                        cursor.field(field!("type"));
+                        let name_span = cursor.field_span(field!("name"), kind!("identifier"));
+                        let name = self.file_text[name_span].to_owned();
+                        
+                        self.template_inputs.alloc(TemplateInput {
+                            name,
+                            name_span,
+                            kind: TemplateInputKind::Generative(GenerativeTemplateInputKind {
+                                decl_span,
+                                declaration_instruction: FlatID::PLACEHOLDER,
+                            }),
+                        });
+                    }),
+                    _other => cursor.could_not_match()
+                }
+                
             });
         }
 
@@ -202,16 +223,6 @@ impl<'linker> InitializationContext<'linker> {
         let name = self.file_text[name_span].to_owned();
 
         match (is_generative, is_input) {
-            (true, Some(true)) => {
-                self.template_inputs.alloc(TemplateInput {
-                    name,
-                    name_span,
-                    kind: TemplateInputKind::Generative(GenerativeTemplateInputKind {
-                        decl_span,
-                        declaration_instruction: FlatID::PLACEHOLDER,
-                    }),
-                });
-            }
             (false, Some(is_input)) => {
                 self.ports.alloc(Port {
                     name,

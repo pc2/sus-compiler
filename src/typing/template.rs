@@ -53,8 +53,7 @@ impl TemplateInputKind {
 
 #[derive(Debug)]
 pub struct TemplateArg {
-    pub name_specification: Option<Span>,
-    pub whole_span: Span,
+    pub name_span: Span,
     pub kind: TemplateArgKind,
 }
 
