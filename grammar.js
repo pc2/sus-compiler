@@ -25,6 +25,21 @@ function newlineSepSeq($, rule) {
     )
 }
 
+// Makes a list of "item" fields
+function commaSepSeq($, rule) {
+    return seq(
+        optional($._linebreak),
+        optional(seq(
+            field('item', rule),
+            repeat(seq(
+                $._comma,
+                field('item', rule)
+            )),
+            optional($._linebreak)
+        ))
+    )
+}
+
 const PREC = {
     compare : 2,
     and: 3,
@@ -60,9 +75,12 @@ module.exports = grammar({
         // Template Declaration
 
         template_declaration_arguments: $ => seq(
-            '<',
-            sepSeq($.template_declaration_type, $._comma),
-            '>'
+            '#(',
+            commaSepSeq($, choice(
+                $.template_declaration_type,
+                $.declaration
+            )),
+            ')'
         ),
 
         template_declaration_type: $ => seq(
@@ -268,10 +286,10 @@ module.exports = grammar({
 
         namespace_list: $ => sepSeq1($.identifier, '::'),
 
-        // myFunc::<int, 2>
+        // myFunc #(T: type int, VAL: 2)
         template_global: $ => seq(
             optional(field('is_global_path', '::')),
-            $.namespace_list,
+            field('namespace_list', $.namespace_list),
 
             // Template
             optional(field('template_args', $.template_args))
@@ -279,7 +297,7 @@ module.exports = grammar({
         
         template_args: $ => seq(
             '#(',
-            sepSeq($.template_arg, $._comma),
+            commaSepSeq($, $.template_arg),
             ')'
         ),
 

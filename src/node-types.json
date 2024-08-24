@@ -1194,6 +1194,10 @@
         "required": false,
         "types": [
           {
+            "type": "declaration",
+            "named": true
+          },
+          {
             "type": "template_declaration_type",
             "named": true
           }
@@ -1231,6 +1235,16 @@
           }
         ]
       },
+      "namespace_list": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "namespace_list",
+            "named": true
+          }
+        ]
+      },
       "template_args": {
         "multiple": false,
         "required": false,
@@ -1241,16 +1255,6 @@
           }
         ]
       }
-    },
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "namespace_list",
-          "named": true
-        }
-      ]
     }
   },
   {
