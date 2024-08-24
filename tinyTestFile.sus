@@ -1,4 +1,18 @@
 
+module replicatee #(T, int NUM_REPLS) {
+	interface replicatee: T data -> T[NUM_REPLS] result
+
+	for int i in 0..NUM_REPLS {
+		result[i] = data
+	} 
+}
+
+module use_replicatee {
+	replicatee #(NUM_REPLS: 50, T: type bool) a
+
+	bool[50] repls = a(true)
+}
+
 extern module TestExtern {
 	input int in_a'3
 

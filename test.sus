@@ -833,7 +833,7 @@ module replicate #(T, int NUM_REPLS) {
 }
 
 module use_replicate {
-	replicate #(NUM_REPLS: 50, T: type bool) a
+	replicate #(NUM_REPLS: 50, NUM_REPLS: 30, T: type bool) a
 	replicate #(NUM_REPLS: 20, T: type int[30]) b
 }
 

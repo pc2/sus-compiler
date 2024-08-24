@@ -312,11 +312,12 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                         (TemplateInputKind::Type(_), TemplateArgKind::Type(_)) 
                         | (TemplateInputKind::Generative(_), TemplateArgKind::Value(_)) => {
                             // Correct pairing
-                            if let Some(prev) = &template_arg_map[id] {
+                            let elem = &mut template_arg_map[id];
+                            if let Some(prev) = elem {
                                 self.errors.error(name_span, format!("'{name}' has already been defined previously"))
                                     .info_same_file(prev.name_span, "Defined here previously");
                             } else {
-                                template_arg_map[id] = Some(TemplateArg { name_span, kind: template_arg });
+                                *elem = Some(TemplateArg { name_span, kind: template_arg });
                             }
                         }
                         (TemplateInputKind::Type(_), TemplateArgKind::Value(_)) => {
@@ -1465,8 +1466,8 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                 assert!(context.ports_to_visit.is_empty());
 
                 let instructions = context.instructions;
-                
-                match file_obj {
+
+                let link_info : &mut LinkInfo = match file_obj {
                     NameElem::Module(module_uuid) => {
                         let md = &mut linker.modules[module_uuid];
                         // Set all declaration_instruction values
@@ -1490,6 +1491,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                             }
                         }
                         md.instructions = instructions;
+                        &mut md.link_info
                     }
                     NameElem::Type(type_uuid) => {
                         let typ = &mut linker.types[type_uuid];
@@ -1515,11 +1517,15 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                             }
                         }
                         typ.instructions = instructions;
+                        &mut typ.link_info
                     }
                     NameElem::Constant(const_uuid) => {
                         todo!("TODO Constant flattening")
                     }
-                }
+                };
+
+                link_info.resolved_globals = errors_globals.1.into_inner();
+                link_info.errors = errors_globals.0.into_storage();
             });
         });
         span_debugger.defuse();

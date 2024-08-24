@@ -68,6 +68,7 @@ impl ErrorStore {
         self.did_error = checkpoint.1;
     }
 
+    /// Returns true if no errors have been reported
     pub fn is_untouched(&self) -> bool {
         self.errors.is_empty()
     }
@@ -112,7 +113,7 @@ impl<'linker> ErrorCollector<'linker> {
 
     /// Turn the collector back into a [ErrorStore]
     pub fn into_storage(self) -> ErrorStore {
-        self.error_store.into_inner()
+        self.error_store.replace(ErrorStore::new())
     }
 
     fn assert_span_good(&self, span: Span) {
@@ -164,6 +165,14 @@ impl<'linker> ErrorCollector<'linker> {
     }
     pub fn set_did_error(&mut self) {
         self.error_store.get_mut().did_error = true;
+    }
+}
+
+impl<'l> Drop for ErrorCollector<'l> {
+    fn drop(&mut self) {
+        if !self.error_store.borrow().is_untouched() {
+            panic!("ErrorCollector should have been emptied!");
+        }
     }
 }
 
