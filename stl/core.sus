@@ -1,12 +1,11 @@
 
 // Compiler Intrinsic
-__builtin__ module LatencyOffset<T> {
-    input gen int OFFSET
+__builtin__ module LatencyOffset #(T, int OFFSET) {
     interface LatencyOffset : T in'0 -> T out'OFFSET
 }
 
 // Compiler Intrinsic
-__builtin__ module CrossDomain<T> {
+__builtin__ module CrossDomain #(T) {
     interface in_domain : T in'0
     domain out
     interface out_domain : -> T out'0

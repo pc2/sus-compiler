@@ -669,7 +669,7 @@ module test_separated_domain {
 
 	int domain5
 
-	int::<MIN = 0, MAX = 199;> my_int
+	int #(MIN: 0, MAX: 199) my_int
 }
 
 module no_port_module {}
@@ -746,18 +746,11 @@ module sumUpTo {
 		int idx = iter_index
 	}
 
-	int<t> beep
+	int beep
 }
 
-/* TODO
-module templateModule<abc> {
-
-}
-*/
-
-module test<T> {
-    interface test : ::int::<beep = 20 > 3; BEEP = int::<;>> ab 
-	input gen int MY_INPUT
+module test #(T, int MY_INPUT) {
+    interface test : ::int #(beep: 20 > 3, BEEP: int) ab 
 
 	MY_INPUT = 3
 
@@ -765,34 +758,30 @@ module test<T> {
 
 	beep = 3
 
-	FIFO::<BITWIDTH = 4;> badoop
+	FIFO #(BITWIDTH: 4) badoop
 }
 
 module use_test {
-	test::<3;> test_mod
+	test #(MY_INPUT: 3) test_mod
 
 
 }
 
 
-module tinyTestMod {
-	input gen int beep
-
+module tinyTestMod #(int beep) {
 	output int o = beep
 }
 
 
 module testTinyTestMod {
-	tinyTestMod::<beep = 3;> a
-	tinyTestMod::<beep = 4;> b
-	tinyTestMod::<beep = 3;> c
+	tinyTestMod #(beep: 3) a
+	tinyTestMod #(beep: 4) b
+	tinyTestMod #(beep: 3) c
 }
 
 
 
-module tree_add {
-	input gen int WIDTH
-
+module tree_add #(int WIDTH) {
 	input int[WIDTH] values
 	output int sum
 
@@ -800,8 +789,8 @@ module tree_add {
 		sum = values[0]
 	} else {
 		gen int HALF_WIDTH = WIDTH / 2
-		tree_add::<HALF_WIDTH;> left
-		tree_add::<HALF_WIDTH;> right
+		tree_add #(WIDTH: HALF_WIDTH) left
+		tree_add #(WIDTH: HALF_WIDTH) right
 
 		for int i in 0..HALF_WIDTH {
 			left.values[i] = values[i]
@@ -825,7 +814,7 @@ module make_tree_add {
 		vs[i] = i
 	}
 
-	tree_add::<SIZE;> tr
+	tree_add #(WIDTH: SIZE) tr
 
 	tr.values = vs
 
@@ -833,9 +822,7 @@ module make_tree_add {
 }
 
 
-module replicate<T> {
-	input gen int NUM_REPLS
-
+module replicate #(T, int NUM_REPLS) {
 	input T data
 
 	output T[NUM_REPLS] result
@@ -846,15 +833,11 @@ module replicate<T> {
 }
 
 module use_replicate {
-	replicate::<NUM_REPLS = 50; T = bool> a
-	replicate::<NUM_REPLS = 20; T = int[30]> b
+	replicate #(NUM_REPLS: 50, T: type bool) a
+	replicate #(NUM_REPLS: 20, T: type int[30]) b
 }
 
-module permute_t<T> {
-	input gen int SIZE
-
-	input gen int[SIZE] SOURCES
-
+module permute_t #(T, int SIZE, int[SIZE] SOURCES) {
 	interface permute : T[SIZE] d_in -> T[SIZE] d_out
 
 	for int i in 0..SIZE {
@@ -863,16 +846,16 @@ module permute_t<T> {
 }
 
 module use_permute {
-	gen int[8] indices
+	gen int[8] SOURCES
 
-	indices[0] = 3
-	indices[1] = 2
-	indices[2] = 4
-	indices[3] = 5
-	indices[4] = 1
-	indices[5] = 2
-	indices[6] = 7
-	indices[7] = 6
+	SOURCES[0] = 3
+	SOURCES[1] = 2
+	SOURCES[2] = 4
+	SOURCES[3] = 5
+	SOURCES[4] = 1
+	SOURCES[5] = 2
+	SOURCES[6] = 7
+	SOURCES[7] = 6
 
 
 	int[2] inArr
@@ -880,9 +863,9 @@ module use_permute {
 	inArr[0] = 2387
 	inArr[1] = 786823
 
-	permute_t::<SIZE = 8, SOURCES = indices; T = int> permut
+	permute_t #(SIZE: 8, SOURCES, T: type int) permut
 
-	int[8] beep = permut.permute(indices)
+	int[8] beep = permut.permute(SOURCES)
 }
 
 module instruction_decoder {

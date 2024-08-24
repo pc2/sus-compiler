@@ -1,14 +1,11 @@
-/*
+
 extern module TestExtern {
 	input int in_a'3
 
 	output int in_b'5
 }
 
-struct Matrix<T> {
-	input gen int WIDTH
-	input gen int HEIGHT
-
+struct Matrix #(T, int WIDTH, int HEIGHT) {
 	T[WIDTH][HEIGHT] data
 }
 
@@ -20,11 +17,4 @@ module ModUsingFloat {
 	output float boop
 
 	boop = beep
-}
-*/
-
-module testTemplate {
-	f(a < beeep >)
-
-	f(a < beeep >)
 }

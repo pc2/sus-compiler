@@ -179,31 +179,24 @@ impl Module {
     ) -> String {
         use std::fmt::Write;
 
-        let mut type_args: Vec<&str> = Vec::new();
-        let mut temporary_gen_input_builder = String::new();
+        let mut template_args: Vec<&str> = Vec::new();
         for (_id, t) in &self.link_info.template_arguments {
             match &t.kind {
                 TemplateInputKind::Type(TypeTemplateInputKind {  }) => {
-                    type_args.push(&t.name)
+                    template_args.push(&t.name)
                 }
                 TemplateInputKind::Generative(GenerativeTemplateInputKind {
                     decl_span,
                     declaration_instruction: _,
-                }) => writeln!(
-                    temporary_gen_input_builder,
-                    "input gen {}",
-                    &file_text[*decl_span]
-                )
-                .unwrap(),
+                }) => template_args.push(&file_text[*decl_span])
             }
         }
 
         let mut result = format!(
-            "module {}<{}>:\n",
+            "module {} #({}):\n",
             self.link_info.get_full_name(),
-            type_args.join(", ")
+            template_args.join(", ")
         );
-        result.push_str(&temporary_gen_input_builder);
 
         for (domain_id, domain) in &self.domains {
             if let Some(domain_map) = &local_domains {
