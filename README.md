@@ -200,7 +200,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [ ] Clock Domain Crossings
 - ~~[ ] Rhythm Syntax~~
 - [ ] Interface Generator Syntax
-- [ ] Standard Library Bundled with compiler
+- [x] Standard Library Bundled with compiler
 
 ### Performance, Linking and Name Resolution
 - [ ] Namespaces
