@@ -8,7 +8,7 @@
     </a>
     <br/>
     <a href="https://discord.gg/ZCgzjbrppz">
-        <img src="https://img.shields.io/discord/1268590533756850206?style=flat</img>"/>
+        <img src="https://img.shields.io/discord/1268590533756850206?style=flat"/>
     </a>
     <a href="https://github.com/pc2/sus-compiler/actions">
         <img src="https://github.com/pc2/sus-compiler/workflows/CI/badge.svg?branch=master&event=push">
