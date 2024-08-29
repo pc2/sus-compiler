@@ -1,3 +1,20 @@
+
+<p align="center">
+    <a href="https://crates.io/crates/sus_compiler">
+        <img src="https://img.shields.io/github/release/pc2/sus-compiler.svg">
+    </a>
+    <a href="https://crates.io/crates/sus_compiler">
+        <img src="https://img.shields.io/badge/platforms-Windows%20|%20Linux%20|%20macOS-green.svg">
+    </a>
+    <br/>
+    <a href="https://discord.gg/ZCgzjbrppz">
+        <img src="https://img.shields.io/discord/1268590533756850206?style=flat</img>"/>
+    </a>
+    <a href="https://github.com/pc2/sus-compiler/actions">
+        <img src="https://github.com/pc2/sus-compiler/workflows/CI/badge.svg?branch=master&event=push">
+    </a>
+</p>
+
 # SUS Language
 
 SUS is a new RTL Hardware Design Language, similar to Verilog or VHDL, that focuses on simplifying the development of high-performance computing FPGA accelerators, without sacrificing any design freedom at the altar of abstraction. 
@@ -18,8 +35,6 @@ ext install LennartVanHirtum.sus-lsp
 To get started with learning SUS, have a look at [this talk](https://www.youtube.com/watch?v=jJvtZvcimyM). In 40 minutes it goes over most language features through examples. Because further development will make this outdated rather quickly, a changelog is provided below to keep track. 
 
 For an example project to tinker with, see [VonTum/BitSerialMatrixMultiply](https://github.com/VonTum/BitSerialMatrixMultiply). 
-
-To get in touch, feel free to join our [Discord](https://discord.gg/ZCgzjbrppz). 
 
 #### Changelog since Talk
 - Nothing yet

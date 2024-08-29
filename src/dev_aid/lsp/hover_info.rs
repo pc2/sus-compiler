@@ -193,9 +193,9 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     let decl = md.instructions[*declaration_instruction].unwrap_wire_declaration();
                     hover.sus_code(format!(
                         "param {} {}",
-                        template_arg.name,
                         decl.typ_expr
-                            .to_string(&linker.types, &link_info.template_arguments)
+                            .to_string(&linker.types, &link_info.template_arguments),
+                        template_arg.name
                     ));
                     hover.gather_hover_infos(md, *declaration_instruction, true);
                 }

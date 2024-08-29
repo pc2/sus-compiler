@@ -8,9 +8,9 @@ module replicatee #(T, int NUM_REPLS) {
 }
 
 module use_replicatee {
-	replicatee #(NUM_REPLS: 50, T: type bool) a
+	replicatee #(NUM_REPLS: 50, T: type bool) repl
 
-	bool[50] repls = a(true)
+	bool[50] repls = repl(true)
 }
 
 extern module TestExtern {
