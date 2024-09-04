@@ -1,18 +1,12 @@
 
 <p align="center">
-    <a href="https://crates.io/crates/sus_compiler">
-        <img src="https://img.shields.io/github/release/pc2/sus-compiler.svg">
-    </a>
-    <a href="https://crates.io/crates/sus_compiler">
-        <img src="https://img.shields.io/badge/platforms-Windows%20|%20Linux%20|%20macOS-green.svg">
-    </a>
+    <img src="philosophy/images/susLogo.svg" alt="SUS logo" style="width:30%">
     <br/>
-    <a href="https://discord.gg/ZCgzjbrppz">
-        <img src="https://img.shields.io/discord/1268590533756850206?style=flat"/>
-    </a>
-    <a href="https://github.com/pc2/sus-compiler/actions">
-        <img src="https://github.com/pc2/sus-compiler/workflows/CI/badge.svg?branch=master&event=push">
-    </a>
+    <a href="https://crates.io/crates/sus_compiler"><img src="https://img.shields.io/github/release/pc2/sus-compiler.svg"></a>
+    <a href="https://crates.io/crates/sus_compiler"><img src="https://img.shields.io/badge/platforms-Windows%20|%20Linux%20|%20macOS-green.svg"></a>
+    <br/>
+    <a href="https://discord.gg/ZCgzjbrppz"><img src="https://img.shields.io/discord/1268590533756850206?style=flat"/></a>
+    <a href="https://github.com/pc2/sus-compiler/actions"><img src="https://github.com/pc2/sus-compiler/workflows/CI/badge.svg"></a>
 </p>
 
 # SUS Language

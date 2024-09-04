@@ -223,7 +223,7 @@ module PopCount #(int WIDTH) {
 		gen int LEFT_WIDTH = WIDTH / 2
 		gen int RIGHT_WIDTH = WIDTH - LEFT_WIDTH
 
-		bool[LEFT_WIDTH] left_part, bool[RIGHT_WIDTH] right_part = SplitAt #(SIZE: WIDTH, SPLIT_AT: LEFT_WIDTH, T: type bool)(bits)
+		bool[LEFT_WIDTH] left_part, bool[RIGHT_WIDTH] right_part = SplitAt #(SIZE: WIDTH, SPLIT_POINT: LEFT_WIDTH, T: type bool)(bits)
 
 		reg reg popcount = PopCount #(WIDTH: LEFT_WIDTH)(left_part) + PopCount #(WIDTH: RIGHT_WIDTH)(right_part)
 	}
@@ -243,7 +243,7 @@ module TreeAdd #(int WIDTH) {
 		gen int LEFT_WIDTH = WIDTH / 2
 		gen int RIGHT_WIDTH = WIDTH - LEFT_WIDTH
 
-		int[LEFT_WIDTH] left_part, int[RIGHT_WIDTH] right_part = SplitAt #(SIZE: WIDTH, SPLIT_AT: LEFT_WIDTH, T: type int)(values)
+		int[LEFT_WIDTH] left_part, int[RIGHT_WIDTH] right_part = SplitAt #(SIZE: WIDTH, SPLIT_POINT: LEFT_WIDTH, T: type int)(values)
 
 		// Can add pipelining registers here too. Latency Counting will figure it out.
 		reg total = TreeAdd #(WIDTH: LEFT_WIDTH)(left_part) + TreeAdd #(WIDTH: RIGHT_WIDTH)(right_part)
