@@ -230,22 +230,31 @@ module PopCount #(int WIDTH) {
 }
 
 
+// Recursive Tree Add module recurses smaller copies of itself. 
 module TreeAdd #(int WIDTH) {
 	interface TreeAdd : int[WIDTH] values'0 -> int total
 
 	if WIDTH == 0 {
-		// Have to explicitly give zero a latency count. Otherwise total's latency can't be determined. 
+		// Have to explicitly give zero a latency count. 
+		// Otherwise total's latency can't be determined. 
 		int zero'0 = 0
 		total = zero
 	} else if WIDTH == 1 {
 		total = values[0]
 	} else {
-		gen int LEFT_WIDTH = WIDTH / 2
-		gen int RIGHT_WIDTH = WIDTH - LEFT_WIDTH
+		gen int L_SZ = WIDTH / 2
+		gen int R_SZ = WIDTH - L_SZ
 
-		int[LEFT_WIDTH] left_part, int[RIGHT_WIDTH] right_part = SplitAt #(SIZE: WIDTH, SPLIT_POINT: LEFT_WIDTH, T: type int)(values)
+		// Can declare modules and use them later. 
+		SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
+		int[L_SZ] left_part, int[R_SZ] right_part = split(values)
 
-		// Can add pipelining registers here too. Latency Counting will figure it out.
-		reg total = TreeAdd #(WIDTH: LEFT_WIDTH)(left_part) + TreeAdd #(WIDTH: RIGHT_WIDTH)(right_part)
+		// Or instantiate submodules inline
+		int left_total = TreeAdd #(WIDTH: L_SZ)(left_part)
+		int right_total = TreeAdd #(WIDTH: R_SZ)(right_part)
+		
+		// Can add pipelining registers here too. 
+		// Latency Counting will figure it out.
+		reg total = left_total + right_total
 	}
 }

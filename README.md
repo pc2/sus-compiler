@@ -192,8 +192,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Intrinsic Modules
 - [x] Can Parse FIFO implementation
 - [ ] Clock Domain Crossings
-- ~~[ ] Rhythm Syntax~~
-- [ ] Interface Generator Syntax
+- [ ] Submodule Generators
 - [x] Standard Library Bundled with compiler
 
 ### Performance, Linking and Name Resolution
@@ -207,14 +206,15 @@ In this example, we create a memory block with a read port and a write port. Thi
 
 ### Safety
 - [x] Basic Type Checking (bools, ints, arrays, etc)
-- [ ] Types for Interfaces
 - [ ] Integer and Array Bounds Checking
 - [ ] Conflicting assignments (such as calling the same module twice in a single cycle, multiple assignments to a single variable)
 
-### Inference
+### Typing & Inference
+- [ ] Hindley-Milner typing
 - [ ] Template Type Inference
 - [ ] Generative Parameter Inference
 - [ ] Latency Count Inference
+- [ ] Let-syntax
 
 ### Latency Counting
 - [x] Basic latency assignment algorithm
@@ -263,6 +263,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [ ] RISC-V CPU
 - [ ] Enigma Machine
 - [ ] Enigma Code Breaking
+- [ ] Bitwise dedekind D10 estimation accelerator
 
 ### Safety through Interface Asserts (PDL-style asserts)
 - [ ] btor2?
