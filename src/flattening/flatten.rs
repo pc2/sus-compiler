@@ -1,4 +1,6 @@
-use crate::alloc::{ArenaAllocator, UUIDRange, UUID};
+use crate::alloc::{ArenaAllocator, UUIDAllocator, UUIDRange, UUID};
+use crate::typing::abstract_type::DomainType;
+use crate::typing::type_inference::TypeVariableIDMarker;
 use crate::{alloc::UUIDRangeIter, prelude::*};
 
 use std::
@@ -201,6 +203,19 @@ enum DeclarationContext {
     StructField
 }
 
+struct TypingAllocator {
+    type_variables_allocator: UUIDAllocator<TypeVariableIDMarker>,
+}
+
+impl TypingAllocator {
+    fn alloc_unset_type(&mut self) -> FullType {
+        FullType {
+            typ: AbstractType::Unknown(self.type_variables_allocator.alloc()),
+            domain: DomainType::new_unset()
+        }
+    }
+}
+
 struct FlatteningContext<'l, 'errs> {
     modules: Resolver<'l, 'errs, ModuleUUIDMarker, Module>,
     #[allow(dead_code)]
@@ -212,6 +227,7 @@ struct FlatteningContext<'l, 'errs> {
 
     working_on_link_info: &'l LinkInfo,
     instructions: FlatAlloc<Instruction, FlatIDMarker>,
+    type_alloc: TypingAllocator,
 
     fields_to_visit: UUIDRangeIter<FieldIDMarker>,
     ports_to_visit: UUIDRangeIter<PortIDMarker>,
@@ -290,7 +306,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                         Some(NamedLocal::TemplateType(t)) => TemplateArgKind::Type(WrittenType::Template(name_span, t)),
                         Some(NamedLocal::Declaration(decl_id)) => {
                             let wire_read_id = self.instructions.alloc(Instruction::Wire(WireInstance { 
-                                typ: FullType::new_unset(),
+                                typ: self.type_alloc.alloc_unset_type(),
                                 span: name_span,
                                 source: WireSource::WireRef(WireReference::simple_var_read(decl_id, name_span)) 
                             }));
@@ -657,7 +673,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
 
             let decl_id = self.instructions.alloc(Instruction::Declaration(Declaration{
                 typ_expr,
-                typ : FullType::new_unset(),
+                typ : self.type_alloc.alloc_unset_type(),
                 read_only,
                 declaration_itself_is_not_written_to,
                 is_port,
@@ -685,7 +701,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
 
     fn alloc_error(&mut self, span: Span) -> FlatID {
         self.instructions.alloc(Instruction::Wire(WireInstance {
-            typ: FullType::new_unset(),
+            typ: self.type_alloc.alloc_unset_type(),
             span,
             source: WireSource::new_error(),
         }))
@@ -887,7 +903,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
         };
 
         let wire_instance = WireInstance {
-            typ: FullType::new_unset(),
+            typ: self.type_alloc.alloc_unset_type(),
             span: expr_span,
             source,
         };
@@ -1132,7 +1148,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                 if let Some((Some((to, write_modifiers)), to_span)) = to_iter.next() {
                     let from =
                         self.instructions.alloc(Instruction::Wire(WireInstance {
-                            typ: FullType::new_unset(),
+                            typ: self.type_alloc.alloc_unset_type(),
                             span: func_call_span,
                             source: WireSource::WireRef(WireReference::simple_port(PortInfo {
                                 port,
@@ -1157,7 +1173,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
         for leftover_to in to_iter {
             if let (Some((to, write_modifiers)), to_span) = leftover_to {
                 let err_id = self.instructions.alloc(Instruction::Wire(WireInstance {
-                    typ: FullType::new_unset(),
+                    typ: self.type_alloc.alloc_unset_type(),
                     span: func_call_span,
                     source: WireSource::new_error(),
                 }));
@@ -1453,6 +1469,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                     errors: name_resolver.errors,
                     working_on_link_info: linker.get_link_info(file_obj).unwrap(),
                     instructions: FlatAlloc::new(),
+                    type_alloc: TypingAllocator { type_variables_allocator: UUIDAllocator::new() },
                     modules,
                     types,
                     constants,

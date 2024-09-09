@@ -4,6 +4,7 @@ use crate::prelude::*;
 use std::ops::{Deref, Index};
 
 use super::abstract_type::AbstractType;
+use super::type_inference::TypeVariableID;
 use crate::linker::get_builtin_type;
 use crate::{
     flattening::{BinaryOperator, UnaryOperator},
@@ -34,7 +35,7 @@ impl Into<AbstractType> for &ConcreteType {
                 let concrete_sub: AbstractType = sub.into();
                 AbstractType::Array(Box::new(concrete_sub))
             }
-            ConcreteType::Unknown => AbstractType::Unknown,
+            ConcreteType::Unknown => AbstractType::Unknown(TypeVariableID::PLACEHOLDER),
             ConcreteType::Error => AbstractType::Error,
         }
     }

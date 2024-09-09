@@ -3,6 +3,7 @@ use crate::prelude::*;
 use std::{cell::RefCell, ops::Deref};
 
 use super::template::TemplateInputs;
+use super::type_inference::TypeVariableID;
 use crate::flattening::{BinaryOperator, StructType, UnaryOperator};
 use crate::linker::{get_builtin_type, Resolver};
 use crate::to_string::map_to_type_names;
@@ -15,7 +16,7 @@ use crate::to_string::map_to_type_names;
 #[derive(Debug, Clone)]
 pub enum AbstractType {
     Error,
-    Unknown,
+    Unknown(TypeVariableID),
     Template(TemplateID),
     Named(TypeUUID),
     Array(Box<AbstractType>),
@@ -27,7 +28,7 @@ impl AbstractType {
     ) -> bool {
         match self {
             AbstractType::Error => CHECK_ERROR,
-            AbstractType::Unknown => CHECK_UNKNOWN,
+            AbstractType::Unknown(_) => CHECK_UNKNOWN,
             AbstractType::Template(_id) => false,
             AbstractType::Named(_id) => false,
             AbstractType::Array(arr_box) => arr_box
@@ -70,21 +71,6 @@ impl DomainType {
 pub struct FullType {
     pub typ: AbstractType,
     pub domain: DomainType,
-}
-
-impl FullType {
-    pub fn new_generative(typ: AbstractType) -> FullType {
-        FullType {
-            typ,
-            domain: DomainType::Generative,
-        }
-    }
-    pub fn new_unset() -> FullType {
-        FullType {
-            typ: AbstractType::Error,
-            domain: DomainType::Physical(DomainID::PLACEHOLDER),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -158,7 +144,7 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
                 self.type_compare(&exp.deref(), &fnd.deref())
             }
             (AbstractType::Error, _) | (_, AbstractType::Error) => true, // Just assume correct, because the other side has an error
-            (AbstractType::Unknown, _) | (_, AbstractType::Unknown) => todo!("Type Unification"),
+            (AbstractType::Unknown(_), _) | (_, AbstractType::Unknown(_)) => todo!("Type Unification"),
             _ => false,
         }
     }

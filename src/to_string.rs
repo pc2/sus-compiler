@@ -72,7 +72,7 @@ impl AbstractType {
     ) -> String {
         match self {
             AbstractType::Error => "{error}".to_owned(),
-            AbstractType::Unknown => "{unknown}".to_owned(),
+            AbstractType::Unknown(id) => format!("{id:?}"),
             AbstractType::Template(id) => template_names.get_template_name(*id).to_owned(),
             AbstractType::Named(id) => linker_types[*id].get_full_name(),
             AbstractType::Array(sub) => sub.deref().to_string(linker_types, template_names) + "[]",

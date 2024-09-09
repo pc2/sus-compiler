@@ -53,6 +53,30 @@ impl<IndexMarker> UUID<IndexMarker> {
     pub const PLACEHOLDER: Self = UUID(usize::MAX, PhantomData);
 }
 
+pub struct UUIDAllocator<IndexMarker> {
+    cur : UUID<IndexMarker>
+}
+
+impl<IndexMarker> UUIDAllocator<IndexMarker> {
+    pub fn new() -> Self {
+        Self {
+            cur: UUID(0, PhantomData)
+        }
+    }
+    pub fn alloc(&mut self) -> UUID<IndexMarker> {
+        let allocated_id = self.cur;
+        self.cur.0+=1;
+        allocated_id
+    }
+    pub fn into_flat_alloc<T: Default>(self) -> FlatAlloc<T, IndexMarker> {
+        let mut result = FlatAlloc::with_capacity(self.cur.0);
+        for _ in 0..self.cur.0 {
+            result.alloc(T::default());
+        }
+        result
+    }
+}
+
 pub struct UUIDRange<IndexMarker>(pub UUID<IndexMarker>, pub UUID<IndexMarker>);
 
 impl<IndexMarker> UUIDRange<IndexMarker> {
