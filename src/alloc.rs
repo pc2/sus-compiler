@@ -68,12 +68,18 @@ impl<IndexMarker> UUIDAllocator<IndexMarker> {
         self.cur.0+=1;
         allocated_id
     }
-    pub fn into_flat_alloc<T: Default>(self) -> FlatAlloc<T, IndexMarker> {
+    pub fn to_flat_alloc<T: Default>(&self) -> FlatAlloc<T, IndexMarker> {
         let mut result = FlatAlloc::with_capacity(self.cur.0);
         for _ in 0..self.cur.0 {
             result.alloc(T::default());
         }
         result
+    }
+}
+
+impl<IndexMarker: UUIDMarker> std::fmt::Debug for UUIDAllocator<IndexMarker> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        f.debug_struct("UUIDAllocator").field("count: ", &self.cur.0).finish()
     }
 }
 

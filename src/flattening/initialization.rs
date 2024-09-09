@@ -310,6 +310,7 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
         errors,
         is_extern,
         resolved_globals,
+        type_variable_alloc: UUIDAllocator::new(),
         template_arguments: ctx.template_inputs,
         after_initial_parse_cp,
         after_flatten_cp: None,

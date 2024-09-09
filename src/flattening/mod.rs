@@ -5,7 +5,9 @@ mod parser;
 mod typechecking;
 mod walk;
 
+use crate::alloc::UUIDAllocator;
 use crate::prelude::*;
+use crate::typing::type_inference::TypeVariableIDMarker;
 
 use std::ops::Deref;
 

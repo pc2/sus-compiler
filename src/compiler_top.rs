@@ -79,7 +79,7 @@ impl Linker {
         file_id
     }
 
-    // When lsp is not used, this gives a warning
+    // When --feature lsp is not used, this gives a warning
     #[allow(dead_code)]
     pub fn add_or_update_file<ExtraInfoManager : LinkerExtraFileInfoManager>(&mut self, file_identifier: &str, text: String, info_mngr : &mut ExtraInfoManager) {
         if let Some(file_id) = self.find_file(file_identifier) {

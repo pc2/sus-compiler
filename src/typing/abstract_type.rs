@@ -1,9 +1,11 @@
+use crate::alloc::UUIDAllocator;
 use crate::prelude::*;
 
+use std::cell::OnceCell;
 use std::{cell::RefCell, ops::Deref};
 
 use super::template::TemplateInputs;
-use super::type_inference::TypeVariableID;
+use super::type_inference::{TypeVariableID, TypeVariableIDMarker};
 use crate::flattening::{BinaryOperator, StructType, UnaryOperator};
 use crate::linker::{get_builtin_type, Resolver};
 use crate::to_string::map_to_type_names;
@@ -113,6 +115,7 @@ pub struct TypeUnifier<'linker, 'errs> {
     domain_substitutor: RefCell<FlatAlloc<DomainTypeSubstitution, DomainIDMarker>>,
     errors: &'errs ErrorCollector<'linker>,
     pub final_domains: FlatAlloc<BestName, DomainIDMarker>,
+    pub type_substitutor: FlatAlloc<OnceCell<AbstractType>, TypeVariableIDMarker>
 }
 
 impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
@@ -121,6 +124,7 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         template_inputs: &TemplateInputs,
         errors: &'errs ErrorCollector<'linker>,
         domain_names: &FlatAlloc<String, DomainIDMarker>,
+        type_var_id_alloc: &UUIDAllocator<TypeVariableIDMarker>
     ) -> Self {
         let domains = domain_names
             .map(|(_id, name)| DomainTypeSubstitution::KnownDomain { name: name.clone() });
@@ -131,6 +135,7 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
             errors,
             domain_substitutor: RefCell::new(domains),
             final_domains,
+            type_substitutor: type_var_id_alloc.to_flat_alloc()
         }
     }
 

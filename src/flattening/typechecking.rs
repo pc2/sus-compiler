@@ -37,6 +37,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
                         &modules.working_on.link_info.template_arguments,
                         name_resolver.errors,
                         &modules.working_on.domain_names,
+                        &modules.working_on.link_info.type_variable_alloc
                     ),
                     constants,
                     runtime_condition_stack: Vec::new(),

@@ -2,7 +2,7 @@ pub mod checkpoint;
 mod resolver;
 pub use resolver::*;
 
-use crate::prelude::*;
+use crate::{alloc::UUIDAllocator, prelude::*, typing::type_inference::TypeVariableIDMarker};
 
 use std::{
     cell::RefCell,
@@ -90,6 +90,11 @@ pub struct LinkInfo {
     pub errors: ErrorStore,
     pub resolved_globals: ResolvedGlobals,
     pub is_extern : IsExtern,
+
+    /// Created in Stage 2: Flattening
+    /// 
+    /// Is only temporary. It's used during typechecking to allocate the type unification block
+    pub type_variable_alloc: UUIDAllocator<TypeVariableIDMarker>,
 
     pub template_arguments: TemplateInputs,
 

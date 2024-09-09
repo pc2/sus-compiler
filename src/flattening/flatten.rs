@@ -3,10 +3,6 @@ use crate::typing::abstract_type::DomainType;
 use crate::typing::type_inference::TypeVariableIDMarker;
 use crate::{alloc::UUIDRangeIter, prelude::*};
 
-use std::
-    str::FromStr
-;
-
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 
@@ -204,13 +200,13 @@ enum DeclarationContext {
 }
 
 struct TypingAllocator {
-    type_variables_allocator: UUIDAllocator<TypeVariableIDMarker>,
+    type_variable_alloc: UUIDAllocator<TypeVariableIDMarker>,
 }
 
 impl TypingAllocator {
     fn alloc_unset_type(&mut self) -> FullType {
         FullType {
-            typ: AbstractType::Unknown(self.type_variables_allocator.alloc()),
+            typ: AbstractType::Unknown(self.type_variable_alloc.alloc()),
             domain: DomainType::new_unset()
         }
     }
@@ -840,6 +836,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
 
         let source = if kind == kind!("number") {
             let text = &self.name_resolver.file_text[expr_span];
+            use std::str::FromStr;            
             WireSource::Constant(Value::Integer(BigInt::from_str(text).unwrap()))
         } else if kind == kind!("unary_op") {
             cursor.go_down_no_check(|cursor| {
@@ -1469,7 +1466,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                     errors: name_resolver.errors,
                     working_on_link_info: linker.get_link_info(file_obj).unwrap(),
                     instructions: FlatAlloc::new(),
-                    type_alloc: TypingAllocator { type_variables_allocator: UUIDAllocator::new() },
+                    type_alloc: TypingAllocator { type_variable_alloc: UUIDAllocator::new() },
                     modules,
                     types,
                     constants,
@@ -1483,6 +1480,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                 assert!(context.ports_to_visit.is_empty());
 
                 let instructions = context.instructions;
+                let type_alloc = context.type_alloc;
 
                 let link_info : &mut LinkInfo = match file_obj {
                     NameElem::Module(module_uuid) => {
@@ -1543,6 +1541,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
 
                 link_info.resolved_globals = errors_globals.1.into_inner();
                 link_info.errors = errors_globals.0.into_storage();
+                link_info.type_variable_alloc = type_alloc.type_variable_alloc;
             });
         });
         span_debugger.defuse();
