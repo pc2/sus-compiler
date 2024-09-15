@@ -377,6 +377,7 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
 
     // ===== Both =====
 
+    /// Unify the given full type [found] with the expected type [expected]. 
     pub fn typecheck_and_generative<const MUST_BE_GENERATIVE: bool>(
         &self,
         found: &FullType,

@@ -347,7 +347,6 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     /// outside of a condition block
     fn join_with_condition(&self, ref_domain: &DomainType, span: Span) {
         if let Some(condition_domain) = self.get_current_condition_domain() {
-            // Just check that
             self.type_checker.combine_domains::<false, _>(ref_domain, &DomainType::Physical(condition_domain.0), |wire_ref_domain_name, condition_domain_name| {
                 let wire_ref_domain_name = wire_ref_domain_name.unwrap();
                 self.errors.error(span, format!("Attempting to write to a wire from domain '{wire_ref_domain_name}' within a condition in domain '{condition_domain_name}'"))

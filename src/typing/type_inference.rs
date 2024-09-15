@@ -2,8 +2,6 @@
 
 use std::cell::OnceCell;
 
-use itertools::Itertools;
-
 use crate::prelude::*;
 
 use crate::alloc::{UUIDMarker, UUID};
@@ -15,8 +13,8 @@ impl UUIDMarker for TypeVariableIDMarker {
 pub type TypeVariableID = UUID<TypeVariableIDMarker>;
 
 #[derive(Debug, Clone, Copy)]
-enum HindleyMilnerInfo<TypeFuncIdent> {
-    /// Just a marker. Use [HindleyMilner::type_func_for_each_matching]
+pub enum HindleyMilnerInfo<TypeFuncIdent> {
+    /// Just a marker. Use [HindleyMilner::unify_all_args]
     TypeFunc(TypeFuncIdent),
     TypeVar(TypeVariableID),
     /// Used for errors. Just returning Ok(()) prevents type errors from propagating
@@ -105,8 +103,8 @@ impl HindleyMilner<AbstractTypeHMInfo> for AbstractType {
     fn fully_substitute(&mut self, substitution_map: &FlatAlloc<OnceCell<Self>, TypeVariableIDMarker>) {
         match self {
             AbstractType::Error => {}
-            AbstractType::Template(_) => {}
-            AbstractType::Named(_) => {}
+            AbstractType::Template(_) => {} // Template Name is included in get_hm_info
+            AbstractType::Named(_) => {} // Name is included in get_hm_info
             AbstractType::Array(arr_typ) => {
                 arr_typ.fully_substitute(substitution_map);
             },
