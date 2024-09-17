@@ -154,6 +154,7 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         }
     }
 
+    // Compares two types, if they aren't the same then this produces an error. 
     pub fn typecheck_abstr(
         &self,
         found: &AbstractType,
@@ -386,6 +387,8 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         context: &str,
         declared_here: Option<SpanFile>,
     ) {
+
+
         self.typecheck_abstr(&found.typ, span, &expected, context, declared_here);
 
         if MUST_BE_GENERATIVE && found.domain != DomainType::Generative {
