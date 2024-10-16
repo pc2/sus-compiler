@@ -1,12 +1,11 @@
-use crate::alloc::UUIDAllocator;
 use crate::prelude::*;
+use crate::value::Value;
 
-use std::cell::OnceCell;
-use std::{cell::RefCell, ops::Deref};
+use std::ops::Deref;
 
 use super::template::TemplateInputs;
-use super::type_inference::{TypeVariableID, TypeVariableIDMarker};
-use crate::flattening::{BinaryOperator, StructType, UnaryOperator};
+use super::type_inference::{DomainVariableID, DomainVariableIDMarker, TypeSubstitutor, TypeVariableID, TypeVariableIDMarker};
+use crate::flattening::{BinaryOperator, Instruction, StructType, TypingAllocator, UnaryOperator, WrittenType};
 use crate::linker::{get_builtin_type, Resolver};
 use crate::to_string::map_to_type_names;
 
@@ -47,10 +46,15 @@ pub const INT_TYPE: AbstractType = AbstractType::Named(get_builtin_type("int"));
 pub enum DomainType {
     /// Generative conflicts with nothing
     Generative,
-    /// This object is a real wire. It corresponds to a certain (clock) domain. It can only affect wires in the same clock domain.
-    /// Initial value is Physical(DomainID::PLACEHOLDER)
+    /// This object is a real wire. It corresponds to a certain (clock) domain. It can only affect wires in the same domain.
     Physical(DomainID),
+
+    /// These are unified by Hindley-Milner unification
+    /// 
+    /// They always point to non-generative domains. 
+    DomainVariable(DomainVariableID)
 }
+
 impl DomainType {
     pub fn unwrap_physical(&self) -> DomainID {
         let Self::Physical(w) = self else {
@@ -62,10 +66,8 @@ impl DomainType {
         match self {
             DomainType::Generative => true,
             DomainType::Physical(_) => false,
+            DomainType::DomainVariable(_) => false,
         }
-    }
-    pub fn new_unset() -> DomainType {
-        DomainType::Physical(DomainID::PLACEHOLDER)
     }
 }
 
@@ -75,35 +77,6 @@ pub struct FullType {
     pub domain: DomainType,
 }
 
-#[derive(Debug, Clone)]
-enum DomainTypeSubstitution {
-    /// Known Domains correspond to the declared interfaces on the module.
-    ///
-    /// They are mutually exclusive. When two known domains come into contact, they produce an error
-    KnownDomain { name: String },
-    /// Unknown Domains are not mutually exclusive. When an unknown interface meets a known or unknown interface, it converts to an AliasFor
-    UnknownDomain { converts_to: DomainID },
-    /// Hindley-Milner Type Unification. When domains are merged, AliasFor objects are created from one of the domains to the other
-    AliasFor(DomainID),
-}
-
-pub enum BestName {
-    NamedDomain,
-    SubModule(FlatID, DomainID),
-    NamedWire(FlatID),
-    UnnamedWire,
-}
-impl BestName {
-    fn strength(&self) -> i8 {
-        match self {
-            BestName::NamedDomain => 3,
-            BestName::SubModule(_, _) => 2,
-            BestName::NamedWire(_) => 1,
-            BestName::UnnamedWire => 0,
-        }
-    }
-}
-
 /// Unification of domains?
 ///
 /// 'A U 'x -> 'x = 'A
@@ -111,11 +84,10 @@ impl BestName {
 /// 'x U 'y -> 'x = 'y
 pub struct TypeUnifier<'linker, 'errs> {
     pub linker_types: Resolver<'linker, 'errs, TypeUUIDMarker, StructType>,
-    template_type_names: FlatAlloc<String, TemplateIDMarker>,
-    domain_substitutor: RefCell<FlatAlloc<DomainTypeSubstitution, DomainIDMarker>>,
+    pub template_type_names: FlatAlloc<String, TemplateIDMarker>,
     errors: &'errs ErrorCollector<'linker>,
-    pub final_domains: FlatAlloc<BestName, DomainIDMarker>,
-    pub type_substitutor: FlatAlloc<OnceCell<AbstractType>, TypeVariableIDMarker>
+    pub type_substitutor: TypeSubstitutor<AbstractType, TypeVariableIDMarker>,
+    pub domain_substitutor: TypeSubstitutor<DomainType, DomainVariableIDMarker>,
 }
 
 impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
@@ -123,58 +95,85 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         linker_types: Resolver<'linker, 'errs, TypeUUIDMarker, StructType>,
         template_inputs: &TemplateInputs,
         errors: &'errs ErrorCollector<'linker>,
-        domain_names: &FlatAlloc<String, DomainIDMarker>,
-        type_var_id_alloc: &UUIDAllocator<TypeVariableIDMarker>
+        typing_alloc: &TypingAllocator
     ) -> Self {
-        let domains = domain_names
-            .map(|(_id, name)| DomainTypeSubstitution::KnownDomain { name: name.clone() });
-        let final_domains = domain_names.map(|(_id, _interface)| BestName::NamedDomain);
         Self {
             linker_types,
             template_type_names: map_to_type_names(template_inputs),
             errors,
-            domain_substitutor: RefCell::new(domains),
-            final_domains,
-            type_substitutor: type_var_id_alloc.to_flat_alloc()
+            type_substitutor: TypeSubstitutor::init(&typing_alloc.type_variable_alloc),
+            domain_substitutor: TypeSubstitutor::init(&typing_alloc.domain_variable_alloc)
         }
     }
 
-    // ===== Types =====
+    pub fn alloc_typ_variable(&self) -> TypeVariableID {
+        self.type_substitutor.alloc()
+    }
 
-    fn type_compare(&self, expected: &AbstractType, found: &AbstractType) -> bool {
-        match (expected, found) {
-            (AbstractType::Named(exp), AbstractType::Named(fnd)) => exp == fnd,
-            (AbstractType::Template(t), AbstractType::Template(t2)) => t == t2,
-            (AbstractType::Array(exp), AbstractType::Array(fnd)) => {
-                self.type_compare(&exp.deref(), &fnd.deref())
+    pub fn alloc_domain_variable(&self) -> DomainVariableID {
+        self.domain_substitutor.alloc()
+    }
+
+    /// This should always be what happens first to a given variable. 
+    /// 
+    /// Therefore it should be impossible that one of the internal unifications ever fails
+    pub fn unify_with_written_type(&mut self, instructions: &FlatAlloc<Instruction, FlatIDMarker>, wr_typ: &WrittenType, typ: &AbstractType) {
+        match wr_typ {
+            WrittenType::Error(_span) => {} // Already an error, don't unify
+            WrittenType::Template(_span, uuid) => {
+                self.type_substitutor.unify_must_succeed(&typ, &AbstractType::Template(*uuid));
             }
-            (AbstractType::Error, _) | (_, AbstractType::Error) => true, // Just assume correct, because the other side has an error
-            (AbstractType::Unknown(_), _) | (_, AbstractType::Unknown(_)) => todo!("Type Unification"),
-            _ => false,
+            WrittenType::Named(global_reference) => {
+                if !global_reference.template_args.is_empty() {
+                    todo!("Type template arguments")
+                }
+
+                self.type_substitutor.unify_must_succeed(&typ, &AbstractType::Named(global_reference.id));
+            }
+            WrittenType::Array(_span, array_content_and_size) =>  {
+                let (arr_content, size_flat, array_bracket_span) = array_content_and_size.deref();
+
+                let size_instr = instructions[*size_flat].unwrap_wire();
+                
+                // Of course, the user can still make mistakes
+                if !size_instr.typ.domain.is_generative() {
+                    self.errors.error(array_bracket_span.inner_span(), "The size of arrays must be a generative value. (gen)");
+                }
+                
+                let arr_content_variable = AbstractType::Unknown(self.alloc_typ_variable());
+
+                self.type_substitutor.unify_must_succeed(typ, &AbstractType::Array(Box::new(arr_content_variable.clone())));
+
+                Self::unify_with_written_type(self, instructions, arr_content, &arr_content_variable);
+            }
         }
     }
 
-    // Compares two types, if they aren't the same then this produces an error. 
-    pub fn typecheck_abstr(
+    /// TODO make WrittenValue compared to Value to encode Spans
+    pub fn unify_with_constant(&mut self, typ: &AbstractType, value: &Value, value_span: Span) {
+        match value {
+            Value::Bool(_) => self.type_substitutor.unify_report_error(typ, &BOOL_TYPE, value_span, "bool constant"),
+            Value::Integer(_big_int) => self.type_substitutor.unify_report_error(typ, &INT_TYPE, value_span, "int constant"),
+            Value::Array(arr) => {
+                let arr_content_variable = AbstractType::Unknown(self.alloc_typ_variable());
+                self.type_substitutor.unify_report_error(typ, &AbstractType::Array(Box::new(arr_content_variable.clone())), value_span, "array constant");
+                
+                for v in arr.deref() {
+                    self.unify_with_constant(&arr_content_variable, v, value_span);
+                }
+            }
+            Value::Error | Value::Unset => {} // Already an error, don't unify
+        }
+    }
+
+    // Unifies arr_type with output_typ[]
+    pub fn unify_with_array_of(
         &self,
-        found: &AbstractType,
-        span: Span,
-        expected: &AbstractType,
-        context: &str,
-        declared_here: Option<SpanFile>,
+        arr_type: &AbstractType,
+        output_typ: AbstractType,
+        arr_span: Span,
     ) {
-        if !self.type_compare(expected, found) {
-            let expected_name = expected.to_string(&self.linker_types, &self.template_type_names);
-            let found_name = found.to_string(&self.linker_types, &self.template_type_names);
-            let err_ref = self.errors.error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
-            if let Some(declared_here) = declared_here {
-                err_ref.info(declared_here, "Declared here");
-            }
-            assert!(
-                expected_name != found_name,
-                "{expected_name} != {found_name}"
-            );
-        }
+        self.type_substitutor.unify_report_error(arr_type, &AbstractType::Array(Box::new(output_typ)), arr_span, "array access");
     }
 
     pub fn typecheck_unary_operator_abstr(
@@ -182,15 +181,16 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         op: UnaryOperator,
         input_typ: &AbstractType,
         span: Span,
-    ) -> AbstractType {
+        output_typ: &AbstractType,
+    ) {
         if op == UnaryOperator::Not {
-            self.typecheck_abstr(input_typ, span, &BOOL_TYPE, "! input", None);
-            BOOL_TYPE
+            self.type_substitutor.unify_report_error(input_typ, &BOOL_TYPE, span, "! input");
+            self.type_substitutor.unify_report_error(output_typ, &BOOL_TYPE, span, "! output");
         } else if op == UnaryOperator::Negate {
-            self.typecheck_abstr(input_typ, span, &INT_TYPE, "- input", None);
-            INT_TYPE
+            self.type_substitutor.unify_report_error(input_typ, &INT_TYPE, span, "unary - input");
+            self.type_substitutor.unify_report_error(output_typ, &INT_TYPE, span, "unary - output");
         } else {
-            let gather_type = match op {
+            let reduction_type = match op {
                 UnaryOperator::And => BOOL_TYPE,
                 UnaryOperator::Or => BOOL_TYPE,
                 UnaryOperator::Xor => BOOL_TYPE,
@@ -198,16 +198,8 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
                 UnaryOperator::Product => INT_TYPE,
                 _ => unreachable!(),
             };
-            let arr_content_typ = self.typecheck_is_array_abstr(input_typ, span);
-            self.typecheck_abstr(
-                &arr_content_typ,
-                span,
-                &gather_type,
-                &format!("{op} input"),
-                None,
-            );
-
-            gather_type
+            self.type_substitutor.unify_report_error(output_typ, &reduction_type, span, "array reduction");
+            self.unify_with_array_of(input_typ, output_typ.clone(), span);
         }
     }
 
@@ -218,162 +210,43 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         right_typ: &AbstractType,
         left_span: Span,
         right_span: Span,
-    ) -> AbstractType {
-        let ((exp_left, exp_right), out) = match op {
-            BinaryOperator::And => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
-            BinaryOperator::Or => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
-            BinaryOperator::Xor => ((BOOL_TYPE, BOOL_TYPE), BOOL_TYPE),
-            BinaryOperator::Add => ((INT_TYPE, INT_TYPE), INT_TYPE),
-            BinaryOperator::Subtract => ((INT_TYPE, INT_TYPE), INT_TYPE),
-            BinaryOperator::Multiply => ((INT_TYPE, INT_TYPE), INT_TYPE),
-            BinaryOperator::Divide => ((INT_TYPE, INT_TYPE), INT_TYPE),
-            BinaryOperator::Modulo => ((INT_TYPE, INT_TYPE), INT_TYPE),
-            BinaryOperator::Equals => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
-            BinaryOperator::NotEquals => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
-            BinaryOperator::GreaterEq => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
-            BinaryOperator::Greater => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
-            BinaryOperator::LesserEq => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
-            BinaryOperator::Lesser => ((INT_TYPE, INT_TYPE), BOOL_TYPE),
+        output_typ: &AbstractType,
+    ) {
+        let (exp_left, exp_right, out_typ) = match op {
+            BinaryOperator::And => (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
+            BinaryOperator::Or => (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
+            BinaryOperator::Xor => (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
+            BinaryOperator::Add => (INT_TYPE, INT_TYPE, INT_TYPE),
+            BinaryOperator::Subtract => (INT_TYPE, INT_TYPE, INT_TYPE),
+            BinaryOperator::Multiply => (INT_TYPE, INT_TYPE, INT_TYPE),
+            BinaryOperator::Divide => (INT_TYPE, INT_TYPE, INT_TYPE),
+            BinaryOperator::Modulo => (INT_TYPE, INT_TYPE, INT_TYPE),
+            BinaryOperator::Equals => (INT_TYPE, INT_TYPE, BOOL_TYPE),
+            BinaryOperator::NotEquals => (INT_TYPE, INT_TYPE, BOOL_TYPE),
+            BinaryOperator::GreaterEq => (INT_TYPE, INT_TYPE, BOOL_TYPE),
+            BinaryOperator::Greater => (INT_TYPE, INT_TYPE, BOOL_TYPE),
+            BinaryOperator::LesserEq => (INT_TYPE, INT_TYPE, BOOL_TYPE),
+            BinaryOperator::Lesser => (INT_TYPE, INT_TYPE, BOOL_TYPE),
         };
 
-        self.typecheck_abstr(
+        self.type_substitutor.unify_report_error(
             left_typ,
-            left_span,
             &exp_left,
-            &format!("{op} left side"),
-            None,
+            left_span,
+            "binop left side"
         );
-        self.typecheck_abstr(
+        self.type_substitutor.unify_report_error(
             right_typ,
-            right_span,
             &exp_right,
-            &format!("{op} right side"),
-            None,
+            right_span,
+            "binop right side"
         );
-
-        out
-    }
-
-    pub fn typecheck_is_array_abstr(
-        &self,
-        arr_type: &AbstractType,
-        arr_span: Span,
-    ) -> AbstractType {
-        let AbstractType::Array(arr_element_type) = arr_type else {
-            let arr_type_name = arr_type.to_string(&self.linker_types, &self.template_type_names);
-            self.errors.error(arr_span, format!("Typing Error: Attempting to index into this, but it is not of array type, instead found a {arr_type_name}"));
-            return AbstractType::Error;
-        };
-        arr_element_type.deref().clone()
-    }
-
-    // ===== Domains =====
-    fn get_root_domain(&self, mut v: DomainID) -> DomainID {
-        let doms_borrow = self.domain_substitutor.borrow();
-        while let DomainTypeSubstitution::AliasFor(new_v) = &doms_borrow[v] {
-            v = *new_v;
-        }
-        v
-    }
-
-    pub fn new_unknown_domain_id(&self) -> DomainID {
-        self.domain_substitutor
-            .borrow_mut()
-            .alloc(DomainTypeSubstitution::UnknownDomain {
-                converts_to: DomainID::PLACEHOLDER,
-            })
-    }
-
-    pub fn new_unknown_domain(&self, is_generative: bool) -> DomainType {
-        if is_generative {
-            DomainType::Generative
-        } else {
-            DomainType::Physical(self.new_unknown_domain_id())
-        }
-    }
-
-    /// Returns the names of the KnownDomains on error
-    fn try_merge_physical<ErrFunc: FnOnce(&str, &str)>(
-        &self,
-        a: DomainID,
-        b: DomainID,
-        err_func: ErrFunc,
-    ) -> bool {
-        let root_a = self.get_root_domain(a);
-        let root_b = self.get_root_domain(b);
-
-        let mut domains_borrow = self.domain_substitutor.borrow_mut();
-        let Some((dom_a, dom_b)) = domains_borrow.get2_mut(root_a, root_b) else {
-            return true;
-        }; // Same domain anyway
-
-        match (dom_a, dom_b) {
-            (DomainTypeSubstitution::AliasFor(_), _) | (_, DomainTypeSubstitution::AliasFor(_)) => {
-                unreachable!()
-            }
-            (
-                DomainTypeSubstitution::KnownDomain { name: name_a },
-                DomainTypeSubstitution::KnownDomain { name: name_b },
-            ) => {
-                err_func(name_a, name_b);
-                false
-            }
-            (
-                DomainTypeSubstitution::KnownDomain { name: _ },
-                dom_b @ DomainTypeSubstitution::UnknownDomain { converts_to: _ },
-            ) => {
-                *dom_b = DomainTypeSubstitution::AliasFor(root_a);
-                true
-            }
-            (
-                dom_a @ DomainTypeSubstitution::UnknownDomain { converts_to: _ },
-                DomainTypeSubstitution::UnknownDomain { converts_to: _ },
-            )
-            | (
-                dom_a @ DomainTypeSubstitution::UnknownDomain { converts_to: _ },
-                DomainTypeSubstitution::KnownDomain { name: _ },
-            ) => {
-                *dom_a = DomainTypeSubstitution::AliasFor(root_b);
-                true
-            }
-        }
-    }
-
-    /// Passes the names of the conflicting domain to the given error reporting function
-    ///
-    /// B_MUST_BE_SUBTYPE means that a value of type "b" must be able to be assigned to a variable of type "a"
-    ///
-    /// The error function is called with None as the first argument if it's generative. A bit hacky but eh
-    pub fn combine_domains<const B_MUST_BE_SUBTYPE: bool, ErrFunc: FnOnce(Option<&str>, &str)>(
-        &self,
-        a: &DomainType,
-        b: &DomainType,
-        err_func: ErrFunc,
-    ) -> DomainType {
-        match (a, b) {
-            (DomainType::Physical(wa), DomainType::Physical(wb)) => {
-                self.try_merge_physical(*wa, *wb, |l, r| err_func(Some(l), r));
-                DomainType::Physical(*wa)
-            }
-            (DomainType::Generative, DomainType::Physical(w)) => {
-                if B_MUST_BE_SUBTYPE {
-                    let root = self.get_root_domain(*w);
-                    let domains_borrow = self.domain_substitutor.borrow();
-
-                    let other_domain = match &domains_borrow[root] {
-                        DomainTypeSubstitution::KnownDomain { name } => &name,
-                        DomainTypeSubstitution::UnknownDomain { converts_to: _ } => {
-                            "as-of-yet-unknown"
-                        }
-                        DomainTypeSubstitution::AliasFor(_) => unreachable!(),
-                    };
-                    err_func(None, other_domain);
-                }
-                DomainType::Physical(*w)
-            }
-            (DomainType::Physical(w), DomainType::Generative) => DomainType::Physical(*w),
-            (DomainType::Generative, DomainType::Generative) => DomainType::Generative,
-        }
+        self.type_substitutor.unify_report_error(
+            output_typ,
+            &out_typ,
+            Span::new_overarching(left_span, right_span),
+            "binop output"
+        );
     }
 
     // ===== Both =====
@@ -382,57 +255,39 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
     pub fn typecheck_and_generative<const MUST_BE_GENERATIVE: bool>(
         &self,
         found: &FullType,
-        span: Span,
         expected: &AbstractType,
-        context: &str,
-        declared_here: Option<SpanFile>,
+        span: Span,
+        context: &'static str
     ) {
-
-
-        self.typecheck_abstr(&found.typ, span, &expected, context, declared_here);
+        self.type_substitutor.unify_report_error(&found.typ, &expected, span, context);
 
         if MUST_BE_GENERATIVE && found.domain != DomainType::Generative {
-            let err_ref = self
-                .errors
+            self.errors
                 .error(span, format!("A generative value is required in {context}"));
-            if let Some(span_file) = declared_here {
-                err_ref.info(span_file, "Declared here");
+        }
+    }
+
+    pub fn typecheck_domain_from_to(&self, from_domain: &DomainType, to_domain: &DomainType, span: Span, context: &'static str) {
+        match (from_domain.is_generative(), to_domain.is_generative()) {
+            (true, _) => {} // From domain is generative, so nothing needs to be done
+            (false, true) => {
+                self.errors.error(span, format!("Attempting use a non-generative variable in a generative context. "));
+            }
+            (false, false) => {
+                self.domain_substitutor.unify_report_error(&from_domain, &to_domain, span, context);
             }
         }
     }
 
-    pub fn typecheck_write_to(
-        &self,
-        found: &FullType,
-        span: Span,
-        expected: &FullType,
-        context: &str,
-        declared_here: Option<SpanFile>,
-    ) {
-        self.typecheck_abstr(&found.typ, span, &expected.typ, context, declared_here);
-
-        self.combine_domains::<true, _>(&expected.domain, &found.domain, |expected_domain, found_domain| {
-            let err_text = if let Some(expected_domain_is_physical) = expected_domain {
-                format!("Cannot write to a wire in domain '{expected_domain_is_physical}' from a wire in domain '{found_domain}'")
-            } else { // Expected is generative
-                format!("Cannot write to a generative wire from a non-generative wire in domain '{found_domain}'")
-            };
-            let err_ref = self.errors.error(span, err_text);
-            if let Some(declared_here) = declared_here {
-                err_ref.info(declared_here, "Declared here");
-            }
-        });
-    }
     pub fn typecheck_unary_operator(
         &self,
         op: UnaryOperator,
         input_typ: &FullType,
+        output_typ: &FullType,
         span: Span,
-    ) -> FullType {
-        FullType {
-            typ: self.typecheck_unary_operator_abstr(op, &input_typ.typ, span),
-            domain: input_typ.domain,
-        }
+    ) {
+        self.typecheck_unary_operator_abstr(op, &input_typ.typ, span, &output_typ.typ);
+        self.typecheck_domain_from_to(&input_typ.domain, &output_typ.domain, span, "unary op");
     }
 
     pub fn typecheck_binary_operator(
@@ -442,86 +297,40 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         right_typ: &FullType,
         left_span: Span,
         right_span: Span,
-    ) -> FullType {
-        FullType {
-            typ : self.typecheck_binary_operator_abstr(op, &left_typ.typ, &right_typ.typ, left_span, right_span),
-            domain : self.combine_domains::<false, _>(&left_typ.domain, &right_typ.domain, |left_name, right_name| {
-                let left_name = left_name.unwrap();
-                self.errors.error(right_span, format!("Attempting to combine wires of different domains. The domain for this wire is '{right_name}' and the other is '{left_name}'"))
-                    .info_same_file(left_span, format!("Other wire in domain '{left_name}'"));
-            })
-        }
+        output_typ: &FullType,
+    ) {
+        self.typecheck_binary_operator_abstr(op, &left_typ.typ, &right_typ.typ, left_span, right_span, &output_typ.typ);
+        self.typecheck_domain_from_to(&left_typ.domain, &output_typ.domain, left_span, "binop left");
+        self.typecheck_domain_from_to(&right_typ.domain, &output_typ.domain, right_span, "binop right");
     }
 
     pub fn typecheck_array_access(
         &self,
-        arr_type: &FullType,
+        arr_type: &AbstractType,
+        idx_type: &AbstractType,
         arr_span: Span,
-        idx_type: &FullType,
         idx_span: Span,
-    ) -> FullType {
-        self.typecheck_abstr(&idx_type.typ, idx_span, &INT_TYPE, "array index", None);
-        FullType {
-            typ : self.typecheck_is_array_abstr(&arr_type.typ, arr_span),
-            domain : self.combine_domains::<false, _>(&arr_type.domain, &idx_type.domain, |arr_domain, idx_domain| {
-                let arr_domain = arr_domain.unwrap();
-                self.errors.error(idx_span, format!("Attempting to index into an array of a different domain. The domain for this index is '{idx_domain}' but the array is '{arr_domain}'"));
-            })
-        }
+        output_typ: &AbstractType,
+    ) {
+        self.type_substitutor.unify_report_error(&idx_type, &INT_TYPE, idx_span, "array index");
+        self.unify_with_array_of(&arr_type, output_typ.clone(), arr_span);
     }
 
-    /// At this point, the only elements in self.domains that aren't [DomainTypeSubstitution::AliasFor] are unique, and each represent their domain
-    pub fn finalize_domain(&mut self, w: DomainID, best_name: BestName) -> DomainID {
-        let root_dom = self.get_root_domain(w);
-        match &mut self.domain_substitutor.get_mut()[root_dom] {
-            DomainTypeSubstitution::KnownDomain { name: _ } => root_dom,
-            DomainTypeSubstitution::UnknownDomain { converts_to } => {
-                if *converts_to == DomainID::PLACEHOLDER {
-                    *converts_to = self.final_domains.alloc(best_name);
-                } else {
-                    let found_name = &mut self.final_domains[*converts_to];
-                    if best_name.strength() > found_name.strength() {
-                        *found_name = best_name;
-                    }
-                }
-                *converts_to
-            }
-            DomainTypeSubstitution::AliasFor(_) => unreachable!(),
-        }
+    pub fn typecheck_write_to(
+        &self,
+        found: &FullType,
+        expected: &FullType,
+        span: Span,
+        context: &'static str
+    ) {
+        self.type_substitutor.unify_report_error(&found.typ, &expected.typ, span, context);
+        self.typecheck_domain_from_to(&found.domain, &expected.domain, span, context);
     }
 
-    pub fn finalize_type(&mut self, typ: &mut FullType, span: Span, best_name: BestName) {
-        match &mut typ.domain {
-            DomainType::Generative => {}
-            DomainType::Physical(w) => {
-                assert!(*w != DomainID::PLACEHOLDER);
-                let root = self.finalize_domain(*w, best_name);
-                *w = root;
-            }
-        }
-        if typ.typ.contains_error_or_unknown::<true, true>() {
-            self.errors.error(
-                span,
-                format!(
-                    "Unresolved Type: {}",
-                    typ.typ
-                        .to_string(&self.linker_types, &self.template_type_names)
-                ),
-            );
-        }
-    }
-}
+    pub fn finalize_type(&mut self, typ: &mut FullType) {
+        use super::type_inference::HindleyMilner;
 
-impl<'linker, 'errs> std::fmt::Debug for TypeUnifier<'linker, 'errs> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("TypeUnifier::domains\n")?;
-        let domains_borrow = self.domain_substitutor.borrow();
-        for (id, d) in domains_borrow.iter() {
-            id.fmt(f)?;
-            f.write_str(" -> ")?;
-            d.fmt(f)?;
-            f.write_str("\n")?;
-        }
-        Ok(())
+        typ.domain.fully_substitute(&self.domain_substitutor);
+        typ.typ.fully_substitute(&self.type_substitutor);
     }
 }

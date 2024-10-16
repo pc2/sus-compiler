@@ -668,6 +668,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         let wire_found = self.wire_to_real_wire(w, original_instruction, domain)?;
                         SubModuleOrWire::Wire(wire_found)
                     }
+                    DomainType::DomainVariable(_) => unreachable!("Domain variables have been eliminated by type checking")
                 },
                 Instruction::Write(conn) => {
                     self.instantiate_connection(
@@ -739,6 +740,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             // Get rid of the condition
                             let _ = self.condition_stack.pop().unwrap();
                         }
+                        DomainType::DomainVariable(_) => unreachable!("Domain variables have been eliminated by type checking")
                     }
                     instruction_range.skip_to(stm.else_end);
                     continue;

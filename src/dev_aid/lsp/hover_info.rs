@@ -162,6 +162,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                             .push(Cow::Owned(DomainType::physical_to_string(ph, &md.domains)))
                     }
                 }
+                DomainType::DomainVariable(_) => unreachable!("Variables should have been eliminated already")
             };
             details_vec.push(Cow::Owned(
                 wire.typ

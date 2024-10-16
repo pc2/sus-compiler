@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::typing::type_inference::{FailedUnification, HindleyMilner};
 
 use walk::for_each_generative_input_in_template_args;
 
@@ -8,7 +9,7 @@ use crate::linker::{
 };
 
 use crate::typing::{
-    abstract_type::{BestName, DomainType, TypeUnifier, BOOL_TYPE, INT_TYPE},
+    abstract_type::{DomainType, TypeUnifier, BOOL_TYPE, INT_TYPE},
     template::TemplateArgKind,
 };
 
@@ -34,7 +35,6 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
                         types,
                         &modules.working_on.link_info.template_arguments,
                         name_resolver.errors,
-                        &modules.working_on.domain_names,
                         &modules.working_on.link_info.type_variable_alloc
                     ),
                     constants,
@@ -122,8 +122,23 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     }
 
-    fn get_type_of_wire_reference(&self, wire_ref: &WireReference) -> FullType {
-        let mut write_to_type = match &wire_ref.root {
+    /// Wire references are used in two contexts: 
+    /// - Reading from a wire
+    /// - Writing to a wire
+    /// 
+    /// The AbstractTypes just get unified
+    /// 
+    /// But the domains behave differently. 
+    /// - Reading: 
+    ///     The domains combine to form the lowest common denominator. 
+    ///     If all are generative this becomes generative
+    ///     At least one non-generative domain makes the whole thing non-generative
+    ///     It should be supplied with a generative output_typ domain when generative, and an unknown domain variable otherwise
+    /// - Writing: 
+    ///     The output_typ domain should be generative when wire_ref.root is generative, or a generative value is required such as with "initial"
+    ///     When wire_ref.root is not generative, it should be an unknown domain variable
+    fn typecheck_wire_reference(&self, wire_ref: &WireReference, whole_span: Span, output_typ: &FullType) {
+        let root_type = match &wire_ref.root {
             WireReferenceRoot::LocalDecl(id, _) => {
                 let decl_root = self.modules.working_on.instructions[*id].unwrap_wire_declaration();
                 decl_root.typ.clone()
@@ -136,23 +151,31 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 self.get_type_of_port(port.port, port.submodule_decl)
             }
         };
-
+        self.type_checker.typecheck_domain_from_to(&root_type.domain, &output_typ.domain, whole_span, "array access array");
+        
+        let mut current_type_in_progress = root_type.typ;
         for p in &wire_ref.path {
             match p {
                 &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
                     let idx_wire = self.modules.working_on.instructions[idx].unwrap_wire();
 
-                    write_to_type = self.type_checker.typecheck_array_access(
-                        &write_to_type,
-                        bracket_span.outer_span(),
-                        &idx_wire.typ,
+                    let new_resulting_variable = AbstractType::Unknown(self.type_checker.alloc_typ_variable());
+                    let arr_span = bracket_span.outer_span();
+                    self.type_checker.typecheck_array_access(
+                        &current_type_in_progress,
+                        &idx_wire.typ.typ,
+                        arr_span,
                         idx_wire.span,
+                        &new_resulting_variable
                     );
+
+                    self.type_checker.typecheck_domain_from_to(&idx_wire.typ.domain, &output_typ.domain, idx_wire.span, "array access index");
+                    current_type_in_progress = new_resulting_variable;
                 }
             }
         }
 
-        write_to_type
+        self.type_checker.type_substitutor.unify_report_error(&current_type_in_progress, &output_typ.typ, whole_span, "variable reference");
     }
 
     fn control_flow_visit_instruction(&mut self, inst_id: FlatID) {
@@ -281,17 +304,15 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     let template_input_decl = target_instructions
                         [template_input.declaration_instruction]
                         .unwrap_wire_declaration();
-                    let declared_here = Some((template_input_decl.name_span, self.errors.file));
                     let val_wire = self.modules.working_on.instructions[*val].unwrap_wire();
                     let target_abstract_type = template_input_decl
                         .typ_expr
                         .to_type_with_substitute(&global_ref.template_args);
                     self.type_checker.typecheck_and_generative::<true>(
                         &val_wire.typ,
-                        val_wire.span,
                         &target_abstract_type,
-                        "generative template argument",
-                        declared_here,
+                        val_wire.span,
+                        "generative template argument"
                     );
                 }
             }
@@ -313,10 +334,9 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 let idx_wire = self.modules.working_on.instructions[*arr_idx].unwrap_wire();
                 self.type_checker.typecheck_and_generative::<true>(
                     &idx_wire.typ,
-                    idx_wire.span,
                     &INT_TYPE,
-                    "array size",
-                    None,
+                    idx_wire.span,
+                    "array size"
                 );
             }
         }
@@ -332,27 +352,24 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     /// outside of a condition block
     fn join_with_condition(&self, ref_domain: &DomainType, span: Span) {
         if let Some(condition_domain) = self.get_current_condition_domain() {
-            self.type_checker.combine_domains::<false, _>(ref_domain, &DomainType::Physical(condition_domain.0), |wire_ref_domain_name, condition_domain_name| {
-                let wire_ref_domain_name = wire_ref_domain_name.unwrap();
-                self.errors.error(span, format!("Attempting to write to a wire from domain '{wire_ref_domain_name}' within a condition in domain '{condition_domain_name}'"))
-                    .info_same_file(condition_domain.1, format!("This condition has domain '{condition_domain_name}'"));
-            });
+            self.type_checker.typecheck_domain_from_to(ref_domain, &DomainType::Physical(condition_domain.0), span, "condition join");
         }
     }
 
-    fn typecheck_visit_instruction(&self, instr_id: FlatID) {
+    fn typecheck_visit_instruction(&mut self, instr_id: FlatID) {
         match &self.modules.working_on.instructions[instr_id] {
             Instruction::SubModule(sm) => {
-                self.typecheck_template_global(&sm.module_ref);
+                // IDK TODO. Resetting Module domains is unknown as of yet
+                /*self.typecheck_template_global(&sm.module_ref);
                 let md = &self.modules[sm.module_ref.id];
                 let local_interface_domains = md
                     .domain_names
-                    .map(|_| self.type_checker.new_unknown_domain_id());
+                    .map(|_| self.type_checker.alloc_domain_variable());
 
                 let Instruction::SubModule(sm) = &mut self.modules.working_on.instructions[instr_id] else {
                     unreachable!()
                 };
-                sm.local_interface_domains = local_interface_domains;
+                sm.local_interface_domains = local_interface_domains;*/
             }
             Instruction::Declaration(decl) => {
                 if let Some(latency_spec) = decl.latency_specifier {
@@ -360,36 +377,22 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         self.modules.working_on.instructions[latency_spec].unwrap_wire();
                     self.type_checker.typecheck_and_generative::<true>(
                         &latency_spec_wire.typ,
-                        latency_spec_wire.span,
                         &INT_TYPE,
-                        "latency specifier",
-                        None,
+                        latency_spec_wire.span,
+                        "latency specifier"
                     );
                 }
-
-                self.typecheck_written_type(&decl.typ_expr);
-
-                let typ = decl.typ_expr.to_type();
-                let Instruction::Declaration(decl) =
-                    &mut self.modules.working_on.instructions[instr_id]
-                else {
-                    unreachable!()
-                };
-                decl.typ.typ = typ;
-                if decl.typ.domain == DomainType::Physical(DomainID::PLACEHOLDER) {
-                    decl.typ.domain = self
-                        .type_checker
-                        .new_unknown_domain(decl.identifier_type.is_generative());
-                }
+                
+                // Unify with the type written in the source code
+                self.type_checker.unify_with_written_type(&self.modules.working_on.instructions, &decl.typ_expr, &decl.typ.typ);
             }
             Instruction::IfStatement(stm) => {
                 let wire = &self.modules.working_on.instructions[stm.condition].unwrap_wire();
                 self.type_checker.typecheck_and_generative::<false>(
                     &wire.typ,
-                    wire.span,
                     &BOOL_TYPE,
-                    "if statement condition",
-                    None,
+                    wire.span,
+                    "if statement condition"
                 );
             }
             Instruction::ForStatement(stm) => {
@@ -399,29 +402,30 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
                 self.type_checker.typecheck_and_generative::<true>(
                     &start.typ,
-                    start.span,
                     &loop_var.typ.typ,
-                    "for loop start",
-                    None,
+                    start.span,
+                    "for loop start"
                 );
                 self.type_checker.typecheck_and_generative::<true>(
                     &end.typ,
-                    end.span,
                     &loop_var.typ.typ,
-                    "for loop end",
-                    None,
+                    end.span,
+                    "for loop end"
                 );
             }
             Instruction::Wire(w) => {
-                let result_typ = match &w.source {
-                    WireSource::WireRef(from_wire) => self.get_type_of_wire_reference(from_wire),
+                match &w.source {
+                    WireSource::WireRef(from_wire) => {
+                        self.typecheck_wire_reference(from_wire, w.span, &w.typ);
+                    }
                     &WireSource::UnaryOp { op, right } => {
                         let right_wire = self.modules.working_on.instructions[right].unwrap_wire();
                         self.type_checker.typecheck_unary_operator(
                             op,
                             &right_wire.typ,
-                            right_wire.span,
-                        )
+                            &w.typ,
+                            right_wire.span
+                        );
                     }
                     &WireSource::BinaryOp { op, left, right } => {
                         let left_wire = self.modules.working_on.instructions[left].unwrap_wire();
@@ -432,14 +436,11 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                             &right_wire.typ,
                             left_wire.span,
                             right_wire.span,
+                            &w.typ
                         )
                     }
-                    WireSource::Constant(value) => value.get_type_of_constant(),
+                    WireSource::Constant(value) => self.type_checker.unify_with_constant(&w.typ.typ, value, w.span),
                 };
-                let Instruction::Wire(w) = &mut self.modules.working_on.instructions[instr_id] else {
-                    unreachable!()
-                };
-                w.typ = result_typ;
             }
             Instruction::FuncCall(fc) => {
                 for (port, arg) in std::iter::zip(fc.func_call_inputs.into_iter(), &fc.arguments) {
@@ -456,42 +457,34 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     self.join_with_condition(&write_to_type.domain, from_wire.span.debug());
                     self.type_checker.typecheck_write_to(
                         &from_wire.typ,
-                        from_wire.span,
                         &write_to_type,
-                        "function argument",
-                        Some(declared_here),
+                        from_wire.span,
+                        "function argument"
                     );
                 }
             }
             Instruction::Write(conn) => {
-                // Typecheck digging down into write side
-                let mut write_to_type = self.get_type_of_wire_reference(&conn.to);
+                // Typecheck the value with target type
+                let from_wire = self.modules.working_on.instructions[conn.from].unwrap_wire();
 
-                self.join_with_condition(&write_to_type.domain, conn.to_span.debug());
+                // Typecheck digging down into write side
+                self.typecheck_wire_reference(&conn.to, conn.to_span, &conn.to_type);
+                self.join_with_condition(&conn.to_type.domain, conn.to_span.debug());
 
                 let declared_here = self.get_wire_ref_declaration_point(&conn.to.root);
 
                 let write_context = match conn.write_modifiers {
-                    WriteModifiers::Connection {
-                        num_regs: _,
-                        regs_span: _,
-                    } => "connection",
-                    WriteModifiers::Initial { initial_kw_span: _ } => {
-                        write_to_type.domain = DomainType::Generative;
-                        "initial value"
-                    }
+                    WriteModifiers::Connection {..} => "connection",
+                    WriteModifiers::Initial { initial_kw_span: _ } => "initial value"
                 };
 
-                // Typecheck the value with target type
-                let from_wire = self.modules.working_on.instructions[conn.from].unwrap_wire();
 
                 from_wire.span.debug();
                 self.type_checker.typecheck_write_to(
                     &from_wire.typ,
+                    &conn.to_type,
                     from_wire.span,
-                    &write_to_type,
                     write_context,
-                    declared_here,
                 );
             }
         }
@@ -517,30 +510,52 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             self.typecheck_visit_instruction(elem_id);
         }
 
+        for FailedUnification{mut found, mut expected, span, context} in self.type_checker.type_substitutor.extract_errors() {
+            found.fully_substitute(&self.type_checker.type_substitutor);
+            expected.fully_substitute(&self.type_checker.type_substitutor);
+
+            let expected_name = expected.to_string(&self.type_checker.linker_types, &self.type_checker.template_type_names);
+            let found_name = found.to_string(&self.type_checker.linker_types, &self.type_checker.template_type_names);
+            self.errors.error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
+
+            assert!(
+                expected_name != found_name,
+                "{expected_name} != {found_name}"
+            );
+        }
+        for FailedUnification{mut found, mut expected, span, context} in self.type_checker.domain_substitutor.extract_errors() {
+            found.fully_substitute(&self.type_checker.domain_substitutor);
+            expected.fully_substitute(&self.type_checker.domain_substitutor);
+
+            let expected_name = format!("{expected:?}");
+            let found_name = format!("{found:?}");
+            self.errors.error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"));
+
+            assert!(
+                expected_name != found_name,
+                "{expected_name} != {found_name}"
+            );
+        }
+
         // Post type application. Solidify types and flag any remaining AbstractType::Unknown
         for (id, inst) in self.modules.working_on.instructions.iter_mut() {
             match inst {
-                Instruction::Wire(w) => {
-                    self.type_checker
-                        .finalize_type(&mut w.typ, w.span, BestName::UnnamedWire);
-                }
-                Instruction::Declaration(decl) => self.type_checker.finalize_type(
-                    &mut decl.typ,
-                    decl.decl_span,
-                    BestName::NamedWire(id),
-                ),
-                Instruction::SubModule(sm) => {
+                Instruction::Wire(w) => self.type_checker.finalize_type(&mut w.typ),
+                Instruction::Declaration(decl) => self.type_checker.finalize_type(&mut decl.typ),
+                // IDK TODO re-add with new submodule domain system
+                /*Instruction::SubModule(sm) => {
                     for (interface_id, i) in &mut sm.local_interface_domains {
                         *i = self
                             .type_checker
-                            .finalize_domain(*i, BestName::SubModule(id, interface_id));
+                            .domain_substitutor.(*i, BestName::SubModule(id, interface_id));
                     }
-                }
+                }*/
                 _other => {}
             }
         }
-
-        self.modules.working_on.domains =
+        
+        // IDK TODO, I'll see how this pans out later
+        /*self.modules.working_on.domains =
             self.type_checker
                 .final_domains
                 .map(|(id, best_name)| DomainInfo {
@@ -558,7 +573,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                             .clone(),
                         BestName::UnnamedWire => format!("domain_{}", id.get_hidden_value()),
                     },
-                });
+                });*/
     }
 
     /*

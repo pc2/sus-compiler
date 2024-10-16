@@ -7,6 +7,7 @@ mod walk;
 
 use crate::alloc::UUIDAllocator;
 use crate::prelude::*;
+use crate::typing::type_inference::{DomainVariableIDMarker, TypeVariableIDMarker};
 
 use std::ops::Deref;
 
@@ -251,6 +252,7 @@ impl WireReferencePathElement {
     }
 }
 
+
 #[derive(Debug, Clone, Copy)]
 pub enum WireReferenceRoot {
     LocalDecl(FlatID, Span),
@@ -282,18 +284,21 @@ impl WireReferenceRoot {
 pub struct WireReference {
     pub root: WireReferenceRoot,
     pub path: Vec<WireReferencePathElement>,
+    pub is_generative: bool,
 }
 
 impl WireReference {
     fn simple_port(port: PortInfo) -> WireReference {
         WireReference {
             root: WireReferenceRoot::SubModulePort(port),
+            is_generative: false,
             path: Vec::new(),
         }
     }
-    fn simple_var_read(id: FlatID, name_span: Span) -> WireReference {
+    fn simple_var_read(id: FlatID, is_generative: bool, name_span: Span) -> WireReference {
         WireReference{
             root: WireReferenceRoot::LocalDecl(id, name_span),
+            is_generative,
             path: Vec::new()
         }
     }
@@ -305,11 +310,27 @@ pub enum WriteModifiers {
     Initial { initial_kw_span: Span },
 }
 
+impl WriteModifiers {
+    pub fn requires_generative(&self) -> bool {
+        match self {
+            Self::Connection { .. } => false,
+            Self::Initial { .. } => true
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Write {
     pub from: FlatID,
     pub to: WireReference,
     pub to_span: Span,
+    /// The type and domain to which will be written. 
+    /// 
+    /// The output_typ domain should be generative when to.root is generative, or a generative value is required such as with "initial"
+    /// When this is not the case, it should be initialized with an unknown Domain Variable
+    /// 
+    /// In short, this should be the type and domain *to which* the read type must be unified. 
+    pub to_type: FullType,
     pub write_modifiers: WriteModifiers,
 }
 
@@ -547,6 +568,7 @@ impl FuncCallInstruction {
 #[derive(Debug)]
 pub struct IfStatement {
     pub condition: FlatID,
+    pub is_generative: bool,
     pub then_start: FlatID,
     pub then_end_else_start: FlatID,
     pub else_end: FlatID,
@@ -607,4 +629,10 @@ impl Instruction {
 pub enum ModuleOrWrittenType {
     WrittenType(WrittenType),
     Module(GlobalReference<ModuleUUID>),
+}
+
+#[derive(Debug)]
+pub struct TypingAllocator {
+    pub type_variable_alloc: UUIDAllocator<TypeVariableIDMarker>,
+    pub domain_variable_alloc: UUIDAllocator<DomainVariableIDMarker>
 }

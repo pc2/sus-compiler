@@ -68,6 +68,9 @@ impl<IndexMarker> UUIDAllocator<IndexMarker> {
         self.cur.0+=1;
         allocated_id
     }
+    pub fn peek(&self) -> UUID<IndexMarker> {
+        self.cur
+    }
     pub fn to_flat_alloc<T: Default>(&self) -> FlatAlloc<T, IndexMarker> {
         let mut result = FlatAlloc::with_capacity(self.cur.0);
         for _ in 0..self.cur.0 {
@@ -80,6 +83,16 @@ impl<IndexMarker> UUIDAllocator<IndexMarker> {
 impl<IndexMarker: UUIDMarker> std::fmt::Debug for UUIDAllocator<IndexMarker> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("UUIDAllocator").field("count: ", &self.cur.0).finish()
+    }
+}
+
+impl<IndexMarker: UUIDMarker> IntoIterator for &UUIDAllocator<IndexMarker> {
+    type Item = UUID<IndexMarker>;
+
+    type IntoIter = UUIDRangeIter<IndexMarker>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        UUIDRangeIter(UUID::from_hidden_value(0), self.cur)
     }
 }
 

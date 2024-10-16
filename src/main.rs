@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 mod alloc;
+mod block_vector;
 mod util;
 
 mod config;

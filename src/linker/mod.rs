@@ -1,8 +1,8 @@
+use crate::prelude::*;
+
 pub mod checkpoint;
 mod resolver;
 pub use resolver::*;
-
-use crate::{alloc::UUIDAllocator, prelude::*, typing::type_inference::TypeVariableIDMarker};
 
 use std::{
     cell::RefCell,
@@ -21,7 +21,7 @@ use crate::{
 
 use crate::errors::{CompileError, ErrorInfo, ErrorLevel, ErrorStore};
 
-use crate::flattening::StructType;
+use crate::flattening::{StructType, TypingAllocator};
 
 use crate::typing::{
     abstract_type::{DomainType, FullType},
@@ -94,7 +94,7 @@ pub struct LinkInfo {
     /// Created in Stage 2: Flattening
     /// 
     /// Is only temporary. It's used during typechecking to allocate the type unification block
-    pub type_variable_alloc: UUIDAllocator<TypeVariableIDMarker>,
+    pub type_variable_alloc: TypingAllocator,
 
     pub template_arguments: TemplateInputs,
 
