@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::Index;
 
-use crate::block_vector::BlockVec;
+use crate::block_vector::{BlockVec, BlockVecIter};
 use crate::prelude::*;
 
 use crate::alloc::{UUIDAllocator, UUIDMarker, UUID};
@@ -32,10 +32,23 @@ pub struct FailedUnification<MyType> {
     pub context: &'static str
 }
 
+/// Pretty big block size so for most typing needs we only need one
+const BLOCK_SIZE : usize = 512;
+
 pub struct TypeSubstitutor<MyType : HindleyMilner<VariableIDMarker>, VariableIDMarker : UUIDMarker> {
-    substitution_map: BlockVec<OnceCell<MyType>, 512>, // Pretty big block size so we usually just need one
+    substitution_map: BlockVec<OnceCell<MyType>, BLOCK_SIZE>,
     failed_unifications: RefCell<Vec<FailedUnification<MyType>>>,
     _ph: PhantomData<VariableIDMarker>
+}
+
+impl<'v, MyType: HindleyMilner<VariableIDMarker> + 'v, VariableIDMarker: UUIDMarker> IntoIterator for &'v TypeSubstitutor<MyType, VariableIDMarker> {
+    type Item = &'v OnceCell<MyType>;
+
+    type IntoIter = BlockVecIter<'v, OnceCell<MyType>, BLOCK_SIZE>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.substitution_map.iter()
+    }
 }
 
 impl<MyType : HindleyMilner<VariableIDMarker>, VariableIDMarker : UUIDMarker> Index<UUID<VariableIDMarker>> for TypeSubstitutor<MyType, VariableIDMarker> {
@@ -45,6 +58,8 @@ impl<MyType : HindleyMilner<VariableIDMarker>, VariableIDMarker : UUIDMarker> In
         &self.substitution_map[index.get_hidden_value()]
     }
 }
+
+
 
 impl<MyType : HindleyMilner<VariableIDMarker>+Clone, VariableIDMarker : UUIDMarker> TypeSubstitutor<MyType, VariableIDMarker> {
     pub fn init(variable_alloc : &UUIDAllocator<VariableIDMarker>) -> Self {
@@ -109,6 +124,10 @@ impl<MyType : HindleyMilner<VariableIDMarker>+Clone, VariableIDMarker : UUIDMark
     }
     pub fn extract_errors(&mut self) -> Vec<FailedUnification<MyType>> {
         self.failed_unifications.replace(Vec::new())
+    }
+
+    pub fn iter(&self) -> BlockVecIter<'_, OnceCell<MyType>, BLOCK_SIZE> {
+        self.into_iter()
     }
 }
 

@@ -537,6 +537,14 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             );
         }
 
+        // Set the remaining domain variables that aren't associated with a module port. 
+        // We just find domain IDs that haven't been 
+        let mut leftover_domain_alloc = UUIDAllocator::new_start_from(self.modules.working_on.domain_names.get_next_alloc_id());
+        for d in self.type_checker.domain_substitutor.iter() {
+            if d.get().is_none() {
+                assert!(d.set(DomainType::Physical(leftover_domain_alloc.alloc())).is_ok());
+            }
+        }
         // Post type application. Solidify types and flag any remaining AbstractType::Unknown
         for (id, inst) in self.modules.working_on.instructions.iter_mut() {
             match inst {

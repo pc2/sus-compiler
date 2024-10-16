@@ -63,6 +63,11 @@ impl<IndexMarker> UUIDAllocator<IndexMarker> {
             cur: UUID(0, PhantomData)
         }
     }
+    pub fn new_start_from(start: UUID<IndexMarker>) -> Self {
+        Self {
+            cur: start
+        }
+    }
     pub fn alloc(&mut self) -> UUID<IndexMarker> {
         let allocated_id = self.cur;
         self.cur.0+=1;
