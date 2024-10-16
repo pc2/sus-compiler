@@ -542,6 +542,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             match inst {
                 Instruction::Wire(w) => self.type_checker.finalize_type(&mut w.typ),
                 Instruction::Declaration(decl) => self.type_checker.finalize_type(&mut decl.typ),
+                Instruction::Write(Write { to_type, .. }) => self.type_checker.finalize_type(to_type),
                 // IDK TODO re-add with new submodule domain system
                 /*Instruction::SubModule(sm) => {
                     for (interface_id, i) in &mut sm.local_interface_domains {
