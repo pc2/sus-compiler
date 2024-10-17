@@ -83,6 +83,9 @@ impl<IndexMarker> UUIDAllocator<IndexMarker> {
         }
         result
     }
+    pub fn into_range(&self) -> UUIDRange<IndexMarker> {
+        UUIDRange(UUID::from_hidden_value(0), self.cur)
+    }
 }
 
 impl<IndexMarker: UUIDMarker> std::fmt::Debug for UUIDAllocator<IndexMarker> {

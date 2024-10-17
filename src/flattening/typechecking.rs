@@ -518,6 +518,18 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 assert!(d.set(DomainType::Physical(leftover_domain_alloc.alloc())).is_ok());
             }
         }
+
+        // Assign names to all of the domains in this module
+        self.modules.working_on.domains = leftover_domain_alloc.into_range().map(|id| DomainInfo {
+            name: {
+                if let Some(name) = self.modules.working_on.domain_names.get(id) {
+                    name.clone()
+                } else {
+                    format!("domain_{}", id.get_hidden_value())
+                }
+            }
+        });
+
         // Post type application. Solidify types and flag any remaining AbstractType::Unknown
         for (_id, inst) in self.modules.working_on.instructions.iter_mut() {
             match inst {
