@@ -510,33 +510,6 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             self.typecheck_visit_instruction(elem_id);
         }
 
-        for FailedUnification{mut found, mut expected, span, context} in self.type_checker.type_substitutor.extract_errors() {
-            found.fully_substitute(&self.type_checker.type_substitutor);
-            expected.fully_substitute(&self.type_checker.type_substitutor);
-
-            let expected_name = expected.to_string(&self.type_checker.linker_types, &self.type_checker.template_type_names);
-            let found_name = found.to_string(&self.type_checker.linker_types, &self.type_checker.template_type_names);
-            self.errors.error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
-
-            assert!(
-                expected_name != found_name,
-                "{expected_name} != {found_name}"
-            );
-        }
-        for FailedUnification{mut found, mut expected, span, context} in self.type_checker.domain_substitutor.extract_errors() {
-            found.fully_substitute(&self.type_checker.domain_substitutor);
-            expected.fully_substitute(&self.type_checker.domain_substitutor);
-
-            let expected_name = format!("{expected:?}");
-            let found_name = format!("{found:?}");
-            self.errors.error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"));
-
-            assert!(
-                expected_name != found_name,
-                "{expected_name} != {found_name}"
-            );
-        }
-
         // Set the remaining domain variables that aren't associated with a module port. 
         // We just find domain IDs that haven't been 
         let mut leftover_domain_alloc = UUIDAllocator::new_start_from(self.modules.working_on.domain_names.get_next_alloc_id());
@@ -548,18 +521,46 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         // Post type application. Solidify types and flag any remaining AbstractType::Unknown
         for (_id, inst) in self.modules.working_on.instructions.iter_mut() {
             match inst {
-                Instruction::Wire(w) => self.type_checker.finalize_type(&mut w.typ),
-                Instruction::Declaration(decl) => self.type_checker.finalize_type(&mut decl.typ),
-                Instruction::Write(Write { to_type, .. }) => self.type_checker.finalize_type(to_type),
+                Instruction::Wire(w) => self.type_checker.finalize_type(&mut w.typ, w.span),
+                Instruction::Declaration(decl) => self.type_checker.finalize_type(&mut decl.typ, decl.name_span),
+                Instruction::Write(Write { to_type, to_span, .. }) => self.type_checker.finalize_type(to_type, *to_span),
                 // IDK TODO re-add with new submodule domain system
                 Instruction::SubModule(sm) => {
                     for (_domain_id_in_submodule, domain_assigned_to_it_here) in &mut sm.local_interface_domains {
                         use self::HindleyMilner;
-                        domain_assigned_to_it_here.fully_substitute(&self.type_checker.domain_substitutor);
+                        domain_assigned_to_it_here.fully_substitute(&self.type_checker.domain_substitutor).unwrap();
                     }
                 }
                 _other => {}
             }
+        }
+
+        for FailedUnification{mut found, mut expected, span, context} in self.type_checker.type_substitutor.extract_errors() {
+            // Not being able to fully substitute is not an issue. We just display partial types
+            let _ = found.fully_substitute(&self.type_checker.type_substitutor);
+            let _ = expected.fully_substitute(&self.type_checker.type_substitutor);
+
+            let expected_name = expected.to_string(&self.type_checker.linker_types, &self.type_checker.template_type_names);
+            let found_name = found.to_string(&self.type_checker.linker_types, &self.type_checker.template_type_names);
+            self.errors.error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
+
+            assert!(
+                expected_name != found_name,
+                "{expected_name} != {found_name}"
+            );
+        }
+        for FailedUnification{mut found, mut expected, span, context} in self.type_checker.domain_substitutor.extract_errors() {
+            found.fully_substitute(&self.type_checker.domain_substitutor).unwrap();
+            expected.fully_substitute(&self.type_checker.domain_substitutor).unwrap();
+
+            let expected_name = format!("{expected:?}");
+            let found_name = format!("{found:?}");
+            self.errors.error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"));
+
+            assert!(
+                expected_name != found_name,
+                "{expected_name} != {found_name}"
+            );
         }
     }
 

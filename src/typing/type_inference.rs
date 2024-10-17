@@ -159,7 +159,9 @@ pub trait HindleyMilner<VariableIDMarker: UUIDMarker> : Sized {
     fn unify_all_args<F : FnMut(&Self, &Self) -> bool>(left : &Self, right : &Self, unify : &mut F) -> bool;
 
     /// Has to be implemented per 
-    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, VariableIDMarker>);
+    /// 
+    /// Returns Ok(()) when no variables remain
+    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, VariableIDMarker>) -> Result<(), ()>;
 }
 
 
@@ -192,17 +194,17 @@ impl HindleyMilner<TypeVariableIDMarker> for AbstractType {
         }
     }
 
-    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, TypeVariableIDMarker>) {
+    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, TypeVariableIDMarker>) -> Result<(), ()> {
         match self {
-            AbstractType::Error => {}
-            AbstractType::Template(_) => {} // Template Name is included in get_hm_info
-            AbstractType::Named(_) => {} // Name is included in get_hm_info
+            AbstractType::Error => Ok(()),
+            AbstractType::Template(_) => Ok(()), // Template Name is included in get_hm_info
+            AbstractType::Named(_) => Ok(()), // Name is included in get_hm_info
             AbstractType::Array(arr_typ) => {
-                arr_typ.fully_substitute(substitutor);
+                arr_typ.fully_substitute(substitutor)
             },
             AbstractType::Unknown(var) => {
-                *self = substitutor.substitution_map[var.get_hidden_value()].get().expect("No unknown type variables can be left").clone();
-                self.fully_substitute(substitutor);
+                *self = substitutor.substitution_map[var.get_hidden_value()].get().ok_or(())?.clone();
+                self.fully_substitute(substitutor)
             }
         }
     }
@@ -224,12 +226,13 @@ impl HindleyMilner<DomainVariableIDMarker> for DomainType {
         true
     }
 
-    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, DomainVariableIDMarker>) {
+    /// For domains, always returns Ok(()). Or rather it should, since any leftover unconnected domains should be assigned an ID of their own by the type checker
+    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, DomainVariableIDMarker>) -> Result<(), ()> {
         match self {
-            DomainType::Generative | DomainType::Physical(_) => {} // Do nothing, These are done already
+            DomainType::Generative | DomainType::Physical(_) => Ok(()), // Do nothing, These are done already
             DomainType::DomainVariable(var) => {
-                *self = substitutor.substitution_map[var.get_hidden_value()].get().unwrap().clone();
-                self.fully_substitute(substitutor);
+                *self = substitutor.substitution_map[var.get_hidden_value()].get().expect("It's impossible for domain variables to remain, as any unset domain variable would have been replaced with a new physical domain").clone();
+                self.fully_substitute(substitutor)
             }
         }
     }

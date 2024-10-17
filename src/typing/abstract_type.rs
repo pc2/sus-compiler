@@ -327,10 +327,13 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         self.typecheck_domain_from_to(&found.domain, &expected.domain, span, context);
     }
 
-    pub fn finalize_type(&mut self, typ: &mut FullType) {
+    pub fn finalize_type(&mut self, typ: &mut FullType, span: Span) {
         use super::type_inference::HindleyMilner;
 
-        typ.domain.fully_substitute(&self.domain_substitutor);
-        typ.typ.fully_substitute(&self.type_substitutor);
+        typ.domain.fully_substitute(&self.domain_substitutor).unwrap();
+        if typ.typ.fully_substitute(&self.type_substitutor).is_err() {
+            let typ_as_string = typ.typ.to_string(&self.linker_types, &self.template_type_names);
+            self.errors.error(span, format!("Could not fully figure out the type of this object. {typ_as_string}"));
+        }
     }
 }
