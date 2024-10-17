@@ -7,6 +7,7 @@ mod walk;
 
 use crate::alloc::UUIDAllocator;
 use crate::prelude::*;
+use crate::typing::abstract_type::DomainType;
 use crate::typing::type_inference::{DomainVariableIDMarker, TypeVariableIDMarker};
 
 use std::ops::Deref;
@@ -172,13 +173,13 @@ pub struct DomainInfo {
 
 #[derive(Clone, Copy)]
 pub struct InterfaceToDomainMap<'linker> {
-    pub local_domain_map: &'linker FlatAlloc<DomainID, DomainIDMarker>,
+    pub local_domain_map: &'linker FlatAlloc<DomainType, DomainIDMarker>,
     pub domains: &'linker FlatAlloc<DomainInfo, DomainIDMarker>,
 }
 
 impl<'linker> InterfaceToDomainMap<'linker> {
     pub fn local_domain_to_global_domain(&self, domain: DomainID) -> &'linker DomainInfo {
-        let local_domain = self.local_domain_map[domain];
+        let local_domain = self.local_domain_map[domain].unwrap_physical();
         &self.domains[local_domain]
     }
 }
@@ -518,7 +519,9 @@ pub struct SubModuleInstance {
     pub name: Option<(String, Span)>,
     pub declaration_runtime_depth: usize,
     /// Maps each of the module's local domains to the domain that it is used in.
-    pub local_interface_domains: FlatAlloc<DomainID, DomainIDMarker>,
+    /// 
+    /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::DomainVariable] before typing)
+    pub local_interface_domains: FlatAlloc<DomainType, DomainIDMarker>,
     pub documentation: Documentation,
 }
 

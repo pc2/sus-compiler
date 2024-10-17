@@ -98,7 +98,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             typ: decl
                 .typ_expr
                 .to_type_with_substitute(&submodule_inst.module_ref.template_args),
-            domain: DomainType::Physical(port_local_domain),
+            domain: port_local_domain.clone(),
         }
     }
 
@@ -360,16 +360,16 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         match &self.modules.working_on.instructions[instr_id] {
             Instruction::SubModule(sm) => {
                 // IDK TODO. Resetting Module domains is unknown as of yet
-                /*self.typecheck_template_global(&sm.module_ref);
+                self.typecheck_template_global(&sm.module_ref);
                 let md = &self.modules[sm.module_ref.id];
                 let local_interface_domains = md
                     .domain_names
-                    .map(|_| self.type_checker.alloc_domain_variable());
+                    .map(|_| DomainType::DomainVariable(self.type_checker.alloc_domain_variable()));
 
                 let Instruction::SubModule(sm) = &mut self.modules.working_on.instructions[instr_id] else {
                     unreachable!()
                 };
-                sm.local_interface_domains = local_interface_domains;*/
+                sm.local_interface_domains = local_interface_domains;
             }
             Instruction::Declaration(decl) => {
                 if let Some(latency_spec) = decl.latency_specifier {
@@ -546,43 +546,21 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
         }
         // Post type application. Solidify types and flag any remaining AbstractType::Unknown
-        for (id, inst) in self.modules.working_on.instructions.iter_mut() {
+        for (_id, inst) in self.modules.working_on.instructions.iter_mut() {
             match inst {
                 Instruction::Wire(w) => self.type_checker.finalize_type(&mut w.typ),
                 Instruction::Declaration(decl) => self.type_checker.finalize_type(&mut decl.typ),
                 Instruction::Write(Write { to_type, .. }) => self.type_checker.finalize_type(to_type),
                 // IDK TODO re-add with new submodule domain system
-                /*Instruction::SubModule(sm) => {
-                    for (interface_id, i) in &mut sm.local_interface_domains {
-                        *i = self
-                            .type_checker
-                            .domain_substitutor.(*i, BestName::SubModule(id, interface_id));
+                Instruction::SubModule(sm) => {
+                    for (_domain_id_in_submodule, domain_assigned_to_it_here) in &mut sm.local_interface_domains {
+                        use self::HindleyMilner;
+                        domain_assigned_to_it_here.fully_substitute(&self.type_checker.domain_substitutor);
                     }
-                }*/
+                }
                 _other => {}
             }
         }
-        
-        // IDK TODO, I'll see how this pans out later
-        /*self.modules.working_on.domains =
-            self.type_checker
-                .final_domains
-                .map(|(id, best_name)| DomainInfo {
-                    name: match *best_name {
-                        BestName::NamedDomain => self.modules.working_on.domain_names[id].clone(),
-                        BestName::SubModule(sm_instr, sm_domain) => {
-                            let sm = self.modules.working_on.instructions[sm_instr].unwrap_submodule();
-                            sm.module_ref.span.debug();
-                            let sm_md = &self.modules[sm.module_ref.id];
-                            format!("{}_{}", sm.get_name(&sm_md), sm_md.domain_names[sm_domain])
-                        }
-                        BestName::NamedWire(decl_id) => self.modules.working_on.instructions[decl_id]
-                            .unwrap_wire_declaration()
-                            .name
-                            .clone(),
-                        BestName::UnnamedWire => format!("domain_{}", id.get_hidden_value()),
-                    },
-                });*/
     }
 
     /*

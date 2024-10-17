@@ -473,7 +473,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             let new_wire = self.wires.alloc(RealWire {
                 source,
                 original_instruction: submod_instance.original_instruction,
-                domain,
+                domain: domain.unwrap_physical(),
                 typ: ConcreteType::Unknown,
                 name: self.unique_name_producer.get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
                 absolute_latency: CALCULATE_LATENCY_LATER,
@@ -699,7 +699,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     for (port, arg) in
                         std::iter::zip(fc.func_call_inputs.iter(), fc.arguments.iter())
                     {
-                        let from = self.get_wire_or_constant_as_wire(*arg, domain);
+                        let from = self.get_wire_or_constant_as_wire(*arg, domain.unwrap_physical());
                         let port_wire = self.get_submodule_port(submod_id, port, None);
                         self.instantiate_write_to_wire(
                             port_wire,
