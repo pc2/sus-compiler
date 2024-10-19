@@ -271,7 +271,7 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         match (from_domain.is_generative(), to_domain.is_generative()) {
             (true, _) => {} // From domain is generative, so nothing needs to be done
             (false, true) => {
-                self.errors.error(span, format!("Attempting use a non-generative variable in a generative context. "));
+                self.errors.error(span, format!("Attempting use a non-generative variable in a generative context: {context}"));
             }
             (false, false) => {
                 self.domain_substitutor.unify_report_error(&from_domain, &to_domain, span, context);

@@ -1158,13 +1158,13 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
 
     fn flatten_assign_function_call(
         &mut self,
-        to: Vec<(Option<(WireReference, bool, WriteModifiers)>, Span)>,
+        to: Vec<(Option<(WireReference, WriteModifiers)>, Span)>,
         cursor: &mut Cursor,
     ) {
         // Error on all to items that require writing a generative value
         for (to_item, to_span) in &to {
-            if let Some((_to, generative_required, _write_modifiers)) = to_item {
-                if *generative_required {
+            if let Some((to, _write_modifiers)) = to_item {
+                if to.is_generative {
                     self.errors.error(*to_span, "A generative value must be written to this, but function calls cannot return generative values");
                 }
             }
@@ -1198,7 +1198,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
 
             let mut to_iter = to.into_iter();
             for port in outputs {
-                if let Some((Some((to, _generative_required, write_modifiers)), to_span)) = to_iter.next() {
+                if let Some((Some((to, write_modifiers)), to_span)) = to_iter.next() {
                     let from =
                         self.instructions.alloc(Instruction::Wire(WireInstance {
                             typ: self.type_alloc.alloc_unset_type(DomainAllocOption::NonGenerativeUnknown), // TODO Generative Function Calls https://github.com/pc2/sus-compiler/issues/10
@@ -1225,7 +1225,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
             to.into_iter()
         };
         for leftover_to in to_iter {
-            if let (Some((to, _generative_required, write_modifiers)), to_span) = leftover_to {
+            if let (Some((to, write_modifiers)), to_span) = leftover_to {
                 let err_id = self.instructions.alloc(Instruction::Wire(WireInstance {
                     typ: self.type_alloc.alloc_unset_type(DomainAllocOption::NonGenerativeUnknown),
                     span: func_call_span,
@@ -1272,8 +1272,8 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                         if to.len() != 1 {
                             self.errors.error(span, format!("Non-function assignments must output exactly 1 output instead of {}", to.len()));
                         }
-                        if let Some((Some((to, requires_generative, write_modifiers)), to_span)) = to.into_iter().next() {
-                            let to_type = self.type_alloc.alloc_unset_type(if requires_generative {DomainAllocOption::Generative} else {DomainAllocOption::NonGenerativeUnknown});
+                        if let Some((Some((to, write_modifiers)), to_span)) = to.into_iter().next() {
+                            let to_type = self.type_alloc.alloc_unset_type(if to.is_generative {DomainAllocOption::Generative} else {DomainAllocOption::NonGenerativeUnknown});
                             self.instructions.alloc(Instruction::Write(Write{from: read_side, to, to_span, write_modifiers, to_type}));
                         }
                     }
@@ -1371,7 +1371,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
     fn flatten_assignment_left_side(
         &mut self,
         cursor: &mut Cursor,
-    ) -> Vec<(Option<(WireReference, bool, WriteModifiers)>, Span)> {
+    ) -> Vec<(Option<(WireReference, WriteModifiers)>, Span)> {
         cursor.collect_list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
                 let write_modifiers = self.flatten_write_modifiers(cursor);
@@ -1389,21 +1389,18 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                         );
                         let flat_root_decl = self.instructions[root].unwrap_wire_declaration();
                         let is_generative = flat_root_decl.identifier_type.is_generative();
-                        let requires_generative = is_generative || write_modifiers.requires_generative();
                         Some((
                             WireReference {
                                 root: WireReferenceRoot::LocalDecl(root, flat_root_decl.name_span),
                                 is_generative,
                                 path: Vec::new(),
                             },
-                            requires_generative,
                             write_modifiers,
                         ))
                     } else {
                         // It's _expression
                         if let Some(wire_ref) = self.flatten_wire_reference(cursor).expect_wireref(self) {
-                            let requires_generative = wire_ref.is_generative || write_modifiers.requires_generative();
-                            Some((wire_ref, requires_generative, write_modifiers))
+                            Some((wire_ref, write_modifiers))
                         } else {
                             None
                         }

@@ -54,7 +54,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
 struct ConditionStackElem {
     ends_at: FlatID,
     span: Span,
-    domain: DomainID,
+    domain: DomainType,
 }
 
 struct TypeCheckingContext<'l, 'errs> {
@@ -151,7 +151,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 self.get_type_of_port(port.port, port.submodule_decl)
             }
         };
-        self.type_checker.typecheck_domain_from_to(&root_type.domain, &output_typ.domain, whole_span, "array access array");
+        self.type_checker.typecheck_domain_from_to(&root_type.domain, &output_typ.domain, whole_span, "wire reference root with root type");
         
         let mut current_type_in_progress = root_type.typ;
         for p in &wire_ref.path {
@@ -267,11 +267,11 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
             Instruction::IfStatement(if_stmt) => {
                 let condition_wire = self.modules.working_on.instructions[if_stmt.condition].unwrap_wire();
-                if let DomainType::Physical(domain) = condition_wire.typ.domain {
+                if !condition_wire.typ.domain.is_generative() {
                     self.runtime_condition_stack.push(ConditionStackElem {
                         ends_at: if_stmt.else_end,
                         span: condition_wire.span,
-                        domain,
+                        domain: condition_wire.typ.domain.clone(),
                     });
                 }
             }
@@ -352,7 +352,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     /// outside of a condition block
     fn join_with_condition(&self, ref_domain: &DomainType, span: Span) {
         if let Some(condition_domain) = self.get_current_condition_domain() {
-            self.type_checker.typecheck_domain_from_to(ref_domain, &DomainType::Physical(condition_domain.0), span, "condition join");
+            self.type_checker.typecheck_domain_from_to(ref_domain, &condition_domain.0, span, "condition join");
         }
     }
 
@@ -490,7 +490,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     }
 
-    fn get_current_condition_domain(&self) -> Option<(DomainID, Span)> {
+    fn get_current_condition_domain(&self) -> Option<(DomainType, Span)> {
         let last = self.runtime_condition_stack.last()?;
         Some((last.domain, last.span))
     }
