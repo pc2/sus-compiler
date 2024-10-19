@@ -2,6 +2,7 @@ use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use crate::config::EarlyExitUpTo;
 use crate::prelude::*;
 
 use tree_sitter::Parser;
@@ -124,6 +125,7 @@ impl Linker {
             instructions.clear();
             instantiations.clear_instances()
         }
+        if config().early_exit == EarlyExitUpTo::Initialize {return}
 
         flatten_all_modules(self);
         if config().debug_print_module_contents {
@@ -131,6 +133,7 @@ impl Linker {
                 md.print_flattened_module(&self.files[md.link_info.file]);
             }
         }
+        if config().early_exit == EarlyExitUpTo::Flatten {return}
 
         typecheck_all_modules(self);
 
@@ -139,6 +142,7 @@ impl Linker {
                 md.print_flattened_module(&self.files[md.link_info.file]);
             }
         }
+        if config().early_exit == EarlyExitUpTo::AbstractTypecheck {return}
 
         // Make an initial instantiation of all modules
         // Won't be possible once we have template modules
@@ -157,5 +161,6 @@ impl Linker {
             }
             span_debugger.defuse();
         }
+        if config().early_exit == EarlyExitUpTo::Instantiate {return}
     }
 }

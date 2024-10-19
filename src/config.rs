@@ -2,6 +2,19 @@ use std::{cell::UnsafeCell, env, ffi::OsStr, path::PathBuf};
 
 use clap::{Arg, Command};
 
+/// Describes at what point in the compilation process we should exit early. 
+/// 
+/// This is mainly to aid in debugging, where incorrect results from flattening/typechecking may lead to errors, 
+/// which we still wish to see in say the LSP
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EarlyExitUpTo {
+    Initialize,
+    Flatten,
+    AbstractTypecheck,
+    Instantiate,
+    CodeGen
+}
+
 pub struct ConfigStruct {
     pub use_lsp: bool,
     pub lsp_debug_mode: bool,
@@ -10,6 +23,7 @@ pub struct ConfigStruct {
     pub debug_print_module_contents: bool,
     pub debug_print_latency_graph: bool,
     pub codegen_module_and_dependencies_one_file: Option<String>,
+    pub early_exit: EarlyExitUpTo
 }
 
 pub fn config() -> &'static ConfigStruct {
@@ -56,6 +70,12 @@ pub fn parse_args() -> Vec<PathBuf> {
             .long("standalone")
             .takes_value(true)
             .help("Generate standalone code with all dependencies in one file of the module specified. "))
+        .arg(Arg::new("upto")
+            .long("upto")
+            .help("Describes at what point in the compilation process we should exit early. This is mainly to aid in debugging, where incorrect results from flattening/typechecking may lead to errors, which we still wish to see in say the LSP")
+            .takes_value(true)
+            .possible_values(&["initialize", "flatten", "typecheck", "instantiate", "codegen"])
+            .default_value("codegen"))
         .arg(Arg::new("files")
             .multiple_values(true)
             .help(".sus Files")
@@ -84,6 +104,15 @@ pub fn parse_args() -> Vec<PathBuf> {
     config.codegen = matches.is_present("codegen");
     config.debug_print_module_contents = matches.is_present("debug");
     config.debug_print_latency_graph = matches.is_present("debug-latency");
+    config.early_exit = match matches.value_of("upto").unwrap() {
+        "initialize" => EarlyExitUpTo::Initialize,
+        "flatten" => EarlyExitUpTo::Flatten,
+        "typecheck" => EarlyExitUpTo::AbstractTypecheck,
+        "instantiate" => EarlyExitUpTo::Instantiate,
+        "codegen" => EarlyExitUpTo::CodeGen,
+        _ => unreachable!()
+    };
+
 
     if let Some(standalone) = matches.value_of("standalone") {
         config.codegen_module_and_dependencies_one_file = Some(standalone.to_string());
@@ -126,5 +155,6 @@ static CONFIG: ConfigStructWrapper = ConfigStructWrapper {
         codegen: false,
         debug_print_latency_graph: false,
         codegen_module_and_dependencies_one_file: None,
+        early_exit: EarlyExitUpTo::CodeGen
     }),
 };

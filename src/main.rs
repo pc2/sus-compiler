@@ -32,7 +32,7 @@ use std::rc::Rc;
 use prelude::*;
 
 use codegen_fallback::gen_verilog_code;
-use config::{config, parse_args};
+use config::{config, parse_args, EarlyExitUpTo};
 use dev_aid::ariadne_interface::*;
 use flattening::Module;
 use instantiation::InstantiatedModule;
@@ -120,6 +120,8 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     let (linker, mut paths_arena) = compile_all(file_paths);
     print_all_errors(&linker, &mut paths_arena.file_sources);
+
+    if config.early_exit != EarlyExitUpTo::CodeGen {return Ok(())}
 
     if config.codegen {
         for (_id, md) in &linker.modules {
