@@ -32,11 +32,11 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
                 let mut context = TypeCheckingContext {
                     errors: name_resolver.errors,
                     type_checker: TypeUnifier::new(
-                        types,
                         &modules.working_on.link_info.template_arguments,
                         name_resolver.errors,
                         &modules.working_on.link_info.type_variable_alloc
                     ),
+                    types,
                     constants,
                     runtime_condition_stack: Vec::new(),
                     modules,
@@ -44,6 +44,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
 
                 context.typecheck();
                 context.find_unused_variables();
+                apply_types(&mut context.type_checker, context.modules.working_on, context.errors, &context.types);
             },
         );
 
@@ -60,6 +61,7 @@ struct ConditionStackElem {
 struct TypeCheckingContext<'l, 'errs> {
     modules: WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>,
     type_checker: TypeUnifier<'l, 'errs>,
+    types: Resolver<'l, 'errs, TypeUUIDMarker, StructType>,
     constants: Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
     errors: &'errs ErrorCollector<'l>,
     runtime_condition_stack: Vec<ConditionStackElem>,
@@ -495,6 +497,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         Some((last.domain, last.span))
     }
 
+    /// Should be followed up by a [apply_types] call to actually apply all the checked types. 
     fn typecheck(&mut self) {
         for (_id, port) in &self.modules.working_on.ports {
             let Instruction::Declaration(decl) =
@@ -509,73 +512,8 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             self.control_flow_visit_instruction(elem_id);
             self.typecheck_visit_instruction(elem_id);
         }
-
-        // Set the remaining domain variables that aren't associated with a module port. 
-        // We just find domain IDs that haven't been 
-        let mut leftover_domain_alloc = UUIDAllocator::new_start_from(self.modules.working_on.domain_names.get_next_alloc_id());
-        for d in self.type_checker.domain_substitutor.iter() {
-            if d.get().is_none() {
-                assert!(d.set(DomainType::Physical(leftover_domain_alloc.alloc())).is_ok());
-            }
-        }
-
-        // Assign names to all of the domains in this module
-        self.modules.working_on.domains = leftover_domain_alloc.into_range().map(|id| DomainInfo {
-            name: {
-                if let Some(name) = self.modules.working_on.domain_names.get(id) {
-                    name.clone()
-                } else {
-                    format!("domain_{}", id.get_hidden_value())
-                }
-            }
-        });
-
-        // Post type application. Solidify types and flag any remaining AbstractType::Unknown
-        for (_id, inst) in self.modules.working_on.instructions.iter_mut() {
-            match inst {
-                Instruction::Wire(w) => self.type_checker.finalize_type(&mut w.typ, w.span),
-                Instruction::Declaration(decl) => self.type_checker.finalize_type(&mut decl.typ, decl.name_span),
-                Instruction::Write(Write { to_type, to_span, .. }) => self.type_checker.finalize_type(to_type, *to_span),
-                // IDK TODO re-add with new submodule domain system
-                Instruction::SubModule(sm) => {
-                    for (_domain_id_in_submodule, domain_assigned_to_it_here) in &mut sm.local_interface_domains {
-                        use self::HindleyMilner;
-                        domain_assigned_to_it_here.fully_substitute(&self.type_checker.domain_substitutor).unwrap();
-                    }
-                }
-                _other => {}
-            }
-        }
-
-        for FailedUnification{mut found, mut expected, span, context} in self.type_checker.type_substitutor.extract_errors() {
-            // Not being able to fully substitute is not an issue. We just display partial types
-            let _ = found.fully_substitute(&self.type_checker.type_substitutor);
-            let _ = expected.fully_substitute(&self.type_checker.type_substitutor);
-
-            let expected_name = expected.to_string(&self.type_checker.linker_types, &self.type_checker.template_type_names);
-            let found_name = found.to_string(&self.type_checker.linker_types, &self.type_checker.template_type_names);
-            self.errors.error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
-
-            assert!(
-                expected_name != found_name,
-                "{expected_name} != {found_name}"
-            );
-        }
-        for FailedUnification{mut found, mut expected, span, context} in self.type_checker.domain_substitutor.extract_errors() {
-            found.fully_substitute(&self.type_checker.domain_substitutor).unwrap();
-            expected.fully_substitute(&self.type_checker.domain_substitutor).unwrap();
-
-            let expected_name = format!("{expected:?}");
-            let found_name = format!("{found:?}");
-            self.errors.error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"));
-
-            assert!(
-                expected_name != found_name,
-                "{expected_name} != {found_name}"
-            );
-        }
     }
-
+    
     /*
         ==== Additional Warnings ====
     */
@@ -662,5 +600,80 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
         }
         instruction_fanins
+    }
+}
+
+
+// ====== Free functions for actually applying the result of type checking ======
+
+pub fn apply_types<'linker, 'errs>(
+    type_checker: &mut TypeUnifier,
+    working_on: &mut Module,
+    errors: &ErrorCollector,
+    types: &Resolver<'linker, 'errs, TypeUUIDMarker, StructType>
+) {
+    // Set the remaining domain variables that aren't associated with a module port. 
+    // We just find domain IDs that haven't been 
+    let mut leftover_domain_alloc = UUIDAllocator::new_start_from(working_on.domain_names.get_next_alloc_id());
+    for d in type_checker.domain_substitutor.iter() {
+        if d.get().is_none() {
+            assert!(d.set(DomainType::Physical(leftover_domain_alloc.alloc())).is_ok());
+        }
+    }
+
+    // Assign names to all of the domains in this module
+    working_on.domains = leftover_domain_alloc.into_range().map(|id| DomainInfo {
+        name: {
+            if let Some(name) = working_on.domain_names.get(id) {
+                name.clone()
+            } else {
+                format!("domain_{}", id.get_hidden_value())
+            }
+        }
+    });
+
+    // Post type application. Solidify types and flag any remaining AbstractType::Unknown
+    for (_id, inst) in working_on.instructions.iter_mut() {
+        match inst {
+            Instruction::Wire(w) => type_checker.finalize_type(types, &mut w.typ, w.span),
+            Instruction::Declaration(decl) => type_checker.finalize_type(types, &mut decl.typ, decl.name_span),
+            Instruction::Write(Write { to_type, to_span, .. }) => type_checker.finalize_type(types, to_type, *to_span),
+            // IDK TODO re-add with new submodule domain system
+            Instruction::SubModule(sm) => {
+                for (_domain_id_in_submodule, domain_assigned_to_it_here) in &mut sm.local_interface_domains {
+                    use self::HindleyMilner;
+                    domain_assigned_to_it_here.fully_substitute(&type_checker.domain_substitutor).unwrap();
+                }
+            }
+            _other => {}
+        }
+    }
+
+    for FailedUnification{mut found, mut expected, span, context} in type_checker.type_substitutor.extract_errors() {
+        // Not being able to fully substitute is not an issue. We just display partial types
+        let _ = found.fully_substitute(&type_checker.type_substitutor);
+        let _ = expected.fully_substitute(&type_checker.type_substitutor);
+
+        let expected_name = expected.to_string(types, &type_checker.template_type_names);
+        let found_name = found.to_string(types, &type_checker.template_type_names);
+        errors.error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
+
+        assert!(
+            expected_name != found_name,
+            "{expected_name} != {found_name}"
+        );
+    }
+    for FailedUnification{mut found, mut expected, span, context} in type_checker.domain_substitutor.extract_errors() {
+        found.fully_substitute(&type_checker.domain_substitutor).unwrap();
+        expected.fully_substitute(&type_checker.domain_substitutor).unwrap();
+
+        let expected_name = format!("{expected:?}");
+        let found_name = format!("{found:?}");
+        errors.error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"));
+
+        assert!(
+            expected_name != found_name,
+            "{expected_name} != {found_name}"
+        );
     }
 }

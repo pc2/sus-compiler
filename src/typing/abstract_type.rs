@@ -83,7 +83,6 @@ pub struct FullType {
 ///
 /// 'x U 'y -> 'x = 'y
 pub struct TypeUnifier<'linker, 'errs> {
-    pub linker_types: Resolver<'linker, 'errs, TypeUUIDMarker, StructType>,
     pub template_type_names: FlatAlloc<String, TemplateIDMarker>,
     errors: &'errs ErrorCollector<'linker>,
     pub type_substitutor: TypeSubstitutor<AbstractType, TypeVariableIDMarker>,
@@ -92,13 +91,11 @@ pub struct TypeUnifier<'linker, 'errs> {
 
 impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
     pub fn new(
-        linker_types: Resolver<'linker, 'errs, TypeUUIDMarker, StructType>,
         template_inputs: &TemplateInputs,
         errors: &'errs ErrorCollector<'linker>,
         typing_alloc: &TypingAllocator
     ) -> Self {
         Self {
-            linker_types,
             template_type_names: map_to_type_names(template_inputs),
             errors,
             type_substitutor: TypeSubstitutor::init(&typing_alloc.type_variable_alloc),
@@ -327,12 +324,12 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         self.typecheck_domain_from_to(&found.domain, &expected.domain, span, context);
     }
 
-    pub fn finalize_type(&mut self, typ: &mut FullType, span: Span) {
+    pub fn finalize_type(&mut self, types: &Resolver<'_, '_, TypeUUIDMarker, StructType>, typ: &mut FullType, span: Span) {
         use super::type_inference::HindleyMilner;
 
         typ.domain.fully_substitute(&self.domain_substitutor).unwrap();
         if typ.typ.fully_substitute(&self.type_substitutor).is_err() {
-            let typ_as_string = typ.typ.to_string(&self.linker_types, &self.template_type_names);
+            let typ_as_string = typ.typ.to_string(types, &self.template_type_names);
             self.errors.error(span, format!("Could not fully figure out the type of this object. {typ_as_string}"));
         }
     }
