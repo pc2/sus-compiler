@@ -541,12 +541,36 @@ Error: Latency Counting couldn't reach this node
      │                                                 ───┬──  
      │                                                    ╰──── Latency Counting couldn't reach this node
 ─────╯
+Error: ::doNothing does not have a main interface. You should explicitly specify an interface to access
+     ╭─[test.sus:445:2]
+     │
+ 431 │ module doNothing {}
+     │        ────┬────  
+     │            ╰────── Module 'doNothing' defined here. module ::doNothing #():
+
+     │ 
+ 445 │     doNothing()
+     │     ────┬────  
+     │         ╰────── ::doNothing does not have a main interface. You should explicitly specify an interface to access
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:462:7]
      │
  462 │     bool b = xor(true, false)
      │          ┬  
      │          ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: ::doNothing does not have a main interface. You should explicitly specify an interface to access
+     ╭─[test.sus:601:2]
+     │
+ 431 │ module doNothing {}
+     │        ────┬────  
+     │            ╰────── Module 'doNothing' defined here. module ::doNothing #():
+
+     │ 
+ 601 │     doNothing()
+     │     ────┬────  
+     │         ╰────── ::doNothing does not have a main interface. You should explicitly specify an interface to access
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:608:22]
@@ -684,6 +708,37 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  672 │     int #(MIN: 0, MAX: 199) my_int
      │                             ───┬──  
      │                                ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: ::no_port_module does not have a main interface. You should explicitly specify an interface to access
+     ╭─[test.sus:678:2]
+     │
+ 675 │ module no_port_module {}
+     │        ───────┬──────  
+     │               ╰──────── Module 'no_port_module' defined here. module ::no_port_module #():
+
+     │ 
+ 678 │     no_port_module()
+     │     ───────┬──────  
+     │            ╰──────── ::no_port_module does not have a main interface. You should explicitly specify an interface to access
+─────╯
+Error: ::no_port_module does not have a main interface. You should explicitly specify an interface to access
+     ╭─[test.sus:681:10]
+     │
+ 675 │ module no_port_module {}
+     │        ───────┬──────  
+     │               ╰──────── Module 'no_port_module' defined here. module ::no_port_module #():
+
+     │ 
+ 681 │     int x = no_port()
+     │             ───┬───  
+     │                ╰───── ::no_port_module does not have a main interface. You should explicitly specify an interface to access
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:681:6]
+     │
+ 681 │     int x = no_port()
+     │         ┬  
+     │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:686:21]
@@ -1043,4 +1098,42 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  894 │     interface run_instruction : bool[32] instr
      │                                          ──┬──  
      │                                            ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: ::no_main_interface does not have a main interface. You should explicitly specify an interface to access
+     ╭─[test.sus:917:10]
+     │
+ 910 │ module no_main_interface {
+     │        ────────┬────────  
+     │                ╰────────── Module 'no_main_interface' defined here. module ::no_main_interface #():
+
+     │ 
+ 917 │     int x = no_interface_named()
+     │             ─────────┬────────  
+     │                      ╰────────── ::no_main_interface does not have a main interface. You should explicitly specify an interface to access
+─────╯
+Error: ::no_main_interface does not have a main interface. You should explicitly specify an interface to access
+     ╭─[test.sus:918:10]
+     │
+ 910 │ module no_main_interface {
+     │        ────────┬────────  
+     │                ╰────────── Module 'no_main_interface' defined here. module ::no_main_interface #():
+
+     │ 
+ 918 │     int y = no_main_interface()
+     │             ────────┬────────  
+     │                     ╰────────── ::no_main_interface does not have a main interface. You should explicitly specify an interface to access
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:917:6]
+     │
+ 917 │     int x = no_interface_named()
+     │         ┬  
+     │         ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:918:6]
+     │
+ 918 │     int y = no_main_interface()
+     │         ┬  
+     │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯

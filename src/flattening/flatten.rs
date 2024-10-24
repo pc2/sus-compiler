@@ -788,12 +788,19 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
         })
     }
 
-    fn get_main_interface(&self, submodule_decl: FlatID) -> Option<(InterfaceID, &Interface)> {
+    fn get_main_interface(&self, submodule_decl: FlatID, span: Span) -> Option<(InterfaceID, &Interface)> {
         let sm = self.instructions[submodule_decl].unwrap_submodule();
 
         let md = &self.modules[sm.module_ref.id];
 
-        md.get_main_interface()
+        let result = md.get_main_interface();
+
+        if result.is_none() {
+            self.errors.error(span, format!("{} does not have a main interface. You should explicitly specify an interface to access", md.link_info.get_full_name()))
+                .info_obj(md);
+        }
+
+        result
     }
 
     /// Produces a new [SubModuleInstance] if a global was passed, or a reference to the existing instance if it's referenced by name
@@ -815,7 +822,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                     }));
                 Some(ModuleInterfaceReference {
                     submodule_decl,
-                    submodule_interface: self.get_main_interface(submodule_decl)?.0,
+                    submodule_interface: self.get_main_interface(submodule_decl, interface_span)?.0,
                     name_span: None,
                     interface_span,
                 })
@@ -823,7 +830,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
             PartialWireReference::ModuleButNoPort(submodule_decl, name_span) => {
                 Some(ModuleInterfaceReference {
                     submodule_decl,
-                    submodule_interface: self.get_main_interface(submodule_decl)?.0,
+                    submodule_interface: self.get_main_interface(submodule_decl, name_span)?.0,
                     name_span: Some(name_span),
                     interface_span: name_span,
                 })
@@ -1007,7 +1014,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                         }
                     }
                 }
-                LocalOrGlobal::NotFound(_) => PartialWireReference::Error,
+                LocalOrGlobal::NotFound(_) => PartialWireReference::Error
             }
         } else if kind == kind!("array_op") {
             cursor.go_down_no_check(|cursor| {

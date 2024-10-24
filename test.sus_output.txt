@@ -97,6 +97,8 @@ TREE SITTER module! permute_t
 TREE SITTER module! use_permute
 TREE SITTER module! instruction_decoder
 TREE SITTER module! run_instruction
+TREE SITTER module! no_main_interface
+TREE SITTER module! use_no_main_interface
 Typechecking DualPortMem
 Typechecking UseDualPortMem
 Typechecking FIFO
@@ -193,6 +195,8 @@ Typechecking permute_t
 Typechecking use_permute
 Typechecking instruction_decoder
 Typechecking run_instruction
+Typechecking no_main_interface
+Typechecking use_no_main_interface
 Instantiating UseDualPortMem
 Instantiating submodules for UseDualPortMem
 Instantiating DualPortMem
@@ -400,10 +404,7 @@ Instantiating doNothing
 Instantiating submodules for doNothing
 Concrete Typechecking doNothing
 Latency Counting doNothing
-Instantiating contains_submodule_submodule
-Instantiating submodules for contains_submodule_submodule
-Concrete Typechecking contains_submodule_submodule
-Latency Counting contains_submodule_submodule
+Not Instantiating contains_submodule_submodule due to flattening errors
 Instantiating xor
 Instantiating submodules for xor
 Concrete Typechecking xor
@@ -444,10 +445,7 @@ Instantiating use_submodule_named_ports
 Instantiating submodules for use_submodule_named_ports
 Concrete Typechecking use_submodule_named_ports
 Latency Counting use_submodule_named_ports
-Instantiating contains_submodule_submodule
-Instantiating submodules for contains_submodule_submodule
-Concrete Typechecking contains_submodule_submodule
-Latency Counting contains_submodule_submodule
+Not Instantiating contains_submodule_submodule due to flattening errors
 Instantiating cross_bool
 Instantiating submodules for cross_bool
 Concrete Typechecking cross_bool
@@ -475,10 +473,7 @@ Instantiating no_port_module
 Instantiating submodules for no_port_module
 Concrete Typechecking no_port_module
 Latency Counting no_port_module
-Instantiating use_no_input_module
-Instantiating submodules for use_no_input_module
-Concrete Typechecking use_no_input_module
-Latency Counting use_no_input_module
+Not Instantiating use_no_input_module due to flattening errors
 Instantiating mod_with_unused_interface
 Instantiating submodules for mod_with_unused_interface
 Concrete Typechecking mod_with_unused_interface
@@ -560,3 +555,8 @@ Instantiating submodules for instruction_decoder
 Concrete Typechecking instruction_decoder
 Latency Counting instruction_decoder
 Not Instantiating run_instruction due to flattening errors
+Instantiating no_main_interface
+Instantiating submodules for no_main_interface
+Concrete Typechecking no_main_interface
+Latency Counting no_main_interface
+Not Instantiating use_no_main_interface due to flattening errors

@@ -678,7 +678,7 @@ module use_no_input_module {
 	no_port_module()
 
 	no_port_module no_port
-	no_port()
+	int x = no_port()
 }
 
 module mod_with_unused_interface {
@@ -904,4 +904,16 @@ module run_instruction {
 	if decoder.is_arith() : int reg_a, int reg_b, Operator op {
 		// ...
 	}
+}
+
+// Test no main interface error
+module no_main_interface {
+	//interface no_main_interface
+}
+
+module use_no_main_interface {
+
+	no_main_interface no_interface_named
+	int x = no_interface_named()
+	int y = no_main_interface()
 }
