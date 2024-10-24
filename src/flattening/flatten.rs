@@ -1262,7 +1262,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
 
                     cursor.field(field!("assign_value"));
 
-                    let (node_kind, span) = cursor.kind_span();
+                    let (node_kind, value_span) = cursor.kind_span();
 
                     if node_kind == kind!("func_call") {
                         self.flatten_assign_function_call(to, cursor);
@@ -1270,9 +1270,13 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                         let (read_side, read_side_is_generative) = self.flatten_expr(cursor);
 
                         if to.len() != 1 {
-                            self.errors.error(span, format!("Non-function assignments must output exactly 1 output instead of {}", to.len()));
+                            self.errors.error(value_span, format!("Non-function assignments must output exactly 1 output instead of {}", to.len()));
                         }
                         if let Some((Some((to, write_modifiers)), to_span)) = to.into_iter().next() {
+                            if to.is_generative && !read_side_is_generative {
+                                self.errors.error(value_span, "This value is non-generative, yet it is being assigned to a generative value")
+                                .info_same_file(to_span, "This object is generative");
+                            }
                             let to_type = self.type_alloc.alloc_unset_type(if to.is_generative {DomainAllocOption::Generative} else {DomainAllocOption::NonGenerativeUnknown});
                             self.instructions.alloc(Instruction::Write(Write{from: read_side, to, to_span, write_modifiers, to_type}));
                         }

@@ -264,15 +264,10 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         }
     }
 
-    pub fn typecheck_domain_from_to(&self, from_domain: &DomainType, to_domain: &DomainType, span: Span, context: &'static str) {
-        match (from_domain.is_generative(), to_domain.is_generative()) {
-            (true, _) => {} // From domain is generative, so nothing needs to be done
-            (false, true) => {
-                self.errors.error(span, format!("Attempting use a non-generative variable in a generative context: {context}"));
-            }
-            (false, false) => {
-                self.domain_substitutor.unify_report_error(&from_domain, &to_domain, span, context);
-            }
+    pub fn unify_domains(&self, from_domain: &DomainType, to_domain: &DomainType, span: Span, context: &'static str) {
+        // The case of writes to generatives from non-generatives should be fully covered by flattening
+        if !from_domain.is_generative() && !to_domain.is_generative() {
+            self.domain_substitutor.unify_report_error(&from_domain, &to_domain, span, context);
         }
     }
 
@@ -284,7 +279,7 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         span: Span,
     ) {
         self.typecheck_unary_operator_abstr(op, &input_typ.typ, span, &output_typ.typ);
-        self.typecheck_domain_from_to(&input_typ.domain, &output_typ.domain, span, "unary op");
+        self.unify_domains(&input_typ.domain, &output_typ.domain, span, "unary op");
     }
 
     pub fn typecheck_binary_operator(
@@ -297,8 +292,8 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         output_typ: &FullType,
     ) {
         self.typecheck_binary_operator_abstr(op, &left_typ.typ, &right_typ.typ, left_span, right_span, &output_typ.typ);
-        self.typecheck_domain_from_to(&left_typ.domain, &output_typ.domain, left_span, "binop left");
-        self.typecheck_domain_from_to(&right_typ.domain, &output_typ.domain, right_span, "binop right");
+        self.unify_domains(&left_typ.domain, &output_typ.domain, left_span, "binop left");
+        self.unify_domains(&right_typ.domain, &output_typ.domain, right_span, "binop right");
     }
 
     pub fn typecheck_array_access(
@@ -321,7 +316,7 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         context: &'static str
     ) {
         self.type_substitutor.unify_report_error(&found.typ, &expected.typ, span, context);
-        self.typecheck_domain_from_to(&found.domain, &expected.domain, span, context);
+        self.unify_domains(&found.domain, &expected.domain, span, context);
     }
 
     pub fn finalize_type(&mut self, types: &Resolver<'_, '_, TypeUUIDMarker, StructType>, typ: &mut FullType, span: Span) {

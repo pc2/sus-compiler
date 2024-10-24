@@ -153,7 +153,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 self.get_type_of_port(port.port, port.submodule_decl)
             }
         };
-        self.type_checker.typecheck_domain_from_to(&root_type.domain, &output_typ.domain, whole_span, "wire reference root with root type");
+        self.type_checker.unify_domains(&root_type.domain, &output_typ.domain, whole_span, "wire reference root with root type");
         
         let mut current_type_in_progress = root_type.typ;
         for p in &wire_ref.path {
@@ -171,7 +171,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         &new_resulting_variable
                     );
 
-                    self.type_checker.typecheck_domain_from_to(&idx_wire.typ.domain, &output_typ.domain, idx_wire.span, "array access index");
+                    self.type_checker.unify_domains(&idx_wire.typ.domain, &output_typ.domain, idx_wire.span, "array access index");
                     current_type_in_progress = new_resulting_variable;
                 }
             }
@@ -354,7 +354,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     /// outside of a condition block
     fn join_with_condition(&self, ref_domain: &DomainType, span: Span) {
         if let Some(condition_domain) = self.get_current_condition_domain() {
-            self.type_checker.typecheck_domain_from_to(ref_domain, &condition_domain.0, span, "condition join");
+            self.type_checker.unify_domains(ref_domain, &condition_domain.0, span, "condition join");
         }
     }
 

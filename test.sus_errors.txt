@@ -692,12 +692,14 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                          ┬  
      │                          ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Attempting use a non-generative variable in a generative context: connection
+Error: This value is non-generative, yet it is being assigned to a generative value
      ╭─[test.sus:701:6]
      │
  701 │     b = a
-     │         ┬  
-     │         ╰── Attempting use a non-generative variable in a generative context: connection
+     │     ┬   ┬  
+     │     ╰────── This object is generative
+     │         │  
+     │         ╰── This value is non-generative, yet it is being assigned to a generative value
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:691:6]
