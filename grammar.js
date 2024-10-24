@@ -42,9 +42,9 @@ function commaSepSeq($, rule) {
 
 const PREC = {
     compare : 2,
-    and: 3,
+    xor: 3,
     or: 4,
-    xor: 5,
+    and: 5,
     additive: 6,
     multiplicative: 7,
     unary: 8,
@@ -234,9 +234,9 @@ module.exports = grammar({
         binary_op: $ => {
             const TABLE = [
                 [PREC.compare, choice('==', '!=', '<', '<=', '>', '>=')],
-                [PREC.and, '&'],
-                [PREC.or, '|'],
                 [PREC.xor, '^'],
+                [PREC.or, '|'],
+                [PREC.and, '&'],
                 [PREC.additive, choice('+', '-')],
                 [PREC.multiplicative, choice('*', '/', '%')],
             ];

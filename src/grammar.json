@@ -1114,7 +1114,7 @@
                 "name": "operator",
                 "content": {
                   "type": "STRING",
-                  "value": "&"
+                  "value": "^"
                 }
               },
               {
@@ -1180,7 +1180,7 @@
                 "name": "operator",
                 "content": {
                   "type": "STRING",
-                  "value": "^"
+                  "value": "&"
                 }
               },
               {
