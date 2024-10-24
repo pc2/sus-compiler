@@ -1,0 +1,562 @@
+Standard Library Directory: /home/lennart/Desktop/sus-compiler/target/debug/build/sus_compiler-75259068bf570e24/out/../../../share/sus_compiler/std
+TREE SITTER module! DualPortMem
+TREE SITTER module! UseDualPortMem
+TREE SITTER module! FIFO
+TREE SITTER module! example_FIFO
+TREE SITTER module! use_Iterator
+TREE SITTER module! Iterator
+TREE SITTER module! FixedSizeIterator
+TREE SITTER module! SlowClockGenerator
+TREE SITTER module! SplitAt
+TREE SITTER module! Abs
+TREE SITTER module! Slice
+TREE SITTER module! useSlice
+TREE SITTER module! BitSelect
+TREE SITTER module! PopCount
+TREE SITTER module! TreeAdd
+TREE SITTER module! LatencyOffset
+TREE SITTER module! CrossDomain
+TREE SITTER module! IntToBits
+TREE SITTER module! BitsToInt
+TREE SITTER module! bool
+TREE SITTER module! int
+TREE SITTER module! example_md
+TREE SITTER module! multiply_add
+TREE SITTER module! test_pow17
+TREE SITTER module! pow17
+TREE SITTER module! fibonnaci
+TREE SITTER module! blur2
+TREE SITTER module! Tree_Multiply
+TREE SITTER module! Accumulator
+TREE SITTER module! blur
+TREE SITTER module! Unpack4
+TREE SITTER module! generative
+TREE SITTER module! add_indices_to_array
+TREE SITTER module! assignment_producer
+TREE SITTER module! test_various_assignments
+TREE SITTER module! first_bit_idx_6
+TREE SITTER module! multiply_add_with_latencies
+TREE SITTER module! first_bit_idx_24
+TREE SITTER module! permute
+TREE SITTER module! permute24
+TREE SITTER module! test_single_wire
+TREE SITTER module! disjoint_ports
+TREE SITTER module! undeteriminable_input_latency
+TREE SITTER module! specified_input_latency
+TREE SITTER module! determinable_input_latency
+TREE SITTER module! determinable_because_no_input_output_ports
+TREE SITTER module! conflicting_latency_declarations
+TREE SITTER module! bad_cycle
+TREE SITTER module! module_taking_time
+TREE SITTER module! matrix_vector_mul
+TREE SITTER module! bad_cycle2
+TREE SITTER module! module_taking_a_lot_of_time
+TREE SITTER module! offset_latency
+TREE SITTER module! good_cycle
+TREE SITTER module! input_only
+TREE SITTER module! multiple_inputs_only
+TREE SITTER module! output_only
+TREE SITTER module! multiple_outputs_only
+TREE SITTER module! submodule
+TREE SITTER module! doNothing
+TREE SITTER module! contains_submodule_submodule
+TREE SITTER module! xor
+TREE SITTER module! use_xor
+TREE SITTER module! fizz_buzz
+TREE SITTER module! fizz_buzz_gen
+TREE SITTER module! mbf_dual
+TREE SITTER module! monotonize_down
+TREE SITTER module! my_mod
+TREE SITTER module! use_my_mod
+TREE SITTER module! submodule_named_ports
+TREE SITTER module! use_submodule_named_ports
+TREE SITTER module! contains_submodule_submodule
+TREE SITTER module! cross_bool
+TREE SITTER module! cross_int
+TREE SITTER module! cross_memory
+TREE SITTER module! offset_backwards
+TREE SITTER module! dual_port_mem
+TREE SITTER module! use_fifo
+TREE SITTER module! test_separated_domain
+TREE SITTER module! no_port_module
+TREE SITTER module! use_no_input_module
+TREE SITTER module! mod_with_unused_interface
+TREE SITTER module! test_write_to_gen_var
+TREE SITTER module! use_bad_interface
+TREE SITTER module! sequenceDownFrom
+TREE SITTER module! sumUpTo
+TREE SITTER module! test
+TREE SITTER module! use_test
+TREE SITTER module! tinyTestMod
+TREE SITTER module! testTinyTestMod
+TREE SITTER module! tree_add
+TREE SITTER module! make_tree_add
+TREE SITTER module! replicate
+TREE SITTER module! use_replicate
+TREE SITTER module! permute_t
+TREE SITTER module! use_permute
+TREE SITTER module! instruction_decoder
+TREE SITTER module! run_instruction
+Typechecking DualPortMem
+Typechecking UseDualPortMem
+Typechecking FIFO
+Typechecking example_FIFO
+Typechecking use_Iterator
+Typechecking Iterator
+Typechecking FixedSizeIterator
+Typechecking SlowClockGenerator
+Typechecking SplitAt
+Typechecking Abs
+Typechecking Slice
+Typechecking useSlice
+Typechecking BitSelect
+Typechecking PopCount
+Typechecking TreeAdd
+Typechecking LatencyOffset
+Typechecking CrossDomain
+Typechecking IntToBits
+Typechecking BitsToInt
+Typechecking example_md
+Typechecking multiply_add
+Typechecking test_pow17
+Typechecking pow17
+Typechecking fibonnaci
+Typechecking blur2
+Typechecking Tree_Multiply
+Typechecking Accumulator
+Typechecking blur
+Typechecking Unpack4
+Typechecking generative
+Typechecking add_indices_to_array
+Typechecking assignment_producer
+Typechecking test_various_assignments
+Typechecking first_bit_idx_6
+Typechecking multiply_add_with_latencies
+Typechecking first_bit_idx_24
+Typechecking permute
+Typechecking permute24
+Typechecking test_single_wire
+Typechecking disjoint_ports
+Typechecking undeteriminable_input_latency
+Typechecking specified_input_latency
+Typechecking determinable_input_latency
+Typechecking determinable_because_no_input_output_ports
+Typechecking conflicting_latency_declarations
+Typechecking bad_cycle
+Typechecking module_taking_time
+Typechecking matrix_vector_mul
+Typechecking bad_cycle2
+Typechecking module_taking_a_lot_of_time
+Typechecking offset_latency
+Typechecking good_cycle
+Typechecking input_only
+Typechecking multiple_inputs_only
+Typechecking output_only
+Typechecking multiple_outputs_only
+Typechecking submodule
+Typechecking doNothing
+Typechecking contains_submodule_submodule
+Typechecking xor
+Typechecking use_xor
+Typechecking fizz_buzz
+Typechecking fizz_buzz_gen
+Typechecking mbf_dual
+Typechecking monotonize_down
+Typechecking my_mod
+Typechecking use_my_mod
+Typechecking submodule_named_ports
+Typechecking use_submodule_named_ports
+Typechecking contains_submodule_submodule
+Typechecking cross_bool
+Typechecking cross_int
+Typechecking cross_memory
+Typechecking offset_backwards
+Typechecking dual_port_mem
+Typechecking use_fifo
+Typechecking test_separated_domain
+Typechecking no_port_module
+Typechecking use_no_input_module
+Typechecking mod_with_unused_interface
+Typechecking test_write_to_gen_var
+Typechecking use_bad_interface
+Typechecking sequenceDownFrom
+Typechecking sumUpTo
+Typechecking test
+Typechecking use_test
+Typechecking tinyTestMod
+Typechecking testTinyTestMod
+Typechecking tree_add
+Typechecking make_tree_add
+Typechecking replicate
+Typechecking use_replicate
+Typechecking permute_t
+Typechecking use_permute
+Typechecking instruction_decoder
+Typechecking run_instruction
+Instantiating UseDualPortMem
+Instantiating submodules for UseDualPortMem
+Instantiating DualPortMem
+Instantiating submodules for DualPortMem
+Instantiating CrossDomain
+Instantiating submodules for CrossDomain
+Concrete Typechecking CrossDomain
+Latency Counting CrossDomain
+Concrete Typechecking DualPortMem
+Latency Counting DualPortMem
+Concrete Typechecking UseDualPortMem
+Latency Counting UseDualPortMem
+Instantiating example_FIFO
+Instantiating submodules for example_FIFO
+Instantiating FIFO
+Instantiating submodules for FIFO
+Instantiating CrossDomain
+Instantiating submodules for CrossDomain
+Concrete Typechecking CrossDomain
+Latency Counting CrossDomain
+Instantiating CrossDomain
+Instantiating submodules for CrossDomain
+Concrete Typechecking CrossDomain
+Latency Counting CrossDomain
+Instantiating LatencyOffset
+Instantiating submodules for LatencyOffset
+Concrete Typechecking LatencyOffset
+Latency Counting LatencyOffset
+Concrete Typechecking FIFO
+Latency Counting FIFO
+Concrete Typechecking example_FIFO
+Latency Counting example_FIFO
+Instantiating use_Iterator
+Instantiating submodules for use_Iterator
+Instantiating Iterator
+Instantiating submodules for Iterator
+Concrete Typechecking Iterator
+Latency Counting Iterator
+Concrete Typechecking use_Iterator
+Latency Counting use_Iterator
+Instantiating Abs
+Instantiating submodules for Abs
+Concrete Typechecking Abs
+Latency Counting Abs
+Instantiating useSlice
+Instantiating submodules for useSlice
+Instantiating Slice
+Instantiating submodules for Slice
+Concrete Typechecking Slice
+Latency Counting Slice
+Concrete Typechecking useSlice
+Latency Counting useSlice
+Instantiating IntToBits
+Instantiating submodules for IntToBits
+Concrete Typechecking IntToBits
+Latency Counting IntToBits
+Instantiating BitsToInt
+Instantiating submodules for BitsToInt
+Concrete Typechecking BitsToInt
+Latency Counting BitsToInt
+Instantiating example_md
+Instantiating submodules for example_md
+Concrete Typechecking example_md
+Latency Counting example_md
+Instantiating multiply_add
+Instantiating submodules for multiply_add
+Concrete Typechecking multiply_add
+Latency Counting multiply_add
+Instantiating test_pow17
+Instantiating submodules for test_pow17
+Instantiating pow17
+Instantiating submodules for pow17
+Concrete Typechecking pow17
+Latency Counting pow17
+Concrete Typechecking test_pow17
+Latency Counting test_pow17
+Instantiating fibonnaci
+Instantiating submodules for fibonnaci
+Concrete Typechecking fibonnaci
+Latency Counting fibonnaci
+Instantiating blur2
+Instantiating submodules for blur2
+Concrete Typechecking blur2
+Latency Counting blur2
+Instantiating Tree_Multiply
+Instantiating submodules for Tree_Multiply
+Concrete Typechecking Tree_Multiply
+Latency Counting Tree_Multiply
+Instantiating Accumulator
+Instantiating submodules for Accumulator
+Concrete Typechecking Accumulator
+Latency Counting Accumulator
+Instantiating blur
+Instantiating submodules for blur
+Concrete Typechecking blur
+Latency Counting blur
+Instantiating Unpack4
+Instantiating submodules for Unpack4
+Concrete Typechecking Unpack4
+Latency Counting Unpack4
+Not Instantiating generative due to flattening errors
+Instantiating add_indices_to_array
+Instantiating submodules for add_indices_to_array
+Concrete Typechecking add_indices_to_array
+Latency Counting add_indices_to_array
+Instantiating assignment_producer
+Instantiating submodules for assignment_producer
+Concrete Typechecking assignment_producer
+Latency Counting assignment_producer
+Instantiating test_various_assignments
+Instantiating submodules for test_various_assignments
+Concrete Typechecking test_various_assignments
+Latency Counting test_various_assignments
+Instantiating first_bit_idx_6
+Instantiating submodules for first_bit_idx_6
+Concrete Typechecking first_bit_idx_6
+Latency Counting first_bit_idx_6
+Not Instantiating multiply_add_with_latencies due to flattening errors
+Instantiating first_bit_idx_24
+Instantiating submodules for first_bit_idx_24
+Concrete Typechecking first_bit_idx_24
+Latency Counting first_bit_idx_24
+Instantiating permute
+Instantiating submodules for permute
+Concrete Typechecking permute
+Latency Counting permute
+Not Instantiating permute24 due to flattening errors
+Instantiating test_single_wire
+Instantiating submodules for test_single_wire
+Concrete Typechecking test_single_wire
+Latency Counting test_single_wire
+Instantiating disjoint_ports
+Instantiating submodules for disjoint_ports
+Concrete Typechecking disjoint_ports
+Latency Counting disjoint_ports
+Instantiating undeteriminable_input_latency
+Instantiating submodules for undeteriminable_input_latency
+Concrete Typechecking undeteriminable_input_latency
+Latency Counting undeteriminable_input_latency
+Instantiating specified_input_latency
+Instantiating submodules for specified_input_latency
+Concrete Typechecking specified_input_latency
+Latency Counting specified_input_latency
+Instantiating determinable_input_latency
+Instantiating submodules for determinable_input_latency
+Concrete Typechecking determinable_input_latency
+Latency Counting determinable_input_latency
+Instantiating determinable_because_no_input_output_ports
+Instantiating submodules for determinable_because_no_input_output_ports
+Concrete Typechecking determinable_because_no_input_output_ports
+Latency Counting determinable_because_no_input_output_ports
+Instantiating conflicting_latency_declarations
+Instantiating submodules for conflicting_latency_declarations
+Concrete Typechecking conflicting_latency_declarations
+Latency Counting conflicting_latency_declarations
+Instantiating bad_cycle
+Instantiating submodules for bad_cycle
+Concrete Typechecking bad_cycle
+Latency Counting bad_cycle
+Instantiating module_taking_time
+Instantiating submodules for module_taking_time
+Concrete Typechecking module_taking_time
+Latency Counting module_taking_time
+Instantiating matrix_vector_mul
+Instantiating submodules for matrix_vector_mul
+Concrete Typechecking matrix_vector_mul
+Latency Counting matrix_vector_mul
+Instantiating bad_cycle2
+Instantiating submodules for bad_cycle2
+Concrete Typechecking bad_cycle2
+Latency Counting bad_cycle2
+Instantiating module_taking_a_lot_of_time
+Instantiating submodules for module_taking_a_lot_of_time
+Concrete Typechecking module_taking_a_lot_of_time
+Latency Counting module_taking_a_lot_of_time
+Instantiating offset_latency
+Instantiating submodules for offset_latency
+Concrete Typechecking offset_latency
+Latency Counting offset_latency
+Instantiating good_cycle
+Instantiating submodules for good_cycle
+Concrete Typechecking good_cycle
+Latency Counting good_cycle
+Instantiating input_only
+Instantiating submodules for input_only
+Concrete Typechecking input_only
+Latency Counting input_only
+Instantiating multiple_inputs_only
+Instantiating submodules for multiple_inputs_only
+Concrete Typechecking multiple_inputs_only
+Latency Counting multiple_inputs_only
+Instantiating output_only
+Instantiating submodules for output_only
+Concrete Typechecking output_only
+Latency Counting output_only
+Instantiating multiple_outputs_only
+Instantiating submodules for multiple_outputs_only
+Concrete Typechecking multiple_outputs_only
+Latency Counting multiple_outputs_only
+Instantiating submodule
+Instantiating submodules for submodule
+Concrete Typechecking submodule
+Latency Counting submodule
+Instantiating doNothing
+Instantiating submodules for doNothing
+Concrete Typechecking doNothing
+Latency Counting doNothing
+Instantiating contains_submodule_submodule
+Instantiating submodules for contains_submodule_submodule
+Concrete Typechecking contains_submodule_submodule
+Latency Counting contains_submodule_submodule
+Instantiating xor
+Instantiating submodules for xor
+Concrete Typechecking xor
+Latency Counting xor
+Instantiating use_xor
+Instantiating submodules for use_xor
+Concrete Typechecking use_xor
+Latency Counting use_xor
+Instantiating fizz_buzz
+Instantiating submodules for fizz_buzz
+Concrete Typechecking fizz_buzz
+Latency Counting fizz_buzz
+Instantiating fizz_buzz_gen
+Instantiating submodules for fizz_buzz_gen
+Concrete Typechecking fizz_buzz_gen
+Latency Counting fizz_buzz_gen
+Instantiating mbf_dual
+Instantiating submodules for mbf_dual
+Concrete Typechecking mbf_dual
+Latency Counting mbf_dual
+Instantiating monotonize_down
+Instantiating submodules for monotonize_down
+Concrete Typechecking monotonize_down
+Latency Counting monotonize_down
+Instantiating my_mod
+Instantiating submodules for my_mod
+Concrete Typechecking my_mod
+Latency Counting my_mod
+Instantiating use_my_mod
+Instantiating submodules for use_my_mod
+Concrete Typechecking use_my_mod
+Latency Counting use_my_mod
+Instantiating submodule_named_ports
+Instantiating submodules for submodule_named_ports
+Concrete Typechecking submodule_named_ports
+Latency Counting submodule_named_ports
+Instantiating use_submodule_named_ports
+Instantiating submodules for use_submodule_named_ports
+Concrete Typechecking use_submodule_named_ports
+Latency Counting use_submodule_named_ports
+Instantiating contains_submodule_submodule
+Instantiating submodules for contains_submodule_submodule
+Concrete Typechecking contains_submodule_submodule
+Latency Counting contains_submodule_submodule
+Instantiating cross_bool
+Instantiating submodules for cross_bool
+Concrete Typechecking cross_bool
+Latency Counting cross_bool
+Instantiating cross_int
+Instantiating submodules for cross_int
+Concrete Typechecking cross_int
+Latency Counting cross_int
+Instantiating cross_memory
+Instantiating submodules for cross_memory
+Concrete Typechecking cross_memory
+Latency Counting cross_memory
+Instantiating offset_backwards
+Instantiating submodules for offset_backwards
+Concrete Typechecking offset_backwards
+Latency Counting offset_backwards
+Instantiating dual_port_mem
+Instantiating submodules for dual_port_mem
+Concrete Typechecking dual_port_mem
+Latency Counting dual_port_mem
+Instantiating use_fifo
+Instantiating submodules for use_fifo
+Not Instantiating test_separated_domain due to flattening errors
+Instantiating no_port_module
+Instantiating submodules for no_port_module
+Concrete Typechecking no_port_module
+Latency Counting no_port_module
+Instantiating use_no_input_module
+Instantiating submodules for use_no_input_module
+Concrete Typechecking use_no_input_module
+Latency Counting use_no_input_module
+Instantiating mod_with_unused_interface
+Instantiating submodules for mod_with_unused_interface
+Concrete Typechecking mod_with_unused_interface
+Latency Counting mod_with_unused_interface
+Not Instantiating test_write_to_gen_var due to flattening errors
+Instantiating use_bad_interface
+Instantiating submodules for use_bad_interface
+Concrete Typechecking use_bad_interface
+Latency Counting use_bad_interface
+Instantiating sequenceDownFrom
+Instantiating submodules for sequenceDownFrom
+Concrete Typechecking sequenceDownFrom
+Latency Counting sequenceDownFrom
+Instantiating sumUpTo
+Instantiating submodules for sumUpTo
+Concrete Typechecking sumUpTo
+Latency Counting sumUpTo
+Instantiating use_test
+Instantiating submodules for use_test
+Instantiating testTinyTestMod
+Instantiating submodules for testTinyTestMod
+Instantiating tinyTestMod
+Instantiating submodules for tinyTestMod
+Concrete Typechecking tinyTestMod
+Latency Counting tinyTestMod
+Instantiating tinyTestMod
+Instantiating submodules for tinyTestMod
+Concrete Typechecking tinyTestMod
+Latency Counting tinyTestMod
+Concrete Typechecking testTinyTestMod
+Latency Counting testTinyTestMod
+Instantiating make_tree_add
+Instantiating submodules for make_tree_add
+Instantiating tree_add
+Instantiating submodules for tree_add
+Instantiating tree_add
+Instantiating submodules for tree_add
+Instantiating tree_add
+Instantiating submodules for tree_add
+Instantiating tree_add
+Instantiating submodules for tree_add
+Instantiating tree_add
+Instantiating submodules for tree_add
+Instantiating tree_add
+Instantiating submodules for tree_add
+Instantiating tree_add
+Instantiating submodules for tree_add
+Instantiating tree_add
+Instantiating submodules for tree_add
+Concrete Typechecking tree_add
+Latency Counting tree_add
+Concrete Typechecking tree_add
+Latency Counting tree_add
+Concrete Typechecking tree_add
+Latency Counting tree_add
+Concrete Typechecking tree_add
+Latency Counting tree_add
+Concrete Typechecking tree_add
+Latency Counting tree_add
+Concrete Typechecking tree_add
+Latency Counting tree_add
+Concrete Typechecking tree_add
+Latency Counting tree_add
+Concrete Typechecking tree_add
+Latency Counting tree_add
+Concrete Typechecking make_tree_add
+Latency Counting make_tree_add
+Not Instantiating use_replicate due to flattening errors
+Instantiating use_permute
+Instantiating submodules for use_permute
+Instantiating permute_t
+Instantiating submodules for permute_t
+Concrete Typechecking permute_t
+Latency Counting permute_t
+Concrete Typechecking use_permute
+Latency Counting use_permute
+Instantiating instruction_decoder
+Instantiating submodules for instruction_decoder
+Concrete Typechecking instruction_decoder
+Latency Counting instruction_decoder
+Not Instantiating run_instruction due to flattening errors

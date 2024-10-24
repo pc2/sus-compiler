@@ -687,6 +687,20 @@ module mod_with_unused_interface {
 	}
 }
 
+module test_write_to_gen_var {
+	int a
+
+	gen int b
+
+	a = b
+
+	a = a
+
+	b = b
+
+	b = a
+}
+
 module use_bad_interface {
 	mod_with_unused_interface mm
 

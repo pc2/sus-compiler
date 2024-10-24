@@ -92,6 +92,12 @@ pub fn compile_all(
     (linker, file_source_manager)
 }
 
+fn ariadne_config() -> Config {
+    Config::default()
+        .with_index_type(IndexType::Byte)
+        .with_color(config().use_color)
+}
+
 pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
     error: &CompileError,
     file: FileUUID,
@@ -110,7 +116,7 @@ pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
 
     let error_span = error.position.into_range();
 
-    let config = Config::default().with_index_type(IndexType::Byte);
+    let config = ariadne_config();
     let mut report: ReportBuilder<'_, (FileUUID, Range<usize>)> =
         Report::build(report_kind, file, error_span.start).with_config(config);
     report = report.with_message(&error.reason).with_label(
@@ -162,9 +168,7 @@ pub fn pretty_print_spans_in_reverse_order(file_data : &FileData, spans: Vec<Ran
             return;
         }
 
-        let config = Config::default()
-            .with_index_type(IndexType::Byte)
-            .with_color(!config().use_lsp); // Disable color because LSP output doesn't support it
+        let config = ariadne_config();
 
         let mut report: ReportBuilder<'_, Range<usize>> =
             Report::build(ReportKind::Advice, (), span.start).with_config(config);
@@ -185,9 +189,7 @@ pub fn pretty_print_many_spans(file_data: &FileData, spans: &[(String, Range<usi
         name : &file_data.file_identifier
     };
 
-    let config = Config::default()
-        .with_index_type(IndexType::Byte)
-        .with_color(!config().use_lsp); // Disable color because LSP output doesn't support it
+    let config = ariadne_config();
 
     if spans.len() == 0 {
         return;

@@ -23,7 +23,9 @@ pub struct ConfigStruct {
     pub debug_print_module_contents: bool,
     pub debug_print_latency_graph: bool,
     pub codegen_module_and_dependencies_one_file: Option<String>,
-    pub early_exit: EarlyExitUpTo
+    pub early_exit: EarlyExitUpTo,
+    /// For terminal environments where color is not supported
+    pub use_color: bool
 }
 
 pub fn config() -> &'static ConfigStruct {
@@ -76,6 +78,9 @@ pub fn parse_args() -> Vec<PathBuf> {
             .takes_value(true)
             .possible_values(&["initialize", "flatten", "typecheck", "instantiate", "codegen"])
             .default_value("codegen"))
+        .arg(Arg::new("nocolor")
+            .long("nocolor")
+            .help("Disables color printing in the errors of the sus_compiler output"))
         .arg(Arg::new("files")
             .multiple_values(true)
             .help(".sus Files")
@@ -104,6 +109,13 @@ pub fn parse_args() -> Vec<PathBuf> {
     config.codegen = matches.is_present("codegen");
     config.debug_print_module_contents = matches.is_present("debug");
     config.debug_print_latency_graph = matches.is_present("debug-latency");
+    if matches.is_present("nocolor") {
+        config.use_color = false;
+    }
+    if config.use_lsp {
+         // Disable color because LSP output doesn't support it
+         config.use_color = false;
+    }
     config.early_exit = match matches.value_of("upto").unwrap() {
         "initialize" => EarlyExitUpTo::Initialize,
         "flatten" => EarlyExitUpTo::Flatten,
@@ -155,6 +167,7 @@ static CONFIG: ConfigStructWrapper = ConfigStructWrapper {
         codegen: false,
         debug_print_latency_graph: false,
         codegen_module_and_dependencies_one_file: None,
-        early_exit: EarlyExitUpTo::CodeGen
+        early_exit: EarlyExitUpTo::CodeGen,
+        use_color: true
     }),
 };

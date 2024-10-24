@@ -1,0 +1,1044 @@
+Warning: Unused port 'push'
+    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:86:2]
+    │
+ 48 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
+    │                           ──┬─  
+    │                             ╰─── Port 'push' declared here
+    │ 
+ 86 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+    │     ──┬─                                          ┬  
+    │       ╰────────────────────────────────────────────── Unused port 'push'
+    │                                                   │  
+    │                                                   ╰── f declared here
+────╯
+Warning: Unused port 'data_in'
+    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:86:2]
+    │
+ 48 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
+    │                                               ───┬───  
+    │                                                  ╰───── Port 'data_in' declared here
+    │ 
+ 86 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+    │     ──┬─                                          ┬  
+    │       ╰────────────────────────────────────────────── Unused port 'data_in'
+    │                                                   │  
+    │                                                   ╰── f declared here
+────╯
+Warning: Unused port 'ready'
+    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:86:2]
+    │
+ 50 │     output bool ready'0
+    │                 ──┬──  
+    │                   ╰──── Port 'ready' declared here
+    │ 
+ 86 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+    │     ──┬─                                          ┬  
+    │       ╰────────────────────────────────────────────── Unused port 'ready'
+    │                                                   │  
+    │                                                   ╰── f declared here
+────╯
+Warning: Unused port 'pop'
+    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:86:2]
+    │
+ 53 │     interface pop : bool pop -> bool data_valid, T data_out
+    │                          ─┬─  
+    │                           ╰─── Port 'pop' declared here
+    │ 
+ 86 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+    │     ──┬─                                          ┬  
+    │       ╰────────────────────────────────────────────── Unused port 'pop'
+    │                                                   │  
+    │                                                   ╰── f declared here
+────╯
+Warning: Unused port 'data_valid'
+    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:86:2]
+    │
+ 53 │     interface pop : bool pop -> bool data_valid, T data_out
+    │                                      ─────┬────  
+    │                                           ╰────── Port 'data_valid' declared here
+    │ 
+ 86 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+    │     ──┬─                                          ┬  
+    │       ╰────────────────────────────────────────────── Unused port 'data_valid'
+    │                                                   │  
+    │                                                   ╰── f declared here
+────╯
+Warning: Unused port 'data_out'
+    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:86:2]
+    │
+ 53 │     interface pop : bool pop -> bool data_valid, T data_out
+    │                                                    ────┬───  
+    │                                                        ╰───── Port 'data_out' declared here
+    │ 
+ 86 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+    │     ──┬─                                          ┬  
+    │       ╰────────────────────────────────────────────── Unused port 'data_out'
+    │                                                   │  
+    │                                                   ╰── f declared here
+────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:190:10]
+     │
+ 190 │     int[20] arr
+     │             ─┬─  
+     │              ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:192:9]
+     │
+ 192 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
+     │            ───┬──  
+     │               ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+   ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:3:43]
+   │
+ 3 │ __builtin__ module LatencyOffset #(T, int OFFSET) {
+   │                                           ───┬──  
+   │                                              ╰──── Unused Variable: This variable does not affect the output ports of this module
+───╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+   ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:4:33]
+   │
+ 4 │     interface LatencyOffset : T in'0 -> T out'OFFSET
+   │                                 ─┬  
+   │                                  ╰── Unused Variable: This variable does not affect the output ports of this module
+───╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+   ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:9:29]
+   │
+ 9 │     interface in_domain : T in'0
+   │                             ─┬  
+   │                              ╰── Unused Variable: This variable does not affect the output ports of this module
+───╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:15:31]
+    │
+ 15 │     interface IntToBits : int value'0 -> bool[32] bits'0
+    │                               ──┬──  
+    │                                 ╰──── Unused Variable: This variable does not affect the output ports of this module
+────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:19:36]
+    │
+ 19 │     interface IntToBits : bool[32] bits'0 -> int value'0
+    │                                    ──┬─  
+    │                                      ╰─── Unused Variable: This variable does not affect the output ports of this module
+────╯
+Error: 'contains_submodule_submodule' conflicts with other declarations:
+     ╭─[test.sus:441:8]
+     │
+ 441 │ module contains_submodule_submodule {
+     │        ──────────────┬─────────────  
+     │                      ╰─────────────── 'contains_submodule_submodule' conflicts with other declarations:
+     │ 
+ 597 │ module contains_submodule_submodule {
+     │        ──────────────┬─────────────  
+     │                      ╰─────────────── Conflicts with
+─────╯
+Error: 'contains_submodule_submodule' conflicts with other declarations:
+     ╭─[test.sus:597:8]
+     │
+ 441 │ module contains_submodule_submodule {
+     │        ──────────────┬─────────────  
+     │                      ╰─────────────── Conflicts with
+     │ 
+ 597 │ module contains_submodule_submodule {
+     │        ──────────────┬─────────────  
+     │                      ╰─────────────── 'contains_submodule_submodule' conflicts with other declarations:
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+    ╭─[test.sus:26:6]
+    │
+ 26 │     int a = pow17(2)
+    │         ┬  
+    │         ╰── Unused Variable: This variable does not affect the output ports of this module
+────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+    ╭─[test.sus:60:10]
+    │
+ 60 │     gen int a
+    │             ┬  
+    │             ╰── Unused Variable: This variable does not affect the output ports of this module
+────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+    ╭─[test.sus:62:11]
+    │
+ 62 │     gen bool b = true
+    │              ┬  
+    │              ╰── Unused Variable: This variable does not affect the output ports of this module
+────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+    ╭─[test.sus:63:11]
+    │
+ 63 │     gen bool bb = false
+    │              ─┬  
+    │               ╰── Unused Variable: This variable does not affect the output ports of this module
+────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:115:10]
+     │
+ 115 │     gen int A = 1
+     │             ┬  
+     │             ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: 'i' is read-only
+     ╭─[test.sus:159:11]
+     │
+ 142 │     interface generative : int i -> int o, int o2
+     │                            ──┬──  
+     │                              ╰──── 'i' declared here
+     │ 
+ 159 │     if test {i = 5}
+     │              ┬  
+     │              ╰── 'i' is read-only
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:144:13]
+     │
+ 144 │     gen int[x] ys
+     │                ─┬  
+     │                 ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:148:13]
+     │
+ 148 │     gen int[3] ps
+     │                ─┬  
+     │                 ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:155:13]
+     │
+ 155 │     gen int[3] xx = a
+     │                ─┬  
+     │                 ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:178:15]
+     │
+ 178 │     state int[3] st
+     │                  ─┬  
+     │                   ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:179:7]
+     │
+ 179 │     bool b
+     │          ┬  
+     │          ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:180:10]
+     │
+ 180 │     reg int a, st[2], reg reg b = assignment_producer()
+     │             ┬  
+     │             ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Latency Counting couldn't reach this node
+     ╭─[test.sus:179:2]
+     │
+ 179 │     bool b
+     │     ───┬──  
+     │        ╰──── Latency Counting couldn't reach this node
+─────╯
+Error: Latency Counting couldn't reach this node
+     ╭─[test.sus:180:6]
+     │
+ 180 │     reg int a, st[2], reg reg b = assignment_producer()
+     │         ──┬──  
+     │           ╰──── Latency Counting couldn't reach this node
+─────╯
+Error: No Global of the name 'multiply' was found. Did you forget to import it?
+     ╭─[test.sus:219:17]
+     │
+ 219 │     int tmp'1 = multiply(a, b)
+     │                 ────┬───  
+     │                     ╰───── No Global of the name 'multiply' was found. Did you forget to import it?
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:218:49]
+     │
+ 218 │     interface multiply_add_with_latencies : int a'0, int b'0, int c'0 -> int r'0
+     │                                                 ┬  
+     │                                                 ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:218:58]
+     │
+ 218 │     interface multiply_add_with_latencies : int a'0, int b'0, int c'0 -> int r'0
+     │                                                          ┬  
+     │                                                          ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:224:43]
+     │
+ 224 │     interface first_bit_idx_24 : bool[24] bits -> int first
+     │                                           ──┬─  
+     │                                             ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:225:9]
+     │
+ 225 │     int[4] offsets
+     │            ───┬───  
+     │               ╰───── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:226:10]
+     │
+ 226 │     bool[4] was_nonzeros
+     │             ──────┬─────  
+     │                   ╰─────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:228:10]
+     │
+ 228 │     for int i in 0..4 {
+     │             ┬  
+     │             ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:229:11]
+     │
+ 229 │        bool[6] these_bits
+     │                ─────┬────  
+     │                     ╰────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:230:11]
+     │
+ 230 │        for int j in 0..6 {
+     │                ┬  
+     │                ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:234:7]
+     │
+ 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
+     │            ───┬──  
+     │               ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:234:20]
+     │
+ 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
+     │                         ─────┬─────  
+     │                              ╰─────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Pre-emptive error because latency-unspecified 'first' is never written to. 
+(This is because work-in-progress code would get a lot of latency counting errors while unfinished)
+     ╭─[test.sus:224:55]
+     │
+ 224 │     interface first_bit_idx_24 : bool[24] bits -> int first
+     │                                                       ──┬──  
+     │                                                         ╰──── Pre-emptive error because latency-unspecified 'first' is never written to. 
+(This is because work-in-progress code would get a lot of latency counting errors while unfinished)
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:241:44]
+     │
+ 241 │     interface permute : bool[128] mbf, int selected_permutation -> bool[128] permuted_mbf
+     │                                            ──────────┬─────────  
+     │                                                      ╰─────────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Latency Counting couldn't reach this node
+     ╭─[test.sus:241:40]
+     │
+ 241 │     interface permute : bool[128] mbf, int selected_permutation -> bool[128] permuted_mbf
+     │                                        ────────────┬───────────  
+     │                                                    ╰───────────── Latency Counting couldn't reach this node
+─────╯
+Error: Function call syntax is only possible on modules or interfaces of modules
+     ╭─[test.sus:267:2]
+     │
+ 267 │     aaaaa()
+     │     ──┬──  
+     │       ╰──── Function call syntax is only possible on modules or interfaces of modules
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:248:37]
+     │
+ 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
+     │                                     ─┬─  
+     │                                      ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:248:51]
+     │
+ 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
+     │                                                   ───────┬──────  
+     │                                                          ╰──────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:248:72]
+     │
+ 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
+     │                                                                        ──┬──  
+     │                                                                          ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:252:10]
+     │
+ 252 │     gen int aaaaa = 5
+     │             ──┬──  
+     │               ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Typing Error: connection expects a ::bool[] but was given a ::int
+     ╭─[test.sus:250:41]
+     │
+ 250 │     state bool[24] stored_valid_permutes = 000000000000000000000000
+     │                                            ────────────┬───────────  
+     │                                                        ╰───────────── Typing Error: connection expects a ::bool[] but was given a ::int
+─────╯
+Error: Typing Error: binop left side expects a ::bool but was given a ::bool[]
+     ╭─[test.sus:263:26]
+     │
+ 263 │     stored_valid_permutes = stored_valid_permutes & permutes_to_keep
+     │                             ──────────┬──────────  
+     │                                       ╰──────────── Typing Error: binop left side expects a ::bool but was given a ::bool[]
+─────╯
+Error: Typing Error: binop right side expects a ::bool but was given a ::bool[]
+     ╭─[test.sus:263:50]
+     │
+ 263 │     stored_valid_permutes = stored_valid_permutes & permutes_to_keep
+     │                                                     ────────┬───────  
+     │                                                             ╰───────── Typing Error: binop right side expects a ::bool but was given a ::bool[]
+─────╯
+Error: Typing Error: connection expects a ::bool[] but was given a ::bool
+     ╭─[test.sus:263:26]
+     │
+ 263 │     stored_valid_permutes = stored_valid_permutes & permutes_to_keep
+     │                             ────────────────────┬───────────────────  
+     │                                                 ╰───────────────────── Typing Error: connection expects a ::bool[] but was given a ::bool
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:278:50]
+     │
+ 278 │     interface disjoint_ports : int a, int b, int c -> int result
+     │                                                  ┬  
+     │                                                  ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Latency Counting couldn't reach this node
+     ╭─[test.sus:278:46]
+     │
+ 278 │     interface disjoint_ports : int a, int b, int c -> int result
+     │                                              ──┬──  
+     │                                                ╰──── Latency Counting couldn't reach this node
+─────╯
+Error: Cannot determine port latency. Options are 1 and 2
+Try specifying an explicit latency or rework the module to remove this ambiguity
+     ╭─[test.sus:284:74]
+     │
+ 284 │     interface undeteriminable_input_latency : int a, int b -> int x, int y
+     │                                                                          ┬  
+     │                                                                          ╰── Cannot determine port latency. Options are 1 and 2
+Try specifying an explicit latency or rework the module to remove this ambiguity
+─────╯
+Error: Conflicting specified latency
+
+a'0
+-> nio'1 (+1)
+-> x'2 (+1)
+
+But this was specified as x'1
+     ╭─[test.sus:325:67]
+     │
+ 325 │     interface conflicting_latency_declarations : int a'0 -> int x'1
+     │                                                  ───┬───          ┬  
+     │                                                     ╰──────────────── 'a' declared here
+     │                                                                   │  
+     │                                                                   ╰── Conflicting specified latency
+
+a'0
+-> nio'1 (+1)
+-> x'2 (+1)
+
+But this was specified as x'1
+─────╯
+Error: This register is part of a net-positive latency cycle of +1
+
+state_reg'1
+-> state_reg'2 (+1)
+
+Which conflicts with the starting latency
+     ╭─[test.sus:337:2]
+     │
+ 337 │     reg state_reg = state_reg + a
+     │     ─┬─  
+     │      ╰─── This register is part of a net-positive latency cycle of +1
+
+state_reg'1
+-> state_reg'2 (+1)
+
+Which conflicts with the starting latency
+─────╯
+Error: This write is part of a net-positive latency cycle of +5
+
+_1_i'0
+-> test'5 (+5)
+-> _1_i'5 (+0)
+
+Which conflicts with the starting latency
+     ╭─[test.sus:363:2]
+     │
+ 363 │     test = module_taking_time(test+a)
+     │     ──┬─  
+     │       ╰─── This write is part of a net-positive latency cycle of +5
+
+_1_i'0
+-> test'5 (+5)
+-> _1_i'5 (+0)
+
+Which conflicts with the starting latency
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:375:36]
+     │
+ 375 │     interface offset_latency : int i'0 -> int o'-5
+     │                                    ┬  
+     │                                    ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:393:32]
+     │
+ 393 │     interface input_only : int i
+     │                                ┬  
+     │                                ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:394:12]
+     │
+ 394 │     state int loop
+     │               ──┬─  
+     │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:400:42]
+     │
+ 400 │     interface multiple_inputs_only : int i, int i2
+     │                                          ┬  
+     │                                          ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:400:49]
+     │
+ 400 │     interface multiple_inputs_only : int i, int i2
+     │                                                 ─┬  
+     │                                                  ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:401:12]
+     │
+ 401 │     state int loop
+     │               ──┬─  
+     │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Latency Counting couldn't reach this node
+     ╭─[test.sus:415:49]
+     │
+ 415 │     interface multiple_outputs_only : -> int o, int o2
+     │                                                 ───┬──  
+     │                                                    ╰──── Latency Counting couldn't reach this node
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:462:7]
+     │
+ 462 │     bool b = xor(true, false)
+     │          ┬  
+     │          ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:608:22]
+     │
+ 608 │     interface in : bool i'0
+     │                         ┬  
+     │                         ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:613:21]
+     │
+ 613 │     interface in : int i'0
+     │                        ┬  
+     │                        ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:619:31]
+     │
+ 619 │     interface in : bool[20][512] i'0
+     │                                  ┬  
+     │                                  ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:625:39]
+     │
+ 625 │     interface offset_backwards : bool i'0 -> bool o'-5
+     │                                       ┬  
+     │                                       ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:651:11]
+     │
+ 651 │     bool[20] data
+     │              ──┬─  
+     │                ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:653:7]
+     │
+ 653 │     bool valid, bool[20] data2 = fiii.pop(true)
+     │          ──┬──  
+     │            ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:653:23]
+     │
+ 653 │     bool valid, bool[20] data2 = fiii.pop(true)
+     │                          ──┬──  
+     │                            ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Could not instantiate ::FIFO because the template arguments 'T', 'DEPTH', 'READY_SLACK' were missing and no default was provided
+     ╭─[test.sus:649:2]
+     │
+ 649 │     FIFO fiii
+     │     ──┬─  
+     │       ╰─── Could not instantiate ::FIFO because the template arguments 'T', 'DEPTH', 'READY_SLACK' were missing and no default was provided
+     │
+     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:36:2]
+     │
+  36 │     T,
+     │     ┬  
+     │     ╰── 'T' defined here
+  37 │     int DEPTH,
+     │         ──┬──  
+     │           ╰──── 'DEPTH' defined here
+     │ 
+  39 │     int READY_SLACK
+     │         ─────┬─────  
+     │              ╰─────── 'READY_SLACK' defined here
+─────╯
+Error: MIN is not a valid template argument of ::int
+     ╭─[test.sus:672:8]
+     │
+ 672 │     int #(MIN: 0, MAX: 199) my_int
+     │           ─┬─  
+     │            ╰─── MIN is not a valid template argument of ::int
+     │
+     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:26:20]
+     │
+  26 │ __builtin__ struct int {}
+     │                    ─┬─  
+     │                     ╰─── 'int' defined here
+─────╯
+Error: MAX is not a valid template argument of ::int
+     ╭─[test.sus:672:16]
+     │
+ 672 │     int #(MIN: 0, MAX: 199) my_int
+     │                   ─┬─  
+     │                    ╰─── MAX is not a valid template argument of ::int
+     │
+     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:26:20]
+     │
+  26 │ __builtin__ struct int {}
+     │                    ─┬─  
+     │                     ╰─── 'int' defined here
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:659:43]
+     │
+ 659 │     interface test_separated_domain : int main
+     │                                           ──┬─  
+     │                                             ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:660:6]
+     │
+ 660 │     int domain2
+     │         ───┬───  
+     │            ╰───── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:662:6]
+     │
+ 662 │     int domain3
+     │         ───┬───  
+     │            ╰───── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:664:6]
+     │
+ 664 │     int domain4
+     │         ───┬───  
+     │            ╰───── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:670:6]
+     │
+ 670 │     int domain5
+     │         ───┬───  
+     │            ╰───── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:672:26]
+     │
+ 672 │     int #(MIN: 0, MAX: 199) my_int
+     │                             ───┬──  
+     │                                ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:686:21]
+     │
+ 686 │        interface v : int a -> int b
+     │                          ┬  
+     │                          ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Attempting use a non-generative variable in a generative context: connection
+     ╭─[test.sus:701:6]
+     │
+ 701 │     b = a
+     │         ┬  
+     │         ╰── Attempting use a non-generative variable in a generative context: connection
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:691:6]
+     │
+ 691 │     int a
+     │         ┬  
+     │         ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:693:10]
+     │
+ 693 │     gen int b
+     │             ┬  
+     │             ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: The result of this operation is not used
+     ╭─[test.sus:707:2]
+     │
+ 707 │     mm.a
+     │     ──┬─  
+     │       ╰─── The result of this operation is not used
+─────╯
+Error: Port 'a' is used, but the instantiated module has this port disabled
+     ╭─[test.sus:707:5]
+     │
+ 686 │        interface v : int a -> int b
+     │                          ┬  
+     │                          ╰── Port 'a' declared here
+     │ 
+ 705 │     mod_with_unused_interface mm
+     │                               ─┬  
+     │                                ╰── mm declared here
+     │ 
+ 707 │     mm.a
+     │        ┬  
+     │        ╰── Port 'a' is used, but the instantiated module has this port disabled
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:750:30]
+     │
+ 750 │     interface sumUpTo : bool start
+     │                              ──┬──  
+     │                                ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:756:7]
+     │
+ 756 │     bool re = sdf.ready
+     │          ─┬  
+     │           ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:758:7]
+     │
+ 758 │     bool iter_valid, int iter_index = sdf.iter()
+     │          ─────┬────  
+     │               ╰────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:758:23]
+     │
+ 758 │     bool iter_valid, int iter_index = sdf.iter()
+     │                          ─────┬────  
+     │                               ╰────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:760:7]
+     │
+ 760 │        int idx = iter_index
+     │            ─┬─  
+     │             ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:763:6]
+     │
+ 763 │     int beep
+     │         ──┬─  
+     │           ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: beep is not a valid template argument of ::int
+     ╭─[test.sus:767:30]
+     │
+ 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
+     │                              ──┬─  
+     │                                ╰─── beep is not a valid template argument of ::int
+     │
+     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:26:20]
+     │
+  26 │ __builtin__ struct int {}
+     │                    ─┬─  
+     │                     ╰─── 'int' defined here
+─────╯
+Error: BEEP is not a valid template argument of ::int
+     ╭─[test.sus:767:44]
+     │
+ 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
+     │                                            ──┬─  
+     │                                              ╰─── BEEP is not a valid template argument of ::int
+     │
+     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:26:20]
+     │
+  26 │ __builtin__ struct int {}
+     │                    ─┬─  
+     │                     ╰─── 'int' defined here
+─────╯
+Error: ::int is not a named wire: local or constant, it is a Struct instead!
+     ╭─[test.sus:767:50]
+     │
+ 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
+     │                                                  ─┬─  
+     │                                                   ╰─── ::int is not a named wire: local or constant, it is a Struct instead!
+     │
+     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:26:20]
+     │
+  26 │ __builtin__ struct int {}
+     │                    ─┬─  
+     │                     ╰─── Defined here
+─────╯
+Error: Template arguments must be known at compile-time!
+     ╭─[test.sus:767:50]
+     │
+ 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
+     │                                                  ─┬─  
+     │                                                   ╰─── Template arguments must be known at compile-time!
+─────╯
+Error: BITWIDTH is not a valid template argument of ::FIFO
+     ╭─[test.sus:775:9]
+     │
+ 775 │     FIFO #(BITWIDTH: 4) badoop
+     │            ────┬───  
+     │                ╰───── BITWIDTH is not a valid template argument of ::FIFO
+     │
+     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:35:8]
+     │
+  35 │ module FIFO #(
+     │        ──┬─  
+     │          ╰─── 'FIFO' defined here
+─────╯
+Error: 'MY_INPUT' is read-only
+     ╭─[test.sus:769:2]
+     │
+ 766 │ module test #(T, int MY_INPUT) {
+     │                  ──────┬─────  
+     │                        ╰─────── 'MY_INPUT' declared here
+     │ 
+ 769 │     MY_INPUT = 3
+     │     ────┬───  
+     │         ╰───── 'MY_INPUT' is read-only
+─────╯
+Error: 'beep' is read-only
+     ╭─[test.sus:773:2]
+     │
+ 771 │     input int beep
+     │           ────┬───  
+     │               ╰───── 'beep' declared here
+     │ 
+ 773 │     beep = 3
+     │     ──┬─  
+     │       ╰─── 'beep' is read-only
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:766:22]
+     │
+ 766 │ module test #(T, int MY_INPUT) {
+     │                      ────┬───  
+     │                          ╰───── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:767:55]
+     │
+ 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
+     │                                                       ─┬  
+     │                                                        ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:771:12]
+     │
+ 771 │     input int beep
+     │               ──┬─  
+     │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Could not fully figure out the type of this object. type_variable_4
+     ╭─[test.sus:767:50]
+     │
+ 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
+     │                                                  ─┬─  
+     │                                                   ╰─── Could not fully figure out the type of this object. type_variable_4
+─────╯
+Error: Could not instantiate ::test because the template arguments 'T' were missing and no default was provided
+     ╭─[test.sus:779:2]
+     │
+ 766 │ module test #(T, int MY_INPUT) {
+     │               ┬  
+     │               ╰── 'T' defined here
+     │ 
+ 779 │     test #(MY_INPUT: 3) test_mod
+     │     ──┬─  
+     │       ╰─── Could not instantiate ::test because the template arguments 'T' were missing and no default was provided
+─────╯
+Warning: Unused port 'o'
+     ╭─[test.sus:791:2]
+     │
+ 786 │     output int o = beep
+     │                ┬  
+     │                ╰── Port 'o' declared here
+     │ 
+ 791 │     tinyTestMod #(beep: 3) a
+     │     ─────┬─────            ┬  
+     │          ╰──────────────────── Unused port 'o'
+     │                            │  
+     │                            ╰── a declared here
+─────╯
+Warning: Unused port 'o'
+     ╭─[test.sus:792:2]
+     │
+ 786 │     output int o = beep
+     │                ┬  
+     │                ╰── Port 'o' declared here
+     │ 
+ 792 │     tinyTestMod #(beep: 4) b
+     │     ─────┬─────            ┬  
+     │          ╰──────────────────── Unused port 'o'
+     │                            │  
+     │                            ╰── b declared here
+─────╯
+Warning: Unused port 'o'
+     ╭─[test.sus:793:2]
+     │
+ 786 │     output int o = beep
+     │                ┬  
+     │                ╰── Port 'o' declared here
+     │ 
+ 793 │     tinyTestMod #(beep: 3) c
+     │     ─────┬─────            ┬  
+     │          ╰──────────────────── Unused port 'o'
+     │                            │  
+     │                            ╰── c declared here
+─────╯
+Error: 'NUM_REPLS' has already been defined previously
+     ╭─[test.sus:850:29]
+     │
+ 850 │     replicate #(NUM_REPLS: 50, NUM_REPLS: 30, T: type bool) a
+     │                 ────┬────      ────┬────  
+     │                     ╰───────────────────── Defined here previously
+     │                                    │      
+     │                                    ╰────── 'NUM_REPLS' has already been defined previously
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:863:13]
+     │
+ 863 │     gen int[8] SOURCES
+     │                ───┬───  
+     │                   ╰───── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:875:9]
+     │
+ 875 │     int[2] inArr
+     │            ──┬──  
+     │              ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:882:9]
+     │
+ 882 │     int[8] beep = permut.permute(SOURCES)
+     │            ──┬─  
+     │              ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:886:28]
+     │
+ 886 │     interface from : bool[32] instr
+     │                               ──┬──  
+     │                                 ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ╭─[test.sus:898:23]
+     │
+ 898 │ ╭─▶     if decoder.is_jump() : int target_addr {
+     │ │                            ────────┬────────  
+     │ │                                    ╰────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ┆ ┆   
+ 900 │ ├─▶     }
+     │ │           
+     │ ╰─────────── Parent node 'if_statement'
+─────╯
+Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ╭─[test.sus:901:23]
+     │
+ 901 │ ╭─▶     if decoder.is_load() : int reg_to, int addr {
+     │ │                            ───────────┬──────────  
+     │ │                                       ╰──────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ┆ ┆   
+ 903 │ ├─▶     }
+     │ │           
+     │ ╰─────────── Parent node 'if_statement'
+─────╯
+Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ╭─[test.sus:904:5]
+     │
+ 904 │ ╭─▶     if decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │ │          ─────────────────────────┬─────────────────────────  
+     │ │                                   ╰─────────────────────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ┆ ┆   
+ 906 │ ├─▶     }
+     │ │           
+     │ ╰─────────── Parent node 'if_statement'
+─────╯
+Error: A function called in this context may only return one result. Split this function call into a separate line instead.
+     ╭─[test.sus:898:5]
+     │
+ 887 │     interface is_jump
+     │               ───┬───  
+     │                  ╰───── Interface 'is_jump' defined here
+     │ 
+ 898 │     if decoder.is_jump() : int target_addr {
+     │        ────────┬────────  
+     │                ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
+─────╯
+Error: A function called in this context may only return one result. Split this function call into a separate line instead.
+     ╭─[test.sus:901:5]
+     │
+ 888 │     interface is_load
+     │               ───┬───  
+     │                  ╰───── Interface 'is_load' defined here
+     │ 
+ 901 │     if decoder.is_load() : int reg_to, int addr {
+     │        ────────┬────────  
+     │                ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
+─────╯
+Error: No Global of the name 'op' was found. Did you forget to import it?
+     ╭─[test.sus:904:57]
+     │
+ 904 │     if decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │                                                            ─┬  
+     │                                                             ╰── No Global of the name 'op' was found. Did you forget to import it?
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:894:42]
+     │
+ 894 │     interface run_instruction : bool[32] instr
+     │                                          ──┬──  
+     │                                            ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
