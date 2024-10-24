@@ -11,6 +11,7 @@ pub enum EarlyExitUpTo {
     Initialize,
     Flatten,
     AbstractTypecheck,
+    Lint,
     Instantiate,
     CodeGen
 }
@@ -83,7 +84,7 @@ pub fn parse_args() -> Vec<PathBuf> {
             .long("upto")
             .help("Describes at what point in the compilation process we should exit early. This is mainly to aid in debugging, where incorrect results from flattening/typechecking may lead to errors, which we still wish to see in say the LSP")
             .takes_value(true)
-            .possible_values(&["initialize", "flatten", "typecheck", "instantiate", "codegen"])
+            .possible_values(&["initialize", "flatten", "typecheck", "lint", "instantiate", "codegen"])
             .default_value("codegen"))
         .arg(Arg::new("nocolor")
             .long("nocolor")
@@ -130,6 +131,7 @@ pub fn parse_args() -> Vec<PathBuf> {
         "initialize" => EarlyExitUpTo::Initialize,
         "flatten" => EarlyExitUpTo::Flatten,
         "typecheck" => EarlyExitUpTo::AbstractTypecheck,
+        "lint" => EarlyExitUpTo::Lint,
         "instantiate" => EarlyExitUpTo::Instantiate,
         "codegen" => EarlyExitUpTo::CodeGen,
         _ => unreachable!()

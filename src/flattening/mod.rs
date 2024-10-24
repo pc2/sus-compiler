@@ -4,6 +4,7 @@ mod name_context;
 mod parser;
 mod typechecking;
 mod walk;
+mod lints;
 
 use crate::alloc::UUIDAllocator;
 use crate::prelude::*;
@@ -15,6 +16,7 @@ use std::ops::Deref;
 pub use flatten::flatten_all_modules;
 pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
+pub use lints::perform_lints;
 
 use crate::linker::{Documentation, LinkInfo};
 use crate::{file_position::FileText, instantiation::InstantiationList, value::Value};

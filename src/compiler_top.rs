@@ -13,7 +13,7 @@ use crate::{
 };
 
 use crate::flattening::{
-    flatten_all_modules, gather_initial_file_data, typecheck_all_modules, Module,
+    flatten_all_modules, gather_initial_file_data, perform_lints, typecheck_all_modules, Module
 };
 
 const STD_LIB_PATH: &str = env!("SUS_COMPILER_STD_LIB_PATH");
@@ -139,6 +139,10 @@ impl Linker {
             md.print_flattened_module(&self.files[md.link_info.file]);
         });
         if config().early_exit == EarlyExitUpTo::AbstractTypecheck {return}
+
+        perform_lints(self);
+        
+        if config().early_exit == EarlyExitUpTo::Lint {return}
 
         // Make an initial instantiation of all modules
         // Won't be possible once we have template modules

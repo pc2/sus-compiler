@@ -356,34 +356,6 @@ Error: Function call syntax is only possible on modules or interfaces of modules
      │     ──┬──  
      │       ╰──── Function call syntax is only possible on modules or interfaces of modules
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:248:37]
-     │
- 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
-     │                                     ─┬─  
-     │                                      ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:248:51]
-     │
- 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
-     │                                                   ───────┬──────  
-     │                                                          ╰──────── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:248:72]
-     │
- 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
-     │                                                                        ──┬──  
-     │                                                                          ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:252:10]
-     │
- 252 │     gen int aaaaa = 5
-     │             ──┬──  
-     │               ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
 Error: Typing Error: connection expects a ::bool[] but was given a ::int
      ╭─[test.sus:250:41]
      │
@@ -411,6 +383,34 @@ Error: Typing Error: connection expects a ::bool[] but was given a ::bool
  263 │     stored_valid_permutes = stored_valid_permutes & permutes_to_keep
      │                             ────────────────────┬───────────────────  
      │                                                 ╰───────────────────── Typing Error: connection expects a ::bool[] but was given a ::bool
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:248:37]
+     │
+ 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
+     │                                     ─┬─  
+     │                                      ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:248:51]
+     │
+ 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
+     │                                                   ───────┬──────  
+     │                                                          ╰──────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:248:72]
+     │
+ 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
+     │                                                                        ──┬──  
+     │                                                                          ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:252:10]
+     │
+ 252 │     gen int aaaaa = 5
+     │             ──┬──  
+     │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:278:50]
@@ -915,6 +915,13 @@ Error: 'beep' is read-only
      │     ──┬─  
      │       ╰─── 'beep' is read-only
 ─────╯
+Error: Could not fully figure out the type of this object. type_variable_4
+     ╭─[test.sus:767:50]
+     │
+ 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
+     │                                                  ─┬─  
+     │                                                   ╰─── Could not fully figure out the type of this object. type_variable_4
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:766:22]
      │
@@ -935,13 +942,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  771 │     input int beep
      │               ──┬─  
      │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not fully figure out the type of this object. type_variable_4
-     ╭─[test.sus:767:50]
-     │
- 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
-     │                                                  ─┬─  
-     │                                                   ╰─── Could not fully figure out the type of this object. type_variable_4
 ─────╯
 Error: Could not instantiate ::test because the template arguments 'T' were missing and no default was provided
      ╭─[test.sus:779:2]

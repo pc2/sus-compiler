@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use crate::typing::type_inference::{FailedUnification, HindleyMilner};
 
-use walk::for_each_generative_input_in_template_args;
-
 use crate::debug::SpanDebugger;
 use crate::linker::{
     with_module_editing_context, Linkable, NameElem, NamedConstant, Resolver, WorkingOnResolver,
@@ -43,7 +41,6 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
                 };
 
                 context.typecheck();
-                context.find_unused_variables();
                 apply_types(&mut context.type_checker, context.modules.working_on, context.errors, &context.types);
             },
         );
@@ -361,7 +358,6 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     fn typecheck_visit_instruction(&mut self, instr_id: FlatID) {
         match &self.modules.working_on.instructions[instr_id] {
             Instruction::SubModule(sm) => {
-                // IDK TODO. Resetting Module domains is unknown as of yet
                 self.typecheck_template_global(&sm.module_ref);
                 let md = &self.modules[sm.module_ref.id];
                 let local_interface_domains = md
@@ -513,94 +509,6 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             self.typecheck_visit_instruction(elem_id);
         }
     }
-    
-    /*
-        ==== Additional Warnings ====
-    */
-    fn find_unused_variables(&self) {
-        let instruction_fanins = self.make_fanins();
-
-        let mut is_instance_used_map: FlatAlloc<bool, FlatIDMarker> =
-            self.modules.working_on.instructions.map(|_| false);
-
-        let mut wire_to_explore_queue: Vec<FlatID> = Vec::new();
-
-        for (_id, port) in &self.modules.working_on.ports {
-            if !port.is_input {
-                is_instance_used_map[port.declaration_instruction] = true;
-                wire_to_explore_queue.push(port.declaration_instruction);
-            }
-        }
-
-        while let Some(item) = wire_to_explore_queue.pop() {
-            for from in &instruction_fanins[item] {
-                if !is_instance_used_map[*from] {
-                    is_instance_used_map[*from] = true;
-                    wire_to_explore_queue.push(*from);
-                }
-            }
-        }
-
-        // Now produce warnings from the unused list
-        for (id, inst) in self.modules.working_on.instructions.iter() {
-            if !is_instance_used_map[id] {
-                if let Instruction::Declaration(decl) = inst {
-                    self.errors.warn(decl.name_span, "Unused Variable: This variable does not affect the output ports of this module");
-                }
-            }
-        }
-    }
-
-    fn make_fanins(&self) -> FlatAlloc<Vec<FlatID>, FlatIDMarker> {
-        // Setup Wire Fanouts List for faster processing
-        let mut instruction_fanins: FlatAlloc<Vec<FlatID>, FlatIDMarker> =
-            self.modules.working_on.instructions.map(|_| Vec::new());
-
-        for (inst_id, inst) in self.modules.working_on.instructions.iter() {
-            let mut collector_func = |id| instruction_fanins[inst_id].push(id);
-            match inst {
-                Instruction::Write(conn) => {
-                    if let Some(flat_root) = conn.to.root.get_root_flat() {
-                        instruction_fanins[flat_root].push(conn.from);
-                        WireReferencePathElement::for_each_dependency(&conn.to.path, |idx_wire| {
-                            instruction_fanins[flat_root].push(idx_wire)
-                        });
-                    }
-                }
-                Instruction::SubModule(sm) => {
-                    for_each_generative_input_in_template_args(
-                        &sm.module_ref.template_args,
-                        &mut collector_func,
-                    );
-                }
-                Instruction::FuncCall(fc) => {
-                    for a in &fc.arguments {
-                        instruction_fanins[fc.interface_reference.submodule_decl].push(*a);
-                    }
-                }
-                Instruction::Declaration(decl) => {
-                    decl.typ_expr.for_each_generative_input(&mut collector_func);
-                }
-                Instruction::Wire(wire) => {
-                    wire.source.for_each_dependency(collector_func);
-                }
-                Instruction::IfStatement(stm) => {
-                    for id in FlatIDRange::new(stm.then_start, stm.else_end) {
-                        if let Instruction::Write(conn) = &self.modules.working_on.instructions[id] {
-                            if let Some(flat_root) = conn.to.root.get_root_flat() {
-                                instruction_fanins[flat_root].push(stm.condition);
-                            }
-                        }
-                    }
-                }
-                Instruction::ForStatement(stm) => {
-                    instruction_fanins[stm.loop_var_decl].push(stm.start);
-                    instruction_fanins[stm.loop_var_decl].push(stm.end);
-                }
-            }
-        }
-        instruction_fanins
-    }
 }
 
 
@@ -638,7 +546,7 @@ pub fn apply_types<'linker, 'errs>(
             Instruction::Wire(w) => type_checker.finalize_type(types, &mut w.typ, w.span),
             Instruction::Declaration(decl) => type_checker.finalize_type(types, &mut decl.typ, decl.name_span),
             Instruction::Write(Write { to_type, to_span, .. }) => type_checker.finalize_type(types, to_type, *to_span),
-            // IDK TODO re-add with new submodule domain system
+            // TODO Submodule domains may not be crossed either? 
             Instruction::SubModule(sm) => {
                 for (_domain_id_in_submodule, domain_assigned_to_it_here) in &mut sm.local_interface_domains {
                     use self::HindleyMilner;
