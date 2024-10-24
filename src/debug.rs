@@ -1,6 +1,6 @@
 use std::{cell::RefCell, ops::Range};
 
-use crate::{linker::FileData, pretty_print_spans_in_reverse_order};
+use crate::{alloc::ArenaAllocator, config::ConfigStruct, flattening::Module, linker::FileData, pretty_print_spans_in_reverse_order, ModuleUUIDMarker};
 
 /// Many duplicates will be produced, and filtering them out in the code itself is inefficient. Therefore just keep a big buffer and deduplicate as needed
 const SPAN_TOUCH_HISTORY_SIZE: usize = 256;
@@ -113,6 +113,38 @@ impl<'text> Drop for SpanDebugger<'text> {
         if !self.defused {
             println!("Panic happened in Span-guarded context: {}", self.context);
             print_most_recent_spans(self.file_data)
+        }
+    }
+}
+
+
+
+impl ConfigStruct {
+    /// The reason we pass an explicit bool here is because it merges the "if config().debug_xyz" with the for loop. 
+    pub fn for_each_debug_module<F : FnMut(&Module)>(&self, should_debug: bool, modules: &ArenaAllocator<Module, ModuleUUIDMarker>, mut f : F) {
+        if should_debug {
+            for (_, md) in modules {
+                let passes_whitelist = if let Some(wl) = &self.debug_whitelist {
+                    wl.contains(&md.link_info.name)
+                } else {
+                    true
+                };
+                if passes_whitelist {
+                    f(md)
+                }
+            }
+        }
+    }
+
+    pub fn should_print_for_debug(&self, should_debug: bool, md_name: &str) -> bool {
+        if should_debug {
+            if let Some(wl) = &self.debug_whitelist {
+                wl.contains(md_name)
+            } else {
+                true
+            }
+        } else {
+            false
         }
     }
 }

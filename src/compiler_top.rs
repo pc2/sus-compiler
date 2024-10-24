@@ -128,20 +128,16 @@ impl Linker {
         if config().early_exit == EarlyExitUpTo::Initialize {return}
 
         flatten_all_modules(self);
-        if config().debug_print_module_contents {
-            for (_, md) in &self.modules {
-                md.print_flattened_module(&self.files[md.link_info.file]);
-            }
-        }
+        config().for_each_debug_module(config().debug_print_module_contents, &self.modules, |md| {
+            md.print_flattened_module(&self.files[md.link_info.file]);
+        });
         if config().early_exit == EarlyExitUpTo::Flatten {return}
 
         typecheck_all_modules(self);
 
-        if config().debug_print_module_contents {
-            for (_, md) in &self.modules {
-                md.print_flattened_module(&self.files[md.link_info.file]);
-            }
-        }
+        config().for_each_debug_module(config().debug_print_module_contents, &self.modules, |md| {
+            md.print_flattened_module(&self.files[md.link_info.file]);
+        });
         if config().early_exit == EarlyExitUpTo::AbstractTypecheck {return}
 
         // Make an initial instantiation of all modules

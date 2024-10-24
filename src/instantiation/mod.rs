@@ -207,7 +207,7 @@ impl InstantiationList {
 
             let result = perform_instantiation(md, linker, &template_args);
 
-            if config().debug_print_module_contents {
+            if config().should_print_for_debug(config().debug_print_module_contents, &result.name) {
                 println!("[[Instantiated {}]]", result.name);
                 for (id, w) in &result.wires {
                     println!("{id:?} -> {w:?}");
@@ -446,7 +446,7 @@ fn perform_instantiation(
         return context.extract();
     }
 
-    if config().debug_print_module_contents {
+    if config().should_print_for_debug(config().debug_print_module_contents, &context.name) {
         println!("[[Executed {}]]", &context.name);
         for (id, w) in &context.wires {
             println!("{id:?} -> {w:?}");

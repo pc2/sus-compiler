@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, env, ffi::OsStr, path::PathBuf};
+use std::{cell::UnsafeCell, collections::HashSet, env, ffi::OsStr, path::PathBuf};
 
 use clap::{Arg, Command};
 
@@ -22,6 +22,7 @@ pub struct ConfigStruct {
     pub codegen: bool,
     pub debug_print_module_contents: bool,
     pub debug_print_latency_graph: bool,
+    pub debug_whitelist: Option<HashSet<String>>,
     pub codegen_module_and_dependencies_one_file: Option<String>,
     pub early_exit: EarlyExitUpTo,
     /// For terminal environments where color is not supported
@@ -68,6 +69,12 @@ pub fn parse_args() -> Vec<PathBuf> {
             .long("debug-latency")
             .hide(true)
             .help("Print latency graph for debugging"))
+        .arg(Arg::new("debug-whitelist")
+            .long("debug-whitelist")
+            .hide(true)
+            .help("Sets the modules that should be shown by --debug. When not provided all modules are whitelisted")
+            .takes_value(true)
+            .multiple_values(true))
         .arg(Arg::new("standalone")
             .long("standalone")
             .takes_value(true)
@@ -109,6 +116,9 @@ pub fn parse_args() -> Vec<PathBuf> {
     config.codegen = matches.is_present("codegen");
     config.debug_print_module_contents = matches.is_present("debug");
     config.debug_print_latency_graph = matches.is_present("debug-latency");
+    if let Some(s) = matches.get_many("debug-whitelist") {
+        config.debug_whitelist = Some(s.map(|s: &String| s.clone()).collect())
+    }
     if matches.is_present("nocolor") {
         config.use_color = false;
     }
@@ -168,6 +178,7 @@ static CONFIG: ConfigStructWrapper = ConfigStructWrapper {
         debug_print_latency_graph: false,
         codegen_module_and_dependencies_one_file: None,
         early_exit: EarlyExitUpTo::CodeGen,
-        use_color: true
+        use_color: true,
+        debug_whitelist: None,
     }),
 };
