@@ -674,8 +674,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                     let submod_id = self.instructions.alloc(Instruction::SubModule(SubModuleInstance{
                         name : Some((name.to_owned(), name_span)),
                         module_ref,
-                        declaration_runtime_depth : DECL_DEPTH_LATER,
-                        local_interface_domains : FlatAlloc::new(),
+                        local_interface_domains : OnceCell::new(),
                         documentation
                     }));
 
@@ -701,7 +700,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                 name : name.to_owned(),
                 name_span,
                 decl_span,
-                declaration_runtime_depth : DECL_DEPTH_LATER,
+                declaration_runtime_depth : OnceCell::new(),
                 latency_specifier : span_latency_specifier.map(|(ls, _)| ls),
                 documentation
             }));
@@ -816,8 +815,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                     self.instructions.alloc(Instruction::SubModule(SubModuleInstance {
                         name: None,
                         module_ref,
-                        declaration_runtime_depth: DECL_DEPTH_LATER,
-                        local_interface_domains: FlatAlloc::new(),
+                        local_interface_domains: OnceCell::new(),
                         documentation,
                     }));
                 Some(ModuleInterfaceReference {
@@ -1578,6 +1576,15 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                             }
                         }
                         md.instructions = instructions;
+                        for (_id, port) in &md.ports {
+                            let Instruction::Declaration(decl) =
+                                &mut md.instructions[port.declaration_instruction]
+                            else {
+                                unreachable!()
+                            };
+                            decl.typ.domain = DomainType::Physical(port.domain);
+                        }
+                
                         &mut md.link_info
                     }
                     NameElem::Type(type_uuid) => {

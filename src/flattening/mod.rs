@@ -11,6 +11,7 @@ use crate::prelude::*;
 use crate::typing::abstract_type::DomainType;
 use crate::typing::type_inference::{DomainVariableIDMarker, TypeVariableIDMarker};
 
+use std::cell::OnceCell;
 use std::ops::Deref;
 
 pub use flatten::flatten_all_modules;
@@ -459,8 +460,6 @@ impl WrittenType {
     }
 }
 
-const DECL_DEPTH_LATER: usize = usize::MAX;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeclarationPortInfo {
     NotPort,
@@ -501,7 +500,7 @@ pub struct Declaration {
     pub decl_span: Span,
     pub name_span: Span,
     pub name: String,
-    pub declaration_runtime_depth: usize,
+    pub declaration_runtime_depth: OnceCell<usize>,
     /// Variables are read_only when they may not be controlled by the current block of code.
     /// This is for example, the inputs of the current module, or the outputs of nested modules.
     /// But could also be the iterator of a for loop.
@@ -519,11 +518,10 @@ pub struct SubModuleInstance {
     pub module_ref: GlobalReference<ModuleUUID>,
     /// Name is not always present in source code. Such as in inline function call syntax: my_mod(a, b, c)
     pub name: Option<(String, Span)>,
-    pub declaration_runtime_depth: usize,
     /// Maps each of the module's local domains to the domain that it is used in.
     /// 
     /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::DomainVariable] before typing)
-    pub local_interface_domains: FlatAlloc<DomainType, DomainIDMarker>,
+    pub local_interface_domains: OnceCell<FlatAlloc<DomainType, DomainIDMarker>>,
     pub documentation: Documentation,
 }
 
