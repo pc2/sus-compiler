@@ -57,6 +57,12 @@ pub struct UUIDAllocator<IndexMarker> {
     cur : UUID<IndexMarker>
 }
 
+impl<IndexMarker> Clone for UUIDAllocator<IndexMarker> {
+    fn clone(&self) -> Self {
+        Self { cur: self.cur.clone() }
+    }
+}
+
 impl<IndexMarker> UUIDAllocator<IndexMarker> {
     pub fn new() -> Self {
         Self {

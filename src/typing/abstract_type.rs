@@ -1,3 +1,4 @@
+use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
 use crate::value::Value;
 
@@ -82,18 +83,18 @@ pub struct FullType {
 /// 'A U 'x -> 'x = 'A
 ///
 /// 'x U 'y -> 'x = 'y
-pub struct TypeUnifier<'linker, 'errs> {
+pub struct TypeUnifier<'linker_file_texts, 'errs> {
     pub template_type_names: FlatAlloc<String, TemplateIDMarker>,
-    errors: &'errs ErrorCollector<'linker>,
+    pub errors: &'errs ErrorCollector<'linker_file_texts>,
     pub type_substitutor: TypeSubstitutor<AbstractType, TypeVariableIDMarker>,
     pub domain_substitutor: TypeSubstitutor<DomainType, DomainVariableIDMarker>,
 }
 
-impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
+impl<'linker_file_texts, 'errs> TypeUnifier<'linker_file_texts, 'errs> {
     pub fn new(
         template_inputs: &TemplateInputs,
-        errors: &'errs ErrorCollector<'linker>,
-        typing_alloc: &TypingAllocator
+        errors: &'errs ErrorCollector<'linker_file_texts>,
+        typing_alloc: TypingAllocator
     ) -> Self {
         Self {
             template_type_names: map_to_type_names(template_inputs),
@@ -319,7 +320,7 @@ impl<'linker, 'errs> TypeUnifier<'linker, 'errs> {
         self.unify_domains(&found.domain, &expected.domain, span, context);
     }
 
-    pub fn finalize_type(&mut self, types: &Resolver<'_, '_, TypeUUIDMarker, StructType>, typ: &mut FullType, span: Span) {
+    pub fn finalize_type(&mut self, types: &ArenaAllocator<StructType, TypeUUIDMarker>, typ: &mut FullType, span: Span) {
         use super::type_inference::HindleyMilner;
 
         typ.domain.fully_substitute(&self.domain_substitutor).unwrap();

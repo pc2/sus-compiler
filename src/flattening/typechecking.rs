@@ -1,9 +1,10 @@
+use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
 use crate::typing::type_inference::{FailedUnification, HindleyMilner};
 
 use crate::debug::SpanDebugger;
 use crate::linker::{
-    with_module_editing_context, Linkable, NameElem, NamedConstant, Resolver, WorkingOnResolver,
+    make_resolvers, with_module_editing_context, FileData, Linkable, NameElem, NamedConstant, Resolver
 };
 
 use crate::typing::{
@@ -14,38 +15,59 @@ use crate::typing::{
 use super::*;
 
 pub fn typecheck_all_modules(linker: &mut Linker) {
-    let linker_ptr: *mut Linker = linker;
-    for (module_uuid, module) in &mut linker.modules {
-        let ctx_info_string = format!("Typechecking {}", &module.link_info.name);
+    let module_uuids : Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
+    for module_uuid in module_uuids {
+        let obj_link_info = &mut linker.modules[module_uuid].link_info;
+
+        let ctx_info_string = format!("Typechecking {}", &obj_link_info.name);
         println!("{ctx_info_string}");
         let mut span_debugger = SpanDebugger::new(
             &ctx_info_string,
-            &linker.files[module.link_info.file],
+            &linker.files[obj_link_info.file],
         );
 
-        with_module_editing_context(
-            linker_ptr,
-            module_uuid,
-            |modules, types, constants, name_resolver| {
-                let mut context = TypeCheckingContext {
-                    errors: name_resolver.errors,
-                    type_checker: TypeUnifier::new(
-                        &modules.working_on.link_info.template_arguments,
-                        name_resolver.errors,
-                        &modules.working_on.link_info.type_variable_alloc
-                    ),
-                    types,
-                    constants,
-                    runtime_condition_stack: Vec::new(),
-                    working_on: module,
-                    modules,
-                };
 
-                context.typecheck();
-                apply_types(&mut context.type_checker, context.modules.working_on, context.errors, &context.types);
-            },
-        );
+        let file: &FileData = &linker.files[obj_link_info.file];
 
+        // Extract errors and resolved_globals for easier editing
+        let errors_globals = obj_link_info.take_errors_globals_for_editing(&linker.files);
+
+        let working_on: &Module = &linker.modules[module_uuid];
+
+        let (modules, types, constants, name_resolver) = make_resolvers(linker, &file.file_text, &errors_globals);
+
+        let type_checker = {
+            let mut context = TypeCheckingContext {
+                errors: name_resolver.errors,
+                type_checker: TypeUnifier::new(
+                    &working_on.link_info.template_arguments,
+                    name_resolver.errors,
+                    working_on.link_info.type_variable_alloc.clone()
+                ),
+                types,
+                constants,
+                runtime_condition_stack: Vec::new(),
+                working_on,
+                modules,
+            };
+
+            context.typecheck();
+            context.type_checker
+        };
+        
+
+        let new_type_checker = TypeUnifier {
+            template_type_names: type_checker.template_type_names,
+            errors: &errors_globals.0,
+            type_substitutor: type_checker.type_substitutor,
+            domain_substitutor: type_checker.domain_substitutor,
+        };
+        // Grab another mutable copy of md so it doesn't force a borrow conflict
+        let working_on_mut = &mut linker.modules[module_uuid];
+        apply_types(new_type_checker, working_on_mut, &errors_globals.0, &linker.types);
+
+        working_on_mut.link_info.reabsorb_errors_globals(errors_globals);
+        
         span_debugger.defuse();
     }
 }
@@ -56,17 +78,17 @@ struct ConditionStackElem {
     domain: DomainType,
 }
 
-struct TypeCheckingContext<'l, 'errs> {
-    pub working_on: &'l Module,
-    modules: WorkingOnResolver<'l, 'errs, ModuleUUIDMarker, Module>,
-    type_checker: TypeUnifier<'l, 'errs>,
+struct TypeCheckingContext<'l, 'errs, 'linker_file_texts> {
+    working_on: &'l Module,
+    modules: Resolver<'l, 'errs, ModuleUUIDMarker, Module>,
+    type_checker: TypeUnifier<'linker_file_texts, 'errs>,
     types: Resolver<'l, 'errs, TypeUUIDMarker, StructType>,
     constants: Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
     errors: &'errs ErrorCollector<'l>,
     runtime_condition_stack: Vec<ConditionStackElem>,
 }
 
-impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
+impl<'l, 'errs, 'linker_file_texts> TypeCheckingContext<'l, 'errs, 'linker_file_texts> {
     fn get_link_info<ID: Into<NameElem>>(&self, id: ID) -> Option<&LinkInfo> {
         let ne: NameElem = id.into();
         match ne {
@@ -499,11 +521,11 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
 // ====== Free functions for actually applying the result of type checking ======
 
-pub fn apply_types<'linker, 'errs>(
-    type_checker: &mut TypeUnifier,
+pub fn apply_types(
+    mut type_checker: TypeUnifier,
     working_on: &mut Module,
     errors: &ErrorCollector,
-    types: &Resolver<'linker, 'errs, TypeUUIDMarker, StructType>
+    types: &ArenaAllocator<StructType, TypeUUIDMarker>
 ) {
     // Set the remaining domain variables that aren't associated with a module port. 
     // We just find domain IDs that haven't been 

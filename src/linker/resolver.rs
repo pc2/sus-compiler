@@ -82,7 +82,7 @@ where
 pub struct NameResolver<'linker, 'err_and_globals> {
     pub file_text: &'linker FileText,
     pub errors: &'err_and_globals ErrorCollector<'linker>,
-    linker: *const Linker,
+    linker: &'linker Linker,
     resolved_globals: &'err_and_globals RefCell<ResolvedGlobals>,
 }
 
@@ -90,10 +90,9 @@ impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
     /// SAFETY: Files are never touched, and as long as this object is managed properly linker will also exist long enough.
     pub fn resolve_global<'slf>(&'slf self, name_span: Span) -> Option<(NameElem, Span)> {
         let name = &self.file_text[name_span];
-        let linker = unsafe { &*self.linker };
 
         let mut resolved_globals = self.resolved_globals.borrow_mut();
-        match linker.global_namespace.get(name) {
+        match self.linker.global_namespace.get(name) {
             Some(NamespaceElement::Global(found)) => {
                 resolved_globals.referenced_globals.push(*found);
                 Some((*found, name_span))
@@ -104,7 +103,7 @@ impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
                 let err_ref = self.errors.error(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."));
 
                 for collider_global in coll.iter() {
-                    let err_loc = linker.get_linking_error_location(*collider_global);
+                    let err_loc = self.linker.get_linking_error_location(*collider_global);
                     if let Some(span_file) = err_loc.location {
                         err_ref.info(
                             span_file,
@@ -137,7 +136,7 @@ impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
     }
 
     pub fn get_linking_error_location(&self, name_elem: NameElem) -> LinkingErrorLocation {
-        unsafe { &*self.linker }.get_linking_error_location(name_elem)
+        self.linker.get_linking_error_location(name_elem)
     }
     pub fn not_expected_global_error(&self, name_elem: NameElem, span: Span, expected: &str) {
         // SAFETY: The allocated linker objects aren't going to change.
@@ -155,7 +154,7 @@ impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
 }
 
 /// pub struct ModuleEditContext<'linker, 'err_and_globals> {
-///     pub modules : InternalResolver<'linker, 'err_and_globals, ModuleUUIDMarker, Module>,
+///     pub modules : Resolver<'linker, 'err_and_globals, ModuleUUIDMarker, Module>,
 ///     pub types : Resolver<'linker, 'err_and_globals, TypeUUIDMarker, NamedType>,
 ///     pub constants : Resolver<'linker, 'err_and_globals, ConstantUUIDMarker, NamedConstant>,
 ///     pub name_resolver : NameResolver<'linker, 'err_and_globals>,
@@ -163,18 +162,17 @@ impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
 /// }
 pub fn with_module_editing_context<
     F: for<'linker, 'errs> FnOnce(
-        WorkingOnResolver<'linker, 'errs, ModuleUUIDMarker, Module>,
+        Resolver<'linker, 'errs, ModuleUUIDMarker, Module>,
         Resolver<'linker, 'errs, TypeUUIDMarker, StructType>,
         Resolver<'linker, 'errs, ConstantUUIDMarker, NamedConstant>,
         NameResolver<'linker, 'errs>,
+        &'linker Module
     ),
 >(
-    linker_ptr: *mut Linker,
+    linker: &mut Linker,
     module_uuid: ModuleUUID,
     f: F,
 ) {
-    let linker = unsafe { &mut *linker_ptr };
-    let linker_modules_ptr: *const _ = &linker.modules;
     let md: &mut Module = &mut linker.modules[module_uuid];
     let file: &FileData = &linker.files[md.link_info.file];
 
@@ -184,11 +182,11 @@ pub fn with_module_editing_context<
     let errors = &errors_a;
     let resolved_globals = &resolved_globals_a;
 
+    let md: &Module = &linker.modules[module_uuid];
     // Use context
     f(
-        WorkingOnResolver {
-            working_on: md,
-            arr: linker_modules_ptr,
+        Resolver {
+            arr: &linker.modules,
             resolved_globals,
         },
         Resolver {
@@ -201,12 +199,15 @@ pub fn with_module_editing_context<
         },
         NameResolver {
             file_text: &file.file_text,
-            linker: linker_ptr,
+            linker,
             errors,
             resolved_globals,
         },
+        md
     );
 
+    // Grab another mutable copy of md so it doesn't force a borrow conflict
+    let md: &mut Module = &mut linker.modules[module_uuid];
     md.link_info.reabsorb_errors_globals((errors_a, resolved_globals_a));
 }
 
@@ -230,7 +231,7 @@ pub fn make_resolvers<'linker, 'errors>(linker: &'linker Linker, file_text: &'li
     },
     NameResolver {
         file_text,
-        linker: linker as *const Linker,
+        linker,
         errors,
         resolved_globals,
     })

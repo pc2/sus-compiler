@@ -634,7 +634,7 @@ pub enum ModuleOrWrittenType {
     Module(GlobalReference<ModuleUUID>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TypingAllocator {
     pub type_variable_alloc: UUIDAllocator<TypeVariableIDMarker>,
     pub domain_variable_alloc: UUIDAllocator<DomainVariableIDMarker>
