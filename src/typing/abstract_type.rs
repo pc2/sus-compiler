@@ -7,7 +7,7 @@ use std::ops::Deref;
 use super::template::TemplateInputs;
 use super::type_inference::{DomainVariableID, DomainVariableIDMarker, TypeSubstitutor, TypeVariableID, TypeVariableIDMarker};
 use crate::flattening::{BinaryOperator, Instruction, StructType, TypingAllocator, UnaryOperator, WrittenType};
-use crate::linker::{get_builtin_type, Resolver};
+use crate::linker::get_builtin_type;
 use crate::to_string::map_to_type_names;
 
 /// This contains only the information that can be easily type-checked.

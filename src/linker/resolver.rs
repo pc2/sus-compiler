@@ -57,28 +57,6 @@ where
     }
 }
 
-pub struct WorkingOnResolver<'linker, 'err_and_globals, IDM: UUIDMarker, T> {
-    pub working_on: &'linker mut T,
-    arr: *const ArenaAllocator<T, IDM>,
-    resolved_globals: &'err_and_globals RefCell<ResolvedGlobals>,
-}
-
-impl<'linker, 'err_and_globals, IDM: UUIDMarker, T> Index<UUID<IDM>>
-    for WorkingOnResolver<'linker, 'err_and_globals, IDM, T>
-where
-    NameElem: From<UUID<IDM>>,
-{
-    type Output = T;
-
-    fn index<'slf>(&'slf self, index: UUID<IDM>) -> &'slf Self::Output {
-        self.resolved_globals
-            .borrow_mut()
-            .referenced_globals
-            .push(NameElem::from(index));
-        unsafe { &(*self.arr)[index] }
-    }
-}
-
 pub struct NameResolver<'linker, 'err_and_globals> {
     pub file_text: &'linker FileText,
     pub errors: &'err_and_globals ErrorCollector<'linker>,
@@ -151,64 +129,6 @@ impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
             err_ref.info(span_file, "Defined here");
         }
     }
-}
-
-/// pub struct ModuleEditContext<'linker, 'err_and_globals> {
-///     pub modules : Resolver<'linker, 'err_and_globals, ModuleUUIDMarker, Module>,
-///     pub types : Resolver<'linker, 'err_and_globals, TypeUUIDMarker, NamedType>,
-///     pub constants : Resolver<'linker, 'err_and_globals, ConstantUUIDMarker, NamedConstant>,
-///     pub name_resolver : NameResolver<'linker, 'err_and_globals>,
-///     pub errors : &'err_and_globals ErrorCollector
-/// }
-pub fn with_module_editing_context<
-    F: for<'linker, 'errs> FnOnce(
-        Resolver<'linker, 'errs, ModuleUUIDMarker, Module>,
-        Resolver<'linker, 'errs, TypeUUIDMarker, StructType>,
-        Resolver<'linker, 'errs, ConstantUUIDMarker, NamedConstant>,
-        NameResolver<'linker, 'errs>,
-        &'linker Module
-    ),
->(
-    linker: &mut Linker,
-    module_uuid: ModuleUUID,
-    f: F,
-) {
-    let md: &mut Module = &mut linker.modules[module_uuid];
-    let file: &FileData = &linker.files[md.link_info.file];
-
-    // Extract errors and resolved_globals for easier editing
-    let (errors_a, resolved_globals_a) = md.link_info.take_errors_globals_for_editing(&linker.files);
-
-    let errors = &errors_a;
-    let resolved_globals = &resolved_globals_a;
-
-    let md: &Module = &linker.modules[module_uuid];
-    // Use context
-    f(
-        Resolver {
-            arr: &linker.modules,
-            resolved_globals,
-        },
-        Resolver {
-            arr: &linker.types,
-            resolved_globals,
-        },
-        Resolver {
-            arr: &linker.constants,
-            resolved_globals,
-        },
-        NameResolver {
-            file_text: &file.file_text,
-            linker,
-            errors,
-            resolved_globals,
-        },
-        md
-    );
-
-    // Grab another mutable copy of md so it doesn't force a borrow conflict
-    let md: &mut Module = &mut linker.modules[module_uuid];
-    md.link_info.reabsorb_errors_globals((errors_a, resolved_globals_a));
 }
 
 pub fn make_resolvers<'linker, 'errors>(linker: &'linker Linker, file_text: &'linker FileText, (errors, resolved_globals): &'errors (ErrorCollector<'linker>, RefCell<ResolvedGlobals>)) -> (

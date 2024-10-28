@@ -4,7 +4,7 @@ use crate::typing::type_inference::{FailedUnification, HindleyMilner};
 
 use crate::debug::SpanDebugger;
 use crate::linker::{
-    make_resolvers, with_module_editing_context, FileData, Linkable, NameElem, NamedConstant, Resolver
+    make_resolvers, FileData, Linkable, NameElem, NamedConstant, Resolver
 };
 
 use crate::typing::{
