@@ -261,13 +261,11 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
     }
 
     fn get_link_info_for(&self, found_global: NameElem) -> Option<&'l LinkInfo> {
-        let info : *const LinkInfo = match found_global {
+        Some(match found_global {
             NameElem::Module(md_id) => &self.globals[md_id].link_info,
             NameElem::Type(typ_id) => &self.globals[typ_id].link_info,
             NameElem::Constant(_) => return None
-        };
-        // SAFETY Can safely cast this away, because we can't touch anything in the Linker
-        Some(unsafe{&*info})
+        })
     }
 
     fn must_be_generative(&self, is_generative: bool, context: &str, span: Span) {
