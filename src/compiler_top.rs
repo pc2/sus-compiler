@@ -125,6 +125,9 @@ impl Linker {
             instructions.clear();
             instantiations.clear_instances()
         }
+        for (_, typ) in &mut self.types {
+            typ.link_info.reset_to(AFTER_INITIAL_PARSE_CP);
+        }
         if config().early_exit == EarlyExitUpTo::Initialize {return}
 
         flatten_all_modules(self);

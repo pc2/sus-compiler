@@ -25,8 +25,9 @@ impl CheckPoint {
 
 impl LinkInfo {
     pub fn reset_to(&mut self, checkpoint_id: usize) {
-        let cp = self.checkpoints[checkpoint_id];
         assert!(checkpoint_id < self.checkpoints.len());
+        let cp = self.checkpoints[checkpoint_id];
+        self.checkpoints.truncate(checkpoint_id + 1);
         self.errors.reset_to(cp.errors_cp);
         self.resolved_globals.reset_to(cp.resolved_globals_cp);
     }

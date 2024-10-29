@@ -177,7 +177,8 @@ impl LinkInfo {
         // Store errors and resolved_globals back into module
         assert!(self.resolved_globals.is_untouched());
         assert!(self.errors.is_untouched());
-        assert!(self.checkpoints.len() == checkpoint_id);
+        let expected_checkpoint = self.checkpoints.len();
+        assert_eq!(expected_checkpoint, checkpoint_id, "The new checkpoint is not what was expected. The new checkpoint was {checkpoint_id}, whereas the expected next checkpoint is {expected_checkpoint}");
         
         self.resolved_globals = resolved_globals;
         self.errors = errors.into_storage();
