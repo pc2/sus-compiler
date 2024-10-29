@@ -173,14 +173,15 @@ impl<'l> Index<ConstantUUID> for GlobalResolver<'l> {
 }
 
 impl LinkInfo {
-    pub fn reabsorb_errors_globals(&mut self, (errors, resolved_globals): (ErrorCollector, ResolvedGlobals)) {
+    pub fn reabsorb_errors_globals(&mut self, (errors, resolved_globals): (ErrorCollector, ResolvedGlobals), checkpoint_id: usize) {
         // Store errors and resolved_globals back into module
         assert!(self.resolved_globals.is_untouched());
         assert!(self.errors.is_untouched());
+        assert!(self.checkpoints.len() == checkpoint_id);
         
         self.resolved_globals = resolved_globals;
         self.errors = errors.into_storage();
-        self.after_flatten_cp = Some(CheckPoint::checkpoint(
+        self.checkpoints.push(CheckPoint::checkpoint(
             &self.errors,
             &self.resolved_globals,
         ));

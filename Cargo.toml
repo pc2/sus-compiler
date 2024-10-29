@@ -24,6 +24,7 @@ ariadne = "0.4.1" # for nice errors
 num = "0.4"
 # itertools = "0.13.0"
 clap = "3.2"
+arrayvec = "0.7.6"
 
 # Tree sitter
 tree-sitter = "~0.22.2"

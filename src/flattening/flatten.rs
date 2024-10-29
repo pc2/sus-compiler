@@ -5,7 +5,7 @@ use crate::{alloc::UUIDRangeIter, prelude::*};
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 
-use crate::linker::{FileData, GlobalResolver, NameElem};
+use crate::linker::{FileData, GlobalResolver, NameElem, AFTER_FLATTEN_CP};
 use crate::{debug::SpanDebugger, value::Value};
 
 use super::name_context::LocalVariableContext;
@@ -1610,7 +1610,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                     }
                 };
 
-                link_info.reabsorb_errors_globals(errors_globals);
+                link_info.reabsorb_errors_globals(errors_globals, AFTER_FLATTEN_CP);
                 link_info.type_variable_alloc = type_alloc;
             });
         });

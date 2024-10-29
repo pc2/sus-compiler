@@ -1,3 +1,4 @@
+use crate::linker::AFTER_LINTS_CP;
 use crate::prelude::*;
 
 use super::walk::for_each_generative_input_in_template_args;
@@ -8,8 +9,9 @@ use super::{Instruction, Module, WireReferencePathElement};
 pub fn perform_lints(linker: &mut Linker) {
     for (_, md) in &mut linker.modules {
         let errors = ErrorCollector::from_storage(md.link_info.errors.take(), md.link_info.file, &linker.files);
+        let resolved_globals = md.link_info.resolved_globals.take();
         find_unused_variables(md, &errors);
-        md.link_info.errors = errors.into_storage()
+        md.link_info.reabsorb_errors_globals((errors, resolved_globals), AFTER_LINTS_CP);
     }
 }
 

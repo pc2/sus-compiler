@@ -1,9 +1,11 @@
+use arrayvec::ArrayVec;
 use sus_proc_macro::{field, kind, kw};
 
-use crate::linker::IsExtern;
+use crate::errors::ErrorStore;
+use crate::linker::{IsExtern, AFTER_INITIAL_PARSE_CP};
 use crate::prelude::*;
 
-use crate::linker::{checkpoint::CheckPoint, FileBuilder, LinkInfo, ResolvedGlobals};
+use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
 use crate::{file_position::FileText, flattening::Module, instantiation::InstantiationList};
 
 use crate::typing::template::{
@@ -296,25 +298,21 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
 
     let (name_span, name) = ctx.gather_initial_global_object(cursor);
 
-    let resolved_globals = ResolvedGlobals::empty();
-    let errors = parsing_errors.into_storage();
-    let after_initial_parse_cp =
-        CheckPoint::checkpoint(&errors, &resolved_globals);
-
-    let link_info = LinkInfo {
+    let mut link_info = LinkInfo {
         documentation: cursor.extract_gathered_comments(),
         file: builder.file_id,
         name,
         name_span,
         span,
-        errors,
+        errors: ErrorStore::new(),
         is_extern,
-        resolved_globals,
+        resolved_globals: ResolvedGlobals::empty(),
         type_variable_alloc: TypingAllocator{domain_variable_alloc: UUIDAllocator::new(), type_variable_alloc: UUIDAllocator::new()},
         template_arguments: ctx.template_inputs,
-        after_initial_parse_cp,
-        after_flatten_cp: None,
+        checkpoints: ArrayVec::new()
     };
+
+    link_info.reabsorb_errors_globals((parsing_errors, ResolvedGlobals::empty()), AFTER_INITIAL_PARSE_CP);
 
     match global_obj_kind {
         GlobalObjectKind::Module | GlobalObjectKind::Function => {

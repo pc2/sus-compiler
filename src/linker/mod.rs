@@ -2,6 +2,7 @@ use crate::prelude::*;
 
 pub mod checkpoint;
 mod resolver;
+use arrayvec::ArrayVec;
 pub use resolver::*;
 
 use std::{
@@ -80,6 +81,12 @@ pub enum IsExtern {
     Builtin
 }
 
+pub const AFTER_INITIAL_PARSE_CP : usize = 0;
+pub const AFTER_FLATTEN_CP : usize = 1;
+pub const AFTER_TYPECHECK_CP : usize = 2;
+pub const AFTER_LINTS_CP : usize = 3;
+
+
 #[derive(Debug)]
 pub struct LinkInfo {
     pub file: FileUUID,
@@ -98,9 +105,12 @@ pub struct LinkInfo {
 
     pub template_arguments: TemplateInputs,
 
-    /// Reset checkpoints. These are to reset errors and resolved_globals
-    pub after_initial_parse_cp: CheckPoint,
-    pub after_flatten_cp: Option<CheckPoint>,
+    /// Reset checkpoints. These are to reset errors and resolved_globals for incremental compilation. 
+    /// 
+    /// TODO the system is there, just need to actually do incremental compilation
+    /// 
+    /// Right now it already functions as a sanity check, to make sure no steps in building modules/types are skipped
+    pub checkpoints : ArrayVec<CheckPoint, 4>
 }
 
 impl LinkInfo {

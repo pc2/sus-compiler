@@ -4,7 +4,7 @@ use crate::typing::type_inference::{FailedUnification, HindleyMilner};
 
 use crate::debug::SpanDebugger;
 use crate::linker::{
-    GlobalResolver, Linkable, NameElem
+    GlobalResolver, Linkable, NameElem, AFTER_TYPECHECK_CP
 };
 
 use crate::typing::{
@@ -50,7 +50,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
         let working_on_mut = &mut linker.modules[module_uuid];
         apply_types(type_checker, working_on_mut, &errs_and_globals.0, &linker.types);
 
-        working_on_mut.link_info.reabsorb_errors_globals(errs_and_globals);
+        working_on_mut.link_info.reabsorb_errors_globals(errs_and_globals, AFTER_TYPECHECK_CP);
         
         span_debugger.defuse();
     }

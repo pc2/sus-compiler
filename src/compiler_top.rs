@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
+use crate::linker::AFTER_INITIAL_PARSE_CP;
 use crate::prelude::*;
 
 use tree_sitter::Parser;
@@ -120,8 +121,7 @@ impl Linker {
                 instantiations,
                 ..
             } = md;
-            link_info.reset_to(link_info.after_initial_parse_cp);
-            link_info.after_flatten_cp = None;
+            link_info.reset_to(AFTER_INITIAL_PARSE_CP);
             instructions.clear();
             instantiations.clear_instances()
         }
