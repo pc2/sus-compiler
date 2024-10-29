@@ -134,6 +134,8 @@ impl TypeUnifier {
                 if !size_instr.typ.domain.is_generative() {
                     errors.error(array_bracket_span.inner_span(), "The size of arrays must be a generative value. (gen)");
                 }
+
+                self.type_substitutor.unify_report_error(&size_instr.typ.typ, &INT_TYPE, array_bracket_span.inner_span(), "array size");
                 
                 let arr_content_variable = AbstractType::Unknown(self.alloc_typ_variable());
 

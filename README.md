@@ -184,7 +184,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Generative For Loops
 - [ ] Generative While Loops
 - [x] Generative Parameters
-- [ ] Generative Default Arguments
+- [ ] Generative Parameter Default Arguments
 - [x] Type Parameters
 - [ ] Generative Asserts
 - [x] Multi-Interface Syntax
@@ -210,7 +210,9 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [ ] Conflicting assignments (such as calling the same module twice in a single cycle, multiple assignments to a single variable)
 
 ### Typing & Inference
-- [ ] Hindley-Milner typing
+- [x] Hindley-Milner typing for Abstract Types
+- [x] Hindley-Milner typing for Domain Types
+- [ ] Hindley-Milner typing for Concrete Types
 - [ ] Template Type Inference
 - [ ] Generative Parameter Inference
 - [ ] Latency Count Inference

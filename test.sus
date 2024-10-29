@@ -917,3 +917,19 @@ module use_no_main_interface {
 	int x = no_interface_named()
 	int y = no_main_interface()
 }
+
+module moduleWithBadDeclaration {
+	int[true] a
+}
+
+module moduleWithBadInterface {
+	interface moduleWithBadInterface : int[true] a
+}
+
+module useModuleWithBadInterface {
+	int[3] xyz
+	moduleWithBadInterface(xyz)
+
+	xyz[3] = true
+}
+

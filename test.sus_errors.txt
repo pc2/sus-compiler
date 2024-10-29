@@ -1137,3 +1137,45 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │         ┬  
      │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: Typing Error: array size expects a ::int but was given a ::bool
+     ╭─[test.sus:922:6]
+     │
+ 922 │     int[true] a
+     │         ──┬─  
+     │           ╰─── Typing Error: array size expects a ::int but was given a ::bool
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:922:12]
+     │
+ 922 │     int[true] a
+     │               ┬  
+     │               ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Typing Error: array size expects a ::int but was given a ::bool
+     ╭─[test.sus:926:41]
+     │
+ 926 │     interface moduleWithBadInterface : int[true] a
+     │                                            ──┬─  
+     │                                              ╰─── Typing Error: array size expects a ::int but was given a ::bool
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:926:47]
+     │
+ 926 │     interface moduleWithBadInterface : int[true] a
+     │                                                  ┬  
+     │                                                  ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Typing Error: connection expects a ::int but was given a ::bool
+     ╭─[test.sus:933:11]
+     │
+ 933 │     xyz[3] = true
+     │              ──┬─  
+     │                ╰─── Typing Error: connection expects a ::int but was given a ::bool
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:930:9]
+     │
+ 930 │     int[3] xyz
+     │            ─┬─  
+     │             ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯

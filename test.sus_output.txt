@@ -99,6 +99,9 @@ TREE SITTER module! instruction_decoder
 TREE SITTER module! run_instruction
 TREE SITTER module! no_main_interface
 TREE SITTER module! use_no_main_interface
+TREE SITTER module! moduleWithBadDeclaration
+TREE SITTER module! moduleWithBadInterface
+TREE SITTER module! useModuleWithBadInterface
 Typechecking DualPortMem
 Typechecking UseDualPortMem
 Typechecking FIFO
@@ -197,6 +200,9 @@ Typechecking instruction_decoder
 Typechecking run_instruction
 Typechecking no_main_interface
 Typechecking use_no_main_interface
+Typechecking moduleWithBadDeclaration
+Typechecking moduleWithBadInterface
+Typechecking useModuleWithBadInterface
 Instantiating UseDualPortMem
 Instantiating submodules for UseDualPortMem
 Instantiating DualPortMem
@@ -560,3 +566,6 @@ Instantiating submodules for no_main_interface
 Concrete Typechecking no_main_interface
 Latency Counting no_main_interface
 Not Instantiating use_no_main_interface due to flattening errors
+Not Instantiating moduleWithBadDeclaration due to flattening errors
+Not Instantiating moduleWithBadInterface due to flattening errors
+Not Instantiating useModuleWithBadInterface due to flattening errors
