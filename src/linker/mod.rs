@@ -440,7 +440,7 @@ impl Linker {
         let mut parsing_errors =
             std::mem::replace(&mut self.files[file_id].parsing_errors, ErrorStore::new());
         let file_data = &self.files[file_id];
-        let other_parsing_errors = parsing_errors.take_for_editing(file_id, &self.files);
+        let other_parsing_errors = ErrorCollector::from_storage(parsing_errors.take(), file_id, &self.files);
 
         f(FileBuilder {
             file_id,

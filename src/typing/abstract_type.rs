@@ -83,22 +83,19 @@ pub struct FullType {
 /// 'A U 'x -> 'x = 'A
 ///
 /// 'x U 'y -> 'x = 'y
-pub struct TypeUnifier<'linker_file_texts, 'errs> {
+pub struct TypeUnifier {
     pub template_type_names: FlatAlloc<String, TemplateIDMarker>,
-    pub errors: &'errs ErrorCollector<'linker_file_texts>,
     pub type_substitutor: TypeSubstitutor<AbstractType, TypeVariableIDMarker>,
     pub domain_substitutor: TypeSubstitutor<DomainType, DomainVariableIDMarker>,
 }
 
-impl<'linker_file_texts, 'errs> TypeUnifier<'linker_file_texts, 'errs> {
+impl TypeUnifier {
     pub fn new(
         template_inputs: &TemplateInputs,
-        errors: &'errs ErrorCollector<'linker_file_texts>,
         typing_alloc: TypingAllocator
     ) -> Self {
         Self {
             template_type_names: map_to_type_names(template_inputs),
-            errors,
             type_substitutor: TypeSubstitutor::init(&typing_alloc.type_variable_alloc),
             domain_substitutor: TypeSubstitutor::init(&typing_alloc.domain_variable_alloc)
         }
@@ -115,7 +112,7 @@ impl<'linker_file_texts, 'errs> TypeUnifier<'linker_file_texts, 'errs> {
     /// This should always be what happens first to a given variable. 
     /// 
     /// Therefore it should be impossible that one of the internal unifications ever fails
-    pub fn unify_with_written_type(&mut self, instructions: &FlatAlloc<Instruction, FlatIDMarker>, wr_typ: &WrittenType, typ: &AbstractType) {
+    pub fn unify_with_written_type(&mut self, instructions: &FlatAlloc<Instruction, FlatIDMarker>, wr_typ: &WrittenType, typ: &AbstractType, errors: &ErrorCollector) {
         match wr_typ {
             WrittenType::Error(_span) => {} // Already an error, don't unify
             WrittenType::Template(_span, uuid) => {
@@ -135,14 +132,14 @@ impl<'linker_file_texts, 'errs> TypeUnifier<'linker_file_texts, 'errs> {
                 
                 // Of course, the user can still make mistakes
                 if !size_instr.typ.domain.is_generative() {
-                    self.errors.error(array_bracket_span.inner_span(), "The size of arrays must be a generative value. (gen)");
+                    errors.error(array_bracket_span.inner_span(), "The size of arrays must be a generative value. (gen)");
                 }
                 
                 let arr_content_variable = AbstractType::Unknown(self.alloc_typ_variable());
 
                 self.type_substitutor.unify_must_succeed(typ, &AbstractType::Array(Box::new(arr_content_variable.clone())));
 
-                Self::unify_with_written_type(self, instructions, arr_content, &arr_content_variable);
+                Self::unify_with_written_type(self, instructions, arr_content, &arr_content_variable, errors);
             }
         }
     }
@@ -255,13 +252,13 @@ impl<'linker_file_texts, 'errs> TypeUnifier<'linker_file_texts, 'errs> {
         found: &FullType,
         expected: &AbstractType,
         span: Span,
-        context: &'static str
+        context: &'static str,
+        errors: &ErrorCollector
     ) {
         self.type_substitutor.unify_report_error(&found.typ, &expected, span, context);
 
         if MUST_BE_GENERATIVE && found.domain != DomainType::Generative {
-            self.errors
-                .error(span, format!("A generative value is required in {context}"));
+            errors.error(span, format!("A generative value is required in {context}"));
         }
     }
 
@@ -320,13 +317,13 @@ impl<'linker_file_texts, 'errs> TypeUnifier<'linker_file_texts, 'errs> {
         self.unify_domains(&found.domain, &expected.domain, span, context);
     }
 
-    pub fn finalize_type(&mut self, types: &ArenaAllocator<StructType, TypeUUIDMarker>, typ: &mut FullType, span: Span) {
+    pub fn finalize_type(&mut self, types: &ArenaAllocator<StructType, TypeUUIDMarker>, typ: &mut FullType, span: Span, errors: &ErrorCollector) {
         use super::type_inference::HindleyMilner;
 
         typ.domain.fully_substitute(&self.domain_substitutor).unwrap();
         if typ.typ.fully_substitute(&self.type_substitutor).is_err() {
             let typ_as_string = typ.typ.to_string(types, &self.template_type_names);
-            self.errors.error(span, format!("Could not fully figure out the type of this object. {typ_as_string}"));
+            errors.error(span, format!("Could not fully figure out the type of this object. {typ_as_string}"));
         }
     }
 }

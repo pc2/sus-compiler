@@ -7,7 +7,7 @@ use super::{Instruction, Module, WireReferencePathElement};
 
 pub fn perform_lints(linker: &mut Linker) {
     for (_, md) in &mut linker.modules {
-        let errors = md.link_info.errors.take_for_editing(md.link_info.file, &linker.files);
+        let errors = ErrorCollector::from_storage(md.link_info.errors.take(), md.link_info.file, &linker.files);
         find_unused_variables(md, &errors);
         md.link_info.errors = errors.into_storage()
     }

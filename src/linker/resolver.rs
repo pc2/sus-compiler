@@ -2,8 +2,6 @@
 
 use std::ops::Index;
 
-use crate::alloc::{UUIDMarker, UUID};
-
 use self::checkpoint::ResolvedGlobalsCheckpoint;
 
 use super::*;
@@ -36,38 +34,47 @@ impl ResolvedGlobals {
     }
 }
 
-pub struct Resolver<'linker, 'err_and_globals, IDM: UUIDMarker, T> {
-    arr: &'linker ArenaAllocator<T, IDM>,
-    resolved_globals: &'err_and_globals RefCell<ResolvedGlobals>,
-}
-
-impl<'linker, 'err_and_globals, IDM: UUIDMarker, T> Index<UUID<IDM>>
-    for Resolver<'linker, 'err_and_globals, IDM, T>
-where
-    NameElem: From<UUID<IDM>>,
-{
-    type Output = T;
-
-    fn index(&self, index: UUID<IDM>) -> &'linker Self::Output {
-        self.resolved_globals
-            .borrow_mut()
-            .referenced_globals
-            .push(NameElem::from(index));
-        &self.arr[index]
-    }
-}
-
-pub struct NameResolver<'linker, 'err_and_globals> {
-    pub file_text: &'linker FileText,
-    pub errors: &'err_and_globals ErrorCollector<'linker>,
+pub struct GlobalResolver<'linker> {
     linker: &'linker Linker,
-    resolved_globals: &'err_and_globals RefCell<ResolvedGlobals>,
+    pub file_data: &'linker FileData,
+    pub obj_link_info: &'linker LinkInfo,
+
+    pub errors: ErrorCollector<'linker>,
+    pub resolved_globals: RefCell<ResolvedGlobals>
 }
 
-impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
+impl<'linker> GlobalResolver<'linker> {
+    pub fn take_errors_globals(linker: &mut Linker, global_obj: NameElem) -> (ErrorStore, ResolvedGlobals) {
+        let obj_link_info = Linker::get_link_info_mut(&mut linker.modules, &mut linker.types, global_obj).unwrap();
+
+        let errors = obj_link_info.errors.take();
+        let resolved_globals = obj_link_info.resolved_globals.take();
+
+        (errors, resolved_globals)
+    }
+    pub fn new(linker: &'linker Linker, global_obj: NameElem, errors_globals: (ErrorStore, ResolvedGlobals)) -> Self {
+        let obj_link_info = linker.get_link_info(global_obj).unwrap();
+
+        let file_data = &linker.files[obj_link_info.file];
+
+        GlobalResolver {
+            linker,
+            file_data,
+            obj_link_info,
+            errors: ErrorCollector::from_storage(errors_globals.0, obj_link_info.file, &linker.files),
+            resolved_globals: RefCell::new(errors_globals.1),
+        }
+    }
+    /// Get the [ErrorCollector] and [ResolvedGlobals] out of this
+    pub fn decommission<'linker_files>(self, linker_files: &'linker_files ArenaAllocator<FileData, FileUUIDMarker>) -> (ErrorCollector<'linker_files>, ResolvedGlobals) {
+        let errors = self.errors.re_attach(linker_files);
+        let resolved_globals = self.resolved_globals.into_inner();
+        (errors, resolved_globals)
+    }
+
     /// SAFETY: Files are never touched, and as long as this object is managed properly linker will also exist long enough.
     pub fn resolve_global<'slf>(&'slf self, name_span: Span) -> Option<(NameElem, Span)> {
-        let name = &self.file_text[name_span];
+        let name = &self.file_data.file_text[name_span];
 
         let mut resolved_globals = self.resolved_globals.borrow_mut();
         match self.linker.global_namespace.get(name) {
@@ -131,46 +138,47 @@ impl<'linker, 'err_and_globals> NameResolver<'linker, 'err_and_globals> {
     }
 }
 
-pub fn make_resolvers<'linker, 'errors>(linker: &'linker Linker, file_text: &'linker FileText, (errors, resolved_globals): &'errors (ErrorCollector<'linker>, RefCell<ResolvedGlobals>)) -> (
-    Resolver<'linker, 'errors, ModuleUUIDMarker, Module>,
-    Resolver<'linker, 'errors, TypeUUIDMarker, StructType>,
-    Resolver<'linker, 'errors, ConstantUUIDMarker, NamedConstant>,
-    NameResolver<'linker, 'errors>
-) {
-    (Resolver {
-        arr: &linker.modules,
-        resolved_globals,
-    },
-    Resolver {
-        arr: &linker.types,
-        resolved_globals,
-    },
-    Resolver {
-        arr: &linker.constants,
-        resolved_globals,
-    },
-    NameResolver {
-        file_text,
-        linker,
-        errors,
-        resolved_globals,
-    })
+impl<'l> Index<ModuleUUID> for GlobalResolver<'l> {
+    type Output = Module;
+
+    fn index(&self, index: ModuleUUID) -> &Self::Output {
+        self.resolved_globals.borrow_mut()
+            .referenced_globals
+            .push(NameElem::Module(index));
+
+        &self.linker.modules[index]
+    }
+}
+impl<'l> Index<TypeUUID> for GlobalResolver<'l> {
+    type Output = StructType;
+
+    fn index(&self, index: TypeUUID) -> &Self::Output {
+        self.resolved_globals.borrow_mut()
+            .referenced_globals
+            .push(NameElem::Type(index));
+
+        &self.linker.types[index]
+    }
+}
+impl<'l> Index<ConstantUUID> for GlobalResolver<'l> {
+    type Output = NamedConstant;
+
+    fn index(&self, index: ConstantUUID) -> &Self::Output {
+        self.resolved_globals.borrow_mut()
+            .referenced_globals
+            .push(NameElem::Constant(index));
+
+        &self.linker.constants[index]
+    }
 }
 
 impl LinkInfo {
-    pub fn take_errors_globals_for_editing<'linker>(&mut self, files: &'linker ArenaAllocator<FileData, FileUUIDMarker>) -> (ErrorCollector<'linker>, RefCell<ResolvedGlobals>) {
-        let errors = self.errors.take_for_editing(self.file, files);
-        let resolved_globals = RefCell::new(self.resolved_globals.take());
-
-        (errors, resolved_globals)
-    }
-
-    pub fn reabsorb_errors_globals(&mut self, (errors, resolved_globals): (ErrorCollector, RefCell<ResolvedGlobals>)) {
+    pub fn reabsorb_errors_globals(&mut self, (errors, resolved_globals): (ErrorCollector, ResolvedGlobals)) {
         // Store errors and resolved_globals back into module
         assert!(self.resolved_globals.is_untouched());
         assert!(self.errors.is_untouched());
-        self.resolved_globals = resolved_globals.into_inner();
-
+        
+        self.resolved_globals = resolved_globals;
         self.errors = errors.into_storage();
         self.after_flatten_cp = Some(CheckPoint::checkpoint(
             &self.errors,

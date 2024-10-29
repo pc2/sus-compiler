@@ -45,18 +45,8 @@ impl ErrorStore {
         }
     }
 
-    pub fn take_for_editing<'linker>(
-        &mut self,
-        file: FileUUID,
-        files: &'linker ArenaAllocator<FileData, FileUUIDMarker>,
-    ) -> ErrorCollector<'linker> {
-        let error_store = RefCell::new(std::mem::replace(self, ErrorStore::new()));
-        ErrorCollector {
-            error_store,
-            file,
-            file_len: files[file].file_text.len(),
-            files,
-        }
+    pub fn take<'linker>(&mut self) -> Self {
+        std::mem::replace(self, ErrorStore::new())
     }
 
     pub fn checkpoint(&self) -> ErrorCheckpoint {
@@ -114,6 +104,24 @@ impl<'linker> ErrorCollector<'linker> {
     /// Turn the collector back into a [ErrorStore]
     pub fn into_storage(self) -> ErrorStore {
         self.error_store.replace(ErrorStore::new())
+    }
+    /// Turn an [ErrorStore] into [ErrorCollector]
+    pub fn from_storage(error_store: ErrorStore, file: FileUUID, files: &'linker ArenaAllocator<FileData, FileUUIDMarker>) -> Self {
+        Self {
+            error_store: RefCell::new(error_store),
+            file,
+            file_len: files[file].file_text.len(),
+            files,
+        }
+    }
+    /// To re-attach this [ErrorCollector] to a new [Linker]. Mostly to get around the borrow checker
+    pub fn re_attach<'new_linker>(self, files: &'new_linker ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorCollector<'new_linker> {
+        ErrorCollector {
+            error_store: RefCell::new(self.error_store.replace(ErrorStore::new())),
+            file: self.file,
+            file_len: self.file_len,
+            files,
+        }
     }
 
     fn assert_span_good(&self, span: Span) {

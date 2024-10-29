@@ -4,7 +4,7 @@ use crate::typing::type_inference::{FailedUnification, HindleyMilner};
 
 use crate::debug::SpanDebugger;
 use crate::linker::{
-    make_resolvers, FileData, Linkable, NameElem, NamedConstant, Resolver
+    GlobalResolver, Linkable, NameElem
 };
 
 use crate::typing::{
@@ -17,56 +17,40 @@ use super::*;
 pub fn typecheck_all_modules(linker: &mut Linker) {
     let module_uuids : Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
     for module_uuid in module_uuids {
-        let obj_link_info = &mut linker.modules[module_uuid].link_info;
+        let global_id = NameElem::Module(module_uuid);
+        let errs_globals = GlobalResolver::take_errors_globals(linker, global_id);
+        let globals = GlobalResolver::new(linker, global_id, errs_globals);
 
-        let ctx_info_string = format!("Typechecking {}", &obj_link_info.name);
+        let ctx_info_string = format!("Typechecking {}", &globals.obj_link_info.name);
         println!("{ctx_info_string}");
         let mut span_debugger = SpanDebugger::new(
             &ctx_info_string,
-            &linker.files[obj_link_info.file],
+            &linker.files[globals.obj_link_info.file],
         );
-
-
-        let file: &FileData = &linker.files[obj_link_info.file];
-
-        // Extract errors and resolved_globals for easier editing
-        let errors_globals = obj_link_info.take_errors_globals_for_editing(&linker.files);
 
         let working_on: &Module = &linker.modules[module_uuid];
 
-        let (modules, types, constants, name_resolver) = make_resolvers(linker, &file.file_text, &errors_globals);
-
-        let type_checker = {
-            let mut context = TypeCheckingContext {
-                errors: name_resolver.errors,
-                type_checker: TypeUnifier::new(
-                    &working_on.link_info.template_arguments,
-                    name_resolver.errors,
-                    working_on.link_info.type_variable_alloc.clone()
-                ),
-                types,
-                constants,
-                runtime_condition_stack: Vec::new(),
-                working_on,
-                modules,
-            };
-
-            context.typecheck();
-            context.type_checker
+        let mut context = TypeCheckingContext {
+            globals : &globals,
+            errors: &globals.errors,
+            type_checker: TypeUnifier::new(
+                &working_on.link_info.template_arguments,
+                working_on.link_info.type_variable_alloc.clone()
+            ),
+            runtime_condition_stack: Vec::new(),
+            working_on,
         };
-        
 
-        let new_type_checker = TypeUnifier {
-            template_type_names: type_checker.template_type_names,
-            errors: &errors_globals.0,
-            type_substitutor: type_checker.type_substitutor,
-            domain_substitutor: type_checker.domain_substitutor,
-        };
+        context.typecheck();
+
+        let type_checker = context.type_checker;
+        let errs_and_globals = globals.decommission(&linker.files);
+
         // Grab another mutable copy of md so it doesn't force a borrow conflict
         let working_on_mut = &mut linker.modules[module_uuid];
-        apply_types(new_type_checker, working_on_mut, &errors_globals.0, &linker.types);
+        apply_types(type_checker, working_on_mut, &errs_and_globals.0, &linker.types);
 
-        working_on_mut.link_info.reabsorb_errors_globals(errors_globals);
+        working_on_mut.link_info.reabsorb_errors_globals(errs_and_globals);
         
         span_debugger.defuse();
     }
@@ -78,21 +62,19 @@ struct ConditionStackElem {
     domain: DomainType,
 }
 
-struct TypeCheckingContext<'l, 'errs, 'linker_file_texts> {
-    working_on: &'l Module,
-    modules: Resolver<'l, 'errs, ModuleUUIDMarker, Module>,
-    type_checker: TypeUnifier<'linker_file_texts, 'errs>,
-    types: Resolver<'l, 'errs, TypeUUIDMarker, StructType>,
-    constants: Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
+struct TypeCheckingContext<'l, 'errs> {
+    globals: &'l GlobalResolver<'l>,
     errors: &'errs ErrorCollector<'l>,
+    working_on: &'l Module,
+    type_checker: TypeUnifier,
     runtime_condition_stack: Vec<ConditionStackElem>,
 }
 
-impl<'l, 'errs, 'linker_file_texts> TypeCheckingContext<'l, 'errs, 'linker_file_texts> {
+impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     fn get_link_info<ID: Into<NameElem>>(&self, id: ID) -> Option<&LinkInfo> {
         let ne: NameElem = id.into();
         match ne {
-            NameElem::Module(md_id) => Some(&self.modules[md_id].link_info),
+            NameElem::Module(md_id) => Some(&self.globals[md_id].link_info),
             NameElem::Type(_) | NameElem::Constant(_) => None, // TODO all globals should have link_info
         }
     }
@@ -106,7 +88,7 @@ impl<'l, 'errs, 'linker_file_texts> TypeCheckingContext<'l, 'errs, 'linker_file_
             .unwrap_submodule()
             .module_ref
             .id;
-        let module = &self.modules[submodule_id];
+        let module = &self.globals[submodule_id];
         let decl = module.get_port_decl(port);
         (decl, module.link_info.file)
     }
@@ -114,7 +96,7 @@ impl<'l, 'errs, 'linker_file_texts> TypeCheckingContext<'l, 'errs, 'linker_file_
     fn get_type_of_port(&self, port: PortID, submodule_instr: FlatID) -> FullType {
         let (decl, _file) = self.get_decl_of_module_port(port, submodule_instr);
         let submodule_inst = self.working_on.instructions[submodule_instr].unwrap_submodule();
-        let submodule_module = &self.modules[submodule_inst.module_ref.id];
+        let submodule_module = &self.globals[submodule_inst.module_ref.id];
         let port_interface = submodule_module.ports[port].domain;
         let port_local_domain = submodule_inst.local_interface_domains.get().unwrap()[port_interface];
         FullType {
@@ -135,7 +117,7 @@ impl<'l, 'errs, 'linker_file_texts> TypeCheckingContext<'l, 'errs, 'linker_file_
                 Some((decl_root.decl_span, self.errors.file))
             }
             WireReferenceRoot::NamedConstant(cst, _) => {
-                let linker_cst = &self.constants[*cst];
+                let linker_cst = &self.globals[*cst];
                 linker_cst.get_span_file()
             }
             WireReferenceRoot::SubModulePort(port) => {
@@ -167,7 +149,7 @@ impl<'l, 'errs, 'linker_file_texts> TypeCheckingContext<'l, 'errs, 'linker_file_
                 decl_root.typ.clone()
             }
             WireReferenceRoot::NamedConstant(cst, _) => {
-                let linker_cst = &self.constants[*cst];
+                let linker_cst = &self.globals[*cst];
                 linker_cst.get_full_type()
             }
             WireReferenceRoot::SubModulePort(port) => {
@@ -308,7 +290,7 @@ impl<'l, 'errs, 'linker_file_texts> TypeCheckingContext<'l, 'errs, 'linker_file_
         let NameElem::Module(md_id) = ne else {
             todo!("TODO Move Instructions to link_info too")
         };
-        let target_instructions = &self.modules[md_id].instructions;
+        let target_instructions = &self.globals[md_id].instructions;
 
         for (template_id, value) in global_ref.template_args.iter_valids() {
             match &value.kind {
@@ -330,7 +312,8 @@ impl<'l, 'errs, 'linker_file_texts> TypeCheckingContext<'l, 'errs, 'linker_file_
                         &val_wire.typ,
                         &target_abstract_type,
                         val_wire.span,
-                        "generative template argument"
+                        "generative template argument",
+                        &self.errors
                     );
                 }
             }
@@ -354,7 +337,8 @@ impl<'l, 'errs, 'linker_file_texts> TypeCheckingContext<'l, 'errs, 'linker_file_
                     &idx_wire.typ,
                     &INT_TYPE,
                     idx_wire.span,
-                    "array size"
+                    "array size",
+                    &self.errors
                 );
             }
         }
@@ -378,7 +362,7 @@ impl<'l, 'errs, 'linker_file_texts> TypeCheckingContext<'l, 'errs, 'linker_file_
         match &self.working_on.instructions[instr_id] {
             Instruction::SubModule(sm) => {
                 self.typecheck_template_global(&sm.module_ref);
-                let md = &self.modules[sm.module_ref.id];
+                let md = &self.globals[sm.module_ref.id];
                 let local_interface_domains = md
                     .domain_names
                     .map(|_| DomainType::DomainVariable(self.type_checker.alloc_domain_variable()));
@@ -393,12 +377,13 @@ impl<'l, 'errs, 'linker_file_texts> TypeCheckingContext<'l, 'errs, 'linker_file_
                         &latency_spec_wire.typ,
                         &INT_TYPE,
                         latency_spec_wire.span,
-                        "latency specifier"
+                        "latency specifier",
+                        &self.errors
                     );
                 }
                 
                 // Unify with the type written in the source code
-                self.type_checker.unify_with_written_type(&self.working_on.instructions, &decl.typ_expr, &decl.typ.typ);
+                self.type_checker.unify_with_written_type(&self.working_on.instructions, &decl.typ_expr, &decl.typ.typ, &self.errors);
             }
             Instruction::IfStatement(stm) => {
                 let wire = &self.working_on.instructions[stm.condition].unwrap_wire();
@@ -406,7 +391,8 @@ impl<'l, 'errs, 'linker_file_texts> TypeCheckingContext<'l, 'errs, 'linker_file_
                     &wire.typ,
                     &BOOL_TYPE,
                     wire.span,
-                    "if statement condition"
+                    "if statement condition",
+                    &self.errors
                 );
             }
             Instruction::ForStatement(stm) => {
@@ -418,13 +404,15 @@ impl<'l, 'errs, 'linker_file_texts> TypeCheckingContext<'l, 'errs, 'linker_file_
                     &start.typ,
                     &loop_var.typ.typ,
                     start.span,
-                    "for loop start"
+                    "for loop start",
+                    &self.errors
                 );
                 self.type_checker.typecheck_and_generative::<true>(
                     &end.typ,
                     &loop_var.typ.typ,
                     end.span,
-                    "for loop end"
+                    "for loop end",
+                    &self.errors
                 );
             }
             Instruction::Wire(w) => {
@@ -550,9 +538,9 @@ pub fn apply_types(
     // Post type application. Solidify types and flag any remaining AbstractType::Unknown
     for (_id, inst) in working_on.instructions.iter_mut() {
         match inst {
-            Instruction::Wire(w) => type_checker.finalize_type(types, &mut w.typ, w.span),
-            Instruction::Declaration(decl) => type_checker.finalize_type(types, &mut decl.typ, decl.name_span),
-            Instruction::Write(Write { to_type, to_span, .. }) => type_checker.finalize_type(types, to_type, *to_span),
+            Instruction::Wire(w) => type_checker.finalize_type(types, &mut w.typ, w.span, errors),
+            Instruction::Declaration(decl) => type_checker.finalize_type(types, &mut decl.typ, decl.name_span, errors),
+            Instruction::Write(Write { to_type, to_span, .. }) => type_checker.finalize_type(types, to_type, *to_span, errors),
             // TODO Submodule domains may not be crossed either? 
             Instruction::SubModule(sm) => {
                 for (_domain_id_in_submodule, domain_assigned_to_it_here) in sm.local_interface_domains.get_mut().unwrap() {

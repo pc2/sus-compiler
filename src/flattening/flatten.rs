@@ -5,9 +5,7 @@ use crate::{alloc::UUIDRangeIter, prelude::*};
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 
-use crate::linker::{
-    make_resolvers, FileData, NameElem, NameResolver, NamedConstant, Resolver
-};
+use crate::linker::{FileData, GlobalResolver, NameElem};
 use crate::{debug::SpanDebugger, value::Value};
 
 use super::name_context::LocalVariableContext;
@@ -65,11 +63,11 @@ impl PartialWireReference {
                         span,
                         "cannot operate on modules directly. Should use ports instead",
                     )
-                    .info_obj(&ctx.modules[md_uuid]);
+                    .info_obj(&ctx.globals[md_uuid]);
                 None
             }
             PartialWireReference::GlobalModuleName(md_ref) => {
-                let md = &ctx.modules[md_ref.id];
+                let md = &ctx.globals[md_ref.id];
                 ctx.errors
                     .error(
                         md_ref.span,
@@ -91,7 +89,7 @@ impl PartialWireReference {
                     .unwrap_submodule()
                     .module_ref
                     .id;
-                let md = &ctx.modules[md_uuid];
+                let md = &ctx.globals[md_uuid];
                 let interf = &md.interfaces[interface];
                 ctx.errors
                     .error(
@@ -219,12 +217,7 @@ impl TypingAllocator {
 }
 
 struct FlatteningContext<'l, 'errs> {
-    modules: Resolver<'l, 'errs, ModuleUUIDMarker, Module>,
-    #[allow(dead_code)]
-    types: Resolver<'l, 'errs, TypeUUIDMarker, StructType>,
-    #[allow(dead_code)]
-    constants: Resolver<'l, 'errs, ConstantUUIDMarker, NamedConstant>,
-    name_resolver: NameResolver<'l, 'errs>,
+    globals: &'l GlobalResolver<'l>,
     errors: &'errs ErrorCollector<'l>,
 
     working_on_link_info: &'l LinkInfo,
@@ -269,8 +262,8 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
 
     fn get_link_info_for(&self, found_global: NameElem) -> Option<&'l LinkInfo> {
         let info : *const LinkInfo = match found_global {
-            NameElem::Module(md_id) => &self.modules[md_id].link_info,
-            NameElem::Type(typ_id) => &self.types[typ_id].link_info,
+            NameElem::Module(md_id) => &self.globals[md_id].link_info,
+            NameElem::Type(typ_id) => &self.globals[typ_id].link_info,
             NameElem::Constant(_) => return None
         };
         // SAFETY Can safely cast this away, because we can't touch anything in the Linker
@@ -296,7 +289,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                 let name_span =
                     cursor.field_span(field!("name"), kind!("identifier"));
 
-                let name = &self.name_resolver.file_text[name_span];
+                let name = &self.globals.file_data.file_text[name_span];
 
                 let name_found = link_info.template_arguments.iter().find(|(_id, arg)| arg.name == name);
                 if name_found.is_none() {
@@ -388,7 +381,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                 let [local_name] = name_path.as_slice() else {
                     unreachable!()
                 };
-                let name_text = &self.name_resolver.file_text[*local_name];
+                let name_text = &self.globals.file_data.file_text[*local_name];
                 if let Some(decl_id) = self.local_variable_context.get_declaration_for(name_text) {
                     return LocalOrGlobal::Local(*local_name, decl_id);
                 }
@@ -399,7 +392,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                 self.errors.todo(name_path[1], "Namespaces");
                 return LocalOrGlobal::NotFound(name_path[0]);
             };
-            if let Some((found_global, found_global_span)) = self.name_resolver.resolve_global(*name_span) {
+            if let Some((found_global, found_global_span)) = self.globals.resolve_global(*name_span) {
                 // MUST Still be at field!("template_args")
                 let template_args_whole_span = template_args_used.then(|| BracketSpan::from_outer(cursor.span()));
 
@@ -493,7 +486,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                         })
                     }
                     _ => {
-                        self.name_resolver.not_expected_global_error(
+                        self.globals.not_expected_global_error(
                             resolved_global,
                             resolved_global_span,
                             accepted_text,
@@ -515,7 +508,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
     fn alloc_local_name(&mut self, name_span: Span, named_local: NamedLocal) {
         if let Err(conflict) = self
             .local_variable_context
-            .add_declaration(&self.name_resolver.file_text[name_span], named_local)
+            .add_declaration(&self.globals.file_data.file_text[name_span], named_local)
         {
             let err_ref = self.errors.error(
                 name_span,
@@ -669,7 +662,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                     if let Some((_, span)) = span_latency_specifier {
                         self.errors.error(span, "Cannot add latency specifier to module instances");
                     }
-                    let name = &self.name_resolver.file_text[name_span];
+                    let name = &self.globals.file_data.file_text[name_span];
 
                     let submod_id = self.instructions.alloc(Instruction::SubModule(SubModuleInstance{
                         name : Some((name.to_owned(), name_span)),
@@ -684,7 +677,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                 }
             };
 
-            let name = &self.name_resolver.file_text[name_span];
+            let name = &self.globals.file_data.file_text[name_span];
 
             if is_port.implies_read_only() {
                 read_only = true;
@@ -790,7 +783,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
     fn get_main_interface(&self, submodule_decl: FlatID, span: Span) -> Option<(InterfaceID, &Interface)> {
         let sm = self.instructions[submodule_decl].unwrap_submodule();
 
-        let md = &self.modules[sm.module_ref.id];
+        let md = &self.globals[sm.module_ref.id];
 
         let result = md.get_main_interface();
 
@@ -860,7 +853,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
     ) -> (&Module, &Interface) {
         let submodule =
             self.instructions[interface_reference.submodule_decl].unwrap_submodule();
-        let md = &self.modules[submodule.module_ref.id];
+        let md = &self.globals[submodule.module_ref.id];
         let interface = &md.interfaces[interface_reference.submodule_interface];
         (md, interface)
     }
@@ -870,7 +863,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
         let (kind, expr_span) = cursor.kind_span();
 
         let (source, is_generative) = if kind == kind!("number") {
-            let text = &self.name_resolver.file_text[expr_span];
+            let text = &self.globals.file_data.file_text[expr_span];
             use std::str::FromStr;            
             (WireSource::Constant(Value::Integer(BigInt::from_str(text).unwrap())), true)
         } else if kind == kind!("unary_op") {
@@ -1003,7 +996,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                             })
                         }
                         NameElem::Type(_) => {
-                            self.name_resolver.not_expected_global_error(
+                            self.globals.not_expected_global_error(
                                 name_elem,
                                 span,
                                 "named wire: local or constant",
@@ -1065,9 +1058,9 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                     PartialWireReference::ModuleButNoPort(submodule_decl, submodule_name_span) => {
                         let submodule = self.instructions[submodule_decl].unwrap_submodule();
 
-                        let submod = &self.modules[submodule.module_ref.id];
+                        let submod = &self.globals[submodule.module_ref.id];
 
-                        match submod.get_port_or_interface_by_name(port_name_span, &self.name_resolver.file_text, self.errors) {
+                        match submod.get_port_or_interface_by_name(port_name_span, &self.globals.file_data.file_text, self.errors) {
                             Some(PortOrInterface::Port(port)) => {
                                 let port_info = PortInfo{
                                     submodule_name_span : Some(submodule_name_span),
@@ -1483,7 +1476,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
         
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
         self.flatten_template_inputs(cursor);
-        let module_name = &self.name_resolver.file_text[name_span];
+        let module_name = &self.globals.file_data.file_text[name_span];
         println!("TREE SITTER module! {module_name}");
         // Interface is allocated in self
         if cursor.optional_field(field!("interface_ports")) {
@@ -1509,38 +1502,35 @@ pub fn flatten_all_modules(linker: &mut Linker) {
 
         cursor.list(kind!("source_file"), |cursor| {
             cursor.go_down(kind!("global_object"), |cursor| {
-                let file_obj = *associated_value_iter.next().expect("Iterator cannot be exhausted");
-                let (obj_link_info_mut, ports_to_visit, fields_to_visit, default_declaration_context) = match file_obj {
+                let global_obj = *associated_value_iter.next().expect("Iterator cannot be exhausted");
+
+                let errors_globals = GlobalResolver::take_errors_globals(linker, global_obj);
+                let globals = GlobalResolver::new(linker, global_obj, errors_globals);
+
+                let (ports_to_visit, fields_to_visit, default_declaration_context) = match global_obj {
                     NameElem::Module(module_uuid) => {
-                        let md = &mut linker.modules[module_uuid];
-                        (&mut md.link_info, md.ports.id_range().into_iter(), UUIDRange::empty().into_iter(), DeclarationContext::PlainWire)
+                        let md = &globals[module_uuid];
+                        (md.ports.id_range().into_iter(), UUIDRange::empty().into_iter(), DeclarationContext::PlainWire)
                     }
                     NameElem::Type(type_uuid) => {
-                        let typ = &mut linker.types[type_uuid];
-                        (&mut typ.link_info, UUIDRange::empty().into_iter(), typ.fields.id_range().into_iter(), DeclarationContext::StructField)
+                        let typ = &globals[type_uuid];
+                        (UUIDRange::empty().into_iter(), typ.fields.id_range().into_iter(), DeclarationContext::StructField)
                     }
                     NameElem::Constant(const_uuid) => {
                         todo!("TODO Constant flattening")
                     }
                 };
 
-                let errors_globals = obj_link_info_mut.take_errors_globals_for_editing(&linker.files);
-
-                let (modules, types, constants, name_resolver) = make_resolvers(linker, &file.file_text, &errors_globals);
-
                 let mut context = FlatteningContext {
+                    globals : &globals,
                     ports_to_visit,
                     fields_to_visit,
                     default_declaration_context,
-                    errors: name_resolver.errors,
-                    working_on_link_info: linker.get_link_info(file_obj).unwrap(),
+                    errors: &globals.errors,
+                    working_on_link_info: linker.get_link_info(global_obj).unwrap(),
                     instructions: FlatAlloc::new(),
                     type_alloc: TypingAllocator { type_variable_alloc: UUIDAllocator::new(), domain_variable_alloc: UUIDAllocator::new() },
                     named_domain_alloc: UUIDAllocator::new(),
-                    modules,
-                    types,
-                    constants,
-                    name_resolver,
                     local_variable_context: LocalVariableContext::new_initial(),
                 };
 
@@ -1552,7 +1542,9 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                 let instructions = context.instructions;
                 let type_alloc = context.type_alloc;
 
-                let link_info : &mut LinkInfo = match file_obj {
+                let errors_globals = globals.decommission(&linker.files);
+
+                let link_info : &mut LinkInfo = match global_obj {
                     NameElem::Module(module_uuid) => {
                         let md = &mut linker.modules[module_uuid];
                         // Set all declaration_instruction values
@@ -1618,8 +1610,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                     }
                 };
 
-                link_info.resolved_globals = errors_globals.1.into_inner();
-                link_info.errors = errors_globals.0.into_storage();
+                link_info.reabsorb_errors_globals(errors_globals);
                 link_info.type_variable_alloc = type_alloc;
             });
         });
