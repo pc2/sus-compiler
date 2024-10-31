@@ -4,9 +4,9 @@ use crate::value::Value;
 
 use std::ops::Deref;
 
-use super::template::TemplateInputs;
+use super::template::{TemplateAbstractTypes, TemplateInputs};
 use super::type_inference::{DomainVariableID, DomainVariableIDMarker, TypeSubstitutor, TypeVariableID, TypeVariableIDMarker};
-use crate::flattening::{BinaryOperator, Instruction, StructType, TypingAllocator, UnaryOperator, WrittenType};
+use crate::flattening::{BinaryOperator, StructType, TypingAllocator, UnaryOperator, WrittenType};
 use crate::linker::get_builtin_type;
 use crate::to_string::map_to_type_names;
 
@@ -112,36 +112,47 @@ impl TypeUnifier {
     /// This should always be what happens first to a given variable. 
     /// 
     /// Therefore it should be impossible that one of the internal unifications ever fails
-    pub fn unify_with_written_type(&mut self, instructions: &FlatAlloc<Instruction, FlatIDMarker>, wr_typ: &WrittenType, typ: &AbstractType, errors: &ErrorCollector) {
+    pub fn unify_with_written_type_must_succeed(&self, wr_typ: &WrittenType, typ: &AbstractType) {
         match wr_typ {
             WrittenType::Error(_span) => {} // Already an error, don't unify
-            WrittenType::Template(_span, uuid) => {
-                self.type_substitutor.unify_must_succeed(&typ, &AbstractType::Template(*uuid));
+            WrittenType::TemplateVariable(_span, argument_id) => {
+                self.type_substitutor.unify_must_succeed(&typ, &AbstractType::Template(*argument_id));
             }
             WrittenType::Named(global_reference) => {
-                if !global_reference.template_args.is_empty() {
-                    todo!("Type template arguments")
-                }
-
                 self.type_substitutor.unify_must_succeed(&typ, &AbstractType::Named(global_reference.id));
             }
             WrittenType::Array(_span, array_content_and_size) =>  {
-                let (arr_content, size_flat, array_bracket_span) = array_content_and_size.deref();
+                let (arr_content, _size_flat, _array_bracket_span) = array_content_and_size.deref();
 
-                let size_instr = instructions[*size_flat].unwrap_wire();
-                
-                // Of course, the user can still make mistakes
-                if !size_instr.typ.domain.is_generative() {
-                    errors.error(array_bracket_span.inner_span(), "The size of arrays must be a generative value. (gen)");
-                }
-
-                self.type_substitutor.unify_report_error(&size_instr.typ.typ, &INT_TYPE, array_bracket_span.inner_span(), "array size");
-                
                 let arr_content_variable = AbstractType::Unknown(self.alloc_typ_variable());
 
                 self.type_substitutor.unify_must_succeed(typ, &AbstractType::Array(Box::new(arr_content_variable.clone())));
 
-                Self::unify_with_written_type(self, instructions, arr_content, &arr_content_variable, errors);
+                Self::unify_with_written_type_must_succeed(self, arr_content, &arr_content_variable);
+            }
+        }
+    }
+
+    /// This should always be what happens first to a given variable. 
+    /// 
+    /// Therefore it should be impossible that one of the internal unifications ever fails
+    pub fn unify_with_written_type_substitute_templates_must_succeed(&self, wr_typ: &WrittenType, typ: &AbstractType, template_type_args: &TemplateAbstractTypes) {
+        match wr_typ {
+            WrittenType::Error(_span) => {} // Already an error, don't unify
+            WrittenType::TemplateVariable(_span, argument_id) => {
+                self.type_substitutor.unify_must_succeed(&typ, &template_type_args[*argument_id]);
+            }
+            WrittenType::Named(global_reference) => {
+                self.type_substitutor.unify_must_succeed(&typ, &AbstractType::Named(global_reference.id));
+            }
+            WrittenType::Array(_span, array_content_and_size) =>  {
+                let (arr_content, _size_flat, _array_bracket_span) = array_content_and_size.deref();
+
+                let arr_content_variable = AbstractType::Unknown(self.alloc_typ_variable());
+
+                self.type_substitutor.unify_must_succeed(typ, &AbstractType::Array(Box::new(arr_content_variable.clone())));
+
+                Self::unify_with_written_type_substitute_templates_must_succeed(self, arr_content, &arr_content_variable, template_type_args);
             }
         }
     }
@@ -248,22 +259,6 @@ impl TypeUnifier {
 
     // ===== Both =====
 
-    /// Unify the given full type [found] with the expected type [expected]. 
-    pub fn typecheck_and_generative<const MUST_BE_GENERATIVE: bool>(
-        &self,
-        found: &FullType,
-        expected: &AbstractType,
-        span: Span,
-        context: &'static str,
-        errors: &ErrorCollector
-    ) {
-        self.type_substitutor.unify_report_error(&found.typ, &expected, span, context);
-
-        if MUST_BE_GENERATIVE && found.domain != DomainType::Generative {
-            errors.error(span, format!("A generative value is required in {context}"));
-        }
-    }
-
     pub fn unify_domains(&self, from_domain: &DomainType, to_domain: &DomainType, span: Span, context: &'static str) {
         // The case of writes to generatives from non-generatives should be fully covered by flattening
         if !from_domain.is_generative() && !to_domain.is_generative() {
@@ -308,6 +303,16 @@ impl TypeUnifier {
         self.unify_with_array_of(&arr_type, output_typ.clone(), arr_span);
     }
 
+    pub fn typecheck_write_to_abstract(
+        &self,
+        found: &AbstractType,
+        expected: &AbstractType,
+        span: Span,
+        context: &'static str
+    ) {
+        self.type_substitutor.unify_report_error(&found, &expected, span, context);
+    }
+
     pub fn typecheck_write_to(
         &self,
         found: &FullType,
@@ -315,17 +320,25 @@ impl TypeUnifier {
         span: Span,
         context: &'static str
     ) {
-        self.type_substitutor.unify_report_error(&found.typ, &expected.typ, span, context);
+        self.typecheck_write_to_abstract(&found.typ, &expected.typ, span, context);
         self.unify_domains(&found.domain, &expected.domain, span, context);
     }
 
-    pub fn finalize_type(&mut self, types: &ArenaAllocator<StructType, TypeUUIDMarker>, typ: &mut FullType, span: Span, errors: &ErrorCollector) {
+    pub fn finalize_domain_type(&mut self, typ_domain: &mut DomainType) {
         use super::type_inference::HindleyMilner;
+        typ_domain.fully_substitute(&self.domain_substitutor).unwrap();
+    }
 
-        typ.domain.fully_substitute(&self.domain_substitutor).unwrap();
-        if typ.typ.fully_substitute(&self.type_substitutor).is_err() {
-            let typ_as_string = typ.typ.to_string(types, &self.template_type_names);
+    pub fn finalize_abstract_type(&mut self, types: &ArenaAllocator<StructType, TypeUUIDMarker>, typ: &mut AbstractType, span: Span, errors: &ErrorCollector) {
+        use super::type_inference::HindleyMilner;
+        if typ.fully_substitute(&self.type_substitutor).is_err() {
+            let typ_as_string = typ.to_string(types, &self.template_type_names);
             errors.error(span, format!("Could not fully figure out the type of this object. {typ_as_string}"));
         }
+    }
+
+    pub fn finalize_type(&mut self, types: &ArenaAllocator<StructType, TypeUUIDMarker>, typ: &mut FullType, span: Span, errors: &ErrorCollector) {
+        self.finalize_domain_type(&mut typ.domain);
+        self.finalize_abstract_type(types, &mut typ.typ, span, errors);
     }
 }

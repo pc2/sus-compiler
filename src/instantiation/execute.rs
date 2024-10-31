@@ -157,7 +157,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn concretize_type(&self, typ: &WrittenType) -> ExecutionResult<ConcreteType> {
         Ok(match typ {
             WrittenType::Error(_) => caught_by_typecheck!("Error Type"),
-            WrittenType::Template(_, template_id) => match &self.template_args[*template_id] {
+            WrittenType::TemplateVariable(_, template_id) => match &self.template_args[*template_id] {
                 ConcreteTemplateArg::Type(typ) => typ.clone(),
                 ConcreteTemplateArg::Value(_) => caught_by_typecheck!(),
                 ConcreteTemplateArg::NotProvided => unreachable!("Type not provided!"),

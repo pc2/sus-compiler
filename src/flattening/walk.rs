@@ -50,7 +50,7 @@ pub fn for_each_generative_input_in_template_args<F: FnMut(FlatID)>(
 impl WrittenType {
     pub fn for_each_generative_input<F: FnMut(FlatID)>(&self, f: &mut F) {
         match self {
-            WrittenType::Error(_) | WrittenType::Template(_, _) => {}
+            WrittenType::Error(_) | WrittenType::TemplateVariable(_, _) => {}
             WrittenType::Named(name) => {
                 for_each_generative_input_in_template_args(&name.template_args, f)
             }

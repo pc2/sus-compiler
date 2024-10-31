@@ -52,7 +52,7 @@ impl WrittenType {
     ) -> String {
         match self {
             WrittenType::Error(_) => "{error}".to_owned(),
-            WrittenType::Template(_, id) => template_names.get_template_name(*id).to_owned(),
+            WrittenType::TemplateVariable(_, id) => template_names.get_template_name(*id).to_owned(),
             WrittenType::Named(named_type) => linker_types[named_type.id].get_full_name(),
             WrittenType::Array(_, sub) => {
                 sub.deref().0.to_string(linker_types, template_names) + "[]"

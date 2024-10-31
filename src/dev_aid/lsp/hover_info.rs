@@ -174,8 +174,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
         }
         LocationInfo::Type(typ, link_info) => {
             hover.sus_code(
-                typ.to_type()
-                    .to_string(&linker.types, &link_info.template_arguments),
+                typ.to_string(&linker.types, &link_info.template_arguments),
             );
         }
         LocationInfo::TemplateInput(in_obj, link_info, _template_id, template_arg) => {

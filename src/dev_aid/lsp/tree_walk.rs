@@ -295,7 +295,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
             (self.visitor)(typ_expr_span, LocationInfo::Type(typ_expr, link_info));
             match typ_expr {
                 WrittenType::Error(_) => {}
-                WrittenType::Template(span, template_id) => {
+                WrittenType::TemplateVariable(span, template_id) => {
                     self.visit(
                         *span,
                         LocationInfo::TemplateInput(

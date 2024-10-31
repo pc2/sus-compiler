@@ -497,8 +497,7 @@ Instantiating sumUpTo
 Instantiating submodules for sumUpTo
 Concrete Typechecking sumUpTo
 Latency Counting sumUpTo
-Instantiating use_test
-Instantiating submodules for use_test
+Not Instantiating use_test due to flattening errors
 Instantiating testTinyTestMod
 Instantiating submodules for testTinyTestMod
 Instantiating tinyTestMod

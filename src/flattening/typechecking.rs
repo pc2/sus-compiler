@@ -1,5 +1,7 @@
 use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
+use crate::typing::abstract_type::AbstractType;
+use crate::typing::template::TemplateInputKind;
 use crate::typing::type_inference::{FailedUnification, HindleyMilner};
 
 use crate::debug::SpanDebugger;
@@ -79,11 +81,11 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     }
 
-    fn get_decl_of_module_port<'s>(
-        &'s self,
+    fn get_decl_of_module_port(
+        &self,
         port: PortID,
         submodule_instr: FlatID,
-    ) -> (&'s Declaration, FileUUID) {
+    ) -> (&Declaration, FileUUID) {
         let submodule_id = self.working_on.instructions[submodule_instr]
             .unwrap_submodule()
             .module_ref
@@ -94,15 +96,15 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     }
 
     fn get_type_of_port(&self, port: PortID, submodule_instr: FlatID) -> FullType {
-        let (decl, _file) = self.get_decl_of_module_port(port, submodule_instr);
         let submodule_inst = self.working_on.instructions[submodule_instr].unwrap_submodule();
         let submodule_module = &self.globals[submodule_inst.module_ref.id];
+        let decl = submodule_module.get_port_decl(port);
         let port_interface = submodule_module.ports[port].domain;
         let port_local_domain = submodule_inst.local_interface_domains.get().unwrap()[port_interface];
+        let typ = AbstractType::Unknown(self.type_checker.alloc_typ_variable());
+        self.type_checker.unify_with_written_type_substitute_templates_must_succeed(&decl.typ_expr, &typ, &submodule_inst.module_ref.template_arg_types);
         FullType {
-            typ: decl
-                .typ_expr
-                .to_type_with_substitute(&submodule_inst.module_ref.template_args),
+            typ,
             domain: port_local_domain.clone(),
         }
     }
@@ -191,13 +193,13 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             self.runtime_condition_stack.pop().unwrap();
         }
         match &self.working_on.instructions[inst_id] {
-            Instruction::SubModule(_) => {}
+            Instruction::SubModule(sm) => {
+                self.typecheck_template_global(&sm.module_ref);
+            }
             Instruction::FuncCall(_) => {}
             Instruction::Declaration(decl) => {
-                // TODO this is wrong? 
-                if decl.identifier_type.is_generative() {
-                    decl.declaration_runtime_depth.set(self.runtime_condition_stack.len()).unwrap();
-                }
+                // For both runtime, and compiletime declarations. 
+                decl.declaration_runtime_depth.set(self.runtime_condition_stack.len()).unwrap();
             }
             Instruction::Wire(_) => {}
             Instruction::Write(conn) => {
@@ -216,15 +218,15 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         return;
                     }
                     WireReferenceRoot::SubModulePort(port) => {
-                        let r = self.get_decl_of_module_port(port.port, port.submodule_decl);
+                        let module_port_decl = self.get_decl_of_module_port(port.port, port.submodule_decl);
 
-                        if !r.0.is_port.as_regular_port().unwrap() {
+                        if !module_port_decl.0.is_port.as_regular_port().unwrap() {
                             self.errors
                                 .error(conn.to_span, "Cannot assign to a submodule output port")
-                                .info_obj_different_file(r.0, r.1);
+                                .info_obj_different_file(module_port_decl.0, module_port_decl.1);
                         }
 
-                        r
+                        module_port_decl
                     }
                 };
 
@@ -292,38 +294,53 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         };
         let target_instructions = &self.globals[md_id].instructions;
 
-        for (template_id, value) in global_ref.template_args.iter_valids() {
-            match &value.kind {
-                TemplateArgKind::Type(typ) => {
-                    self.typecheck_written_type(typ);
-                }
-                TemplateArgKind::Value(val) => {
-                    let template_input = link_info.template_arguments[template_id]
-                        .kind
-                        .unwrap_value();
-                    let template_input_decl = target_instructions
-                        [template_input.declaration_instruction]
-                        .unwrap_wire_declaration();
-                    let val_wire = self.working_on.instructions[*val].unwrap_wire();
-                    let target_abstract_type = template_input_decl
-                        .typ_expr
-                        .to_type_with_substitute(&global_ref.template_args);
-                    self.type_checker.typecheck_and_generative::<true>(
-                        &val_wire.typ,
-                        &target_abstract_type,
-                        val_wire.span,
-                        "generative template argument",
-                        &self.errors
+        for (parameter_id, argument_type) in &global_ref.template_arg_types {
+            let parameter = &link_info.template_arguments[parameter_id];
+            match &parameter.kind {
+                TemplateInputKind::Type(_) => {} // Do nothing, nothing to unify with. Maybe in the future traits? 
+                TemplateInputKind::Generative(template_input) => {
+                    let decl = target_instructions[template_input.declaration_instruction].unwrap_wire_declaration();
+
+                    self.type_checker.unify_with_written_type_substitute_templates_must_succeed(
+                        &decl.typ_expr,
+                        &argument_type,
+                        &global_ref.template_arg_types // Yes that's right. We already must substitute the templates for type variables here
                     );
+
+                    
+                }
+            }
+
+            if let Some(given_arg) = &global_ref.template_args[parameter_id] {
+                match &given_arg.kind {
+                    TemplateArgKind::Type(wr_typ) => {
+                        self.typecheck_written_type(wr_typ);
+                        // This slot will not have been filled out yet
+                        self.type_checker.unify_with_written_type_must_succeed(wr_typ, argument_type);
+                    }
+                    TemplateArgKind::Value(val) => {
+                        let val_wire = self.working_on.instructions[*val].unwrap_wire();
+
+                        self.type_checker.typecheck_write_to_abstract(
+                            &val_wire.typ.typ,
+                            &argument_type,
+                            val_wire.span,
+                            "generative template argument"
+                        );
+                    }
                 }
             }
         }
     }
 
+    /// Critically, this is different from [TypeUnifier::unify_with_written_type]. 
+    /// That one unifies a given typ with the written type, without checking the written type. 
+    /// 
+    /// This function checks the written type itself. 
     fn typecheck_written_type(&self, wr_typ: &WrittenType) {
         match wr_typ {
             WrittenType::Error(_) => {}
-            WrittenType::Template(_, _) => {}
+            WrittenType::TemplateVariable(_, _) => {}
             WrittenType::Named(global_ref) => {
                 self.typecheck_template_global(global_ref);
             }
@@ -333,12 +350,11 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 self.typecheck_written_type(content_typ);
 
                 let idx_wire = self.working_on.instructions[*arr_idx].unwrap_wire();
-                self.type_checker.typecheck_and_generative::<true>(
-                    &idx_wire.typ,
+                self.type_checker.typecheck_write_to_abstract(
+                    &idx_wire.typ.typ,
                     &INT_TYPE,
                     idx_wire.span,
-                    "array size",
-                    &self.errors
+                    "array size"
                 );
             }
         }
@@ -373,26 +389,26 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 if let Some(latency_spec) = decl.latency_specifier {
                     let latency_spec_wire =
                         self.working_on.instructions[latency_spec].unwrap_wire();
-                    self.type_checker.typecheck_and_generative::<true>(
-                        &latency_spec_wire.typ,
+                    self.type_checker.typecheck_write_to_abstract(
+                        &latency_spec_wire.typ.typ,
                         &INT_TYPE,
                         latency_spec_wire.span,
-                        "latency specifier",
-                        &self.errors
+                        "latency specifier"
                     );
                 }
                 
+                self.typecheck_written_type(&decl.typ_expr);
+
                 // Unify with the type written in the source code
-                self.type_checker.unify_with_written_type(&self.working_on.instructions, &decl.typ_expr, &decl.typ.typ, &self.errors);
+                self.type_checker.unify_with_written_type_must_succeed(&decl.typ_expr, &decl.typ.typ);
             }
             Instruction::IfStatement(stm) => {
                 let wire = &self.working_on.instructions[stm.condition].unwrap_wire();
-                self.type_checker.typecheck_and_generative::<false>(
-                    &wire.typ,
+                self.type_checker.typecheck_write_to_abstract(
+                    &wire.typ.typ,
                     &BOOL_TYPE,
                     wire.span,
-                    "if statement condition",
-                    &self.errors
+                    "if statement condition"
                 );
             }
             Instruction::ForStatement(stm) => {
@@ -400,19 +416,17 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 let start = self.working_on.instructions[stm.start].unwrap_wire();
                 let end = self.working_on.instructions[stm.end].unwrap_wire();
 
-                self.type_checker.typecheck_and_generative::<true>(
-                    &start.typ,
+                self.type_checker.typecheck_write_to_abstract(
+                    &start.typ.typ,
                     &loop_var.typ.typ,
                     start.span,
-                    "for loop start",
-                    &self.errors
+                    "for loop start"
                 );
-                self.type_checker.typecheck_and_generative::<true>(
-                    &end.typ,
+                self.type_checker.typecheck_write_to_abstract(
+                    &end.typ.typ,
                     &loop_var.typ.typ,
                     end.span,
-                    "for loop end",
-                    &self.errors
+                    "for loop end"
                 );
             }
             Instruction::Wire(w) => {
@@ -544,14 +558,17 @@ pub fn apply_types(
             // TODO Submodule domains may not be crossed either? 
             Instruction::SubModule(sm) => {
                 for (_domain_id_in_submodule, domain_assigned_to_it_here) in sm.local_interface_domains.get_mut().unwrap() {
-                    use self::HindleyMilner;
-                    domain_assigned_to_it_here.fully_substitute(&type_checker.domain_substitutor).unwrap();
+                    type_checker.finalize_domain_type(domain_assigned_to_it_here);
+                }
+                for (_template_id, template_type) in &mut sm.module_ref.template_arg_types {
+                    type_checker.finalize_abstract_type(types, template_type, sm.module_ref.span, errors);
                 }
             }
             _other => {}
         }
     }
 
+    // Print all errors
     for FailedUnification{mut found, mut expected, span, context} in type_checker.type_substitutor.extract_errors() {
         // Not being able to fully substitute is not an issue. We just display partial types
         let _ = found.fully_substitute(&type_checker.type_substitutor);

@@ -23,8 +23,8 @@ use crate::linker::{Documentation, LinkInfo};
 use crate::{file_position::FileText, instantiation::InstantiationList, value::Value};
 
 use crate::typing::{
-    abstract_type::{AbstractType, FullType},
-    template::{GlobalReference, TemplateArgs},
+    abstract_type::FullType,
+    template::GlobalReference,
 };
 
 #[derive(Debug)]
@@ -413,7 +413,7 @@ impl WireSource {
 #[derive(Debug)]
 pub enum WrittenType {
     Error(Span),
-    Template(Span, TemplateID),
+    TemplateVariable(Span, TemplateID),
     Named(GlobalReference<TypeUUID>),
     Array(Span, Box<(WrittenType, FlatID, BracketSpan)>),
 }
@@ -422,40 +422,9 @@ impl WrittenType {
     pub fn get_span(&self) -> Span {
         match self {
             WrittenType::Error(span)
-            | WrittenType::Template(span, ..)
+            | WrittenType::TemplateVariable(span, ..)
             | WrittenType::Named(GlobalReference { span, .. })
             | WrittenType::Array(span, _) => *span,
-        }
-    }
-
-    pub fn to_type(&self) -> AbstractType {
-        match self {
-            WrittenType::Error(_) => AbstractType::Error,
-            WrittenType::Template(_, template_id) => AbstractType::Template(*template_id),
-            WrittenType::Named(named_type) => AbstractType::Named(named_type.id),
-            WrittenType::Array(_, arr_box) => {
-                let (elem_typ, _arr_idx, _br_span) = arr_box.deref();
-                AbstractType::Array(Box::new(elem_typ.to_type()))
-            }
-        }
-    }
-
-    pub fn to_type_with_substitute(&self, template_args: &TemplateArgs) -> AbstractType {
-        match self {
-            WrittenType::Error(_) => AbstractType::Error,
-            WrittenType::Template(_, template_id) => {
-                let Some(type_arg) = &template_args[*template_id] else {
-                    return AbstractType::Error;
-                }; // Could not infer the type, though this is a TODO
-                let target_typ = type_arg.kind.unwrap_type();
-
-                target_typ.to_type()
-            }
-            WrittenType::Named(named_type) => AbstractType::Named(named_type.id),
-            WrittenType::Array(_, arr_box) => {
-                let (elem_typ, _arr_idx, _br_span) = arr_box.deref();
-                AbstractType::Array(Box::new(elem_typ.to_type_with_substitute(template_args)))
-            }
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use super::concrete_type::ConcreteType;
+use super::{abstract_type::AbstractType, concrete_type::ConcreteType};
 use crate::{flattening::WrittenType, linker::LinkInfo, value::TypedValue};
 
 #[derive(Debug)]
@@ -8,6 +8,7 @@ pub struct GlobalReference<ID> {
     pub span: Span,
     pub id: ID,
     pub template_args: TemplateArgs,
+    pub template_arg_types: TemplateAbstractTypes,
     pub template_span: Option<BracketSpan>,
 }
 
@@ -54,6 +55,7 @@ impl TemplateInputKind {
 #[derive(Debug)]
 pub struct TemplateArg {
     pub name_span: Span,
+    pub value_span: Span,
     pub kind: TemplateArgKind,
 }
 
@@ -88,6 +90,10 @@ pub enum ConcreteTemplateArg {
 }
 
 pub type TemplateArgs = FlatAlloc<Option<TemplateArg>, TemplateIDMarker>;
+/// Applies to both Template Type args and Template Value args. 
+/// 
+/// For Types this is the Type, for Values this is unified with the parameter declaration type
+pub type TemplateAbstractTypes = FlatAlloc<AbstractType, TemplateIDMarker>;
 pub type TemplateInputs = FlatAlloc<TemplateInput, TemplateIDMarker>;
 pub type ConcreteTemplateArgs = FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>;
 

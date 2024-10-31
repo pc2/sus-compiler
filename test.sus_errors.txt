@@ -922,6 +922,13 @@ Error: Could not fully figure out the type of this object. type_variable_4
      │                                                  ─┬─  
      │                                                   ╰─── Could not fully figure out the type of this object. type_variable_4
 ─────╯
+Error: Could not fully figure out the type of this object. type_variable_12
+     ╭─[test.sus:775:2]
+     │
+ 775 │     FIFO #(BITWIDTH: 4) badoop
+     │     ──┬─  
+     │       ╰─── Could not fully figure out the type of this object. type_variable_12
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:766:22]
      │
@@ -943,16 +950,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │               ──┬─  
      │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Could not instantiate ::test because the template arguments 'T' were missing and no default was provided
+Error: Could not fully figure out the type of this object. type_variable_1
      ╭─[test.sus:779:2]
      │
- 766 │ module test #(T, int MY_INPUT) {
-     │               ┬  
-     │               ╰── 'T' defined here
-     │ 
  779 │     test #(MY_INPUT: 3) test_mod
      │     ──┬─  
-     │       ╰─── Could not instantiate ::test because the template arguments 'T' were missing and no default was provided
+     │       ╰─── Could not fully figure out the type of this object. type_variable_1
 ─────╯
 Warning: Unused port 'o'
      ╭─[test.sus:791:2]
