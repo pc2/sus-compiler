@@ -2,6 +2,8 @@
 
 use std::ops::Index;
 
+use crate::typing::template::GlobalReference;
+
 use self::checkpoint::ResolvedGlobalsCheckpoint;
 
 use super::*;
@@ -123,13 +125,13 @@ impl<'linker> GlobalResolver<'linker> {
     pub fn get_linking_error_location(&self, name_elem: NameElem) -> LinkingErrorLocation {
         self.linker.get_linking_error_location(name_elem)
     }
-    pub fn not_expected_global_error(&self, name_elem: NameElem, span: Span, expected: &str) {
+    pub fn not_expected_global_error<ID: Copy>(&self, global_ref: &GlobalReference<ID>, expected: &str) where NameElem: From<ID> {
         // SAFETY: The allocated linker objects aren't going to change.
-        let info = self.get_linking_error_location(name_elem);
+        let info = self.get_linking_error_location(NameElem::from(global_ref.id));
         let name = &info.full_name;
         let global_type = info.named_type;
         let err_ref = self.errors.error(
-            span,
+            global_ref.total_span,
             format!("{name} is not a {expected}, it is a {global_type} instead!"),
         );
         if let Some(span_file) = info.location {

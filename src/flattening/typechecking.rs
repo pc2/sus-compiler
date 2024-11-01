@@ -555,7 +555,7 @@ pub fn apply_types(
                     type_checker.finalize_domain_type(domain_assigned_to_it_here);
                 }
                 for (_template_id, template_type) in &mut sm.module_ref.template_arg_types {
-                    type_checker.finalize_abstract_type(types, template_type, sm.module_ref.span, errors);
+                    type_checker.finalize_abstract_type(types, template_type, sm.module_ref.total_span, errors);
                 }
             }
             _other => {}

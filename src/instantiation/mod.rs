@@ -309,7 +309,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
             if !check_all_template_args_valid(
                 &self.errors,
-                submod_instr.module_ref.span,
+                submod_instr.module_ref.total_span,
                 &sub_module.link_info,
                 &sm.template_args,
             ) {
@@ -344,7 +344,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             let source_code_port = &sub_module.ports[port_id];
                             self.errors
                                 .warn(
-                                    submod_instr.module_ref.span,
+                                    submod_instr.module_ref.total_span,
                                     format!("Unused port '{}'", source_code_port.name),
                                 )
                                 .info_obj_different_file(
@@ -396,7 +396,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 sm.instance = Some(instance);
             } else {
                 self.errors.error(
-                    submod_instr.module_ref.span,
+                    submod_instr.module_ref.total_span,
                     "Error instantiating submodule",
                 );
                 success = false;

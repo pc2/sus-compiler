@@ -5,7 +5,7 @@ use crate::{flattening::WrittenType, linker::LinkInfo, value::TypedValue};
 
 #[derive(Debug)]
 pub struct GlobalReference<ID> {
-    pub span: Span,
+    pub total_span: Span,
     pub id: ID,
     pub template_args: TemplateArgs,
     pub template_arg_types: TemplateAbstractTypes,

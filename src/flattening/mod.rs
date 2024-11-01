@@ -122,7 +122,7 @@ impl Module {
 
     pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
         match &self.instructions[instr_id] {
-            Instruction::SubModule(sm) => sm.module_ref.span,
+            Instruction::SubModule(sm) => sm.module_ref.total_span,
             Instruction::FuncCall(fc) => fc.whole_func_span,
             Instruction::Declaration(decl) => decl.decl_span,
             Instruction::Wire(w) => w.span,
@@ -421,10 +421,10 @@ pub enum WrittenType {
 impl WrittenType {
     pub fn get_span(&self) -> Span {
         match self {
-            WrittenType::Error(span)
-            | WrittenType::TemplateVariable(span, ..)
-            | WrittenType::Named(GlobalReference { span, .. })
-            | WrittenType::Array(span, _) => *span,
+            WrittenType::Error(total_span)
+            | WrittenType::TemplateVariable(total_span, ..)
+            | WrittenType::Named(GlobalReference { total_span, .. })
+            | WrittenType::Array(total_span, _) => *total_span,
         }
     }
 }

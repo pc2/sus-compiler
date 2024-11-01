@@ -274,7 +274,7 @@ impl ErrorInfoObject for SubModuleInstance {
         if let Some((name, span)) = &self.name {
             (*span, format!("{name} declared here"))
         } else {
-            (self.module_ref.span, "Used here".to_owned())
+            (self.module_ref.total_span, "Used here".to_owned())
         }
     }
 }
