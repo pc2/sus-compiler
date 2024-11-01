@@ -100,7 +100,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         let submodule_module = &self.globals[submodule_inst.module_ref.id];
         let decl = submodule_module.get_port_decl(port);
         let port_interface = submodule_module.ports[port].domain;
-        let port_local_domain = submodule_inst.local_interface_domains.get().unwrap()[port_interface];
+        let port_local_domain = submodule_inst.local_interface_domains[port_interface];
         let typ = AbstractType::Unknown(self.type_checker.alloc_typ_variable());
         self.type_checker.unify_with_written_type_substitute_templates_must_succeed(&decl.typ_expr, &typ, &submodule_inst.module_ref.template_arg_types);
         FullType {
@@ -378,12 +378,6 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         match &self.working_on.instructions[instr_id] {
             Instruction::SubModule(sm) => {
                 self.typecheck_template_global(&sm.module_ref);
-                let md = &self.globals[sm.module_ref.id];
-                let local_interface_domains = md
-                    .domain_names
-                    .map(|_| DomainType::DomainVariable(self.type_checker.alloc_domain_variable()));
-
-                sm.local_interface_domains.set(local_interface_domains).unwrap();
             }
             Instruction::Declaration(decl) => {
                 if let Some(latency_spec) = decl.latency_specifier {
@@ -557,7 +551,7 @@ pub fn apply_types(
             Instruction::Write(Write { to_type, to_span, .. }) => type_checker.finalize_type(types, to_type, *to_span, errors),
             // TODO Submodule domains may not be crossed either? 
             Instruction::SubModule(sm) => {
-                for (_domain_id_in_submodule, domain_assigned_to_it_here) in sm.local_interface_domains.get_mut().unwrap() {
+                for (_domain_id_in_submodule, domain_assigned_to_it_here) in &mut sm.local_interface_domains {
                     type_checker.finalize_domain_type(domain_assigned_to_it_here);
                 }
                 for (_template_id, template_type) in &mut sm.module_ref.template_arg_types {

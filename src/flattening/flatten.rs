@@ -677,10 +677,15 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                     }
                     let name = &self.globals.file_data.file_text[name_span];
 
+                    let md = &self.globals[module_ref.id];
+                    let local_interface_domains = md
+                        .domain_names
+                        .map(|_| DomainType::DomainVariable(self.type_alloc.domain_variable_alloc.alloc()));
+
                     let submod_id = self.instructions.alloc(Instruction::SubModule(SubModuleInstance{
                         name : Some((name.to_owned(), name_span)),
                         module_ref,
-                        local_interface_domains : OnceCell::new(),
+                        local_interface_domains,
                         documentation
                     }));
 
@@ -817,11 +822,16 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
             PartialWireReference::GlobalModuleName(module_ref) => {
                 let documentation = cursor.extract_gathered_comments();
                 let interface_span = module_ref.span;
+                let md = &self.globals[module_ref.id];
+                let local_interface_domains = md
+                    .domain_names
+                    .map(|_| DomainType::DomainVariable(self.type_alloc.domain_variable_alloc.alloc()));
+
                 let submodule_decl =
                     self.instructions.alloc(Instruction::SubModule(SubModuleInstance {
                         name: None,
                         module_ref,
-                        local_interface_domains: OnceCell::new(),
+                        local_interface_domains,
                         documentation,
                     }));
                 Some(ModuleInterfaceReference {

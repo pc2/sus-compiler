@@ -469,7 +469,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             } else {
                 RealWireDataSource::ReadOnly
             };
-            let domain = submodule_instruction.local_interface_domains.get().unwrap()[port_data.domain];
+            let domain = submodule_instruction.local_interface_domains[port_data.domain];
             let new_wire = self.wires.alloc(RealWire {
                 source,
                 original_instruction: submod_instance.original_instruction,
@@ -689,7 +689,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     let submod_interface_domain =
                         submod_md.interfaces[fc.interface_reference.submodule_interface].domain;
                     let domain =
-                        original_submod_instr.local_interface_domains.get().unwrap()[submod_interface_domain];
+                        original_submod_instr.local_interface_domains[submod_interface_domain];
 
                     add_to_small_set(
                         &mut self.submodules[submod_id].interface_call_sites

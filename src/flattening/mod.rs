@@ -490,7 +490,7 @@ pub struct SubModuleInstance {
     /// Maps each of the module's local domains to the domain that it is used in.
     /// 
     /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::DomainVariable] before typing)
-    pub local_interface_domains: OnceCell<FlatAlloc<DomainType, DomainIDMarker>>,
+    pub local_interface_domains: FlatAlloc<DomainType, DomainIDMarker>,
     pub documentation: Documentation,
 }
 

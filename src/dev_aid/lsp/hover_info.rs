@@ -141,7 +141,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             ));
 
             let show_interfaces = submodule.is_multi_domain().then_some(InterfaceToDomainMap {
-                local_domain_map: &submod.local_interface_domains.get().unwrap(),
+                local_domain_map: &submod.local_interface_domains,
                 domains: &md.domains,
             });
             hover.sus_code(submodule.make_all_ports_info_string(
