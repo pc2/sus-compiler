@@ -4,10 +4,9 @@ use num::BigInt;
 
 use crate::flattening::{BinaryOperator, UnaryOperator};
 
-use crate::typing::{
-    abstract_type::{AbstractType, DomainType, FullType, BOOL_TYPE, INT_TYPE},
-    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
-};
+use crate::typing::
+    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}
+;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
@@ -19,26 +18,6 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn get_type_of_constant(&self) -> FullType {
-        FullType {
-            typ: match self {
-                Value::Bool(_) => BOOL_TYPE,
-                Value::Integer(_) => INT_TYPE,
-                Value::Array(_b) => {
-                    unreachable!("Can't express arrays as constants (yet?)");
-                    /*let content_typ = if let Some(b_first) = b.first() {
-                        b_first.get_type()
-                    } else {
-                        Type::Invalid
-                    }
-                    Type::Array(Box::new((content_typ, b.len())))*/
-                }
-                Value::Unset => AbstractType::Error,
-                Value::Error => AbstractType::Error,
-            },
-            domain: DomainType::Generative,
-        }
-    }
     pub fn get_concrete_type_of_constant(&self) -> ConcreteType {
         match self {
             Value::Bool(_) => BOOL_CONCRETE_TYPE,
