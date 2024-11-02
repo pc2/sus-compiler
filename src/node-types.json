@@ -386,6 +386,26 @@
     }
   },
   {
+    "type": "const_and_type",
+    "named": true,
+    "fields": {
+      "const_type": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "array_type",
+            "named": true
+          },
+          {
+            "type": "template_global",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "decl_assign_statement",
     "named": true,
     "fields": {
@@ -792,8 +812,8 @@
         "required": true,
         "types": [
           {
-            "type": "function",
-            "named": false
+            "type": "const_and_type",
+            "named": true
           },
           {
             "type": "module",
@@ -1472,6 +1492,10 @@
     "named": false
   },
   {
+    "type": "const",
+    "named": false
+  },
+  {
     "type": "domain",
     "named": false
   },
@@ -1485,10 +1509,6 @@
   },
   {
     "type": "for",
-    "named": false
-  },
-  {
-    "type": "function",
     "named": false
   },
   {

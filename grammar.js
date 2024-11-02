@@ -64,12 +64,17 @@ module.exports = grammar({
             // Because we want to reuse our "generative code", we parse them under the same umbrella. 
             // Their differences are their semantic meaning, and therefore what constructs are allowed in each
             // For instance, modules have no restrictions
-            // Functions cannot contain state or modules
+            // Consts only contain generative code (with generative parameters they're similar to functions)
             // Struct defines types, and cannot contain non-generative operations. (Only non-generative declarations are allowed, these define the fields)
-            field('object_type', choice('module', 'function', 'struct')),
+            field('object_type', choice('module', 'struct', $.const_and_type)),
             field('name', $.identifier),
             optional(field('template_declaration_arguments', $.template_declaration_arguments)),
             field('block', $.block)
+        ),
+
+        const_and_type: $ => seq(
+            'const',
+            field('const_type', $._type)
         ),
         
         // Template Declaration

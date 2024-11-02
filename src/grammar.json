@@ -112,11 +112,11 @@
               },
               {
                 "type": "STRING",
-                "value": "function"
+                "value": "struct"
               },
               {
-                "type": "STRING",
-                "value": "struct"
+                "type": "SYMBOL",
+                "name": "const_and_type"
               }
             ]
           }
@@ -151,6 +151,23 @@
           "content": {
             "type": "SYMBOL",
             "name": "block"
+          }
+        }
+      ]
+    },
+    "const_and_type": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "const"
+        },
+        {
+          "type": "FIELD",
+          "name": "const_type",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_type"
           }
         }
       ]
