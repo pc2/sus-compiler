@@ -300,6 +300,9 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
     let (name_span, name) = ctx.gather_initial_global_object(cursor);
 
     let mut link_info = LinkInfo {
+        type_variable_alloc: TypingAllocator{domain_variable_alloc: UUIDAllocator::new(), type_variable_alloc: UUIDAllocator::new()},
+        template_arguments: ctx.template_inputs,
+        instructions: FlatAlloc::new(),
         documentation: cursor.extract_gathered_comments(),
         file: builder.file_id,
         name,
@@ -308,8 +311,6 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
         errors: ErrorStore::new(),
         is_extern,
         resolved_globals: ResolvedGlobals::empty(),
-        type_variable_alloc: TypingAllocator{domain_variable_alloc: UUIDAllocator::new(), type_variable_alloc: UUIDAllocator::new()},
-        template_arguments: ctx.template_inputs,
         checkpoints: ArrayVec::new()
     };
 
@@ -319,7 +320,6 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
         GlobalObjectKind::Module => {
             builder.add_module(Module {
                 link_info,
-                instructions: FlatAlloc::new(),
                 ports: ctx.ports,
                 domain_names: ctx.domains,
                 domains: FlatAlloc::new(),
@@ -330,14 +330,12 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
         GlobalObjectKind::Struct => {
             builder.add_type(StructType {
                 link_info,
-                fields: ctx.fields,
-                instructions: FlatAlloc::new()
+                fields: ctx.fields
             });
         }
         GlobalObjectKind::Const => {
             builder.add_const(NamedConstant {
                 link_info,
-                instructions: FlatAlloc::new(),
                 output_decl: FlatID::PLACEHOLDER,
                 val: TypedValue::make_placeholder(),
             });

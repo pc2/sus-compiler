@@ -190,7 +190,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                         todo!("Non-module template args")
                     };
                     let md = &linker.modules[md_id];
-                    let decl = md.instructions[*declaration_instruction].unwrap_wire_declaration();
+                    let decl = md.link_info.instructions[*declaration_instruction].unwrap_wire_declaration();
                     hover.sus_code(format!(
                         "param {} {}",
                         decl.typ_expr

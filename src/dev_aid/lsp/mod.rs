@@ -227,7 +227,7 @@ fn gather_completions(linker: &Linker, file_id: FileUUID, position: usize) -> Ve
         });
 
         if m.link_info.file == file_id && m.link_info.span.contains_pos(position) {
-            for (_id, v) in &m.instructions {
+            for (_id, v) in &m.link_info.instructions {
                 if let Instruction::Declaration(d) = v {
                     result.push(CompletionItem {
                         label: d.name.to_string(),

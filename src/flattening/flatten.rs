@@ -1563,7 +1563,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                 // Make sure all ports have been visited
                 assert!(context.ports_to_visit.is_empty());
 
-                let instructions = context.instructions;
+                let mut instructions = context.instructions;
                 let type_alloc = context.type_alloc;
 
                 let errors_globals = globals.decommission(&linker.files);
@@ -1591,10 +1591,9 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                                 }
                             }
                         }
-                        md.instructions = instructions;
                         for (_id, port) in &md.ports {
                             let Instruction::Declaration(decl) =
-                                &mut md.instructions[port.declaration_instruction]
+                                &mut instructions[port.declaration_instruction]
                             else {
                                 unreachable!()
                             };
@@ -1626,7 +1625,6 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                                 }
                             }
                         }
-                        typ.instructions = instructions;
                         &mut typ.link_info
                     }
                     NameElem::Constant(const_uuid) => {
@@ -1644,6 +1642,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
 
                 link_info.reabsorb_errors_globals(errors_globals, AFTER_FLATTEN_CP);
                 link_info.type_variable_alloc = type_alloc;
+                link_info.instructions = instructions;
             });
         });
         span_debugger.defuse();

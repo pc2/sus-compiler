@@ -20,10 +20,10 @@ pub fn perform_lints(linker: &mut Linker) {
     ==== Additional Warnings ====
 */
 fn find_unused_variables(md: &Module, errors: &ErrorCollector) {
-    let instruction_fanins = make_fanins(&md.instructions);
+    let instruction_fanins = make_fanins(&md.link_info.instructions);
 
     let mut is_instance_used_map: FlatAlloc<bool, FlatIDMarker> =
-        md.instructions.map(|_| false);
+        md.link_info.instructions.map(|_| false);
 
     let mut wire_to_explore_queue: Vec<FlatID> = Vec::new();
 
@@ -44,7 +44,7 @@ fn find_unused_variables(md: &Module, errors: &ErrorCollector) {
     }
 
     // Now produce warnings from the unused list
-    for (id, inst) in md.instructions.iter() {
+    for (id, inst) in md.link_info.instructions.iter() {
         if !is_instance_used_map[id] {
             if let Instruction::Declaration(decl) = inst {
                 errors.warn(decl.name_span, "Unused Variable: This variable does not affect the output ports of this module");

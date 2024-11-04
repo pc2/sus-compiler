@@ -35,7 +35,7 @@ pub type ExecutionResult<T> = Result<T, (Span, String)>;
 
 impl<'fl> GenerationState<'fl> {
     fn span_of(&self, v: FlatID) -> Span {
-        let instr = &self.md.instructions[v];
+        let instr = &self.md.link_info.instructions[v];
         match instr {
             Instruction::Declaration(d) => d.name_span,
             Instruction::Wire(w) => w.span,
@@ -460,7 +460,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         } else {
             let port_data = &self.linker.modules[submod_instance.module_uuid].ports[port_id];
             let submodule_instruction =
-                self.md.instructions[submod_instance.original_instruction].unwrap_submodule();
+                self.md.link_info.instructions[submod_instance.original_instruction].unwrap_submodule();
             let source = if port_data.is_input {
                 RealWireDataSource::Multiplexer {
                     is_state: None,
@@ -621,7 +621,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     ) -> ExecutionResult<()> {
         let mut instruction_range = block_range.into_iter();
         while let Some(original_instruction) = instruction_range.next() {
-            let instr = &self.md.instructions[original_instruction];
+            let instr = &self.md.link_info.instructions[original_instruction];
             self.md.get_instruction_span(original_instruction).debug();
             let instance_to_add: SubModuleOrWire = match instr {
                 Instruction::SubModule(submodule) => {
@@ -682,7 +682,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::FuncCall(fc) => {
                     let submod_id = self.generation_state[fc.interface_reference.submodule_decl]
                         .unwrap_submodule_instance();
-                    let original_submod_instr = self.md.instructions
+                    let original_submod_instr = self.md.link_info.instructions
                         [fc.interface_reference.submodule_decl]
                         .unwrap_submodule();
                     let submod_md = &self.linker.modules[original_submod_instr.module_ref.id];
@@ -715,7 +715,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::IfStatement(stm) => {
                     let then_range = FlatIDRange::new(stm.then_start, stm.then_end_else_start);
                     let else_range = FlatIDRange::new(stm.then_end_else_start, stm.else_end);
-                    let if_condition_wire = self.md.instructions[stm.condition].unwrap_wire();
+                    let if_condition_wire = self.md.link_info.instructions[stm.condition].unwrap_wire();
                     match if_condition_wire.typ.domain {
                         DomainType::Generative => {
                             let condition_val =
@@ -758,8 +758,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         .unwrap_integer()
                         .clone();
                     if start_val > end_val {
-                        let start_flat = &self.md.instructions[stm.start].unwrap_wire();
-                        let end_flat = &self.md.instructions[stm.end].unwrap_wire();
+                        let start_flat = &self.md.link_info.instructions[stm.start].unwrap_wire();
+                        let end_flat = &self.md.link_info.instructions[stm.end].unwrap_wire();
                         return Err((
                             Span::new_overarching(start_flat.span, end_flat.span),
                             format!("for loop range end is before begin: {start_val}:{end_val}"),
@@ -805,7 +805,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
 
     pub fn execute_module(&mut self) -> ExecutionResult<()> {
-        let result = self.instantiate_code_block(self.md.instructions.id_range());
+        let result = self.instantiate_code_block(self.md.link_info.instructions.id_range());
         self.make_interface();
         result
     }

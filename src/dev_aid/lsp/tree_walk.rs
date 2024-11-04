@@ -56,7 +56,7 @@ impl<'linker> From<LocationInfo<'linker>> for RefersTo {
         match info {
             LocationInfo::InModule(md_id, md, flat_id, flat_obj) => match flat_obj {
                 InModule::NamedLocal(_) => {
-                    let decl = md.instructions[flat_id].unwrap_wire_declaration();
+                    let decl = md.link_info.instructions[flat_id].unwrap_wire_declaration();
                     match decl.is_port {
                         DeclarationPortInfo::NotPort => {}
                         DeclarationPortInfo::StructField { field_id:_ } => {}
@@ -249,7 +249,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                         md_id,
                         md,
                         *decl_id,
-                        InModule::NamedLocal(md.instructions[*decl_id].unwrap_wire_declaration()),
+                        InModule::NamedLocal(md.link_info.instructions[*decl_id].unwrap_wire_declaration()),
                     ),
                 );
             }
@@ -258,7 +258,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
             }
             WireReferenceRoot::SubModulePort(port) => {
                 if let Some(span) = port.port_name_span {
-                    let sm_instruction = md.instructions[port.submodule_decl].unwrap_submodule();
+                    let sm_instruction = md.link_info.instructions[port.submodule_decl].unwrap_submodule();
                     let submodule = &self.linker.modules[sm_instruction.module_ref.id];
                     self.visit(
                         span,
@@ -275,7 +275,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                             md,
                             port.submodule_decl,
                             InModule::NamedSubmodule(
-                                md.instructions[port.submodule_decl].unwrap_submodule(),
+                                md.link_info.instructions[port.submodule_decl].unwrap_submodule(),
                             ),
                         ),
                     );
@@ -326,7 +326,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
     ) {
         if let Some(submod_name_span) = iref.name_span {
             let submodule_instruction = iref.submodule_decl;
-            let submodule = md.instructions[submodule_instruction].unwrap_submodule();
+            let submodule = md.link_info.instructions[submodule_instruction].unwrap_submodule();
             self.visit(
                 submod_name_span,
                 LocationInfo::InModule(
@@ -387,7 +387,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                 );
             }
 
-            for (id, inst) in &md.instructions {
+            for (id, inst) in &md.link_info.instructions {
                 match inst {
                     Instruction::SubModule(sm) => {
                         self.walk_global_reference(

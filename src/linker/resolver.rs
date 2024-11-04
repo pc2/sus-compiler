@@ -42,7 +42,7 @@ pub struct GlobalResolver<'linker> {
     pub obj_link_info: &'linker LinkInfo,
 
     pub errors: ErrorCollector<'linker>,
-    pub resolved_globals: RefCell<ResolvedGlobals>
+    resolved_globals: RefCell<ResolvedGlobals>
 }
 
 impl<'linker> GlobalResolver<'linker> {
@@ -127,6 +127,11 @@ impl<'linker> GlobalResolver<'linker> {
             format!("{name} is not a {expected}, it is a {global_type} instead!"),
         );
         err_ref.info(info.location, "Defined here");
+    }
+
+    pub fn get_link_info(&self, id: NameElem) -> &LinkInfo {
+        self.resolved_globals.borrow_mut().referenced_globals.push(id);
+        self.linker.get_link_info(id)
     }
 }
 

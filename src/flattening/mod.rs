@@ -65,9 +65,6 @@ pub struct Module {
     /// Created in Stage 1: Initialization
     pub interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
 
-    /// Created in Stage 2: Flattening. type data is filled out during Typechecking
-    pub instructions: FlatAlloc<Instruction, FlatIDMarker>,
-
     /// Created in Stage 2: Typechecking
     pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,
 
@@ -85,7 +82,7 @@ impl Module {
     pub fn get_port_decl(&self, port: PortID) -> &Declaration {
         let flat_port = self.ports[port].declaration_instruction;
 
-        self.instructions[flat_port].unwrap_wire_declaration()
+        self.link_info.instructions[flat_port].unwrap_wire_declaration()
     }
 
     /// Get a port by the given name. Reports non existing ports errors
@@ -121,7 +118,7 @@ impl Module {
     }
 
     pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
-        match &self.instructions[instr_id] {
+        match &self.link_info.instructions[instr_id] {
             Instruction::SubModule(sm) => sm.module_ref.total_span,
             Instruction::FuncCall(fc) => fc.whole_func_span,
             Instruction::Declaration(decl) => decl.decl_span,
@@ -147,10 +144,7 @@ pub struct StructType {
     /// Created in Stage 1: Initialization
     ///
     /// [StructField::declaration_instruction] are set in Stage 2: Flattening
-    fields: FlatAlloc<StructField, FieldIDMarker>,
-
-    /// Created in Stage 2: Flattening. type data is filled out during Typechecking
-    pub instructions: FlatAlloc<Instruction, FlatIDMarker>,
+    fields: FlatAlloc<StructField, FieldIDMarker>
 }
 
 #[derive(Debug)]

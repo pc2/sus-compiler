@@ -648,9 +648,9 @@ Error: MIN is not a valid template argument of ::int
      │           ─┬─  
      │            ╰─── MIN is not a valid template argument of ::int
      │
-     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:26:20]
+     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:28:20]
      │
-  26 │ __builtin__ struct int {}
+  28 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -661,9 +661,9 @@ Error: MAX is not a valid template argument of ::int
      │                   ─┬─  
      │                    ╰─── MAX is not a valid template argument of ::int
      │
-     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:26:20]
+     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:28:20]
      │
-  26 │ __builtin__ struct int {}
+  28 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -841,9 +841,9 @@ Error: beep is not a valid template argument of ::int
      │                              ──┬─  
      │                                ╰─── beep is not a valid template argument of ::int
      │
-     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:26:20]
+     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:28:20]
      │
-  26 │ __builtin__ struct int {}
+  28 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -854,9 +854,9 @@ Error: BEEP is not a valid template argument of ::int
      │                                            ──┬─  
      │                                              ╰─── BEEP is not a valid template argument of ::int
      │
-     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:26:20]
+     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:28:20]
      │
-  26 │ __builtin__ struct int {}
+  28 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -867,9 +867,9 @@ Error: ::int is not a named wire: local or constant, it is a Struct instead!
      │                                                  ─┬─  
      │                                                   ╰─── ::int is not a named wire: local or constant, it is a Struct instead!
      │
-     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:26:20]
+     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:28:20]
      │
-  26 │ __builtin__ struct int {}
+  28 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── Defined here
 ─────╯

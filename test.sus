@@ -932,8 +932,3 @@ module useModuleWithBadInterface {
 
 	xyz[3] = true
 }
-
-
-module check_qzdqzz {
-	gen bool b = false
-}

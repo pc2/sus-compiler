@@ -233,7 +233,7 @@ impl Module {
         }
         println!("Instructions:");
         let mut spans_print = Vec::new();
-        for (id, inst) in &self.instructions {
+        for (id, inst) in &self.link_info.instructions {
             println!("    {id:?}: {inst:?}");
             let span = self.get_instruction_span(id);
             spans_print.push((format!("{id:?}"), span.into_range()));

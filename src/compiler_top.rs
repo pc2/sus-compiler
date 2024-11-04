@@ -129,12 +129,11 @@ impl Linker {
         for (_, md) in &mut self.modules {
             let Module {
                 link_info,
-                instructions,
                 instantiations,
                 ..
             } = md;
             link_info.reset_to(AFTER_INITIAL_PARSE_CP);
-            instructions.clear();
+            link_info.instructions.clear();
             instantiations.clear_instances()
         }
         for (_, typ) in &mut self.types {

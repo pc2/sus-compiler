@@ -40,7 +40,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
                 working_on.link_info.type_variable_alloc.clone()
             ),
             runtime_condition_stack: Vec::new(),
-            working_on,
+            working_on: &working_on.link_info,
         };
 
         context.typecheck();
@@ -67,20 +67,12 @@ struct ConditionStackElem {
 struct TypeCheckingContext<'l, 'errs> {
     globals: &'l GlobalResolver<'l>,
     errors: &'errs ErrorCollector<'l>,
-    working_on: &'l Module,
+    working_on: &'l LinkInfo,
     type_checker: TypeUnifier,
     runtime_condition_stack: Vec<ConditionStackElem>,
 }
 
 impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
-    fn get_link_info<ID: Into<NameElem>>(&self, id: ID) -> Option<&LinkInfo> {
-        let ne: NameElem = id.into();
-        match ne {
-            NameElem::Module(md_id) => Some(&self.globals[md_id].link_info),
-            NameElem::Type(_) | NameElem::Constant(_) => None, // TODO all globals should have link_info
-        }
-    }
-
     fn get_decl_of_module_port(
         &self,
         port: PortID,
@@ -285,21 +277,15 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         &self,
         global_ref: &GlobalReference<ID>,
     ) {
-        let Some(link_info) = self.get_link_info(global_ref.id) else {
-            return;
-        }; // TODO all objects should have link_info
-        let ne: NameElem = global_ref.id.into();
-        let NameElem::Module(md_id) = ne else {
-            todo!("TODO Move Instructions to link_info too")
-        };
-        let target_instructions = &self.globals[md_id].instructions;
+        let global_obj: NameElem = global_ref.id.into();
+        let target_link_info = self.globals.get_link_info(global_obj);
 
         for (parameter_id, argument_type) in &global_ref.template_arg_types {
-            let parameter = &link_info.template_arguments[parameter_id];
+            let parameter = &target_link_info.template_arguments[parameter_id];
             match &parameter.kind {
                 TemplateInputKind::Type(_) => {} // Do nothing, nothing to unify with. Maybe in the future traits? 
                 TemplateInputKind::Generative(template_input) => {
-                    let decl = target_instructions[template_input.declaration_instruction].unwrap_wire_declaration();
+                    let decl = target_link_info.instructions[template_input.declaration_instruction].unwrap_wire_declaration();
 
                     self.type_checker.unify_with_written_type_substitute_templates_must_succeed(
                         &decl.typ_expr,
@@ -307,7 +293,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         &global_ref.template_arg_types // Yes that's right. We already must substitute the templates for type variables here
                     );
 
-                    
+
                 }
             }
 
@@ -544,7 +530,7 @@ pub fn apply_types(
     });
 
     // Post type application. Solidify types and flag any remaining AbstractType::Unknown
-    for (_id, inst) in working_on.instructions.iter_mut() {
+    for (_id, inst) in working_on.link_info.instructions.iter_mut() {
         match inst {
             Instruction::Wire(w) => type_checker.finalize_type(types, &mut w.typ, w.span, errors),
             Instruction::Declaration(decl) => type_checker.finalize_type(types, &mut decl.typ, decl.name_span, errors),

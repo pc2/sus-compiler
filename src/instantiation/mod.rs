@@ -304,7 +304,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn instantiate_submodules(&mut self) -> bool {
         let mut success = true;
         for (_sm_id, sm) in &mut self.submodules {
-            let submod_instr = self.md.instructions[sm.original_instruction].unwrap_submodule();
+            let submod_instr = self.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
             let sub_module = &self.linker.modules[sm.module_uuid];
 
             if !check_all_template_args_valid(
@@ -415,7 +415,7 @@ fn perform_instantiation(
         name: pretty_print_concrete_instance(linker, &md.link_info, template_args),
         generation_state: GenerationState {
             md,
-            generation_state: md.instructions.map(|(_, _)| SubModuleOrWire::Unnasigned),
+            generation_state: md.link_info.instructions.map(|(_, _)| SubModuleOrWire::Unnasigned),
         },
         condition_stack: Vec::new(),
         wires: FlatAlloc::new(),

@@ -427,7 +427,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     writes_involved.last().unwrap().to_latency,
                 );
                 let unique_write_instructions =
-                    filter_unique_write_flats(&writes_involved, &self.md.instructions);
+                    filter_unique_write_flats(&writes_involved, &self.md.link_info.instructions);
                 let rest_of_message = format!(" part of a net-positive latency cycle of +{net_roundtrip_latency}\n\n{path_message}\nWhich conflicts with the starting latency");
 
                 let mut did_place_error = false;
@@ -465,7 +465,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
             LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
                 for port in bad_ports {
-                    let port_decl = self.md.instructions
+                    let port_decl = self.md.link_info.instructions
                         [self.wires[latency_node_meanings[port.0]].original_instruction]
                         .unwrap_wire_declaration();
                     self.errors.error(port_decl.name_span, format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
@@ -477,11 +477,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let end_wire =
                     &self.wires[latency_node_meanings[conflict_path.last().unwrap().wire]];
                 let start_decl =
-                    self.md.instructions[start_wire.original_instruction].unwrap_wire_declaration();
+                    self.md.link_info.instructions[start_wire.original_instruction].unwrap_wire_declaration();
                 let end_decl =
-                    self.md.instructions[end_wire.original_instruction].unwrap_wire_declaration();
+                    self.md.link_info.instructions[end_wire.original_instruction].unwrap_wire_declaration();
                 let end_latency_decl =
-                    self.md.instructions[end_decl.latency_specifier.unwrap()].unwrap_wire();
+                    self.md.link_info.instructions[end_decl.latency_specifier.unwrap()].unwrap_wire();
 
                 let writes_involved =
                     self.gather_all_mux_inputs(latency_node_meanings, &conflict_path);

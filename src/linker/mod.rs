@@ -104,6 +104,9 @@ pub struct LinkInfo {
 
     pub template_arguments: TemplateInputs,
 
+    /// Created in Stage 2: Flattening. type data is filled out during Typechecking
+    pub instructions: FlatAlloc<Instruction, FlatIDMarker>,
+
     /// Reset checkpoints. These are to reset errors and resolved_globals for incremental compilation. 
     /// 
     /// TODO the system is there, just need to actually do incremental compilation
@@ -130,7 +133,6 @@ pub struct LinkingErrorLocation {
 #[derive(Debug)]
 pub struct NamedConstant {
     pub link_info: LinkInfo,
-    pub instructions: FlatAlloc<Instruction, FlatIDMarker>,
     pub output_decl: FlatID,
     pub val: TypedValue
 }
