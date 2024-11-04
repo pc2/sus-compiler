@@ -2,10 +2,11 @@ use arrayvec::ArrayVec;
 use sus_proc_macro::{field, kind, kw};
 
 use crate::errors::ErrorStore;
-use crate::linker::{IsExtern, AFTER_INITIAL_PARSE_CP};
+use crate::linker::{IsExtern, NamedConstant, AFTER_INITIAL_PARSE_CP};
 use crate::prelude::*;
 
 use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
+use crate::value::TypedValue;
 use crate::{file_position::FileText, flattening::Module, instantiation::InstantiationList};
 
 use crate::typing::template::{
@@ -278,8 +279,8 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
         kw!("module") => {
             GlobalObjectKind::Module
         }
-        kw!("function") => {
-            GlobalObjectKind::Function
+        kind!("const_and_type") => {
+            GlobalObjectKind::Const
         }
         kw!("struct") => {
             GlobalObjectKind::Struct
@@ -315,8 +316,8 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
     link_info.reabsorb_errors_globals((parsing_errors, ResolvedGlobals::empty()), AFTER_INITIAL_PARSE_CP);
 
     match global_obj_kind {
-        GlobalObjectKind::Module | GlobalObjectKind::Function => {
-            let md = Module {
+        GlobalObjectKind::Module => {
+            builder.add_module(Module {
                 link_info,
                 instructions: FlatAlloc::new(),
                 ports: ctx.ports,
@@ -324,18 +325,22 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
                 domains: FlatAlloc::new(),
                 interfaces: ctx.interfaces,
                 instantiations: InstantiationList::new(),
-            };
-
-            builder.add_module(md);
+            });
         }
         GlobalObjectKind::Struct => {
-            let typ = StructType {
+            builder.add_type(StructType {
                 link_info,
                 fields: ctx.fields,
                 instructions: FlatAlloc::new()
-            };
-
-            builder.add_type(typ);
+            });
+        }
+        GlobalObjectKind::Const => {
+            builder.add_const(NamedConstant {
+                link_info,
+                instructions: FlatAlloc::new(),
+                output_decl: FlatID::PLACEHOLDER,
+                val: TypedValue::make_placeholder(),
+            });
         }
     }
 }

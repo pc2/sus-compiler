@@ -3,8 +3,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
-use crate::linker::AFTER_INITIAL_PARSE_CP;
+use crate::linker::{get_builtin_constant, get_builtin_type, AFTER_INITIAL_PARSE_CP};
 use crate::prelude::*;
+use crate::value::{TypedValue, Value};
 
 use tree_sitter::Parser;
 
@@ -33,9 +34,20 @@ impl LinkerExtraFileInfoManager for () {}
 
 impl Linker {
     pub fn add_standard_library<ExtraInfoManager : LinkerExtraFileInfoManager>(&mut self, info_mngr : &mut ExtraInfoManager) {
+        assert!(self.modules.is_empty());
+        assert!(self.types.is_empty());
+        assert!(self.constants.is_empty());
         println!("Standard Library Directory: {STD_LIB_PATH}");
         let stl_path = PathBuf::from_str(STD_LIB_PATH).expect("Standard library directory is not a valid path?");
         self.add_all_files_in_directory(&stl_path, info_mngr);
+
+        assert_eq!(self.types[get_builtin_type("int")].link_info.name, "int");
+        assert_eq!(self.types[get_builtin_type("bool")].link_info.name, "bool");
+
+        assert_eq!(self.constants[get_builtin_constant("true")].link_info.name, "true");
+        assert_eq!(self.constants[get_builtin_constant("false")].link_info.name, "false");
+        self.constants[get_builtin_constant("true")].val = TypedValue::from_value(Value::Bool(true));
+        self.constants[get_builtin_constant("false")].val = TypedValue::from_value(Value::Bool(false));
     }
 
     pub fn add_all_files_in_directory<ExtraInfoManager : LinkerExtraFileInfoManager>(&mut self, directory : &PathBuf, info_mngr : &mut ExtraInfoManager) {
@@ -127,6 +139,9 @@ impl Linker {
         }
         for (_, typ) in &mut self.types {
             typ.link_info.reset_to(AFTER_INITIAL_PARSE_CP);
+        }
+        for (_, cst) in &mut self.constants {
+            cst.link_info.reset_to(AFTER_INITIAL_PARSE_CP);
         }
         if config().early_exit == EarlyExitUpTo::Initialize {return}
 

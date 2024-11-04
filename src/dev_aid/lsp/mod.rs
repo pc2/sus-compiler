@@ -219,7 +219,6 @@ fn initialize_all_files(init_params: &InitializeParams) -> (Linker, LSPFileManag
 fn gather_completions(linker: &Linker, file_id: FileUUID, position: usize) -> Vec<CompletionItem> {
     let mut result = Vec::new();
 
-    use crate::linker::Linkable;
     for (_, m) in &linker.modules {
         result.push(CompletionItem {
             label: m.link_info.name.to_string(),
@@ -241,14 +240,14 @@ fn gather_completions(linker: &Linker, file_id: FileUUID, position: usize) -> Ve
     }
     for (_, c) in &linker.constants {
         result.push(CompletionItem {
-            label: c.get_name().to_string(),
+            label: c.link_info.name.to_string(),
             kind: Some(CompletionItemKind::CONSTANT),
             ..Default::default()
         });
     }
     for (_, t) in &linker.types {
         result.push(CompletionItem {
-            label: t.get_name().to_string(),
+            label: t.link_info.name.to_string(),
             kind: Some(CompletionItemKind::STRUCT),
             ..Default::default()
         });
@@ -397,9 +396,8 @@ fn handle_request(
                         goto_definition_list.push((template_arg.name_span, link_info.file))
                     }
                     LocationInfo::Global(id) => {
-                        if let Some(link_info) = linker.get_link_info(id) {
-                            goto_definition_list.push((link_info.name_span, link_info.file));
-                        }
+                        let link_info = linker.get_link_info(id);
+                        goto_definition_list.push((link_info.name_span, link_info.file));
                     }
                     LocationInfo::Port(_sm, md, port_id) => {
                         goto_definition_list.push((md.ports[port_id].name_span, md.link_info.file));

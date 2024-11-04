@@ -190,9 +190,15 @@ impl core::fmt::Display for BinaryOperator {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GenerativeKind {
+    PlainGenerative,
+    ForLoopGenerative
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DeclarationContext {
     IO{is_input : bool},
-    ForLoopGenerative,
+    Generative(GenerativeKind),
     TemplateGenerative(TemplateID),
     PlainWire,
     StructField
@@ -235,7 +241,7 @@ struct FlatteningContext<'l, 'errs> {
     default_declaration_context: DeclarationContext
 }
 
-impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
+impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     fn flatten_template_inputs(&mut self, cursor: &mut Cursor) {
         let mut template_inputs_to_visit = self.working_on_link_info.template_arguments.id_range().into_iter();
         if cursor.optional_field(field!("template_declaration_arguments")) {
@@ -583,9 +589,9 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                     }
                     DeclarationPortInfo::RegularPort { is_input, port_id: PortID::PLACEHOLDER }
                 }
-                DeclarationContext::ForLoopGenerative => {
+                DeclarationContext::Generative(_) => {
                     if let Some((_, io_span)) = io_kw {
-                        self.errors.error(io_span, "Cannot declare 'input' or 'output' to the iterator of a for loop");
+                        self.errors.error(io_span, "Cannot declare 'input' or 'output' to declarations in a generative context");
                     }
                     DeclarationPortInfo::NotPort
                 }
@@ -635,7 +641,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                         }
                     }
                 }
-                DeclarationContext::ForLoopGenerative | DeclarationContext::TemplateGenerative(_) => {
+                DeclarationContext::Generative(_) | DeclarationContext::TemplateGenerative(_) => {
                     if let Some((_, modifier_span)) = declaration_modifiers {
                         self.errors.error(modifier_span, "Cannot add modifiers to implicitly generative declarations");
                     }
@@ -1282,7 +1288,7 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
                 cursor.go_down_no_check(|cursor| {
                     let loop_var_decl_frame = self.local_variable_context.new_frame();
                     cursor.field(field!("for_decl"));
-                    let loop_var_decl = self.flatten_declaration::<false>(DeclarationContext::ForLoopGenerative, true, true, cursor);
+                    let loop_var_decl = self.flatten_declaration::<false>(DeclarationContext::Generative(GenerativeKind::ForLoopGenerative), true, true, cursor);
 
                     cursor.field(field!("from"));
                     let (start, start_is_generative) = self.flatten_expr(cursor);
@@ -1467,14 +1473,38 @@ impl<'l, 'errs : 'l> FlatteningContext<'l, 'errs> {
         let _ = cursor.optional_field(field!("extern_marker"));
         // Skip because we know this from initialization. 
         cursor.field(field!("object_type"));
+
+        // We parse this one a bit strangely. Just because visually it looks nicer to have the template arguments after
+        // const int[SIZE] range #(int SIZE) {}
+        let const_type_cursor = (cursor.kind() == kind!("const_and_type")).then(|| cursor.clone());
         
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
         self.flatten_template_inputs(cursor);
         let module_name = &self.globals.file_data.file_text[name_span];
         println!("TREE SITTER module! {module_name}");
-        // Interface is allocated in self
-        if cursor.optional_field(field!("interface_ports")) {
-            self.flatten_interface_ports(cursor);
+
+        if let Some(mut const_type_cursor) = const_type_cursor {
+            let decl_span = const_type_cursor.span();
+            const_type_cursor.go_down(kind!("const_and_type"), |const_type_cursor| {
+                const_type_cursor.field(field!("const_type"));
+                let typ_expr = self.flatten_type(const_type_cursor);
+                let module_output_decl = self.instructions.alloc(Instruction::Declaration(Declaration{
+                    typ_expr,
+                    typ: self.type_alloc.alloc_unset_type(DomainAllocOption::Generative),
+                    decl_span,
+                    name_span,
+                    name: module_name.to_string(),
+                    declaration_runtime_depth: OnceCell::new(),
+                    read_only: false,
+                    declaration_itself_is_not_written_to: true,
+                    is_port: DeclarationPortInfo::NotPort,
+                    identifier_type: IdentifierType::Generative,
+                    latency_specifier: None,
+                    documentation: const_type_cursor.extract_gathered_comments(),
+                }));
+
+                self.alloc_local_name(name_span, NamedLocal::Declaration(module_output_decl));
+            });
         }
 
         cursor.field(field!("block"));
@@ -1511,7 +1541,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                         (UUIDRange::empty().into_iter(), typ.fields.id_range().into_iter(), DeclarationContext::StructField)
                     }
                     NameElem::Constant(const_uuid) => {
-                        todo!("TODO Constant flattening")
+                        (UUIDRange::empty().into_iter(), UUIDRange::empty().into_iter(), DeclarationContext::Generative(GenerativeKind::PlainGenerative))
                     }
                 };
 
@@ -1521,7 +1551,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                     fields_to_visit,
                     default_declaration_context,
                     errors: &globals.errors,
-                    working_on_link_info: linker.get_link_info(global_obj).unwrap(),
+                    working_on_link_info: linker.get_link_info(global_obj),
                     instructions: FlatAlloc::new(),
                     type_alloc: TypingAllocator { type_variable_alloc: UUIDAllocator::new(), domain_variable_alloc: UUIDAllocator::new() },
                     named_domain_alloc: UUIDAllocator::new(),
@@ -1600,7 +1630,15 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                         &mut typ.link_info
                     }
                     NameElem::Constant(const_uuid) => {
-                        todo!("TODO Constant flattening")
+                        let cst = &mut linker.constants[const_uuid];
+
+                        cst.output_decl = instructions.iter().find(|(_decl_id, instr)| {
+                            if let Instruction::Declaration(decl) = instr {
+                                decl.name_span == cst.link_info.name_span
+                            } else {false}
+                        }).unwrap().0;
+
+                        &mut cst.link_info
                     }
                 };
 

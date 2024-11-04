@@ -18,7 +18,6 @@ use std::{
     ops::Index,
 };
 
-use crate::linker::Linkable;
 use std::fmt::Write;
 use std::ops::Deref;
 
@@ -53,7 +52,7 @@ impl WrittenType {
         match self {
             WrittenType::Error(_) => "{error}".to_owned(),
             WrittenType::TemplateVariable(_, id) => template_names.get_template_name(*id).to_owned(),
-            WrittenType::Named(named_type) => linker_types[named_type.id].get_full_name(),
+            WrittenType::Named(named_type) => linker_types[named_type.id].link_info.get_full_name(),
             WrittenType::Array(_, sub) => {
                 sub.deref().0.to_string(linker_types, template_names) + "[]"
             }
@@ -74,7 +73,7 @@ impl AbstractType {
             AbstractType::Error => "{error}".to_owned(),
             AbstractType::Unknown(id) => format!("{id:?}"),
             AbstractType::Template(id) => template_names.get_template_name(*id).to_owned(),
-            AbstractType::Named(id) => linker_types[*id].get_full_name(),
+            AbstractType::Named(id) => linker_types[*id].link_info.get_full_name(),
             AbstractType::Array(sub) => sub.deref().to_string(linker_types, template_names) + "[]",
         }
     }
@@ -86,7 +85,7 @@ impl ConcreteType {
         linker_types: &TypVec,
     ) -> String {
         match self {
-            ConcreteType::Named(name) => linker_types[*name].get_full_name(),
+            ConcreteType::Named(name) => linker_types[*name].link_info.get_full_name(),
             ConcreteType::Array(arr_box) => {
                 let (elem_typ, arr_size) = arr_box.deref();
                 format!(

@@ -12,7 +12,7 @@ use num::BigInt;
 
 use crate::flattening::*;
 use crate::value::{compute_binary_op, compute_unary_op, TypedValue, Value};
-use crate::{linker::NamedConstant, util::add_to_small_set};
+use crate::util::add_to_small_set;
 
 use crate::typing::{
     abstract_type::DomainType,
@@ -203,9 +203,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 SubModuleOrWire::SubModule(_) => unreachable!(),
                 SubModuleOrWire::Unnasigned => unreachable!(),
             },
-            WireReferenceRoot::NamedConstant(cst, _) => {
-                let NamedConstant::Builtin { name: _, val } = &self.linker.constants[*cst];
-                RealWireRefRoot::Constant(val.clone())
+            WireReferenceRoot::NamedConstant(cst_id, _) => {
+                let cst = &self.linker.constants[*cst_id];
+                RealWireRefRoot::Constant(cst.val.clone())
             }
             WireReferenceRoot::SubModulePort(port) => {
                 return self.instantiate_port_wire_ref_root(

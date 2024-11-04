@@ -178,6 +178,12 @@ impl TypedValue {
             value: Value::Integer(i),
         }
     }
+    pub fn make_placeholder() -> Self {
+        Self {
+            typ: ConcreteType::Error,
+            value: Value::Error
+        }
+    }
     /// panics if the value can't be typed.
     pub fn from_value(value: Value) -> Self {
         Self {

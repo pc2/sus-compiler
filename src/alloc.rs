@@ -285,6 +285,9 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
         self.data.clear();
         self.free_slots.clear();
     }
+    pub fn is_empty(&self) -> bool {
+        self.data.len() == self.free_slots.len()
+    }
     pub fn iter<'a>(&'a self) -> FlatOptionIterator<'a, T, IndexMarker> {
         self.into_iter()
     }

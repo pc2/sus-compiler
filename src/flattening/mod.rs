@@ -30,7 +30,7 @@ use crate::typing::{
 #[derive(Debug)]
 pub enum GlobalObjectKind {
     Module,
-    Function,
+    Const,
     Struct
 }
 

@@ -6,7 +6,7 @@ use crate::typing::type_inference::{FailedUnification, HindleyMilner};
 
 use crate::debug::SpanDebugger;
 use crate::linker::{
-    GlobalResolver, Linkable, NameElem, AFTER_TYPECHECK_CP
+    GlobalResolver, NameElem, AFTER_TYPECHECK_CP
 };
 
 use crate::typing::{
@@ -112,19 +112,19 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     fn get_wire_ref_declaration_point(
         &self,
         wire_ref_root: &WireReferenceRoot,
-    ) -> Option<SpanFile> {
+    ) -> SpanFile {
         match wire_ref_root {
             WireReferenceRoot::LocalDecl(id, _) => {
                 let decl_root = self.working_on.instructions[*id].unwrap_wire_declaration();
-                Some((decl_root.decl_span, self.errors.file))
+                (decl_root.decl_span, self.errors.file)
             }
             WireReferenceRoot::NamedConstant(cst, _) => {
                 let linker_cst = &self.globals[*cst];
-                linker_cst.get_span_file()
+                linker_cst.link_info.get_span_file()
             }
             WireReferenceRoot::SubModulePort(port) => {
                 let (decl, file) = self.get_decl_of_module_port(port.port, port.submodule_decl);
-                Some((decl.decl_span, file))
+                (decl.decl_span, file)
             }
         }
     }

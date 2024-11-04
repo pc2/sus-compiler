@@ -20,6 +20,8 @@ TREE SITTER module! IntToBits
 TREE SITTER module! BitsToInt
 TREE SITTER module! bool
 TREE SITTER module! int
+TREE SITTER module! true
+TREE SITTER module! false
 TREE SITTER module! example_md
 TREE SITTER module! multiply_add
 TREE SITTER module! test_pow17

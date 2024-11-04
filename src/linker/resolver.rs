@@ -47,7 +47,7 @@ pub struct GlobalResolver<'linker> {
 
 impl<'linker> GlobalResolver<'linker> {
     pub fn take_errors_globals(linker: &mut Linker, global_obj: NameElem) -> (ErrorStore, ResolvedGlobals) {
-        let obj_link_info = Linker::get_link_info_mut(&mut linker.modules, &mut linker.types, global_obj).unwrap();
+        let obj_link_info = Linker::get_link_info_mut(&mut linker.modules, &mut linker.types, &mut linker.constants, global_obj);
 
         let errors = obj_link_info.errors.take();
         let resolved_globals = obj_link_info.resolved_globals.take();
@@ -55,7 +55,7 @@ impl<'linker> GlobalResolver<'linker> {
         (errors, resolved_globals)
     }
     pub fn new(linker: &'linker Linker, global_obj: NameElem, errors_globals: (ErrorStore, ResolvedGlobals)) -> Self {
-        let obj_link_info = linker.get_link_info(global_obj).unwrap();
+        let obj_link_info = linker.get_link_info(global_obj);
 
         let file_data = &linker.files[obj_link_info.file];
 
@@ -91,18 +91,10 @@ impl<'linker> GlobalResolver<'linker> {
 
                 for collider_global in coll.iter() {
                     let err_loc = self.linker.get_linking_error_location(*collider_global);
-                    if let Some(span_file) = err_loc.location {
-                        err_ref.info(
-                            span_file,
-                            format!("{} {} declared here", err_loc.named_type, err_loc.full_name),
-                        );
-                    } else {
-                        // Kinda hacky, point the 'builtin' back to the declaration location because builtins don't have a location
-                        err_ref.info_same_file(
-                            name_span,
-                            format!("{} {}", err_loc.named_type, err_loc.full_name),
-                        );
-                    }
+                    err_ref.info(
+                        err_loc.location,
+                        format!("{} {} declared here", err_loc.named_type, err_loc.full_name),
+                    );
                 }
 
                 None
@@ -134,9 +126,7 @@ impl<'linker> GlobalResolver<'linker> {
             global_ref.total_span,
             format!("{name} is not a {expected}, it is a {global_type} instead!"),
         );
-        if let Some(span_file) = info.location {
-            err_ref.info(span_file, "Defined here");
-        }
+        err_ref.info(info.location, "Defined here");
     }
 }
 

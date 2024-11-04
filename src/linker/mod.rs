@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{flattening::Instruction, prelude::*};
 
 pub mod checkpoint;
 mod resolver;
@@ -45,7 +45,6 @@ pub const fn get_builtin_type(name: &'static str) -> TypeUUID {
     }
 }
 
-#[allow(dead_code)]
 pub const fn get_builtin_constant(name: &'static str) -> ConstantUUID {
     if let Some(is_constant) = const_str_position_in_tuples(name, &BUILTIN_CONSTANTS) {
         ConstantUUID::from_hidden_value(is_constant)
@@ -118,38 +117,27 @@ impl LinkInfo {
         format!("::{}", self.name)
     }
     pub fn get_span_file(&self) -> SpanFile {
-        (self.span, self.file)
+        (self.name_span, self.file)
     }
 }
 
 pub struct LinkingErrorLocation {
     pub named_type: &'static str,
     pub full_name: String,
-    pub location: Option<SpanFile>,
-}
-
-pub trait Linkable {
-    fn get_name(&self) -> &str;
-    fn get_full_name(&self) -> String {
-        format!("::{}", self.get_name())
-    }
-    fn get_linking_error_location(&self) -> LinkingErrorLocation;
-    fn get_link_info(&self) -> Option<&LinkInfo>;
-    fn get_span_file(&self) -> Option<SpanFile> {
-        self.get_link_info().map(|l| (l.span, l.file))
-    }
+    pub location: SpanFile,
 }
 
 #[derive(Debug)]
-pub enum NamedConstant {
-    Builtin { name: &'static str, val: TypedValue },
+pub struct NamedConstant {
+    pub link_info: LinkInfo,
+    pub instructions: FlatAlloc<Instruction, FlatIDMarker>,
+    pub output_decl: FlatID,
+    pub val: TypedValue
 }
 
 impl NamedConstant {
     pub fn get_concrete_type(&self) -> &ConcreteType {
-        match self {
-            NamedConstant::Builtin { name: _, val } => &val.typ,
-        }
+        &self.val.typ
     }
     pub fn get_full_type(&self) -> FullType {
         FullType {
@@ -158,45 +146,7 @@ impl NamedConstant {
         }
     }
     pub fn get_value(&self) -> &TypedValue {
-        match self {
-            NamedConstant::Builtin { name: _, val } => &val,
-        }
-    }
-}
-
-impl Linkable for NamedConstant {
-    fn get_name(&self) -> &'static str {
-        match self {
-            NamedConstant::Builtin { name, val: _ } => name,
-        }
-    }
-    fn get_linking_error_location(&self) -> LinkingErrorLocation {
-        LinkingErrorLocation {
-            named_type: "Builtin Constant",
-            full_name: self.get_full_name(),
-            location: None,
-        }
-    }
-    fn get_link_info(&self) -> Option<&LinkInfo> {
-        match self {
-            NamedConstant::Builtin { name: _, val: _ } => None,
-        }
-    }
-}
-
-impl Linkable for StructType {
-    fn get_name(&self) -> &str {
-        &self.link_info.name
-    }
-    fn get_linking_error_location(&self) -> LinkingErrorLocation {
-        LinkingErrorLocation {
-            named_type: "Struct",
-            full_name: self.link_info.get_full_name(),
-            location: Some((self.link_info.name_span, self.link_info.file)),
-        }
-    }
-    fn get_link_info(&self) -> Option<&LinkInfo> {
-        Some(&self.link_info)
+        &self.val
     }
 }
 
@@ -250,105 +200,71 @@ pub struct Linker {
 
 impl Linker {
     pub fn new() -> Linker {
-        let mut result = Linker {
+        Linker {
             types: ArenaAllocator::new(),
             modules: ArenaAllocator::new(),
             constants: ArenaAllocator::new(),
             files: ArenaAllocator::new(),
             global_namespace: HashMap::new(),
-        };
-
-        fn add_known_unique_name(result: &mut Linker, name: String, new_obj_id: NameElem) {
-            let already_exisits = result
-                .global_namespace
-                .insert(name.into(), NamespaceElement::Global(new_obj_id));
-            assert!(already_exisits.is_none());
         }
-
-        for (name, val) in BUILTIN_CONSTANTS {
-            let id = result.constants.alloc(NamedConstant::Builtin {
-                name,
-                val: TypedValue::from_value(val),
-            });
-            add_known_unique_name(&mut result, name.into(), NameElem::Constant(id));
-        }
-
-        result
     }
 
-    pub fn get_link_info(&self, global: NameElem) -> Option<&LinkInfo> {
+    pub fn get_link_info(&self, global: NameElem) -> &LinkInfo {
         match global {
-            NameElem::Module(md_id) => Some(&self.modules[md_id].link_info),
-            NameElem::Type(typ_id) => Some(&self.types[typ_id].link_info),
-            NameElem::Constant(_) => {
-                None // Can't define constants yet
-            }
+            NameElem::Module(md_id) => &self.modules[md_id].link_info,
+            NameElem::Type(typ_id) => &self.types[typ_id].link_info,
+            NameElem::Constant(cst_id) => &self.constants[cst_id].link_info
         }
     }
     pub fn get_link_info_mut<'l>(
         modules: &'l mut ArenaAllocator<Module, ModuleUUIDMarker>,
         types: &'l mut ArenaAllocator<StructType, TypeUUIDMarker>,
+        constants: &'l mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
         global: NameElem
-    ) -> Option<&'l mut LinkInfo> {
+    ) -> &'l mut LinkInfo {
         match global {
-            NameElem::Module(md_id) => Some(&mut modules[md_id].link_info),
-            NameElem::Type(typ_id) => Some(&mut types[typ_id].link_info),
-            NameElem::Constant(_) => {
-                None // Can't define constants yet
-            }
+            NameElem::Module(md_id) => &mut modules[md_id].link_info,
+            NameElem::Type(typ_id) => &mut types[typ_id].link_info,
+            NameElem::Constant(cst_id) => &mut constants[cst_id].link_info
         }
     }
     pub fn get_full_name(&self, global: NameElem) -> String {
         match global {
             NameElem::Module(id) => self.modules[id].link_info.get_full_name(),
-            NameElem::Type(id) => self.types[id].get_full_name(),
-            NameElem::Constant(id) => self.constants[id].get_full_name(),
+            NameElem::Type(id) => self.types[id].link_info.get_full_name(),
+            NameElem::Constant(id) => self.constants[id].link_info.get_full_name(),
         }
     }
     fn get_linking_error_location(&self, global: NameElem) -> LinkingErrorLocation {
-        match global {
-            NameElem::Module(id) => {
-                let md = &self.modules[id];
-                LinkingErrorLocation {
-                    named_type: "Module",
-                    full_name: md.link_info.get_full_name(),
-                    location: Some((md.link_info.name_span, md.link_info.file)),
-                }
-            }
-            NameElem::Type(id) => self.types[id].get_linking_error_location(),
-            NameElem::Constant(id) => self.constants[id].get_linking_error_location(),
+        let named_type = match global {
+            NameElem::Module(_) => "Module",
+            NameElem::Type(_) => "Struct",
+            NameElem::Constant(_) => "Constant"
+        };
+        let link_info = self.get_link_info(global);
+        LinkingErrorLocation {
+            named_type,
+            full_name: link_info.get_full_name(),
+            location: link_info.get_span_file(),
         }
     }
-    fn for_all_duplicate_declaration_errors<F: FnMut(&CompileError)>(
-        &self,
-        file_uuid: FileUUID,
-        f: &mut F,
-    ) {
+    fn for_all_duplicate_declaration_errors<F: FnMut(&CompileError)>(&self, file_uuid: FileUUID, f: &mut F) {
         // Conflicting Declarations
         for item in &self.global_namespace {
             let NamespaceElement::Colission(colission) = &item.1 else {
                 continue;
             };
-            let infos: Vec<Option<&LinkInfo>> =
+            let infos: Vec<&LinkInfo> =
                 colission.iter().map(|id| self.get_link_info(*id)).collect();
 
             for (idx, info) in infos.iter().enumerate() {
-                let Some(info) = info else { continue }; // Is not a builtin
-                if info.file != file_uuid {
-                    continue;
-                } // Not for this file
+                if info.file != file_uuid {continue}
                 let mut conflict_infos = Vec::new();
-                let mut builtin_conflict = false;
                 for (idx_2, conflicts_with) in infos.iter().enumerate() {
                     if idx_2 == idx {
                         continue;
                     }
-                    if let Some(conflicts_with) = conflicts_with {
-                        conflict_infos.push(conflicts_with);
-                    } else {
-                        assert!(!builtin_conflict);
-                        builtin_conflict = true;
-                    }
+                    conflict_infos.push(conflicts_with);
                 }
                 let this_object_name = &info.name;
                 let infos = conflict_infos
@@ -359,11 +275,9 @@ impl Linker {
                         info: "Conflicts with".to_owned(),
                     })
                     .collect();
-                let reason = if builtin_conflict {
-                    format!("Cannot redeclare the builtin '{this_object_name}'")
-                } else {
-                    format!("'{this_object_name}' conflicts with other declarations:")
-                };
+
+                let reason = format!("'{this_object_name}' conflicts with other declarations:");
+                
                 f(&CompileError {
                     position: info.name_span,
                     reason,
@@ -481,9 +395,7 @@ pub struct FileBuilder<'linker> {
     associated_values: &'linker mut Vec<NameElem>,
     global_namespace: &'linker mut HashMap<String, NamespaceElement>,
     modules: &'linker mut ArenaAllocator<Module, ModuleUUIDMarker>,
-    #[allow(dead_code)]
     types: &'linker mut ArenaAllocator<StructType, TypeUUIDMarker>,
-    #[allow(dead_code)]
     constants: &'linker mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
 }
 
@@ -520,5 +432,12 @@ impl<'linker> FileBuilder<'linker> {
         let new_type_uuid = NameElem::Type(self.types.alloc(typ));
         self.associated_values.push(new_type_uuid);
         self.add_name(type_name, new_type_uuid);
+    }
+
+    pub fn add_const(&mut self, cst: NamedConstant) {
+        let const_name = cst.link_info.name.clone();
+        let new_const_uuid = NameElem::Constant(self.constants.alloc(cst));
+        self.associated_values.push(new_const_uuid);
+        self.add_name(const_name, new_const_uuid);
     }
 }

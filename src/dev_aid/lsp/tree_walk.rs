@@ -216,7 +216,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
         let target_name_elem = NameElem::from(global.id);
         self.visit(global.total_span, LocationInfo::Global(target_name_elem));
         for (id, template_arg) in global.template_args.iter_valids() {
-            let target_link_info = self.linker.get_link_info(target_name_elem).unwrap();
+            let target_link_info = self.linker.get_link_info(target_name_elem);
             self.visit(
                 template_arg.name_span,
                 LocationInfo::TemplateInput(
@@ -442,6 +442,15 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
         }
     }
 
+    fn walk_constant(&mut self, cst_id: ConstantUUID) {
+        let cst = &self.linker.constants[cst_id];
+        if !(self.should_prune)(cst.link_info.span) {
+            self.walk_name_and_template_arguments(NameElem::Constant(cst_id), &cst.link_info);
+
+            println!("TODO constant instructions")
+        }
+    }
+
     fn walk_file(&mut self, file: &'linker FileData) {
         for global in &file.associated_values {
             match *global {
@@ -451,8 +460,8 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                 NameElem::Type(typ_id) => {
                     self.walk_struct(typ_id);
                 }
-                NameElem::Constant(_) => {
-                    todo!()
+                NameElem::Constant(cst_id) => {
+                    self.walk_constant(cst_id);
                 }
             }
         }

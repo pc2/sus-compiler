@@ -31,6 +31,7 @@ fn print_current_node_indented<'ft>(file_text: &'ft FileText, cursor: &TreeCurso
     node_name
 }
 
+#[derive(Clone)]
 pub struct Cursor<'t> {
     cursor: TreeCursor<'t>,
     file_text: &'t FileText,

@@ -19,10 +19,15 @@ __builtin__ module BitsToInt {
     interface IntToBits : bool[32] bits'0 -> int value'0
 }
 
-// For now these two must be in this order, because they're constants in the code. 
+// For now these builtin declarations must be in this order, because they're constants in the code. 
+// We'll get a better system for this at some point
 
+// The decider of truth and falsity
 __builtin__ struct bool {}
-
+// An integer of variable size. Right now it's not implemented yet, so this is just a 32-bit int. 
 __builtin__ struct int {}
 
-
+// True, as in '1'
+__builtin__ const bool true {}
+// False, as in '0'
+__builtin__ const bool false {}
