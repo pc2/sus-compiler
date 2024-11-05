@@ -105,6 +105,7 @@ impl TypeUnifier {
         self.type_substitutor.alloc()
     }
 
+    #[allow(dead_code)]
     pub fn alloc_domain_variable(&self) -> DomainVariableID {
         self.domain_substitutor.alloc()
     }

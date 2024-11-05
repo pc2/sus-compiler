@@ -251,10 +251,10 @@ impl WireReferencePathElement {
 }
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub enum WireReferenceRoot {
     LocalDecl(FlatID, Span),
-    NamedConstant(ConstantUUID, Span),
+    NamedConstant(GlobalReference<ConstantUUID>, Span),
     SubModulePort(PortInfo),
 }
 

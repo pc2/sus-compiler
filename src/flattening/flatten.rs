@@ -991,7 +991,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     }
                 },
                 LocalOrGlobal::Constant(cst_ref) => {
-                    let root = WireReferenceRoot::NamedConstant(cst_ref.id, expr_span); // TODO Constants with templates
+                    let root = WireReferenceRoot::NamedConstant(cst_ref, expr_span);
                     PartialWireReference::WireReference(WireReference {
                         root,
                         is_generative: true,

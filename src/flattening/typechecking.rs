@@ -111,7 +111,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 (decl_root.decl_span, self.errors.file)
             }
             WireReferenceRoot::NamedConstant(cst, _) => {
-                let linker_cst = &self.globals[*cst];
+                let linker_cst = &self.globals[cst.id];
                 linker_cst.link_info.get_span_file()
             }
             WireReferenceRoot::SubModulePort(port) => {
@@ -143,8 +143,14 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 decl_root.typ.clone()
             }
             WireReferenceRoot::NamedConstant(cst, _) => {
-                let linker_cst = &self.globals[*cst];
-                linker_cst.get_full_type()
+                let linker_cst = &self.globals[cst.id];
+                let decl = linker_cst.link_info.instructions[linker_cst.output_decl].unwrap_wire_declaration();
+                let typ = AbstractType::Unknown(self.type_checker.alloc_typ_variable());
+                self.type_checker.unify_with_written_type_substitute_templates_must_succeed(&decl.typ_expr, &typ, &cst.template_arg_types);
+                FullType {
+                    typ,
+                    domain: DomainType::Generative
+                }
             }
             WireReferenceRoot::SubModulePort(port) => {
                 self.get_type_of_port(port.port, port.submodule_decl)

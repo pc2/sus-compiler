@@ -3,8 +3,6 @@ use crate::prelude::*;
 
 use std::ops::{Deref, Index};
 
-use super::abstract_type::AbstractType;
-use super::type_inference::TypeVariableID;
 use crate::linker::get_builtin_type;
 use crate::{
     flattening::{BinaryOperator, UnaryOperator},
@@ -21,24 +19,6 @@ pub enum ConcreteType {
     Array(Box<(ConcreteType, ConcreteType)>),
     Unknown,
     Error,
-}
-
-impl Into<AbstractType> for &ConcreteType {
-    fn into(self) -> AbstractType {
-        match self {
-            ConcreteType::Named(name) => AbstractType::Named(*name),
-            ConcreteType::Value(_) => {
-                unreachable!("Turning a ConcreteType::Value into an AbstractType");
-            }
-            ConcreteType::Array(arr) => {
-                let (sub, _sz) = arr.deref();
-                let concrete_sub: AbstractType = sub.into();
-                AbstractType::Array(Box::new(concrete_sub))
-            }
-            ConcreteType::Unknown => AbstractType::Unknown(TypeVariableID::PLACEHOLDER),
-            ConcreteType::Error => AbstractType::Error,
-        }
-    }
 }
 
 /// Panics on Type Errors that should have been caught by [AbstractType]

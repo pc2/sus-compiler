@@ -24,11 +24,7 @@ use crate::errors::{CompileError, ErrorInfo, ErrorLevel, ErrorStore};
 
 use crate::flattening::{StructType, TypingAllocator};
 
-use crate::typing::{
-    abstract_type::{DomainType, FullType},
-    concrete_type::ConcreteType,
-    template::TemplateInputs,
-};
+use crate::typing::template::TemplateInputs;
 
 use self::checkpoint::CheckPoint;
 
@@ -138,15 +134,6 @@ pub struct NamedConstant {
 }
 
 impl NamedConstant {
-    pub fn get_concrete_type(&self) -> &ConcreteType {
-        &self.val.typ
-    }
-    pub fn get_full_type(&self) -> FullType {
-        FullType {
-            typ: self.get_concrete_type().into(),
-            domain: DomainType::Generative,
-        }
-    }
     pub fn get_value(&self) -> &TypedValue {
         &self.val
     }

@@ -254,7 +254,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                 );
             }
             WireReferenceRoot::NamedConstant(cst, span) => {
-                self.visit(*span, LocationInfo::Global(NameElem::Constant(*cst)))
+                self.visit(*span, LocationInfo::Global(NameElem::Constant(cst.id)))
             }
             WireReferenceRoot::SubModulePort(port) => {
                 if let Some(span) = port.port_name_span {
