@@ -1,4 +1,4 @@
-use crate::{flattening::Instruction, prelude::*};
+use crate::{flattening::Instruction, prelude::*, typing::template::{GenerativeTemplateInputKind, TemplateInputKind, TypeTemplateInputKind}};
 
 pub mod checkpoint;
 mod resolver;
@@ -118,6 +118,26 @@ impl LinkInfo {
     pub fn get_span_file(&self) -> SpanFile {
         (self.name_span, self.file)
     }
+    pub fn get_full_name_and_template_args(&self, file_text: &FileText) -> String {
+        let mut template_args: Vec<&str> = Vec::new();
+        for (_id, t) in &self.template_arguments {
+            match &t.kind {
+                TemplateInputKind::Type(TypeTemplateInputKind {  }) => {
+                    template_args.push(&t.name)
+                }
+                TemplateInputKind::Generative(GenerativeTemplateInputKind {
+                    decl_span,
+                    declaration_instruction: _,
+                }) => template_args.push(&file_text[*decl_span])
+            }
+        }
+
+        format!(
+            "{} #({})",
+            self.get_full_name(),
+            template_args.join(", ")
+        )
+    }
 }
 
 pub struct LinkingErrorLocation {
@@ -215,13 +235,6 @@ impl Linker {
             NameElem::Module(md_id) => &mut modules[md_id].link_info,
             NameElem::Type(typ_id) => &mut types[typ_id].link_info,
             NameElem::Constant(cst_id) => &mut constants[cst_id].link_info
-        }
-    }
-    pub fn get_full_name(&self, global: NameElem) -> String {
-        match global {
-            NameElem::Module(id) => self.modules[id].link_info.get_full_name(),
-            NameElem::Type(id) => self.types[id].link_info.get_full_name(),
-            NameElem::Constant(id) => self.constants[id].link_info.get_full_name(),
         }
     }
     fn get_linking_error_location(&self, global: NameElem) -> LinkingErrorLocation {

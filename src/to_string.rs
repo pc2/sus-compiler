@@ -8,8 +8,7 @@ use crate::typing::{
     abstract_type::{AbstractType, DomainType},
     concrete_type::ConcreteType,
     template::{
-        ConcreteTemplateArg, ConcreteTemplateArgs, GenerativeTemplateInputKind, TemplateInputKind,
-        TemplateInputs, TypeTemplateInputKind,
+        ConcreteTemplateArg, ConcreteTemplateArgs, TemplateInputs,
     },
 };
 
@@ -176,26 +175,8 @@ impl Module {
         file_text: &FileText,
         local_domains: Option<InterfaceToDomainMap>,
     ) -> String {
-        use std::fmt::Write;
-
-        let mut template_args: Vec<&str> = Vec::new();
-        for (_id, t) in &self.link_info.template_arguments {
-            match &t.kind {
-                TemplateInputKind::Type(TypeTemplateInputKind {  }) => {
-                    template_args.push(&t.name)
-                }
-                TemplateInputKind::Generative(GenerativeTemplateInputKind {
-                    decl_span,
-                    declaration_instruction: _,
-                }) => template_args.push(&file_text[*decl_span])
-            }
-        }
-
-        let mut result = format!(
-            "module {} #({}):\n",
-            self.link_info.get_full_name(),
-            template_args.join(", ")
-        );
+        let full_name_with_args = self.link_info.get_full_name_and_template_args(file_text);
+        let mut result = format!("module {full_name_with_args}:\n");
 
         for (domain_id, domain) in &self.domains {
             if let Some(domain_map) = &local_domains {

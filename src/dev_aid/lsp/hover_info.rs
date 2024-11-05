@@ -204,7 +204,8 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
         LocationInfo::Global(global) => {
             let link_info = linker.get_link_info(global);
             hover.documentation_link_info(link_info);
-            hover.sus_code(format!("{}", linker.get_full_name(global)));
+            let file = &linker.files[link_info.file];
+            hover.sus_code(format!("{}", link_info.get_full_name_and_template_args(&file.file_text)));
             match global {
                 NameElem::Module(md_uuid) => {
                     let md = &linker.modules[md_uuid];
