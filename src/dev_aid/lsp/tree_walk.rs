@@ -214,7 +214,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
         NameElem: From<ID>,
     {
         let target_name_elem = NameElem::from(global.id);
-        self.visit(global.total_span, LocationInfo::Global(target_name_elem));
+        self.visit(global.name_span, LocationInfo::Global(target_name_elem));
         for (id, template_arg) in global.template_args.iter_valids() {
             let target_link_info = self.linker.get_link_info(target_name_elem);
             self.visit(
@@ -253,8 +253,8 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                     ),
                 );
             }
-            WireReferenceRoot::NamedConstant(cst, span) => {
-                self.visit(*span, LocationInfo::Global(NameElem::Constant(cst.id)))
+            WireReferenceRoot::NamedConstant(cst) => {
+                self.walk_global_reference(NameElem::Module(md_id), &md.link_info, cst);
             }
             WireReferenceRoot::SubModulePort(port) => {
                 if let Some(span) = port.port_name_span {

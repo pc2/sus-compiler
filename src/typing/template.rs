@@ -5,11 +5,21 @@ use crate::{flattening::WrittenType, linker::LinkInfo, value::TypedValue};
 
 #[derive(Debug)]
 pub struct GlobalReference<ID> {
-    pub total_span: Span,
+    pub name_span: Span,
     pub id: ID,
     pub template_args: TemplateArgs,
     pub template_arg_types: TemplateAbstractTypes,
     pub template_span: Option<BracketSpan>,
+}
+
+impl<ID> GlobalReference<ID> {
+    pub fn get_total_span(&self) -> Span {
+        let mut result = self.name_span;
+        if let Some(template_span) = self.template_span {
+            result = Span::new_overarching(result, template_span.outer_span());
+        }
+        result
+    }
 }
 
 #[derive(Debug)]

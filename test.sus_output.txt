@@ -104,6 +104,9 @@ TREE SITTER module! use_no_main_interface
 TREE SITTER module! moduleWithBadDeclaration
 TREE SITTER module! moduleWithBadInterface
 TREE SITTER module! useModuleWithBadInterface
+TREE SITTER module! SUM_UP
+TREE SITTER module! dont_care
+TREE SITTER module! m
 Typechecking DualPortMem
 Typechecking UseDualPortMem
 Typechecking FIFO
@@ -205,6 +208,7 @@ Typechecking use_no_main_interface
 Typechecking moduleWithBadDeclaration
 Typechecking moduleWithBadInterface
 Typechecking useModuleWithBadInterface
+Typechecking m
 Instantiating UseDualPortMem
 Instantiating submodules for UseDualPortMem
 Instantiating DualPortMem
@@ -570,3 +574,4 @@ Not Instantiating use_no_main_interface due to flattening errors
 Not Instantiating moduleWithBadDeclaration due to flattening errors
 Not Instantiating moduleWithBadInterface due to flattening errors
 Not Instantiating useModuleWithBadInterface due to flattening errors
+Not Instantiating m due to flattening errors

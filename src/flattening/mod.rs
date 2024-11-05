@@ -119,7 +119,7 @@ impl Module {
 
     pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
         match &self.link_info.instructions[instr_id] {
-            Instruction::SubModule(sm) => sm.module_ref.total_span,
+            Instruction::SubModule(sm) => sm.module_ref.get_total_span(),
             Instruction::FuncCall(fc) => fc.whole_func_span,
             Instruction::Declaration(decl) => decl.decl_span,
             Instruction::Wire(w) => w.span,
@@ -254,7 +254,7 @@ impl WireReferencePathElement {
 #[derive(Debug)]
 pub enum WireReferenceRoot {
     LocalDecl(FlatID, Span),
-    NamedConstant(GlobalReference<ConstantUUID>, Span),
+    NamedConstant(GlobalReference<ConstantUUID>),
     SubModulePort(PortInfo),
 }
 
@@ -262,7 +262,7 @@ impl WireReferenceRoot {
     pub fn get_root_flat(&self) -> Option<FlatID> {
         match self {
             WireReferenceRoot::LocalDecl(f, _) => Some(*f),
-            WireReferenceRoot::NamedConstant(_, _) => None,
+            WireReferenceRoot::NamedConstant(_) => None,
             WireReferenceRoot::SubModulePort(port) => Some(port.submodule_decl),
         }
     }
@@ -417,8 +417,8 @@ impl WrittenType {
         match self {
             WrittenType::Error(total_span)
             | WrittenType::TemplateVariable(total_span, ..)
-            | WrittenType::Named(GlobalReference { total_span, .. })
             | WrittenType::Array(total_span, _) => *total_span,
+            WrittenType::Named(global_ref) => global_ref.get_total_span()
         }
     }
 }

@@ -203,7 +203,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 SubModuleOrWire::SubModule(_) => unreachable!(),
                 SubModuleOrWire::Unnasigned => unreachable!(),
             },
-            WireReferenceRoot::NamedConstant(cst, _) => {
+            WireReferenceRoot::NamedConstant(cst) => {
                 let cst = &self.linker.constants[cst.id];
                 RealWireRefRoot::Constant(cst.val.clone())
             }
@@ -357,7 +357,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             &WireReferenceRoot::LocalDecl(decl_id, _span) => {
                 self.generation_state.get_generation_value(decl_id)?.clone()
             }
-            WireReferenceRoot::NamedConstant(cst, _span) => {
+            WireReferenceRoot::NamedConstant(cst) => {
                 self.linker.constants[cst.id].get_value().clone()
             }
             &WireReferenceRoot::SubModulePort(_) => {

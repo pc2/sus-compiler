@@ -75,14 +75,14 @@ impl<'linker> GlobalResolver<'linker> {
     }
 
     /// SAFETY: Files are never touched, and as long as this object is managed properly linker will also exist long enough.
-    pub fn resolve_global<'slf>(&'slf self, name_span: Span) -> Option<(NameElem, Span)> {
+    pub fn resolve_global<'slf>(&'slf self, name_span: Span) -> Option<NameElem> {
         let name = &self.file_data.file_text[name_span];
 
         let mut resolved_globals = self.resolved_globals.borrow_mut();
         match self.linker.global_namespace.get(name) {
             Some(NamespaceElement::Global(found)) => {
                 resolved_globals.referenced_globals.push(*found);
-                Some((*found, name_span))
+                Some(*found)
             }
             Some(NamespaceElement::Colission(coll)) => {
                 resolved_globals.all_resolved = false;
@@ -123,7 +123,7 @@ impl<'linker> GlobalResolver<'linker> {
         let name = &info.full_name;
         let global_type = info.named_type;
         let err_ref = self.errors.error(
-            global_ref.total_span,
+            global_ref.name_span,
             format!("{name} is not a {expected}, it is a {global_type} instead!"),
         );
         err_ref.info(info.location, "Defined here");

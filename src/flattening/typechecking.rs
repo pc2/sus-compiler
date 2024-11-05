@@ -110,7 +110,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 let decl_root = self.working_on.instructions[*id].unwrap_wire_declaration();
                 (decl_root.decl_span, self.errors.file)
             }
-            WireReferenceRoot::NamedConstant(cst, _) => {
+            WireReferenceRoot::NamedConstant(cst) => {
                 let linker_cst = &self.globals[cst.id];
                 linker_cst.link_info.get_span_file()
             }
@@ -142,7 +142,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 let decl_root = self.working_on.instructions[*id].unwrap_wire_declaration();
                 decl_root.typ.clone()
             }
-            WireReferenceRoot::NamedConstant(cst, _) => {
+            WireReferenceRoot::NamedConstant(cst) => {
                 let linker_cst = &self.globals[cst.id];
                 let decl = linker_cst.link_info.instructions[linker_cst.output_decl].unwrap_wire_declaration();
                 let typ = AbstractType::Unknown(self.type_checker.alloc_typ_variable());
@@ -201,9 +201,9 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
             Instruction::Wire(_) => {}
             Instruction::Write(conn) => {
-                let (decl, file) = match conn.to.root {
+                let (decl, file) = match &conn.to.root {
                     WireReferenceRoot::LocalDecl(decl_id, _) => {
-                        let decl = self.working_on.instructions[decl_id].unwrap_wire_declaration();
+                        let decl = self.working_on.instructions[*decl_id].unwrap_wire_declaration();
                         if decl.read_only {
                             self.errors
                                 .error(conn.to_span, format!("'{}' is read-only", decl.name))
@@ -211,8 +211,8 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         }
                         (decl, self.errors.file)
                     }
-                    WireReferenceRoot::NamedConstant(_, span) => {
-                        self.errors.error(span, "Cannot assign to a global");
+                    WireReferenceRoot::NamedConstant(cst) => {
+                        self.errors.error(cst.name_span, "Cannot assign to a global");
                         return;
                     }
                     WireReferenceRoot::SubModulePort(port) => {
@@ -538,17 +538,27 @@ pub fn apply_types(
     // Post type application. Solidify types and flag any remaining AbstractType::Unknown
     for (_id, inst) in working_on.link_info.instructions.iter_mut() {
         match inst {
-            Instruction::Wire(w) => type_checker.finalize_type(types, &mut w.typ, w.span, errors),
+            Instruction::Wire(w) => {
+                type_checker.finalize_type(types, &mut w.typ, w.span, errors);
+                if let WireSource::WireRef(wr) = &mut w.source {
+                    if let WireReferenceRoot::NamedConstant(cst) = &mut wr.root {
+                        type_checker.finalize_global_ref(types, cst, errors);
+                    }
+                }
+            }
             Instruction::Declaration(decl) => type_checker.finalize_type(types, &mut decl.typ, decl.name_span, errors),
-            Instruction::Write(Write { to_type, to_span, .. }) => type_checker.finalize_type(types, to_type, *to_span, errors),
+            Instruction::Write(Write { to_type, to_span, to, .. }) => {
+                type_checker.finalize_type(types, to_type, *to_span, errors);
+                if let WireReferenceRoot::NamedConstant(cst) = &mut to.root {
+                    type_checker.finalize_global_ref(types, cst, errors);
+                }
+            }
             // TODO Submodule domains may not be crossed either? 
             Instruction::SubModule(sm) => {
                 for (_domain_id_in_submodule, domain_assigned_to_it_here) in &mut sm.local_interface_domains {
                     type_checker.finalize_domain_type(domain_assigned_to_it_here);
                 }
-                for (_template_id, template_type) in &mut sm.module_ref.template_arg_types {
-                    type_checker.finalize_abstract_type(types, template_type, sm.module_ref.total_span, errors);
-                }
+                type_checker.finalize_global_ref(types, &mut sm.module_ref, errors);
             }
             _other => {}
         }

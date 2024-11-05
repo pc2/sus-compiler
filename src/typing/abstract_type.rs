@@ -4,7 +4,7 @@ use crate::value::Value;
 
 use std::ops::Deref;
 
-use super::template::{TemplateAbstractTypes, TemplateInputs};
+use super::template::{GlobalReference, TemplateAbstractTypes, TemplateInputs};
 use super::type_inference::{DomainVariableID, DomainVariableIDMarker, TypeSubstitutor, TypeVariableID, TypeVariableIDMarker};
 use crate::flattening::{BinaryOperator, StructType, TypingAllocator, UnaryOperator, WrittenType};
 use crate::linker::get_builtin_type;
@@ -341,5 +341,12 @@ impl TypeUnifier {
     pub fn finalize_type(&mut self, types: &ArenaAllocator<StructType, TypeUUIDMarker>, typ: &mut FullType, span: Span, errors: &ErrorCollector) {
         self.finalize_domain_type(&mut typ.domain);
         self.finalize_abstract_type(types, &mut typ.typ, span, errors);
+    }
+
+    pub fn finalize_global_ref<ID>(&mut self, types: &ArenaAllocator<StructType, TypeUUIDMarker>, global_ref: &mut GlobalReference<ID>, errors: &ErrorCollector) {
+        let global_ref_span = global_ref.get_total_span();
+        for (_template_id, template_type) in &mut global_ref.template_arg_types {
+            self.finalize_abstract_type(types, template_type, global_ref_span, errors);
+        }
     }
 }

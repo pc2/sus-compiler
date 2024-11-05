@@ -6,8 +6,8 @@ Warning: Unused port 'push'
     │                             ╰─── Port 'push' declared here
     │ 
  86 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──┬─                                          ┬  
-    │       ╰────────────────────────────────────────────── Unused port 'push'
+    │     ──────────────────────┬────────────────────── ┬  
+    │                           ╰────────────────────────── Unused port 'push'
     │                                                   │  
     │                                                   ╰── f declared here
 ────╯
@@ -19,8 +19,8 @@ Warning: Unused port 'data_in'
     │                                                  ╰───── Port 'data_in' declared here
     │ 
  86 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──┬─                                          ┬  
-    │       ╰────────────────────────────────────────────── Unused port 'data_in'
+    │     ──────────────────────┬────────────────────── ┬  
+    │                           ╰────────────────────────── Unused port 'data_in'
     │                                                   │  
     │                                                   ╰── f declared here
 ────╯
@@ -32,8 +32,8 @@ Warning: Unused port 'ready'
     │                   ╰──── Port 'ready' declared here
     │ 
  86 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──┬─                                          ┬  
-    │       ╰────────────────────────────────────────────── Unused port 'ready'
+    │     ──────────────────────┬────────────────────── ┬  
+    │                           ╰────────────────────────── Unused port 'ready'
     │                                                   │  
     │                                                   ╰── f declared here
 ────╯
@@ -45,8 +45,8 @@ Warning: Unused port 'pop'
     │                           ╰─── Port 'pop' declared here
     │ 
  86 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──┬─                                          ┬  
-    │       ╰────────────────────────────────────────────── Unused port 'pop'
+    │     ──────────────────────┬────────────────────── ┬  
+    │                           ╰────────────────────────── Unused port 'pop'
     │                                                   │  
     │                                                   ╰── f declared here
 ────╯
@@ -58,8 +58,8 @@ Warning: Unused port 'data_valid'
     │                                           ╰────── Port 'data_valid' declared here
     │ 
  86 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──┬─                                          ┬  
-    │       ╰────────────────────────────────────────────── Unused port 'data_valid'
+    │     ──────────────────────┬────────────────────── ┬  
+    │                           ╰────────────────────────── Unused port 'data_valid'
     │                                                   │  
     │                                                   ╰── f declared here
 ────╯
@@ -71,8 +71,8 @@ Warning: Unused port 'data_out'
     │                                                        ╰───── Port 'data_out' declared here
     │ 
  86 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──┬─                                          ┬  
-    │       ╰────────────────────────────────────────────── Unused port 'data_out'
+    │     ──────────────────────┬────────────────────── ┬  
+    │                           ╰────────────────────────── Unused port 'data_out'
     │                                                   │  
     │                                                   ╰── f declared here
 ────╯
@@ -926,8 +926,8 @@ Error: Could not fully figure out the type of this object. type_variable_12
      ╭─[test.sus:775:2]
      │
  775 │     FIFO #(BITWIDTH: 4) badoop
-     │     ──┬─  
-     │       ╰─── Could not fully figure out the type of this object. type_variable_12
+     │     ─────────┬─────────  
+     │              ╰─────────── Could not fully figure out the type of this object. type_variable_12
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:766:22]
@@ -954,8 +954,8 @@ Error: Could not fully figure out the type of this object. type_variable_1
      ╭─[test.sus:779:2]
      │
  779 │     test #(MY_INPUT: 3) test_mod
-     │     ──┬─  
-     │       ╰─── Could not fully figure out the type of this object. type_variable_1
+     │     ─────────┬─────────  
+     │              ╰─────────── Could not fully figure out the type of this object. type_variable_1
 ─────╯
 Warning: Unused port 'o'
      ╭─[test.sus:791:2]
@@ -965,8 +965,8 @@ Warning: Unused port 'o'
      │                ╰── Port 'o' declared here
      │ 
  791 │     tinyTestMod #(beep: 3) a
-     │     ─────┬─────            ┬  
-     │          ╰──────────────────── Unused port 'o'
+     │     ───────────┬────────── ┬  
+     │                ╰────────────── Unused port 'o'
      │                            │  
      │                            ╰── a declared here
 ─────╯
@@ -978,8 +978,8 @@ Warning: Unused port 'o'
      │                ╰── Port 'o' declared here
      │ 
  792 │     tinyTestMod #(beep: 4) b
-     │     ─────┬─────            ┬  
-     │          ╰──────────────────── Unused port 'o'
+     │     ───────────┬────────── ┬  
+     │                ╰────────────── Unused port 'o'
      │                            │  
      │                            ╰── b declared here
 ─────╯
@@ -991,8 +991,8 @@ Warning: Unused port 'o'
      │                ╰── Port 'o' declared here
      │ 
  793 │     tinyTestMod #(beep: 3) c
-     │     ─────┬─────            ┬  
-     │          ╰──────────────────── Unused port 'o'
+     │     ───────────┬────────── ┬  
+     │                ╰────────────── Unused port 'o'
      │                            │  
      │                            ╰── c declared here
 ─────╯
@@ -1181,4 +1181,70 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  930 │     int[3] xyz
      │            ─┬─  
      │             ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: BEEEP is not a valid template argument of ::SUM_UP
+     ╭─[test.sus:954:38]
+     │
+ 937 │ const int SUM_UP #(int SIZE, int[SIZE] DATA) {
+     │           ───┬──  
+     │              ╰──── 'SUM_UP' defined here
+     │ 
+ 954 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
+     │                                         ──┬──  
+     │                                           ╰──── BEEEP is not a valid template argument of ::SUM_UP
+─────╯
+Error: ABC is not a valid template argument of ::int
+     ╭─[test.sus:956:8]
+     │
+ 956 │     int #(ABC) x
+     │           ─┬─  
+     │            ╰─── ABC is not a valid template argument of ::int
+     │
+     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:28:20]
+     │
+  28 │ __builtin__ struct int {}
+     │                    ─┬─  
+     │                     ╰─── 'int' defined here
+─────╯
+Error: ABC does not name a Type or a Value.
+     ╭─[test.sus:956:8]
+     │
+ 956 │     int #(ABC) x
+     │           ─┬─  
+     │            ╰─── ABC does not name a Type or a Value.
+─────╯
+Error: Could not fully figure out the type of this object. type_variable_21
+     ╭─[test.sus:954:14]
+     │
+ 954 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
+     │                 ────────────────┬────────────────  
+     │                                 ╰────────────────── Could not fully figure out the type of this object. type_variable_21
+─────╯
+Error: Could not fully figure out the type of this object. type_variable_22
+     ╭─[test.sus:954:14]
+     │
+ 954 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
+     │                 ────────────────┬────────────────  
+     │                                 ╰────────────────── Could not fully figure out the type of this object. type_variable_22
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:947:13]
+     │
+ 947 │     gen int[5] DATA
+     │                ──┬─  
+     │                  ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:954:10]
+     │
+ 954 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
+     │             ┬  
+     │             ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:956:13]
+     │
+ 956 │     int #(ABC) x
+     │                ┬  
+     │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯

@@ -11,7 +11,7 @@ impl WireSource {
             WireSource::WireRef(wire_ref) => {
                 match &wire_ref.root {
                     WireReferenceRoot::LocalDecl(decl_id, _) => func(*decl_id),
-                    WireReferenceRoot::NamedConstant(_, _) => {}
+                    WireReferenceRoot::NamedConstant(_) => {}
                     WireReferenceRoot::SubModulePort(submod_port) => {
                         func(submod_port.submodule_decl)
                     }

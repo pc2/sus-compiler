@@ -72,7 +72,7 @@ impl PartialWireReference {
                 let md = &ctx.globals[md_ref.id];
                 ctx.errors
                     .error(
-                        md_ref.total_span,
+                        md_ref.name_span,
                         format!(
                             "Expected a Wire Reference, but found module '{}' instead",
                             md.link_info.name
@@ -268,14 +268,6 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         assert!(template_inputs_to_visit.is_empty());
     }
 
-    fn get_link_info_for(&self, found_global: NameElem) -> Option<&'l LinkInfo> {
-        Some(match found_global {
-            NameElem::Module(md_id) => &self.globals[md_id].link_info,
-            NameElem::Type(typ_id) => &self.globals[typ_id].link_info,
-            NameElem::Constant(_) => return None
-        })
-    }
-
     fn must_be_generative(&self, is_generative: bool, context: &str, span: Span) {
         if !is_generative {
             self.errors.error(span, format!("{context} must be a compile-time expression"));
@@ -283,7 +275,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 
     fn flatten_template_args(&mut self, found_global: NameElem, has_template_args: bool, cursor: &mut Cursor) -> TemplateArgs {
-        let Some(link_info) = self.get_link_info_for(found_global) else {return FlatAlloc::new()};
+        let link_info = self.globals.get_link_info(found_global);
         let full_object_name = link_info.get_full_name();
 
         let mut template_arg_map : FlatAlloc<Option<TemplateArg>, TemplateIDMarker> = link_info.template_arguments.map(|_| None);
@@ -400,11 +392,11 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             }
 
             // Global identifier
-            let [name_span] = name_path.as_slice() else {
+            let [name_span] = *name_path.as_slice() else {
                 self.errors.todo(name_path[1], "Namespaces");
                 return LocalOrGlobal::NotFound(name_path[0]);
             };
-            if let Some((global_id, total_span)) = self.globals.resolve_global(*name_span) {
+            if let Some(global_id) = self.globals.resolve_global(name_span) {
                 // MUST Still be at field!("template_args")
                 let template_span = template_args_used.then(|| BracketSpan::from_outer(cursor.span()));
 
@@ -415,28 +407,28 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 match global_id {
                     NameElem::Module(id) => LocalOrGlobal::Module(GlobalReference {
                         id,
-                        total_span,
+                        name_span,
                         template_args,
                         template_arg_types,
                         template_span,
                     }),
                     NameElem::Type(id) => LocalOrGlobal::Type(GlobalReference {
                         id,
-                        total_span,
+                        name_span,
                         template_args,
                         template_arg_types,
                         template_span,
                     }),
                     NameElem::Constant(id) => LocalOrGlobal::Constant(GlobalReference {
                         id,
-                        total_span,
+                        name_span,
                         template_args,
                         template_arg_types,
                         template_span,
                     }),
                 }
             } else {
-                LocalOrGlobal::NotFound(*name_span)
+                LocalOrGlobal::NotFound(name_span)
             }
         })
     }
@@ -498,11 +490,11 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 LocalOrGlobal::Module(module_ref) if ALLOW_MODULES => ModuleOrWrittenType::Module(module_ref),
                 LocalOrGlobal::Module(module_ref) => {
                     self.globals.not_expected_global_error(&module_ref, accepted_text);
-                    ModuleOrWrittenType::WrittenType(WrittenType::Error(module_ref.total_span))
+                    ModuleOrWrittenType::WrittenType(WrittenType::Error(module_ref.name_span))
                 }
                 LocalOrGlobal::Constant(constant_ref) => {
                     self.globals.not_expected_global_error(&constant_ref, accepted_text);
-                    ModuleOrWrittenType::WrittenType(WrittenType::Error(constant_ref.total_span))
+                    ModuleOrWrittenType::WrittenType(WrittenType::Error(constant_ref.name_span))
                 }
                 LocalOrGlobal::NotFound(name_span) => {
                     ModuleOrWrittenType::WrittenType(WrittenType::Error(name_span))
@@ -822,7 +814,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             PartialWireReference::Error => None,
             PartialWireReference::GlobalModuleName(module_ref) => {
                 let documentation = cursor.extract_gathered_comments();
-                let interface_span = module_ref.total_span;
+                let interface_span = module_ref.get_total_span();
                 let submodule_decl = self.alloc_submodule_instruction(module_ref, None, documentation);
                 Some(ModuleInterfaceReference {
                     submodule_decl,
@@ -937,7 +929,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             if let Some(wr) = self.flatten_wire_reference(cursor).expect_wireref(self) {
                 let mut is_comptime = match wr.root {
                     WireReferenceRoot::LocalDecl(uuid, _span) => self.instructions[uuid].unwrap_wire_declaration().identifier_type.is_generative(),
-                    WireReferenceRoot::NamedConstant(_, _) => true,
+                    WireReferenceRoot::NamedConstant(_) => true,
                     WireReferenceRoot::SubModulePort(_) => false,
                 };
 
@@ -991,7 +983,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     }
                 },
                 LocalOrGlobal::Constant(cst_ref) => {
-                    let root = WireReferenceRoot::NamedConstant(cst_ref, expr_span);
+                    let root = WireReferenceRoot::NamedConstant(cst_ref);
                     PartialWireReference::WireReference(WireReference {
                         root,
                         is_generative: true,
@@ -1046,7 +1038,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 match flattened_arr_expr {
                     PartialWireReference::Error => PartialWireReference::Error,
                     PartialWireReference::GlobalModuleName(md_ref) => {
-                        self.errors.error(md_ref.total_span, "Ports or interfaces can only be accessed on modules that have been explicitly declared. Declare this submodule on its own line");
+                        self.errors.error(md_ref.get_total_span(), "Ports or interfaces can only be accessed on modules that have been explicitly declared. Declare this submodule on its own line");
                         PartialWireReference::Error
                     }
                     PartialWireReference::ModuleWithInterface { submodule_decl:_, submodule_name_span, interface:_, interface_name_span } => {
