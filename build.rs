@@ -1,14 +1,9 @@
-use std::env;
-use std::fs;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 fn main() {
-    let out_dir = env::var("OUT_DIR").unwrap();
-    let install_dir = PathBuf::from(out_dir)
-        .join("../../..")
-        .join("share")
-        .join("sus_compiler")
-        .join("std");
+    let mut install_dir = get_sus_dir();
+    install_dir.push(env!("CARGO_PKG_VERSION"));
+    install_dir.push("stl");
     
     fs::create_dir_all(&install_dir).expect("Failed to create std_lib directory");
 
@@ -16,6 +11,18 @@ fn main() {
 
     // Print the path to make it available during the build
     println!("cargo:rustc-env=SUS_COMPILER_STD_LIB_PATH={}", install_dir.display());
+}
+
+fn get_sus_dir() -> PathBuf {
+    let mut sus_dir = dirs_next::home_dir().expect("Could not determine home directory");
+    sus_dir.push(".sus");
+
+    // Create the .sus directory if it doesn't exist
+    if !sus_dir.exists() {
+        fs::create_dir(&sus_dir).expect("Failed to create .sus directory");
+    }
+
+    sus_dir
 }
 
 // Helper function to copy a directory and its contents recursively

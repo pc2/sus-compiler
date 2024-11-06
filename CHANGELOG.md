@@ -14,3 +14,5 @@
 - All builtin names (bool, int, true, false) are now defined in [stl/core.sus](stl/core.sus). This is so the templating system works for all of them. 
 - Since link_info is now shared between Modules, Types and Constants, we now share all code for templating, typing, etc. 
 - Instructions are now part of LinkInfo. 
+## 0.1.1
+- Change sus stl installation directory to $HOME/.sus/VERSION/stl
