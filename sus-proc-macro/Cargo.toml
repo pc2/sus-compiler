@@ -1,21 +1,22 @@
 [package]
 name = "sus-proc-macro"
 description = "Proc-macros for use in the sus-compiler"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Lennart Van Hirtum <lennart.vanhirtum@gmail.com>"]
 edition = "2021"
+license = "GPL-3.0-or-later"
 repository = "https://github.com/pc2/sus-compiler"
 homepage = "https://github.com/pc2/sus-compiler"
-license = "GPL-3.0-or-later"
 readme = "README.md"
-keywords = ["proc-macro", "tree-sitter", "sus"]
-categories = []
+keywords = ["sus", "fpga", "hdl", "proc-macro", "tree-sitter"]
+categories = ["compilers", "text-processing"]
+rust-version = "1.78"
 
 [dependencies]
 
 # Tree sitter
 tree-sitter = "~0.22.2"
-tree-sitter-sus = {version = "~0.0.2", path = "../tree-sitter-sus"}
+tree-sitter-sus = {version = "~0.1.0", path = "../tree-sitter-sus"}
 
 # proc_macro utils
 syn = "1.0"

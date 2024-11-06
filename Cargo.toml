@@ -6,9 +6,10 @@ authors = ["Lennart Van Hirtum <lennart.vanhirtum@gmail.com>"]
 edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/pc2/sus-compiler"
-keywords = ["sus", "fpga", "vlsi", "verilog", "hdl"]
-categories = ["compilers", "text-processing"]
+homepage = "https://github.com/pc2/sus-compiler"
 readme = "README.md"
+keywords = ["sus", "fpga", "vlsi", "hdl", "verilog"]
+categories = ["compilers", "text-processing"]
 rust-version = "1.78"
 
 [workspace]
@@ -28,9 +29,9 @@ arrayvec = "0.7.6"
 
 # Tree sitter
 tree-sitter = "~0.22.2"
-tree-sitter-sus = {version = "~0.0.2", path = "./tree-sitter-sus"}
+tree-sitter-sus = {version = "~0.1.0", path = "./tree-sitter-sus"}
 
-sus-proc-macro = {version = "~0.0.1", path = "./sus-proc-macro"}
+sus-proc-macro = {version = "~0.1.0", path = "./sus-proc-macro"}
 
 # calyx-ir = {version = "0.6.1", optional = true}
 # calyx-opt = {version = "0.6.1", optional = true}
