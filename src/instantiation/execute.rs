@@ -193,6 +193,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
     }
 
+    /// TODO make builtins that depend on parameters
     fn get_named_constant_value(&self, cst_ref: &GlobalReference<ConstantUUID>) -> TypedValue {
         let linker_cst = &self.linker.constants[cst_ref.id];
 
@@ -489,7 +490,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 source,
                 original_instruction: submod_instance.original_instruction,
                 domain: domain.unwrap_physical(),
-                typ: ConcreteType::Unknown,
+                typ: ConcreteType::Unknown(self.type_substitutor.alloc()),
                 name: self.unique_name_producer.get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
                 absolute_latency: CALCULATE_LATENCY_LATER,
             });
@@ -569,7 +570,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         };
         Ok(self.wires.alloc(RealWire {
             name : self.unique_name_producer.get_unique_name(""),
-            typ: ConcreteType::Unknown,
+            typ: ConcreteType::Unknown(self.type_substitutor.alloc()),
             original_instruction,
             domain,
             source,

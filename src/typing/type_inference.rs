@@ -3,15 +3,17 @@
 use std::cell::{OnceCell, RefCell};
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::ops::Index;
+use std::ops::{Deref, DerefMut, Index};
 
 use crate::block_vector::{BlockVec, BlockVecIter};
 use crate::prelude::*;
 
 use crate::alloc::{UUIDAllocator, UUIDMarker, UUID};
+use crate::value::Value;
 
 use super::abstract_type::AbstractType;
 use super::abstract_type::DomainType;
+use super::concrete_type::ConcreteType;
 
 pub struct TypeVariableIDMarker;
 impl UUIDMarker for TypeVariableIDMarker {
@@ -24,6 +26,12 @@ impl UUIDMarker for DomainVariableIDMarker {
     const DISPLAY_NAME: &'static str = "domain_variable_";
 }
 pub type DomainVariableID = UUID<DomainVariableIDMarker>;
+
+pub struct ConcreteTypeVariableIDMarker;
+impl UUIDMarker for ConcreteTypeVariableIDMarker {
+    const DISPLAY_NAME: &'static str = "concrete_type_variable_";
+}
+pub type ConcreteTypeVariableID = UUID<ConcreteTypeVariableIDMarker>;
 
 pub struct FailedUnification<MyType> {
     pub found: MyType,
@@ -62,6 +70,14 @@ impl<MyType : HindleyMilner<VariableIDMarker>, VariableIDMarker : UUIDMarker> In
 
 
 impl<MyType : HindleyMilner<VariableIDMarker>+Clone, VariableIDMarker : UUIDMarker> TypeSubstitutor<MyType, VariableIDMarker> {
+    pub fn new() -> Self {
+        Self {
+            substitution_map: BlockVec::new(),
+            failed_unifications: RefCell::new(Vec::new()),
+            _ph: PhantomData
+        }
+    }
+    
     pub fn init(variable_alloc : &UUIDAllocator<VariableIDMarker>) -> Self {
         Self {
             substitution_map: variable_alloc.into_iter().map(|_| OnceCell::new()).collect(),
@@ -143,9 +159,9 @@ pub enum HindleyMilnerInfo<TypeFuncIdent, VariableIDMarker : UUIDMarker> {
 }
 
 pub trait HindleyMilner<VariableIDMarker: UUIDMarker> : Sized {
-    type TypeFuncIdent : Eq;
+    type TypeFuncIdent<'slf> : Eq where Self : 'slf;
 
-    fn get_hm_info(&self) -> HindleyMilnerInfo<Self::TypeFuncIdent, VariableIDMarker>;
+    fn get_hm_info<'slf>(&'slf self) -> HindleyMilnerInfo<Self::TypeFuncIdent<'slf>, VariableIDMarker>;
 
     /// Iterate through all arguments and unify them
     /// 
@@ -169,7 +185,7 @@ pub enum AbstractTypeHMInfo {
 }
 
 impl HindleyMilner<TypeVariableIDMarker> for AbstractType {
-    type TypeFuncIdent = AbstractTypeHMInfo;
+    type TypeFuncIdent<'slf> = AbstractTypeHMInfo;
 
     fn get_hm_info(&self) -> HindleyMilnerInfo<AbstractTypeHMInfo, TypeVariableIDMarker> {
         match self {
@@ -205,7 +221,7 @@ impl HindleyMilner<TypeVariableIDMarker> for AbstractType {
 }
 
 impl HindleyMilner<DomainVariableIDMarker> for DomainType {
-    type TypeFuncIdent = DomainID;
+    type TypeFuncIdent<'slf> = DomainID;
 
     fn get_hm_info(&self) -> HindleyMilnerInfo<DomainID, DomainVariableIDMarker> {
         match self {
@@ -226,6 +242,55 @@ impl HindleyMilner<DomainVariableIDMarker> for DomainType {
             DomainType::Generative | DomainType::Physical(_) => Ok(()), // Do nothing, These are done already
             DomainType::DomainVariable(var) => {
                 *self = substitutor.substitution_map[var.get_hidden_value()].get().expect("It's impossible for domain variables to remain, as any unset domain variable would have been replaced with a new physical domain").clone();
+                self.fully_substitute(substitutor)
+            }
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConcreteTypeHMInfo<'slf> {
+    Named(TypeUUID),
+    Value(&'slf Value),
+    Array
+}
+
+
+impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
+    type TypeFuncIdent<'slf> = ConcreteTypeHMInfo<'slf>;
+
+    fn get_hm_info(&self) -> HindleyMilnerInfo<ConcreteTypeHMInfo, ConcreteTypeVariableIDMarker> {
+        match self {
+            ConcreteType::Unknown(var_id) => HindleyMilnerInfo::TypeVar(*var_id),
+            ConcreteType::Named(named_id) => HindleyMilnerInfo::TypeFunc(ConcreteTypeHMInfo::Named(*named_id)),
+            ConcreteType::Value(v) => HindleyMilnerInfo::TypeFunc(ConcreteTypeHMInfo::Value(v)),
+            ConcreteType::Array(_) => HindleyMilnerInfo::TypeFunc(ConcreteTypeHMInfo::Array),
+        }
+    }
+
+    fn unify_all_args<F : FnMut(&Self, &Self) -> bool>(left : &Self, right : &Self, unify : &mut F) -> bool {
+        match (left, right) {
+            (ConcreteType::Named(na), ConcreteType::Named(nb)) => {assert!(*na == *nb); true}, // Already covered by get_hm_info
+            (ConcreteType::Array(arr_typ_1), ConcreteType::Array(arr_typ_2)) => {
+                let (arr_typ_1_arr, arr_typ_1_sz) = arr_typ_1.deref();
+                let (arr_typ_2_arr, arr_typ_2_sz) = arr_typ_2.deref();
+                unify(arr_typ_1_arr, arr_typ_2_arr) & unify(arr_typ_1_sz, arr_typ_2_sz)
+            }
+            (_, _) => unreachable!("All others should have been eliminated by get_hm_info check")
+        }
+    }
+
+    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, ConcreteTypeVariableIDMarker>) -> Result<(), ()> {
+        match self {
+            ConcreteType::Named(_) | ConcreteType::Value(_) => Ok(()), // Already included in get_hm_info
+            ConcreteType::Array(arr_typ) => {
+                let (arr_typ, arr_sz) = arr_typ.deref_mut();
+                arr_typ.fully_substitute(substitutor)?;
+                arr_sz.fully_substitute(substitutor)
+            },
+            ConcreteType::Unknown(var) => {
+                *self = substitutor.substitution_map[var.get_hidden_value()].get().ok_or(())?.clone();
                 self.fully_substitute(substitutor)
             }
         }

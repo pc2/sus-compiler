@@ -1,5 +1,5 @@
 Warning: Unused port 'push'
-    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:86:2]
+    ╭─[/home/lennart/.sus/0.2.0-devel/stl/util.sus:86:2]
     │
  48 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
     │                           ──┬─  
@@ -12,7 +12,7 @@ Warning: Unused port 'push'
     │                                                   ╰── f declared here
 ────╯
 Warning: Unused port 'data_in'
-    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:86:2]
+    ╭─[/home/lennart/.sus/0.2.0-devel/stl/util.sus:86:2]
     │
  48 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
     │                                               ───┬───  
@@ -25,7 +25,7 @@ Warning: Unused port 'data_in'
     │                                                   ╰── f declared here
 ────╯
 Warning: Unused port 'ready'
-    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:86:2]
+    ╭─[/home/lennart/.sus/0.2.0-devel/stl/util.sus:86:2]
     │
  50 │     output bool ready'0
     │                 ──┬──  
@@ -38,7 +38,7 @@ Warning: Unused port 'ready'
     │                                                   ╰── f declared here
 ────╯
 Warning: Unused port 'pop'
-    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:86:2]
+    ╭─[/home/lennart/.sus/0.2.0-devel/stl/util.sus:86:2]
     │
  53 │     interface pop : bool pop -> bool data_valid, T data_out
     │                          ─┬─  
@@ -51,7 +51,7 @@ Warning: Unused port 'pop'
     │                                                   ╰── f declared here
 ────╯
 Warning: Unused port 'data_valid'
-    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:86:2]
+    ╭─[/home/lennart/.sus/0.2.0-devel/stl/util.sus:86:2]
     │
  53 │     interface pop : bool pop -> bool data_valid, T data_out
     │                                      ─────┬────  
@@ -64,7 +64,7 @@ Warning: Unused port 'data_valid'
     │                                                   ╰── f declared here
 ────╯
 Warning: Unused port 'data_out'
-    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:86:2]
+    ╭─[/home/lennart/.sus/0.2.0-devel/stl/util.sus:86:2]
     │
  53 │     interface pop : bool pop -> bool data_valid, T data_out
     │                                                    ────┬───  
@@ -77,49 +77,49 @@ Warning: Unused port 'data_out'
     │                                                   ╰── f declared here
 ────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:190:10]
+     ╭─[/home/lennart/.sus/0.2.0-devel/stl/util.sus:190:10]
      │
  190 │     int[20] arr
      │             ─┬─  
      │              ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:192:9]
+     ╭─[/home/lennart/.sus/0.2.0-devel/stl/util.sus:192:9]
      │
  192 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
      │            ───┬──  
      │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-   ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:3:43]
+   ╭─[/home/lennart/.sus/0.2.0-devel/stl/core.sus:3:43]
    │
  3 │ __builtin__ module LatencyOffset #(T, int OFFSET) {
    │                                           ───┬──  
    │                                              ╰──── Unused Variable: This variable does not affect the output ports of this module
 ───╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-   ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:4:33]
+   ╭─[/home/lennart/.sus/0.2.0-devel/stl/core.sus:4:33]
    │
  4 │     interface LatencyOffset : T in'0 -> T out'OFFSET
    │                                 ─┬  
    │                                  ╰── Unused Variable: This variable does not affect the output ports of this module
 ───╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-   ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:9:29]
+   ╭─[/home/lennart/.sus/0.2.0-devel/stl/core.sus:9:29]
    │
  9 │     interface in_domain : T in'0
    │                             ─┬  
    │                              ╰── Unused Variable: This variable does not affect the output ports of this module
 ───╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:15:31]
+    ╭─[/home/lennart/.sus/0.2.0-devel/stl/core.sus:15:31]
     │
  15 │     interface IntToBits : int value'0 -> bool[32] bits'0
     │                               ──┬──  
     │                                 ╰──── Unused Variable: This variable does not affect the output ports of this module
 ────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:19:36]
+    ╭─[/home/lennart/.sus/0.2.0-devel/stl/core.sus:19:36]
     │
  19 │     interface IntToBits : bool[32] bits'0 -> int value'0
     │                                    ──┬─  
@@ -628,7 +628,7 @@ Error: Could not instantiate ::FIFO because the template arguments 'T', 'DEPTH',
      │     ──┬─  
      │       ╰─── Could not instantiate ::FIFO because the template arguments 'T', 'DEPTH', 'READY_SLACK' were missing and no default was provided
      │
-     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:36:2]
+     ├─[/home/lennart/.sus/0.2.0-devel/stl/util.sus:36:2]
      │
   36 │     T,
      │     ┬  
@@ -648,7 +648,7 @@ Error: MIN is not a valid template argument of ::int
      │           ─┬─  
      │            ╰─── MIN is not a valid template argument of ::int
      │
-     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:28:20]
+     ├─[/home/lennart/.sus/0.2.0-devel/stl/core.sus:28:20]
      │
   28 │ __builtin__ struct int {}
      │                    ─┬─  
@@ -661,7 +661,7 @@ Error: MAX is not a valid template argument of ::int
      │                   ─┬─  
      │                    ╰─── MAX is not a valid template argument of ::int
      │
-     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:28:20]
+     ├─[/home/lennart/.sus/0.2.0-devel/stl/core.sus:28:20]
      │
   28 │ __builtin__ struct int {}
      │                    ─┬─  
@@ -841,7 +841,7 @@ Error: beep is not a valid template argument of ::int
      │                              ──┬─  
      │                                ╰─── beep is not a valid template argument of ::int
      │
-     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:28:20]
+     ├─[/home/lennart/.sus/0.2.0-devel/stl/core.sus:28:20]
      │
   28 │ __builtin__ struct int {}
      │                    ─┬─  
@@ -854,7 +854,7 @@ Error: BEEP is not a valid template argument of ::int
      │                                            ──┬─  
      │                                              ╰─── BEEP is not a valid template argument of ::int
      │
-     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:28:20]
+     ├─[/home/lennart/.sus/0.2.0-devel/stl/core.sus:28:20]
      │
   28 │ __builtin__ struct int {}
      │                    ─┬─  
@@ -867,7 +867,7 @@ Error: ::int is not a named wire: local or constant, it is a Struct instead!
      │                                                  ─┬─  
      │                                                   ╰─── ::int is not a named wire: local or constant, it is a Struct instead!
      │
-     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:28:20]
+     ├─[/home/lennart/.sus/0.2.0-devel/stl/core.sus:28:20]
      │
   28 │ __builtin__ struct int {}
      │                    ─┬─  
@@ -887,7 +887,7 @@ Error: BITWIDTH is not a valid template argument of ::FIFO
      │            ────┬───  
      │                ╰───── BITWIDTH is not a valid template argument of ::FIFO
      │
-     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/util.sus:35:8]
+     ├─[/home/lennart/.sus/0.2.0-devel/stl/util.sus:35:8]
      │
   35 │ module FIFO #(
      │        ──┬─  
@@ -1200,7 +1200,7 @@ Error: ABC is not a valid template argument of ::int
      │           ─┬─  
      │            ╰─── ABC is not a valid template argument of ::int
      │
-     ├─[/home/lennart/Desktop/sus-compiler/target/debug/share/sus_compiler/std/core.sus:28:20]
+     ├─[/home/lennart/.sus/0.2.0-devel/stl/core.sus:28:20]
      │
   28 │ __builtin__ struct int {}
      │                    ─┬─  

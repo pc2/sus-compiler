@@ -8,6 +8,7 @@ mod unique_names;
 use unique_names::UniqueNames;
 
 use crate::prelude::*;
+use crate::typing::type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor};
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
@@ -277,6 +278,8 @@ struct InstantiationContext<'fl, 'l> {
     wires: FlatAlloc<RealWire, WireIDMarker>,
     submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
 
+    type_substitutor: TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
+
     // Used for Execution
     unique_name_producer: UniqueNames,
     condition_stack : Vec<ConditionStackElem>,
@@ -417,6 +420,7 @@ fn perform_instantiation(
             md,
             generation_state: md.link_info.instructions.map(|(_, _)| SubModuleOrWire::Unnasigned),
         },
+        type_substitutor: TypeSubstitutor::new(),
         condition_stack: Vec::new(),
         wires: FlatAlloc::new(),
         submodules: FlatAlloc::new(),

@@ -9,6 +9,8 @@ use crate::{
     value::Value,
 };
 
+use super::type_inference::ConcreteTypeVariableID;
+
 pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(get_builtin_type("bool"));
 pub const INT_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(get_builtin_type("int"));
 
@@ -17,7 +19,7 @@ pub enum ConcreteType {
     Named(TypeUUID),
     Value(Value),
     Array(Box<(ConcreteType, ConcreteType)>),
-    Unknown
+    Unknown(ConcreteTypeVariableID)
 }
 
 /// Panics on Type Errors that should have been caught by [AbstractType]
@@ -103,7 +105,7 @@ impl ConcreteType {
                     && target_arr_size.type_compare(found_arr_size)
             }
             (ConcreteType::Value(lv), ConcreteType::Value(rv)) => lv == rv,
-            (ConcreteType::Unknown, _) | (_, ConcreteType::Unknown) => {
+            (ConcreteType::Unknown(_), _) | (_, ConcreteType::Unknown(_)) => {
                 todo!("Type Unification {self:?} {found:?}")
             }
             _ => false,
@@ -135,7 +137,7 @@ impl ConcreteType {
         linker_types: &TypVec,
         errors: &ErrorCollector,
     ) {
-        if *self == ConcreteType::Unknown {
+        if let ConcreteType::Unknown(_) = self {
             *self = source_type.clone();
         } else {
             self.check_type(source_type, span, linker_types, errors);

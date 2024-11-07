@@ -1,4 +1,4 @@
-Standard Library Directory: /home/lennart/Desktop/sus-compiler/target/debug/build/sus_compiler-75259068bf570e24/out/../../../share/sus_compiler/std
+Standard Library Directory: /home/lennart/.sus/0.2.0-devel/stl
 TREE SITTER module! DualPortMem
 TREE SITTER module! UseDualPortMem
 TREE SITTER module! FIFO

@@ -211,7 +211,7 @@ impl ConcreteType {
                 }
                 Value::Array(arr.into_boxed_slice())
             }
-            ConcreteType::Value(_) | ConcreteType::Unknown => unreachable!(),
+            ConcreteType::Value(_) | ConcreteType::Unknown(_) => unreachable!(),
         }
     }
 
