@@ -54,7 +54,7 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
             }
         }
         ConcreteType::Array(_) => unreachable!("All arrays have been used up already"),
-        ConcreteType::Value(_) | ConcreteType::Unknown | ConcreteType::Error => unreachable!(),
+        ConcreteType::Value(_) | ConcreteType::Unknown => unreachable!(),
     }
 }
 

@@ -6,7 +6,9 @@
 
 use std::ops::{Deref, Index, IndexMut};
 
+use crate::linker::{get_builtin_type, IsExtern};
 use crate::prelude::*;
+use crate::typing::template::GlobalReference;
 
 use num::BigInt;
 
@@ -191,6 +193,20 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
     }
 
+    fn get_named_constant_value(&self, cst_ref: &GlobalReference<ConstantUUID>) -> TypedValue {
+        let linker_cst = &self.linker.constants[cst_ref.id];
+
+        if linker_cst.link_info.is_extern == IsExtern::Builtin {
+            match linker_cst.link_info.name.as_str() {
+                "true" => TypedValue{value: Value::Bool(true), typ: ConcreteType::Named(get_builtin_type("bool"))},
+                "false" => TypedValue{value: Value::Bool(false), typ: ConcreteType::Named(get_builtin_type("bool"))},
+                other => unreachable!("{other} is not a known builtin constant")
+            }
+        } else {
+            todo!("Custom Constants");
+        }
+    }
+
     // Points to the wire in the hardware that corresponds to the root of this.
     fn determine_wire_ref_root(&mut self, wire_ref_root: &WireReferenceRoot) -> RealWireRefRoot {
         match wire_ref_root {
@@ -204,8 +220,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 SubModuleOrWire::Unnasigned => unreachable!(),
             },
             WireReferenceRoot::NamedConstant(cst) => {
-                let cst = &self.linker.constants[cst.id];
-                RealWireRefRoot::Constant(cst.val.clone())
+                RealWireRefRoot::Constant(self.get_named_constant_value(cst))
             }
             WireReferenceRoot::SubModulePort(port) => {
                 return self.instantiate_port_wire_ref_root(
@@ -358,7 +373,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 self.generation_state.get_generation_value(decl_id)?.clone()
             }
             WireReferenceRoot::NamedConstant(cst) => {
-                self.linker.constants[cst.id].get_value().clone()
+                self.get_named_constant_value(cst)
             }
             &WireReferenceRoot::SubModulePort(_) => {
                 todo!("Don't yet support compile time functions")

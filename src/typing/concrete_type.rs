@@ -17,8 +17,7 @@ pub enum ConcreteType {
     Named(TypeUUID),
     Value(Value),
     Array(Box<(ConcreteType, ConcreteType)>),
-    Unknown,
-    Error,
+    Unknown
 }
 
 /// Panics on Type Errors that should have been caught by [AbstractType]
@@ -104,7 +103,6 @@ impl ConcreteType {
                     && target_arr_size.type_compare(found_arr_size)
             }
             (ConcreteType::Value(lv), ConcreteType::Value(rv)) => lv == rv,
-            (ConcreteType::Error, _) | (_, ConcreteType::Error) => true, // Just assume correct, because the other side has an error
             (ConcreteType::Unknown, _) | (_, ConcreteType::Unknown) => {
                 todo!("Type Unification {self:?} {found:?}")
             }

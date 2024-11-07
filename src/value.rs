@@ -178,12 +178,6 @@ impl TypedValue {
             value: Value::Integer(i),
         }
     }
-    pub fn make_placeholder() -> Self {
-        Self {
-            typ: ConcreteType::Error,
-            value: Value::Error
-        }
-    }
     /// panics if the value can't be typed.
     pub fn from_value(value: Value) -> Self {
         Self {
@@ -217,7 +211,7 @@ impl ConcreteType {
                 }
                 Value::Array(arr.into_boxed_slice())
             }
-            ConcreteType::Value(_) | ConcreteType::Unknown | ConcreteType::Error => unreachable!(),
+            ConcreteType::Value(_) | ConcreteType::Unknown => unreachable!(),
         }
     }
 

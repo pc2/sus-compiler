@@ -6,7 +6,6 @@ use crate::linker::{IsExtern, NamedConstant, AFTER_INITIAL_PARSE_CP};
 use crate::prelude::*;
 
 use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
-use crate::value::TypedValue;
 use crate::{file_position::FileText, flattening::Module, instantiation::InstantiationList};
 
 use crate::typing::template::{
@@ -336,8 +335,7 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
         GlobalObjectKind::Const => {
             builder.add_const(NamedConstant {
                 link_info,
-                output_decl: FlatID::PLACEHOLDER,
-                val: TypedValue::make_placeholder(),
+                output_decl: FlatID::PLACEHOLDER
             });
         }
     }

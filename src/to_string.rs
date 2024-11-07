@@ -94,7 +94,6 @@ impl ConcreteType {
             }
             ConcreteType::Value(v) => format!("{{concrete_type_{v}}}"),
             ConcreteType::Unknown => format!("{{concrete_type_unknown}}"),
-            ConcreteType::Error => format!("{{concrete_type_error}}"),
         }
     }
 }

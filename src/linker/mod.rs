@@ -16,8 +16,7 @@ use crate::{
     alloc::ArenaAllocator,
     file_position::FileText,
     flattening::Module,
-    util::{const_str_position, const_str_position_in_tuples},
-    value::{TypedValue, Value},
+    util::const_str_position,
 };
 
 use crate::errors::{CompileError, ErrorInfo, ErrorLevel, ErrorStore};
@@ -30,20 +29,9 @@ use self::checkpoint::CheckPoint;
 
 const BUILTIN_TYPES: [&'static str; 2] = ["bool", "int"];
 
-const BUILTIN_CONSTANTS: [(&'static str, Value); 2] =
-    [("true", Value::Bool(true)), ("false", Value::Bool(false))];
-
 pub const fn get_builtin_type(name: &'static str) -> TypeUUID {
     if let Some(is_type) = const_str_position(name, &BUILTIN_TYPES) {
         TypeUUID::from_hidden_value(is_type)
-    } else {
-        unreachable!()
-    }
-}
-
-pub const fn get_builtin_constant(name: &'static str) -> ConstantUUID {
-    if let Some(is_constant) = const_str_position_in_tuples(name, &BUILTIN_CONSTANTS) {
-        ConstantUUID::from_hidden_value(is_constant)
     } else {
         unreachable!()
     }
@@ -69,7 +57,7 @@ impl Documentation {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IsExtern {
     Normal,
     Extern,
@@ -149,14 +137,7 @@ pub struct LinkingErrorLocation {
 #[derive(Debug)]
 pub struct NamedConstant {
     pub link_info: LinkInfo,
-    pub output_decl: FlatID,
-    pub val: TypedValue
-}
-
-impl NamedConstant {
-    pub fn get_value(&self) -> &TypedValue {
-        &self.val
-    }
+    pub output_decl: FlatID
 }
 
 pub struct FileData {

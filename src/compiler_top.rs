@@ -3,9 +3,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
-use crate::linker::{get_builtin_constant, get_builtin_type, AFTER_INITIAL_PARSE_CP};
+use crate::linker::{get_builtin_type, AFTER_INITIAL_PARSE_CP};
 use crate::prelude::*;
-use crate::value::{TypedValue, Value};
 
 use tree_sitter::Parser;
 
@@ -43,11 +42,6 @@ impl Linker {
 
         assert_eq!(self.types[get_builtin_type("int")].link_info.name, "int");
         assert_eq!(self.types[get_builtin_type("bool")].link_info.name, "bool");
-
-        assert_eq!(self.constants[get_builtin_constant("true")].link_info.name, "true");
-        assert_eq!(self.constants[get_builtin_constant("false")].link_info.name, "false");
-        self.constants[get_builtin_constant("true")].val = TypedValue::from_value(Value::Bool(true));
-        self.constants[get_builtin_constant("false")].val = TypedValue::from_value(Value::Bool(false));
     }
 
     pub fn add_all_files_in_directory<ExtraInfoManager : LinkerExtraFileInfoManager>(&mut self, directory : &PathBuf, info_mngr : &mut ExtraInfoManager) {
