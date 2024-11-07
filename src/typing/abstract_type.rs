@@ -17,27 +17,10 @@ use crate::to_string::map_to_type_names;
 /// What isn't included are the parameters of types. So Array Sizes for example.
 #[derive(Debug, Clone)]
 pub enum AbstractType {
-    Error,
     Unknown(TypeVariableID),
     Template(TemplateID),
     Named(TypeUUID),
     Array(Box<AbstractType>),
-}
-
-impl AbstractType {
-    pub fn contains_error_or_unknown<const CHECK_ERROR: bool, const CHECK_UNKNOWN: bool>(
-        &self,
-    ) -> bool {
-        match self {
-            AbstractType::Error => CHECK_ERROR,
-            AbstractType::Unknown(_) => CHECK_UNKNOWN,
-            AbstractType::Template(_id) => false,
-            AbstractType::Named(_id) => false,
-            AbstractType::Array(arr_box) => arr_box
-                .deref()
-                .contains_error_or_unknown::<CHECK_ERROR, CHECK_UNKNOWN>(),
-        }
-    }
 }
 
 pub const BOOL_TYPE: AbstractType = AbstractType::Named(get_builtin_type("bool"));

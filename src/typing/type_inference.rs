@@ -88,8 +88,7 @@ impl<MyType : HindleyMilner<VariableIDMarker>+Clone, VariableIDMarker : UUIDMark
                             self.unify(arg_a, arg_b)
                         })
                     }
-                    HindleyMilnerInfo::TypeVar(_) => self.unify(b, a),
-                    HindleyMilnerInfo::MatchesAny => true
+                    HindleyMilnerInfo::TypeVar(_) => self.unify(b, a)
                 }
             }
             HindleyMilnerInfo::TypeVar(var) => {
@@ -106,7 +105,6 @@ impl<MyType : HindleyMilner<VariableIDMarker>+Clone, VariableIDMarker : UUIDMark
                     true
                 }
             }
-            HindleyMilnerInfo::MatchesAny => true
         }
     }
     pub fn unify_must_succeed(&self, a: &MyType, b: &MyType) {
@@ -141,9 +139,7 @@ impl<MyType: HindleyMilner<VariableIDMarker>, VariableIDMarker: UUIDMarker> Drop
 pub enum HindleyMilnerInfo<TypeFuncIdent, VariableIDMarker : UUIDMarker> {
     /// Just a marker. Use [HindleyMilner::unify_all_args]
     TypeFunc(TypeFuncIdent),
-    TypeVar(UUID<VariableIDMarker>),
-    /// Used for errors. Just returning Ok(()) prevents type errors from propagating
-    MatchesAny
+    TypeVar(UUID<VariableIDMarker>)
 }
 
 pub trait HindleyMilner<VariableIDMarker: UUIDMarker> : Sized {
@@ -177,7 +173,6 @@ impl HindleyMilner<TypeVariableIDMarker> for AbstractType {
 
     fn get_hm_info(&self) -> HindleyMilnerInfo<AbstractTypeHMInfo, TypeVariableIDMarker> {
         match self {
-            AbstractType::Error => HindleyMilnerInfo::MatchesAny,
             AbstractType::Unknown(var_id) => HindleyMilnerInfo::TypeVar(*var_id),
             AbstractType::Template(template_id) => HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Template(*template_id)),
             AbstractType::Named(named_id) => HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Named(*named_id)),
@@ -196,7 +191,6 @@ impl HindleyMilner<TypeVariableIDMarker> for AbstractType {
 
     fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, TypeVariableIDMarker>) -> Result<(), ()> {
         match self {
-            AbstractType::Error => Ok(()),
             AbstractType::Template(_) => Ok(()), // Template Name is included in get_hm_info
             AbstractType::Named(_) => Ok(()), // Name is included in get_hm_info
             AbstractType::Array(arr_typ) => {

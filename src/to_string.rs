@@ -69,7 +69,6 @@ impl AbstractType {
         template_names: &TemplateVec,
     ) -> String {
         match self {
-            AbstractType::Error => "{error}".to_owned(),
             AbstractType::Unknown(id) => format!("{id:?}"),
             AbstractType::Template(id) => template_names.get_template_name(*id).to_owned(),
             AbstractType::Named(id) => linker_types[*id].link_info.get_full_name(),
