@@ -1,6 +1,8 @@
-use crate::typing::concrete_type::ConcreteType;
+use crate::typing::{concrete_type::ConcreteType, type_inference::FailedUnification};
 
 use super::*;
+
+use crate::typing::type_inference::HindleyMilner;
 
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn walk_type_along_path(
@@ -95,6 +97,35 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     destination_typ.check_type(&source_typ, span, &self.linker.types, &self.errors);
                 }
             };
+        }
+
+        self.finalize();
+    }
+
+    fn finalize(&mut self) {
+        for (_id, w) in &mut self.wires {
+            if let Err(()) = w.typ.fully_substitute(&self.type_substitutor) {
+                let typ_as_str = w.typ.to_string(&self.linker.types);
+                
+                let span = self.md.get_instruction_span(w.original_instruction);
+                self.errors.error(span, format!("Could not finalize this type, some parameters were still unknown: {typ_as_str}"));
+            }
+        }
+
+        // Print all errors
+        for FailedUnification{mut found, mut expected, span, context} in self.type_substitutor.extract_errors() {
+            // Not being able to fully substitute is not an issue. We just display partial types
+            let _ = found.fully_substitute(&self.type_substitutor);
+            let _ = expected.fully_substitute(&self.type_substitutor);
+    
+            let expected_name = expected.to_string(&self.linker.types);
+            let found_name = found.to_string(&self.linker.types);
+            self.errors.error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
+    
+            assert!(
+                expected_name != found_name,
+                "{expected_name} != {found_name}"
+            );
         }
     }
 }

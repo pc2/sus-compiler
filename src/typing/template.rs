@@ -99,6 +99,19 @@ pub enum ConcreteTemplateArg {
     NotProvided,
 }
 
+impl ConcreteTemplateArg {
+    #[track_caller]
+    pub fn unwrap_type(&self) -> &ConcreteType {
+        let Self::Type(t) = self else {unreachable!()};
+        t
+    }
+    #[track_caller]
+    pub fn unwrap_value(&self) -> &TypedValue {
+        let Self::Value(v) = self else {unreachable!()};
+        v
+    }
+}
+
 pub type TemplateArgs = FlatAlloc<Option<TemplateArg>, TemplateIDMarker>;
 /// Applies to both Template Type args and Template Value args. 
 /// 

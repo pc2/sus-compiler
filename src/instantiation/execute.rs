@@ -159,18 +159,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn concretize_type(&self, typ: &WrittenType) -> ExecutionResult<ConcreteType> {
         Ok(match typ {
             WrittenType::Error(_) => caught_by_typecheck!("Error Type"),
-            WrittenType::TemplateVariable(_, template_id) => match &self.template_args[*template_id] {
-                ConcreteTemplateArg::Type(typ) => typ.clone(),
-                ConcreteTemplateArg::Value(_) => caught_by_typecheck!(),
-                ConcreteTemplateArg::NotProvided => unreachable!("Type not provided!"),
-            },
+            WrittenType::TemplateVariable(_, template_id) => self.template_args[*template_id].unwrap_type().clone(),
             WrittenType::Named(named_type) => ConcreteType::Named(named_type.id),
             WrittenType::Array(_, arr_box) => {
                 let (arr_content_typ, arr_size_wire, _bracket_span) = arr_box.deref();
                 let inner_typ = self.concretize_type(arr_content_typ)?;
-                let arr_size = self
-                    .generation_state
-                    .get_generation_integer(*arr_size_wire)?;
+                let arr_size = self.generation_state.get_generation_integer(*arr_size_wire)?;
                 ConcreteType::Array(Box::new((
                     inner_typ,
                     ConcreteType::Value(Value::Integer(arr_size.clone())),
@@ -586,15 +580,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         let typ = self.concretize_type(&wire_decl.typ_expr)?;
 
         Ok(if wire_decl.identifier_type == IdentifierType::Generative {
-            let value = if let DeclarationPortInfo::GenerativeInput(template_id) = wire_decl.is_port
-            {
-                match &self.template_args[template_id] {
-                    ConcreteTemplateArg::Type(_) => caught_by_typecheck!(),
-                    ConcreteTemplateArg::Value(v) => v.clone(),
-                    ConcreteTemplateArg::NotProvided => {
-                        unreachable!("All template parameters must be set")
-                    }
-                }
+            let value = if let DeclarationPortInfo::GenerativeInput(template_id) = wire_decl.is_port {
+                self.template_args[template_id].unwrap_value().clone()
             } else {
                 typ.get_initial_typed_val()
             };

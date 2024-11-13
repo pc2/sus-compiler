@@ -792,6 +792,13 @@ Error: Port 'a' is used, but the instantiated module has this port disabled
      │        ┬  
      │        ╰── Port 'a' is used, but the instantiated module has this port disabled
 ─────╯
+Error: Could not finalize this type, some parameters were still unknown: {concrete_type_variable_0}
+     ╭─[test.sus:705:2]
+     │
+ 705 │     mod_with_unused_interface mm
+     │     ────────────┬────────────  
+     │                 ╰────────────── Could not finalize this type, some parameters were still unknown: {concrete_type_variable_0}
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:750:30]
      │

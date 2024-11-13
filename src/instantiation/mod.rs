@@ -2,7 +2,7 @@ mod execute;
 mod latency_algorithm;
 mod latency_count;
 mod list_of_lists;
-mod typecheck;
+mod concrete_typecheck;
 mod unique_names;
 
 use unique_names::UniqueNames;
