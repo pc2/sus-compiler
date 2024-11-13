@@ -271,7 +271,8 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
 
     fn unify_all_args<F : FnMut(&Self, &Self) -> bool>(left : &Self, right : &Self, unify : &mut F) -> bool {
         match (left, right) {
-            (ConcreteType::Named(na), ConcreteType::Named(nb)) => {assert!(*na == *nb); true}, // Already covered by get_hm_info
+            (ConcreteType::Named(na), ConcreteType::Named(nb)) => {assert!(*na == *nb); true} // Already covered by get_hm_info
+            (ConcreteType::Value(v_1), ConcreteType::Value(v_2)) => {assert!(*v_1 == *v_2); true} // Already covered by get_hm_info
             (ConcreteType::Array(arr_typ_1), ConcreteType::Array(arr_typ_2)) => {
                 let (arr_typ_1_arr, arr_typ_1_sz) = arr_typ_1.deref();
                 let (arr_typ_2_arr, arr_typ_2_sz) = arr_typ_2.deref();

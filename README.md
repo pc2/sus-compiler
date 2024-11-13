@@ -214,7 +214,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 ### Typing & Inference
 - [x] Hindley-Milner typing for Abstract Types
 - [x] Hindley-Milner typing for Domain Types
-- [ ] Hindley-Milner typing for Concrete Types
+- [x] Hindley-Milner typing for Concrete Types
 - [ ] Template Type Inference
 - [ ] Generative Parameter Inference
 - [ ] Latency Count Inference

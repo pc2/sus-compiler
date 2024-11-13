@@ -1,4 +1,4 @@
-use crate::typing::{concrete_type::ConcreteType, type_inference::FailedUnification};
+use crate::typing::{concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, type_inference::FailedUnification};
 
 use super::*;
 
@@ -7,24 +7,29 @@ use crate::typing::type_inference::HindleyMilner;
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn walk_type_along_path(
         &self,
-        mut cur_typ: ConcreteType,
-        path: &[RealWirePathElem],
+        mut current_type_in_progress: ConcreteType,
+        path: &[RealWirePathElem]
     ) -> ConcreteType {
         for p in path {
+            let typ_after_applying_array = ConcreteType::Unknown(self.type_substitutor.alloc());
             match p {
-                RealWirePathElem::ArrayAccess {
-                    span: _,
-                    idx_wire: _,
-                } => {
-                    cur_typ = cur_typ.down_array().clone();
+                RealWirePathElem::ArrayAccess {span: _, idx_wire: _} => { // TODO #28 integer size <-> array bound check
+                    let arr_size = ConcreteType::Unknown(self.type_substitutor.alloc());
+                    let arr_box = Box::new((typ_after_applying_array.clone(), arr_size));
+                    self.type_substitutor.unify_must_succeed(&current_type_in_progress, &ConcreteType::Array(arr_box));
+                    current_type_in_progress = typ_after_applying_array;
                 }
             }
         }
 
-        cur_typ
+        current_type_in_progress
     }
 
-    pub fn typecheck(&mut self) {
+    fn make_array_of(&self, concrete_typ: ConcreteType) -> ConcreteType {
+        ConcreteType::Array(Box::new((concrete_typ, ConcreteType::Unknown(self.type_substitutor.alloc()))))
+    }
+
+    fn typecheck_all_wires(&self) {
         for this_wire_id in self.wires.id_range() {
             let this_wire = &self.wires[this_wire_id];
             let span = self.md.get_instruction_span(this_wire.original_instruction);
@@ -32,44 +37,53 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
             match &this_wire.source {
                 RealWireDataSource::ReadOnly => {}
-                RealWireDataSource::Multiplexer {
-                    is_state: _,
-                    sources: _,
-                } => {} // Do muxes later.
+                RealWireDataSource::Multiplexer { is_state, sources } => {
+                    if let Some(is_state) = is_state {
+                        assert!(is_state.is_of_type(&this_wire.typ));
+                    }
+                    for s in sources {
+                        let source_typ = &self.wires[s.from.from].typ;
+                        let destination_typ = self.walk_type_along_path(self.wires[this_wire_id].typ.clone(), &s.to_path);
+                        self.type_substitutor.unify_report_error(&destination_typ, &source_typ, span, "write wire access");
+                    }
+                }
                 &RealWireDataSource::UnaryOp { op, right } => {
-                    let right_typ = self.wires[right].typ.clone();
-                    self.wires[this_wire_id]
-                        .typ
-                        .typecheck_concrete_unary_operator(
-                            op,
-                            &right_typ,
-                            span,
-                            &self.linker.types,
-                            &self.errors,
-                        );
+                    // TODO overloading
+                    let (input_typ, output_typ) = match op {
+                        UnaryOperator::Not => (BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE),
+                        UnaryOperator::Negate => (INT_CONCRETE_TYPE, INT_CONCRETE_TYPE),
+                        UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => (self.make_array_of(BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+                        UnaryOperator::Sum | UnaryOperator::Product => (self.make_array_of(INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
+                    };
+
+                    self.type_substitutor.unify_report_error(&self.wires[right].typ, &input_typ, span, "unary input");
+                    self.type_substitutor.unify_report_error(&self.wires[this_wire_id].typ, &output_typ, span, "unary output");
                 }
                 &RealWireDataSource::BinaryOp { op, left, right } => {
-                    let left_typ = self.wires[left].typ.clone();
-                    let right_typ = self.wires[right].typ.clone();
-                    self.wires[this_wire_id]
-                        .typ
-                        .typecheck_concrete_binary_operator(
-                            op,
-                            &left_typ,
-                            &right_typ,
-                            span,
-                            &self.linker.types,
-                            &self.errors,
-                        );
+                    // TODO overloading
+                    let ((in_left, in_right), out) = match op {
+                        BinaryOperator::And => ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+                        BinaryOperator::Or => ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+                        BinaryOperator::Xor => ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+                        BinaryOperator::Add => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
+                        BinaryOperator::Subtract => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
+                        BinaryOperator::Multiply => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
+                        BinaryOperator::Divide => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
+                        BinaryOperator::Modulo => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
+                        BinaryOperator::Equals => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+                        BinaryOperator::NotEquals => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+                        BinaryOperator::GreaterEq => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+                        BinaryOperator::Greater => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+                        BinaryOperator::LesserEq => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+                        BinaryOperator::Lesser => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+                    };
+                    self.type_substitutor.unify_report_error(&self.wires[this_wire_id].typ, &out, span, "binary output");
+                    self.type_substitutor.unify_report_error(&self.wires[left].typ, &in_left, span, "binary left");
+                    self.type_substitutor.unify_report_error(&self.wires[right].typ, &in_right, span, "binary right");
                 }
                 RealWireDataSource::Select { root, path } => {
                     let found_typ = self.walk_type_along_path(self.wires[*root].typ.clone(), path);
-                    self.wires[this_wire_id].typ.check_or_update_type(
-                        &found_typ,
-                        span,
-                        &self.linker.types,
-                        &self.errors,
-                    );
+                    self.type_substitutor.unify_report_error(&found_typ, &self.wires[this_wire_id].typ, span, "wire access");
                 }
                 RealWireDataSource::Constant { value } => {
                     assert!(
@@ -79,27 +93,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 }
             };
         }
-
-        // Do typechecking of Multiplexers afterwards, because typechecker isn't so smart right now.
-        for this_wire_id in self.wires.id_range() {
-            let this_wire = &self.wires[this_wire_id];
-            let span = self.md.get_instruction_span(this_wire.original_instruction);
-            span.debug();
-
-            if let RealWireDataSource::Multiplexer { is_state, sources } = &this_wire.source {
-                if let Some(is_state) = is_state {
-                    assert!(is_state.is_of_type(&this_wire.typ));
-                }
-                for s in sources {
-                    let source_typ = &self.wires[s.from.from].typ;
-                    let destination_typ =
-                        self.walk_type_along_path(self.wires[this_wire_id].typ.clone(), &s.to_path);
-                    destination_typ.check_type(&source_typ, span, &self.linker.types, &self.errors);
-                }
-            };
-        }
-
-        self.finalize();
     }
 
     fn finalize(&mut self) {
@@ -127,5 +120,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 "{expected_name} != {found_name}"
             );
         }
+    }
+
+    pub fn typecheck(&mut self) {
+        self.typecheck_all_wires();
+
+        self.finalize();
     }
 }
