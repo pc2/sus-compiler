@@ -85,7 +85,7 @@ fn codegen_with_dependencies(linker: &Linker, md: &Module, file_name: &str) {
         let (cur_instance, cur_md) = to_process_queue[cur_idx];
 
         for (_, sub_mod) in &cur_instance.submodules {
-            let new_inst = sub_mod.instance.as_ref().unwrap().as_ref();
+            let new_inst = sub_mod.instance.get().unwrap().as_ref();
 
             // Skip duplicates
             // Yeah yeah I know O(n²) but this list shouldn't grow too big. Fix if needed

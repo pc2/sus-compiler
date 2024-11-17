@@ -31,7 +31,9 @@ To get started with learning SUS, have a look at [this talk](https://www.youtube
 For an example project to tinker with, see [VonTum/BitSerialMatrixMultiply](https://github.com/VonTum/BitSerialMatrixMultiply). 
 
 #### Changelog since Talk
-- Nothing yet
+- Template syntax has changed to `#(NameA: 3, TypeB: type int[3], ValueC: true)`
+- Standard Library is delivered with SUS Compiler
+- Hindley-Milner for Concrete Typing
 
 ## Core philosophy
 

@@ -201,7 +201,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         for (_sm_id, sm) in &self.submodules {
             // Instances may not be valid (or may not exist yet due to inference)
-            let Some(instance) = &sm.instance else {
+            let Some(instance) = &sm.instance.get() else {
                 continue;
             };
 

@@ -95,6 +95,106 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
     }
 
+    pub fn instantiate_submodule(&self, sm: &SubModule) -> bool {
+        let submod_instr = self.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
+        let sub_module = &self.linker.modules[sm.module_uuid];
+
+        if !check_all_template_args_valid(
+            &self.errors,
+            submod_instr.module_ref.get_total_span(),
+            &sub_module.link_info,
+            &sm.template_args,
+        ) {
+            return false;
+        };
+
+        if let Some(instance) = sub_module.instantiations.instantiate(
+            sub_module,
+            self.linker,
+            sm.template_args.clone(),
+        ) {
+            for (port_id, concrete_port) in &instance.interface_ports {
+                let connecting_wire = &sm.port_map[port_id];
+
+                match (concrete_port, connecting_wire) {
+                    (None, None) => {} // Invalid port not connected, good!
+                    (None, Some(connecting_wire)) => {
+                        // Port is not enabled, but attempted to be used
+                        // A question may be "What if no port was in the source code? There would be no error reported"
+                        // But this is okay, because non-visible ports are only possible for function calls
+                        // We have a second routine that reports invalid interfaces.
+                        let source_code_port = &sub_module.ports[port_id];
+                        for span in &connecting_wire.name_refs {
+                            self.errors.error(*span, format!("Port '{}' is used, but the instantiated module has this port disabled", source_code_port.name))
+                                .info_obj_different_file(source_code_port, sub_module.link_info.file)
+                                .info_obj_same_file(submod_instr);
+                        }
+                    }
+                    (Some(_concrete_port), None) => {
+                        // Port is enabled, but not used
+                        let source_code_port = &sub_module.ports[port_id];
+                        self.errors
+                            .warn(
+                                submod_instr.module_ref.get_total_span(),
+                                format!("Unused port '{}'", source_code_port.name),
+                            )
+                            .info_obj_different_file(
+                                source_code_port,
+                                sub_module.link_info.file,
+                            )
+                            .info_obj_same_file(submod_instr);
+                    }
+                    (Some(concrete_port), Some(connecting_wire)) => {
+                        let wire = &self.wires[connecting_wire.maps_to_wire];
+                        self.type_substitutor.unify_must_succeed(&wire.typ, &concrete_port.typ)
+                    }
+                }
+            }
+            for (interface_id, interface_references) in &sm.interface_call_sites {
+                if !interface_references.is_empty() {
+                    let sm_interface = &sub_module.interfaces[interface_id];
+                    let interface_name = &sm_interface.name;
+                    if let Some(representative_port) = sm_interface
+                        .func_call_inputs
+                        .first()
+                        .or(sm_interface.func_call_outputs.first())
+                    {
+                        if instance.interface_ports[representative_port].is_none() {
+                            for span in interface_references {
+                                self.errors.error(*span, format!("The interface '{interface_name}' is disabled in this submodule instance"))
+                                    .info_obj_same_file(submod_instr)
+                                    .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
+                            }
+                        }
+                    } else {
+                        for span in interface_references {
+                            self.errors.todo(*span, format!("Using empty interface '{interface_name}' (This is a TODO with Actions etc)"))
+                                .info_obj_same_file(submod_instr)
+                                .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
+                        }
+                    }
+                    if sm_interface
+                        .all_ports()
+                        .iter()
+                        .any(|port_id| instance.interface_ports[port_id].is_none())
+                    {
+                        // We say an interface is invalid if it has an invalid port.
+                        todo!("Invalid Interfaces");
+                    }
+                }
+            }
+
+            sm.instance.set(instance).expect("Can only set the instance of a submodule once");
+            true
+        } else {
+            self.errors.error(
+                submod_instr.module_ref.get_total_span(),
+                "Error instantiating submodule",
+            );
+            false
+        }
+    }
+
     fn finalize(&mut self) {
         for (_id, w) in &mut self.wires {
             if let Err(()) = w.typ.fully_substitute(&self.type_substitutor) {

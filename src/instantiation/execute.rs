@@ -651,7 +651,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     }
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule {
                         original_instruction,
-                        instance: None,
+                        instance: OnceCell::new(),
                         port_map,
                         interface_call_sites,
                         name : self.unique_name_producer.get_unique_name(name_origin),

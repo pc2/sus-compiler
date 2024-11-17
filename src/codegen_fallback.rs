@@ -284,7 +284,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
         for (_id, sm) in &self.instance.submodules {
             let sm_inst: &InstantiatedModule = sm
                 .instance
-                .as_ref()
+                .get()
                 .expect("Invalid submodules are impossible to remain by the time codegen happens");
             let sm_instance_name = mangle(&sm_inst.name);
             let sm_name = &sm.name;
