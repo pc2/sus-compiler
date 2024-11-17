@@ -32,3 +32,13 @@ module ModUsingFloat {
 
 	boop = beep
 }
+
+
+
+module partialModule #(int UNKNOWN) {
+
+}
+
+module usePartialModule {
+	partialModule m
+}

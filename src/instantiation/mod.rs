@@ -23,7 +23,7 @@ use crate::{
 
 use crate::typing::{
     concrete_type::ConcreteType,
-    template::{check_all_template_args_valid, ConcreteTemplateArgs},
+    template::ConcreteTemplateArgs,
 };
 
 use self::latency_algorithm::SpecifiedLatency;
@@ -355,11 +355,6 @@ fn perform_instantiation(
         for (id, sm) in &context.submodules {
             println!("SubModule {id:?}: {sm:?}");
         }
-    }
-
-    println!("Instantiating submodules for {}", md.link_info.name);
-    if !context.submodules.iter().all(|(_id, sm)| context.instantiate_submodule(sm)) {
-        return context.extract();
     }
 
     println!("Concrete Typechecking {}", md.link_info.name);

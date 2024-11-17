@@ -496,6 +496,14 @@ impl SubModuleInstance {
             &corresponding_module.link_info.name
         }
     }
+    /// If it is named, then return the [Span] of the name, otherwise return the span of the module ref
+    pub fn get_most_relevant_span(&self) -> Span {
+        if let Some((_name, span)) = &self.name {
+            *span
+        } else {
+            self.module_ref.get_total_span()
+        }
+    }
 }
 
 #[derive(Debug)]

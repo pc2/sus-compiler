@@ -641,6 +641,22 @@ Error: Could not instantiate ::FIFO because the template arguments 'T', 'DEPTH',
      │         ─────┬─────  
      │              ╰─────── 'READY_SLACK' defined here
 ─────╯
+Error: Could not fully instantiate fiii!
+     ╭─[test.sus:649:7]
+     │
+ 649 │     FIFO fiii
+     │          ──┬─  
+     │            ╰─── Could not fully instantiate fiii!
+─────╯
+Error: Pre-emptive error because latency-unspecified 'o' is never written to. 
+(This is because work-in-progress code would get a lot of latency counting errors while unfinished)
+     ╭─[test.sus:648:33]
+     │
+ 648 │     interface use_fifo : -> int o
+     │                                 ┬  
+     │                                 ╰── Pre-emptive error because latency-unspecified 'o' is never written to. 
+(This is because work-in-progress code would get a lot of latency counting errors while unfinished)
+─────╯
 Error: MIN is not a valid template argument of ::int
      ╭─[test.sus:672:8]
      │

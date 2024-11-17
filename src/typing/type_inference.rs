@@ -167,7 +167,7 @@ pub trait HindleyMilner<VariableIDMarker: UUIDMarker> : Sized {
     /// 
     /// If any pair couldn't be unified, return false
     /// 
-    /// This is never called by the user, only by [unify]
+    /// This is never called by the user, only by [TypeSubstitutor::unify]
     fn unify_all_args<F : FnMut(&Self, &Self) -> bool>(left : &Self, right : &Self, unify : &mut F) -> bool;
 
     /// Has to be implemented per 

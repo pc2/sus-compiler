@@ -712,7 +712,7 @@ module use_bad_interface {
 /*
 	interface
 	action
-	request
+	query
 	trigger
 */
 
