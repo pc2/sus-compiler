@@ -8,7 +8,7 @@ use std::ops::{Deref, Index, IndexMut};
 
 use crate::linker::{get_builtin_type, IsExtern};
 use crate::prelude::*;
-use crate::typing::template::GlobalReference;
+use crate::typing::template::{GlobalReference, HowDoWeKnowTheTemplateArg};
 
 use num::BigInt;
 
@@ -639,11 +639,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     for (_id, v) in &submodule.module_ref.template_args {
                         template_args.alloc(match v {
                             Some(arg) => match &arg.kind {
-                                TemplateArgKind::Type(typ) => {
-                                    ConcreteTemplateArg::Type(self.concretize_type(typ)?)
-                                }
+                                TemplateArgKind::Type(typ) => ConcreteTemplateArg::Type(
+                                    self.concretize_type(typ)?,
+                                    HowDoWeKnowTheTemplateArg::Given
+                                ),
                                 TemplateArgKind::Value(v) => ConcreteTemplateArg::Value(
                                     self.generation_state.get_generation_value(*v)?.clone(),
+                                    HowDoWeKnowTheTemplateArg::Given
                                 ),
                             },
                             None => ConcreteTemplateArg::NotProvided,

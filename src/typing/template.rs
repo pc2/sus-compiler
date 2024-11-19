@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 use super::{abstract_type::AbstractType, concrete_type::ConcreteType};
-use crate::{flattening::WrittenType, linker::LinkInfo, value::TypedValue};
+use crate::{flattening::WrittenType, value::TypedValue};
 
 #[derive(Debug)]
 pub struct GlobalReference<ID> {
@@ -92,22 +92,37 @@ impl TemplateArgKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HowDoWeKnowTheTemplateArg {
+    Given,
+    Inferred,
+}
+
+impl HowDoWeKnowTheTemplateArg {
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            HowDoWeKnowTheTemplateArg::Given => "given",
+            HowDoWeKnowTheTemplateArg::Inferred => "inferred",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteTemplateArg {
-    Type(ConcreteType),
-    Value(TypedValue),
+    Type(ConcreteType, HowDoWeKnowTheTemplateArg),
+    Value(TypedValue, HowDoWeKnowTheTemplateArg),
     NotProvided,
 }
 
 impl ConcreteTemplateArg {
     #[track_caller]
     pub fn unwrap_type(&self) -> &ConcreteType {
-        let Self::Type(t) = self else {unreachable!()};
+        let Self::Type(t, _) = self else {unreachable!()};
         t
     }
     #[track_caller]
     pub fn unwrap_value(&self) -> &TypedValue {
-        let Self::Value(v) = self else {unreachable!()};
+        let Self::Value(v, _) = self else {unreachable!()};
         v
     }
 }
@@ -119,39 +134,3 @@ pub type TemplateArgs = FlatAlloc<Option<TemplateArg>, TemplateIDMarker>;
 pub type TemplateAbstractTypes = FlatAlloc<AbstractType, TemplateIDMarker>;
 pub type TemplateInputs = FlatAlloc<TemplateInput, TemplateIDMarker>;
 pub type ConcreteTemplateArgs = FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>;
-
-pub fn check_all_template_args_valid(
-    errors: &ErrorCollector,
-    span: Span,
-    target_link_info: &LinkInfo,
-    template_args: &ConcreteTemplateArgs,
-) -> bool {
-    let mut not_found_list: Vec<&TemplateInput> = Vec::new();
-    for (id, arg) in &target_link_info.template_arguments {
-        match &template_args[id] {
-            ConcreteTemplateArg::Type(_) => {}
-            ConcreteTemplateArg::Value(_) => {}
-            ConcreteTemplateArg::NotProvided => {
-                not_found_list.push(arg);
-            }
-        }
-    }
-    if !not_found_list.is_empty() {
-        let mut uncovered_ports_list = String::new();
-        for v in &not_found_list {
-            use std::fmt::Write;
-            write!(uncovered_ports_list, "'{}', ", v.name).unwrap();
-        }
-        uncovered_ports_list.truncate(uncovered_ports_list.len() - 2); // Cut off last comma
-        let err_ref = errors.error(span, format!("Could not instantiate {} because the template arguments {uncovered_ports_list} were missing and no default was provided", target_link_info.get_full_name()));
-        for v in &not_found_list {
-            err_ref.info(
-                (v.name_span, target_link_info.file),
-                format!("'{}' defined here", v.name),
-            );
-        }
-        false
-    } else {
-        true
-    }
-}

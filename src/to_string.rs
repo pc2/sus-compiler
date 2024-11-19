@@ -221,38 +221,36 @@ impl Module {
     }
 }
 
-pub fn pretty_print_concrete_instance(
-    linker: &Linker,
-    link_info: &LinkInfo,
-    template_args: &ConcreteTemplateArgs,
-) -> String {
-    assert!(link_info.template_arguments.len() == template_args.len());
-
-    let mut result = link_info.get_full_name();
-
-    if !link_info.template_arguments.is_empty() {
-        result.push_str("::<");
-
-        for (id, input) in &link_info.template_arguments {
-            let given_arg = &template_args[id];
-
-            result.push_str(&input.name);
-            match given_arg {
-                ConcreteTemplateArg::Type(t) => {
-                    write!(result, " = {}, ", t.to_string(&linker.types)).unwrap();
-                }
-                ConcreteTemplateArg::Value(v) => {
-                    write!(result, " = {}, ", v.value).unwrap();
-                }
-                ConcreteTemplateArg::NotProvided => {
-                    result.push_str(" not provided, ");
-                }
-            }
-        }
-
-        result.truncate(result.len() - 2);
-        result.push_str(">");
+pub fn pretty_print_concrete_instance<TypVec>(
+    target_link_info: &LinkInfo,
+    given_template_args: &ConcreteTemplateArgs,
+    linker_types: &TypVec
+) -> String
+where TypVec: Index<TypeUUID, Output = StructType> {
+    assert!(given_template_args.len() == target_link_info.template_arguments.len());
+    let object_full_name = target_link_info.get_full_name();
+    if given_template_args.len() == 0 {
+        return format!("{object_full_name} #()");
     }
 
+    use std::fmt::Write;
+    let mut result = format!("{object_full_name} #(\n");
+    for (id, arg) in given_template_args {
+        let arg_in_target = &target_link_info.template_arguments[id];
+        write!(result, "    {}: ", arg_in_target.name).unwrap();
+        match arg {
+            ConcreteTemplateArg::Type(concrete_type, how_do_we_know_the_template_arg) => {
+                write!(result, "type {} /* {} */,\n", concrete_type.to_string(linker_types), how_do_we_know_the_template_arg.to_str()).unwrap();
+            }
+            ConcreteTemplateArg::Value(typed_value, how_do_we_know_the_template_arg) => {
+                write!(result, "{} /* {} */,\n", typed_value.value.to_string(), how_do_we_know_the_template_arg.to_str()).unwrap();
+            }
+            ConcreteTemplateArg::NotProvided => {
+                write!(result, "/* Could not infer */\n").unwrap();
+            }
+        }
+    }
+
+    result.push(')');
     result
 }

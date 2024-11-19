@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use crate::prelude::*;
+use crate::to_string::pretty_print_concrete_instance;
 
 use lsp_types::{LanguageString, MarkedString};
 
@@ -71,6 +72,17 @@ impl<'l> HoverCollector<'l> {
             }
         });
     }
+
+    fn gather_submodule_hover_infos(&mut self, md: &Module, submodule: &Module, id: FlatID) {
+        md.instantiations.for_each_instance(|_template_args, inst| {
+            for (_id, sm) in &inst.submodules {
+                if sm.original_instruction != id {
+                    continue;
+                }
+                self.sus_code(pretty_print_concrete_instance(&submodule.link_info, &sm.template_args, &self.linker.types));
+            }
+        });
+    }
 }
 
 pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<MarkedString> {
@@ -124,7 +136,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
 
             hover.gather_hover_infos(md, decl_id, decl.identifier_type.is_generative());
         }
-        LocationInfo::InModule(_, md, _, InModule::NamedSubmodule(submod)) => {
+        LocationInfo::InModule(_, md, id, InModule::NamedSubmodule(submod)) => {
             let submodule = &linker.modules[submod.module_ref.id];
 
             // Declaration's documentation
@@ -151,6 +163,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
 
             // Module documentation
             hover.documentation_link_info(&submodule.link_info);
+            hover.gather_submodule_hover_infos(md, submodule, id);
         }
         LocationInfo::InModule(_md_id, md, id, InModule::Temporary(wire)) => {
             let mut details_vec: Vec<Cow<str>> = Vec::with_capacity(2);

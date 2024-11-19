@@ -621,32 +621,20 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                          ──┬──  
      │                            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Could not instantiate ::FIFO because the template arguments 'T', 'DEPTH', 'READY_SLACK' were missing and no default was provided
-     ╭─[test.sus:649:2]
-     │
- 649 │     FIFO fiii
-     │     ──┬─  
-     │       ╰─── Could not instantiate ::FIFO because the template arguments 'T', 'DEPTH', 'READY_SLACK' were missing and no default was provided
-     │
-     ├─[/home/lennart/.sus/0.2.0-devel/stl/util.sus:36:2]
-     │
-  36 │     T,
-     │     ┬  
-     │     ╰── 'T' defined here
-  37 │     int DEPTH,
-     │         ──┬──  
-     │           ╰──── 'DEPTH' defined here
-     │ 
-  39 │     int READY_SLACK
-     │         ─────┬─────  
-     │              ╰─────── 'READY_SLACK' defined here
-─────╯
-Error: Could not fully instantiate fiii!
+Error: Could not fully instantiate ::FIFO #(
+    T: /* Could not infer */
+    DEPTH: /* Could not infer */
+    READY_SLACK: /* Could not infer */
+)
      ╭─[test.sus:649:7]
      │
  649 │     FIFO fiii
      │          ──┬─  
-     │            ╰─── Could not fully instantiate fiii!
+     │            ╰─── Could not fully instantiate ::FIFO #(
+    T: /* Could not infer */
+    DEPTH: /* Could not infer */
+    READY_SLACK: /* Could not infer */
+)
 ─────╯
 Error: Pre-emptive error because latency-unspecified 'o' is never written to. 
 (This is because work-in-progress code would get a lot of latency counting errors while unfinished)

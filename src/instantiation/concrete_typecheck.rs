@@ -1,4 +1,10 @@
-use crate::typing::{concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}, delayed_constraint::{DelayedConstraint, DelayedConstraintStatus, DelayedConstraintsList}, template::check_all_template_args_valid, type_inference::FailedUnification};
+
+use crate::typing::template::ConcreteTemplateArg;
+use crate::typing::{
+    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
+    delayed_constraint::{DelayedConstraint, DelayedConstraintStatus, DelayedConstraintsList},
+    type_inference::FailedUnification
+};
 
 use super::*;
 
@@ -147,14 +153,15 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
         let submod_instr = context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
         let sub_module = &context.linker.modules[sm.module_uuid];
 
-        if !check_all_template_args_valid(
-            &context.errors,
-            submod_instr.module_ref.get_total_span(),
-            &sub_module.link_info,
-            &sm.template_args,
-        ) {
-            return DelayedConstraintStatus::NoProgress;
-        };
+        // Check if there's any argument that isn't known
+        for (_id, arg) in &sm.template_args {
+            match arg {
+                ConcreteTemplateArg::NotProvided => {
+                    return DelayedConstraintStatus::NoProgress;
+                }
+                ConcreteTemplateArg::Type(..) | ConcreteTemplateArg::Value(..) => {}
+            }
+        }
 
         if let Some(instance) = sub_module.instantiations.instantiate(
             sub_module,
@@ -169,7 +176,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                     (None, Some(connecting_wire)) => {
                         // Port is not enabled, but attempted to be used
                         // A question may be "What if no port was in the source code? There would be no error reported"
-                        // But this is okay, because non-visible ports are only possible for function calls
+                        // But this is okay, because nonvisible ports are only possible for function calls
                         // We have a second routine that reports invalid interfaces.
                         let source_code_port = &sub_module.ports[port_id];
                         for span in &connecting_wire.name_refs {
@@ -249,9 +256,8 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
         let submod_instr = context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
         let sub_module = &context.linker.modules[sm.module_uuid];
 
-        let name = submod_instr.get_name(sub_module);
-
-        let message = format!("Could not fully instantiate {name}!");
+        let submodule_template_args_string = pretty_print_concrete_instance(&sub_module.link_info, &sm.template_args, &context.linker.types);
+        let message = format!("Could not fully instantiate {submodule_template_args_string}");
 
         context.errors.error(submod_instr.get_most_relevant_span(), message);
     }

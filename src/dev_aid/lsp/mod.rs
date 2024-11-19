@@ -608,7 +608,6 @@ pub fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     // Create the transport. Includes the stdio (stdin and stdout) versions but this could
     // also be implemented to use sockets or HTTP.
-    //let (connection, io_threads) = Connection::listen(SocketAddr::from(([127,0,0,1], 25000)))?;
     println!("Connecting on port {}...", config().lsp_port);
     let (connection, io_threads) =
         lsp_server::Connection::connect(SocketAddr::from(([127, 0, 0, 1], config().lsp_port)))?;

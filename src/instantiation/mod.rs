@@ -312,7 +312,7 @@ fn perform_instantiation(
     template_args: &ConcreteTemplateArgs,
 ) -> InstantiatedModule {
     let mut context = InstantiationContext {
-        name: pretty_print_concrete_instance(linker, &md.link_info, template_args),
+        name: pretty_print_concrete_instance(&md.link_info, template_args, &linker.types),
         generation_state: GenerationState {
             md,
             generation_state: md.link_info.instructions.map(|(_, _)| SubModuleOrWire::Unnasigned),
