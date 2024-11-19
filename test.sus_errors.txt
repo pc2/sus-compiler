@@ -622,7 +622,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Could not fully instantiate ::FIFO #(
-    T: /* Could not infer */
+    T: type ::bool[20] /* inferred */,
     DEPTH: /* Could not infer */
     READY_SLACK: /* Could not infer */
 )
@@ -631,7 +631,7 @@ Error: Could not fully instantiate ::FIFO #(
  649 │     FIFO fiii
      │          ──┬─  
      │            ╰─── Could not fully instantiate ::FIFO #(
-    T: /* Could not infer */
+    T: type ::bool[20] /* inferred */,
     DEPTH: /* Could not infer */
     READY_SLACK: /* Could not infer */
 )
@@ -1007,207 +1007,238 @@ Warning: Unused port 'o'
      │                            │  
      │                            ╰── c declared here
 ─────╯
-Error: 'NUM_REPLS' has already been defined previously
-     ╭─[test.sus:850:29]
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:854:6]
      │
- 850 │     replicate #(NUM_REPLS: 50, NUM_REPLS: 30, T: type bool) a
-     │                 ────┬────      ────┬────  
-     │                     ╰───────────────────── Defined here previously
-     │                                    │      
-     │                                    ╰────── 'NUM_REPLS' has already been defined previously
+ 854 │     int val = 3
+     │         ─┬─  
+     │          ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:863:13]
+     ╭─[test.sus:857:10]
      │
- 863 │     gen int[8] SOURCES
+ 857 │     int[30] out = c.result
+     │             ─┬─  
+     │              ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused port 'data'
+     ╭─[test.sus:851:2]
+     │
+ 840 │     input T data
+     │             ──┬─  
+     │               ╰─── Port 'data' declared here
+     │ 
+ 851 │     replicate #(NUM_REPLS: 20, T: type int[30]) b
+     │     ─────────────────────┬───────────────────── ┬  
+     │                          ╰───────────────────────── Unused port 'data'
+     │                                                 │  
+     │                                                 ╰── b declared here
+─────╯
+Warning: Unused port 'result'
+     ╭─[test.sus:851:2]
+     │
+ 842 │     output T[NUM_REPLS] result
+     │                         ───┬──  
+     │                            ╰──── Port 'result' declared here
+     │ 
+ 851 │     replicate #(NUM_REPLS: 20, T: type int[30]) b
+     │     ─────────────────────┬───────────────────── ┬  
+     │                          ╰───────────────────────── Unused port 'result'
+     │                                                 │  
+     │                                                 ╰── b declared here
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:869:13]
+     │
+ 869 │     gen int[8] SOURCES
      │                ───┬───  
      │                   ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:875:9]
+     ╭─[test.sus:881:9]
      │
- 875 │     int[2] inArr
+ 881 │     int[2] inArr
      │            ──┬──  
      │              ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:882:9]
+     ╭─[test.sus:888:9]
      │
- 882 │     int[8] beep = permut.permute(SOURCES)
+ 888 │     int[8] beep = permut.permute(SOURCES)
      │            ──┬─  
      │              ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:886:28]
+     ╭─[test.sus:892:28]
      │
- 886 │     interface from : bool[32] instr
+ 892 │     interface from : bool[32] instr
      │                               ──┬──  
      │                                 ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[test.sus:898:23]
+     ╭─[test.sus:904:23]
      │
- 898 │ ╭─▶     if decoder.is_jump() : int target_addr {
+ 904 │ ╭─▶     if decoder.is_jump() : int target_addr {
      │ │                            ────────┬────────  
      │ │                                    ╰────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ┆ ┆   
- 900 │ ├─▶     }
-     │ │           
-     │ ╰─────────── Parent node 'if_statement'
-─────╯
-Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[test.sus:901:23]
-     │
- 901 │ ╭─▶     if decoder.is_load() : int reg_to, int addr {
-     │ │                            ───────────┬──────────  
-     │ │                                       ╰──────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ┆ ┆   
- 903 │ ├─▶     }
-     │ │           
-     │ ╰─────────── Parent node 'if_statement'
-─────╯
-Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[test.sus:904:5]
-     │
- 904 │ ╭─▶     if decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │ │          ─────────────────────────┬─────────────────────────  
-     │ │                                   ╰─────────────────────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ┆ ┆   
  906 │ ├─▶     }
      │ │           
      │ ╰─────────── Parent node 'if_statement'
 ─────╯
-Error: A function called in this context may only return one result. Split this function call into a separate line instead.
-     ╭─[test.sus:898:5]
+Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ╭─[test.sus:907:23]
      │
- 887 │     interface is_jump
+ 907 │ ╭─▶     if decoder.is_load() : int reg_to, int addr {
+     │ │                            ───────────┬──────────  
+     │ │                                       ╰──────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ┆ ┆   
+ 909 │ ├─▶     }
+     │ │           
+     │ ╰─────────── Parent node 'if_statement'
+─────╯
+Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ╭─[test.sus:910:5]
+     │
+ 910 │ ╭─▶     if decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │ │          ─────────────────────────┬─────────────────────────  
+     │ │                                   ╰─────────────────────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ┆ ┆   
+ 912 │ ├─▶     }
+     │ │           
+     │ ╰─────────── Parent node 'if_statement'
+─────╯
+Error: A function called in this context may only return one result. Split this function call into a separate line instead.
+     ╭─[test.sus:904:5]
+     │
+ 893 │     interface is_jump
      │               ───┬───  
      │                  ╰───── Interface 'is_jump' defined here
      │ 
- 898 │     if decoder.is_jump() : int target_addr {
+ 904 │     if decoder.is_jump() : int target_addr {
      │        ────────┬────────  
      │                ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
 ─────╯
 Error: A function called in this context may only return one result. Split this function call into a separate line instead.
-     ╭─[test.sus:901:5]
+     ╭─[test.sus:907:5]
      │
- 888 │     interface is_load
+ 894 │     interface is_load
      │               ───┬───  
      │                  ╰───── Interface 'is_load' defined here
      │ 
- 901 │     if decoder.is_load() : int reg_to, int addr {
+ 907 │     if decoder.is_load() : int reg_to, int addr {
      │        ────────┬────────  
      │                ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
 ─────╯
 Error: No Global of the name 'op' was found. Did you forget to import it?
-     ╭─[test.sus:904:57]
+     ╭─[test.sus:910:57]
      │
- 904 │     if decoder.is_arith() : int reg_a, int reg_b, Operator op {
+ 910 │     if decoder.is_arith() : int reg_a, int reg_b, Operator op {
      │                                                            ─┬  
      │                                                             ╰── No Global of the name 'op' was found. Did you forget to import it?
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:894:42]
+     ╭─[test.sus:900:42]
      │
- 894 │     interface run_instruction : bool[32] instr
+ 900 │     interface run_instruction : bool[32] instr
      │                                          ──┬──  
      │                                            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: ::no_main_interface does not have a main interface. You should explicitly specify an interface to access
-     ╭─[test.sus:917:10]
+     ╭─[test.sus:923:10]
      │
- 910 │ module no_main_interface {
+ 916 │ module no_main_interface {
      │        ────────┬────────  
      │                ╰────────── Module 'no_main_interface' defined here. module ::no_main_interface #():
 
      │ 
- 917 │     int x = no_interface_named()
+ 923 │     int x = no_interface_named()
      │             ─────────┬────────  
      │                      ╰────────── ::no_main_interface does not have a main interface. You should explicitly specify an interface to access
 ─────╯
 Error: ::no_main_interface does not have a main interface. You should explicitly specify an interface to access
-     ╭─[test.sus:918:10]
+     ╭─[test.sus:924:10]
      │
- 910 │ module no_main_interface {
+ 916 │ module no_main_interface {
      │        ────────┬────────  
      │                ╰────────── Module 'no_main_interface' defined here. module ::no_main_interface #():
 
      │ 
- 918 │     int y = no_main_interface()
+ 924 │     int y = no_main_interface()
      │             ────────┬────────  
      │                     ╰────────── ::no_main_interface does not have a main interface. You should explicitly specify an interface to access
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:917:6]
+     ╭─[test.sus:923:6]
      │
- 917 │     int x = no_interface_named()
+ 923 │     int x = no_interface_named()
      │         ┬  
      │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:918:6]
+     ╭─[test.sus:924:6]
      │
- 918 │     int y = no_main_interface()
+ 924 │     int y = no_main_interface()
      │         ┬  
      │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Typing Error: array size expects a ::int but was given a ::bool
-     ╭─[test.sus:922:6]
+     ╭─[test.sus:928:6]
      │
- 922 │     int[true] a
+ 928 │     int[true] a
      │         ──┬─  
      │           ╰─── Typing Error: array size expects a ::int but was given a ::bool
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:922:12]
+     ╭─[test.sus:928:12]
      │
- 922 │     int[true] a
+ 928 │     int[true] a
      │               ┬  
      │               ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Typing Error: array size expects a ::int but was given a ::bool
-     ╭─[test.sus:926:41]
+     ╭─[test.sus:932:41]
      │
- 926 │     interface moduleWithBadInterface : int[true] a
+ 932 │     interface moduleWithBadInterface : int[true] a
      │                                            ──┬─  
      │                                              ╰─── Typing Error: array size expects a ::int but was given a ::bool
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:926:47]
+     ╭─[test.sus:932:47]
      │
- 926 │     interface moduleWithBadInterface : int[true] a
+ 932 │     interface moduleWithBadInterface : int[true] a
      │                                                  ┬  
      │                                                  ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Typing Error: connection expects a ::int but was given a ::bool
-     ╭─[test.sus:933:11]
+     ╭─[test.sus:939:11]
      │
- 933 │     xyz[3] = true
+ 939 │     xyz[3] = true
      │              ──┬─  
      │                ╰─── Typing Error: connection expects a ::int but was given a ::bool
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:930:9]
+     ╭─[test.sus:936:9]
      │
- 930 │     int[3] xyz
+ 936 │     int[3] xyz
      │            ─┬─  
      │             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: BEEEP is not a valid template argument of ::SUM_UP
-     ╭─[test.sus:954:38]
+     ╭─[test.sus:960:38]
      │
- 937 │ const int SUM_UP #(int SIZE, int[SIZE] DATA) {
+ 943 │ const int SUM_UP #(int SIZE, int[SIZE] DATA) {
      │           ───┬──  
      │              ╰──── 'SUM_UP' defined here
      │ 
- 954 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
+ 960 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
      │                                         ──┬──  
      │                                           ╰──── BEEEP is not a valid template argument of ::SUM_UP
 ─────╯
 Error: ABC is not a valid template argument of ::int
-     ╭─[test.sus:956:8]
+     ╭─[test.sus:962:8]
      │
- 956 │     int #(ABC) x
+ 962 │     int #(ABC) x
      │           ─┬─  
      │            ╰─── ABC is not a valid template argument of ::int
      │
@@ -1218,44 +1249,44 @@ Error: ABC is not a valid template argument of ::int
      │                     ╰─── 'int' defined here
 ─────╯
 Error: ABC does not name a Type or a Value.
-     ╭─[test.sus:956:8]
+     ╭─[test.sus:962:8]
      │
- 956 │     int #(ABC) x
+ 962 │     int #(ABC) x
      │           ─┬─  
      │            ╰─── ABC does not name a Type or a Value.
 ─────╯
 Error: Could not fully figure out the type of this object. type_variable_21
-     ╭─[test.sus:954:14]
+     ╭─[test.sus:960:14]
      │
- 954 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
+ 960 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
      │                 ────────────────┬────────────────  
      │                                 ╰────────────────── Could not fully figure out the type of this object. type_variable_21
 ─────╯
 Error: Could not fully figure out the type of this object. type_variable_22
-     ╭─[test.sus:954:14]
+     ╭─[test.sus:960:14]
      │
- 954 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
+ 960 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
      │                 ────────────────┬────────────────  
      │                                 ╰────────────────── Could not fully figure out the type of this object. type_variable_22
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:947:13]
+     ╭─[test.sus:953:13]
      │
- 947 │     gen int[5] DATA
+ 953 │     gen int[5] DATA
      │                ──┬─  
      │                  ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:954:10]
+     ╭─[test.sus:960:10]
      │
- 954 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
+ 960 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
      │             ┬  
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:956:13]
+     ╭─[test.sus:962:13]
      │
- 956 │     int #(ABC) x
+ 962 │     int #(ABC) x
      │                ┬  
      │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯

@@ -170,10 +170,10 @@ pub trait HindleyMilner<VariableIDMarker: UUIDMarker> : Sized {
     /// This is never called by the user, only by [TypeSubstitutor::unify]
     fn unify_all_args<F : FnMut(&Self, &Self) -> bool>(left : &Self, right : &Self, unify : &mut F) -> bool;
 
-    /// Has to be implemented per 
+    /// Has to be implemented separately per type
     /// 
-    /// Returns Ok(()) when no variables remain
-    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, VariableIDMarker>) -> Result<(), ()>;
+    /// Returns true when no Unknowns remain
+    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, VariableIDMarker>) -> bool;
 }
 
 
@@ -205,15 +205,15 @@ impl HindleyMilner<TypeVariableIDMarker> for AbstractType {
         }
     }
 
-    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, TypeVariableIDMarker>) -> Result<(), ()> {
+    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, TypeVariableIDMarker>) -> bool {
         match self {
-            AbstractType::Template(_) => Ok(()), // Template Name is included in get_hm_info
-            AbstractType::Named(_) => Ok(()), // Name is included in get_hm_info
+            AbstractType::Named(_) | AbstractType::Template(_) => true, // Template Name & Name is included in get_hm_info
             AbstractType::Array(arr_typ) => {
                 arr_typ.fully_substitute(substitutor)
             },
             AbstractType::Unknown(var) => {
-                *self = substitutor.substitution_map[var.get_hidden_value()].get().ok_or(())?.clone();
+                let Some(replacement) = substitutor.substitution_map[var.get_hidden_value()].get() else {return false};
+                *self = replacement.clone();
                 self.fully_substitute(substitutor)
             }
         }
@@ -236,10 +236,10 @@ impl HindleyMilner<DomainVariableIDMarker> for DomainType {
         true
     }
 
-    /// For domains, always returns Ok(()). Or rather it should, since any leftover unconnected domains should be assigned an ID of their own by the type checker
-    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, DomainVariableIDMarker>) -> Result<(), ()> {
+    /// For domains, always returns true. Or rather it should, since any leftover unconnected domains should be assigned an ID of their own by the type checker
+    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, DomainVariableIDMarker>) -> bool {
         match self {
-            DomainType::Generative | DomainType::Physical(_) => Ok(()), // Do nothing, These are done already
+            DomainType::Generative | DomainType::Physical(_) => true, // Do nothing, These are done already
             DomainType::DomainVariable(var) => {
                 *self = substitutor.substitution_map[var.get_hidden_value()].get().expect("It's impossible for domain variables to remain, as any unset domain variable would have been replaced with a new physical domain").clone();
                 self.fully_substitute(substitutor)
@@ -282,16 +282,17 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
         }
     }
 
-    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, ConcreteTypeVariableIDMarker>) -> Result<(), ()> {
+    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, ConcreteTypeVariableIDMarker>) -> bool {
         match self {
-            ConcreteType::Named(_) | ConcreteType::Value(_) => Ok(()), // Already included in get_hm_info
+            ConcreteType::Named(_) | ConcreteType::Value(_) => true, // Don't need to do anything, this is already final
             ConcreteType::Array(arr_typ) => {
                 let (arr_typ, arr_sz) = arr_typ.deref_mut();
-                arr_typ.fully_substitute(substitutor)?;
+                arr_typ.fully_substitute(substitutor) &&
                 arr_sz.fully_substitute(substitutor)
             },
             ConcreteType::Unknown(var) => {
-                *self = substitutor.substitution_map[var.get_hidden_value()].get().ok_or(())?.clone();
+                let Some(replacement) = substitutor.substitution_map[var.get_hidden_value()].get() else {return false};
+                *self = replacement.clone();
                 self.fully_substitute(substitutor)
             }
         }

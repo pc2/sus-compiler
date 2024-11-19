@@ -470,7 +470,15 @@ Latency Counting tree_add
 Latency Counting tree_add
 Latency Counting tree_add
 Latency Counting make_tree_add
-Not Instantiating use_replicate due to flattening errors
+Instantiating use_replicate
+Concrete Typechecking use_replicate
+Instantiating replicate
+Concrete Typechecking replicate
+Latency Counting replicate
+Instantiating replicate
+Concrete Typechecking replicate
+Latency Counting replicate
+Latency Counting use_replicate
 Instantiating use_permute
 Concrete Typechecking use_permute
 Instantiating permute_t

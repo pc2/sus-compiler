@@ -847,8 +847,14 @@ module replicate #(T, int NUM_REPLS) {
 }
 
 module use_replicate {
-	replicate #(NUM_REPLS: 50, NUM_REPLS: 30, T: type bool) a
+	//replicate #(NUM_REPLS: 50, NUM_REPLS: 30, T: type bool) a
 	replicate #(NUM_REPLS: 20, T: type int[30]) b
+	replicate c
+
+	int val = 3
+
+	c.data = val
+	int[30] out = c.result
 }
 
 module permute_t #(T, int SIZE, int[SIZE] SOURCES) {

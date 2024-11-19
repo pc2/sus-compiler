@@ -310,12 +310,12 @@ impl TypeUnifier {
 
     pub fn finalize_domain_type(&mut self, typ_domain: &mut DomainType) {
         use super::type_inference::HindleyMilner;
-        typ_domain.fully_substitute(&self.domain_substitutor).unwrap();
+        assert!(typ_domain.fully_substitute(&self.domain_substitutor) == true);
     }
 
     pub fn finalize_abstract_type(&mut self, types: &ArenaAllocator<StructType, TypeUUIDMarker>, typ: &mut AbstractType, span: Span, errors: &ErrorCollector) {
         use super::type_inference::HindleyMilner;
-        if typ.fully_substitute(&self.type_substitutor).is_err() {
+        if typ.fully_substitute(&self.type_substitutor) == false {
             let typ_as_string = typ.to_string(types, &self.template_type_names);
             errors.error(span, format!("Could not fully figure out the type of this object. {typ_as_string}"));
         }

@@ -35,4 +35,15 @@ impl ConcreteType {
         let (sub, _sz) = arr_box.deref();
         sub
     }
+    pub fn contains_unknown(&self) -> bool {
+        match self {
+            ConcreteType::Named(_) => false,
+            ConcreteType::Value(_) => false,
+            ConcreteType::Array(arr_box) => {
+                let (arr_arr, arr_size) = arr_box.deref();
+                arr_arr.contains_unknown() || arr_size.contains_unknown()
+            }
+            ConcreteType::Unknown(_) => true,
+        }
+    }
 }

@@ -580,8 +580,8 @@ pub fn apply_types(
         );
     }
     for FailedUnification{mut found, mut expected, span, context} in type_checker.domain_substitutor.extract_errors() {
-        found.fully_substitute(&type_checker.domain_substitutor).unwrap();
-        expected.fully_substitute(&type_checker.domain_substitutor).unwrap();
+        assert!(found.fully_substitute(&type_checker.domain_substitutor));
+        assert!(expected.fully_substitute(&type_checker.domain_substitutor));
 
         let expected_name = format!("{expected:?}");
         let found_name = format!("{found:?}");
