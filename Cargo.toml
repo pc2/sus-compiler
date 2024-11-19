@@ -26,7 +26,7 @@ members = [
 ariadne = "0.4.1" # for nice errors
 num = "0.4"
 # itertools = "0.13.0"
-clap = { version = "4.5.21", features = ["derive"] }
+clap = { version = "4.5.21", features = ["derive", "wrap_help"] }
 arrayvec = "0.7.6"
 
 # Tree sitter
