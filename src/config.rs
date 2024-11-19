@@ -21,6 +21,12 @@ pub enum EarlyExitUpTo {
     CodeGen,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub enum TargetLanguage {
+    SystemVerilog,
+    VHDL,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct ConfigStruct {
     pub use_lsp: bool,
@@ -33,6 +39,7 @@ pub struct ConfigStruct {
     pub codegen_module_and_dependencies_one_file: Option<String>,
     pub early_exit: EarlyExitUpTo,
     pub use_color: bool,
+    pub target_language: TargetLanguage,
     pub files: Vec<PathBuf>,
 }
 
@@ -93,6 +100,11 @@ fn command_builder() -> Command {
             .long("nocolor")
             .help("Disables color printing in the errors of the sus_compiler output")
             .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("target")
+            .long("target")
+            .help("Sets the target HDL")
+            .value_parser(clap::builder::EnumValueParser::<TargetLanguage>::new())
+            .default_value("system-verilog"))
         .arg(Arg::new("files")
             .action(clap::ArgAction::Append)
             .help(".sus Files")
@@ -129,6 +141,7 @@ where
     let use_color = !matches.get_flag("nocolor") && !use_lsp;
     let early_exit = *matches.get_one("upto").unwrap();
     let codegen_module_and_dependencies_one_file = matches.get_one("standalone").cloned();
+    let target_language = *matches.get_one("target").unwrap();
     let file_paths: Vec<PathBuf> = match matches.get_many("files") {
         Some(files) => files.cloned().collect(),
         None => std::fs::read_dir(".")
@@ -150,6 +163,7 @@ where
         codegen_module_and_dependencies_one_file,
         early_exit,
         use_color,
+        target_language,
         files: file_paths,
     })
 }
