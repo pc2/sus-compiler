@@ -156,8 +156,7 @@ where
 
 pub fn config() -> &'static ConfigStruct {
     static CONFIG: LazyLock<ConfigStruct> = LazyLock::new(|| {
-        let args: Vec<OsString> = std::env::args_os().collect();
-        parse_args(args.as_slice())
+        parse_args(std::env::args_os())
             .map_err(|err| err.exit())
             .unwrap()
     });
