@@ -15,7 +15,7 @@ mod to_string;
 mod typing;
 mod value;
 
-mod codegen_fallback;
+mod codegen;
 
 mod dev_aid;
 mod linker;
@@ -31,7 +31,7 @@ use std::{error::Error, fs};
 
 use prelude::*;
 
-use codegen_fallback::gen_verilog_code;
+use codegen::system_verilog::gen_verilog_code;
 use config::{config, EarlyExitUpTo};
 use dev_aid::ariadne_interface::*;
 use flattening::Module;
