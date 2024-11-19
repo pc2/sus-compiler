@@ -10,7 +10,7 @@ homepage = "https://github.com/pc2/sus-compiler"
 readme = "README.md"
 keywords = ["sus", "fpga", "vlsi", "hdl", "verilog"]
 categories = ["compilers", "text-processing"]
-rust-version = "1.78"
+rust-version = "1.80"
 
 include = ["/src", "/stl/*", "/README.md", "/LICENSE", "/CHANGELOG.md", "/build.rs", "/rustfmt.toml"]
 
@@ -26,7 +26,7 @@ members = [
 ariadne = "0.4.1" # for nice errors
 num = "0.4"
 # itertools = "0.13.0"
-clap = "3.2"
+clap = { version = "4.5.21", features = ["derive"] }
 arrayvec = "0.7.6"
 
 # Tree sitter
