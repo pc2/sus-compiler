@@ -10,7 +10,7 @@ homepage = "https://github.com/pc2/sus-compiler"
 readme = "README.md"
 keywords = ["sus", "fpga", "vlsi", "hdl", "verilog"]
 categories = ["compilers", "text-processing"]
-rust-version = "1.78"
+rust-version = "1.80"
 
 include = ["/src", "/stl/*", "/README.md", "/LICENSE", "/CHANGELOG.md", "/build.rs", "/rustfmt.toml"]
 
