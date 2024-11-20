@@ -107,6 +107,8 @@ TREE SITTER module! useModuleWithBadInterface
 TREE SITTER module! SUM_UP
 TREE SITTER module! dont_care
 TREE SITTER module! m
+TREE SITTER module! xyz
+TREE SITTER module! numbersToAddUp
 Typechecking DualPortMem
 Typechecking UseDualPortMem
 Typechecking FIFO
@@ -209,6 +211,8 @@ Typechecking moduleWithBadDeclaration
 Typechecking moduleWithBadInterface
 Typechecking useModuleWithBadInterface
 Typechecking m
+Typechecking xyz
+Typechecking numbersToAddUp
 Instantiating UseDualPortMem
 Concrete Typechecking UseDualPortMem
 Instantiating DualPortMem
@@ -497,3 +501,33 @@ Not Instantiating moduleWithBadDeclaration due to flattening errors
 Not Instantiating moduleWithBadInterface due to flattening errors
 Not Instantiating useModuleWithBadInterface due to flattening errors
 Not Instantiating m due to flattening errors
+Instantiating xyz
+Concrete Typechecking xyz
+Instantiating CrossDomain
+Concrete Typechecking CrossDomain
+Latency Counting CrossDomain
+Latency Counting xyz
+Instantiating numbersToAddUp
+Concrete Typechecking numbersToAddUp
+Instantiating TreeAdd
+Concrete Typechecking TreeAdd
+Instantiating SplitAt
+Concrete Typechecking SplitAt
+Latency Counting SplitAt
+Instantiating TreeAdd
+Concrete Typechecking TreeAdd
+Instantiating SplitAt
+Concrete Typechecking SplitAt
+Latency Counting SplitAt
+Instantiating TreeAdd
+Concrete Typechecking TreeAdd
+Latency Counting TreeAdd
+Latency Counting TreeAdd
+Instantiating TreeAdd
+Concrete Typechecking TreeAdd
+Instantiating SplitAt
+Concrete Typechecking SplitAt
+Latency Counting SplitAt
+Latency Counting TreeAdd
+Latency Counting TreeAdd
+Latency Counting numbersToAddUp

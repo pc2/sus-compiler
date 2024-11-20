@@ -1,4 +1,5 @@
 use crate::alloc::ArenaAllocator;
+use crate::errors::{ErrorInfo, ErrorInfoObject, FileKnowingErrorInfoObject};
 use crate::prelude::*;
 use crate::typing::abstract_type::AbstractType;
 use crate::typing::template::TemplateInputKind;
@@ -101,22 +102,22 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     }
 
-    fn get_wire_ref_declaration_point(
+    fn get_wire_ref_info(
         &self,
         wire_ref_root: &WireReferenceRoot,
-    ) -> SpanFile {
+    ) -> ErrorInfo {
         match wire_ref_root {
             WireReferenceRoot::LocalDecl(id, _) => {
                 let decl_root = self.working_on.instructions[*id].unwrap_wire_declaration();
-                (decl_root.decl_span, self.errors.file)
+                decl_root.make_info(self.errors.file)
             }
             WireReferenceRoot::NamedConstant(cst) => {
                 let linker_cst = &self.globals[cst.id];
-                linker_cst.link_info.get_span_file()
+                linker_cst.link_info.make_global_info(&self.errors.files)
             }
             WireReferenceRoot::SubModulePort(port) => {
                 let (decl, file) = self.get_decl_of_module_port(port.port, port.submodule_decl);
-                (decl.decl_span, file)
+                decl.make_info(file)
             }
         }
     }
@@ -451,7 +452,6 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
                     let (decl, file) =
                         self.get_decl_of_module_port(port, fc.interface_reference.submodule_decl);
-                    let declared_here = (decl.decl_span, file);
 
                     // Typecheck the value with target type
                     let from_wire = self.working_on.instructions[*arg].unwrap_wire();
@@ -461,7 +461,9 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         &from_wire.typ,
                         &write_to_type,
                         from_wire.span,
-                        "function argument"
+                        || {
+                            ("function argument".to_string(), vec![decl.make_info(file)])
+                        }
                     );
                 }
             }
@@ -473,20 +475,19 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 self.typecheck_wire_reference(&conn.to, conn.to_span, &conn.to_type);
                 self.join_with_condition(&conn.to_type.domain, conn.to_span.debug());
 
-                let declared_here = self.get_wire_ref_declaration_point(&conn.to.root);
-
-                let write_context = match conn.write_modifiers {
-                    WriteModifiers::Connection {..} => "connection",
-                    WriteModifiers::Initial { initial_kw_span: _ } => "initial value"
-                };
-
-
                 from_wire.span.debug();
                 self.type_checker.typecheck_write_to(
                     &from_wire.typ,
                     &conn.to_type,
                     from_wire.span,
-                    write_context,
+                    || {
+                        let write_context = match conn.write_modifiers {
+                            WriteModifiers::Connection {..} => "connection",
+                            WriteModifiers::Initial { initial_kw_span: _ } => "initial value"
+                        };
+                        let declared_here = self.get_wire_ref_info(&conn.to.root);
+                        (write_context.to_string(), vec![declared_here])
+                    }
                 );
             }
         }
@@ -565,27 +566,31 @@ pub fn apply_types(
     }
 
     // Print all errors
-    for FailedUnification{mut found, mut expected, span, context} in type_checker.type_substitutor.extract_errors() {
+    for FailedUnification{mut found, mut expected, span, context, infos} in type_checker.type_substitutor.extract_errors() {
         // Not being able to fully substitute is not an issue. We just display partial types
         let _ = found.fully_substitute(&type_checker.type_substitutor);
         let _ = expected.fully_substitute(&type_checker.type_substitutor);
 
         let expected_name = expected.to_string(types, &type_checker.template_type_names);
         let found_name = found.to_string(types, &type_checker.template_type_names);
-        errors.error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
+        errors
+            .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
+            .add_info_list(infos);
 
         assert!(
             expected_name != found_name,
             "{expected_name} != {found_name}"
         );
     }
-    for FailedUnification{mut found, mut expected, span, context} in type_checker.domain_substitutor.extract_errors() {
+    for FailedUnification{mut found, mut expected, span, context, infos} in type_checker.domain_substitutor.extract_errors() {
         assert!(found.fully_substitute(&type_checker.domain_substitutor));
         assert!(expected.fully_substitute(&type_checker.domain_substitutor));
 
         let expected_name = format!("{expected:?}");
         let found_name = format!("{found:?}");
-        errors.error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"));
+        errors
+            .error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"))
+            .add_info_list(infos);
 
         assert!(
             expected_name != found_name,

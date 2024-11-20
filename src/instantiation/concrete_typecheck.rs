@@ -1,6 +1,7 @@
 
 use std::ops::Deref;
 
+use crate::errors::ErrorInfoObject;
 use crate::flattening::{DeclarationPortInfo, WireReferenceRoot, WireSource, WrittenType};
 use crate::linker::LinkInfo;
 use crate::typing::template::{ConcreteTemplateArg, HowDoWeKnowTheTemplateArg};
@@ -116,15 +117,17 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
 
         // Print all errors
-        for FailedUnification{mut found, mut expected, span, context} in self.type_substitutor.extract_errors() {
+        for FailedUnification{mut found, mut expected, span, context, infos} in self.type_substitutor.extract_errors() {
             // Not being able to fully substitute is not an issue. We just display partial types
             let _ = found.fully_substitute(&self.type_substitutor);
             let _ = expected.fully_substitute(&self.type_substitutor);
     
             let expected_name = expected.to_string(&self.linker.types);
             let found_name = found.to_string(&self.linker.types);
-            self.errors.error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"));
-    
+            self.errors
+                .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
+                .add_info_list(infos);
+
             assert!(
                 expected_name != found_name,
                 "{expected_name} != {found_name}"
@@ -281,7 +284,12 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                     }
                     (Some(concrete_port), Some(connecting_wire)) => {
                         let wire = &context.wires[connecting_wire.maps_to_wire];
-                        context.type_substitutor.unify_report_error(&wire.typ, &concrete_port.typ, submod_instr.module_ref.get_total_span(), "submodule port typechecking")
+                        context.type_substitutor.unify_report_error(&wire.typ, &concrete_port.typ, submod_instr.module_ref.get_total_span(), || {
+                            let abstract_port = &sub_module.ports[port_id];
+                            let port_declared_here = abstract_port.make_info(sub_module.link_info.file);
+
+                            (format!("Port '{}'", abstract_port.name), vec![port_declared_here])
+                        });
                     }
                 }
             }

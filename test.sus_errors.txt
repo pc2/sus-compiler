@@ -186,8 +186,8 @@ Error: 'i' is read-only
      ╭─[test.sus:159:11]
      │
  142 │     interface generative : int i -> int o, int o2
-     │                            ──┬──  
-     │                              ╰──── 'i' declared here
+     │                                ┬  
+     │                                ╰── 'i' declared here
      │ 
  159 │     if test {i = 5}
      │              ┬  
@@ -360,7 +360,9 @@ Error: Typing Error: connection expects a ::bool[] but was given a ::int
      ╭─[test.sus:250:41]
      │
  250 │     state bool[24] stored_valid_permutes = 000000000000000000000000
-     │                                            ────────────┬───────────  
+     │                    ──────────┬──────────   ────────────┬───────────  
+     │                              ╰─────────────────────────────────────── 'stored_valid_permutes' declared here
+     │                                                        │             
      │                                                        ╰───────────── Typing Error: connection expects a ::bool[] but was given a ::int
 ─────╯
 Error: Typing Error: binop left side expects a ::bool but was given a ::bool[]
@@ -380,6 +382,10 @@ Error: Typing Error: binop right side expects a ::bool but was given a ::bool[]
 Error: Typing Error: connection expects a ::bool[] but was given a ::bool
      ╭─[test.sus:263:26]
      │
+ 250 │     state bool[24] stored_valid_permutes = 000000000000000000000000
+     │                    ──────────┬──────────  
+     │                              ╰──────────── 'stored_valid_permutes' declared here
+     │ 
  263 │     stored_valid_permutes = stored_valid_permutes & permutes_to_keep
      │                             ────────────────────┬───────────────────  
      │                                                 ╰───────────────────── Typing Error: connection expects a ::bool[] but was given a ::bool
@@ -445,8 +451,8 @@ But this was specified as x'1
      ╭─[test.sus:325:67]
      │
  325 │     interface conflicting_latency_declarations : int a'0 -> int x'1
-     │                                                  ───┬───          ┬  
-     │                                                     ╰──────────────── 'a' declared here
+     │                                                      ┬            ┬  
+     │                                                      ╰─────────────── 'a' declared here
      │                                                                   │  
      │                                                                   ╰── Conflicting specified latency
 
@@ -908,8 +914,8 @@ Error: 'MY_INPUT' is read-only
      ╭─[test.sus:769:2]
      │
  766 │ module test #(T, int MY_INPUT) {
-     │                  ──────┬─────  
-     │                        ╰─────── 'MY_INPUT' declared here
+     │                      ────┬───  
+     │                          ╰───── 'MY_INPUT' declared here
      │ 
  769 │     MY_INPUT = 3
      │     ────┬───  
@@ -919,8 +925,8 @@ Error: 'beep' is read-only
      ╭─[test.sus:773:2]
      │
  771 │     input int beep
-     │           ────┬───  
-     │               ╰───── 'beep' declared here
+     │               ──┬─  
+     │                 ╰─── 'beep' declared here
      │ 
  773 │     beep = 3
      │     ──┬─  
@@ -1213,6 +1219,10 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: Typing Error: connection expects a ::int but was given a ::bool
      ╭─[test.sus:939:11]
      │
+ 936 │     int[3] xyz
+     │            ─┬─  
+     │             ╰─── 'xyz' declared here
+     │ 
  939 │     xyz[3] = true
      │              ──┬─  
      │                ╰─── Typing Error: connection expects a ::int but was given a ::bool
@@ -1289,4 +1299,32 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  962 │     int #(ABC) x
      │                ┬  
      │                ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:966:9]
+     │
+ 966 │     int[5] a
+     │            ┬  
+     │            ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:971:9]
+     │
+ 971 │     int[5] b = cr.out
+     │            ┬  
+     │            ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:975:9]
+     │
+ 975 │     int[5] arr
+     │            ─┬─  
+     │             ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[test.sus:984:6]
+     │
+ 984 │     int total = adder(arr)
+     │         ──┬──  
+     │           ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯

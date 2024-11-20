@@ -971,25 +971,16 @@ module xyz {
 	int[5] b = cr.out
 }
 
-
-module addNumbersInList #(int Size) {
-	interface addNumbersInList : int[Size] data_in -> int total
-
-	for int i in 0..Size {
-	    total = total + data_in[i]
-	}
-}
-
 module numbersToAddUp {
-	int[11] arr
+	int[5] arr
 	arr[0] = 3
 	arr[1] = 3
 	arr[2] = 3
 	arr[3] = 3
 	arr[4] = 3
 
-	// Don't need to specify #(Size: 11)!
-	addNumbersInList #(Size: 12) adder
+	// Don't need to specify #(WIDTH: 5)!
+	TreeAdd adder
 	int total = adder(arr)
 }
 

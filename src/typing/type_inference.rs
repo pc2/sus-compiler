@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index};
 
 use crate::block_vector::{BlockVec, BlockVecIter};
+use crate::errors::ErrorInfo;
 use crate::prelude::*;
 
 use crate::alloc::{UUIDAllocator, UUIDMarker, UUID};
@@ -37,7 +38,8 @@ pub struct FailedUnification<MyType> {
     pub found: MyType,
     pub expected: MyType,
     pub span: Span,
-    pub context: &'static str
+    pub context: String,
+    pub infos: Vec<ErrorInfo>
 }
 
 /// Pretty big block size so for most typing needs we only need one
@@ -64,6 +66,21 @@ impl<MyType : HindleyMilner<VariableIDMarker>, VariableIDMarker : UUIDMarker> In
 
     fn index(&self, index: UUID<VariableIDMarker>) -> &Self::Output {
         &self.substitution_map[index.get_hidden_value()]
+    }
+}
+
+/// To be passed to [TypeSubstitutor::unify_report_error]
+pub trait UnifyErrorReport {
+    fn report(self) -> (String, Vec<ErrorInfo>);
+}
+impl<'s> UnifyErrorReport for &'s str {
+    fn report(self) -> (String, Vec<ErrorInfo>) {
+        (self.to_string(), Vec::new())
+    }
+}
+impl<F : Fn() -> (String, Vec<ErrorInfo>)> UnifyErrorReport for F {
+    fn report(self) -> (String, Vec<ErrorInfo>) {
+        self()
     }
 }
 
@@ -126,13 +143,15 @@ impl<MyType : HindleyMilner<VariableIDMarker>+Clone, VariableIDMarker : UUIDMark
     pub fn unify_must_succeed(&self, a: &MyType, b: &MyType) {
         assert!(self.unify(a, b), "This unification cannot fail. Usually because we're unifying with a Written Type");
     }
-    pub fn unify_report_error(&self, found: &MyType, expected: &MyType, span: Span, context: &'static str) {
+    pub fn unify_report_error<Report : UnifyErrorReport>(&self, found: &MyType, expected: &MyType, span: Span, reporter: Report) {
         if !self.unify(found, expected) {
+            let (context, infos) = reporter.report();
             self.failed_unifications.borrow_mut().push(FailedUnification {
                 found: found.clone(),
                 expected: expected.clone(),
                 span,
-                context
+                context,
+                infos
             });
         }
     }

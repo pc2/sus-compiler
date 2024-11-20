@@ -5,7 +5,7 @@ use crate::value::Value;
 use std::ops::Deref;
 
 use super::template::{GlobalReference, TemplateAbstractTypes, TemplateInputs};
-use super::type_inference::{DomainVariableID, DomainVariableIDMarker, TypeSubstitutor, TypeVariableID, TypeVariableIDMarker};
+use super::type_inference::{DomainVariableID, DomainVariableIDMarker, TypeSubstitutor, TypeVariableID, TypeVariableIDMarker, UnifyErrorReport};
 use crate::flattening::{BinaryOperator, StructType, TypingAllocator, UnaryOperator, WrittenType};
 use crate::linker::get_builtin_type;
 use crate::to_string::map_to_type_names;
@@ -243,7 +243,13 @@ impl TypeUnifier {
 
     // ===== Both =====
 
-    pub fn unify_domains(&self, from_domain: &DomainType, to_domain: &DomainType, span: Span, context: &'static str) {
+    pub fn unify_domains<Context: UnifyErrorReport>(
+        &self,
+        from_domain: &DomainType,
+        to_domain: &DomainType,
+        span: Span,
+        context: Context
+    ) {
         // The case of writes to generatives from non-generatives should be fully covered by flattening
         if !from_domain.is_generative() && !to_domain.is_generative() {
             self.domain_substitutor.unify_report_error(&from_domain, &to_domain, span, context);
@@ -287,24 +293,24 @@ impl TypeUnifier {
         self.unify_with_array_of(&arr_type, output_typ.clone(), arr_span);
     }
 
-    pub fn typecheck_write_to_abstract(
+    pub fn typecheck_write_to_abstract<Context: UnifyErrorReport>(
         &self,
         found: &AbstractType,
         expected: &AbstractType,
         span: Span,
-        context: &'static str
+        context: Context
     ) {
         self.type_substitutor.unify_report_error(&found, &expected, span, context);
     }
 
-    pub fn typecheck_write_to(
+    pub fn typecheck_write_to<Context: UnifyErrorReport+Clone>(
         &self,
         found: &FullType,
         expected: &FullType,
         span: Span,
-        context: &'static str
+        context: Context
     ) {
-        self.typecheck_write_to_abstract(&found.typ, &expected.typ, span, context);
+        self.typecheck_write_to_abstract(&found.typ, &expected.typ, span, context.clone());
         self.unify_domains(&found.domain, &expected.domain, span, context);
     }
 
