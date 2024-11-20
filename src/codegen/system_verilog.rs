@@ -198,9 +198,6 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             let wire_doc = port_wire.source.wire_or_reg();
             let wire_name = wire_name_self_latency(port_wire, self.use_latency);
             let wire_decl = typ_to_declaration(&port_wire.typ, &wire_name);
-            dbg!(&wire_doc);
-            dbg!(&wire_name);
-            dbg!(&wire_decl);
             write!(
                 self.program_text,
                 ",\n{comment_text}\t{input_or_output} {wire_doc} {wire_decl}"
