@@ -10,6 +10,26 @@ use crate::instantiation::{
 };
 use crate::{linker::get_builtin_type, typing::concrete_type::ConcreteType, value::Value};
 
+use super::mangle;
+
+#[derive(Debug)]
+pub struct VerilogCodegenBackend;
+
+impl super::CodeGenBackend for VerilogCodegenBackend {
+    fn file_extension(&self) -> &str {
+        "sv"
+    }
+    fn output_dir_name(&self) -> &str {
+        "verilog_output"
+    }
+    fn comment(&self) -> &str {
+        "//"
+    }
+    fn codegen(&self, md: &Module, instance: &InstantiatedModule) -> String {
+        gen_verilog_code(md, instance, true)
+    }
+}
+
 fn get_type_name_size(id: TypeUUID) -> u64 {
     if id == get_builtin_type("int") {
         32 // TODO concrete int sizes
@@ -19,17 +39,6 @@ fn get_type_name_size(id: TypeUUID) -> u64 {
         println!("TODO Named Structs Size");
         1 // todo!() // Named structs are not implemented yet
     }
-}
-
-pub fn mangle(str: &str) -> String {
-    let mut result = String::with_capacity(str.len());
-    for c in str.chars() {
-        if c.is_whitespace() || c == ':' {
-            continue;
-        }
-        result.push(if c.is_alphanumeric() { c } else { '_' });
-    }
-    result
 }
 
 /// Creates the Verilog variable declaration for tbis variable.
@@ -459,7 +468,7 @@ impl RealWireDataSource {
     }
 }
 
-pub fn gen_verilog_code(md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String {
+fn gen_verilog_code(md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String {
     let mut program_text = String::new();
 
     let mut ctx = CodeGenerationContext {
