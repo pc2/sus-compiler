@@ -95,7 +95,9 @@ pub struct RealWire {
     pub typ: ConcreteType,
     pub name: String,
     pub domain: DomainID,
-    /// Before latency counting, non i64::MIN values specify specified latency
+    /// non i64::MIN values specify specified latency
+    pub specified_latency: i64,
+    /// The computed latencies after latency counting
     pub absolute_latency: i64,
 }
 

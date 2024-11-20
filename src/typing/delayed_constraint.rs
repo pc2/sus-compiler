@@ -58,6 +58,6 @@ impl<T> DelayedConstraintsList<T> {
 
 impl<T> Drop for DelayedConstraintsList<T> {
     fn drop(&mut self) {
-        assert_eq!(self.0.len(), 0, "DelayedConstraintsList was not resolved. ");
+        assert_eq!(self.0.len(), 0, "DelayedConstraintsList was not resolved.");
     }
 }

@@ -168,10 +168,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         debug_assert!(map_wire_to_latency_node[w_id] == PLACEHOLDER);
                         map_wire_to_latency_node[w_id] = new_idx;
 
-                        if w.absolute_latency != CALCULATE_LATENCY_LATER {
+                        if w.specified_latency != CALCULATE_LATENCY_LATER {
                             initial_values.push(SpecifiedLatency {
                                 wire: new_idx,
-                                latency: w.absolute_latency,
+                                latency: w.specified_latency,
                             });
                         }
                     }
@@ -290,7 +290,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         fanins
     }
-
+    
     // Returns a proper interface if all ports involved did not produce an error. If a port did produce an error then returns None.
     // Computes all latencies involved
     pub fn compute_latencies(&mut self) {
@@ -305,7 +305,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 else {
                     unreachable!()
                 };
-                if sources.is_empty() && port_wire.absolute_latency == CALCULATE_LATENCY_LATER {
+                if sources.is_empty() && port_wire.specified_latency == CALCULATE_LATENCY_LATER {
                     any_invalid_port = true;
                     let port = &self.md.ports[port_id];
                     self.errors.error(port.name_span, format!("Pre-emptive error because latency-unspecified '{}' is never written to. \n(This is because work-in-progress code would get a lot of latency counting errors while unfinished)", port.name));
@@ -487,13 +487,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     self.gather_all_mux_inputs(latency_node_meanings, &conflict_path);
                 let path_message = make_path_info_string(
                     &writes_involved,
-                    start_wire.absolute_latency,
+                    start_wire.specified_latency,
                     &start_wire.name,
                 );
                 //assert!(!writes_involved.is_empty());
 
                 let end_name = &end_wire.name;
-                let specified_end_latency = end_wire.absolute_latency;
+                let specified_end_latency = end_wire.specified_latency;
                 self.errors
                     .error(end_latency_decl.span, format!("Conflicting specified latency\n\n{path_message}\nBut this was specified as {end_name}'{specified_end_latency}"))
                     .info_obj_same_file(start_decl);

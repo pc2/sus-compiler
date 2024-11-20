@@ -431,6 +431,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             domain,
             typ: value.typ,
             name: self.unique_name_producer.get_unique_name(""),
+            specified_latency: CALCULATE_LATENCY_LATER,
             absolute_latency: CALCULATE_LATENCY_LATER,
         })
     }
@@ -486,6 +487,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 domain: domain.unwrap_physical(),
                 typ: ConcreteType::Unknown(self.type_substitutor.alloc()),
                 name: self.unique_name_producer.get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
+                specified_latency: CALCULATE_LATENCY_LATER,
                 absolute_latency: CALCULATE_LATENCY_LATER,
             });
 
@@ -568,6 +570,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             original_instruction,
             domain,
             source,
+            specified_latency: CALCULATE_LATENCY_LATER,
             absolute_latency: CALCULATE_LATENCY_LATER,
         }))
     }
@@ -601,7 +604,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 }
             };
 
-            let absolute_latency: i64 = if let Some(spec) = &wire_decl.latency_specifier {
+            let specified_latency: i64 = if let Some(spec) = &wire_decl.latency_specifier {
                 self.generation_state.get_generation_small_int(*spec)?
             } else {
                 CALCULATE_LATENCY_LATER
@@ -612,7 +615,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 original_instruction,
                 domain: wire_decl.typ.domain.unwrap_physical(),
                 source,
-                absolute_latency,
+                specified_latency,
+                absolute_latency: CALCULATE_LATENCY_LATER,
             });
             SubModuleOrWire::Wire(wire_id)
         })
