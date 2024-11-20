@@ -281,7 +281,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                     }
                     (Some(concrete_port), Some(connecting_wire)) => {
                         let wire = &context.wires[connecting_wire.maps_to_wire];
-                        context.type_substitutor.unify_must_succeed(&wire.typ, &concrete_port.typ)
+                        context.type_substitutor.unify_report_error(&wire.typ, &concrete_port.typ, submod_instr.module_ref.get_total_span(), "submodule port typechecking")
                     }
                 }
             }
