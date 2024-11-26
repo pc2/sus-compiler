@@ -1,4 +1,9 @@
 verilog_output/** linguist-generated
-tree-sitter-sus/** linguist-generated
-tree-sitter-sus/grammar.js linguist-generated=false
-tree-sitter-sus/tree.sh linguist-generated=false
+tree-sitter-sus/src/** linguist-generated
+tree-sitter-sus/bindings/** linguist-generated
+tree-sitter-sus/Makefile linguist-generated
+tree-sitter-sus/package.json linguist-generated
+tree-sitter-sus/*.wasm linguist-generated
+tree-sitter-sus/Package.swift linguist-generated
+tree-sitter-sus/pyproject.toml linguist-generated
+tree-sitter-sus/setup.py linguist-generated
