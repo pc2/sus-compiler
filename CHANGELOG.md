@@ -16,3 +16,12 @@
 - Instructions are now part of LinkInfo. 
 ## 0.1.1
 - Change sus stl installation directory to $HOME/.sus/VERSION/stl
+
+## 0.2.0 (indev)
+- Add Type Inference
+- Add Generative Parameter Inference
+
+### Technical Changes
+- Hindley-Milner for Concrete Typing
+- Submodule Instantiation done During Concrete Typing
+- tree-sitter-sus has been merged into sus-compiler and is no longer a separate repository

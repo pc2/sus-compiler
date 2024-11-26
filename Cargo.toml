@@ -31,9 +31,9 @@ arrayvec = "0.7.6"
 
 # Tree sitter
 tree-sitter = "~0.22.2"
-tree-sitter-sus = {version = "~0.1.0", path = "./tree-sitter-sus"}
+tree-sitter-sus = {version = "~0.2.0-devel", path = "./tree-sitter-sus"}
 
-sus-proc-macro = {version = "~0.1.0", path = "./sus-proc-macro"}
+sus-proc-macro = {version = "~0.2.0-devel", path = "./sus-proc-macro"}
 
 # calyx-ir = {version = "0.6.1", optional = true}
 # calyx-opt = {version = "0.6.1", optional = true}

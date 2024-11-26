@@ -2,10 +2,10 @@
 name = "tree-sitter-sus"
 authors = ["Lennart Van Hirtum <lennart.vanhirtum@gmail.com>"]
 description = "sus grammar for the tree-sitter parsing library"
-version = "0.1.0"
+version = "0.2.0-devel"
 keywords = ["incremental", "parsing", "sus"]
 categories = ["parsing", "text-editors"]
-repository = "https://github.com/tree-sitter/tree-sitter-sus"
+repository = "https://github.com/pc2/sus-compiler"
 edition = "2021"
 license = "GPL-3.0-or-later"
 homepage = "https://github.com/pc2/sus-compiler"
