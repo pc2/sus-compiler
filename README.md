@@ -217,8 +217,8 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Hindley-Milner typing for Abstract Types
 - [x] Hindley-Milner typing for Domain Types
 - [x] Hindley-Milner typing for Concrete Types
-- [ ] Template Type Inference
-- [ ] Generative Parameter Inference
+- [x] Template Type Inference
+- [x] Generative Parameter Inference
 - [ ] Latency Count Inference
 - [ ] Let-syntax
 

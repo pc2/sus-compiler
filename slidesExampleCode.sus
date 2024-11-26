@@ -1,0 +1,110 @@
+
+// Recursive Tree Add module recurses smaller copies of itself. 
+module TreeAdder #(int WIDTH) {
+	interface TreeAdder : int[WIDTH] values'0 -> int total
+
+	if WIDTH == 0 {
+		// Have to explicitly give zero a latency count. 
+		// Otherwise total's latency can't be determined. 
+		int zero'0 = 0
+		total = zero
+	} else if WIDTH == 1 {
+		total = values[0]
+	} else {
+		gen int L_SZ = WIDTH / 2
+		gen int R_SZ = WIDTH - L_SZ
+
+		int[L_SZ] left_part, int[R_SZ] right_part = SplitAt(values)
+
+		int left_total = TreeAdder(left_part)
+		int right_total = TreeAdder(right_part)
+		
+		// Can add pipelining registers here too. 
+		// Latency Counting will figure it out.
+		reg total = left_total + right_total
+	}
+}
+
+module use_TreeAdder {
+    TreeAdder #(WIDTH: 20) t
+}
+
+module TreeAdderBaseCase #(int WIDTH) {
+	interface TreeAdderBaseCase : int[WIDTH] values'0 -> int total
+
+    gen int L_SZ = WIDTH / 2
+    gen int R_SZ = WIDTH - L_SZ
+
+    int[L_SZ] left_part, int[R_SZ] right_part = SplitAt(values)
+
+    int left_total = TreeAdder(left_part)
+    int right_total = TreeAdder(right_part)
+    
+    // Can add pipelining registers here too. 
+    // Latency Counting will figure it out.
+    reg total = left_total + right_total
+}
+
+
+module pairwiseMultiply #(int SIZE) {
+	interface pairwiseMultiply: int[SIZE] a -> int[SIZE-1] out
+
+	for int I in 0..SIZE-1 {
+		out[I] = a[I] * a[I+1]
+	}
+}
+
+
+module use_splitAt {
+    input int[20] arr
+    output int x
+
+    SplitAt #(T: type int, SIZE: 20, SPLIT_POINT: 2) spl
+    int[2] a, int[18] b = spl(arr)
+
+    int[2] c, int[18] d = SplitAt(arr)
+
+    x = a[0] + b[0] + c[0] + d[0]
+}
+
+
+module pairwiseMultiplyFlattened #(int SIZE) {
+	interface pairwiseMultiplyFlattened: int[SIZE] a -> int[SIZE-1] out
+
+    gen int _0 = SIZE-1
+	for int I in 0.._0 {
+        int _1 = a[I]
+        gen int _2 = I+1
+        int _3 = a[_2]
+		out[I] = _1 * _3
+	}
+}
+
+
+
+module pairwiseMultiplyExecuted /* #(int SIZE = 3)*/ {
+	interface pairwiseMultiplyExecuted: int[3] a -> int[2] out
+
+    out[0] = a[0] * a[1]
+    out[1] = a[1] * a[2]
+}
+
+
+
+module BRAMShiftReg #(T, int LATENCY) {
+    interface BRAMShiftReg: T d_in'0 -> T d_out'LATENCY
+
+    state T[LATENCY] memory
+    state int idx = 0
+
+    T out_data = memory[idx]
+    memory[idx] = d_in
+
+    idx = (idx + 1) % LATENCY
+
+    d_out = LatencyOffset #(OFFSET: LATENCY)(out_data)
+}
+
+module use_bram {
+    BRAMShiftReg #(T: type bool[3], LATENCY: 10) b
+}

@@ -45,27 +45,27 @@ module FIFO #(
 	initial read_addr = 0
 	initial write_addr = 0
 
-	interface push : bool push'READY_SLACK, T data_in'READY_SLACK
-	
+	domain push
 	output bool ready'0
+	interface push : bool push'READY_SLACK, T data_in'READY_SLACK
 
 	domain pop
 	interface pop : bool pop -> bool data_valid, T data_out
 	
-	CrossDomain #(T: type int) write_to_pop
+	CrossDomain write_to_pop
 	write_to_pop.in = write_addr
 
-	CrossDomain #(T: type int) read_to_push
+	CrossDomain read_to_push
 	read_to_push.in = read_addr
 
-	CrossDomain #(T: type T[DEPTH]) mem_to_pop
+	CrossDomain mem_to_pop
 	mem_to_pop.in = mem
 
 	if pop {
 		data_valid = read_addr != write_to_pop.out
 		if data_valid {
-			// Add some pipelining registers, just because we can
-			reg reg data_out = mem_to_pop.out[read_addr]
+			// Add a pipelining register, because it can usually be fitted to the 
+			reg data_out = mem_to_pop.out[read_addr]
 			read_addr = (read_addr + 1) % DEPTH
 		}
 	}
@@ -79,8 +79,9 @@ module FIFO #(
 	int space_remaining = (read_to_push.out - write_addr) % DEPTH
 	gen int ALMOST_FULL_TRESHOLD = READY_SLACK + 1 // +1 for the latency reg we introduce here
 	reg bool r = space_remaining >  ALMOST_FULL_TRESHOLD
-	ready = LatencyOffset #(OFFSET: -ALMOST_FULL_TRESHOLD, T: type bool)(r)
+	ready = LatencyOffset #(OFFSET: -ALMOST_FULL_TRESHOLD)(r)
 }
+
 
 module example_FIFO {
 	FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
