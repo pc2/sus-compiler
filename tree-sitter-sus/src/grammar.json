@@ -1,4 +1,5 @@
 {
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/grammar.schema.json",
   "name": "sus",
   "word": "identifier",
   "rules": {
@@ -1733,6 +1734,10 @@
         "value": "\n"
       }
     },
+    "doc_comment": {
+      "type": "PATTERN",
+      "value": "\\/\\/\\/[^\\n]*"
+    },
     "single_line_comment": {
       "type": "PATTERN",
       "value": "\\/\\/[^\\n]*"
@@ -1754,6 +1759,10 @@
     {
       "type": "SYMBOL",
       "name": "multi_line_comment"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "doc_comment"
     }
   ],
   "conflicts": [

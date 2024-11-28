@@ -35,7 +35,7 @@ fn print_current_node_indented<'ft>(file_text: &'ft FileText, cursor: &TreeCurso
 pub struct Cursor<'t> {
     cursor: TreeCursor<'t>,
     file_text: &'t FileText,
-    gathered_comments: Vec<Span>,
+    doc_comments: Vec<Span>,
     current_field_was_already_consumed: bool,
 }
 
@@ -44,7 +44,7 @@ impl<'t> Cursor<'t> {
         Self {
             cursor: tree.walk(),
             file_text,
-            gathered_comments: Vec::new(),
+            doc_comments: Vec::new(),
             current_field_was_already_consumed: false,
         }
     }
@@ -280,23 +280,24 @@ impl<'t> Cursor<'t> {
         let node = self.cursor.node();
         let kind = node.kind_id();
 
-        if kind == kind!("single_line_comment") || kind == kind!("multi_line_comment") {
-            let mut range = node.byte_range();
-            range.start += 2; // skip '/*' or '//'
-            if kind == kind!("multi_line_comment") {
-                range.end -= 2; // skip '*/'
+        if let kind!("doc_comment")|kind!("multi_line_comment")|kind!("single_line_comment") = kind {
+            if kind == kind!("doc_comment") {
+                let mut range = node.byte_range();
+                range.start += 3; // skip '///'
+                self.doc_comments.push(Span::from(range));
+            } else {
+                self.clear_doc_comments();
             }
-            self.gathered_comments.push(Span::from(range));
         }
     }
 
-    pub fn extract_gathered_comments(&mut self) -> Documentation {
-        let gathered = self.gathered_comments.clone().into_boxed_slice();
-        self.gathered_comments.clear();
+    pub fn extract_doc_comments(&mut self) -> Documentation {
+        let gathered = self.doc_comments.clone().into_boxed_slice();
+        self.doc_comments.clear();
         Documentation { gathered }
     }
-    pub fn clear_gathered_comments(&mut self) {
-        self.gathered_comments.clear()
+    pub fn clear_doc_comments(&mut self) {
+        self.doc_comments.clear()
     }
 
     // Error reporting

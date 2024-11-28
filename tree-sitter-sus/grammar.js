@@ -329,6 +329,7 @@ module.exports = grammar({
 
         // Extras
 
+        doc_comment: $ => /\/\/\/[^\n]*/,
         single_line_comment: $ => /\/\/[^\n]*/,
         multi_line_comment: $ => /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\//,
     },
@@ -342,6 +343,7 @@ module.exports = grammar({
     extras: $ => [
         /[ \t\r]+/, // Non newline whitespace
         $.single_line_comment,
-        $.multi_line_comment
+        $.multi_line_comment,
+        $.doc_comment
     ]
 });

@@ -302,7 +302,7 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
         type_variable_alloc: TypingAllocator{domain_variable_alloc: UUIDAllocator::new(), type_variable_alloc: UUIDAllocator::new()},
         template_arguments: ctx.template_inputs,
         instructions: FlatAlloc::new(),
-        documentation: cursor.extract_gathered_comments(),
+        documentation: cursor.extract_doc_comments(),
         file: builder.file_id,
         name,
         name_span,

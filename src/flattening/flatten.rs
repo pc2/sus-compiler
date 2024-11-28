@@ -667,7 +667,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 })} else {None};
             // Parsing components done
 
-            let documentation = cursor.extract_gathered_comments();
+            let documentation = cursor.extract_doc_comments();
 
             let typ_expr = match typ_or_module_expr {
                 ModuleOrWrittenType::WrittenType(typ) => {
@@ -813,7 +813,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         match self.flatten_wire_reference(cursor) {
             PartialWireReference::Error => None,
             PartialWireReference::GlobalModuleName(module_ref) => {
-                let documentation = cursor.extract_gathered_comments();
+                let documentation = cursor.extract_doc_comments();
                 let interface_span = module_ref.get_total_span();
                 let submodule_decl = self.alloc_submodule_instruction(module_ref, None, documentation);
                 Some(ModuleInterfaceReference {
@@ -1240,7 +1240,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         self.local_variable_context.pop_frame(old_frame);
     }
     fn flatten_code_keep_context(&mut self, cursor: &mut Cursor) {
-        cursor.clear_gathered_comments(); // Clear comments at the start of a block
+        cursor.clear_doc_comments(); // Clear comments at the start of a block
         cursor.list(kind!("block"), |cursor| {
             let kind = cursor.kind();
             if kind == kind!("assign_left_side") {
@@ -1321,7 +1321,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             } else {
                 cursor.could_not_match()
             }
-            cursor.clear_gathered_comments(); // Clear comments after every statement, so comments don't bleed over
+            cursor.clear_doc_comments(); // Clear comments after every statement, so comments don't bleed over
         });
     }
 
@@ -1492,7 +1492,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     is_port: DeclarationPortInfo::NotPort,
                     identifier_type: IdentifierType::Generative,
                     latency_specifier: None,
-                    documentation: const_type_cursor.extract_gathered_comments(),
+                    documentation: const_type_cursor.extract_doc_comments(),
                 }));
 
                 self.alloc_local_name(name_span, NamedLocal::Declaration(module_output_decl));
