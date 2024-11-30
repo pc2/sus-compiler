@@ -178,7 +178,7 @@ module Abs {
 	}
 }
 
-// Temporary, to be replaced with slice syntax : result = vals[FROM +: OUT_SIZE]
+/// Temporary, to be replaced with slice syntax : result = vals[FROM +: OUT_SIZE]
 module Slice #(T, int SIZE, int OUT_SIZE, int FROM) {
 	interface Slice : T[SIZE] vals -> T[OUT_SIZE] result
 
@@ -231,7 +231,7 @@ module PopCount #(int WIDTH) {
 }
 
 
-// Recursive Tree Add module recurses smaller copies of itself. 
+/// Recursive Tree Add module recurses smaller copies of itself. 
 module TreeAdd #(int WIDTH) {
 	interface TreeAdd : int[WIDTH] values'0 -> int total
 

@@ -13,7 +13,7 @@ module example_md {
 }
 
 
-// (a*b) + c
+/// (a*b) + c
 module multiply_add {
 	interface multiply_add : int a, int b, int c -> int total
 
@@ -92,7 +92,7 @@ module Accumulator {
 }
 
 
-//timeline (a, true -> /) | (a, false -> /) .. (a, false -> r)* .. (a, true -> r)
+///timeline (a, true -> /) | (a, false -> /) .. (a, false -> r)* .. (a, true -> r)
 module blur {
     interface blur : int a, bool done -> int result 
 	state bool working
@@ -108,7 +108,7 @@ module blur {
 
 
 
-//timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
+///timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
 module Unpack4 {
     interface Unpack4 : int[4] packed -> int out_stream 
 	gen int INITIAL = 0
@@ -180,7 +180,7 @@ module test_various_assignments {
 	reg int a, st[2], reg reg b = assignment_producer()
 }
 
-//timeline (bs -> /, true) | (bs -> v, false)
+///timeline (bs -> /, true) | (bs -> v, false)
 module first_bit_idx_6 {
     interface first_bit_idx_6 : bool[6] bits -> int first, bool all_zeros 
 	if bits[0] {
@@ -243,7 +243,7 @@ module permute {
 	permuted_mbf = mbf
 }
 
-//timeline (X, [false24], true -> /, false) | (X, vs, true -> X, true) .. (/, /, false -> X, true)*
+///timeline (X, [false24], true -> /, false) | (X, vs, true -> X, true) .. (/, /, false -> X, true)*
 module permute24 {
     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid 
 	state bool[128] stored_mbf
@@ -310,7 +310,7 @@ module determinable_input_latency {
     y = t
 }
 
-// This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible. 
+/// This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible. 
 module determinable_because_no_input_output_ports {
     interface determinable_because_no_input_output_ports : int a -> int x 
 	reg int a_d = a
@@ -320,7 +320,7 @@ module determinable_because_no_input_output_ports {
     x = t_d + a_dd
 }
 
-// This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible. 
+/// This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible. 
 module conflicting_latency_declarations {
     interface conflicting_latency_declarations : int a'0 -> int x'1 
 	reg int nio = a
@@ -421,13 +421,13 @@ module multiple_outputs_only {
 }
 
 
-// Test submodule comment
+/// Test submodule comment
 module submodule {
     interface submodule : int a, int b -> int r 
 	r = a * b
 }
 
-// module doing nothing
+/// module doing nothing
 module doNothing {}
 
 /*
@@ -572,7 +572,7 @@ module use_my_mod {
 	either = x | y
 }
 
-// Main module documentation
+/// Main module documentation
 module submodule_named_ports {
     interface submodule_named_ports : int port_a, int port_b -> int port_c 
 	port_c = port_a + port_b
@@ -582,7 +582,7 @@ module submodule_named_ports {
 
 module use_submodule_named_ports {
     interface use_submodule_named_ports : int i -> int o 
-// Test submodule documentation
+/// Test submodule documentation
 	submodule_named_ports sm
 
 	o = sm(i, i)
@@ -596,7 +596,7 @@ module use_submodule_named_ports {
 
 module contains_submodule_submodule {
     interface contains_submodule_submodule : int a, int b, int c -> int r 
-	// Temp val
+	/// Temp val
     int tmp = submodule(a, b)
 	doNothing()
 	reg r = tmp + c
@@ -912,7 +912,7 @@ module run_instruction {
 	}
 }
 
-// Test no main interface error
+/// Test no main interface error
 module no_main_interface {
 	//interface no_main_interface
 }

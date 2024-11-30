@@ -1,10 +1,10 @@
 
-// Compiler Intrinsic
+/// Compiler Intrinsic
 __builtin__ module LatencyOffset #(T, int OFFSET) {
     interface LatencyOffset : T in'0 -> T out'OFFSET
 }
 
-// Compiler Intrinsic
+/// Compiler Intrinsic
 __builtin__ module CrossDomain #(T) {
     interface in_domain : T in'0
     domain out
@@ -22,12 +22,12 @@ __builtin__ module BitsToInt {
 // For now these builtin declarations must be in this order, because they're constants in the code. 
 // We'll get a better system for this at some point
 
-// The decider of truth and falsity
+/// The decider of truth and falsity
 __builtin__ struct bool {}
-// An integer of variable size. Right now it's not implemented yet, so this is just a 32-bit int. 
+/// An integer of variable size. Right now it's not implemented yet, so this is just a 32-bit int. 
 __builtin__ struct int {}
 
-// True, as in '1'
+/// True, as in '1'
 __builtin__ const bool true {}
-// False, as in '0'
+/// False, as in '0'
 __builtin__ const bool false {}
