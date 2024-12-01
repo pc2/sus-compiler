@@ -77,7 +77,7 @@ fn typ_to_declaration(mut typ: &ConcreteType) -> String {
             if sz == 1 {
                 format!("{array_string} std_logic")
             } else {
-                format!("{array_string} std_logic_vector({} downto 0)", sz - 1)
+                format!("{array_string} unsigned({} downto 0)", sz - 1)
             }
         }
         ConcreteType::Array(_) => unreachable!("All arrays have been used up already"),
