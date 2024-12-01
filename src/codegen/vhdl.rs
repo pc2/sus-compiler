@@ -1,11 +1,13 @@
 use super::mangle;
 use crate::{
+    flattening::{DeclarationPortInfo, Instruction},
+    instantiation::RealWire,
     linker::{get_builtin_type, IsExtern},
     typing::concrete_type::ConcreteType,
     FlatAlloc, InstantiatedModule, Module, TypeUUID, WireIDMarker,
 };
-use std::fmt::Write;
 use std::ops::Deref;
+use std::{borrow::Cow, fmt::Write};
 
 #[derive(Debug)]
 pub struct VHDLCodegenBackend;
@@ -23,6 +25,24 @@ impl super::CodeGenBackend for VHDLCodegenBackend {
     fn codegen(&self, md: &Module, instance: &InstantiatedModule) -> String {
         gen_vhdl_code(md, instance)
     }
+}
+
+fn wire_name_with_latency(wire: &RealWire, absolute_latency: i64) -> Cow<str> {
+    assert!(wire.absolute_latency <= absolute_latency);
+
+    if wire.absolute_latency != absolute_latency {
+        if absolute_latency < 0 {
+            Cow::Owned(format!("_{}_N{}", wire.name, -absolute_latency))
+        } else {
+            Cow::Owned(format!("_{}_D{}", wire.name, absolute_latency))
+        }
+    } else {
+        Cow::Borrowed(&wire.name)
+    }
+}
+
+fn wire_name_self_latency(wire: &RealWire) -> Cow<str> {
+    wire_name_with_latency(wire, wire.absolute_latency)
 }
 
 struct CodeGenerationContext<'g, 'out, Stream: std::fmt::Write> {
@@ -66,10 +86,15 @@ fn typ_to_declaration(mut typ: &ConcreteType) -> String {
 }
 
 impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> {
+    fn instance_name(&self) -> String {
+        mangle(&self.instance.name)
+    }
+
     fn write_vhdl_code(&mut self) {
         match self.md.link_info.is_extern {
             IsExtern::Normal => {
-                self.write_module_signature(false);
+                self.write_entity(false);
+                self.write_architecture();
                 /*self.write_wire_declarations();
                 self.write_submodules();
                 self.write_multiplexers();
@@ -78,19 +103,19 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             IsExtern::Extern => {
                 // Do nothing, it's provided externally
                 writeln!(self.program_text, "-- Provided externally").unwrap();
-                self.write_module_signature(true);
+                self.write_entity(true);
             }
             IsExtern::Builtin => {
-                self.write_module_signature(false);
+                self.write_entity(false);
                 //self.write_builtins();
                 //self.write_endmodule();
             }
         }
     }
 
-    fn write_module_signature(&mut self, commented_out: bool) {
+    fn write_entity(&mut self, commented_out: bool) {
         let comment_text = if commented_out { "-- " } else { "" };
-        let instance_name = mangle(&self.instance.name);
+        let instance_name = self.instance_name();
 
         let mut it = self.instance.interface_ports.iter_valids().peekable();
         let end = if it.peek().is_some() { ";" } else { "" };
@@ -109,7 +134,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             let end = if it.peek().is_some() { ";" } else { "" };
             write!(
                 self.program_text,
-                "{comment_text}        {port_name} : {port_direction}{port_type}{end}\n"
+                "{comment_text}        {port_name} : {port_direction} {port_type}{end}\n"
             )
             .unwrap();
         }
@@ -119,6 +144,50 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             "{comment_text}    );\n{comment_text}end entity {instance_name};\n"
         )
         .unwrap();
+    }
+
+    fn write_architecture(&mut self) {
+        let instance_name = self.instance_name();
+        writeln!(
+            &mut self.program_text,
+            "architecture Behavioral of {instance_name} is"
+        )
+        .unwrap();
+        self.write_signal_declarations();
+        writeln!(&mut self.program_text, "begin").unwrap();
+        writeln!(&mut self.program_text, "end Behavioral;").unwrap();
+    }
+
+    fn write_signal_declarations(&mut self) {
+        let signals = self
+            .instance
+            .wires
+            .iter()
+            .filter(|(_, wire)| {
+                if let Instruction::Declaration(wire_decl) =
+                    &self.md.link_info.instructions[wire.original_instruction]
+                {
+                    if let DeclarationPortInfo::RegularPort { .. } = wire_decl.is_port {
+                        return false;
+                    }
+                }
+                return true;
+            })
+            .map(|(_, wire)| {
+                let signal_name = wire_name_self_latency(wire);
+                let signal_type = typ_to_declaration(&wire.typ);
+                format!("    signal {signal_name} : {signal_type}")
+            })
+            .fold(String::new(), |mut a, b| {
+                a.reserve(b.len() + 2);
+                if !a.is_empty() {
+                    a.push_str(";\n");
+                }
+                a.push_str(&b);
+                a
+            });
+        self.program_text.write_str(&signals).unwrap();
+        self.program_text.write_char('\n').unwrap();
     }
 }
 
