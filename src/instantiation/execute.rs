@@ -195,6 +195,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             match linker_cst.link_info.name.as_str() {
                 "true" => TypedValue{value: Value::Bool(true), typ: ConcreteType::Named(get_builtin_type("bool"))},
                 "false" => TypedValue{value: Value::Bool(false), typ: ConcreteType::Named(get_builtin_type("bool"))},
+                "__crash_compiler" => {
+                    cst_ref.get_total_span().debug();
+                    panic!("__crash_compiler Intentional ICE. This is for debugging the compiler and LSP.")
+                }
                 other => unreachable!("{other} is not a known builtin constant")
             }
         } else {
