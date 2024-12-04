@@ -24,8 +24,8 @@ __builtin__ module BitsToInt {
 
 // The decider of truth and falsity
 __builtin__ struct bool {}
-// An integer of variable size. Right now it's not implemented yet, so this is just a 32-bit int. 
-__builtin__ struct int {}
+// An integer of variable size. Right now it's not implemented yet, so this is just a 32-bit int.
+__builtin__ struct int #T(int MAX) {}
 
 // For intentionally triggering an ICE for debugging. It is a constant that crashes the compiler when it is evaluated
 __builtin__ const bool __crash_compiler {}
