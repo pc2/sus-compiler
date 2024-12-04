@@ -8,13 +8,14 @@ use std::ops::{Deref, Index, IndexMut};
 
 use crate::linker::{get_builtin_type, IsExtern};
 use crate::prelude::*;
+use crate::typing::concrete_type::ConcreteGlobalReference;
 use crate::typing::template::{GlobalReference, HowDoWeKnowTheTemplateArg};
 
 use num::BigInt;
 
 use crate::flattening::*;
-use crate::value::{compute_binary_op, compute_unary_op, TypedValue, Value};
 use crate::util::add_to_small_set;
+use crate::value::{compute_binary_op, compute_unary_op, TypedValue, Value};
 
 use crate::typing::{
     abstract_type::DomainType,
@@ -159,12 +160,19 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn concretize_type(&self, typ: &WrittenType) -> ExecutionResult<ConcreteType> {
         Ok(match typ {
             WrittenType::Error(_) => caught_by_typecheck!("Error Type"),
-            WrittenType::TemplateVariable(_, template_id) => self.template_args[*template_id].unwrap_type().clone(),
-            WrittenType::Named(named_type) => ConcreteType::Named(named_type.id),
+            WrittenType::TemplateVariable(_, template_id) => {
+                self.template_args[*template_id].unwrap_type().clone()
+            }
+            WrittenType::Named(named_type) => ConcreteType::Named(ConcreteGlobalReference {
+                id: named_type.id,
+                template_args: FlatAlloc::new(),
+            }),
             WrittenType::Array(_, arr_box) => {
                 let (arr_content_typ, arr_size_wire, _bracket_span) = arr_box.deref();
                 let inner_typ = self.concretize_type(arr_content_typ)?;
-                let arr_size = self.generation_state.get_generation_integer(*arr_size_wire)?;
+                let arr_size = self
+                    .generation_state
+                    .get_generation_integer(*arr_size_wire)?;
                 ConcreteType::Array(Box::new((
                     inner_typ,
                     ConcreteType::Value(Value::Integer(arr_size.clone())),
@@ -193,13 +201,25 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         if linker_cst.link_info.is_extern == IsExtern::Builtin {
             match linker_cst.link_info.name.as_str() {
-                "true" => TypedValue{value: Value::Bool(true), typ: ConcreteType::Named(get_builtin_type("bool"))},
-                "false" => TypedValue{value: Value::Bool(false), typ: ConcreteType::Named(get_builtin_type("bool"))},
+                "true" => TypedValue {
+                    value: Value::Bool(true),
+                    typ: ConcreteType::Named(ConcreteGlobalReference {
+                        id: get_builtin_type("bool"),
+                        template_args: FlatAlloc::new(),
+                    }),
+                },
+                "false" => TypedValue {
+                    value: Value::Bool(false),
+                    typ: ConcreteType::Named(ConcreteGlobalReference {
+                        id: get_builtin_type("bool"),
+                        template_args: FlatAlloc::new(),
+                    }),
+                },
                 "__crash_compiler" => {
                     cst_ref.get_total_span().debug();
                     panic!("__crash_compiler Intentional ICE. This is for debugging the compiler and LSP.")
                 }
-                other => unreachable!("{other} is not a known builtin constant")
+                other => unreachable!("{other} is not a known builtin constant"),
             }
         } else {
             todo!("Custom Constants");
@@ -268,7 +288,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         let from = ConnectFrom {
             num_regs,
             from,
-            condition : self.condition_stack.clone().into_boxed_slice(),
+            condition: self.condition_stack.clone().into_boxed_slice(),
             original_connection: original_instruction,
         };
 
@@ -371,9 +391,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             &WireReferenceRoot::LocalDecl(decl_id, _span) => {
                 self.generation_state.get_generation_value(decl_id)?.clone()
             }
-            WireReferenceRoot::NamedConstant(cst) => {
-                self.get_named_constant_value(cst)
-            }
+            WireReferenceRoot::NamedConstant(cst) => self.get_named_constant_value(cst),
             &WireReferenceRoot::SubModulePort(_) => {
                 todo!("Don't yet support compile time functions")
             }
@@ -474,8 +492,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             wire_found.maps_to_wire
         } else {
             let port_data = &self.linker.modules[submod_instance.module_uuid].ports[port_id];
-            let submodule_instruction =
-                self.md.link_info.instructions[submod_instance.original_instruction].unwrap_submodule();
+            let submodule_instruction = self.md.link_info.instructions
+                [submod_instance.original_instruction]
+                .unwrap_submodule();
             let source = if port_data.is_input {
                 RealWireDataSource::Multiplexer {
                     is_state: None,
@@ -490,7 +509,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 original_instruction: submod_instance.original_instruction,
                 domain: domain.unwrap_physical(),
                 typ: ConcreteType::Unknown(self.type_substitutor.alloc()),
-                name: self.unique_name_producer.get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
+                name: self
+                    .unique_name_producer
+                    .get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
                 specified_latency: CALCULATE_LATENCY_LATER,
                 absolute_latency: CALCULATE_LATENCY_LATER,
             });
@@ -569,7 +590,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
         };
         Ok(self.wires.alloc(RealWire {
-            name : self.unique_name_producer.get_unique_name(""),
+            name: self.unique_name_producer.get_unique_name(""),
             typ: ConcreteType::Unknown(self.type_substitutor.alloc()),
             original_instruction,
             domain,
@@ -587,7 +608,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         let typ = self.concretize_type(&wire_decl.typ_expr)?;
 
         Ok(if wire_decl.identifier_type == IdentifierType::Generative {
-            let value = if let DeclarationPortInfo::GenerativeInput(template_id) = wire_decl.is_port {
+            let value = if let DeclarationPortInfo::GenerativeInput(template_id) = wire_decl.is_port
+            {
                 self.template_args[template_id].unwrap_value().clone()
             } else {
                 typ.get_initial_typed_val()
@@ -626,10 +648,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         })
     }
 
-    fn instantiate_code_block(
-        &mut self,
-        block_range: FlatIDRange,
-    ) -> ExecutionResult<()> {
+    fn instantiate_code_block(&mut self, block_range: FlatIDRange) -> ExecutionResult<()> {
         let mut instruction_range = block_range.into_iter();
         while let Some(original_instruction) = instruction_range.next() {
             let instr = &self.md.link_info.instructions[original_instruction];
@@ -638,7 +657,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::SubModule(submodule) => {
                     let sub_module = &self.linker.modules[submodule.module_ref.id];
 
-                    let name_origin = if let Some((name, _span)) = &submodule.name {name} else {""};
+                    let name_origin = if let Some((name, _span)) = &submodule.name {
+                        name
+                    } else {
+                        ""
+                    };
                     let port_map = sub_module.ports.map(|_| None);
                     let interface_call_sites = sub_module.interfaces.map(|_| Vec::new());
                     let mut template_args =
@@ -649,11 +672,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             Some(arg) => match &arg.kind {
                                 TemplateArgKind::Type(typ) => ConcreteTemplateArg::Type(
                                     self.concretize_type(typ)?,
-                                    HowDoWeKnowTheTemplateArg::Given
+                                    HowDoWeKnowTheTemplateArg::Given,
                                 ),
                                 TemplateArgKind::Value(v) => ConcreteTemplateArg::Value(
                                     self.generation_state.get_generation_value(*v)?.clone(),
-                                    HowDoWeKnowTheTemplateArg::Given
+                                    HowDoWeKnowTheTemplateArg::Given,
                                 ),
                             },
                             None => ConcreteTemplateArg::NotProvided,
@@ -664,7 +687,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         instance: OnceCell::new(),
                         port_map,
                         interface_call_sites,
-                        name : self.unique_name_producer.get_unique_name(name_origin),
+                        name: self.unique_name_producer.get_unique_name(name_origin),
                         module_uuid: submodule.module_ref.id,
                         template_args,
                     }))
@@ -681,7 +704,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         let wire_found = self.wire_to_real_wire(w, original_instruction, domain)?;
                         SubModuleOrWire::Wire(wire_found)
                     }
-                    DomainType::DomainVariable(_) => unreachable!("Domain variables have been eliminated by type checking")
+                    DomainType::DomainVariable(_) => {
+                        unreachable!("Domain variables have been eliminated by type checking")
+                    }
                 },
                 Instruction::Write(conn) => {
                     self.instantiate_connection(
@@ -712,7 +737,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     for (port, arg) in
                         std::iter::zip(fc.func_call_inputs.iter(), fc.arguments.iter())
                     {
-                        let from = self.get_wire_or_constant_as_wire(*arg, domain.unwrap_physical());
+                        let from =
+                            self.get_wire_or_constant_as_wire(*arg, domain.unwrap_physical());
                         let port_wire = self.get_submodule_port(submod_id, port, None);
                         self.instantiate_write_to_wire(
                             port_wire,
@@ -728,7 +754,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::IfStatement(stm) => {
                     let then_range = FlatIDRange::new(stm.then_start, stm.then_end_else_start);
                     let else_range = FlatIDRange::new(stm.then_end_else_start, stm.else_end);
-                    let if_condition_wire = self.md.link_info.instructions[stm.condition].unwrap_wire();
+                    let if_condition_wire =
+                        self.md.link_info.instructions[stm.condition].unwrap_wire();
                     match if_condition_wire.typ.domain {
                         DomainType::Generative => {
                             let condition_val =
@@ -742,7 +769,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         }
                         DomainType::Physical(_domain) => {
                             let condition_wire = self.generation_state[stm.condition].unwrap_wire();
-                            self.condition_stack.push(ConditionStackElem{condition_wire, inverse : false});
+                            self.condition_stack.push(ConditionStackElem {
+                                condition_wire,
+                                inverse: false,
+                            });
                             self.instantiate_code_block(then_range)?;
 
                             if !else_range.is_empty() {
@@ -753,7 +783,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             // Get rid of the condition
                             let _ = self.condition_stack.pop().unwrap();
                         }
-                        DomainType::DomainVariable(_) => unreachable!("Domain variables have been eliminated by type checking")
+                        DomainType::DomainVariable(_) => {
+                            unreachable!("Domain variables have been eliminated by type checking")
+                        }
                     }
                     instruction_range.skip_to(stm.else_end);
                     continue;
