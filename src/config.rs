@@ -38,7 +38,7 @@ pub struct ConfigStruct {
 }
 
 fn command_builder() -> Command {
-    let command = Command::new("SUS Compiler")
+    Command::new("SUS Compiler")
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .about("The compiler for the SUS Hardware Design Language. This compiler takes in .sus files, and produces equivalent SystemVerilog files")
@@ -94,6 +94,10 @@ fn command_builder() -> Command {
             .long("nocolor")
             .help("Disables color printing in the errors of the sus_compiler output")
             .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("ci")
+                .long("ci")
+                .help("Makes the compiler output as environment agnostic as possible")
+                .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("files")
             .action(clap::ArgAction::Append)
             .help(".sus Files")
@@ -108,17 +112,7 @@ fn command_builder() -> Command {
                 } else {
                     Ok(file_path)
                 }
-            }));
-    if cfg!(feature = "ci") {
-        command.arg(
-            Arg::new("ci")
-                .long("ci")
-                .help("Makes the compiler output as environment agnostic as possible")
-                .action(clap::ArgAction::SetTrue),
-        )
-    } else {
-        command
-    }
+            }))
 }
 
 fn parse_args<I, T>(itr: I) -> Result<ConfigStruct, clap::Error>
@@ -140,11 +134,7 @@ where
     let use_color = !matches.get_flag("nocolor") && !use_lsp;
     let early_exit = *matches.get_one("upto").unwrap();
     let codegen_module_and_dependencies_one_file = matches.get_one("standalone").cloned();
-    let ci = if cfg!(feature = "ci") {
-        matches.get_flag("ci")
-    } else {
-        false
-    };
+    let ci = matches.get_flag("ci");
     let file_paths: Vec<PathBuf> = match matches.get_many("files") {
         Some(files) => files.cloned().collect(),
         None => std::fs::read_dir(".")
