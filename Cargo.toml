@@ -58,6 +58,7 @@ dirs-next = "2.0.0"
 default = ["lsp"]
 
 lsp = ["lsp-server", "lsp-types", "serde_json", "serde"]
+ci = []
 # codegen = ["calyx-ir", "calyx-opt", "calyx-backend"]
 # codegen = ["moore-circt-sys", "moore-circt"]
 

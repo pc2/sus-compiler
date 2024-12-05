@@ -33,11 +33,12 @@ pub struct ConfigStruct {
     pub codegen_module_and_dependencies_one_file: Option<String>,
     pub early_exit: EarlyExitUpTo,
     pub use_color: bool,
+    pub ci: bool,
     pub files: Vec<PathBuf>,
 }
 
 fn command_builder() -> Command {
-    Command::new("SUS Compiler")
+    let command = Command::new("SUS Compiler")
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .about("The compiler for the SUS Hardware Design Language. This compiler takes in .sus files, and produces equivalent SystemVerilog files")
@@ -107,7 +108,17 @@ fn command_builder() -> Command {
                 } else {
                     Ok(file_path)
                 }
-            }))
+            }));
+    if cfg!(feature = "ci") {
+        command.arg(
+            Arg::new("ci")
+                .long("ci")
+                .help("Makes the compiler output as environment agnostic as possible")
+                .action(clap::ArgAction::SetTrue),
+        )
+    } else {
+        command
+    }
 }
 
 fn parse_args<I, T>(itr: I) -> Result<ConfigStruct, clap::Error>
@@ -129,6 +140,11 @@ where
     let use_color = !matches.get_flag("nocolor") && !use_lsp;
     let early_exit = *matches.get_one("upto").unwrap();
     let codegen_module_and_dependencies_one_file = matches.get_one("standalone").cloned();
+    let ci = if cfg!(feature = "ci") {
+        matches.get_flag("ci")
+    } else {
+        false
+    };
     let file_paths: Vec<PathBuf> = match matches.get_many("files") {
         Some(files) => files.cloned().collect(),
         None => std::fs::read_dir(".")
@@ -150,6 +166,7 @@ where
         codegen_module_and_dependencies_one_file,
         early_exit,
         use_color,
+        ci,
         files: file_paths,
     })
 }
