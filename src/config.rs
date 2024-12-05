@@ -33,6 +33,7 @@ pub struct ConfigStruct {
     pub codegen_module_and_dependencies_one_file: Option<String>,
     pub early_exit: EarlyExitUpTo,
     pub use_color: bool,
+    pub ci: bool,
     pub files: Vec<PathBuf>,
 }
 
@@ -93,6 +94,10 @@ fn command_builder() -> Command {
             .long("nocolor")
             .help("Disables color printing in the errors of the sus_compiler output")
             .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("ci")
+                .long("ci")
+                .help("Makes the compiler output as environment agnostic as possible")
+                .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("files")
             .action(clap::ArgAction::Append)
             .help(".sus Files")
@@ -129,6 +134,7 @@ where
     let use_color = !matches.get_flag("nocolor") && !use_lsp;
     let early_exit = *matches.get_one("upto").unwrap();
     let codegen_module_and_dependencies_one_file = matches.get_one("standalone").cloned();
+    let ci = matches.get_flag("ci");
     let file_paths: Vec<PathBuf> = match matches.get_many("files") {
         Some(files) => files.cloned().collect(),
         None => std::fs::read_dir(".")
@@ -150,6 +156,7 @@ where
         codegen_module_and_dependencies_one_file,
         early_exit,
         use_color,
+        ci,
         files: file_paths,
     })
 }

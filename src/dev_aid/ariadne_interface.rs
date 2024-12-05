@@ -20,7 +20,13 @@ impl Cache<FileUUID> for (&Linker, &mut ArenaVector<Source<String>, FileUUIDMark
         Ok(&self.1[*id])
     }
     fn display<'a>(&self, id: &'a FileUUID) -> Option<Box<dyn std::fmt::Display + 'a>> {
-        Some(Box::new(self.0.files[*id].file_identifier.clone()))
+        if config().ci {
+            let filename = self.0.files[*id].file_identifier.rsplit("/").next().unwrap_or(self.0.files[*id].file_identifier.as_str());
+            Some(Box::new(filename.to_string()))
+        } else {
+            Some(Box::new(self.0.files[*id].file_identifier.clone()))
+        }
+
     }
 }
 
