@@ -192,6 +192,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 }
 
 fn gen_vhdl_code(md: &Module, instance: &InstantiatedModule) -> String {
+    todo!("VHDl codegen is unfinshed");
     let mut program_text = String::new();
 
     let mut ctx = CodeGenerationContext {
