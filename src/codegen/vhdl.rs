@@ -1,13 +1,14 @@
-use super::mangle;
+
 use crate::{
     flattening::{DeclarationPortInfo, Instruction},
-    instantiation::RealWire,
-    linker::{get_builtin_type, IsExtern},
+    linker::IsExtern,
     typing::concrete_type::ConcreteType,
-    FlatAlloc, InstantiatedModule, Module, TypeUUID, WireIDMarker,
+    FlatAlloc, InstantiatedModule, Module, WireIDMarker,
 };
 use std::ops::Deref;
-use std::{borrow::Cow, fmt::Write};
+use std::fmt::Write;
+
+use super::shared::*;
 
 #[derive(Debug)]
 pub struct VHDLCodegenBackend;
@@ -22,45 +23,17 @@ impl super::CodeGenBackend for VHDLCodegenBackend {
     fn comment(&self) -> &str {
         "--"
     }
-    fn codegen(&self, md: &Module, instance: &InstantiatedModule) -> String {
-        gen_vhdl_code(md, instance)
+    fn codegen(&self, md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String {
+        gen_vhdl_code(md, instance, use_latency)
     }
-}
-
-fn wire_name_with_latency(wire: &RealWire, absolute_latency: i64) -> Cow<str> {
-    assert!(wire.absolute_latency <= absolute_latency);
-
-    if wire.absolute_latency != absolute_latency {
-        if absolute_latency < 0 {
-            Cow::Owned(format!("_{}_N{}", wire.name, -absolute_latency))
-        } else {
-            Cow::Owned(format!("_{}_D{}", wire.name, absolute_latency))
-        }
-    } else {
-        Cow::Borrowed(&wire.name)
-    }
-}
-
-fn wire_name_self_latency(wire: &RealWire) -> Cow<str> {
-    wire_name_with_latency(wire, wire.absolute_latency)
 }
 
 struct CodeGenerationContext<'g, 'out, Stream: std::fmt::Write> {
     md: &'g Module,
     instance: &'g InstantiatedModule,
     program_text: &'out mut Stream,
+    use_latency: bool,
     needed_untils: FlatAlloc<i64, WireIDMarker>,
-}
-
-fn get_type_name_size(id: TypeUUID) -> u64 {
-    if id == get_builtin_type("int") {
-        32 // TODO concrete int sizes
-    } else if id == get_builtin_type("bool") {
-        1
-    } else {
-        println!("TODO Named Structs Size");
-        1 // todo!() // Named structs are not implemented yet
-    }
 }
 
 fn typ_to_declaration(mut typ: &ConcreteType) -> String {
@@ -174,7 +147,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 return true;
             })
             .map(|(_, wire)| {
-                let signal_name = wire_name_self_latency(wire);
+                let signal_name = wire_name_self_latency(wire, self.use_latency);
                 let signal_type = typ_to_declaration(&wire.typ);
                 format!("    signal {signal_name} : {signal_type}")
             })
@@ -191,13 +164,14 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
     }
 }
 
-fn gen_vhdl_code(md: &Module, instance: &InstantiatedModule) -> String {
+fn gen_vhdl_code(md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String {
     todo!("VHDl codegen is unfinshed");
     let mut program_text = String::new();
 
     let mut ctx = CodeGenerationContext {
         md,
         instance,
+        use_latency,
         program_text: &mut program_text,
         needed_untils: instance.compute_needed_untils(),
     };

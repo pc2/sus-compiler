@@ -1,5 +1,6 @@
 pub mod system_verilog;
 pub mod vhdl;
+mod shared;
 
 pub use system_verilog::VerilogCodegenBackend;
 pub use vhdl::VHDLCodegenBackend;
@@ -12,7 +13,7 @@ pub trait CodeGenBackend {
     fn file_extension(&self) -> &str;
     fn output_dir_name(&self) -> &str;
     fn comment(&self) -> &str;
-    fn codegen(&self, md: &Module, instance: &InstantiatedModule) -> String;
+    fn codegen(&self, md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String;
 
     fn make_output_file(&self, name: &str) -> File {
         let mut path = PathBuf::with_capacity(name.len() + self.output_dir_name().len() + self.file_extension().len() + 2);
@@ -40,7 +41,7 @@ pub trait CodeGenBackend {
             return; // Continue
         }
         println!("Instantiating success: {inst_name}");
-        let code = self.codegen(md, &inst);
+        let code = self.codegen(md, &inst, true); // hardcode use_latency = true for now. Maybe forever, we'll see
         write!(out_file, "{} {inst_name}\n{code}", self.comment()).unwrap();
     }
 
@@ -87,15 +88,4 @@ pub trait CodeGenBackend {
             cur_idx += 1;
         }
     }
-}
-
-fn mangle(str: &str) -> String {
-    let mut result = String::with_capacity(str.len());
-    for c in str.chars() {
-        if c.is_whitespace() || c == ':' {
-            continue;
-        }
-        result.push(if c.is_alphanumeric() { c } else { '_' });
-    }
-    result
 }

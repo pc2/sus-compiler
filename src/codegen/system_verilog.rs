@@ -8,9 +8,9 @@ use crate::flattening::{DeclarationPortInfo, Instruction, Module, Port};
 use crate::instantiation::{
     InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem, CALCULATE_LATENCY_LATER,
 };
-use crate::{linker::get_builtin_type, typing::concrete_type::ConcreteType, value::Value};
+use crate::{typing::concrete_type::ConcreteType, value::Value};
 
-use super::mangle;
+use super::shared::*;
 
 #[derive(Debug)]
 pub struct VerilogCodegenBackend;
@@ -25,19 +25,8 @@ impl super::CodeGenBackend for VerilogCodegenBackend {
     fn comment(&self) -> &str {
         "//"
     }
-    fn codegen(&self, md: &Module, instance: &InstantiatedModule) -> String {
-        gen_verilog_code(md, instance, true)
-    }
-}
-
-fn get_type_name_size(id: TypeUUID) -> u64 {
-    if id == get_builtin_type("int") {
-        32 // TODO concrete int sizes
-    } else if id == get_builtin_type("bool") {
-        1
-    } else {
-        println!("TODO Named Structs Size");
-        1 // todo!() // Named structs are not implemented yet
+    fn codegen(&self, md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String {
+        gen_verilog_code(md, instance, use_latency)
     }
 }
 
@@ -65,24 +54,6 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
         ConcreteType::Array(_) => unreachable!("All arrays have been used up already"),
         ConcreteType::Value(_) | ConcreteType::Unknown(_) => unreachable!(),
     }
-}
-
-fn wire_name_with_latency(wire: &RealWire, absolute_latency: i64, use_latency: bool) -> Cow<str> {
-    assert!(wire.absolute_latency <= absolute_latency);
-
-    if use_latency && (wire.absolute_latency != absolute_latency) {
-        if absolute_latency < 0 {
-            Cow::Owned(format!("_{}_N{}", wire.name, -absolute_latency))
-        } else {
-            Cow::Owned(format!("_{}_D{}", wire.name, absolute_latency))
-        }
-    } else {
-        Cow::Borrowed(&wire.name)
-    }
-}
-
-fn wire_name_self_latency(wire: &RealWire, use_latency: bool) -> Cow<str> {
-    wire_name_with_latency(wire, wire.absolute_latency, use_latency)
 }
 
 struct CodeGenerationContext<'g, 'out, Stream: std::fmt::Write> {
