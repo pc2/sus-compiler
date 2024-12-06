@@ -38,10 +38,10 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     let file_paths = config.files.clone();
 
-    let codegen_backend = Box::new(match config.target_language {
+    let codegen_backend = match config.target_language {
         config::TargetLanguage::SystemVerilog => Box::new(VerilogCodegenBackend) as Box<dyn CodeGenBackend>,
         config::TargetLanguage::VHDL => Box::new(VHDLCodegenBackend) as Box<dyn CodeGenBackend>,
-    });
+    };
 
     if config.use_lsp {
         #[cfg(feature = "lsp")]
