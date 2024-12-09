@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     if config.codegen {
         for (_id, md) in &linker.modules {
-            codegen_backend.codegen_to_file(md);
+            codegen_backend.codegen_to_file(md, &linker);
         }
     }
 
