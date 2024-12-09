@@ -8,28 +8,26 @@ use crate::flattening::{DeclarationPortInfo, Instruction, Module, Port};
 use crate::instantiation::{
     InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem, CALCULATE_LATENCY_LATER,
 };
-use crate::{linker::get_builtin_type, typing::concrete_type::ConcreteType, value::Value};
+use crate::{typing::concrete_type::ConcreteType, value::Value};
 
-fn get_type_name_size(id: TypeUUID) -> u64 {
-    if id == get_builtin_type("int") {
-        32 // TODO concrete int sizes
-    } else if id == get_builtin_type("bool") {
-        1
-    } else {
-        println!("TODO Named Structs Size");
-        1 // todo!() // Named structs are not implemented yet
-    }
-}
+use super::shared::*;
 
-pub fn mangle(str: &str) -> String {
-    let mut result = String::with_capacity(str.len());
-    for c in str.chars() {
-        if c.is_whitespace() || c == ':' {
-            continue;
-        }
-        result.push(if c.is_alphanumeric() { c } else { '_' });
+#[derive(Debug)]
+pub struct VerilogCodegenBackend;
+
+impl super::CodeGenBackend for VerilogCodegenBackend {
+    fn file_extension(&self) -> &str {
+        "sv"
     }
-    result
+    fn output_dir_name(&self) -> &str {
+        "verilog_output"
+    }
+    fn comment(&self) -> &str {
+        "//"
+    }
+    fn codegen(&self, md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String {
+        gen_verilog_code(md, instance, use_latency)
+    }
 }
 
 /// Creates the Verilog variable declaration for tbis variable.
@@ -58,24 +56,6 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
     }
 }
 
-fn wire_name_with_latency(wire: &RealWire, absolute_latency: i64, use_latency: bool) -> Cow<str> {
-    assert!(wire.absolute_latency <= absolute_latency);
-
-    if use_latency && (wire.absolute_latency != absolute_latency) {
-        if absolute_latency < 0 {
-            Cow::Owned(format!("_{}_N{}", wire.name, -absolute_latency))
-        } else {
-            Cow::Owned(format!("_{}_D{}", wire.name, absolute_latency))
-        }
-    } else {
-        Cow::Borrowed(&wire.name)
-    }
-}
-
-fn wire_name_self_latency(wire: &RealWire, use_latency: bool) -> Cow<str> {
-    wire_name_with_latency(wire, wire.absolute_latency, use_latency)
-}
-
 struct CodeGenerationContext<'g, 'out, Stream: std::fmt::Write> {
     md: &'g Module,
     instance: &'g InstantiatedModule,
@@ -83,7 +63,7 @@ struct CodeGenerationContext<'g, 'out, Stream: std::fmt::Write> {
 
     use_latency: bool,
 
-    needed_untils : FlatAlloc<i64, WireIDMarker>
+    needed_untils: FlatAlloc<i64, WireIDMarker>,
 }
 
 impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> {
@@ -128,7 +108,11 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
         result
     }
 
-    fn add_latency_registers(&mut self, wire_id: WireID, w: &RealWire) -> Result<(), std::fmt::Error> {
+    fn add_latency_registers(
+        &mut self,
+        wire_id: WireID,
+        w: &RealWire,
+    ) -> Result<(), std::fmt::Error> {
         if self.use_latency {
             // Can do 0 iterations, when w.needed_until == w.absolute_latency. Meaning it's only needed this cycle
             assert!(w.absolute_latency != CALCULATE_LATENCY_LATER);
@@ -170,10 +154,15 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
         }
     }
 
-    fn write_module_signature(&mut self, commented_out : bool) {
+    fn write_module_signature(&mut self, commented_out: bool) {
         let comment_text = if commented_out { "// " } else { "" };
         // First output the interface of the module
-        write!(self.program_text, "{comment_text}module {}(\n{comment_text}\tinput clk", mangle(&self.instance.name)).unwrap();
+        write!(
+            self.program_text,
+            "{comment_text}module {}(\n{comment_text}\tinput clk",
+            mangle(&self.instance.name)
+        )
+        .unwrap();
         for (_id, port) in self.instance.interface_ports.iter_valids() {
             let port_wire = &self.instance.wires[port.wire];
             let input_or_output = if port.is_input { "input" } else { "output" };
@@ -183,7 +172,8 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             write!(
                 self.program_text,
                 ",\n{comment_text}\t{input_or_output} {wire_doc} {wire_decl}"
-            ).unwrap();
+            )
+            .unwrap();
         }
         write!(self.program_text, "\n{comment_text});\n\n").unwrap();
 
@@ -196,7 +186,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
     }
 
     /// Pass a `to` parameter to say to what the constant should be assigned.  
-    fn write_constant(&mut self, to : &str, value : &Value) {
+    fn write_constant(&mut self, to: &str, value: &Value) {
         match value {
             Value::Bool(_) | Value::Integer(_) | Value::Unset => {
                 let v_str = value.inline_constant_to_string();
@@ -218,7 +208,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             if self.can_inline(w) {
                 continue;
             }
-        
+
             if let Instruction::Declaration(wire_decl) =
                 &self.md.link_info.instructions[w.original_instruction]
             {
@@ -228,11 +218,11 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 }
             }
             let wire_or_reg = w.source.wire_or_reg();
-        
+
             let wire_name = wire_name_self_latency(w, self.use_latency);
             let wire_decl = typ_to_declaration(&w.typ, &wire_name);
             write!(self.program_text, "{wire_or_reg} {wire_decl}").unwrap();
-        
+
             match &w.source {
                 RealWireDataSource::Select { root, path } => {
                     let wire_name = self.wire_name(*root, w.absolute_latency);
@@ -245,7 +235,8 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                         " = {}{};",
                         op.op_text(),
                         self.wire_name(*right, w.absolute_latency)
-                    ).unwrap();
+                    )
+                    .unwrap();
                 }
                 RealWireDataSource::BinaryOp { op, left, right } => {
                     writeln!(
@@ -254,7 +245,8 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                         self.wire_name(*left, w.absolute_latency),
                         op.op_text(),
                         self.wire_name(*right, w.absolute_latency)
-                    ).unwrap();
+                    )
+                    .unwrap();
                 }
                 RealWireDataSource::Constant { value } => {
                     // Trivial constants (bools & ints) should have been inlined already
@@ -323,17 +315,21 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                         self.write_constant(&tabbed_name, &invalid_val);
                         "="
                     };
-    
+
                     for s in sources {
                         let path = self.wire_ref_path_to_string(&s.to_path, w.absolute_latency);
                         let from_name = self.wire_name(s.from.from, w.absolute_latency);
                         self.program_text.write_char('\t').unwrap();
                         for cond in s.from.condition.iter() {
                             let cond_name = self.wire_name(cond.condition_wire, w.absolute_latency);
-                            let invert = if cond.inverse {"!"} else {""};
+                            let invert = if cond.inverse { "!" } else { "" };
                             write!(self.program_text, "if({invert}{cond_name}) ").unwrap();
                         }
-                        writeln!(self.program_text, "{output_name}{path} {arrow_str} {from_name};").unwrap();
+                        writeln!(
+                            self.program_text,
+                            "{output_name}{path} {arrow_str} {from_name};"
+                        )
+                        .unwrap();
                     }
                     writeln!(self.program_text, "end").unwrap();
                 }
@@ -349,35 +345,53 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             }
         }
     }
-    
-    /// TODO probably best to have some smarter system for this in the future. 
+
+    /// TODO probably best to have some smarter system for this in the future.
     fn write_builtins(&mut self) {
         match self.md.link_info.name.as_str() {
             "LatencyOffset" => {
-                let _in_port = self.md.unwrap_port(PortID::from_hidden_value(0), true, "in");
-                let _out_port = self.md.unwrap_port(PortID::from_hidden_value(1), false, "out");
+                let _in_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(0), true, "in");
+                let _out_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(1), false, "out");
                 self.program_text.write_str("\tassign out = in;\n").unwrap();
             }
             "CrossDomain" => {
-                let _in_port = self.md.unwrap_port(PortID::from_hidden_value(0), true, "in");
-                let _out_port = self.md.unwrap_port(PortID::from_hidden_value(1), false, "out");
+                let _in_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(0), true, "in");
+                let _out_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(1), false, "out");
                 self.program_text.write_str("\tassign out = in;\n").unwrap();
             }
             "IntToBits" => {
-                let _value_port = self.md.unwrap_port(PortID::from_hidden_value(0), true, "value");
-                let _bits_port = self.md.unwrap_port(PortID::from_hidden_value(1), false, "bits");
+                let _value_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(0), true, "value");
+                let _bits_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(1), false, "bits");
                 for i in 0..32 {
                     write!(self.program_text, "\tassign bits[{i}] = value[{i}];\n").unwrap();
                 }
             }
             "BitsToInt" => {
-                let _bits_port = self.md.unwrap_port(PortID::from_hidden_value(0), true, "bits");
-                let _value_port = self.md.unwrap_port(PortID::from_hidden_value(1), false, "value");
+                let _bits_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(0), true, "bits");
+                let _value_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(1), false, "value");
                 for i in 0..32 {
                     write!(self.program_text, "\tassign value[{i}] = bits[{i}];\n").unwrap();
                 }
             }
-            other => panic!("Unknown Builtin: \"{other}\"! Do not mark modules as __builtin__ yourself!")
+            other => {
+                panic!("Unknown Builtin: \"{other}\"! Do not mark modules as __builtin__ yourself!")
+            }
         }
     }
 
@@ -389,15 +403,9 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 impl Value {
     fn inline_constant_to_string(&self) -> Cow<str> {
         match self {
-            Value::Bool(b) => {
-                Cow::Borrowed(if *b { "1'b1" } else { "1'b0" })
-            }
-            Value::Integer(v) => {
-                Cow::Owned(format!("{v}"))
-            }
-            Value::Unset => {
-                Cow::Borrowed("'x")
-            }
+            Value::Bool(b) => Cow::Borrowed(if *b { "1'b1" } else { "1'b0" }),
+            Value::Integer(v) => Cow::Owned(format!("{v}")),
+            Value::Unset => Cow::Borrowed("'x"),
             Value::Array(_) => unreachable!("Not an inline constant!"),
             Value::Error => unreachable!("Error values should never have reached codegen!"),
         }
@@ -405,14 +413,14 @@ impl Value {
 }
 
 impl Module {
-    fn unwrap_port(&self, port_id : PortID, is_input : bool, name : &str) -> &Port {
+    fn unwrap_port(&self, port_id: PortID, is_input: bool, name: &str) -> &Port {
         let result = &self.ports[port_id];
 
         assert_eq!(result.name, name);
         assert_eq!(result.is_input, is_input);
 
         result
-    }    
+    }
 }
 
 impl RealWireDataSource {
@@ -431,7 +439,7 @@ impl RealWireDataSource {
     }
 }
 
-pub fn gen_verilog_code(md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String {
+fn gen_verilog_code(md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String {
     let mut program_text = String::new();
 
     let mut ctx = CodeGenerationContext {
@@ -439,7 +447,7 @@ pub fn gen_verilog_code(md: &Module, instance: &InstantiatedModule, use_latency:
         instance,
         program_text: &mut program_text,
         use_latency,
-        needed_untils: instance.compute_needed_untils()
+        needed_untils: instance.compute_needed_untils(),
     };
     ctx.write_verilog_code();
 
