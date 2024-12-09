@@ -1,9 +1,6 @@
 
 use crate::{
-    flattening::{DeclarationPortInfo, Instruction},
-    linker::IsExtern,
-    typing::concrete_type::ConcreteType,
-    FlatAlloc, InstantiatedModule, Module, WireIDMarker,
+    flattening::{DeclarationPortInfo, Instruction}, linker::IsExtern, typing::concrete_type::ConcreteType, FlatAlloc, InstantiatedModule, Linker, Module, WireIDMarker
 };
 use std::ops::Deref;
 use std::fmt::Write;
@@ -23,7 +20,7 @@ impl super::CodeGenBackend for VHDLCodegenBackend {
     fn comment(&self) -> &str {
         "--"
     }
-    fn codegen(&self, md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String {
+    fn codegen(&self, md: &Module, instance: &InstantiatedModule, linker: &Linker, use_latency: bool) -> String {
         gen_vhdl_code(md, instance, use_latency)
     }
 }

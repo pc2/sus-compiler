@@ -109,6 +109,8 @@ TREE SITTER module! dont_care
 TREE SITTER module! m
 TREE SITTER module! xyz
 TREE SITTER module! numbersToAddUp
+TREE SITTER module! sized_int_add
+TREE SITTER module! use_sized_int_add
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -213,6 +215,8 @@ Typechecking useModuleWithBadInterface
 Typechecking m
 Typechecking xyz
 Typechecking numbersToAddUp
+Typechecking sized_int_add
+Typechecking use_sized_int_add
 Instantiating IntToBits
 Concrete Typechecking IntToBits
 Latency Counting IntToBits
@@ -531,3 +535,9 @@ Latency Counting SplitAt
 Latency Counting TreeAdd
 Latency Counting TreeAdd
 Latency Counting numbersToAddUp
+Instantiating use_sized_int_add
+Concrete Typechecking use_sized_int_add
+Instantiating sized_int_add
+Concrete Typechecking sized_int_add
+Latency Counting sized_int_add
+Latency Counting use_sized_int_add

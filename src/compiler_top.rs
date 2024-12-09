@@ -47,8 +47,12 @@ impl Linker {
     }
 
     pub fn add_all_files_in_directory<ExtraInfoManager : LinkerExtraFileInfoManager>(&mut self, directory : &PathBuf, info_mngr : &mut ExtraInfoManager) {
-        for file in std::fs::read_dir(directory).unwrap() {
-            let file_path = file.unwrap().path().canonicalize().unwrap();
+        let mut files = std::fs::read_dir(directory).unwrap()
+            .map(|res| res.map(|e| e.path()))
+            .collect::<Result<Vec<_>, std::io::Error>>().unwrap();
+        files.sort();
+        for file in files {
+            let file_path = file.canonicalize().unwrap();
             if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
                 let file_text = std::fs::read_to_string(&file_path).unwrap();
                 let file_identifier : String = info_mngr.convert_filename(&file_path);

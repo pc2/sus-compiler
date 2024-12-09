@@ -1,13 +1,14 @@
 use std::borrow::Cow;
 use std::ops::Deref;
 
-use crate::linker::IsExtern;
+use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
 
 use crate::flattening::{DeclarationPortInfo, Instruction, Module, Port};
 use crate::instantiation::{
     InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem, CALCULATE_LATENCY_LATER,
 };
+use crate::typing::template::{ConcreteTemplateArg, ConcreteTemplateArgs};
 use crate::{typing::concrete_type::ConcreteType, value::Value};
 
 use super::shared::*;
@@ -25,8 +26,14 @@ impl super::CodeGenBackend for VerilogCodegenBackend {
     fn comment(&self) -> &str {
         "//"
     }
-    fn codegen(&self, md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String {
-        gen_verilog_code(md, instance, use_latency)
+    fn codegen(
+        &self,
+        md: &Module,
+        instance: &InstantiatedModule,
+        linker: &Linker,
+        use_latency: bool,
+    ) -> String {
+        gen_verilog_code(md, instance, linker, use_latency)
     }
 }
 
@@ -59,6 +66,7 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
 struct CodeGenerationContext<'g, 'out, Stream: std::fmt::Write> {
     md: &'g Module,
     instance: &'g InstantiatedModule,
+    linker: &'g Linker,
     program_text: &'out mut Stream,
 
     use_latency: bool,
@@ -274,13 +282,18 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 
     fn write_submodules(&mut self) {
         for (_id, sm) in &self.instance.submodules {
+            let sm_md = &self.linker.modules[sm.module_uuid];
             let sm_inst: &InstantiatedModule = sm
                 .instance
                 .get()
                 .expect("Invalid submodules are impossible to remain by the time codegen happens");
-            let sm_instance_name = mangle(&sm_inst.name);
+            if sm_md.link_info.is_extern == IsExtern::Extern {
+                self.write_template_args(&sm_md.link_info, &sm.template_args);
+            } else {
+                self.program_text.write_str(&sm_inst.name).unwrap();
+            };
             let sm_name = &sm.name;
-            writeln!(self.program_text, "{sm_instance_name} {sm_name}(").unwrap();
+            writeln!(self.program_text, " {sm_name}(").unwrap();
             write!(self.program_text, "\t.clk(clk)").unwrap();
             for (port_id, iport) in sm_inst.interface_ports.iter_valids() {
                 let port_name =
@@ -300,6 +313,39 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
         }
     }
 
+    fn write_template_args(
+        &mut self,
+        link_info: &LinkInfo,
+        concrete_template_args: &ConcreteTemplateArgs,
+    ) {
+        self.program_text.write_str(&link_info.name).unwrap();
+        self.program_text.write_str(" #(").unwrap();
+        let mut first = true;
+        concrete_template_args.iter().for_each(|(arg_id, arg)| {
+            let arg_name = &link_info.template_arguments[arg_id].name;
+            let arg_value = match arg {
+                ConcreteTemplateArg::Type(..) => {
+                    unreachable!("No extern module type arguments. Should have been caught by Lint")
+                }
+                ConcreteTemplateArg::Value(typed_value, _) => {
+                    typed_value.value.inline_constant_to_string()
+                }
+                ConcreteTemplateArg::NotProvided => unreachable!("All args are known at codegen"),
+            };
+            if first {
+                self.program_text.write_char(',').unwrap();
+            } else {
+                first = false;
+            }
+            self.program_text.write_char('.').unwrap();
+            self.program_text.write_str(&arg_name).unwrap();
+            self.program_text.write_char('(').unwrap();
+            self.program_text.write_str(&arg_value).unwrap();
+            self.program_text.write_char(')').unwrap();
+        });
+        self.program_text.write_char(')').unwrap();
+    }
+
     fn write_multiplexers(&mut self) {
         for (_id, w) in &self.instance.wires {
             match &w.source {
@@ -309,7 +355,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                         writeln!(self.program_text, "always_ff @(posedge clk) begin").unwrap();
                         "<="
                     } else {
-                        writeln!(self.program_text, "always_comb begin\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesys tool doesn't generate latches").unwrap();
+                        writeln!(self.program_text, "always_comb begin\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches").unwrap();
                         let invalid_val = w.typ.get_initial_val();
                         let tabbed_name = format!("\t{output_name}");
                         self.write_constant(&tabbed_name, &invalid_val);
@@ -404,7 +450,7 @@ impl Value {
     fn inline_constant_to_string(&self) -> Cow<str> {
         match self {
             Value::Bool(b) => Cow::Borrowed(if *b { "1'b1" } else { "1'b0" }),
-            Value::Integer(v) => Cow::Owned(format!("{v}")),
+            Value::Integer(v) => Cow::Owned(v.to_string()),
             Value::Unset => Cow::Borrowed("'x"),
             Value::Array(_) => unreachable!("Not an inline constant!"),
             Value::Error => unreachable!("Error values should never have reached codegen!"),
@@ -439,12 +485,18 @@ impl RealWireDataSource {
     }
 }
 
-fn gen_verilog_code(md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String {
+fn gen_verilog_code(
+    md: &Module,
+    instance: &InstantiatedModule,
+    linker: &Linker,
+    use_latency: bool,
+) -> String {
     let mut program_text = String::new();
 
     let mut ctx = CodeGenerationContext {
         md,
         instance,
+        linker,
         program_text: &mut program_text,
         use_latency,
         needed_untils: instance.compute_needed_untils(),
