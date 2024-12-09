@@ -1,4 +1,12 @@
-Standard Library Directory: /home/lennart/.sus/0.2.0-devel/stl
+TREE SITTER module! LatencyOffset
+TREE SITTER module! CrossDomain
+TREE SITTER module! IntToBits
+TREE SITTER module! BitsToInt
+TREE SITTER module! bool
+TREE SITTER module! int
+TREE SITTER module! __crash_compiler
+TREE SITTER module! true
+TREE SITTER module! false
 TREE SITTER module! DualPortMem
 TREE SITTER module! UseDualPortMem
 TREE SITTER module! FIFO
@@ -14,14 +22,6 @@ TREE SITTER module! useSlice
 TREE SITTER module! BitSelect
 TREE SITTER module! PopCount
 TREE SITTER module! TreeAdd
-TREE SITTER module! LatencyOffset
-TREE SITTER module! CrossDomain
-TREE SITTER module! IntToBits
-TREE SITTER module! BitsToInt
-TREE SITTER module! bool
-TREE SITTER module! int
-TREE SITTER module! true
-TREE SITTER module! false
 TREE SITTER module! example_md
 TREE SITTER module! multiply_add
 TREE SITTER module! test_pow17
@@ -109,6 +109,10 @@ TREE SITTER module! dont_care
 TREE SITTER module! m
 TREE SITTER module! xyz
 TREE SITTER module! numbersToAddUp
+Typechecking LatencyOffset
+Typechecking CrossDomain
+Typechecking IntToBits
+Typechecking BitsToInt
 Typechecking DualPortMem
 Typechecking UseDualPortMem
 Typechecking FIFO
@@ -124,10 +128,6 @@ Typechecking useSlice
 Typechecking BitSelect
 Typechecking PopCount
 Typechecking TreeAdd
-Typechecking LatencyOffset
-Typechecking CrossDomain
-Typechecking IntToBits
-Typechecking BitsToInt
 Typechecking example_md
 Typechecking multiply_add
 Typechecking test_pow17
@@ -213,6 +213,12 @@ Typechecking useModuleWithBadInterface
 Typechecking m
 Typechecking xyz
 Typechecking numbersToAddUp
+Instantiating IntToBits
+Concrete Typechecking IntToBits
+Latency Counting IntToBits
+Instantiating BitsToInt
+Concrete Typechecking BitsToInt
+Latency Counting BitsToInt
 Instantiating UseDualPortMem
 Concrete Typechecking UseDualPortMem
 Instantiating DualPortMem
@@ -252,12 +258,6 @@ Instantiating Slice
 Concrete Typechecking Slice
 Latency Counting Slice
 Latency Counting useSlice
-Instantiating IntToBits
-Concrete Typechecking IntToBits
-Latency Counting IntToBits
-Instantiating BitsToInt
-Concrete Typechecking BitsToInt
-Latency Counting BitsToInt
 Instantiating example_md
 Concrete Typechecking example_md
 Latency Counting example_md
