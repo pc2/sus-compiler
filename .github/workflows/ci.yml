@@ -23,6 +23,8 @@ jobs:
       run: cargo build --verbose --all-features
     - name: Run tests
       run: cargo test --verbose --all-features
+    - name: Run regression test
+      run: cargo run -- test.sus --ci --nocolor 1> test.sus_output_ci.txt 2> test.sus_errors_ci.txt || true && diff -q test.sus_output_ci.txt test.sus_output.txt && diff test.sus_errors_ci.txt test.sus_errors.txt
 
   # check-fmt:
   #   runs-on: ubuntu-latest
