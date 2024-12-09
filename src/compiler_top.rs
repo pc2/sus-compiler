@@ -36,7 +36,9 @@ impl Linker {
         assert!(self.modules.is_empty());
         assert!(self.types.is_empty());
         assert!(self.constants.is_empty());
-        println!("Standard Library Directory: {STD_LIB_PATH}");
+        if !config().ci {
+            println!("Standard Library Directory: {STD_LIB_PATH}");
+        }
         let stl_path = PathBuf::from_str(STD_LIB_PATH).expect("Standard library directory is not a valid path?");
         self.add_all_files_in_directory(&stl_path, info_mngr);
 
