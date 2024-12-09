@@ -450,7 +450,7 @@ impl Value {
     fn inline_constant_to_string(&self) -> Cow<str> {
         match self {
             Value::Bool(b) => Cow::Borrowed(if *b { "1'b1" } else { "1'b0" }),
-            Value::Integer(v) => Cow::Owned(format!("{v}")),
+            Value::Integer(v) => Cow::Owned(v.to_string()),
             Value::Unset => Cow::Borrowed("'x"),
             Value::Array(_) => unreachable!("Not an inline constant!"),
             Value::Error => unreachable!("Error values should never have reached codegen!"),
