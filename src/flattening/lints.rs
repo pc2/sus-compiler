@@ -1,5 +1,6 @@
-use crate::linker::AFTER_LINTS_CP;
+use crate::linker::{IsExtern, LinkInfo, AFTER_LINTS_CP};
 use crate::prelude::*;
+use crate::typing::template::TemplateInputKind;
 
 use super::walk::for_each_generative_input_in_template_args;
 
@@ -11,15 +12,33 @@ pub fn perform_lints(linker: &mut Linker) {
         let errors = ErrorCollector::from_storage(md.link_info.errors.take(), md.link_info.file, &linker.files);
         let resolved_globals = md.link_info.resolved_globals.take();
         find_unused_variables(md, &errors);
+        extern_objects_may_not_have_type_template_args(&md.link_info, &errors);
         md.link_info.reabsorb_errors_globals((errors, resolved_globals), AFTER_LINTS_CP);
     }
 }
 
+/*
+    ==== Additional Errors ====
+*/
+fn extern_objects_may_not_have_type_template_args(link_info: &LinkInfo, errors: &ErrorCollector) {
+    if link_info.is_extern == IsExtern::Extern {
+        for (_id, arg) in &link_info.template_arguments {
+            if let TemplateInputKind::Type(..) = &arg.kind {
+                errors.error(arg.name_span, "'extern' modules may not have 'type' arguments. Convert to bool[] first");
+            }
+        }
+    }
+}
 
 /*
     ==== Additional Warnings ====
 */
 fn find_unused_variables(md: &Module, errors: &ErrorCollector) {
+    match md.link_info.is_extern {
+        IsExtern::Normal => {}
+        IsExtern::Extern | IsExtern::Builtin => {return} // Don't report unused variables for extern modules. 
+    }
+
     let instruction_fanins = make_fanins(&md.link_info.instructions);
 
     let mut is_instance_used_map: FlatAlloc<bool, FlatIDMarker> =

@@ -13,7 +13,7 @@ pub trait CodeGenBackend {
     fn file_extension(&self) -> &str;
     fn output_dir_name(&self) -> &str;
     fn comment(&self) -> &str;
-    fn codegen(&self, md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String;
+    fn codegen(&self, md: &Module, instance: &InstantiatedModule, linker: &Linker, use_latency: bool) -> String;
 
     fn make_output_file(&self, name: &str) -> File {
         let mut path = PathBuf::with_capacity(name.len() + self.output_dir_name().len() + self.file_extension().len() + 2);
@@ -34,21 +34,21 @@ pub trait CodeGenBackend {
         file
     }
 
-    fn codegen_instance(&self, inst: &InstantiatedModule, md: &Module, out_file: &mut File) {
+    fn codegen_instance(&self, inst: &InstantiatedModule, md: &Module, linker: &Linker, out_file: &mut File) {
         let inst_name = &inst.name;
         if inst.errors.did_error {
             println!("Instantiating error: {inst_name}");
             return; // Continue
         }
         println!("Instantiating success: {inst_name}");
-        let code = self.codegen(md, &inst, true); // hardcode use_latency = true for now. Maybe forever, we'll see
+        let code = self.codegen(md, &inst, linker, true); // hardcode use_latency = true for now. Maybe forever, we'll see
         write!(out_file, "{} {inst_name}\n{code}", self.comment()).unwrap();
     }
 
-    fn codegen_to_file(&self, md: &Module) {
+    fn codegen_to_file(&self, md: &Module, linker: &Linker) {
         let mut out_file = self.make_output_file(&md.link_info.name);
         md.instantiations.for_each_instance(|_template_args, inst| {
-            self.codegen_instance(inst.as_ref(), md, &mut out_file)
+            self.codegen_instance(inst.as_ref(), md, linker, &mut out_file)
         });
     }
 
@@ -83,7 +83,7 @@ pub trait CodeGenBackend {
                 to_process_queue.push((new_inst, &linker.modules[sub_mod.module_uuid]));
             }
     
-            self.codegen_instance(cur_instance, cur_md, &mut out_file);
+            self.codegen_instance(cur_instance, cur_md, linker, &mut out_file);
     
             cur_idx += 1;
         }
