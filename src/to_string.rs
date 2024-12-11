@@ -85,7 +85,7 @@ impl ConcreteType {
         linker_types: &TypVec,
     ) -> String {
         match self {
-            ConcreteType::Named(name) => linker_types[(*name).id].link_info.get_full_name(),
+            ConcreteType::Named(name) => linker_types[name.id].link_info.get_full_name(),
             ConcreteType::Array(arr_box) => {
                 let (elem_typ, arr_size) = arr_box.deref();
                 format!(
