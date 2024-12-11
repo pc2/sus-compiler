@@ -163,10 +163,30 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             WrittenType::TemplateVariable(_, template_id) => {
                 self.template_args[*template_id].unwrap_type().clone()
             }
-            WrittenType::Named(named_type) => ConcreteType::Named(ConcreteGlobalReference {
-                id: named_type.id,
-                template_args: FlatAlloc::new(),
-            }),
+            WrittenType::Named(named_type) => {
+                let template_args =
+                    named_type
+                        .template_args
+                        .map(|template_arg| match template_arg.1 {
+                            Some(template_arg) => match &template_arg.kind {
+                                TemplateArgKind::Type(written_type) => ConcreteTemplateArg::Type(
+                                    self.concretize_type(&written_type).unwrap(),
+                                    HowDoWeKnowTheTemplateArg::Given,
+                                ),
+                                TemplateArgKind::Value(uuid) => ConcreteTemplateArg::Value(
+                                    self.generation_state[*uuid]
+                                        .unwrap_generation_value()
+                                        .clone(),
+                                    HowDoWeKnowTheTemplateArg::Given,
+                                ),
+                            },
+                            None => ConcreteTemplateArg::NotProvided,
+                        });
+                ConcreteType::Named(ConcreteGlobalReference {
+                    id: named_type.id,
+                    template_args,
+                })
+            }
             WrittenType::Array(_, arr_box) => {
                 let (arr_content_typ, arr_size_wire, _bracket_span) = arr_box.deref();
                 let inner_typ = self.concretize_type(arr_content_typ)?;
