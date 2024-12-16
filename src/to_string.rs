@@ -79,23 +79,95 @@ impl AbstractType {
     }
 }
 
-impl ConcreteType {
-    pub fn to_string<TypVec: Index<TypeUUID, Output = StructType>>(
-        &self,
-        linker_types: &TypVec,
-    ) -> String {
-        match self {
-            ConcreteType::Named(name) => linker_types[name.id].link_info.get_full_name(),
+#[derive(Debug)]
+struct ConcreteTypeDisplay<'a, TypVec: Index<TypeUUID, Output = StructType>> {
+    concrete_type: &'a ConcreteType,
+    linker_types: &'a TypVec,
+}
+
+impl<'a, TypVec: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'a, TypVec> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.concrete_type {
+            ConcreteType::Named(name) => {
+                f.write_str(&self.linker_types[name.id].link_info.get_full_name())?;
+                f.write_char('(')?;
+                let mut template_args_it = name.template_args.iter().peekable();
+                while let Some((_, template_arg)) = template_args_it.next() {
+                    template_arg.display(self.linker_types).fmt(f)?;
+                    if template_args_it.peek().is_some() {
+                        f.write_str(", ")?;
+                    }
+                }
+                f.write_char(')')
+            }
             ConcreteType::Array(arr_box) => {
                 let (elem_typ, arr_size) = arr_box.deref();
-                format!(
+                write!(
+                    f,
                     "{}[{}]",
-                    elem_typ.to_string(linker_types),
+                    elem_typ.display(self.linker_types),
                     arr_size.unwrap_value().unwrap_integer()
                 )
             }
-            ConcreteType::Value(v) => format!("{{concrete_type_{v}}}"),
-            ConcreteType::Unknown(u) => format!("{{{u:?}}}"),
+            ConcreteType::Value(v) => write!(f, "{{concrete_type_{v}}}"),
+            ConcreteType::Unknown(u) => write!(f, "{{{u:?}}}"),
+        }
+    }
+}
+
+impl ConcreteType {
+    pub fn display<'a, TypVec: Index<TypeUUID, Output = StructType>>(
+        &'a self,
+        linker_types: &'a TypVec,
+    ) -> impl Display + 'a {
+        ConcreteTypeDisplay {
+            concrete_type: self,
+            linker_types,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ConcreteTemplateArgDisplay<'a, TypVec: Index<TypeUUID, Output = StructType>> {
+    concrete_template_arg: &'a ConcreteTemplateArg,
+    linker_types: &'a TypVec,
+}
+
+impl<'a, TypVec: Index<TypeUUID, Output = StructType>> Display
+    for ConcreteTemplateArgDisplay<'a, TypVec>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.concrete_template_arg {
+            ConcreteTemplateArg::Type(concrete_type, how_do_we_know_the_template_arg) => {
+                write!(
+                    f,
+                    "{}, {}",
+                    concrete_type.display(self.linker_types),
+                    how_do_we_know_the_template_arg
+                )
+            }
+            ConcreteTemplateArg::Value(typed_value, how_do_we_know_the_template_arg) => {
+                write!(
+                    f,
+                    "{}, {}",
+                    typed_value.value, how_do_we_know_the_template_arg
+                )
+            }
+            ConcreteTemplateArg::NotProvided => {
+                write!(f, "not provided")
+            }
+        }
+    }
+}
+
+impl ConcreteTemplateArg {
+    pub fn display<'a, TypVec: Index<TypeUUID, Output = StructType>>(
+        &'a self,
+        linker_types: &'a TypVec,
+    ) -> impl Display + 'a {
+        ConcreteTemplateArgDisplay {
+            concrete_template_arg: self,
+            linker_types,
         }
     }
 }
@@ -237,7 +309,6 @@ where
         return format!("{object_full_name} #()");
     }
 
-    use std::fmt::Write;
     let mut result = format!("{object_full_name} #(\n");
     for (id, arg) in given_template_args {
         let arg_in_target = &target_link_info.template_arguments[id];
@@ -247,8 +318,8 @@ where
                 write!(
                     result,
                     "type {} /* {} */,\n",
-                    concrete_type.to_string(linker_types),
-                    how_do_we_know_the_template_arg.to_str()
+                    concrete_type.display(linker_types),
+                    how_do_we_know_the_template_arg
                 )
                 .unwrap();
             }
@@ -256,8 +327,7 @@ where
                 write!(
                     result,
                     "{} /* {} */,\n",
-                    typed_value.value.to_string(),
-                    how_do_we_know_the_template_arg.to_str()
+                    typed_value.value, how_do_we_know_the_template_arg
                 )
                 .unwrap();
             }

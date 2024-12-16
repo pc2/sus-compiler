@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::prelude::*;
 
 use super::{abstract_type::AbstractType, concrete_type::ConcreteType};
@@ -98,11 +100,11 @@ pub enum HowDoWeKnowTheTemplateArg {
     Inferred,
 }
 
-impl HowDoWeKnowTheTemplateArg {
-    pub fn to_str(&self) -> &'static str {
+impl Display for HowDoWeKnowTheTemplateArg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            HowDoWeKnowTheTemplateArg::Given => "given",
-            HowDoWeKnowTheTemplateArg::Inferred => "inferred",
+            HowDoWeKnowTheTemplateArg::Given => f.write_str("given"),
+            HowDoWeKnowTheTemplateArg::Inferred => f.write_str("inferred"),
         }
     }
 }
