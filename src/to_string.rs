@@ -1,5 +1,6 @@
 use crate::prelude::*;
 
+use crate::typing::template::HowDoWeKnowTheTemplateArg;
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
 use crate::flattening::{
@@ -75,6 +76,15 @@ impl AbstractType {
             AbstractType::Template(id) => template_names.get_template_name(*id).to_owned(),
             AbstractType::Named(id) => linker_types[*id].link_info.get_full_name(),
             AbstractType::Array(sub) => sub.deref().to_string(linker_types, template_names) + "[]",
+        }
+    }
+}
+
+impl Display for HowDoWeKnowTheTemplateArg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            HowDoWeKnowTheTemplateArg::Given => f.write_str("given"),
+            HowDoWeKnowTheTemplateArg::Inferred => f.write_str("inferred"),
         }
     }
 }

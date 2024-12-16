@@ -100,15 +100,6 @@ pub enum HowDoWeKnowTheTemplateArg {
     Inferred,
 }
 
-impl Display for HowDoWeKnowTheTemplateArg {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            HowDoWeKnowTheTemplateArg::Given => f.write_str("given"),
-            HowDoWeKnowTheTemplateArg::Inferred => f.write_str("inferred"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteTemplateArg {
     Type(ConcreteType, HowDoWeKnowTheTemplateArg),
