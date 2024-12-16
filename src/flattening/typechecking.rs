@@ -571,8 +571,8 @@ pub fn apply_types(
         let _ = found.fully_substitute(&type_checker.type_substitutor);
         let _ = expected.fully_substitute(&type_checker.type_substitutor);
 
-        let expected_name = expected.to_string(types, &type_checker.template_type_names);
-        let found_name = found.to_string(types, &type_checker.template_type_names);
+        let expected_name = expected.display(types, &type_checker.template_type_names).to_string();
+        let found_name = found.display(types, &type_checker.template_type_names).to_string();
         errors
             .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
             .add_info_list(infos);

@@ -1,9 +1,6 @@
-use std::fmt::Display;
-
 use crate::prelude::*;
-
-use super::{abstract_type::AbstractType, concrete_type::ConcreteType};
 use crate::{flattening::WrittenType, value::TypedValue};
+use super::{abstract_type::AbstractType, concrete_type::ConcreteType};
 
 #[derive(Debug)]
 pub struct GlobalReference<ID> {

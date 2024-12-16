@@ -40,42 +40,98 @@ impl TemplateNameGetter for TemplateInputs {
     }
 }
 
-impl WrittenType {
-    pub fn to_string<
-        TypVec: Index<TypeUUID, Output = StructType>,
-        TemplateVec: TemplateNameGetter,
-    >(
-        &self,
-        linker_types: &TypVec,
-        template_names: &TemplateVec,
-    ) -> String {
-        match self {
-            WrittenType::Error(_) => "{error}".to_owned(),
+#[derive(Debug)]
+struct WrittenTypeDisplay<
+    'a,
+    TypVec: Index<TypeUUID, Output = StructType>,
+    TemplateVec: TemplateNameGetter,
+> {
+    written_type: &'a WrittenType,
+    linker_types: &'a TypVec,
+    template_names: &'a TemplateVec,
+}
+
+impl<'a, TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
+    for WrittenTypeDisplay<'a, TypVec, TemplateVec>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.written_type {
+            WrittenType::Error(_) => f.write_str("{error"),
             WrittenType::TemplateVariable(_, id) => {
-                template_names.get_template_name(*id).to_owned()
+                f.write_str(self.template_names.get_template_name(*id))
             }
-            WrittenType::Named(named_type) => linker_types[named_type.id].link_info.get_full_name(),
+            WrittenType::Named(named_type) => {
+                f.write_str(&self.linker_types[named_type.id].link_info.get_full_name())
+            }
             WrittenType::Array(_, sub) => {
-                sub.deref().0.to_string(linker_types, template_names) + "[]"
+                write!(
+                    f,
+                    "{}[]",
+                    sub.deref()
+                        .0
+                        .display(self.linker_types, self.template_names)
+                )
             }
         }
     }
 }
 
-impl AbstractType {
-    pub fn to_string<
+impl WrittenType {
+    pub fn display<
+        'a,
         TypVec: Index<TypeUUID, Output = StructType>,
         TemplateVec: TemplateNameGetter,
     >(
-        &self,
-        linker_types: &TypVec,
-        template_names: &TemplateVec,
-    ) -> String {
-        match self {
-            AbstractType::Unknown(id) => format!("{id:?}"),
-            AbstractType::Template(id) => template_names.get_template_name(*id).to_owned(),
-            AbstractType::Named(id) => linker_types[*id].link_info.get_full_name(),
-            AbstractType::Array(sub) => sub.deref().to_string(linker_types, template_names) + "[]",
+        &'a self,
+        linker_types: &'a TypVec,
+        template_names: &'a TemplateVec,
+    ) -> impl Display + 'a {
+        WrittenTypeDisplay {
+            written_type: self,
+            linker_types,
+            template_names,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct AbstractTypeDisplay<
+    'a,
+    TypVec: Index<TypeUUID, Output = StructType>,
+    TemplateVec: TemplateNameGetter,
+> {
+    abstract_type: &'a AbstractType,
+    linker_types: &'a TypVec,
+    template_names: &'a TemplateVec,
+}
+
+impl<'a, TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
+    for AbstractTypeDisplay<'a, TypVec, TemplateVec>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.abstract_type {
+            AbstractType::Unknown(id) => write!(f, "{id:?}"),
+            AbstractType::Template(id) => f.write_str(self.template_names.get_template_name(*id)),
+            AbstractType::Named(id) => f.write_str(&self.linker_types[*id].link_info.get_full_name()),
+            AbstractType::Array(sub) => write!(f, "{}[]", sub.deref().display(self.linker_types, self.template_names)),
+        }
+    }
+}
+
+impl AbstractType {
+    pub fn display<
+        'a,
+        TypVec: Index<TypeUUID, Output = StructType>,
+        TemplateVec: TemplateNameGetter,
+    >(
+        &'a self,
+        linker_types: &'a TypVec,
+        template_names: &'a TemplateVec,
+    ) -> impl Display + 'a {
+        AbstractTypeDisplay {
+            abstract_type: self,
+            linker_types,
+            template_names,
         }
     }
 }
