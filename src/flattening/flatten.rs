@@ -1112,11 +1112,13 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
     fn flatten_if_statement(&mut self, cursor: &mut Cursor) {
         cursor.go_down(kind!("if_statement"), |cursor| {
+            cursor.field(field!("if_literal"));
+            let literal_is_when = cursor.kind() == kw!("when");
             cursor.field(field!("condition"));
             let (condition, condition_is_generative) = self.flatten_expr(cursor);
-
             let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement {
                 condition,
+                is_when: literal_is_when,
                 is_generative: condition_is_generative,// TODO `if` vs `when` https://github.com/pc2/sus-compiler/issues/3
                 then_start: FlatID::PLACEHOLDER,
                 then_end_else_start: FlatID::PLACEHOLDER,
