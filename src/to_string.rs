@@ -112,8 +112,14 @@ impl<'a, TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateName
         match self.abstract_type {
             AbstractType::Unknown(id) => write!(f, "{id:?}"),
             AbstractType::Template(id) => f.write_str(self.template_names.get_template_name(*id)),
-            AbstractType::Named(id) => f.write_str(&self.linker_types[*id].link_info.get_full_name()),
-            AbstractType::Array(sub) => write!(f, "{}[]", sub.deref().display(self.linker_types, self.template_names)),
+            AbstractType::Named(id) => {
+                f.write_str(&self.linker_types[*id].link_info.get_full_name())
+            }
+            AbstractType::Array(sub) => write!(
+                f,
+                "{}[]",
+                sub.deref().display(self.linker_types, self.template_names)
+            ),
         }
     }
 }
@@ -203,26 +209,12 @@ impl<'a, TypVec: Index<TypeUUID, Output = StructType>> Display
     for ConcreteTemplateArgDisplay<'a, TypVec>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.concrete_template_arg {
-            ConcreteTemplateArg::Type(concrete_type, how_do_we_know_the_template_arg) => {
-                write!(
-                    f,
-                    "{}, {}",
-                    concrete_type.display(self.linker_types),
-                    how_do_we_know_the_template_arg
-                )
-            }
-            ConcreteTemplateArg::Value(typed_value, how_do_we_know_the_template_arg) => {
-                write!(
-                    f,
-                    "{}, {}",
-                    typed_value.value, how_do_we_know_the_template_arg
-                )
-            }
-            ConcreteTemplateArg::NotProvided => {
-                write!(f, "not provided")
-            }
-        }
+        write!(
+            f,
+            "{}, {}",
+            self.concrete_template_arg.kind.display(self.linker_types),
+            self.concrete_template_arg.source
+        )
     }
 }
 
@@ -378,29 +370,13 @@ where
     let mut result = format!("{object_full_name} #(\n");
     for (id, arg) in given_template_args {
         let arg_in_target = &target_link_info.template_arguments[id];
-        write!(result, "    {}: ", arg_in_target.name).unwrap();
-        match arg {
-            ConcreteTemplateArg::Type(concrete_type, how_do_we_know_the_template_arg) => {
-                write!(
-                    result,
-                    "type {} /* {} */,\n",
-                    concrete_type.display(linker_types),
-                    how_do_we_know_the_template_arg
-                )
-                .unwrap();
-            }
-            ConcreteTemplateArg::Value(typed_value, how_do_we_know_the_template_arg) => {
-                write!(
-                    result,
-                    "{} /* {} */,\n",
-                    typed_value.value, how_do_we_know_the_template_arg
-                )
-                .unwrap();
-            }
-            ConcreteTemplateArg::NotProvided => {
-                write!(result, "/* Could not infer */\n").unwrap();
-            }
-        }
+        write!(
+            result,
+            "    {}: {}",
+            arg_in_target.name,
+            arg.display(linker_types)
+        )
+        .unwrap();
     }
 
     result.push(')');
