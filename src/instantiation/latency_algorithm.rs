@@ -1,3 +1,20 @@
+//! Latency Counting concerns three types of nodes:
+//! - Late nodes: These usually correspond to inputs. LC tries to make these as late as possible
+//! - Early nodes: Usually correspond to outputs. LC tries to make these as early as possible
+//!     (therby squeezing the inputs and outputs together as closely as possible)
+//! - Neutral nodes: These just need to get some absolute latency assigned.
+//!     LC will make these as early as possible, without affecting late nodes. 
+//!     Neutral nodes not constrained by Late nodes get added in last, by a single backwards pass
+//! 
+//! Latency counting works in two stages:
+//! - First we start from the ports (the early and late nodes). 
+//!     From here we try to discover other ports, by walking the dependency graph
+//!     Any ports we discover must be unambiguously reachable at the exact same absolute latency from other ports
+//! - Once we have found all ports, and no port reports a conflicting latency, we can fill in the internal latencies
+//!     This starts from the late ports, and seeds them with the found latencies. 
+//!     From here it keeps all the found latencies, such that the resulting latencies are all as early as possible. 
+
+
 use crate::config::config;
 
 use super::list_of_lists::ListOfLists;
@@ -312,14 +329,31 @@ fn pop_a_port(ports: &mut Vec<PortLatencyCandidate>) -> Option<PortLatencyCandid
     Some(ports.swap_remove(found_idx))
 }
 
+/// If no latencies are given, we have to initialize an arbitrary one ourselves. Prefer input ports over output ports over regular wires    
+pub fn initialize_specified_latencies_if_needed(
+    inputs: &[usize],
+    outputs: &[usize],
+    specified_latencies: &mut Vec<SpecifiedLatency>) {
+
+    if specified_latencies.len() == 0 {
+        *specified_latencies = initialize_specified_latencies(inputs, outputs);
+    }
+}
+
+pub fn initialize_specified_latencies(inputs: &[usize], outputs: &[usize]) -> Vec<SpecifiedLatency> {
+    let wire = *inputs.first().unwrap_or(outputs.first().unwrap_or(&0));
+    vec![SpecifiedLatency { wire, latency: 0 }]
+}
+
 /// All elements in latencies must initially be [LatencyNode::UNSET] or pinned known values
 pub fn solve_latencies(
     fanins: &ListOfLists<FanInOut>,
     fanouts: &ListOfLists<FanInOut>,
     inputs: &[usize],
     outputs: &[usize],
-    mut specified_latencies: Vec<SpecifiedLatency>,
+    specified_latencies: &[SpecifiedLatency],
 ) -> Result<Vec<i64>, LatencyCountingError> {
+    assert!(specified_latencies.len() >= 1);
     if config().debug_print_latency_graph {
         print_latency_test_case(fanins, inputs, outputs, &specified_latencies);
     }
@@ -336,14 +370,8 @@ pub fn solve_latencies(
     // and reports errors if port conflicts arise
     let mut ports_to_place = Vec::with_capacity(inputs.len() + outputs.len());
 
-    // If no latencies are given, we have to initialize an arbitrary one ourselves. Prefer input ports over output ports over regular wires
-    if specified_latencies.len() == 0 {
-        let wire = *inputs.first().unwrap_or(outputs.first().unwrap_or(&0));
-        specified_latencies.push(SpecifiedLatency { wire, latency: 0 });
-    }
-
     // Set up the specified latencies
-    for spec_lat in &specified_latencies {
+    for spec_lat in specified_latencies {
         working_latencies[spec_lat.wire] = LatencyNode::new_pinned(spec_lat.latency);
     }
 
@@ -370,7 +398,7 @@ pub fn solve_latencies(
     count_latency_all_in_list::<false>(
         &mut working_latencies,
         &fanouts,
-        &specified_latencies,
+        specified_latencies,
         &mut stack,
     )?;
     inform_all_ports(&mut ports_to_place, &working_latencies)?;
@@ -497,15 +525,28 @@ mod tests {
 
     fn solve_latencies_infer_ports(
         fanins: &ListOfLists<FanInOut>,
-        specified_latencies: Vec<SpecifiedLatency>,
+        mut specified_latencies: Vec<SpecifiedLatency>,
     ) -> Result<Vec<i64>, LatencyCountingError> {
-        let fanins = fanins.into();
         let fanouts = convert_fanin_to_fanout(fanins);
 
         let inputs = infer_ports(fanins);
         let outputs = infer_ports(&fanouts);
 
-        solve_latencies(fanins, &fanouts, &inputs, &outputs, specified_latencies)
+        initialize_specified_latencies_if_needed(&inputs, &outputs, &mut specified_latencies);
+        solve_latencies(fanins, &fanouts, &inputs, &outputs, &specified_latencies)
+    }
+
+    fn solve_latencies_infer_startingpoint(
+        fanins: &ListOfLists<FanInOut>,
+        inputs: &[usize],
+        outputs: &[usize]
+    ) -> Result<Vec<i64>, LatencyCountingError> {
+        let fanouts = convert_fanin_to_fanout(fanins);
+
+        let mut specified_latencies = initialize_specified_latencies(inputs, outputs);
+
+        initialize_specified_latencies_if_needed(&inputs, &outputs, &mut specified_latencies);
+        solve_latencies(fanins, &fanouts, &inputs, &outputs, &specified_latencies)
     }
 
     fn latencies_equal(a: &[i64], b: &[i64]) -> bool {
@@ -536,13 +577,8 @@ mod tests {
 
         let correct_latencies = [0, 0, 2, 2, 1, 1, 1];
 
-        let fanouts = convert_fanin_to_fanout(&fanins);
-
-        let inputs = vec![0, 4];
-        let outputs = vec![3, 6];
-
         let found_latencies =
-            solve_latencies(&fanins, &fanouts, &inputs, &outputs, Vec::new()).unwrap();
+        solve_latencies_infer_startingpoint(&fanins, &[0, 4], &[3, 6]).unwrap();
 
         assert!(
             latencies_equal(&found_latencies, &correct_latencies),
@@ -567,15 +603,12 @@ mod tests {
 
         let fanouts = convert_fanin_to_fanout(&fanins);
 
-        let inputs = vec![0, 4];
-        let outputs = vec![3, 6];
-
         let found_latencies = solve_latencies(
             &fanins,
             &fanouts,
-            &inputs,
-            &outputs,
-            vec![SpecifiedLatency {
+            &[0, 4],
+            &[3, 6],
+            &[SpecifiedLatency {
                 wire: 6,
                 latency: 0,
             }],
@@ -602,8 +635,8 @@ mod tests {
 
         let fanouts = convert_fanin_to_fanout(&fanins);
 
-        let inputs = vec![0, 4];
-        let outputs = vec![3, 6];
+        let inputs = [0, 4];
+        let outputs = [3, 6];
 
         for starting_node in 0..7 {
             println!("starting_node: {starting_node}");
@@ -613,7 +646,7 @@ mod tests {
                     &fanouts,
                     &inputs,
                     &outputs,
-                    vec![SpecifiedLatency {
+                    &[SpecifiedLatency {
                         wire: starting_node,
                         latency: 0,
                     }],
@@ -629,7 +662,7 @@ mod tests {
                 &fanouts,
                 &inputs,
                 &outputs,
-                vec![SpecifiedLatency {
+                &[SpecifiedLatency {
                     wire: starting_node,
                     latency: 0,
                 }],
@@ -659,13 +692,8 @@ mod tests {
 
         let correct_latencies = [0, 0, 2, 2, 1, 1, 1, -1];
 
-        let fanouts = convert_fanin_to_fanout(&fanins);
-
-        let inputs = vec![0, 4];
-        let outputs = vec![3, 6];
-
         let found_latencies =
-            solve_latencies(&fanins, &fanouts, &inputs, &outputs, Vec::new()).unwrap();
+            solve_latencies_infer_startingpoint(&fanins, &[0, 4], &[3, 6]).unwrap();
 
         assert!(
             latencies_equal(&found_latencies, &correct_latencies),
@@ -689,13 +717,8 @@ mod tests {
 
         let correct_latencies = [-1, -1, 1, 1, 0, 0, 0, 2];
 
-        let fanouts = convert_fanin_to_fanout(&fanins);
-
-        let inputs = vec![0, 4];
-        let outputs = vec![3, 6];
-
         let found_latencies =
-            solve_latencies(&fanins, &fanouts, &inputs, &outputs, Vec::new()).unwrap();
+            solve_latencies_infer_startingpoint(&fanins, &[0, 4], &[3, 6]).unwrap();
 
         assert!(
             latencies_equal(&found_latencies, &correct_latencies),
@@ -953,9 +976,8 @@ mod tests {
             /*3*/ &[mk_fan(2, 1)],
         ];
         let fanins = ListOfLists::from_slice_slice(&fanins);
-        let fanouts = convert_fanin_to_fanout(&fanins);
 
-        let latencies = solve_latencies(&fanins, &fanouts, &[0, 1], &[3], Vec::new()).unwrap();
+        let latencies = solve_latencies_infer_startingpoint(&fanins, &[0, 1], &[3]).unwrap();
 
         assert_eq!(latencies, &[0, 1, 2, 3]);
     }
@@ -969,9 +991,8 @@ mod tests {
             /*3*/ &[mk_fan(2, 1)],
         ];
         let fanins = ListOfLists::from_slice_slice(&fanins);
-        let fanouts = convert_fanin_to_fanout(&fanins);
 
-        let latencies = solve_latencies(&fanins, &fanouts, &[0], &[2, 3], Vec::new()).unwrap();
+        let latencies = solve_latencies_infer_startingpoint(&fanins, &[0], &[2, 3]).unwrap();
 
         assert_eq!(latencies, &[0, 1, 2, 3]);
     }
@@ -993,12 +1014,8 @@ mod tests {
             /*9*/ &[mk_fan(0, 0), mk_fan(6, 0)],
         ];
         let fanins = ListOfLists::from_slice_slice(&fanins);
-        let fanouts = convert_fanin_to_fanout(&fanins);
-        let inputs = vec![1, 2, 3];
-        let outputs = vec![4, 5];
-        let specified_latencies = vec![];
         let found_latencies =
-            solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();
+            solve_latencies_infer_startingpoint(&fanins, &[1, 2, 3], &[4, 5]).unwrap();
 
         assert_eq!(found_latencies, [0; 10]);
     }
@@ -1017,14 +1034,12 @@ mod tests {
         ];
         let fanins = ListOfLists::from_slice_slice(&fanins);
         let fanouts = convert_fanin_to_fanout(&fanins);
-        let inputs = vec![1, 2, 3];
-        let outputs = vec![4, 5];
-        let specified_latencies = vec![SpecifiedLatency {
+        let specified_latencies = [SpecifiedLatency {
             wire: 1,
             latency: 0,
         }];
         let found_latencies =
-            solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();
+            solve_latencies(&fanins, &fanouts, &[1, 2, 3], &[4, 5], &specified_latencies).unwrap();
 
         assert_eq!(found_latencies, [0; 8]);
     }
@@ -1040,14 +1055,12 @@ mod tests {
         ];
         let fanins = ListOfLists::from_slice_slice(&fanins);
         let fanouts = convert_fanin_to_fanout(&fanins);
-        let inputs = vec![0, 4];
-        let outputs = vec![1, 2];
-        let specified_latencies = vec![SpecifiedLatency {
+        let specified_latencies = [SpecifiedLatency {
             wire: 4,
             latency: 0,
         }];
         let found_latencies =
-            solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();
+            solve_latencies(&fanins, &fanouts, &[0, 4], &[1, 2], &specified_latencies).unwrap();
 
         assert_eq!(found_latencies, [0; 5]);
     }
@@ -1068,14 +1081,12 @@ mod tests {
         ];
         let fanins = ListOfLists::from_slice_slice(&fanins);
         let fanouts = convert_fanin_to_fanout(&fanins);
-        let inputs = vec![];
-        let outputs = vec![];
-        let specified_latencies = vec![SpecifiedLatency {
+        let specified_latencies = [SpecifiedLatency {
             wire: 0,
             latency: 0,
         }];
         let _found_latencies =
-            solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();
+            solve_latencies(&fanins, &fanouts, &[], &[], &specified_latencies).unwrap();
     }
 
     #[test]
@@ -1088,13 +1099,11 @@ mod tests {
         ];
         let fanins = ListOfLists::from_slice_slice(&fanins);
         let fanouts = convert_fanin_to_fanout(&fanins);
-        let inputs = vec![];
-        let outputs = vec![];
-        let specified_latencies = vec![SpecifiedLatency {
+        let specified_latencies = [SpecifiedLatency {
             wire: 0,
             latency: 0,
         }];
         let _found_latencies =
-            solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();
+            solve_latencies(&fanins, &fanouts, &[], &[], &specified_latencies).unwrap();
     }
 }

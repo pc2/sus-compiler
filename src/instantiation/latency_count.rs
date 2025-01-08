@@ -1,5 +1,7 @@
 use std::{cmp::max, iter::zip};
 
+use latency_algorithm::initialize_specified_latencies_if_needed;
+
 use crate::prelude::*;
 
 use crate::{
@@ -328,12 +330,15 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             // Process fanouts
             let fanouts = convert_fanin_to_fanout(&fanins);
 
+            let mut specified_latencies = domain_info.initial_values.clone();
+            initialize_specified_latencies_if_needed(&domain_info.input_ports, &domain_info.output_ports, &mut specified_latencies);
+
             match solve_latencies(
                 &fanins,
                 &fanouts,
                 &domain_info.input_ports,
                 &domain_info.output_ports,
-                domain_info.initial_values.clone(),
+                &specified_latencies
             ) {
                 Ok(latencies) => {
                     for (_id, (node, lat)) in
