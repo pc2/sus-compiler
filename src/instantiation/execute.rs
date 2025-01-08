@@ -161,7 +161,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         Ok(match typ {
             WrittenType::Error(_) => caught_by_typecheck!("Error Type"),
             WrittenType::TemplateVariable(_, template_id) => {
-                self.template_args[*template_id].unwrap_type().clone()
+                self.template_args[*template_id].kind.clone()
             }
             WrittenType::Named(named_type) => {
                 let template_args =
@@ -169,18 +169,24 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         .template_args
                         .map(|template_arg| match template_arg.1 {
                             Some(template_arg) => match &template_arg.kind {
-                                TemplateArgKind::Type(written_type) => ConcreteTemplateArg::Type(
-                                    self.concretize_type(&written_type).unwrap(),
-                                    HowDoWeKnowTheTemplateArg::Given,
-                                ),
-                                TemplateArgKind::Value(uuid) => ConcreteTemplateArg::Value(
-                                    self.generation_state[*uuid]
-                                        .unwrap_generation_value()
-                                        .clone(),
-                                    HowDoWeKnowTheTemplateArg::Given,
-                                ),
+                                TemplateArgKind::Type(written_type) => ConcreteTemplateArg {
+                                    kind: self.concretize_type(&written_type).unwrap(),
+                                    source: HowDoWeKnowTheTemplateArg::Given,
+                                },
+                                TemplateArgKind::Value(uuid) => ConcreteTemplateArg {
+                                    kind: ConcreteType::Value(
+                                        self.generation_state[*uuid]
+                                            .unwrap_generation_value()
+                                            .clone()
+                                            .value,
+                                    ),
+                                    source: HowDoWeKnowTheTemplateArg::Given,
+                                },
                             },
-                            None => ConcreteTemplateArg::NotProvided,
+                            None => ConcreteTemplateArg {
+                                kind: ConcreteType::Unknown(self.type_substitutor.alloc()),
+                                source: HowDoWeKnowTheTemplateArg::Inferred,
+                            },
                         });
                 ConcreteType::Named(ConcreteGlobalReference {
                     id: named_type.id,
@@ -630,7 +636,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         Ok(if wire_decl.identifier_type == IdentifierType::Generative {
             let value = if let DeclarationPortInfo::GenerativeInput(template_id) = wire_decl.is_port
             {
-                self.template_args[template_id].unwrap_value().clone()
+                self.template_args[template_id]
+                    .kind
+                    .clone()
+                    .get_initial_typed_val()
             } else {
                 typ.get_initial_typed_val()
             };
@@ -690,16 +699,24 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     for (_id, v) in &submodule.module_ref.template_args {
                         template_args.alloc(match v {
                             Some(arg) => match &arg.kind {
-                                TemplateArgKind::Type(typ) => ConcreteTemplateArg::Type(
-                                    self.concretize_type(typ)?,
-                                    HowDoWeKnowTheTemplateArg::Given,
-                                ),
-                                TemplateArgKind::Value(v) => ConcreteTemplateArg::Value(
-                                    self.generation_state.get_generation_value(*v)?.clone(),
-                                    HowDoWeKnowTheTemplateArg::Given,
-                                ),
+                                TemplateArgKind::Type(typ) => ConcreteTemplateArg {
+                                    kind: self.concretize_type(typ)?,
+                                    source: HowDoWeKnowTheTemplateArg::Given,
+                                },
+                                TemplateArgKind::Value(v) => ConcreteTemplateArg {
+                                    kind: ConcreteType::Value(
+                                        self.generation_state
+                                            .get_generation_value(*v)?
+                                            .clone()
+                                            .value,
+                                    ),
+                                    source: HowDoWeKnowTheTemplateArg::Given,
+                                },
                             },
-                            None => ConcreteTemplateArg::NotProvided,
+                            None => ConcreteTemplateArg {
+                                kind: ConcreteType::Unknown(self.type_substitutor.alloc()),
+                                source: HowDoWeKnowTheTemplateArg::Inferred,
+                            },
                         });
                     }
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule {

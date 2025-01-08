@@ -1,6 +1,6 @@
-use crate::prelude::*;
-use crate::{flattening::WrittenType, value::TypedValue};
 use super::{abstract_type::AbstractType, concrete_type::ConcreteType};
+use crate::flattening::WrittenType;
+use crate::prelude::*;
 
 #[derive(Debug)]
 pub struct GlobalReference<ID> {
@@ -98,28 +98,14 @@ pub enum HowDoWeKnowTheTemplateArg {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ConcreteTemplateArg {
-    Type(ConcreteType, HowDoWeKnowTheTemplateArg),
-    Value(TypedValue, HowDoWeKnowTheTemplateArg),
-    NotProvided,
-}
-
-impl ConcreteTemplateArg {
-    #[track_caller]
-    pub fn unwrap_type(&self) -> &ConcreteType {
-        let Self::Type(t, _) = self else {unreachable!()};
-        t
-    }
-    #[track_caller]
-    pub fn unwrap_value(&self) -> &TypedValue {
-        let Self::Value(v, _) = self else {unreachable!()};
-        v
-    }
+pub struct ConcreteTemplateArg {
+    pub kind: ConcreteType,
+    pub source: HowDoWeKnowTheTemplateArg,
 }
 
 pub type TemplateArgs = FlatAlloc<Option<TemplateArg>, TemplateIDMarker>;
-/// Applies to both Template Type args and Template Value args. 
-/// 
+/// Applies to both Template Type args and Template Value args.
+///
 /// For Types this is the Type, for Values this is unified with the parameter declaration type
 pub type TemplateAbstractTypes = FlatAlloc<AbstractType, TemplateIDMarker>;
 pub type TemplateInputs = FlatAlloc<TemplateInput, TemplateIDMarker>;
