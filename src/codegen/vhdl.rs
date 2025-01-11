@@ -1,6 +1,6 @@
 
 use crate::{
-    flattening::{DeclarationPortInfo, Instruction}, linker::IsExtern, typing::concrete_type::ConcreteType, FlatAlloc, InstantiatedModule, Linker, Module, WireIDMarker
+    flattening::{DeclarationKind, Instruction}, linker::IsExtern, typing::concrete_type::ConcreteType, FlatAlloc, InstantiatedModule, Linker, Module, WireIDMarker
 };
 use std::ops::Deref;
 use std::fmt::Write;
@@ -137,7 +137,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 if let Instruction::Declaration(wire_decl) =
                     &self.md.link_info.instructions[wire.original_instruction]
                 {
-                    if let DeclarationPortInfo::RegularPort { .. } = wire_decl.is_port {
+                    if let DeclarationKind::RegularPort { .. } = wire_decl.decl_kind {
                         return false;
                     }
                 }

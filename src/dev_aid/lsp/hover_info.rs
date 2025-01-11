@@ -5,7 +5,7 @@ use crate::to_string::pretty_print_concrete_instance;
 
 use lsp_types::{LanguageString, MarkedString};
 
-use crate::flattening::{DeclarationPortInfo, IdentifierType, InterfaceToDomainMap, Module};
+use crate::flattening::{DeclarationKind, IdentifierType, InterfaceToDomainMap, Module};
 use crate::instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER};
 use crate::linker::{Documentation, FileData, LinkInfo, NameElem};
 
@@ -108,13 +108,13 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             if let Some(ds) = &domain_str {
                 details_vec.push(ds);
             }
-            match decl.is_port {
-                DeclarationPortInfo::RegularPort {
+            match decl.decl_kind {
+                DeclarationKind::RegularPort {
                     is_input,
                     port_id: _,
                 } => details_vec.push(if is_input { "input" } else { "output" }),
-                DeclarationPortInfo::NotPort | DeclarationPortInfo::StructField { field_id:_ } => {}
-                DeclarationPortInfo::GenerativeInput(_) => details_vec.push("param"),
+                DeclarationKind::NotPort | DeclarationKind::StructField { field_id:_ } => {}
+                DeclarationKind::GenerativeInput(_) => details_vec.push("param"),
             }
 
             match decl.identifier_type {
@@ -203,7 +203,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                         todo!("Non-module template args")
                     };
                     let md = &linker.modules[md_id];
-                    let decl = md.link_info.instructions[*declaration_instruction].unwrap_wire_declaration();
+                    let decl = md.link_info.instructions[*declaration_instruction].unwrap_declaration();
                     hover.sus_code(format!(
                         "param {} {}",
                         decl.typ_expr

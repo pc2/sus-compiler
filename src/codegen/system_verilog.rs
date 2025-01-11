@@ -4,7 +4,7 @@ use std::ops::Deref;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
 
-use crate::flattening::{DeclarationPortInfo, Instruction, Module, Port};
+use crate::flattening::{DeclarationKind, Instruction, Module, Port};
 use crate::instantiation::{
     InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem, CALCULATE_LATENCY_LATER,
 };
@@ -221,7 +221,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 &self.md.link_info.instructions[w.original_instruction]
             {
                 // Don't print named inputs and outputs, already did that in interface
-                if let DeclarationPortInfo::RegularPort { .. } = wire_decl.is_port {
+                if let DeclarationKind::RegularPort { .. } = wire_decl.decl_kind {
                     continue;
                 }
             }
@@ -364,9 +364,9 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 
                     for s in sources {
                         let path = self.wire_ref_path_to_string(&s.to_path, w.absolute_latency);
-                        let from_name = self.wire_name(s.from.from, w.absolute_latency);
+                        let from_name = self.wire_name(s.from, w.absolute_latency);
                         self.program_text.write_char('\t').unwrap();
-                        for cond in s.from.condition.iter() {
+                        for cond in s.condition.iter() {
                             let cond_name = self.wire_name(cond.condition_wire, w.absolute_latency);
                             let invert = if cond.inverse { "!" } else { "" };
                             write!(self.program_text, "if({invert}{cond_name}) ").unwrap();

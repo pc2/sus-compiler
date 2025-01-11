@@ -102,7 +102,7 @@ fn make_fanins(instructions: &FlatAlloc<Instruction, FlatIDMarker>) -> FlatAlloc
             Instruction::Declaration(decl) => {
                 decl.typ_expr.for_each_generative_input(&mut collector_func);
             }
-            Instruction::Wire(wire) => {
+            Instruction::Expression(wire) => {
                 wire.source.for_each_dependency(collector_func);
             }
             Instruction::IfStatement(stm) => {

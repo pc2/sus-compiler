@@ -27,6 +27,7 @@ pub enum TargetLanguage {
     VHDL,
 }
 
+/// All command-line flags are converted to this struct, of which the singleton instance can be acquired using [crate::config::config]
 #[derive(Debug, PartialEq, Eq)]
 pub struct ConfigStruct {
     pub use_lsp: bool,
@@ -175,6 +176,7 @@ where
     })
 }
 
+/// Access the singleton [ConfigStruct] representing the CLI arguments passed to `sus_compiler`
 pub fn config() -> &'static ConfigStruct {
     static CONFIG: LazyLock<ConfigStruct> = LazyLock::new(|| {
         parse_args(std::env::args_os())

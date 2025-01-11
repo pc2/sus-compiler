@@ -211,6 +211,12 @@ enum DomainAllocOption {
     NonGenerativeKnown(DomainID)
 }
 
+#[derive(Debug)]
+enum ModuleOrWrittenType {
+    WrittenType(WrittenType),
+    Module(GlobalReference<ModuleUUID>),
+}
+
 impl TypingAllocator {
     fn alloc_unset_type(&mut self, domain: DomainAllocOption) -> FullType {
         FullType {
@@ -310,10 +316,10 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     (match self.local_variable_context.get_declaration_for(name) {
                         Some(NamedLocal::TemplateType(t)) => TemplateArgKind::Type(WrittenType::TemplateVariable(name_span, t)),
                         Some(NamedLocal::Declaration(decl_id)) => {
-                            let wire_read_id = self.instructions.alloc(Instruction::Wire(WireInstance { 
+                            let wire_read_id = self.instructions.alloc(Instruction::Expression(Expression { 
                                 typ: self.type_alloc.alloc_unset_type(DomainAllocOption::Generative),
                                 span: name_span,
-                                source: WireSource::WireRef(WireReference::simple_var_read(decl_id, true, name_span)) 
+                                source: ExpressionSource::WireRef(WireReference::simple_var_read(decl_id, true, name_span)) 
                             }));
                             TemplateArgKind::Value(wire_read_id)
                         }
@@ -520,7 +526,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             match conflict {
                 NamedLocal::Declaration(decl_id) => {
                     err_ref.info_obj_same_file(
-                        self.instructions[decl_id].unwrap_wire_declaration(),
+                        self.instructions[decl_id].unwrap_declaration(),
                     );
                 }
                 NamedLocal::SubModule(submod_id) => {
@@ -574,36 +580,36 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             let declaration_modifiers = cursor.optional_field(field!("declaration_modifiers")).then(|| cursor.kind_span());
 
             // Still gets overwritten 
-            let mut is_port = match declaration_context {
+            let mut decl_kind = match declaration_context {
                 DeclarationContext::IO{is_input} => {
                     if let Some((_, io_span)) = io_kw {
                         self.errors.error(io_span, "Cannot redeclare 'input' or 'output' on functional syntax IO");
                     }
-                    DeclarationPortInfo::RegularPort { is_input, port_id: PortID::PLACEHOLDER }
+                    DeclarationKind::RegularPort { is_input, port_id: PortID::PLACEHOLDER }
                 }
                 DeclarationContext::Generative(_) => {
                     if let Some((_, io_span)) = io_kw {
                         self.errors.error(io_span, "Cannot declare 'input' or 'output' to declarations in a generative context");
                     }
-                    DeclarationPortInfo::NotPort
+                    DeclarationKind::NotPort
                 }
                 DeclarationContext::TemplateGenerative(template_id) => {
                     if let Some((_, io_span)) = io_kw {
                         self.errors.error(io_span, "Cannot declare 'input' or 'output' on template values");
                     }
-                    DeclarationPortInfo::GenerativeInput(template_id)
+                    DeclarationKind::GenerativeInput(template_id)
                 }
                 DeclarationContext::PlainWire => {
                     match io_kw {
-                        Some((is_input, _)) => DeclarationPortInfo::RegularPort { is_input, port_id: PortID::PLACEHOLDER },
-                        None => DeclarationPortInfo::NotPort,
+                        Some((is_input, _)) => DeclarationKind::RegularPort { is_input, port_id: PortID::PLACEHOLDER },
+                        None => DeclarationKind::NotPort,
                     }
                 }
                 DeclarationContext::StructField => {
                     if let Some((_, io_span)) = io_kw {
                         self.errors.error(io_span, "Cannot declare 'input' or 'output' in a struct");
                     }
-                    DeclarationPortInfo::StructField { field_id: UUID::PLACEHOLDER }
+                    DeclarationKind::StructField { field_id: UUID::PLACEHOLDER }
                 }
             };
 
@@ -611,19 +617,19 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 DeclarationContext::IO{is_input:_} | DeclarationContext::PlainWire | DeclarationContext::StructField => {
                     match declaration_modifiers {
                         Some((kw!("state"), modifier_span)) => {
-                            if is_port.as_regular_port() == Some(true) {
+                            if decl_kind.is_io_port() == Some(true) {
                                 self.errors.error(modifier_span, "Inputs cannot be decorated with 'state'");
                             }
                             IdentifierType::State
                         }
                         Some((kw!("gen"), modifier_span)) => {
-                            match is_port {
-                                DeclarationPortInfo::NotPort => {}
-                                DeclarationPortInfo::RegularPort { is_input : _, port_id : _ } | DeclarationPortInfo::StructField { field_id:_ } => {
+                            match decl_kind {
+                                DeclarationKind::NotPort => {}
+                                DeclarationKind::RegularPort { is_input : _, port_id : _ } | DeclarationKind::StructField { field_id:_ } => {
                                     self.errors.error(modifier_span, "Cannot declare `gen` on inputs and outputs. To declare template inputs write it between the #()");
-                                    is_port = DeclarationPortInfo::NotPort; // Make it not a port anymore, because it errored
+                                    decl_kind = DeclarationKind::NotPort; // Make it not a port anymore, because it errored
                                 }
-                                DeclarationPortInfo::GenerativeInput(_) => unreachable!("Caught by DeclarationContext::ForLoopGenerative | DeclarationContext::TemplateGenerative(_)")
+                                DeclarationKind::GenerativeInput(_) => unreachable!("Caught by DeclarationContext::ForLoopGenerative | DeclarationContext::TemplateGenerative(_)")
                             }
                             IdentifierType::Generative
                         }
@@ -641,15 +647,15 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
             };
 
-            let alloc_domain_for = match &mut is_port {
-                DeclarationPortInfo::NotPort => if identifier_type.is_generative() {
+            let alloc_domain_for = match &mut decl_kind {
+                DeclarationKind::NotPort => if identifier_type.is_generative() {
                     DomainAllocOption::Generative
                 } else {
                     DomainAllocOption::NonGenerativeUnknown
                 },
-                DeclarationPortInfo::GenerativeInput(_template_id) => {DomainAllocOption::Generative}
-                DeclarationPortInfo::StructField { field_id } => {*field_id = self.fields_to_visit.next().unwrap(); DomainAllocOption::NonGenerativeKnown(UUID::PLACEHOLDER)}
-                DeclarationPortInfo::RegularPort { is_input:_, port_id } => {*port_id = self.ports_to_visit.next().unwrap(); DomainAllocOption::NonGenerativeKnown(self.named_domain_alloc.peek())}
+                DeclarationKind::GenerativeInput(_template_id) => {DomainAllocOption::Generative}
+                DeclarationKind::StructField { field_id } => {*field_id = self.fields_to_visit.next().unwrap(); DomainAllocOption::NonGenerativeKnown(UUID::PLACEHOLDER)}
+                DeclarationKind::RegularPort { is_input:_, port_id } => {*port_id = self.ports_to_visit.next().unwrap(); DomainAllocOption::NonGenerativeKnown(self.named_domain_alloc.peek())}
             };
 
             cursor.field(field!("type"));
@@ -690,7 +696,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
             let name = &self.globals.file_data.file_text[name_span];
 
-            if is_port.implies_read_only() {
+            if decl_kind.implies_read_only() {
                 read_only = true;
             }
 
@@ -699,7 +705,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 typ : self.type_alloc.alloc_unset_type(alloc_domain_for),
                 read_only,
                 declaration_itself_is_not_written_to,
-                is_port,
+                decl_kind,
                 identifier_type,
                 name : name.to_owned(),
                 name_span,
@@ -724,10 +730,10 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 
     fn alloc_error(&mut self, span: Span) -> FlatID {
-        self.instructions.alloc(Instruction::Wire(WireInstance {
+        self.instructions.alloc(Instruction::Expression(Expression {
             typ: self.type_alloc.alloc_unset_type(DomainAllocOption::NonGenerativeUnknown),
             span,
-            source: WireSource::new_error(),
+            source: ExpressionSource::new_error(),
         }))
     }
 
@@ -761,7 +767,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             if arg_count != expected_arg_count {
                 if arg_count > expected_arg_count {
                     // Too many args, complain about excess args at the end
-                    let excess_args_span = Span::new_overarching(self.instructions[arguments[expected_arg_count]].unwrap_wire().span, self.instructions[*arguments.last().unwrap()].unwrap_wire().span);
+                    let excess_args_span = Span::new_overarching(self.instructions[arguments[expected_arg_count]].unwrap_expression().span, self.instructions[*arguments.last().unwrap()].unwrap_expression().span);
 
                     self.errors
                         .error(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."))
@@ -870,7 +876,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         let (source, is_generative) = if kind == kind!("number") {
             let text = &self.globals.file_data.file_text[expr_span];
             use std::str::FromStr;            
-            (WireSource::Constant(Value::Integer(BigInt::from_str(text).unwrap())), true)
+            (ExpressionSource::Constant(Value::Integer(BigInt::from_str(text).unwrap())), true)
         } else if kind == kind!("unary_op") {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("operator"));
@@ -879,7 +885,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 cursor.field(field!("right"));
                 let (right, right_gen) = self.flatten_expr(cursor);
 
-                (WireSource::UnaryOp { op, right }, right_gen)
+                (ExpressionSource::UnaryOp { op, right }, right_gen)
             })
         } else if kind == kind!("binary_op") {
             cursor.go_down_no_check(|cursor| {
@@ -892,7 +898,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 cursor.field(field!("right"));
                 let (right, right_gen) = self.flatten_expr(cursor);
 
-                (WireSource::BinaryOp { op, left, right }, left_gen & right_gen)
+                (ExpressionSource::BinaryOp { op, left, right }, left_gen & right_gen)
             })
         } else if kind == kind!("func_call") {
             (if let Some(fc_id) = self.flatten_func_call(cursor) {
@@ -905,7 +911,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
 
                 if interface.func_call_outputs.len() >= 1 {
-                    WireSource::WireRef(WireReference::simple_port(PortInfo {
+                    ExpressionSource::WireRef(WireReference::simple_port(PortReference {
                         submodule_name_span: fc.interface_reference.name_span,
                         submodule_decl: fc.interface_reference.submodule_decl,
                         port: interface.func_call_outputs.0,
@@ -914,11 +920,11 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     }))
                 } else {
                     // Function desugaring or using threw an error
-                    WireSource::new_error()
+                    ExpressionSource::new_error()
                 }
             } else {
                 // Function desugaring or using threw an error
-                WireSource::new_error()
+                ExpressionSource::new_error()
             }, false) // TODO add compile-time functions https://github.com/pc2/sus-compiler/issues/10
         } else if kind == kind!("parenthesis_expression") {
             // Explicitly return so we don't alloc another WireInstance Instruction
@@ -928,7 +934,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         } else {
             if let Some(wr) = self.flatten_wire_reference(cursor).expect_wireref(self) {
                 let mut is_comptime = match wr.root {
-                    WireReferenceRoot::LocalDecl(uuid, _span) => self.instructions[uuid].unwrap_wire_declaration().identifier_type.is_generative(),
+                    WireReferenceRoot::LocalDecl(uuid, _span) => self.instructions[uuid].unwrap_declaration().identifier_type.is_generative(),
                     WireReferenceRoot::NamedConstant(_) => true,
                     WireReferenceRoot::SubModulePort(_) => false,
                 };
@@ -936,23 +942,23 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 for elem in &wr.path {
                     match elem {
                         WireReferencePathElement::ArrayAccess { idx, bracket_span:_ } => {
-                            is_comptime &= self.instructions[*idx].unwrap_wire().typ.domain.is_generative()
+                            is_comptime &= self.instructions[*idx].unwrap_expression().typ.domain.is_generative()
                         }
                     }
                 }
-                (WireSource::WireRef(wr), is_comptime)
+                (ExpressionSource::WireRef(wr), is_comptime)
             } else {
-                (WireSource::new_error(), false)
+                (ExpressionSource::new_error(), false)
             }
         };
 
-        let wire_instance = WireInstance {
+        let wire_instance = Expression {
             typ: self.type_alloc.alloc_unset_type(if is_generative {DomainAllocOption::Generative} else {DomainAllocOption::NonGenerativeUnknown}),
             span: expr_span,
             source,
         };
         (self.instructions
-            .alloc(Instruction::Wire(wire_instance)), is_generative)
+            .alloc(Instruction::Expression(wire_instance)), is_generative)
     }
 
     fn flatten_wire_reference(&mut self, cursor: &mut Cursor) -> PartialWireReference {
@@ -964,7 +970,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         let root = WireReferenceRoot::LocalDecl(decl_id, expr_span);
                         PartialWireReference::WireReference(WireReference {
                             root,
-                            is_generative: self.instructions[decl_id].unwrap_wire_declaration().identifier_type.is_generative(),
+                            is_generative: self.instructions[decl_id].unwrap_declaration().identifier_type.is_generative(),
                             path: Vec::new(),
                         })
                     }
@@ -1054,7 +1060,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
                         match submod.get_port_or_interface_by_name(port_name_span, &self.globals.file_data.file_text, self.errors) {
                             Some(PortOrInterface::Port(port)) => {
-                                let port_info = PortInfo{
+                                let port_info = PortReference{
                                     submodule_name_span : Some(submodule_name_span),
                                     submodule_decl,
                                     port,
@@ -1190,10 +1196,10 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             for port in outputs {
                 if let Some((Some((to, write_modifiers)), to_span)) = to_iter.next() {
                     let from =
-                        self.instructions.alloc(Instruction::Wire(WireInstance {
+                        self.instructions.alloc(Instruction::Expression(Expression {
                             typ: self.type_alloc.alloc_unset_type(DomainAllocOption::NonGenerativeUnknown), // TODO Generative Function Calls https://github.com/pc2/sus-compiler/issues/10
                             span: func_call_span,
-                            source: WireSource::WireRef(WireReference::simple_port(PortInfo {
+                            source: ExpressionSource::WireRef(WireReference::simple_port(PortReference {
                                 port,
                                 port_name_span: None,
                                 is_input: false,
@@ -1216,10 +1222,10 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         };
         for leftover_to in to_iter {
             if let (Some((to, write_modifiers)), to_span) = leftover_to {
-                let err_id = self.instructions.alloc(Instruction::Wire(WireInstance {
+                let err_id = self.instructions.alloc(Instruction::Expression(Expression {
                     typ: self.type_alloc.alloc_unset_type(DomainAllocOption::NonGenerativeUnknown),
                     span: func_call_span,
-                    source: WireSource::new_error(),
+                    source: ExpressionSource::new_error(),
                 }));
                 self.instructions.alloc(Instruction::Write(Write {
                     from: err_id,
@@ -1381,7 +1387,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                             true,
                             cursor,
                         );
-                        let flat_root_decl = self.instructions[root].unwrap_wire_declaration();
+                        let flat_root_decl = self.instructions[root].unwrap_declaration();
                         let is_generative = flat_root_decl.identifier_type.is_generative();
                         Some((
                             WireReference {
@@ -1489,7 +1495,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     declaration_runtime_depth: OnceCell::new(),
                     read_only: false,
                     declaration_itself_is_not_written_to: true,
-                    is_port: DeclarationPortInfo::NotPort,
+                    decl_kind: DeclarationKind::NotPort,
                     identifier_type: IdentifierType::Generative,
                     latency_specifier: None,
                     documentation: const_type_cursor.extract_gathered_comments(),
@@ -1566,20 +1572,20 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                         // Set all declaration_instruction values
                         for (decl_id, instr) in &instructions {
                             if let Instruction::Declaration(decl) = instr {
-                                match decl.is_port {
-                                    DeclarationPortInfo::NotPort => {},
-                                    DeclarationPortInfo::RegularPort { is_input:_, port_id } => {
+                                match decl.decl_kind {
+                                    DeclarationKind::NotPort => {},
+                                    DeclarationKind::RegularPort { is_input:_, port_id } => {
                                         let port = &mut md.ports[port_id];
                                         assert_eq!(port.name_span, decl.name_span);
                                         port.declaration_instruction = decl_id;
                                     }
-                                    DeclarationPortInfo::GenerativeInput(this_template_id) => {
+                                    DeclarationKind::GenerativeInput(this_template_id) => {
                                         let TemplateInputKind::Generative(GenerativeTemplateInputKind { decl_span:_, declaration_instruction }) = 
                                             &mut md.link_info.template_arguments[this_template_id].kind else {unreachable!()};
                     
                                         *declaration_instruction = decl_id;
                                     }
-                                    DeclarationPortInfo::StructField { field_id:_ } => unreachable!("No Struct fields in Modules")
+                                    DeclarationKind::StructField { field_id:_ } => unreachable!("No Struct fields in Modules")
                                 }
                             }
                         }
@@ -1600,15 +1606,15 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                         // Set all declaration_instruction values
                         for (decl_id, instr) in &instructions {
                             if let Instruction::Declaration(decl) = instr {
-                                match decl.is_port {
-                                    DeclarationPortInfo::NotPort => {assert!(decl.identifier_type == IdentifierType::Generative, "If a variable isn't generative, then it MUST be a struct field")}
-                                    DeclarationPortInfo::StructField { field_id } => {
+                                match decl.decl_kind {
+                                    DeclarationKind::NotPort => {assert!(decl.identifier_type == IdentifierType::Generative, "If a variable isn't generative, then it MUST be a struct field")}
+                                    DeclarationKind::StructField { field_id } => {
                                         let field = &mut typ.fields[field_id];
                                         assert_eq!(field.name_span, decl.name_span);
                                         field.declaration_instruction = decl_id;
                                     }
-                                    DeclarationPortInfo::RegularPort { is_input:_, port_id:_ } => {unreachable!("No ports in structs")}
-                                    DeclarationPortInfo::GenerativeInput(this_template_id) => {
+                                    DeclarationKind::RegularPort { is_input:_, port_id:_ } => {unreachable!("No ports in structs")}
+                                    DeclarationKind::GenerativeInput(this_template_id) => {
                                         let TemplateInputKind::Generative(GenerativeTemplateInputKind { decl_span:_, declaration_instruction }) = 
                                             &mut typ.link_info.template_arguments[this_template_id].kind else {unreachable!()};
                     

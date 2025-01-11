@@ -159,6 +159,10 @@ pub fn compute_binary_op(left: &TypedValue, op: BinaryOperator, right: &TypedVal
     }
 }
 
+/// A value with an attached [ConcreteType]. 
+/// 
+/// TODO: Because we now have Hindley-Milner type inference, the need for adding types to values seems to have gone away
+/// IE, the reason we added types in the first place was because we couldn't figure out the type of an empty array, but with HM that's no problem
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TypedValue {
     pub value: Value,

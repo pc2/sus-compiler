@@ -31,14 +31,6 @@ use self::latency_algorithm::SpecifiedLatency;
 // Temporary value before proper latency is given
 pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
 
-#[derive(Debug)]
-pub struct ConnectFrom {
-    pub num_regs: i64,
-    pub from: WireID,
-    pub condition: Box<[ConditionStackElem]>,
-    pub original_connection: FlatID,
-}
-
 #[derive(Debug, Clone)]
 pub enum RealWirePathElem {
     ArrayAccess { span: BracketSpan, idx_wire: WireID },
@@ -56,12 +48,21 @@ impl RealWirePathElem {
     }
 }
 
+/// One arm of a multiplexer. Each arm has an attached condition that is also stored here. 
+/// 
+/// See [RealWireDataSource::Multiplexer]
 #[derive(Debug)]
 pub struct MultiplexerSource {
     pub to_path: Vec<RealWirePathElem>,
-    pub from: ConnectFrom,
+    pub num_regs: i64,
+    pub from: WireID,
+    pub condition: Box<[ConditionStackElem]>,
+    pub original_connection: FlatID,
 }
 
+/// Where a [RealWire] gets its data, be it an operator, read-only value, constant, etc. 
+/// 
+/// This is the post-instantiation equivalent of [crate::flattening::ExpressionSource]
 #[derive(Debug)]
 pub enum RealWireDataSource {
     ReadOnly,
@@ -87,6 +88,9 @@ pub enum RealWireDataSource {
     },
 }
 
+/// An actual instantiated wire of an [InstantiatedModule] (See [InstantiatedModule::wires])
+/// 
+/// It can have a latency count and domain. All wires have a name, either the name they were given by the user, or a generated name like _1, _13
 #[derive(Debug)]
 pub struct RealWire {
     pub source: RealWireDataSource,
@@ -101,17 +105,25 @@ pub struct RealWire {
     pub absolute_latency: i64,
 }
 
+/// See [SubModule]
+/// 
+/// This represents a port of such a submodule
 #[derive(Debug)]
-pub struct UsedPort {
+pub struct SubModulePort {
     pub maps_to_wire: WireID,
     pub name_refs: Vec<Span>,
 }
 
+/// An actual instantiated submodule of an [InstantiatedModule] (See [InstantiatedModule::submodules])
+/// 
+/// All submodules have a name, either the name they were given by the user, or a generated name like _1, _13
+/// 
+/// When generating RTL code, one submodule object generates a single submodule instantiation
 #[derive(Debug)]
 pub struct SubModule {
     pub original_instruction: FlatID,
     pub instance: OnceCell<Rc<InstantiatedModule>>,
-    pub port_map: FlatAlloc<Option<UsedPort>, PortIDMarker>,
+    pub port_map: FlatAlloc<Option<SubModulePort>, PortIDMarker>,
     pub interface_call_sites: FlatAlloc<Vec<Span>, InterfaceIDMarker>,
     pub name: String,
     pub module_uuid: ModuleUUID,

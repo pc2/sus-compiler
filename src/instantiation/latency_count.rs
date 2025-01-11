@@ -71,7 +71,7 @@ fn filter_unique_write_flats<'w>(
     let mut result: Vec<&'w crate::flattening::Write> = Vec::new();
     for w in writes {
         if let Instruction::Write(original_write) =
-            &instructions[w.mux_input.from.original_connection]
+            &instructions[w.mux_input.original_connection]
         {
             if !result
                 .iter()
@@ -107,10 +107,10 @@ impl RealWireDataSource {
                 sources,
             } => {
                 for s in sources {
-                    f(s.from.from, s.from.num_regs);
-                    RealWirePathElem::for_each_wire_in_path(&s.to_path, |w| f(w, s.from.num_regs));
-                    for elem in s.from.condition.iter() {
-                        f(elem.condition_wire, s.from.num_regs);
+                    f(s.from, s.num_regs);
+                    RealWirePathElem::for_each_wire_in_path(&s.to_path, |w| f(w, s.num_regs));
+                    for elem in s.condition.iter() {
+                        f(elem.condition_wire, s.num_regs);
                     }
                 }
             }
@@ -390,7 +390,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         predecessor_found = true;
                     }
                 };
-                predecessor_adder(s.from.from);
+                predecessor_adder(s.from);
                 RealWirePathElem::for_each_wire_in_path(&s.to_path, predecessor_adder);
                 if predecessor_found {
                     connection_list.push(PathMuxSource {
@@ -467,7 +467,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 for port in bad_ports {
                     let port_decl = self.md.link_info.instructions
                         [self.wires[latency_node_meanings[port.0]].original_instruction]
-                        .unwrap_wire_declaration();
+                        .unwrap_declaration();
                     self.errors.error(port_decl.name_span, format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
                 }
             }
@@ -477,11 +477,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let end_wire =
                     &self.wires[latency_node_meanings[conflict_path.last().unwrap().wire]];
                 let start_decl =
-                    self.md.link_info.instructions[start_wire.original_instruction].unwrap_wire_declaration();
+                    self.md.link_info.instructions[start_wire.original_instruction].unwrap_declaration();
                 let end_decl =
-                    self.md.link_info.instructions[end_wire.original_instruction].unwrap_wire_declaration();
+                    self.md.link_info.instructions[end_wire.original_instruction].unwrap_declaration();
                 let end_latency_decl =
-                    self.md.link_info.instructions[end_decl.latency_specifier.unwrap()].unwrap_wire();
+                    self.md.link_info.instructions[end_decl.latency_specifier.unwrap()].unwrap_expression();
 
                 let writes_involved =
                     self.gather_all_mux_inputs(latency_node_meanings, &conflict_path);
