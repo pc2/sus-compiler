@@ -4,6 +4,7 @@ use std::cell::{OnceCell, RefCell};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index};
+use std::thread::panicking;
 
 use crate::block_vector::{BlockVec, BlockVecIter};
 use crate::errors::ErrorInfo;
@@ -166,7 +167,9 @@ impl<MyType : HindleyMilner<VariableIDMarker>+Clone, VariableIDMarker : UUIDMark
 
 impl<MyType: HindleyMilner<VariableIDMarker>, VariableIDMarker: UUIDMarker> Drop for TypeSubstitutor<MyType, VariableIDMarker> {
     fn drop(&mut self) {
-        assert!(self.failed_unifications.borrow().is_empty(), "Errors were not extracted before dropping!");
+        if !panicking() {
+            assert!(self.failed_unifications.borrow().is_empty(), "Errors were not extracted before dropping!");
+        }
     }
 }
 
