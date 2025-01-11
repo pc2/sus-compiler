@@ -2,15 +2,13 @@ use std::{cell::{UnsafeCell, Cell}, mem::MaybeUninit, ops::{DerefMut, Deref, Ind
 
 
 
-/* 
-    Has the property that appends don't move other elements. References are always preserved, therefore append is const 
-
-    Critically, alloc takes a CONST self, because using this will not invalidate any references derived from this
-    However, IndexMut still requires a mutable reference, since we can edit any arbitrary element, and the compiler can't check for overlap there
-
-    The const iterator exists, though it is not recommended to append elements while iterating over it. The const iterator would continue even onto newer elements
-    Existence of the mutable iterator disallows updating the container of course
-*/
+/// Has the property that appends don't move other elements. References are always preserved, therefore append is const 
+/// 
+/// Critically, alloc takes a CONST self, because using this will not invalidate any references derived from this
+/// However, IndexMut still requires a mutable reference, since we can edit any arbitrary element, and the compiler can't check for overlap there
+/// 
+/// The const iterator exists, though it is not recommended to append elements while iterating over it. The const iterator would continue even onto newer elements
+/// Existence of the mutable iterator disallows updating the container of course
 #[derive(Default)]
 pub struct BlockVec<T, const BLOCK_SIZE : usize = 64> {
     blocks : UnsafeCell<Vec<Box<[MaybeUninit<T>; BLOCK_SIZE]>>>,
@@ -58,6 +56,8 @@ impl<T, const BLOCK_SIZE : usize> BlockVec<T, BLOCK_SIZE> {
         self.length.get() == 0
     }
 
+    /// Critically, since appending to [BlockVec] is non-mutable, it is possible to do so while holding a [BlockVecIter].
+    /// BlockVecIter only iterates up to the size the BlockVec had when [BlockVec::iter] was called
     pub fn iter<'s>(&'s self) -> BlockVecIter<'s, T, BLOCK_SIZE> {
         self.into_iter()
     }

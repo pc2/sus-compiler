@@ -2,6 +2,9 @@ use crate::config::config;
 
 use super::list_of_lists::ListOfLists;
 
+/// A wire for which a latency has been specified. 
+/// 
+/// Provided as a list to [solve_latencies]. 
 #[derive(Debug, Clone, Copy)]
 pub struct SpecifiedLatency {
     pub wire: usize,
@@ -22,6 +25,7 @@ pub enum LatencyCountingError {
     },
 }
 
+/// A graph connection from (resp to) another wire, which specifies the minimal (resp maximal) difference in latency between them. 
 #[derive(Debug, Clone, Copy)]
 pub struct FanInOut {
     pub other: usize,

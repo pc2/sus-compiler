@@ -5,7 +5,7 @@ use std::{
 
 use crate::prelude::FileUUID;
 
-// Span is defined as byte-byte idx. Start inclusive, end exclusive
+/// [Span] is defined as byte-byte idx. Start inclusive, end exclusive
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Span(usize, usize);
 
@@ -76,6 +76,9 @@ impl Display for Span {
     }
 }
 
+/// A span for something that is between brackets. The assumption is that the brackets are 1 byte each. 
+/// 
+/// This struct is provided to improve readability on using these spans
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct BracketSpan(Span);
 

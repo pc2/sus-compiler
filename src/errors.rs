@@ -13,6 +13,9 @@ pub enum ErrorLevel {
     Warning,
 }
 
+/// Represents a comment about a location in the source code.
+/// 
+/// Multiple infos can be attached to a single [CompileError]
 #[derive(Debug, Clone)]
 pub struct ErrorInfo {
     pub position: Span,
@@ -20,6 +23,9 @@ pub struct ErrorInfo {
     pub info: String,
 }
 
+/// Represents an error or warning that the compiler produced. They can be shown in the IDE, or on the CLI
+/// 
+/// All errors for a single file are stored together, which is why this struct does not contain a FileUUID
 #[derive(Debug, Clone)]
 pub struct CompileError {
     pub position: Span,
@@ -30,7 +36,7 @@ pub struct CompileError {
 
 /// Stores all errors gathered within a context for reporting to the user.
 ///
-/// Only editable by converting to a ErrorCollector using [ErrorStore::take_for_editing]
+/// Only editable by converting to a ErrorCollector using [ErrorCollector::from_storage]
 #[derive(Debug, Clone)]
 pub struct ErrorStore {
     errors: Vec<CompileError>,
@@ -184,6 +190,11 @@ impl<'l> Drop for ErrorCollector<'l> {
     }
 }
 
+/// Intermediary struct to make adding infos far easier. 
+/// 
+/// Use as:
+/// 
+///     errors.warn(span, "Unused Variable").info(span2, file2, "In module").info(blablabla)
 pub struct ErrorReference<'ec> {
     err_collector: &'ec ErrorCollector<'ec>,
     pos: usize,

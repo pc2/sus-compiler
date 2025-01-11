@@ -14,7 +14,7 @@ use crate::typing::template::{
 pub enum InModule<'linker> {
     NamedLocal(&'linker Declaration),
     NamedSubmodule(&'linker SubModuleInstance),
-    Temporary(&'linker WireInstance),
+    Temporary(&'linker Expression),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -56,17 +56,17 @@ impl<'linker> From<LocationInfo<'linker>> for RefersTo {
         match info {
             LocationInfo::InModule(md_id, md, flat_id, flat_obj) => match flat_obj {
                 InModule::NamedLocal(_) => {
-                    let decl = md.link_info.instructions[flat_id].unwrap_wire_declaration();
-                    match decl.is_port {
-                        DeclarationPortInfo::NotPort => {}
-                        DeclarationPortInfo::StructField { field_id:_ } => {}
-                        DeclarationPortInfo::RegularPort {
+                    let decl = md.link_info.instructions[flat_id].unwrap_declaration();
+                    match decl.decl_kind {
+                        DeclarationKind::NotPort => {}
+                        DeclarationKind::StructField { field_id:_ } => {}
+                        DeclarationKind::RegularPort {
                             is_input: _,
                             port_id,
                         } => {
                             result.port = Some((md_id, port_id));
                         }
-                        DeclarationPortInfo::GenerativeInput(template_id) => {
+                        DeclarationKind::GenerativeInput(template_id) => {
                             result.template_input = Some((NameElem::Module(md_id), template_id))
                         }
                     }
@@ -249,7 +249,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                         md_id,
                         md,
                         *decl_id,
-                        InModule::NamedLocal(md.link_info.instructions[*decl_id].unwrap_wire_declaration()),
+                        InModule::NamedLocal(md.link_info.instructions[*decl_id].unwrap_declaration()),
                     ),
                 );
             }
@@ -411,8 +411,8 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                             );
                         }
                     }
-                    Instruction::Wire(wire) => {
-                        if let WireSource::WireRef(wire_ref) = &wire.source {
+                    Instruction::Expression(wire) => {
+                        if let ExpressionSource::WireRef(wire_ref) = &wire.source {
                             self.walk_wire_ref(md_id, md, wire_ref);
                         } else {
                             self.visit(

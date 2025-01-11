@@ -41,7 +41,7 @@ impl<'fl> GenerationState<'fl> {
         let instr = &self.md.link_info.instructions[v];
         match instr {
             Instruction::Declaration(d) => d.name_span,
-            Instruction::Wire(w) => w.span,
+            Instruction::Expression(expr) => expr.span,
             _ => unreachable!(),
         }
     }
@@ -311,13 +311,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         num_regs: i64,
         original_instruction: FlatID,
     ) {
-        let from = ConnectFrom {
-            num_regs,
-            from,
-            condition: self.condition_stack.clone().into_boxed_slice(),
-            original_connection: original_instruction,
-        };
-
         let RealWireDataSource::Multiplexer {
             is_state: _,
             sources,
@@ -326,7 +319,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             caught_by_typecheck!("Should only be a writeable wire here")
         };
 
-        sources.push(MultiplexerSource { from, to_path });
+        sources.push(MultiplexerSource {
+            to_path,
+            num_regs,
+            from,
+            condition : self.condition_stack.clone().into_boxed_slice(),
+            original_connection: original_instruction,
+        });
     }
 
     fn instantiate_connection(
@@ -435,14 +434,14 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         Ok(work_on_value)
     }
-    fn compute_compile_time(&mut self, wire_inst: &WireInstance) -> ExecutionResult<TypedValue> {
-        Ok(match &wire_inst.source {
-            WireSource::WireRef(wire_ref) => self.compute_compile_time_wireref(wire_ref)?,
-            &WireSource::UnaryOp { op, right } => {
+    fn compute_compile_time(&mut self, expression: &Expression) -> ExecutionResult<TypedValue> {
+        Ok(match &expression.source {
+            ExpressionSource::WireRef(wire_ref) => self.compute_compile_time_wireref(wire_ref)?,
+            &ExpressionSource::UnaryOp { op, right } => {
                 let right_val = self.generation_state.get_generation_value(right)?;
                 compute_unary_op(op, right_val)
             }
-            &WireSource::BinaryOp { op, left, right } => {
+            &ExpressionSource::BinaryOp { op, left, right } => {
                 let left_val = self.generation_state.get_generation_value(left)?;
                 let right_val = self.generation_state.get_generation_value(right)?;
 
@@ -451,7 +450,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         use num::Zero;
                         if right_val.value.unwrap_integer().is_zero() {
                             return Err((
-                                wire_inst.span,
+                                expression.span,
                                 format!(
                                     "Divide or Modulo by zero: {} / 0",
                                     left_val.unwrap_integer()
@@ -464,7 +463,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
                 compute_binary_op(left_val, op, right_val)
             }
-            WireSource::Constant(value) => TypedValue::from_value(value.clone()),
+            ExpressionSource::Constant(value) => TypedValue::from_value(value.clone()),
         })
     }
     fn alloc_wire_for_const(
@@ -548,7 +547,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Vec::new()
             };
 
-            *wire_found = Some(UsedPort {
+            *wire_found = Some(SubModulePort {
                 maps_to_wire: new_wire,
                 name_refs,
             });
@@ -580,14 +579,14 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             ),
         }
     }
-    fn wire_to_real_wire(
+    fn expression_to_real_wire(
         &mut self,
-        w: &WireInstance,
+        expression: &Expression,
         original_instruction: FlatID,
         domain: DomainID,
     ) -> ExecutionResult<WireID> {
-        let source = match &w.source {
-            WireSource::WireRef(wire_ref) => {
+        let source = match &expression.source {
+            ExpressionSource::WireRef(wire_ref) => {
                 let (root_wire, path_preamble) =
                     self.get_wire_ref_root_as_wire(&wire_ref.root, original_instruction, domain);
                 let path = self.instantiate_wire_ref_path(path_preamble, &wire_ref.path, domain);
@@ -602,16 +601,16 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     path,
                 }
             }
-            &WireSource::UnaryOp { op, right } => {
+            &ExpressionSource::UnaryOp { op, right } => {
                 let right = self.get_wire_or_constant_as_wire(right, domain);
                 RealWireDataSource::UnaryOp { op, right }
             }
-            &WireSource::BinaryOp { op, left, right } => {
+            &ExpressionSource::BinaryOp { op, left, right } => {
                 let left = self.get_wire_or_constant_as_wire(left, domain);
                 let right = self.get_wire_or_constant_as_wire(right, domain);
                 RealWireDataSource::BinaryOp { op, left, right }
             }
-            WireSource::Constant(_) => {
+            ExpressionSource::Constant(_) => {
                 unreachable!("Constant cannot be non-compile-time");
             }
         };
@@ -634,13 +633,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         let typ = self.concretize_type(&wire_decl.typ_expr)?;
 
         Ok(if wire_decl.identifier_type == IdentifierType::Generative {
-            let value = if let DeclarationPortInfo::GenerativeInput(template_id) = wire_decl.is_port
-            {
-                self.template_args[template_id]
-                    .kind
-                    .clone()
-                    .get_initial_typed_val()
+            let value = if let DeclarationKind::GenerativeInput(template_id) = wire_decl.decl_kind {
+                // Only for template arguments, we must initialize their value to the value they've been assigned in the template instantiation
+                self.template_args[template_id].unwrap_value().clone()
             } else {
+                // Empty initial value
                 typ.get_initial_typed_val()
             };
             SubModuleOrWire::CompileTimeValue(value)
@@ -732,13 +729,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::Declaration(wire_decl) => {
                     self.instantiate_declaration(wire_decl, original_instruction)?
                 }
-                Instruction::Wire(w) => match w.typ.domain {
+                Instruction::Expression(expr) => match expr.typ.domain {
                     DomainType::Generative => {
-                        let value_computed = self.compute_compile_time(w)?;
+                        let value_computed = self.compute_compile_time(expr)?;
                         SubModuleOrWire::CompileTimeValue(value_computed)
                     }
                     DomainType::Physical(domain) => {
-                        let wire_found = self.wire_to_real_wire(w, original_instruction, domain)?;
+                        let wire_found = self.expression_to_real_wire(expr, original_instruction, domain)?;
                         SubModuleOrWire::Wire(wire_found)
                     }
                     DomainType::DomainVariable(_) => {
@@ -791,9 +788,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::IfStatement(stm) => {
                     let then_range = FlatIDRange::new(stm.then_start, stm.then_end_else_start);
                     let else_range = FlatIDRange::new(stm.then_end_else_start, stm.else_end);
-                    let if_condition_wire =
-                        self.md.link_info.instructions[stm.condition].unwrap_wire();
-                    match if_condition_wire.typ.domain {
+                    let if_condition_expr = self.md.link_info.instructions[stm.condition].unwrap_expression();
+                    match if_condition_expr.typ.domain {
                         DomainType::Generative => {
                             let condition_val =
                                 self.generation_state.get_generation_value(stm.condition)?;
@@ -840,8 +836,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         .unwrap_integer()
                         .clone();
                     if start_val > end_val {
-                        let start_flat = &self.md.link_info.instructions[stm.start].unwrap_wire();
-                        let end_flat = &self.md.link_info.instructions[stm.end].unwrap_wire();
+                        let start_flat = &self.md.link_info.instructions[stm.start].unwrap_expression();
+                        let end_flat = &self.md.link_info.instructions[stm.end].unwrap_expression();
                         return Err((
                             Span::new_overarching(start_flat.span, end_flat.span),
                             format!("for loop range end is before begin: {start_val}:{end_val}"),

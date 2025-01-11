@@ -2,13 +2,13 @@ use crate::typing::template::{TemplateArgKind, TemplateArgs};
 
 use crate::prelude::*;
 
-use super::{WireReferencePathElement, WireReferenceRoot, WireSource, WrittenType};
+use super::{WireReferencePathElement, WireReferenceRoot, ExpressionSource, WrittenType};
 
-impl WireSource {
+impl ExpressionSource {
     /// Enumerates all instructions that this instruction depends on. This includes (maybe compiletime) wires, and submodules.
     pub fn for_each_dependency<F: FnMut(FlatID)>(&self, mut func: F) {
         match self {
-            WireSource::WireRef(wire_ref) => {
+            ExpressionSource::WireRef(wire_ref) => {
                 match &wire_ref.root {
                     WireReferenceRoot::LocalDecl(decl_id, _) => func(*decl_id),
                     WireReferenceRoot::NamedConstant(_) => {}
@@ -25,12 +25,12 @@ impl WireSource {
                     }
                 }
             }
-            &WireSource::UnaryOp { op: _, right } => func(right),
-            &WireSource::BinaryOp { op: _, left, right } => {
+            &ExpressionSource::UnaryOp { op: _, right } => func(right),
+            &ExpressionSource::BinaryOp { op: _, left, right } => {
                 func(left);
                 func(right)
             }
-            WireSource::Constant(_) => {}
+            ExpressionSource::Constant(_) => {}
         }
     }
 }

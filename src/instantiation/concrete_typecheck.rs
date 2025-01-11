@@ -2,7 +2,7 @@
 use std::ops::Deref;
 
 use crate::errors::ErrorInfoObject;
-use crate::flattening::{DeclarationPortInfo, WireReferenceRoot, WireSource, WrittenType};
+use crate::flattening::{DeclarationKind, WireReferenceRoot, ExpressionSource, WrittenType};
 use crate::linker::LinkInfo;
 use crate::typing::template::{ConcreteTemplateArg, HowDoWeKnowTheTemplateArg};
 use crate::typing::{
@@ -53,7 +53,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         assert!(is_state.is_of_type(&this_wire.typ));
                     }
                     for s in sources {
-                        let source_typ = &self.wires[s.from.from].typ;
+                        let source_typ = &self.wires[s.from].typ;
                         let destination_typ = self.walk_type_along_path(self.wires[this_wire_id].typ.clone(), &s.to_path);
                         self.type_substitutor.unify_report_error(&destination_typ, &source_typ, span, "write wire access");
                     }
@@ -163,19 +163,19 @@ struct SubmoduleTypecheckConstraint {
 ///     output int total
 /// }
 /// ```
-fn can_wire_can_be_value_inferred(link_info: &LinkInfo, flat_wire: FlatID) -> Option<TemplateID> {
-    let wire = link_info.instructions[flat_wire].unwrap_wire();
-    let WireSource::WireRef(wr) = &wire.source else {return None};
+fn can_expression_be_value_inferred(link_info: &LinkInfo, expr_id: FlatID) -> Option<TemplateID> {
+    let expr = link_info.instructions[expr_id].unwrap_expression();
+    let ExpressionSource::WireRef(wr) = &expr.source else {return None};
     if !wr.path.is_empty() {return None} // Must be a plain, no fuss reference to a de
     let WireReferenceRoot::LocalDecl(wire_declaration, _span) = &wr.root else {return None};
-    let template_arg_decl = link_info.instructions[*wire_declaration].unwrap_wire_declaration();
-    let DeclarationPortInfo::GenerativeInput(template_id) = &template_arg_decl.is_port else {return None};
+    let template_arg_decl = link_info.instructions[*wire_declaration].unwrap_declaration();
+    let DeclarationKind::GenerativeInput(template_id) = &template_arg_decl.decl_kind else {return None};
     Some(*template_id)
 }
 
 fn try_to_attach_value_to_template_arg(template_wire_referernce: FlatID, found_value: &ConcreteType, template_args: &mut ConcreteTemplateArgs, submodule_link_info: &LinkInfo) {
     let ConcreteType::Value(v) = found_value else {return}; // We don't have a value to assign
-    if let Some(template_id) = can_wire_can_be_value_inferred(submodule_link_info, template_wire_referernce) {
+    if let Some(template_id) = can_expression_be_value_inferred(submodule_link_info, template_wire_referernce) {
         if let ConcreteTemplateArg::NotProvided = &template_args[template_id] {
             template_args[template_id] = ConcreteTemplateArg::Value(TypedValue::from_value(v.clone()), HowDoWeKnowTheTemplateArg::Inferred)
         }
@@ -218,7 +218,7 @@ impl SubmoduleTypecheckConstraint {
             wire_typ_clone.fully_substitute(&context.type_substitutor);
 
             let port_decl_instr = sub_module.ports[id].declaration_instruction;
-            let port_decl = sub_module.link_info.instructions[port_decl_instr].unwrap_wire_declaration();
+            let port_decl = sub_module.link_info.instructions[port_decl_instr].unwrap_declaration();
 
             infer_parameters_by_walking_type(&port_decl.typ_expr, &wire_typ_clone, &mut sm.template_args, &sub_module.link_info);
         }
