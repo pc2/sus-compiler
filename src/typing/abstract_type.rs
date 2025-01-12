@@ -1,9 +1,7 @@
 use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
 use crate::value::Value;
-
-use std::fmt::Display;
-use std::ops::{Deref, Index};
+use std::ops::Deref;
 
 use super::template::{GlobalReference, TemplateAbstractTypes, TemplateInputs};
 use super::type_inference::{DomainVariableID, DomainVariableIDMarker, TypeSubstitutor, TypeVariableID, TypeVariableIDMarker, UnifyErrorReport};
@@ -22,19 +20,6 @@ pub enum AbstractType {
     Template(TemplateID),
     Named(TypeUUID),
     Array(Box<AbstractType>),
-}
-
-impl AbstractType {
-    pub fn display<'a, TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter>(&'a self, 
-    linker_types: &'a TypVec,
-    template_names: &'a TemplateVec,
-) -> impl Display + 'a {
-        AbstractTypeDisplay {
-            inner: self,
-            linker_types,
-            template_names,
-        }
-    }
 }
 
 pub const BOOL_TYPE: AbstractType = AbstractType::Named(get_builtin_type("bool"));

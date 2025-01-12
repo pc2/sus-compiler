@@ -8,13 +8,11 @@ mod lints;
 
 use crate::alloc::UUIDAllocator;
 use crate::prelude::*;
-use crate::to_string::{TemplateNameGetter, WrittenTypeDisplay};
 use crate::typing::abstract_type::DomainType;
 use crate::typing::type_inference::{DomainVariableIDMarker, TypeVariableIDMarker};
 
 use std::cell::OnceCell;
-use std::fmt::Display;
-use std::ops::{Deref, Index};
+use std::ops::Deref;
 
 pub use flatten::flatten_all_modules;
 pub use initialization::gather_initial_file_data;
@@ -478,16 +476,6 @@ impl WrittenType {
             | WrittenType::TemplateVariable(total_span, ..)
             | WrittenType::Array(total_span, _) => *total_span,
             WrittenType::Named(global_ref) => global_ref.get_total_span()
-        }
-    }
-    pub fn display<'a, TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter>(&'a self, 
-    linker_types: &'a TypVec,
-    template_names: &'a TemplateVec,
-    ) -> impl Display + 'a {
-        WrittenTypeDisplay {
-            inner: self,
-            linker_types,
-            template_names,
         }
     }
 }

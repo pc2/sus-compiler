@@ -45,9 +45,9 @@ pub struct WrittenTypeDisplay<
     TypVec: Index<TypeUUID, Output = StructType>,
     TemplateVec: TemplateNameGetter,
 > {
-    pub inner: &'a WrittenType,
-    pub linker_types: &'a TypVec,
-    pub template_names: &'a TemplateVec,
+    inner: &'a WrittenType,
+    linker_types: &'a TypVec,
+    template_names: &'a TemplateVec,
 }
 
 impl<'a, TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
@@ -75,15 +75,33 @@ impl<'a, TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateName
     }
 }
 
+impl WrittenType {
+    pub fn display<
+        'a,
+        TypVec: Index<TypeUUID, Output = StructType>,
+        TemplateVec: TemplateNameGetter,
+    >(
+        &'a self,
+        linker_types: &'a TypVec,
+        template_names: &'a TemplateVec,
+    ) -> impl Display + 'a {
+        WrittenTypeDisplay {
+            inner: self,
+            linker_types,
+            template_names,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct AbstractTypeDisplay<
     'a,
     TypVec: Index<TypeUUID, Output = StructType>,
     TemplateVec: TemplateNameGetter,
 > {
-    pub inner: &'a AbstractType,
-    pub linker_types: &'a TypVec,
-    pub template_names: &'a TemplateVec,
+    inner: &'a AbstractType,
+    linker_types: &'a TypVec,
+    template_names: &'a TemplateVec,
 }
 
 impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
@@ -105,10 +123,28 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
     }
 }
 
+impl AbstractType {
+    pub fn display<
+        'a,
+        TypVec: Index<TypeUUID, Output = StructType>,
+        TemplateVec: TemplateNameGetter,
+    >(
+        &'a self,
+        linker_types: &'a TypVec,
+        template_names: &'a TemplateVec,
+    ) -> impl Display + 'a {
+        AbstractTypeDisplay {
+            inner: self,
+            linker_types,
+            template_names,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ConcreteTypeDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
-    pub inner: &'a ConcreteType,
-    pub linker_types: &'a T,
+    inner: &'a ConcreteType,
+    linker_types: &'a T,
 }
 
 impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_, T> {
@@ -128,6 +164,18 @@ impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_
             }
             ConcreteType::Value(v) => write!(f, "{{concrete_type_{v}}}"),
             ConcreteType::Unknown(u) => write!(f, "{{{u:?}}}"),
+        }
+    }
+}
+
+impl ConcreteType {
+    pub fn display<'a>(
+        &'a self,
+        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
+    ) -> impl Display + 'a {
+        ConcreteTypeDisplay {
+            inner: self,
+            linker_types,
         }
     }
 }

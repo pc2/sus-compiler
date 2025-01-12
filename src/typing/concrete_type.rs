@@ -1,9 +1,5 @@
-use crate::flattening::StructType;
 use crate::prelude::*;
-use crate::to_string::ConcreteTypeDisplay;
-
-use std::fmt::Display;
-use std::ops::{Deref, Index};
+use std::ops::Deref;
 
 use crate::linker::get_builtin_type;
 use crate::
@@ -47,12 +43,6 @@ impl ConcreteType {
                 arr_arr.contains_unknown() || arr_size.contains_unknown()
             }
             ConcreteType::Unknown(_) => true,
-        }
-    }
-    pub fn display<'a>(&'a self, linker_types: &'a impl Index<TypeUUID, Output = StructType>) -> impl Display + 'a {
-        ConcreteTypeDisplay {
-            inner: self,
-            linker_types,
         }
     }
 }
