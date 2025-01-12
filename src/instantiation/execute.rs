@@ -6,7 +6,7 @@
 
 use std::ops::{Deref, Index, IndexMut};
 
-use crate::linker::{get_builtin_type, IsExtern};
+use crate::linker::IsExtern;
 use crate::prelude::*;
 use crate::typing::concrete_type::ConcreteGlobalReference;
 use crate::typing::template::{GlobalReference, HowDoWeKnowTheTemplateArg};
@@ -77,12 +77,12 @@ impl<'fl> GenerationState<'fl> {
         *target = to_write;
         Ok(())
     }
-    fn get_generation_value(&self, v: FlatID) -> ExecutionResult<&TypedValue> {
+    fn get_generation_value(&self, v: FlatID) -> ExecutionResult<&Value> {
         if let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] {
-            if let Value::Unset | Value::Error = &vv.value {
+            if let Value::Unset | Value::Error = vv {
                 Err((
                     self.span_of(v),
-                    format!("This variable is set but it's {:?}!", vv.value),
+                    format!("This variable is set but it's {:?}!", vv),
                 ))
             } else {
                 Ok(vv)
@@ -130,18 +130,13 @@ impl<'fl> IndexMut<FlatID> for GenerationState<'fl> {
     }
 }
 
-fn array_access(tv: &TypedValue, idx: &BigInt, span: BracketSpan) -> ExecutionResult<TypedValue> {
-    let typ = tv.typ.down_array().clone();
-
-    let Value::Array(arr) = &tv.value else {
+fn array_access<'v>(arr_val: &'v Value, idx: &BigInt, span: BracketSpan) -> ExecutionResult<&'v Value> {
+    let Value::Array(arr) = arr_val else {
         caught_by_typecheck!("Value must be an array")
     };
 
     if let Some(elem) = usize::try_from(idx).ok().and_then(|idx| arr.get(idx)) {
-        Ok(TypedValue {
-            typ,
-            value: elem.clone(),
-        })
+        Ok(elem)
     } else {
         Err((
             span.outer_span(),
@@ -222,25 +217,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
 
     /// TODO make builtins that depend on parameters
-    fn get_named_constant_value(&self, cst_ref: &GlobalReference<ConstantUUID>) -> TypedValue {
+    fn get_named_constant_value(&self, cst_ref: &GlobalReference<ConstantUUID>) -> Value {
         let linker_cst = &self.linker.constants[cst_ref.id];
 
         if linker_cst.link_info.is_extern == IsExtern::Builtin {
             match linker_cst.link_info.name.as_str() {
-                "true" => TypedValue {
-                    value: Value::Bool(true),
-                    typ: ConcreteType::Named(ConcreteGlobalReference {
-                        id: get_builtin_type("bool"),
-                        template_args: FlatAlloc::new(),
-                    }),
-                },
-                "false" => TypedValue {
-                    value: Value::Bool(false),
-                    typ: ConcreteType::Named(ConcreteGlobalReference {
-                        id: get_builtin_type("bool"),
-                        template_args: FlatAlloc::new(),
-                    }),
-                },
+                "true" => Value::Bool(true),
+                "false" => Value::Bool(false),
                 "__crash_compiler" => {
                     cst_ref.get_total_span().debug();
                     panic!("__crash_compiler Intentional ICE. This is for debugging the compiler and LSP.")
@@ -366,11 +349,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     else {
                         unreachable!()
                     };
-                    let mut new_val = std::mem::replace(&mut v_writable.value, Value::Error);
+                    let mut new_val = std::mem::replace(v_writable, Value::Error);
                     self.generation_state.write_gen_variable(
                         &mut new_val,
                         &target_wire_ref.path,
-                        found_v.value,
+                        found_v,
                     )?;
 
                     let SubModuleOrWire::CompileTimeValue(v_writable) =
@@ -378,7 +361,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     else {
                         unreachable!()
                     };
-                    v_writable.value = new_val;
+                    *v_writable = new_val;
                 }
                 RealWireRefRoot::Constant(_cst) => {
                     caught_by_typecheck!("Cannot assign to constants");
@@ -402,7 +385,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 self.generation_state.write_gen_variable(
                     initial_value,
                     &target_wire_ref.path,
-                    found_v.value,
+                    found_v,
                 )?;
             }
         }
@@ -411,8 +394,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn compute_compile_time_wireref(
         &self,
         wire_ref: &WireReference,
-    ) -> ExecutionResult<TypedValue> {
-        let mut work_on_value: TypedValue = match &wire_ref.root {
+    ) -> ExecutionResult<Value> {
+        let mut work_on_value: Value = match &wire_ref.root {
             &WireReferenceRoot::LocalDecl(decl_id, _span) => {
                 self.generation_state.get_generation_value(decl_id)?.clone()
             }
@@ -427,16 +410,16 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
                     let idx = self.generation_state.get_generation_integer(idx)?;
 
-                    array_access(&work_on_value, idx, bracket_span)?
+                    array_access(&work_on_value, idx, bracket_span)?.clone()
                 }
             }
         }
 
         Ok(work_on_value)
     }
-    fn compute_compile_time(&mut self, expression: &Expression) -> ExecutionResult<TypedValue> {
+    fn compute_compile_time(&mut self, expression: &Expression) -> ExecutionResult<Value> {
         Ok(match &expression.source {
-            ExpressionSource::WireRef(wire_ref) => self.compute_compile_time_wireref(wire_ref)?,
+            ExpressionSource::WireRef(wire_ref) => self.compute_compile_time_wireref(wire_ref)?.clone(),
             &ExpressionSource::UnaryOp { op, right } => {
                 let right_val = self.generation_state.get_generation_value(right)?;
                 compute_unary_op(op, right_val)
@@ -448,7 +431,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 match op {
                     BinaryOperator::Divide | BinaryOperator::Modulo => {
                         use num::Zero;
-                        if right_val.value.unwrap_integer().is_zero() {
+                        if right_val.unwrap_integer().is_zero() {
                             return Err((
                                 expression.span,
                                 format!(
@@ -463,20 +446,21 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
                 compute_binary_op(left_val, op, right_val)
             }
-            ExpressionSource::Constant(value) => TypedValue::from_value(value.clone()),
+            ExpressionSource::Constant(value) => value.clone(),
         })
     }
+
     fn alloc_wire_for_const(
         &mut self,
-        value: TypedValue,
+        value: Value,
         original_instruction: FlatID,
         domain: DomainID,
     ) -> WireID {
         self.wires.alloc(RealWire {
-            source: RealWireDataSource::Constant { value: value.value },
+            typ : value.get_type_best_effort(&mut self.type_substitutor),
+            source: RealWireDataSource::Constant { value },
             original_instruction,
             domain,
-            typ: value.typ,
             name: self.unique_name_producer.get_unique_name(""),
             specified_latency: CALCULATE_LATENCY_LATER,
             absolute_latency: CALCULATE_LATENCY_LATER,
@@ -638,7 +622,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 self.template_args[template_id].unwrap_value().clone()
             } else {
                 // Empty initial value
-                typ.get_initial_typed_val()
+                typ.get_initial_val()
             };
             SubModuleOrWire::CompileTimeValue(value)
         } else {
@@ -852,7 +836,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         else {
                             unreachable!()
                         };
-                        *v = TypedValue::make_integer(current_val.clone());
+                        *v = Value::Integer(current_val.clone());
                         current_val += 1;
                         self.instantiate_code_block(stm.loop_body)?;
                     }

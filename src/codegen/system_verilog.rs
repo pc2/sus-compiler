@@ -327,8 +327,8 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 ConcreteTemplateArg::Type(..) => {
                     unreachable!("No extern module type arguments. Should have been caught by Lint")
                 }
-                ConcreteTemplateArg::Value(typed_value, _) => {
-                    typed_value.value.inline_constant_to_string()
+                ConcreteTemplateArg::Value(value, _) => {
+                    value.inline_constant_to_string()
                 }
                 ConcreteTemplateArg::NotProvided => unreachable!("All args are known at codegen"),
             };
