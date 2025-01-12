@@ -177,7 +177,7 @@ fn try_to_attach_value_to_template_arg(template_wire_referernce: FlatID, found_v
     let ConcreteType::Value(v) = found_value else {return}; // We don't have a value to assign
     if let Some(template_id) = can_expression_be_value_inferred(submodule_link_info, template_wire_referernce) {
         if let ConcreteTemplateArg::NotProvided = &template_args[template_id] {
-            template_args[template_id] = ConcreteTemplateArg::Value(TypedValue::from_value(v.clone()), HowDoWeKnowTheTemplateArg::Inferred)
+            template_args[template_id] = ConcreteTemplateArg::Value(v.clone(), HowDoWeKnowTheTemplateArg::Inferred)
         }
     }
 }

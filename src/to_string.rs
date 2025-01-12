@@ -242,8 +242,8 @@ where TypVec: Index<TypeUUID, Output = StructType> {
             ConcreteTemplateArg::Type(concrete_type, how_do_we_know_the_template_arg) => {
                 write!(result, "type {} /* {} */,\n", concrete_type.to_string(linker_types), how_do_we_know_the_template_arg.to_str()).unwrap();
             }
-            ConcreteTemplateArg::Value(typed_value, how_do_we_know_the_template_arg) => {
-                write!(result, "{} /* {} */,\n", typed_value.value.to_string(), how_do_we_know_the_template_arg.to_str()).unwrap();
+            ConcreteTemplateArg::Value(value, how_do_we_know_the_template_arg) => {
+                write!(result, "{} /* {} */,\n", value.to_string(), how_do_we_know_the_template_arg.to_str()).unwrap();
             }
             ConcreteTemplateArg::NotProvided => {
                 write!(result, "/* Could not infer */\n").unwrap();

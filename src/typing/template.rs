@@ -1,7 +1,7 @@
-use crate::prelude::*;
+use crate::{prelude::*, value::Value};
 
 use super::{abstract_type::AbstractType, concrete_type::ConcreteType};
-use crate::{flattening::WrittenType, value::TypedValue};
+use crate::flattening::WrittenType;
 
 #[derive(Debug)]
 pub struct GlobalReference<ID> {
@@ -110,7 +110,7 @@ impl HowDoWeKnowTheTemplateArg {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteTemplateArg {
     Type(ConcreteType, HowDoWeKnowTheTemplateArg),
-    Value(TypedValue, HowDoWeKnowTheTemplateArg),
+    Value(Value, HowDoWeKnowTheTemplateArg),
     NotProvided,
 }
 
@@ -121,7 +121,7 @@ impl ConcreteTemplateArg {
         t
     }
     #[track_caller]
-    pub fn unwrap_value(&self) -> &TypedValue {
+    pub fn unwrap_value(&self) -> &Value {
         let Self::Value(v, _) = self else {unreachable!()};
         v
     }

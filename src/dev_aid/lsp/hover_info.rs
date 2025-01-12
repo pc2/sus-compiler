@@ -51,7 +51,7 @@ impl<'l> HoverCollector<'l> {
             if is_generative {
                 let value_str = match &inst.generation_state[id] {
                     SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => unreachable!(),
-                    SubModuleOrWire::CompileTimeValue(v) => format!(" = {}", v.value),
+                    SubModuleOrWire::CompileTimeValue(v) => format!(" = {}", v),
                     SubModuleOrWire::Unnasigned => format!("never assigned to"),
                 };
                 self.monospace(value_str);
