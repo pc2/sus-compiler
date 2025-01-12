@@ -109,7 +109,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn finalize(&mut self) {
         for (_id, w) in &mut self.wires {
             if w.typ.fully_substitute(&self.type_substitutor) == false {
-                let typ_as_str = w.typ.to_string(&self.linker.types);
+                let typ_as_str = w.typ.display(&self.linker.types);
                 
                 let span = self.md.get_instruction_span(w.original_instruction);
                 self.errors.error(span, format!("Could not finalize this type, some parameters were still unknown: {typ_as_str}"));
@@ -122,8 +122,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             let _ = found.fully_substitute(&self.type_substitutor);
             let _ = expected.fully_substitute(&self.type_substitutor);
     
-            let expected_name = expected.to_string(&self.linker.types);
-            let found_name = found.to_string(&self.linker.types);
+            let expected_name = expected.display(&self.linker.types).to_string();
+            let found_name = found.display(&self.linker.types).to_string();
             self.errors
                 .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
                 .add_info_list(infos);
