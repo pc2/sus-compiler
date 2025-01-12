@@ -18,7 +18,7 @@ use crate::{
     config,
     errors::{CompileError, ErrorStore},
     to_string::pretty_print_concrete_instance,
-    value::{TypedValue, Value},
+    value::Value,
 };
 
 use crate::typing::{
@@ -155,7 +155,7 @@ pub struct InstantiatedModule {
 pub enum SubModuleOrWire {
     SubModule(SubModuleID),
     Wire(WireID),
-    CompileTimeValue(TypedValue),
+    CompileTimeValue(Value),
     // Variable doesn't exist yet
     Unnasigned,
 }
@@ -169,7 +169,7 @@ impl SubModuleOrWire {
         *result
     }
     #[track_caller]
-    pub fn unwrap_generation_value(&self) -> &TypedValue {
+    pub fn unwrap_generation_value(&self) -> &Value {
         let Self::CompileTimeValue(result) = self else {
             unreachable!("SubModuleOrWire::unwrap_generation_value failed! Is {self:?} instead")
         };
@@ -192,7 +192,7 @@ pub enum RealWireRefRoot {
         preamble: Vec<RealWirePathElem>,
     },
     Generative(FlatID),
-    Constant(TypedValue),
+    Constant(Value),
 }
 
 #[derive(Debug)]
