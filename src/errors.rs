@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
 use std::cell::RefCell;
+use std::thread::panicking;
 
 use crate::{alloc::ArenaAllocator, typing::template::TemplateInput};
 
@@ -184,7 +185,7 @@ impl<'linker> ErrorCollector<'linker> {
 
 impl<'l> Drop for ErrorCollector<'l> {
     fn drop(&mut self) {
-        if !self.error_store.borrow().is_untouched() {
+        if !self.error_store.borrow().is_untouched() && !panicking() {
             panic!("ErrorCollector should have been emptied!");
         }
     }
