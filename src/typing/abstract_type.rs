@@ -2,13 +2,14 @@ use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
 use crate::value::Value;
 
-use std::ops::Deref;
+use std::fmt::Display;
+use std::ops::{Deref, Index};
 
 use super::template::{GlobalReference, TemplateAbstractTypes, TemplateInputs};
 use super::type_inference::{DomainVariableID, DomainVariableIDMarker, TypeSubstitutor, TypeVariableID, TypeVariableIDMarker, UnifyErrorReport};
 use crate::flattening::{BinaryOperator, StructType, TypingAllocator, UnaryOperator, WrittenType};
 use crate::linker::get_builtin_type;
-use crate::to_string::map_to_type_names;
+use crate::to_string::{map_to_type_names, AbstractTypeDisplay, TemplateNameGetter};
 
 /// This contains only the information that can be easily type-checked.
 ///
@@ -21,6 +22,19 @@ pub enum AbstractType {
     Template(TemplateID),
     Named(TypeUUID),
     Array(Box<AbstractType>),
+}
+
+impl AbstractType {
+    pub fn display<'a, TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter>(&'a self, 
+    linker_types: &'a TypVec,
+    template_names: &'a TemplateVec,
+) -> impl Display + 'a {
+        AbstractTypeDisplay {
+            inner: self,
+            linker_types,
+            template_names,
+        }
+    }
 }
 
 pub const BOOL_TYPE: AbstractType = AbstractType::Named(get_builtin_type("bool"));
@@ -322,7 +336,7 @@ impl TypeUnifier {
     pub fn finalize_abstract_type(&mut self, types: &ArenaAllocator<StructType, TypeUUIDMarker>, typ: &mut AbstractType, span: Span, errors: &ErrorCollector) {
         use super::type_inference::HindleyMilner;
         if typ.fully_substitute(&self.type_substitutor) == false {
-            let typ_as_string = typ.to_string(types, &self.template_type_names);
+            let typ_as_string = typ.display(types, &self.template_type_names);
             errors.error(span, format!("Could not fully figure out the type of this object. {typ_as_string}"));
         }
     }

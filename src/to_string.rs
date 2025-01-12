@@ -2,14 +2,14 @@ use crate::prelude::*;
 
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
-use crate::flattening::{DomainInfo, Interface, InterfaceToDomainMap, Module, StructType, WrittenType};
+use crate::flattening::{
+    DomainInfo, Interface, InterfaceToDomainMap, Module, StructType, WrittenType,
+};
 use crate::linker::{FileData, LinkInfo};
 use crate::typing::{
     abstract_type::{AbstractType, DomainType},
     concrete_type::ConcreteType,
-    template::{
-        ConcreteTemplateArg, ConcreteTemplateArgs, TemplateInputs,
-    },
+    template::{ConcreteTemplateArg, ConcreteTemplateArgs, TemplateInputs},
 };
 
 use std::{
@@ -39,61 +39,95 @@ impl TemplateNameGetter for TemplateInputs {
     }
 }
 
-impl WrittenType {
-    pub fn to_string<
-        TypVec: Index<TypeUUID, Output = StructType>,
-        TemplateVec: TemplateNameGetter,
-    >(
-        &self,
-        linker_types: &TypVec,
-        template_names: &TemplateVec,
-    ) -> String {
-        match self {
-            WrittenType::Error(_) => "{error}".to_owned(),
-            WrittenType::TemplateVariable(_, id) => template_names.get_template_name(*id).to_owned(),
-            WrittenType::Named(named_type) => linker_types[named_type.id].link_info.get_full_name(),
+#[derive(Debug)]
+pub struct WrittenTypeDisplay<
+    'a,
+    TypVec: Index<TypeUUID, Output = StructType>,
+    TemplateVec: TemplateNameGetter,
+> {
+    pub inner: &'a WrittenType,
+    pub linker_types: &'a TypVec,
+    pub template_names: &'a TemplateVec,
+}
+
+impl<'a, TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
+    for WrittenTypeDisplay<'a, TypVec, TemplateVec>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.inner {
+            WrittenType::Error(_) => f.write_str("{error"),
+            WrittenType::TemplateVariable(_, id) => {
+                f.write_str(self.template_names.get_template_name(*id))
+            }
+            WrittenType::Named(named_type) => {
+                f.write_str(&self.linker_types[named_type.id].link_info.get_full_name())
+            }
             WrittenType::Array(_, sub) => {
-                sub.deref().0.to_string(linker_types, template_names) + "[]"
+                write!(
+                    f,
+                    "{}[]",
+                    sub.deref()
+                        .0
+                        .display(self.linker_types, self.template_names)
+                )
             }
         }
     }
 }
 
-impl AbstractType {
-    pub fn to_string<
-        TypVec: Index<TypeUUID, Output = StructType>,
-        TemplateVec: TemplateNameGetter,
-    >(
-        &self,
-        linker_types: &TypVec,
-        template_names: &TemplateVec,
-    ) -> String {
-        match self {
-            AbstractType::Unknown(id) => format!("{id:?}"),
-            AbstractType::Template(id) => template_names.get_template_name(*id).to_owned(),
-            AbstractType::Named(id) => linker_types[*id].link_info.get_full_name(),
-            AbstractType::Array(sub) => sub.deref().to_string(linker_types, template_names) + "[]",
+#[derive(Debug)]
+pub struct AbstractTypeDisplay<
+    'a,
+    TypVec: Index<TypeUUID, Output = StructType>,
+    TemplateVec: TemplateNameGetter,
+> {
+    pub inner: &'a AbstractType,
+    pub linker_types: &'a TypVec,
+    pub template_names: &'a TemplateVec,
+}
+
+impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
+    for AbstractTypeDisplay<'_, TypVec, TemplateVec>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.inner {
+            AbstractType::Unknown(id) => write!(f, "{id:?}"),
+            AbstractType::Template(id) => f.write_str(self.template_names.get_template_name(*id)),
+            AbstractType::Named(id) => {
+                f.write_str(&self.linker_types[*id].link_info.get_full_name())
+            }
+            AbstractType::Array(sub) => write!(
+                f,
+                "{}[]",
+                sub.deref().display(self.linker_types, self.template_names)
+            ),
         }
     }
 }
 
-impl ConcreteType {
-    pub fn to_string<TypVec: Index<TypeUUID, Output = StructType>>(
-        &self,
-        linker_types: &TypVec,
-    ) -> String {
-        match self {
-            ConcreteType::Named(name) => linker_types[*name].link_info.get_full_name(),
+#[derive(Debug)]
+pub struct ConcreteTypeDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
+    pub inner: &'a ConcreteType,
+    pub linker_types: &'a T,
+}
+
+impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.inner {
+            ConcreteType::Named(name) => {
+                f.write_str(&self.linker_types[*name].link_info.get_full_name())
+            }
             ConcreteType::Array(arr_box) => {
                 let (elem_typ, arr_size) = arr_box.deref();
-                format!(
+                write!(
+                    f,
                     "{}[{}]",
-                    elem_typ.to_string(linker_types),
+                    elem_typ.display(self.linker_types),
                     arr_size.unwrap_value().unwrap_integer()
                 )
             }
-            ConcreteType::Value(v) => format!("{{concrete_type_{v}}}"),
-            ConcreteType::Unknown(u) => format!("{{{u:?}}}"),
+            ConcreteType::Value(v) => write!(f, "{{concrete_type_{v}}}"),
+            ConcreteType::Unknown(u) => write!(f, "{{{u:?}}}"),
         }
     }
 }
@@ -224,9 +258,11 @@ impl Module {
 pub fn pretty_print_concrete_instance<TypVec>(
     target_link_info: &LinkInfo,
     given_template_args: &ConcreteTemplateArgs,
-    linker_types: &TypVec
+    linker_types: &TypVec,
 ) -> String
-where TypVec: Index<TypeUUID, Output = StructType> {
+where
+    TypVec: Index<TypeUUID, Output = StructType>,
+{
     assert!(given_template_args.len() == target_link_info.template_arguments.len());
     let object_full_name = target_link_info.get_full_name();
     if given_template_args.len() == 0 {
@@ -240,10 +276,22 @@ where TypVec: Index<TypeUUID, Output = StructType> {
         write!(result, "    {}: ", arg_in_target.name).unwrap();
         match arg {
             ConcreteTemplateArg::Type(concrete_type, how_do_we_know_the_template_arg) => {
-                write!(result, "type {} /* {} */,\n", concrete_type.to_string(linker_types), how_do_we_know_the_template_arg.to_str()).unwrap();
+                write!(
+                    result,
+                    "type {} /* {} */,\n",
+                    concrete_type.display(linker_types),
+                    how_do_we_know_the_template_arg.to_str()
+                )
+                .unwrap();
             }
             ConcreteTemplateArg::Value(typed_value, how_do_we_know_the_template_arg) => {
-                write!(result, "{} /* {} */,\n", typed_value.value.to_string(), how_do_we_know_the_template_arg.to_str()).unwrap();
+                write!(
+                    result,
+                    "{} /* {} */,\n",
+                    typed_value.value.to_string(),
+                    how_do_we_know_the_template_arg.to_str()
+                )
+                .unwrap();
             }
             ConcreteTemplateArg::NotProvided => {
                 write!(result, "/* Could not infer */\n").unwrap();

@@ -60,7 +60,7 @@ impl<'l> HoverCollector<'l> {
                     if wire.original_instruction != id {
                         continue;
                     }
-                    let typ_str = wire.typ.to_string(&self.linker.types);
+                    let typ_str = wire.typ.display(&self.linker.types);
                     let name_str = &wire.name;
                     let latency_str = if wire.absolute_latency != CALCULATE_LATENCY_LATER {
                         format!("{}", wire.absolute_latency)
@@ -126,7 +126,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             let typ_str = decl
                 .typ
                 .typ
-                .to_string(&linker.types, &md.link_info.template_arguments);
+                .display(&linker.types, &md.link_info.template_arguments).to_string();
             details_vec.push(&typ_str);
 
             details_vec.push(&decl.name);
@@ -180,14 +180,14 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             details_vec.push(Cow::Owned(
                 wire.typ
                     .typ
-                    .to_string(&linker.types, &md.link_info.template_arguments),
+                    .display(&linker.types, &md.link_info.template_arguments).to_string(),
             ));
             hover.sus_code(details_vec.join(" "));
             hover.gather_hover_infos(md, id, wire.typ.domain.is_generative());
         }
         LocationInfo::Type(typ, link_info) => {
             hover.sus_code(
-                typ.to_string(&linker.types, &link_info.template_arguments),
+                typ.display(&linker.types, &link_info.template_arguments).to_string(),
             );
         }
         LocationInfo::TemplateInput(in_obj, link_info, _template_id, template_arg) => {
@@ -207,7 +207,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     hover.sus_code(format!(
                         "param {} {}",
                         decl.typ_expr
-                            .to_string(&linker.types, &link_info.template_arguments),
+                            .display(&linker.types, &link_info.template_arguments),
                         template_arg.name
                     ));
                     hover.gather_hover_infos(md, *declaration_instruction, true);
