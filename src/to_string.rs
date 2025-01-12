@@ -269,7 +269,6 @@ where
         return format!("{object_full_name} #()");
     }
 
-    use std::fmt::Write;
     let mut result = format!("{object_full_name} #(\n");
     for (id, arg) in given_template_args {
         let arg_in_target = &target_link_info.template_arguments[id];
