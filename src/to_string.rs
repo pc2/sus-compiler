@@ -331,11 +331,11 @@ where
                 )
                 .unwrap();
             }
-            ConcreteTemplateArg::Value(typed_value, how_do_we_know_the_template_arg) => {
+            ConcreteTemplateArg::Value(value, how_do_we_know_the_template_arg) => {
                 write!(
                     result,
                     "{} /* {} */,\n",
-                    typed_value.value.to_string(),
+                    value.to_string(),
                     how_do_we_know_the_template_arg.to_str()
                 )
                 .unwrap();
