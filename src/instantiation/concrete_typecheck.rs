@@ -7,8 +7,7 @@ use crate::linker::LinkInfo;
 use crate::typing::template::{ConcreteTemplateArg, HowDoWeKnowTheTemplateArg};
 use crate::typing::{
     concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
-    delayed_constraint::{DelayedConstraint, DelayedConstraintStatus, DelayedConstraintsList},
-    type_inference::FailedUnification
+    type_inference::{FailedUnification, DelayedConstraint, DelayedConstraintStatus, DelayedConstraintsList},
 };
 
 use super::*;

@@ -3,11 +3,11 @@ use crate::prelude::*;
 use crate::value::Value;
 use std::ops::Deref;
 
-use super::template::{GlobalReference, TemplateAbstractTypes, TemplateInputs};
+use super::template::{GlobalReference, TemplateAbstractTypes, Parameters};
 use super::type_inference::{DomainVariableID, DomainVariableIDMarker, TypeSubstitutor, TypeVariableID, TypeVariableIDMarker, UnifyErrorReport};
 use crate::flattening::{BinaryOperator, StructType, TypingAllocator, UnaryOperator, WrittenType};
 use crate::linker::get_builtin_type;
-use crate::to_string::{map_to_type_names, AbstractTypeDisplay, TemplateNameGetter};
+use crate::to_string::map_to_type_names;
 
 /// This contains only the information that can be easily type-checked.
 ///
@@ -16,10 +16,14 @@ use crate::to_string::{map_to_type_names, AbstractTypeDisplay, TemplateNameGette
 /// What isn't included are the parameters of types. So Array Sizes for example.
 #[derive(Debug, Clone)]
 pub enum AbstractType {
-    Unknown(TypeVariableID),
     Template(TemplateID),
     Named(TypeUUID),
     Array(Box<AbstractType>),
+    /// Referencing [AbstractType::Unknown] is a strong code smell. 
+    /// It is likely you should use [TypeSubstitutor::unify] instead
+    /// 
+    /// It should only occur in creation `AbstractType::Unknown(self.type_substitutor.alloc())`
+    Unknown(TypeVariableID),
 }
 
 pub const BOOL_TYPE: AbstractType = AbstractType::Named(get_builtin_type("bool"));
@@ -35,7 +39,12 @@ pub enum DomainType {
     /// These are unified by Hindley-Milner unification
     /// 
     /// They always point to non-generative domains. 
-    DomainVariable(DomainVariableID)
+    /// 
+    /// Referencing [DomainType::Unknown] is a strong code smell. 
+    /// It is likely you should use [TypeSubstitutor::unify] instead
+    /// 
+    /// It should only occur in creation `DomainType::Unknown(self.domain_substitutor.alloc())`
+    Unknown(DomainVariableID)
 }
 
 impl DomainType {
@@ -49,22 +58,26 @@ impl DomainType {
         match self {
             DomainType::Generative => true,
             DomainType::Physical(_) => false,
-            DomainType::DomainVariable(_) => false,
+            DomainType::Unknown(_) => false,
         }
     }
 }
 
+/// Represents all typing information needed in the Flattening Stage. 
+/// 
+/// At the time being, this consists of the structural type ([AbstractType]), IE, if it's an `int`, `bool`, or `int[]`
+/// And the domain ([DomainType]), which tracks part of what (clock) domain this wire is. 
 #[derive(Debug, Clone)]
 pub struct FullType {
     pub typ: AbstractType,
     pub domain: DomainType,
 }
 
-/// Unification of domains?
+/// Performs Hindley-Milner typing during Flattening. (See [TypeSubstitutor])
+/// 
+/// 'A U 'x -> Substitute 'x = 'A
 ///
-/// 'A U 'x -> 'x = 'A
-///
-/// 'x U 'y -> 'x = 'y
+/// 'x U 'y -> Substitute 'x = 'y
 pub struct TypeUnifier {
     pub template_type_names: FlatAlloc<String, TemplateIDMarker>,
     pub type_substitutor: TypeSubstitutor<AbstractType, TypeVariableIDMarker>,
@@ -73,11 +86,11 @@ pub struct TypeUnifier {
 
 impl TypeUnifier {
     pub fn new(
-        template_inputs: &TemplateInputs,
+        parameters: &Parameters,
         typing_alloc: TypingAllocator
     ) -> Self {
         Self {
-            template_type_names: map_to_type_names(template_inputs),
+            template_type_names: map_to_type_names(parameters),
             type_substitutor: TypeSubstitutor::init(&typing_alloc.type_variable_alloc),
             domain_substitutor: TypeSubstitutor::init(&typing_alloc.domain_variable_alloc)
         }

@@ -322,7 +322,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
         self.program_text.write_str(" #(").unwrap();
         let mut first = true;
         concrete_template_args.iter().for_each(|(arg_id, arg)| {
-            let arg_name = &link_info.template_arguments[arg_id].name;
+            let arg_name = &link_info.template_parameters[arg_id].name;
             let arg_value = match arg {
                 ConcreteTemplateArg::Type(..) => {
                     unreachable!("No extern module type arguments. Should have been caught by Lint")

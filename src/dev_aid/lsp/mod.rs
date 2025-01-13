@@ -392,7 +392,7 @@ fn handle_request(
                         .push((submod_decl.name.as_ref().unwrap().1, md.link_info.file)),
                     LocationInfo::InModule(_, _, _, InModule::Temporary(_)) => {}
                     LocationInfo::Type(_, _) => {}
-                    LocationInfo::TemplateInput(_, link_info, _, template_arg) => {
+                    LocationInfo::Parameter(_, link_info, _, template_arg) => {
                         goto_definition_list.push((template_arg.name_span, link_info.file))
                     }
                     LocationInfo::Global(id) => {

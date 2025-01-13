@@ -8,9 +8,10 @@ use self::checkpoint::ResolvedGlobalsCheckpoint;
 
 use super::*;
 
+/// See [GlobalResolver]
 #[derive(Debug)]
 pub struct ResolvedGlobals {
-    referenced_globals: Vec<NameElem>,
+    referenced_globals: Vec<GlobalUUID>,
     all_resolved: bool,
 }
 
@@ -36,6 +37,14 @@ impl ResolvedGlobals {
     }
 }
 
+struct LinkingErrorLocation {
+    pub named_type: &'static str,
+    pub full_name: String,
+    pub location: SpanFile,
+}
+
+/// This struct encapsulates the concept of name resolution. It reports name-not-found errors,
+/// and remembers all of the requested globals in preparation for #49
 pub struct GlobalResolver<'linker> {
     linker: &'linker Linker,
     pub file_data: &'linker FileData,
@@ -46,7 +55,7 @@ pub struct GlobalResolver<'linker> {
 }
 
 impl<'linker> GlobalResolver<'linker> {
-    pub fn take_errors_globals(linker: &mut Linker, global_obj: NameElem) -> (ErrorStore, ResolvedGlobals) {
+    pub fn take_errors_globals(linker: &mut Linker, global_obj: GlobalUUID) -> (ErrorStore, ResolvedGlobals) {
         let obj_link_info = Linker::get_link_info_mut(&mut linker.modules, &mut linker.types, &mut linker.constants, global_obj);
 
         let errors = obj_link_info.errors.take();
@@ -54,7 +63,7 @@ impl<'linker> GlobalResolver<'linker> {
 
         (errors, resolved_globals)
     }
-    pub fn new(linker: &'linker Linker, global_obj: NameElem, errors_globals: (ErrorStore, ResolvedGlobals)) -> Self {
+    pub fn new(linker: &'linker Linker, global_obj: GlobalUUID, errors_globals: (ErrorStore, ResolvedGlobals)) -> Self {
         let obj_link_info = linker.get_link_info(global_obj);
 
         let file_data = &linker.files[obj_link_info.file];
@@ -74,8 +83,22 @@ impl<'linker> GlobalResolver<'linker> {
         (errors, resolved_globals)
     }
 
+    fn get_linking_error_location(&self, global: GlobalUUID) -> LinkingErrorLocation {
+        let named_type = match global {
+            GlobalUUID::Module(_) => "Module",
+            GlobalUUID::Type(_) => "Struct",
+            GlobalUUID::Constant(_) => "Constant"
+        };
+        let link_info = self.linker.get_link_info(global);
+        LinkingErrorLocation {
+            named_type,
+            full_name: link_info.get_full_name(),
+            location: link_info.get_span_file(),
+        }
+    }
+
     /// SAFETY: Files are never touched, and as long as this object is managed properly linker will also exist long enough.
-    pub fn resolve_global<'slf>(&'slf self, name_span: Span) -> Option<NameElem> {
+    pub fn resolve_global<'slf>(&'slf self, name_span: Span) -> Option<GlobalUUID> {
         let name = &self.file_data.file_text[name_span];
 
         let mut resolved_globals = self.resolved_globals.borrow_mut();
@@ -90,7 +113,7 @@ impl<'linker> GlobalResolver<'linker> {
                 let err_ref = self.errors.error(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."));
 
                 for collider_global in coll.iter() {
-                    let err_loc = self.linker.get_linking_error_location(*collider_global);
+                    let err_loc = self.get_linking_error_location(*collider_global);
                     err_ref.info(
                         err_loc.location,
                         format!("{} {} declared here", err_loc.named_type, err_loc.full_name),
@@ -114,12 +137,9 @@ impl<'linker> GlobalResolver<'linker> {
         }
     }
 
-    pub fn get_linking_error_location(&self, name_elem: NameElem) -> LinkingErrorLocation {
-        self.linker.get_linking_error_location(name_elem)
-    }
-    pub fn not_expected_global_error<ID: Copy>(&self, global_ref: &GlobalReference<ID>, expected: &str) where NameElem: From<ID> {
+    pub fn not_expected_global_error<ID: Copy>(&self, global_ref: &GlobalReference<ID>, expected: &str) where GlobalUUID: From<ID> {
         // SAFETY: The allocated linker objects aren't going to change.
-        let info = self.get_linking_error_location(NameElem::from(global_ref.id));
+        let info = self.get_linking_error_location(GlobalUUID::from(global_ref.id));
         let name = &info.full_name;
         let global_type = info.named_type;
         let err_ref = self.errors.error(
@@ -129,7 +149,7 @@ impl<'linker> GlobalResolver<'linker> {
         err_ref.info(info.location, "Defined here");
     }
 
-    pub fn get_link_info(&self, id: NameElem) -> &LinkInfo {
+    pub fn get_link_info(&self, id: GlobalUUID) -> &LinkInfo {
         self.resolved_globals.borrow_mut().referenced_globals.push(id);
         self.linker.get_link_info(id)
     }
@@ -141,7 +161,7 @@ impl<'l> Index<ModuleUUID> for GlobalResolver<'l> {
     fn index(&self, index: ModuleUUID) -> &Self::Output {
         self.resolved_globals.borrow_mut()
             .referenced_globals
-            .push(NameElem::Module(index));
+            .push(GlobalUUID::Module(index));
 
         &self.linker.modules[index]
     }
@@ -152,7 +172,7 @@ impl<'l> Index<TypeUUID> for GlobalResolver<'l> {
     fn index(&self, index: TypeUUID) -> &Self::Output {
         self.resolved_globals.borrow_mut()
             .referenced_globals
-            .push(NameElem::Type(index));
+            .push(GlobalUUID::Type(index));
 
         &self.linker.types[index]
     }
@@ -163,7 +183,7 @@ impl<'l> Index<ConstantUUID> for GlobalResolver<'l> {
     fn index(&self, index: ConstantUUID) -> &Self::Output {
         self.resolved_globals.borrow_mut()
             .referenced_globals
-            .push(NameElem::Constant(index));
+            .push(GlobalUUID::Constant(index));
 
         &self.linker.constants[index]
     }

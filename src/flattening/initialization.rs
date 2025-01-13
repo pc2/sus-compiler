@@ -2,22 +2,22 @@ use arrayvec::ArrayVec;
 use sus_proc_macro::{field, kind, kw};
 
 use crate::errors::ErrorStore;
-use crate::linker::{IsExtern, NamedConstant, AFTER_INITIAL_PARSE_CP};
+use crate::linker::{IsExtern, AFTER_INITIAL_PARSE_CP};
 use crate::prelude::*;
 
 use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
-use crate::{file_position::FileText, flattening::Module, instantiation::InstantiationList};
+use crate::{file_position::FileText, flattening::Module, instantiation::InstantiationCache};
 
 use crate::typing::template::{
-    GenerativeTemplateInputKind, TemplateInput, TemplateInputKind, TemplateInputs,
-    TypeTemplateInputKind,
+    GenerativeParameterKind, Parameter, ParameterKind, Parameters,
+    TypeParameterKind,
 };
 
 use super::parser::Cursor;
 use super::*;
 
 struct InitializationContext<'linker> {
-    template_inputs: TemplateInputs,
+    parameters: Parameters,
 
     // module-only stuff
     ports: FlatAlloc<Port, PortIDMarker>,
@@ -42,10 +42,10 @@ impl<'linker> InitializationContext<'linker> {
                     kind!("template_declaration_type") => cursor.go_down_no_check(|cursor| {
                         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
                         let name = self.file_text[name_span].to_owned();
-                        self.template_inputs.alloc(TemplateInput {
+                        self.parameters.alloc(Parameter {
                             name,
                             name_span,
-                            kind: TemplateInputKind::Type(TypeTemplateInputKind {}),
+                            kind: ParameterKind::Type(TypeParameterKind {}),
                         });
                     }),
                     kind!("declaration") => cursor.go_down_no_check(|cursor| {
@@ -55,10 +55,10 @@ impl<'linker> InitializationContext<'linker> {
                         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
                         let name = self.file_text[name_span].to_owned();
                         
-                        self.template_inputs.alloc(TemplateInput {
+                        self.parameters.alloc(Parameter {
                             name,
                             name_span,
-                            kind: TemplateInputKind::Generative(GenerativeTemplateInputKind {
+                            kind: ParameterKind::Generative(GenerativeParameterKind {
                                 decl_span,
                                 declaration_instruction: FlatID::PLACEHOLDER,
                             }),
@@ -291,7 +291,7 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
         ports: FlatAlloc::new(),
         interfaces: FlatAlloc::new(),
         domains: FlatAlloc::new(),
-        template_inputs: FlatAlloc::new(),
+        parameters: FlatAlloc::new(),
         fields: FlatAlloc::new(),
         file_text: &builder.file_data.file_text,
     };
@@ -300,7 +300,7 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
 
     let mut link_info = LinkInfo {
         type_variable_alloc: TypingAllocator{domain_variable_alloc: UUIDAllocator::new(), type_variable_alloc: UUIDAllocator::new()},
-        template_arguments: ctx.template_inputs,
+        template_parameters: ctx.parameters,
         instructions: FlatAlloc::new(),
         documentation: cursor.extract_gathered_comments(),
         file: builder.file_id,
@@ -323,7 +323,7 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
                 domain_names: ctx.domains,
                 domains: FlatAlloc::new(),
                 interfaces: ctx.interfaces,
-                instantiations: InstantiationList::new(),
+                instantiations: InstantiationCache::new(),
             });
         }
         GlobalObjectKind::Struct => {

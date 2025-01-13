@@ -16,6 +16,10 @@ pub enum ConcreteType {
     Named(TypeUUID),
     Value(Value),
     Array(Box<(ConcreteType, ConcreteType)>),
+    /// Referencing [ConcreteType::Unknown] is a strong code smell. 
+    /// It is likely you should use [crate::typing::type_inference::TypeSubstitutor::unify] instead
+    /// 
+    /// It should only occur in creation `ConcreteType::Unknown(self.type_substitutor.alloc())`
     Unknown(ConcreteTypeVariableID)
 }
 

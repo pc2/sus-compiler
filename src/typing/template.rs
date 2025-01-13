@@ -3,6 +3,13 @@ use crate::{prelude::*, value::Value};
 use super::{abstract_type::AbstractType, concrete_type::ConcreteType};
 use crate::flattening::WrittenType;
 
+/// References any [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant], 
+/// and includes any template arguments. 
+/// 
+/// As an example, this is the struct in charge of representing:
+/// ```sus
+/// FIFO #(DEPTH : 32, T : type int)
+/// ```
 #[derive(Debug)]
 pub struct GlobalReference<ID> {
     pub name_span: Span,
@@ -22,46 +29,61 @@ impl<ID> GlobalReference<ID> {
     }
 }
 
+/// The template parameters of an object ([crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant])
+/// 
+/// See [crate::linker::LinkInfo]
+/// 
+/// Not to be confused with [TemplateArg], which is the argument passed to this parameter. 
 #[derive(Debug)]
-pub struct TemplateInput {
+pub struct Parameter {
     pub name: String,
     pub name_span: Span,
-    pub kind: TemplateInputKind,
+    pub kind: ParameterKind,
 }
 
+/// See [Parameter]
 #[derive(Debug)]
-pub struct GenerativeTemplateInputKind {
+pub struct GenerativeParameterKind {
     pub decl_span: Span,
     /// Set at the end of Flattening
     pub declaration_instruction: FlatID,
 }
 
+/// See [Parameter]
 #[derive(Debug)]
-pub struct TypeTemplateInputKind {}
+pub struct TypeParameterKind {}
 
+/// See [Parameter]
 #[derive(Debug)]
-pub enum TemplateInputKind {
-    Type(TypeTemplateInputKind),
-    Generative(GenerativeTemplateInputKind),
+pub enum ParameterKind {
+    Type(TypeParameterKind),
+    Generative(GenerativeParameterKind),
 }
 
-impl TemplateInputKind {
+impl ParameterKind {
     #[track_caller]
-    pub fn unwrap_type(&self) -> &TypeTemplateInputKind {
+    pub fn unwrap_type(&self) -> &TypeParameterKind {
         let Self::Type(t) = self else {
-            unreachable!("TemplateInputKind::unwrap_type on {self:?}")
+            unreachable!("ParameterKind::unwrap_type on {self:?}")
         };
         t
     }
     #[track_caller]
-    pub fn unwrap_value(&self) -> &GenerativeTemplateInputKind {
+    pub fn unwrap_value(&self) -> &GenerativeParameterKind {
         let Self::Generative(v) = self else {
-            unreachable!("TemplateInputKind::unwrap_value on {self:?}")
+            unreachable!("ParameterKind::unwrap_value on {self:?}")
         };
         v
     }
 }
 
+/// An argument passed to a template parameter. 
+/// 
+/// See [GlobalReference]
+/// 
+/// Not to be confused with [Parameter], which it is passed into. 
+/// 
+/// When instantiated, this becomes a [ConcreteTemplateArg]
 #[derive(Debug)]
 pub struct TemplateArg {
     pub name_span: Span,
@@ -92,6 +114,7 @@ impl TemplateArgKind {
     }
 }
 
+/// Tracks how we arrived at this value through type inference. (See [crate::typing::type_inference])
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HowDoWeKnowTheTemplateArg {
     Given,
@@ -107,10 +130,17 @@ impl HowDoWeKnowTheTemplateArg {
     }
 }
 
+/// Represents the value we're passing into a template argument. 
+/// 
+/// It is the instantiated variant of [TemplateArg]
+/// 
+/// And it is passed to a [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant]'s [Parameter]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteTemplateArg {
     Type(ConcreteType, HowDoWeKnowTheTemplateArg),
     Value(Value, HowDoWeKnowTheTemplateArg),
+    /// It has not been explicitly provided,
+    /// yet [crate::typing::type_inference] may replace this value when it can figure it out from the context
     NotProvided,
 }
 
@@ -127,10 +157,13 @@ impl ConcreteTemplateArg {
     }
 }
 
+/// See [TemplateArg]
 pub type TemplateArgs = FlatAlloc<Option<TemplateArg>, TemplateIDMarker>;
 /// Applies to both Template Type args and Template Value args. 
 /// 
 /// For Types this is the Type, for Values this is unified with the parameter declaration type
 pub type TemplateAbstractTypes = FlatAlloc<AbstractType, TemplateIDMarker>;
-pub type TemplateInputs = FlatAlloc<TemplateInput, TemplateIDMarker>;
+/// See [Parameter]
+pub type Parameters = FlatAlloc<Parameter, TemplateIDMarker>;
+/// See [ConcreteTemplateArg]
 pub type ConcreteTemplateArgs = FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>;

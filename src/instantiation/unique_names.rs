@@ -1,6 +1,12 @@
 use std::collections::HashMap;
 
-
+/// Generates ascending IDs for locals, while keeping the name information as much as possible. 
+/// 
+/// For example, when generating multiple names for the string "beep" it returns:
+/// - beep
+/// - beep_2
+/// - beep_3
+/// - ...
 pub struct UniqueNames {
     name_map : HashMap<String, i64>
 }

@@ -5,7 +5,7 @@ use crate::{alloc::UUIDRangeIter, prelude::*};
 use num::BigInt;
 use sus_proc_macro::{field, kind, kw};
 
-use crate::linker::{FileData, GlobalResolver, NameElem, AFTER_FLATTEN_CP};
+use crate::linker::{FileData, GlobalResolver, GlobalUUID, AFTER_FLATTEN_CP};
 use crate::{debug::SpanDebugger, value::Value};
 
 use super::name_context::LocalVariableContext;
@@ -13,7 +13,7 @@ use super::parser::Cursor;
 use super::*;
 
 use crate::typing::template::{
-    GenerativeTemplateInputKind, TemplateArg, TemplateArgKind, TemplateArgs, TemplateInputKind
+    GenerativeParameterKind, TemplateArg, TemplateArgKind, TemplateArgs, ParameterKind
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -223,7 +223,7 @@ impl TypingAllocator {
             typ: AbstractType::Unknown(self.type_variable_alloc.alloc()),
             domain: match domain {
                 DomainAllocOption::Generative => DomainType::Generative,
-                DomainAllocOption::NonGenerativeUnknown => DomainType::DomainVariable(self.domain_variable_alloc.alloc()),
+                DomainAllocOption::NonGenerativeUnknown => DomainType::Unknown(self.domain_variable_alloc.alloc()),
                 DomainAllocOption::NonGenerativeKnown(domain_id) => DomainType::Physical(domain_id),
             }
         }
@@ -248,17 +248,17 @@ struct FlatteningContext<'l, 'errs> {
 }
 
 impl<'l, 'errs> FlatteningContext<'l, 'errs> {
-    fn flatten_template_inputs(&mut self, cursor: &mut Cursor) {
-        let mut template_inputs_to_visit = self.working_on_link_info.template_arguments.id_range().into_iter();
+    fn flatten_parameters(&mut self, cursor: &mut Cursor) {
+        let mut parameters_to_visit = self.working_on_link_info.template_parameters.id_range().into_iter();
         if cursor.optional_field(field!("template_declaration_arguments")) {
             cursor.list(kind!("template_declaration_arguments"), |cursor| {
-                let claimed_type_id = template_inputs_to_visit.next().unwrap();
+                let claimed_type_id = parameters_to_visit.next().unwrap();
                 match cursor.kind() {
                     kind!("template_declaration_type") => cursor.go_down_no_check(|cursor| {
                         // Already covered in initialization
                         cursor.field(field!("name"));
     
-                        let selected_arg = &self.working_on_link_info.template_arguments[claimed_type_id];
+                        let selected_arg = &self.working_on_link_info.template_parameters[claimed_type_id];
     
                         let name_span = selected_arg.name_span;
     
@@ -271,7 +271,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
             })
         }
-        assert!(template_inputs_to_visit.is_empty());
+        assert!(parameters_to_visit.is_empty());
     }
 
     fn must_be_generative(&self, is_generative: bool, context: &str, span: Span) {
@@ -280,11 +280,11 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         }
     }
 
-    fn flatten_template_args(&mut self, found_global: NameElem, has_template_args: bool, cursor: &mut Cursor) -> TemplateArgs {
+    fn flatten_template_args(&mut self, found_global: GlobalUUID, has_template_args: bool, cursor: &mut Cursor) -> TemplateArgs {
         let link_info = self.globals.get_link_info(found_global);
         let full_object_name = link_info.get_full_name();
 
-        let mut template_arg_map : FlatAlloc<Option<TemplateArg>, TemplateIDMarker> = link_info.template_arguments.map(|_| None);
+        let mut template_arg_map : FlatAlloc<Option<TemplateArg>, TemplateIDMarker> = link_info.template_parameters.map(|_| None);
         
         if !has_template_args {return template_arg_map;}
 
@@ -295,7 +295,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
                 let name = &self.globals.file_data.file_text[name_span];
 
-                let name_found = link_info.template_arguments.iter().find(|(_id, arg)| arg.name == name);
+                let name_found = link_info.template_parameters.iter().find(|(_id, arg)| arg.name == name);
                 if name_found.is_none() {
                     self.errors.error(name_span, format!("{name} is not a valid template argument of {full_object_name}"))
                         .info_obj(link_info);
@@ -334,10 +334,10 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     }, name_span)
                 };
 
-                if let Some((id, template_input)) = name_found {
-                    match (&template_input.kind, &template_arg) {
-                        (TemplateInputKind::Type(_), TemplateArgKind::Type(_)) 
-                        | (TemplateInputKind::Generative(_), TemplateArgKind::Value(_)) => {
+                if let Some((id, parameter)) = name_found {
+                    match (&parameter.kind, &template_arg) {
+                        (ParameterKind::Type(_), TemplateArgKind::Type(_)) 
+                        | (ParameterKind::Generative(_), TemplateArgKind::Value(_)) => {
                             // Correct pairing
                             let elem = &mut template_arg_map[id];
                             if let Some(prev) = elem {
@@ -351,13 +351,13 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                                 });
                             }
                         }
-                        (TemplateInputKind::Type(_), TemplateArgKind::Value(_)) => {
+                        (ParameterKind::Type(_), TemplateArgKind::Value(_)) => {
                             self.errors.error(name_span, format!("'{name}' is not a value. `type` keyword cannot be used for values"))
-                                .info((template_input.name_span, link_info.file), "Declared here");
+                                .info((parameter.name_span, link_info.file), "Declared here");
                         }
-                        (TemplateInputKind::Generative(_), TemplateArgKind::Type(_)) => {
+                        (ParameterKind::Generative(_), TemplateArgKind::Type(_)) => {
                             self.errors.error(name_span, format!("'{name}' is not a type. To use template type arguments use the `type` keyword like `T: type int[123]`"))
-                                .info((template_input.name_span, link_info.file), "Declared here");
+                                .info((parameter.name_span, link_info.file), "Declared here");
                         }
                     }
                 }
@@ -411,21 +411,21 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 let template_arg_types = template_args.map(|_| AbstractType::Unknown(self.type_alloc.type_variable_alloc.alloc()));
 
                 match global_id {
-                    NameElem::Module(id) => LocalOrGlobal::Module(GlobalReference {
+                    GlobalUUID::Module(id) => LocalOrGlobal::Module(GlobalReference {
                         id,
                         name_span,
                         template_args,
                         template_arg_types,
                         template_span,
                     }),
-                    NameElem::Type(id) => LocalOrGlobal::Type(GlobalReference {
+                    GlobalUUID::Type(id) => LocalOrGlobal::Type(GlobalReference {
                         id,
                         name_span,
                         template_args,
                         template_arg_types,
                         template_span,
                     }),
-                    NameElem::Constant(id) => LocalOrGlobal::Constant(GlobalReference {
+                    GlobalUUID::Constant(id) => LocalOrGlobal::Constant(GlobalReference {
                         id,
                         name_span,
                         template_args,
@@ -536,7 +536,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
                 NamedLocal::TemplateType(template_id) => {
                     err_ref.info_obj_same_file(
-                        &self.working_on_link_info.template_arguments[template_id],
+                        &self.working_on_link_info.template_parameters[template_id],
                     );
                 }
             }
@@ -547,7 +547,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         let md = &self.globals[module_ref.id];
         let local_interface_domains = md
             .domain_names
-            .map(|_| DomainType::DomainVariable(self.type_alloc.domain_variable_alloc.alloc()));
+            .map(|_| DomainType::Unknown(self.type_alloc.domain_variable_alloc.alloc()));
 
         self.instructions.alloc(Instruction::SubModule(SubModuleInstance{
             name,
@@ -982,7 +982,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                             span,
                             format!(
                                 "Expected a value, but instead found template type '{}'",
-                                self.working_on_link_info.template_arguments[template_id].name
+                                self.working_on_link_info.template_parameters[template_id].name
                             ),
                         );
                         PartialWireReference::Error
@@ -1477,7 +1477,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         let const_type_cursor = (cursor.kind() == kind!("const_and_type")).then(|| cursor.clone());
         
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
-        self.flatten_template_inputs(cursor);
+        self.flatten_parameters(cursor);
         let module_name = &self.globals.file_data.file_text[name_span];
         println!("TREE SITTER module! {module_name}");
 
@@ -1530,15 +1530,15 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                 let globals = GlobalResolver::new(linker, global_obj, errors_globals);
 
                 let (ports_to_visit, fields_to_visit, default_declaration_context) = match global_obj {
-                    NameElem::Module(module_uuid) => {
+                    GlobalUUID::Module(module_uuid) => {
                         let md = &globals[module_uuid];
                         (md.ports.id_range().into_iter(), UUIDRange::empty().into_iter(), DeclarationContext::PlainWire)
                     }
-                    NameElem::Type(type_uuid) => {
+                    GlobalUUID::Type(type_uuid) => {
                         let typ = &globals[type_uuid];
                         (UUIDRange::empty().into_iter(), typ.fields.id_range().into_iter(), DeclarationContext::StructField)
                     }
-                    NameElem::Constant(const_uuid) => {
+                    GlobalUUID::Constant(const_uuid) => {
                         (UUIDRange::empty().into_iter(), UUIDRange::empty().into_iter(), DeclarationContext::Generative(GenerativeKind::PlainGenerative))
                     }
                 };
@@ -1567,7 +1567,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                 let errors_globals = globals.decommission(&linker.files);
 
                 let link_info : &mut LinkInfo = match global_obj {
-                    NameElem::Module(module_uuid) => {
+                    GlobalUUID::Module(module_uuid) => {
                         let md = &mut linker.modules[module_uuid];
                         // Set all declaration_instruction values
                         for (decl_id, instr) in &instructions {
@@ -1580,8 +1580,8 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                                         port.declaration_instruction = decl_id;
                                     }
                                     DeclarationKind::GenerativeInput(this_template_id) => {
-                                        let TemplateInputKind::Generative(GenerativeTemplateInputKind { decl_span:_, declaration_instruction }) = 
-                                            &mut md.link_info.template_arguments[this_template_id].kind else {unreachable!()};
+                                        let ParameterKind::Generative(GenerativeParameterKind { decl_span:_, declaration_instruction }) = 
+                                            &mut md.link_info.template_parameters[this_template_id].kind else {unreachable!()};
                     
                                         *declaration_instruction = decl_id;
                                     }
@@ -1600,7 +1600,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                 
                         &mut md.link_info
                     }
-                    NameElem::Type(type_uuid) => {
+                    GlobalUUID::Type(type_uuid) => {
                         let typ = &mut linker.types[type_uuid];
                         
                         // Set all declaration_instruction values
@@ -1615,8 +1615,8 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                                     }
                                     DeclarationKind::RegularPort { is_input:_, port_id:_ } => {unreachable!("No ports in structs")}
                                     DeclarationKind::GenerativeInput(this_template_id) => {
-                                        let TemplateInputKind::Generative(GenerativeTemplateInputKind { decl_span:_, declaration_instruction }) = 
-                                            &mut typ.link_info.template_arguments[this_template_id].kind else {unreachable!()};
+                                        let ParameterKind::Generative(GenerativeParameterKind { decl_span:_, declaration_instruction }) = 
+                                            &mut typ.link_info.template_parameters[this_template_id].kind else {unreachable!()};
                     
                                         *declaration_instruction = decl_id;
                                     }
@@ -1625,7 +1625,7 @@ pub fn flatten_all_modules(linker: &mut Linker) {
                         }
                         &mut typ.link_info
                     }
-                    NameElem::Constant(const_uuid) => {
+                    GlobalUUID::Constant(const_uuid) => {
                         let cst = &mut linker.constants[const_uuid];
 
                         cst.output_decl = instructions.iter().find(|(_decl_id, instr)| {

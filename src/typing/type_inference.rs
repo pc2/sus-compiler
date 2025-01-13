@@ -46,6 +46,11 @@ pub struct FailedUnification<MyType> {
 /// Pretty big block size so for most typing needs we only need one
 const BLOCK_SIZE : usize = 512;
 
+/// Implements Hindley-Milner type inference
+/// 
+/// It actually already does eager inference where possible (through [Self::unify])
+/// 
+/// When eager inference is not possible, [DelayedConstraintsList] should be used
 pub struct TypeSubstitutor<MyType : HindleyMilner<VariableIDMarker>, VariableIDMarker : UUIDMarker> {
     substitution_map: BlockVec<OnceCell<MyType>, BLOCK_SIZE>,
     failed_unifications: RefCell<Vec<FailedUnification<MyType>>>,
@@ -249,7 +254,7 @@ impl HindleyMilner<DomainVariableIDMarker> for DomainType {
         match self {
             DomainType::Generative => unreachable!("No explicit comparisons with Generative Possible. These should be filtered out first"),
             DomainType::Physical(domain_id) => HindleyMilnerInfo::TypeFunc(*domain_id),
-            DomainType::DomainVariable(var) => HindleyMilnerInfo::TypeVar(*var)
+            DomainType::Unknown(var) => HindleyMilnerInfo::TypeVar(*var)
         }
     }
 
@@ -262,7 +267,7 @@ impl HindleyMilner<DomainVariableIDMarker> for DomainType {
     fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, DomainVariableIDMarker>) -> bool {
         match self {
             DomainType::Generative | DomainType::Physical(_) => true, // Do nothing, These are done already
-            DomainType::DomainVariable(var) => {
+            DomainType::Unknown(var) => {
                 *self = substitutor.substitution_map[var.get_hidden_value()].get().expect("It's impossible for domain variables to remain, as any unset domain variable would have been replaced with a new physical domain").clone();
                 self.fully_substitute(substitutor)
             }
@@ -320,3 +325,69 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
         }
     }
 }
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DelayedConstraintStatus {
+    Resolved,
+    Progress,
+    NoProgress
+}
+
+pub trait DelayedConstraint<T> {
+    fn try_apply(&mut self, shared_object : &mut T) -> DelayedConstraintStatus;
+    fn report_could_not_resolve_error(&self, shared_object : &T);
+}
+
+/// This is for unification of constraints that may not be resolveable right away
+/// 
+/// Such as struct field access. vec.x cannot resolve the type of x before the type of vec has been resolved
+/// 
+/// The given function should only make changes when it can be successfully resolved
+/// 
+/// When the constraint has been resolved, it should return 'true'
+/// 
+/// For convenience, a &mut T is provided such that a shared mutable object can be used
+pub struct DelayedConstraintsList<T>(Vec<Box<dyn DelayedConstraint<T>>>);
+
+impl<T> DelayedConstraintsList<T> {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    /// Add a constraint
+    pub fn push<C : DelayedConstraint<T> + 'static>(&mut self, constraint: C) {
+        self.0.push(Box::new(constraint));
+    }
+
+    /// Will keep looping over the list of constraints, and try to apply them. 
+    /// 
+    /// Calls [DelayedConstraint::report_could_not_resolve_error] on all constraints that weren't resolved
+    pub fn resolve_delayed_constraints(mut self, shared_object: &mut T) {
+        while self.0.len() > 0 {
+            let mut progress_made = false;
+            self.0.retain_mut(|constraint| {
+                match constraint.try_apply(shared_object) {
+                    DelayedConstraintStatus::Resolved => {progress_made = true; false}
+                    DelayedConstraintStatus::Progress => {progress_made = true; true}
+                    DelayedConstraintStatus::NoProgress => true
+                }
+            });
+            if !progress_made {
+                for constraint in std::mem::replace(&mut self.0, Vec::new()) {
+                    constraint.report_could_not_resolve_error(shared_object);
+                }
+                return; // Exit
+            }
+        }
+    }
+}
+
+impl<T> Drop for DelayedConstraintsList<T> {
+    fn drop(&mut self) {
+        if !std::thread::panicking() {
+            assert_eq!(self.0.len(), 0, "DelayedConstraintsList was not resolved.");
+        }
+    }
+}
+

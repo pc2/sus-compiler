@@ -2,12 +2,12 @@ use crate::alloc::ArenaAllocator;
 use crate::errors::{ErrorInfo, ErrorInfoObject, FileKnowingErrorInfoObject};
 use crate::prelude::*;
 use crate::typing::abstract_type::AbstractType;
-use crate::typing::template::TemplateInputKind;
+use crate::typing::template::ParameterKind;
 use crate::typing::type_inference::{FailedUnification, HindleyMilner};
 
 use crate::debug::SpanDebugger;
 use crate::linker::{
-    GlobalResolver, NameElem, AFTER_TYPECHECK_CP
+    GlobalResolver, GlobalUUID, AFTER_TYPECHECK_CP
 };
 
 use crate::typing::{
@@ -20,7 +20,7 @@ use super::*;
 pub fn typecheck_all_modules(linker: &mut Linker) {
     let module_uuids : Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
     for module_uuid in module_uuids {
-        let global_id = NameElem::Module(module_uuid);
+        let global_id = GlobalUUID::Module(module_uuid);
         let errs_globals = GlobalResolver::take_errors_globals(linker, global_id);
         let globals = GlobalResolver::new(linker, global_id, errs_globals);
 
@@ -37,7 +37,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
             globals : &globals,
             errors: &globals.errors,
             type_checker: TypeUnifier::new(
-                &working_on.link_info.template_arguments,
+                &working_on.link_info.template_parameters,
                 working_on.link_info.type_variable_alloc.clone()
             ),
             runtime_condition_stack: Vec::new(),
@@ -280,19 +280,19 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     }
 
-    fn typecheck_template_global<ID: Copy + Into<NameElem>>(
+    fn typecheck_template_global<ID: Copy + Into<GlobalUUID>>(
         &self,
         global_ref: &GlobalReference<ID>,
     ) {
-        let global_obj: NameElem = global_ref.id.into();
+        let global_obj: GlobalUUID = global_ref.id.into();
         let target_link_info = self.globals.get_link_info(global_obj);
 
         for (parameter_id, argument_type) in &global_ref.template_arg_types {
-            let parameter = &target_link_info.template_arguments[parameter_id];
+            let parameter = &target_link_info.template_parameters[parameter_id];
             match &parameter.kind {
-                TemplateInputKind::Type(_) => {} // Do nothing, nothing to unify with. Maybe in the future traits? 
-                TemplateInputKind::Generative(template_input) => {
-                    let decl = target_link_info.instructions[template_input.declaration_instruction].unwrap_declaration();
+                ParameterKind::Type(_) => {} // Do nothing, nothing to unify with. Maybe in the future traits? 
+                ParameterKind::Generative(parameter) => {
+                    let decl = target_link_info.instructions[parameter.declaration_instruction].unwrap_declaration();
 
                     self.type_checker.unify_with_written_type_substitute_templates_must_succeed(
                         &decl.typ_expr,

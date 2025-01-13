@@ -173,7 +173,7 @@ impl Linker {
                 &self.files[md.link_info.file],
             );
             // Can immediately instantiate modules that have no template args
-            if md.link_info.template_arguments.is_empty() {
+            if md.link_info.template_parameters.is_empty() {
                 let _inst = md.instantiations.instantiate(md, self, FlatAlloc::new());
             }
             span_debugger.defuse();

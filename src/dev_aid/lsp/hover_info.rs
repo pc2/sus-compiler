@@ -7,11 +7,11 @@ use lsp_types::{LanguageString, MarkedString};
 
 use crate::flattening::{DeclarationKind, IdentifierType, InterfaceToDomainMap, Module};
 use crate::instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER};
-use crate::linker::{Documentation, FileData, LinkInfo, NameElem};
+use crate::linker::{Documentation, FileData, LinkInfo, GlobalUUID};
 
 use crate::typing::{
     abstract_type::DomainType,
-    template::{GenerativeTemplateInputKind, TemplateInputKind, TypeTemplateInputKind},
+    template::{GenerativeParameterKind, ParameterKind, TypeParameterKind},
 };
 
 use super::tree_walk::{InModule, LocationInfo};
@@ -126,7 +126,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             let typ_str = decl
                 .typ
                 .typ
-                .display(&linker.types, &md.link_info.template_arguments).to_string();
+                .display(&linker.types, &md.link_info.template_parameters).to_string();
             details_vec.push(&typ_str);
 
             details_vec.push(&decl.name);
@@ -175,31 +175,31 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                             .push(Cow::Owned(DomainType::physical_to_string(ph, &md.domains)))
                     }
                 }
-                DomainType::DomainVariable(_) => unreachable!("Variables should have been eliminated already")
+                DomainType::Unknown(_) => unreachable!("Variables should have been eliminated already")
             };
             details_vec.push(Cow::Owned(
                 wire.typ
                     .typ
-                    .display(&linker.types, &md.link_info.template_arguments).to_string(),
+                    .display(&linker.types, &md.link_info.template_parameters).to_string(),
             ));
             hover.sus_code(details_vec.join(" "));
             hover.gather_hover_infos(md, id, wire.typ.domain.is_generative());
         }
         LocationInfo::Type(typ, link_info) => {
             hover.sus_code(
-                typ.display(&linker.types, &link_info.template_arguments).to_string(),
+                typ.display(&linker.types, &link_info.template_parameters).to_string(),
             );
         }
-        LocationInfo::TemplateInput(in_obj, link_info, _template_id, template_arg) => {
+        LocationInfo::Parameter(in_obj, link_info, _template_id, template_arg) => {
             match &template_arg.kind {
-                TemplateInputKind::Type(TypeTemplateInputKind {  }) => {
+                ParameterKind::Type(TypeParameterKind {  }) => {
                     hover.monospace(format!("type {}", template_arg.name));
                 }
-                TemplateInputKind::Generative(GenerativeTemplateInputKind {
+                ParameterKind::Generative(GenerativeParameterKind {
                     decl_span: _,
                     declaration_instruction,
                 }) => {
-                    let NameElem::Module(md_id) = in_obj else {
+                    let GlobalUUID::Module(md_id) = in_obj else {
                         todo!("Non-module template args")
                     };
                     let md = &linker.modules[md_id];
@@ -207,7 +207,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     hover.sus_code(format!(
                         "param {} {}",
                         decl.typ_expr
-                            .display(&linker.types, &link_info.template_arguments),
+                            .display(&linker.types, &link_info.template_parameters),
                         template_arg.name
                     ));
                     hover.gather_hover_infos(md, *declaration_instruction, true);
@@ -220,15 +220,15 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             let file = &linker.files[link_info.file];
             hover.sus_code(format!("{}", link_info.get_full_name_and_template_args(&file.file_text)));
             match global {
-                NameElem::Module(md_uuid) => {
+                GlobalUUID::Module(md_uuid) => {
                     let md = &linker.modules[md_uuid];
                     hover.sus_code(md.make_all_ports_info_string(
                         &linker.files[md.link_info.file].file_text,
                         None,
                     ));
                 }
-                NameElem::Type(_) => {}
-                NameElem::Constant(_) => {}
+                GlobalUUID::Type(_) => {}
+                GlobalUUID::Constant(_) => {}
             }
         }
         LocationInfo::Port(_sm, md, port_id) => {

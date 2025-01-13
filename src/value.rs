@@ -174,7 +174,7 @@ impl ConcreteType {
                 let mut arr = Vec::new();
                 if arr_size > 0 {
                     let content_typ = arr_typ.get_initial_val();
-                    arr.resize(arr_size as usize, content_typ);
+                    arr.resize(arr_size, content_typ);
                 }
                 Value::Array(arr.into_boxed_slice())
             }

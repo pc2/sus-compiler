@@ -9,10 +9,10 @@ use lsp_types::{
 use crate::{
     dev_aid::lsp::to_position,
     flattening::IdentifierType,
-    linker::{FileData, NameElem},
+    linker::{FileData, GlobalUUID},
 };
 
-use crate::typing::{abstract_type::DomainType, template::TemplateInputKind};
+use crate::typing::{abstract_type::DomainType, template::ParameterKind};
 
 use super::tree_walk::{self, InModule, LocationInfo};
 
@@ -154,16 +154,16 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
                 }
                 LocationInfo::InModule(_md_id, _, _, InModule::Temporary(_)) => return,
                 LocationInfo::Type(_, _) => return,
-                LocationInfo::TemplateInput(_id, _link_info, _, template_arg) => {
+                LocationInfo::Parameter(_id, _link_info, _, template_arg) => {
                     match &template_arg.kind {
-                        TemplateInputKind::Type(_) => IDEIdentifierType::Type,
-                        TemplateInputKind::Generative(_) => IDEIdentifierType::Generative,
+                        ParameterKind::Type(_) => IDEIdentifierType::Type,
+                        ParameterKind::Generative(_) => IDEIdentifierType::Generative,
                     }
                 }
                 LocationInfo::Global(g) => match g {
-                    NameElem::Module(_) => IDEIdentifierType::Interface,
-                    NameElem::Type(_) => IDEIdentifierType::Type,
-                    NameElem::Constant(_) => IDEIdentifierType::Constant,
+                    GlobalUUID::Module(_) => IDEIdentifierType::Interface,
+                    GlobalUUID::Type(_) => IDEIdentifierType::Type,
+                    GlobalUUID::Constant(_) => IDEIdentifierType::Constant,
                 },
                 LocationInfo::Port(_, md, port_id) => {
                     let interface = md.ports[port_id].domain;

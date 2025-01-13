@@ -91,6 +91,8 @@ pub enum RealWireDataSource {
 /// An actual instantiated wire of an [InstantiatedModule] (See [InstantiatedModule::wires])
 /// 
 /// It can have a latency count and domain. All wires have a name, either the name they were given by the user, or a generated name like _1, _13
+/// 
+/// Generated from a [crate::flattening::Expression] instruction
 #[derive(Debug)]
 pub struct RealWire {
     pub source: RealWireDataSource,
@@ -119,6 +121,8 @@ pub struct SubModulePort {
 /// All submodules have a name, either the name they were given by the user, or a generated name like _1, _13
 /// 
 /// When generating RTL code, one submodule object generates a single submodule instantiation
+/// 
+/// Generated from a [crate::flattening::SubModuleInstance] instruction
 #[derive(Debug)]
 pub struct SubModule {
     pub original_instruction: FlatID,
@@ -130,6 +134,7 @@ pub struct SubModule {
     pub template_args: ConcreteTemplateArgs,
 }
 
+/// Generated from [Module::ports]
 #[derive(Debug)]
 pub struct InstantiatedPort {
     pub wire: WireID,
@@ -139,18 +144,26 @@ pub struct InstantiatedPort {
     pub domain: DomainID,
 }
 
+/// [InstantiatedModule] are the final product we're trying to produce with the compiler. 
+/// They amount to little more than a collection of wires, multiplexers and submodules. 
+/// 
+/// With the submodules, they form a tree structure, of nested [InstantiatedModule] references. 
+/// 
+/// Generated when instantiating a [Module]
 #[derive(Debug)]
 pub struct InstantiatedModule {
     /// Unique name involving all template arguments
     pub name: String,
     pub errors: ErrorStore,
-    /// This matches the ports in [Module::module_ports]. Ports are not None when they are not part of this instantiation.
+    /// This matches the ports in [Module::ports]. Ports are not `None` when they are not part of this instantiation.
     pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+    /// See [GenerationState]
     pub generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
 }
 
+/// See [GenerationState]
 #[derive(Debug, Clone)]
 pub enum SubModuleOrWire {
     SubModule(SubModuleID),
@@ -184,23 +197,17 @@ impl SubModuleOrWire {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum RealWireRefRoot {
-    /// The preamble isn't really used yet, but it's there for when we have submodule arrays (soon)
-    Wire {
-        wire_id: WireID,
-        preamble: Vec<RealWirePathElem>,
-    },
-    Generative(FlatID),
-    Constant(Value),
-}
-
+/// Stored per module [Module]. 
+/// With this you can instantiate a module for different sets of template arguments. 
+/// It caches the instantiations that have been made, such that they need not be repeated. 
+/// 
+/// Also, with incremental builds (#49) this will be a prime area for investigation
 #[derive(Debug)]
-pub struct InstantiationList {
+pub struct InstantiationCache {
     cache: RefCell<HashMap<ConcreteTemplateArgs, Rc<InstantiatedModule>>>,
 }
 
-impl InstantiationList {
+impl InstantiationCache {
     pub fn new() -> Self {
         Self {
             cache: RefCell::new(HashMap::new()),
@@ -264,29 +271,44 @@ impl InstantiationList {
 
     // Also passes over invalid instances. Instance validity should not be assumed!
     // Only used for things like syntax highlighting
-    pub fn for_each_instance<'s, F: FnMut(&ConcreteTemplateArgs, &Rc<InstantiatedModule>)>(
+    pub fn for_each_instance<F: FnMut(&ConcreteTemplateArgs, &Rc<InstantiatedModule>)>(
         &self,
         mut f: F,
     ) {
         let borrow = self.cache.borrow();
         for (k, v) in borrow.iter() {
-            f(k, &v)
+            f(k, v)
         }
     }
 }
 
+/// Every [crate::flattening::Instruction] has an associated value (See [SubModuleOrWire]). 
+/// They are either what this local name is currently referencing (either a wire instance or a submodule instance). 
+/// Or in the case of Generative values, the current value in the generative variable. 
 #[derive(Debug)]
 struct GenerationState<'fl> {
     generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
     md: &'fl Module,
 }
 
+/// Runtime conditions applied to a [crate::flattening::Write]
+/// 
+/// ```sus
+/// state int a
+/// when x {
+///   a = 3
+/// } else {
+///   a = 2
+/// }
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConditionStackElem {
     pub condition_wire : WireID,
+    /// When this is an else-branch
     pub inverse : bool
 }
 
+/// As with other contexts, this is the shared state we're lugging around while executing & typechecking a module. 
 struct InstantiationContext<'fl, 'l> {
     name: String,
     generation_state: GenerationState<'fl>,

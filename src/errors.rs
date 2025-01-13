@@ -3,7 +3,7 @@ use crate::prelude::*;
 use std::cell::RefCell;
 use std::thread::panicking;
 
-use crate::{alloc::ArenaAllocator, typing::template::TemplateInput};
+use crate::{alloc::ArenaAllocator, typing::template::Parameter};
 
 use crate::flattening::{Declaration, Instruction, Interface, Module, Port, SubModuleInstance};
 use crate::linker::{checkpoint::ErrorCheckpoint, FileData, LinkInfo};
@@ -298,7 +298,7 @@ impl ErrorInfoObject for Instruction {
     }
 }
 
-impl ErrorInfoObject for TemplateInput {
+impl ErrorInfoObject for Parameter {
     fn make_info(&self, file: FileUUID) -> ErrorInfo {
         ErrorInfo {
             position: self.name_span,

@@ -8,7 +8,6 @@ use std::ops::{Deref, Index, IndexMut};
 
 use crate::linker::IsExtern;
 use crate::prelude::*;
-use crate::typing::concrete_type::BOOL_CONCRETE_TYPE;
 use crate::typing::template::{GlobalReference, HowDoWeKnowTheTemplateArg};
 
 use num::BigInt;
@@ -146,6 +145,20 @@ fn array_access<'v>(arr_val: &'v Value, idx: &BigInt, span: BracketSpan) -> Exec
             ),
         ))
     }
+}
+
+/// Temporary intermediary struct
+/// 
+/// See [WireReferenceRoot]
+#[derive(Debug, Clone)]
+enum RealWireRefRoot {
+    /// The preamble isn't really used yet, but it's there for when we have submodule arrays (soon)
+    Wire {
+        wire_id: WireID,
+        preamble: Vec<RealWirePathElem>,
+    },
+    Generative(FlatID),
+    Constant(Value),
 }
 
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
@@ -679,7 +692,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         let wire_found = self.expression_to_real_wire(expr, original_instruction, domain)?;
                         SubModuleOrWire::Wire(wire_found)
                     }
-                    DomainType::DomainVariable(_) => unreachable!("Domain variables have been eliminated by type checking")
+                    DomainType::Unknown(_) => unreachable!("Domain variables have been eliminated by type checking")
                 },
                 Instruction::Write(conn) => {
                     self.instantiate_connection(
@@ -751,7 +764,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             // Get rid of the condition
                             let _ = self.condition_stack.pop().unwrap();
                         }
-                        DomainType::DomainVariable(_) => unreachable!("Domain variables have been eliminated by type checking")
+                        DomainType::Unknown(_) => unreachable!("Domain variables have been eliminated by type checking")
                     }
                     instruction_range.skip_to(stm.else_end);
                     continue;

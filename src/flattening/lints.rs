@@ -1,6 +1,6 @@
 use crate::linker::{IsExtern, LinkInfo, AFTER_LINTS_CP};
 use crate::prelude::*;
-use crate::typing::template::TemplateInputKind;
+use crate::typing::template::ParameterKind;
 
 use super::walk::for_each_generative_input_in_template_args;
 
@@ -22,8 +22,8 @@ pub fn perform_lints(linker: &mut Linker) {
 */
 fn extern_objects_may_not_have_type_template_args(link_info: &LinkInfo, errors: &ErrorCollector) {
     if link_info.is_extern == IsExtern::Extern {
-        for (_id, arg) in &link_info.template_arguments {
-            if let TemplateInputKind::Type(..) = &arg.kind {
+        for (_id, arg) in &link_info.template_parameters {
+            if let ParameterKind::Type(..) = &arg.kind {
                 errors.error(arg.name_span, "'extern' modules may not have 'type' arguments. Convert to bool[] first");
             }
         }

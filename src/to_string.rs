@@ -9,7 +9,7 @@ use crate::linker::{FileData, LinkInfo};
 use crate::typing::{
     abstract_type::{AbstractType, DomainType},
     concrete_type::ConcreteType,
-    template::{ConcreteTemplateArg, ConcreteTemplateArgs, TemplateInputs},
+    template::{ConcreteTemplateArg, ConcreteTemplateArgs, Parameters},
 };
 
 use std::{
@@ -20,8 +20,8 @@ use std::{
 use std::fmt::Write;
 use std::ops::Deref;
 
-pub fn map_to_type_names(template_inputs: &TemplateInputs) -> FlatAlloc<String, TemplateIDMarker> {
-    template_inputs.map(|(_id, v)| v.name.clone())
+pub fn map_to_type_names(parameters: &Parameters) -> FlatAlloc<String, TemplateIDMarker> {
+    parameters.map(|(_id, v)| v.name.clone())
 }
 
 pub trait TemplateNameGetter {
@@ -33,7 +33,7 @@ impl TemplateNameGetter for FlatAlloc<String, TemplateIDMarker> {
         &self[id]
     }
 }
-impl TemplateNameGetter for TemplateInputs {
+impl TemplateNameGetter for Parameters {
     fn get_template_name(&self, id: TemplateID) -> &str {
         &self[id].name
     }
@@ -311,7 +311,7 @@ pub fn pretty_print_concrete_instance<TypVec>(
 where
     TypVec: Index<TypeUUID, Output = StructType>,
 {
-    assert!(given_template_args.len() == target_link_info.template_arguments.len());
+    assert!(given_template_args.len() == target_link_info.template_parameters.len());
     let object_full_name = target_link_info.get_full_name();
     if given_template_args.len() == 0 {
         return format!("{object_full_name} #()");
@@ -319,7 +319,7 @@ where
 
     let mut result = format!("{object_full_name} #(\n");
     for (id, arg) in given_template_args {
-        let arg_in_target = &target_link_info.template_arguments[id];
+        let arg_in_target = &target_link_info.template_parameters[id];
         write!(result, "    {}: ", arg_in_target.name).unwrap();
         match arg {
             ConcreteTemplateArg::Type(concrete_type, how_do_we_know_the_template_arg) => {

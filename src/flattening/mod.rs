@@ -20,7 +20,7 @@ pub use typechecking::typecheck_all_modules;
 pub use lints::perform_lints;
 
 use crate::linker::{Documentation, LinkInfo};
-use crate::{file_position::FileText, instantiation::InstantiationList, value::Value};
+use crate::{file_position::FileText, instantiation::InstantiationCache, value::Value};
 
 use crate::typing::{
     abstract_type::FullType,
@@ -42,13 +42,15 @@ pub enum GlobalObjectKind {
 ///
 ///     2.1: Parsing: Parse source code to create instruction list.
 ///
-///     2.2: Typecheck: Add typ variables to everything. [Declaration::typ], [WireInstance::typ] and [SubModuleInstance::local_interface_domains] are set in this stage.
+///     2.2: Typecheck: Add typ variables to everything. [Declaration::typ], [Expression::typ] and [SubModuleInstance::local_interface_domains] are set in this stage.
 ///
 /// 3. Instantiation: Actually run generative code and instantiate modules.
 ///
 ///     3.1: Execution
 ///     
 ///     3.2: Concrete Typecheck, Latency Counting
+/// 
+/// All Modules are stored in [Linker::modules] and indexed by [ModuleUUID]
 #[derive(Debug)]
 pub struct Module {
     /// Created in Stage 1: Initialization
@@ -69,7 +71,7 @@ pub struct Module {
     pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,
 
     /// Created in Stage 3: Instantiation
-    pub instantiations: InstantiationList,
+    pub instantiations: InstantiationCache,
 }
 
 impl Module {
@@ -139,6 +141,8 @@ impl Module {
 /// Represents an opaque type in the compiler, like `int` or `bool`. 
 /// 
 /// TODO: Structs #8
+/// 
+/// All Types are stored in [Linker::types] and indexed by [TypeUUID]
 #[derive(Debug)]
 pub struct StructType {
     /// Created in Stage 1: Initialization
@@ -150,6 +154,20 @@ pub struct StructType {
     fields: FlatAlloc<StructField, FieldIDMarker>
 }
 
+/// Global constant, like `true`, `false`, or user-defined constants (TODO #19)
+/// 
+/// All Constants are stored in [Linker::constants] and indexed by [ConstantUUID]
+#[derive(Debug)]
+pub struct NamedConstant {
+    pub link_info: LinkInfo,
+    pub output_decl: FlatID
+}
+
+/// Represents a field in a struct
+/// 
+/// UNFINISHED
+/// 
+/// TODO: Structs #8
 #[derive(Debug)]
 pub struct StructField {
     pub name: String,
@@ -159,13 +177,19 @@ pub struct StructField {
     pub declaration_instruction: FlatID,
 }
 
-
+/// In SUS, when you write `my_submodule.abc`, `abc` could refer to an interface or to a port. 
+/// 
+/// See [Module::get_port_or_interface_by_name]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PortOrInterface {
     Port(PortID),
     Interface(InterfaceID),
 }
 
+/// Information about a (clock) domain. 
+/// 
+/// Right now this only contains the domain name, but when actual clock domains are implemented (#7), 
+/// this will contain information about the Clock. 
 #[derive(Debug)]
 pub struct DomainInfo {
     pub name: String,
@@ -185,10 +209,23 @@ impl<'linker> InterfaceToDomainMap<'linker> {
     }
 }
 
+/// What kind of wire/value does this identifier represent? 
+/// 
+/// We already know it's not a submodule
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IdentifierType {
+    /// Local temporary
+    /// ```sus
+    /// int v = val
+    /// ```
     Local,
+    /// ```sus
+    /// state int v
+    /// ```
     State,
+    /// ```sus
+    /// gen int V = 3
+    /// ```
     Generative,
 }
 
@@ -271,6 +308,7 @@ impl Interface {
     }
 }
 
+/// An element in a [WireReference] path. Could be array accesses, slice accesses, field accesses, etc
 #[derive(Debug, Clone, Copy)]
 pub enum WireReferencePathElement {
     ArrayAccess {
@@ -292,11 +330,24 @@ impl WireReferencePathElement {
     }
 }
 
-
+/// The root of a [WireReference]. Basically where the wire reference starts. 
+/// 
+/// This can be a local declaration, a global constant, the port of a submodule. 
 #[derive(Debug)]
 pub enum WireReferenceRoot {
+    /// ```sus
+    /// int local_var
+    /// local_var = 3
+    /// ```
     LocalDecl(FlatID, Span),
+    /// ```sus
+    /// bool b = true // root is global constant `true`
+    /// ```
     NamedConstant(GlobalReference<ConstantUUID>),
+    /// ```sus
+    /// FIFO local_submodule
+    /// local_submodule.data_in = 3 // root is local_submodule.data_in (yes, both)
+    /// ```
     SubModulePort(PortReference),
 }
 
@@ -317,9 +368,13 @@ impl WireReferenceRoot {
     }
 }
 
-/// References to wires
+/// References to wires or generative variables. 
+/// 
+/// Basically, this struct encapsulates all expressions that can be written to, like field and array accesses. 
+/// 
+/// [Expression] covers anything that can not be written to. 
 ///
-/// Example: `myModule.port[a][b:c]`
+/// Example: `myModule.port[a][b:c]`. (`myModule.port` is the [Self::root], `[a][b:c]` are two parts of the [Self::path])
 #[derive(Debug)]
 pub struct WireReference {
     pub root: WireReferenceRoot,
@@ -344,9 +399,20 @@ impl WireReference {
     }
 }
 
+/// In a [Write], this represents what kind of write it is, based on keywords `reg` or `initial`
 #[derive(Debug)]
 pub enum WriteModifiers {
+    /// A regular write to a local wire (can include latency registers) or generative variable
+    /// ```sus
+    /// int v
+    /// reg reg v = a * 3
+    /// ```
     Connection { num_regs: i64, regs_span: Span },
+    /// Set the initial value of a `state` register
+    /// ```sus
+    /// state int count
+    /// initial count = 3 // Must be generative
+    /// ```
     Initial { initial_kw_span: Span },
 }
 
@@ -383,17 +449,30 @@ pub struct Write {
     pub write_modifiers: WriteModifiers,
 }
 
+/// -x
+/// 
+/// See [crate::value::compute_unary_op]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOperator {
+    /// Horizontal & on arrays
     And,
+    /// Horizontal | on arrays
     Or,
+    /// Horizontal ^ on arrays
     Xor,
+    /// ! on booleans
     Not,
+    /// Horizontal + on arrays
     Sum,
+    /// Horizontal * on arrays
     Product,
+    /// - on integers
     Negate,
 }
 
+/// x * y
+/// 
+/// See [crate::value::compute_binary_op]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperator {
     And,
@@ -414,7 +493,8 @@ pub enum BinaryOperator {
     LesserEq,
 }
 
-/// A reference to a port within a submodule. Not to be confused with [Port], which is the declaration of the port itself in the [Module]
+/// A reference to a port within a submodule. 
+/// Not to be confused with [Port], which is the declaration of the port itself in the [Module]
 #[derive(Debug, Clone, Copy)]
 pub struct PortReference {
     pub submodule_decl: FlatID,
@@ -429,6 +509,10 @@ pub struct PortReference {
 }
 
 /// An [Instruction] that represents a single expression in the program. Like ((3) + (x))
+/// 
+/// See [ExpressionSource]
+/// 
+/// On instantiation, creates [crate::instantiation::RealWire] when non-generative
 #[derive(Debug)]
 pub struct Expression {
     pub typ: FullType,
@@ -436,6 +520,7 @@ pub struct Expression {
     pub source: ExpressionSource,
 }
 
+/// See [Expression]
 #[derive(Debug)]
 pub enum ExpressionSource {
     WireRef(WireReference), // Used to add a span to the reference of a wire.
@@ -480,7 +565,8 @@ impl WrittenType {
     }
 }
 
-/// Little helper struct that tells us what kind of declaration it is. Is it a Port, Template argument, A struct field, or just a regular temporary? 
+/// Little helper struct that tells us what kind of declaration it is. 
+/// Is it a Port, Template argument, A struct field, or just a regular temporary? 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeclarationKind {
     NotPort,
@@ -545,6 +631,8 @@ pub struct Declaration {
 /// It can be referenced by a [WireReferenceRoot::SubModulePort]
 /// 
 /// A SubModuleInstance Instruction always corresponds to a new entry in the [self::name_context::LocalVariableContext]. 
+/// 
+/// When instantiating, creates a [crate::instantiation::SubModule]
 #[derive(Debug)]
 pub struct SubModuleInstance {
     pub module_ref: GlobalReference<ModuleUUID>,
