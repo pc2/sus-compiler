@@ -78,6 +78,7 @@ impl<'linker> InitializationContext<'linker> {
 
     fn gather_ports_in_if_stmt(&mut self, cursor: &mut Cursor) {
         cursor.go_down_no_check(|cursor| {
+            cursor.field(field!("if_literal"));
             cursor.field(field!("condition"));
             cursor.field(field!("then_block"));
             self.gather_all_ports_in_block(cursor);
