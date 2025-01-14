@@ -35,13 +35,13 @@ impl ConcreteType {
     #[track_caller]
     pub fn unwrap_value(&self) -> &Value {
         let ConcreteType::Value(v) = self else {
-            unreachable!("unwrap_value")
+            unreachable!("unwrap_value on {self:?}")
         };
         v
     }
     pub fn down_array(&self) -> &ConcreteType {
         let ConcreteType::Array(arr_box) = self else {
-            unreachable!("Must be an array!")
+            unreachable!("Must be an array! Is {self:?} instead")
         };
         let (sub, _sz) = arr_box.deref();
         sub

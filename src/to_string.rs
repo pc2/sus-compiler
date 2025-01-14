@@ -160,10 +160,10 @@ impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_
                     f,
                     "{}[{}]",
                     elem_typ.display(self.linker_types),
-                    arr_size.unwrap_value().unwrap_integer()
+                    arr_size.display(self.linker_types)
                 )
             }
-            ConcreteType::Value(v) => write!(f, "{{concrete_type_{v}}}"),
+            ConcreteType::Value(v) => write!(f, "{v}"),
             ConcreteType::Unknown(u) => write!(f, "{{{u:?}}}"),
         }
     }

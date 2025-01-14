@@ -518,7 +518,7 @@ pub fn apply_types(
 ) {
     // Set the remaining domain variables that aren't associated with a module port. 
     // We just find domain IDs that haven't been 
-    let mut leftover_domain_alloc = UUIDAllocator::new_start_from(working_on.domain_names.get_next_alloc_id());
+    let mut leftover_domain_alloc = UUIDAllocator::new_start_from(working_on.domains.get_next_alloc_id());
     for d in type_checker.domain_substitutor.iter() {
         if d.get().is_none() {
             assert!(d.set(DomainType::Physical(leftover_domain_alloc.alloc())).is_ok());
@@ -528,8 +528,8 @@ pub fn apply_types(
     // Assign names to all of the domains in this module
     working_on.domains = leftover_domain_alloc.into_range().map(|id| DomainInfo {
         name: {
-            if let Some(name) = working_on.domain_names.get(id) {
-                name.clone()
+            if let Some(name) = working_on.domains.get(id) {
+                name.name.clone()
             } else {
                 format!("domain_{}", id.get_hidden_value())
             }

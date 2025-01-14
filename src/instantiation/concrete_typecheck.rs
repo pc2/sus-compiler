@@ -111,6 +111,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let typ_as_str = w.typ.display(&self.linker.types);
                 
                 let span = self.md.get_instruction_span(w.original_instruction);
+                span.debug();
                 self.errors.error(span, format!("Could not finalize this type, some parameters were still unknown: {typ_as_str}"));
             }
         }

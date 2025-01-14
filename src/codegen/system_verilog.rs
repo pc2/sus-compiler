@@ -131,9 +131,10 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 
                 let var_decl = typ_to_declaration(&w.typ, &to);
 
+                let clk_name = self.md.get_clock_name();
                 writeln!(
                     self.program_text,
-                    "/*latency*/ logic {var_decl}; always_ff @(posedge clk) begin {to} <= {from}; end"
+                    "/*latency*/ logic {var_decl}; always_ff @(posedge {clk_name}) begin {to} <= {from}; end"
                 ).unwrap();
             }
         }
@@ -281,6 +282,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
     }
 
     fn write_submodules(&mut self) {
+        let parent_clk_name = self.md.get_clock_name();
         for (_id, sm) in &self.instance.submodules {
             let sm_md = &self.linker.modules[sm.module_uuid];
             let sm_inst: &InstantiatedModule = sm
@@ -293,8 +295,9 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 self.program_text.write_str(&sm_inst.name).unwrap();
             };
             let sm_name = &sm.name;
+            let submodule_clk_name = sm_md.get_clock_name();
             writeln!(self.program_text, " {sm_name}(").unwrap();
-            write!(self.program_text, "\t.clk(clk)").unwrap();
+            write!(self.program_text, "\t.{submodule_clk_name}({parent_clk_name})").unwrap();
             for (port_id, iport) in sm_inst.interface_ports.iter_valids() {
                 let port_name =
                     wire_name_self_latency(&sm_inst.wires[iport.wire], self.use_latency);
@@ -352,7 +355,8 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     let output_name = wire_name_self_latency(w, self.use_latency);
                     let arrow_str = if is_state.is_some() {
-                        writeln!(self.program_text, "always_ff @(posedge clk) begin").unwrap();
+                        let clk_name = self.md.get_clock_name();
+                        writeln!(self.program_text, "always_ff @(posedge {clk_name}) begin").unwrap();
                         "<="
                     } else {
                         writeln!(self.program_text, "always_comb begin\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches").unwrap();

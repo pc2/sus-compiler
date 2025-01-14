@@ -22,10 +22,14 @@ struct InitializationContext<'linker> {
     // module-only stuff
     ports: FlatAlloc<Port, PortIDMarker>,
     interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
-    domains: FlatAlloc<String, DomainIDMarker>,
+    domains: FlatAlloc<DomainInfo, DomainIDMarker>,
+    /// This is initially true, but when the first `domain xyz` statement is encountered this is set to false. 
+    implicit_clk_domain: bool,
     
     // struct-only stuff
     fields: FlatAlloc<StructField, FieldIDMarker>,
+
+    errors: ErrorCollector<'linker>,
 
     file_text: &'linker FileText,
 }
@@ -34,7 +38,7 @@ impl<'linker> InitializationContext<'linker> {
     fn gather_initial_global_object(&mut self, cursor: &mut Cursor) -> (Span, String) {
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
         let name = self.file_text[name_span].to_owned();
-        self.domains.alloc(name.clone());
+        self.domains.alloc(DomainInfo { name: "clk".to_string() });
         if cursor.optional_field(field!("template_declaration_arguments")) {
             cursor.list(kind!("template_declaration_arguments"), |cursor| {
                 let (kind, decl_span) = cursor.kind_span();
@@ -122,11 +126,25 @@ impl<'linker> InitializationContext<'linker> {
         cursor.list(kind!("block"), |cursor| {
             match cursor.kind() {
                 kind!("domain_statement") => {
+                    let whole_domain_statement_span = cursor.span();
                     cursor.go_down_no_check(|cursor| {
                         let domain_name_span =
                             cursor.field_span(field!("name"), kind!("identifier"));
                         let name = &self.file_text[domain_name_span];
-                        self.domains.alloc(name.to_owned())
+
+                        if self.implicit_clk_domain {
+                            if let Some(existing_port) = self.ports.iter().next() {
+                                // Sad Path: Having ports on the implicit clk domain is not allowed. 
+                                self.errors.error(whole_domain_statement_span, "When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.")
+                                    .info_same_file(existing_port.1.decl_span, "A domain should be explicitly defined before this port");
+                            } else {
+                                // Happy Path: The implicit clk domain hasn't been used yet, so we can safely get rid of it. 
+                                self.domains.clear();
+                            }
+
+                            self.implicit_clk_domain = false;
+                        }
+                        self.domains.alloc(DomainInfo { name: name.to_owned() })
                     });
                 }
                 kind!("interface_statement") => {
@@ -298,8 +316,10 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
         ports: FlatAlloc::new(),
         interfaces: FlatAlloc::new(),
         domains: FlatAlloc::new(),
+        implicit_clk_domain: true,
         parameters: FlatAlloc::new(),
         fields: FlatAlloc::new(),
+        errors: parsing_errors,
         file_text: &builder.file_data.file_text,
     };
 
@@ -320,15 +340,15 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
         checkpoints: ArrayVec::new()
     };
 
-    link_info.reabsorb_errors_globals((parsing_errors, ResolvedGlobals::empty()), AFTER_INITIAL_PARSE_CP);
+    link_info.reabsorb_errors_globals((ctx.errors, ResolvedGlobals::empty()), AFTER_INITIAL_PARSE_CP);
 
     match global_obj_kind {
         GlobalObjectKind::Module => {
             builder.add_module(Module {
                 link_info,
                 ports: ctx.ports,
-                domain_names: ctx.domains,
-                domains: FlatAlloc::new(),
+                domains: ctx.domains,
+                implicit_clk_domain: ctx.implicit_clk_domain,
                 interfaces: ctx.interfaces,
                 instantiations: InstantiationCache::new(),
             });

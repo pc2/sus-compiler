@@ -55,13 +55,11 @@ pub struct Module {
     pub ports: FlatAlloc<Port, PortIDMarker>,
 
     /// Created in Stage 1: Initialization
-    pub domain_names: FlatAlloc<String, DomainIDMarker>,
+    pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,
+    pub implicit_clk_domain: bool,
 
     /// Created in Stage 1: Initialization
     pub interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
-
-    /// Created in Stage 2: Typechecking
-    pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,
 
     /// Created in Stage 3: Instantiation
     pub instantiations: InstantiationCache,
@@ -126,8 +124,11 @@ impl Module {
         }
     }
 
-    pub fn is_multi_domain(&self) -> bool {
-        self.domains.len() > 1
+    /// Temporary upgrade such that we can name the singular clock of the module, such that weirdly-named external module clocks can be used
+    /// 
+    /// See #7
+    pub fn get_clock_name(&self) -> &str {
+        &self.domains.iter().next().unwrap().1.name
     }
 }
 

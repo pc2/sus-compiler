@@ -89,9 +89,10 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 
         let mut it = self.instance.interface_ports.iter_valids().peekable();
         let end = if it.peek().is_some() { ";" } else { "" };
+        let clk_name = self.md.get_clock_name();
         write!(
             self.program_text,
-            "{comment_text}entity {} is (\n{comment_text}    port (\n        clk : in std_logic{end}\n",
+            "{comment_text}entity {} is (\n{comment_text}    port (\n        {clk_name} : in std_logic{end}\n",
             instance_name
         )
         .unwrap();

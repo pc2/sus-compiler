@@ -205,7 +205,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 continue;
             };
 
-            for domain_id in self.linker.modules[sm.module_uuid].domain_names.id_range() {
+            for domain_id in self.linker.modules[sm.module_uuid].domains.id_range() {
                 struct Prev {
                     first: (WireID, i64),
                     prev: (WireID, i64),

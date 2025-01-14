@@ -95,7 +95,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
     match info {
         LocationInfo::InModule(_md_id, md, decl_id, InModule::NamedLocal(decl)) => {
             let mut details_vec: Vec<&str> = Vec::with_capacity(5);
-            let domain_str = if md.is_multi_domain() {
+            let domain_str = if md.implicit_clk_domain {
                 if let DomainType::Physical(ph) = decl.typ.domain {
                     Some(DomainType::physical_to_string(ph, &md.domains))
                 } else {
@@ -152,7 +152,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     .0
             ));
 
-            let show_interfaces = submodule.is_multi_domain().then_some(InterfaceToDomainMap {
+            let show_interfaces = submodule.implicit_clk_domain.then_some(InterfaceToDomainMap {
                 local_domain_map: &submod.local_interface_domains,
                 domains: &md.domains,
             });
@@ -170,7 +170,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             match wire.typ.domain {
                 DomainType::Generative => details_vec.push(Cow::Borrowed("gen")),
                 DomainType::Physical(ph) => {
-                    if md.is_multi_domain() {
+                    if md.implicit_clk_domain {
                         details_vec
                             .push(Cow::Owned(DomainType::physical_to_string(ph, &md.domains)))
                     }

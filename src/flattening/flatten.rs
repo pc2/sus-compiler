@@ -546,7 +546,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     fn alloc_submodule_instruction(&mut self, module_ref: GlobalReference<ModuleUUID>, name: Option<(String, Span)>, documentation: Documentation) -> FlatID {
         let md = &self.globals[module_ref.id];
         let local_interface_domains = md
-            .domain_names
+            .domains
             .map(|_| DomainType::Unknown(self.type_alloc.domain_variable_alloc.alloc()));
 
         self.instructions.alloc(Instruction::SubModule(SubModuleInstance{

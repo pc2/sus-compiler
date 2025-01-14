@@ -1011,3 +1011,12 @@ module use_sized_int_add {
 
 	c = sized_int_add(a, b)
 }
+
+
+module implicit_domain_forbidden {
+	input int bad_port
+
+	domain bad_domain
+
+	output int port_after_domain
+}
