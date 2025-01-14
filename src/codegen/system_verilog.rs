@@ -324,11 +324,11 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
         concrete_template_args.iter().for_each(|(arg_id, arg)| {
             let arg_name = &link_info.template_parameters[arg_id].name;
             let arg_value = match arg {
-                ConcreteTemplateArg::Type(..) => {
-                    unreachable!("No extern module type arguments. Should have been caught by Lint")
-                }
-                ConcreteTemplateArg::Value(value, _) => {
-                    value.inline_constant_to_string()
+                ConcreteTemplateArg::Provided(r#type, _) => {
+                    match r#type {
+                        ConcreteType::Value(value) => value.inline_constant_to_string(),
+                        _ => unreachable!("No extern module type arguments. Should have been caught by Lint")
+                    }
                 }
                 ConcreteTemplateArg::NotProvided => unreachable!("All args are known at codegen"),
             };
@@ -338,7 +338,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 first = false;
             }
             self.program_text.write_char('.').unwrap();
-            self.program_text.write_str(&arg_name).unwrap();
+            self.program_text.write_str(arg_name).unwrap();
             self.program_text.write_char('(').unwrap();
             self.program_text.write_str(&arg_value).unwrap();
             self.program_text.write_char(')').unwrap();

@@ -672,12 +672,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     for (_id, v) in &submodule.module_ref.template_args {
                         template_args.alloc(match v {
                             Some(arg) => match &arg.kind {
-                                TemplateArgKind::Type(typ) => ConcreteTemplateArg::Type(
+                                TemplateArgKind::Type(typ) => ConcreteTemplateArg::Provided(
                                     self.concretize_type(typ)?,
                                     HowDoWeKnowTheTemplateArg::Given,
                                 ),
-                                TemplateArgKind::Value(v) => ConcreteTemplateArg::Value(
-                                    self.generation_state.get_generation_value(*v)?.clone(),
+                                TemplateArgKind::Value(v) => ConcreteTemplateArg::Provided(
+                                    ConcreteType::Value(self.generation_state.get_generation_value(*v)?.clone()),
                                     HowDoWeKnowTheTemplateArg::Given,
                                 ),
                             },
