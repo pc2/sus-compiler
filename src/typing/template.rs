@@ -1,7 +1,7 @@
-use std::fmt::Display;
-use crate::{prelude::*, value::Value};
 use super::{abstract_type::AbstractType, concrete_type::ConcreteType};
 use crate::flattening::WrittenType;
+use crate::{prelude::*, value::Value};
+use std::fmt::Display;
 
 /// References any [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant],
 /// and includes any template arguments.
@@ -54,7 +54,7 @@ pub struct GenerativeParameterKind {
 pub struct TypeParameterKind {}
 
 /// See [Parameter]
-/// 
+///
 /// Must match the [TemplateArgKind] that is passed
 #[derive(Debug)]
 pub enum ParameterKind {
@@ -94,7 +94,7 @@ pub struct TemplateArg {
 }
 
 /// See [TemplateArg]
-/// 
+///
 /// The argument kind passed to [ParameterKind], which it must match
 #[derive(Debug)]
 pub enum TemplateArgKind {
@@ -134,6 +134,13 @@ impl Display for HowDoWeKnowTheTemplateArg {
         })
     }
 }
+
+// --------------------------------------------------
+// IMPORTANT: To those seeking to refactor this struct: don't.
+// It may look like [ConcreteTemplateArg::Value] duplicates [ConcreteType::Value], or that the whole thing could be replaced by [ConcreteType] itself.
+// But the [ConcreteTemplateArg::Type] and [ConcreteTemplateArg::Value] cases differentiate often enough, and semantically are more similar to [ParameterKind].
+// Attempting to merge these uses with [ConcreteType] internals only leads to confusion.
+// --------------------------------------------------
 
 /// Represents the value we're passing into a template argument.
 ///
