@@ -19,6 +19,7 @@ use crate::flattening::{
 
 const STD_LIB_PATH: &str = env!("SUS_COMPILER_STD_LIB_PATH");
 
+/// Any extra operations that should happen when files are added or removed from the linker. Such as caching line offsets. 
 pub trait LinkerExtraFileInfoManager {
     /// This is there to give an acceptable identifier that can be printed
     fn convert_filename(&self, path : &PathBuf) -> String {

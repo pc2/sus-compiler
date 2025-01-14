@@ -27,13 +27,6 @@ use crate::typing::{
     template::GlobalReference,
 };
 
-#[derive(Debug)]
-pub enum GlobalObjectKind {
-    Module,
-    Const,
-    Struct
-}
-
 /// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage.
 ///
 /// 1. Initialization: initial name resolution and port discovery. The Module objects themselves are constructed.
@@ -309,6 +302,8 @@ impl Interface {
 }
 
 /// An element in a [WireReference] path. Could be array accesses, slice accesses, field accesses, etc
+/// 
+/// When executing, this turns into [crate::instantiation::RealWirePathElem]
 #[derive(Debug, Clone, Copy)]
 pub enum WireReferencePathElement {
     ArrayAccess {

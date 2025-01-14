@@ -9,6 +9,7 @@ use crate::{InstantiatedModule, Linker, Module};
 
 use std::{fs::{self, File}, io::Write, path::PathBuf, rc::Rc};
 
+/// Implemented for SystemVerilog [self::system_verilog] or VHDL [self::vhdl]
 pub trait CodeGenBackend {
     fn file_extension(&self) -> &str;
     fn output_dir_name(&self) -> &str;

@@ -58,16 +58,23 @@ impl Documentation {
     }
 }
 
+/// [Module], [StructType], or [NamedConstant] annotation that specifies exceptions to code generation. 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IsExtern {
+    /// Code is generated for this through the regular channel (See [crate::codegen])
+    /// 
     /// ```sus
     /// module md {}
     /// ```
     Normal,
+    /// Modules that are provided externally, and thus no code should be generated for these
+    /// 
     /// ```sus
     /// extern module md {}
     /// ```
     Extern,
+    /// Builtins, like escape hatches for Latency Counting & domains
+    /// 
     /// ```sus
     /// __builtin__ module md {}
     /// ```

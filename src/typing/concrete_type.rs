@@ -23,13 +23,21 @@ pub struct ConcreteGlobalReference<ID> {
     pub template_args: ConcreteTemplateArgs,
 }
 
+/// A post-instantiation type. These fully define what wires should be generated for a given object. 
+/// So as opposed to [crate::typing::abstract_type::AbstractType], type parameters are filled out with concrete values. 
+/// 
+/// Examples: `bool[3]`, `int #(MAX: 20)`
+/// 
+/// Not to be confused with [crate::typing::abstract_type::AbstractType] which represents pre-instantiation types,
+/// or [crate::flattening::WrittenType] which represents the textual in-editor data. 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteType {
     Named(ConcreteGlobalReference<TypeUUID>),
     Value(Value),
     Array(Box<(ConcreteType, ConcreteType)>),
-    /// Referencing [ConcreteType::Unknown] is a strong code smell.
-    /// It is likely you should use [crate::typing::type_inference::TypeSubstitutor::unify] instead
+    /// Referencing [ConcreteType::Unknown] is a strong code smell. 
+    /// It is likely you should use [crate::typing::type_inference::TypeSubstitutor::unify_must_succeed]
+    /// or [crate::typing::type_inference::TypeSubstitutor::unify_report_error] instead
     ///
     /// It should only occur in creation `ConcreteType::Unknown(self.type_substitutor.alloc())`
     Unknown(ConcreteTypeVariableID),
