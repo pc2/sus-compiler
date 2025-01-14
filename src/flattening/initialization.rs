@@ -265,6 +265,13 @@ pub fn gather_initial_file_data(mut builder: FileBuilder) {
     );
 }
 
+
+enum GlobalObjectKind {
+    Module,
+    Const,
+    Struct
+}
+
 fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorCollector, span: Span, cursor: &mut Cursor) {
     let is_extern = match cursor.optional_field(field!("extern_marker")).then(|| cursor.kind()) {
         None => IsExtern::Normal,

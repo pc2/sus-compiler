@@ -54,6 +54,8 @@ pub struct GenerativeParameterKind {
 pub struct TypeParameterKind {}
 
 /// See [Parameter]
+/// 
+/// Must match the [TemplateArgKind] that is passed
 #[derive(Debug)]
 pub enum ParameterKind {
     Type(TypeParameterKind),
@@ -91,6 +93,9 @@ pub struct TemplateArg {
     pub kind: TemplateArgKind,
 }
 
+/// See [TemplateArg]
+/// 
+/// The argument kind passed to [ParameterKind], which it must match
 #[derive(Debug)]
 pub enum TemplateArgKind {
     Type(WrittenType),

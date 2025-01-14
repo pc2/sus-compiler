@@ -24,6 +24,7 @@ pub fn map_to_type_names(parameters: &Parameters) -> FlatAlloc<String, TemplateI
     parameters.map(|(_id, v)| v.name.clone())
 }
 
+/// For [Display::fmt] implementations on types: [ConcreteType], [WrittenType], [AbstractType]
 pub trait TemplateNameGetter {
     fn get_template_name(&self, id: TemplateID) -> &str;
 }

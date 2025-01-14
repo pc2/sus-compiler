@@ -10,6 +10,7 @@ use crate::typing::template::{
     ParameterKind, TypeParameterKind,
 };
 
+/// See [LocationInfo]
 #[derive(Clone, Copy, Debug)]
 pub enum InModule<'linker> {
     NamedLocal(&'linker Declaration),
@@ -17,6 +18,7 @@ pub enum InModule<'linker> {
     Temporary(&'linker Expression),
 }
 
+/// Information about an object in the source code. Used for hovering, completions, syntax highlighting etc. 
 #[derive(Clone, Copy, Debug)]
 pub enum LocationInfo<'linker> {
     InModule(ModuleUUID, &'linker Module, FlatID, InModule<'linker>),

@@ -7,8 +7,12 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-// TODO add custom niche for more efficient Options, wait until custom niches are stabilized (https://internals.rust-lang.org/t/nonmaxusize-and-niche-value-optimisation/19661)
-// Maybe use NonZeroUsize (https://doc.rust-lang.org/std/num/struct.NonZeroUsize.html)
+/// UUIDs are type-safe integers. They are used for [FlatAlloc] and [ArenaAllocator]
+/// 
+/// They don't support arithmetic, as they're just meant to represent pointers. 
+/// 
+/// TODO add custom niche for more efficient Options, wait until custom niches are stabilized (https://internals.rust-lang.org/t/nonmaxusize-and-niche-value-optimisation/19661)
+/// Maybe use NonZeroUsize (https://doc.rust-lang.org/std/num/struct.NonZeroUsize.html)
 pub struct UUID<IndexMarker>(usize, PhantomData<IndexMarker>);
 
 impl<IndexMarker> Clone for UUID<IndexMarker> {
@@ -29,6 +33,7 @@ impl<IndexMarker> Hash for UUID<IndexMarker> {
     }
 }
 
+/// See [UUID]
 pub trait UUIDMarker {
     const DISPLAY_NAME: &'static str;
 }

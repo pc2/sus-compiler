@@ -11,6 +11,7 @@ pub struct SpecifiedLatency {
     pub latency: i64,
 }
 
+/// All the ways [solve_latencies] can go wrong
 #[derive(Debug)]
 pub enum LatencyCountingError {
     ConflictingSpecifiedLatencies {
@@ -60,8 +61,9 @@ struct LatencyStackElem<'d> {
     remaining_fanout: std::slice::Iter<'d, FanInOut>,
 }
 
-// Attempt 3 for Latency Counting
-// TODO make this only take up 8 bytes with bitfield
+/// The node for the latency-counting graph. See [solve_latencies]
+/// 
+/// TODO make this only take up 8 bytes with bitfield
 #[derive(Clone, Copy)]
 struct LatencyNode {
     abs_lat: i64,

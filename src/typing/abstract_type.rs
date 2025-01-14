@@ -9,18 +9,28 @@ use crate::flattening::{BinaryOperator, StructType, TypingAllocator, UnaryOperat
 use crate::linker::get_builtin_type;
 use crate::to_string::map_to_type_names;
 
-/// This contains only the information that can be easily type-checked.
+/// This contains only the information that can be type-checked before template instantiation.
 ///
 /// Its most important components are the names and structure of types.
 ///
 /// What isn't included are the parameters of types. So Array Sizes for example.
+/// 
+/// This is such that useful information can still be given for modules that haven't been instantiated. 
+/// 
+/// Not to be confused with [WrittenType], which is the in-source text representation. 
+/// 
+/// Not to be confused with [crate::typing::concrete_type::ConcreteType], which is the
+/// post-instantiation type. 
+/// 
+/// [AbstractType]s don't actually get converted to [crate::typing::concrete_type::ConcreteType]s. 
+/// Instead [crate::typing::concrete_type::ConcreteType] gets created from [WrittenType] directly. 
 #[derive(Debug, Clone)]
 pub enum AbstractType {
     Template(TemplateID),
     Named(TypeUUID),
     Array(Box<AbstractType>),
     /// Referencing [AbstractType::Unknown] is a strong code smell. 
-    /// It is likely you should use [TypeSubstitutor::unify] instead
+    /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
     /// 
     /// It should only occur in creation `AbstractType::Unknown(self.type_substitutor.alloc())`
     Unknown(TypeVariableID),
@@ -29,6 +39,15 @@ pub enum AbstractType {
 pub const BOOL_TYPE: AbstractType = AbstractType::Named(get_builtin_type("bool"));
 pub const INT_TYPE: AbstractType = AbstractType::Named(get_builtin_type("int"));
 
+/// These represent (clock) domains. While clock domains are included under this umbrella, domains can use the same clock. 
+/// The use case for non-clock-domains is to separate Latency Counting domains. So different pipelines where it doesn't 
+/// necessarily make sense that their values are related by a fixed number of clock cycles. 
+/// 
+/// Domains are resolved pre-instantiation, because dynamic domain merging doesn't seem like a valuable use case. 
+/// 
+/// As a convenience, we make [DomainType::Generative] a special case for a domain. 
+/// 
+/// The fun thing is that we can now use this domain info for syntax highlighting, giving wires in different domains a different color. 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DomainType {
     /// Generative conflicts with nothing
@@ -41,7 +60,7 @@ pub enum DomainType {
     /// They always point to non-generative domains. 
     /// 
     /// Referencing [DomainType::Unknown] is a strong code smell. 
-    /// It is likely you should use [TypeSubstitutor::unify] instead
+    /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
     /// 
     /// It should only occur in creation `DomainType::Unknown(self.domain_substitutor.alloc())`
     Unknown(DomainVariableID)

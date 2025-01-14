@@ -178,6 +178,15 @@ impl<MyType: HindleyMilner<VariableIDMarker>, VariableIDMarker: UUIDMarker> Drop
     }
 }
 
+/// See [HindleyMilner]
+/// 
+/// `TypeFuncIdent` is a value object, that is a "terminal". Basically, it's an atom that can either be equal or not. 
+/// 
+/// Usually this is type names: `int` `bool`, or "array of" without the containing type. 
+/// 
+/// Basically, when unifying, `int` isn't equal to "array of", and thus a type error is generated
+/// 
+/// This enum itself then is either such a terminal, or a type variable that can be unified (IE substituted)
 #[derive(Debug, Clone, Copy)]
 pub enum HindleyMilnerInfo<TypeFuncIdent, VariableIDMarker : UUIDMarker> {
     /// Just a marker. Use [HindleyMilner::unify_all_args]
@@ -185,6 +194,13 @@ pub enum HindleyMilnerInfo<TypeFuncIdent, VariableIDMarker : UUIDMarker> {
     TypeVar(UUID<VariableIDMarker>)
 }
 
+/// Implements Hindley-Milner type unification for various types in the SUS language
+/// 
+/// Unification is roughly based on this video: https://www.youtube.com/watch?v=KNbRLTLniZI
+/// The other HM videos are also highly recommended to understand this
+/// 
+/// Though this implementation does eager unification as much as possible, while unifications that cannot
+/// be performed eagerly are handled by [DelayedConstraintsList]. 
 pub trait HindleyMilner<VariableIDMarker: UUIDMarker> : Sized {
     type TypeFuncIdent<'slf> : Eq where Self : 'slf;
 
@@ -203,7 +219,7 @@ pub trait HindleyMilner<VariableIDMarker: UUIDMarker> : Sized {
     fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, VariableIDMarker>) -> bool;
 }
 
-
+/// [HindleyMilnerInfo] `TypeFuncIdent` for [AbstractType]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AbstractTypeHMInfo {
     Template(TemplateID),
@@ -276,6 +292,7 @@ impl HindleyMilner<DomainVariableIDMarker> for DomainType {
 }
 
 
+/// [HindleyMilnerInfo] `TypeFuncIdent` for [ConcreteType]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConcreteTypeHMInfo<'slf> {
     Named(TypeUUID),
@@ -326,14 +343,20 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
     }
 }
 
-
+/// See [DelayedConstraintsList::resolve_delayed_constraints]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DelayedConstraintStatus {
+    /// The constraint can be removed
     Resolved,
+    /// Progress was made, (potentially enabling other parts to continue), but the constraint cannot be removed
     Progress,
+    /// No progress was made, if all constraints return [DelayedConstraintStatus::NoProgress] then type resolution deadlocked and cannot finish. 
     NoProgress
 }
 
+/// Implement this for any typing constraints that can't be resolved immediately. 
+/// 
+/// See [DelayedConstraintsList]
 pub trait DelayedConstraint<T> {
     fn try_apply(&mut self, shared_object : &mut T) -> DelayedConstraintStatus;
     fn report_could_not_resolve_error(&self, shared_object : &T);

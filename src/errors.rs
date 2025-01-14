@@ -254,6 +254,7 @@ pub trait ErrorInfoObject {
     fn make_info(&self, file: FileUUID) -> ErrorInfo;
 }
 
+/// This represents objects that can be given as info to an error in a straight-forward way.
 pub trait FileKnowingErrorInfoObject {
     fn make_global_info(
         &self,

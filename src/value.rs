@@ -9,11 +9,15 @@ use crate::typing::{
     type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor}
 };
 
+/// Top type for any kind of compiletime value while executing. 
+/// 
+/// These are used during execution ([crate::instantiation::execute])
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
     Bool(bool),
     Integer(BigInt),
     Array(Box<[Value]>),
+    /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
     Error,
 }
