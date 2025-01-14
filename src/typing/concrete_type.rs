@@ -2,14 +2,26 @@ use crate::prelude::*;
 use std::ops::Deref;
 
 use crate::linker::get_builtin_type;
-use crate::
-    value::Value
-;
+use crate::value::Value;
 
+use super::template::ConcreteTemplateArgs;
 use super::type_inference::ConcreteTypeVariableID;
 
-pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(get_builtin_type("bool"));
-pub const INT_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(get_builtin_type("int"));
+pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
+    id: get_builtin_type("bool"),
+    template_args: FlatAlloc::new(),
+});
+
+pub const INT_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
+    id: get_builtin_type("int"),
+    template_args: FlatAlloc::new(),
+});
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ConcreteGlobalReference<ID> {
+    pub id: ID,
+    pub template_args: ConcreteTemplateArgs,
+}
 
 /// A post-instantiation type. These fully define what wires should be generated for a given object. 
 /// So as opposed to [crate::typing::abstract_type::AbstractType], type parameters are filled out with concrete values. 
@@ -20,15 +32,15 @@ pub const INT_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(get_builtin_type
 /// or [crate::flattening::WrittenType] which represents the textual in-editor data. 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteType {
-    Named(TypeUUID),
+    Named(ConcreteGlobalReference<TypeUUID>),
     Value(Value),
     Array(Box<(ConcreteType, ConcreteType)>),
     /// Referencing [ConcreteType::Unknown] is a strong code smell. 
     /// It is likely you should use [crate::typing::type_inference::TypeSubstitutor::unify_must_succeed]
     /// or [crate::typing::type_inference::TypeSubstitutor::unify_report_error] instead
-    /// 
+    ///
     /// It should only occur in creation `ConcreteType::Unknown(self.type_substitutor.alloc())`
-    Unknown(ConcreteTypeVariableID)
+    Unknown(ConcreteTypeVariableID),
 }
 
 impl ConcreteType {
