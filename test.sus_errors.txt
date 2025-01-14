@@ -1,92 +1,92 @@
 Warning: Unused port 'ready'
-    ╭─[util.sus:87:2]
+    ╭─[util.sus:88:2]
     │
- 49 │     output bool ready'0
+ 50 │     output bool ready'0
     │                 ──┬──  
     │                   ╰──── Port 'ready' declared here
     │ 
- 87 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 88 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
     │     ──────────────────────┬────────────────────── ┬  
     │                           ╰────────────────────────── Unused port 'ready'
     │                                                   │  
     │                                                   ╰── f declared here
 ────╯
 Warning: Unused port 'push'
-    ╭─[util.sus:87:2]
+    ╭─[util.sus:88:2]
     │
- 50 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
+ 51 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
     │                           ──┬─  
     │                             ╰─── Port 'push' declared here
     │ 
- 87 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 88 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
     │     ──────────────────────┬────────────────────── ┬  
     │                           ╰────────────────────────── Unused port 'push'
     │                                                   │  
     │                                                   ╰── f declared here
 ────╯
 Warning: Unused port 'data_in'
-    ╭─[util.sus:87:2]
+    ╭─[util.sus:88:2]
     │
- 50 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
+ 51 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
     │                                               ───┬───  
     │                                                  ╰───── Port 'data_in' declared here
     │ 
- 87 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 88 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
     │     ──────────────────────┬────────────────────── ┬  
     │                           ╰────────────────────────── Unused port 'data_in'
     │                                                   │  
     │                                                   ╰── f declared here
 ────╯
 Warning: Unused port 'pop'
-    ╭─[util.sus:87:2]
+    ╭─[util.sus:88:2]
     │
- 53 │     interface pop : bool pop -> bool data_valid, T data_out
+ 54 │     interface pop : bool pop -> bool data_valid, T data_out
     │                          ─┬─  
     │                           ╰─── Port 'pop' declared here
     │ 
- 87 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 88 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
     │     ──────────────────────┬────────────────────── ┬  
     │                           ╰────────────────────────── Unused port 'pop'
     │                                                   │  
     │                                                   ╰── f declared here
 ────╯
 Warning: Unused port 'data_valid'
-    ╭─[util.sus:87:2]
+    ╭─[util.sus:88:2]
     │
- 53 │     interface pop : bool pop -> bool data_valid, T data_out
+ 54 │     interface pop : bool pop -> bool data_valid, T data_out
     │                                      ─────┬────  
     │                                           ╰────── Port 'data_valid' declared here
     │ 
- 87 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 88 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
     │     ──────────────────────┬────────────────────── ┬  
     │                           ╰────────────────────────── Unused port 'data_valid'
     │                                                   │  
     │                                                   ╰── f declared here
 ────╯
 Warning: Unused port 'data_out'
-    ╭─[util.sus:87:2]
+    ╭─[util.sus:88:2]
     │
- 53 │     interface pop : bool pop -> bool data_valid, T data_out
+ 54 │     interface pop : bool pop -> bool data_valid, T data_out
     │                                                    ────┬───  
     │                                                        ╰───── Port 'data_out' declared here
     │ 
- 87 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 88 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
     │     ──────────────────────┬────────────────────── ┬  
     │                           ╰────────────────────────── Unused port 'data_out'
     │                                                   │  
     │                                                   ╰── f declared here
 ────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[util.sus:191:10]
+     ╭─[util.sus:192:10]
      │
- 191 │     int[20] arr
+ 192 │     int[20] arr
      │             ─┬─  
      │              ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[util.sus:193:9]
+     ╭─[util.sus:194:9]
      │
- 193 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
+ 194 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
      │            ───┬──  
      │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
@@ -518,6 +518,7 @@ Error: ::doNothing does not have a main interface. You should explicitly specify
  431 │ module doNothing {}
      │        ────┬────  
      │            ╰────── Module 'doNothing' defined here. module ::doNothing #():
+domain clk:
 
      │ 
  445 │     doNothing()
@@ -537,6 +538,7 @@ Error: ::doNothing does not have a main interface. You should explicitly specify
  431 │ module doNothing {}
      │        ────┬────  
      │            ╰────── Module 'doNothing' defined here. module ::doNothing #():
+domain clk:
 
      │ 
  601 │     doNothing()
@@ -623,9 +625,9 @@ Error: MIN is not a valid template argument of ::int
      │           ─┬─  
      │            ╰─── MIN is not a valid template argument of ::int
      │
-     ├─[core.sus:28:20]
+     ├─[core.sus:29:20]
      │
-  28 │ __builtin__ struct int {}
+  29 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -636,9 +638,9 @@ Error: MAX is not a valid template argument of ::int
      │                   ─┬─  
      │                    ╰─── MAX is not a valid template argument of ::int
      │
-     ├─[core.sus:28:20]
+     ├─[core.sus:29:20]
      │
-  28 │ __builtin__ struct int {}
+  29 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -690,6 +692,7 @@ Error: ::no_port_module does not have a main interface. You should explicitly sp
  675 │ module no_port_module {}
      │        ───────┬──────  
      │               ╰──────── Module 'no_port_module' defined here. module ::no_port_module #():
+domain clk:
 
      │ 
  678 │     no_port_module()
@@ -702,6 +705,7 @@ Error: ::no_port_module does not have a main interface. You should explicitly sp
  675 │ module no_port_module {}
      │        ───────┬──────  
      │               ╰──────── Module 'no_port_module' defined here. module ::no_port_module #():
+domain clk:
 
      │ 
  681 │     int x = no_port()
@@ -823,9 +827,9 @@ Error: beep is not a valid template argument of ::int
      │                              ──┬─  
      │                                ╰─── beep is not a valid template argument of ::int
      │
-     ├─[core.sus:28:20]
+     ├─[core.sus:29:20]
      │
-  28 │ __builtin__ struct int {}
+  29 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -836,9 +840,9 @@ Error: BEEP is not a valid template argument of ::int
      │                                            ──┬─  
      │                                              ╰─── BEEP is not a valid template argument of ::int
      │
-     ├─[core.sus:28:20]
+     ├─[core.sus:29:20]
      │
-  28 │ __builtin__ struct int {}
+  29 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -849,9 +853,9 @@ Error: ::int is not a named wire: local or constant, it is a Struct instead!
      │                                                  ─┬─  
      │                                                   ╰─── ::int is not a named wire: local or constant, it is a Struct instead!
      │
-     ├─[core.sus:28:20]
+     ├─[core.sus:29:20]
      │
-  28 │ __builtin__ struct int {}
+  29 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── Defined here
 ─────╯
@@ -869,9 +873,9 @@ Error: BITWIDTH is not a valid template argument of ::FIFO
      │            ────┬───  
      │                ╰───── BITWIDTH is not a valid template argument of ::FIFO
      │
-     ├─[util.sus:35:8]
+     ├─[util.sus:36:8]
      │
-  35 │ module FIFO #(
+  36 │ module FIFO #(
      │        ──┬─  
      │          ╰─── 'FIFO' defined here
 ─────╯
@@ -1121,6 +1125,7 @@ Error: ::no_main_interface does not have a main interface. You should explicitly
  916 │ module no_main_interface {
      │        ────────┬────────  
      │                ╰────────── Module 'no_main_interface' defined here. module ::no_main_interface #():
+domain clk:
 
      │ 
  923 │     int x = no_interface_named()
@@ -1133,6 +1138,7 @@ Error: ::no_main_interface does not have a main interface. You should explicitly
  916 │ module no_main_interface {
      │        ────────┬────────  
      │                ╰────────── Module 'no_main_interface' defined here. module ::no_main_interface #():
+domain clk:
 
      │ 
  924 │     int y = no_main_interface()
@@ -1217,9 +1223,9 @@ Error: ABC is not a valid template argument of ::int
      │           ─┬─  
      │            ╰─── ABC is not a valid template argument of ::int
      │
-     ├─[core.sus:28:20]
+     ├─[core.sus:29:20]
      │
-  28 │ __builtin__ struct int {}
+  29 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -1293,3 +1299,21 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │         ──┬──  
      │           ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
+      ╭─[test.sus:1019:2]
+      │
+ 1017 │     input int bad_port
+      │           ──────┬─────  
+      │                 ╰─────── A domain should be explicitly defined before this port
+      │ 
+ 1019 │     domain bad_domain
+      │     ────────┬────────  
+      │             ╰────────── When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[test.sus:1017:12]
+      │
+ 1017 │     input int bad_port
+      │               ────┬───  
+      │                   ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯

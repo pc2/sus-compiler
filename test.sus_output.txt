@@ -111,6 +111,7 @@ TREE SITTER module! xyz
 TREE SITTER module! numbersToAddUp
 TREE SITTER module! sized_int_add
 TREE SITTER module! use_sized_int_add
+TREE SITTER module! implicit_domain_forbidden
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -217,6 +218,7 @@ Typechecking xyz
 Typechecking numbersToAddUp
 Typechecking sized_int_add
 Typechecking use_sized_int_add
+Typechecking implicit_domain_forbidden
 Instantiating IntToBits
 Concrete Typechecking IntToBits
 Latency Counting IntToBits
@@ -541,3 +543,4 @@ Instantiating sized_int_add
 Concrete Typechecking sized_int_add
 Latency Counting sized_int_add
 Latency Counting use_sized_int_add
+Not Instantiating implicit_domain_forbidden due to flattening errors

@@ -3,6 +3,7 @@ module DualPortMem #(T, int SIZE) {
 
 	state T[SIZE] mem
 
+	domain write
 	interface write : bool write, int addr, T data
 
 	if write {
