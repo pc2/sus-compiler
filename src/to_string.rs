@@ -50,8 +50,8 @@ pub struct WrittenTypeDisplay<
     template_names: &'a TemplateVec,
 }
 
-impl<'a, TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
-    for WrittenTypeDisplay<'a, TypVec, TemplateVec>
+impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
+    for WrittenTypeDisplay<'_, TypVec, TemplateVec>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner {
@@ -313,7 +313,7 @@ where
 {
     assert!(given_template_args.len() == target_link_info.template_parameters.len());
     let object_full_name = target_link_info.get_full_name();
-    if given_template_args.len() == 0 {
+    if given_template_args.is_empty() {
         return format!("{object_full_name} #()");
     }
 
@@ -323,25 +323,24 @@ where
         write!(result, "    {}: ", arg_in_target.name).unwrap();
         match arg {
             ConcreteTemplateArg::Type(concrete_type, how_do_we_know_the_template_arg) => {
-                write!(
+                writeln!(
                     result,
-                    "type {} /* {} */,\n",
+                    "type {} /* {} */,",
                     concrete_type.display(linker_types),
-                    how_do_we_know_the_template_arg.to_str()
+                    how_do_we_know_the_template_arg
                 )
                 .unwrap();
             }
             ConcreteTemplateArg::Value(value, how_do_we_know_the_template_arg) => {
-                write!(
+                writeln!(
                     result,
-                    "{} /* {} */,\n",
-                    value.to_string(),
-                    how_do_we_know_the_template_arg.to_str()
+                    "{} /* {} */,",
+                    value, how_do_we_know_the_template_arg
                 )
                 .unwrap();
             }
             ConcreteTemplateArg::NotProvided => {
-                write!(result, "/* Could not infer */\n").unwrap();
+                writeln!(result, "/* Could not infer */").unwrap();
             }
         }
     }
