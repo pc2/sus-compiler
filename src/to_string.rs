@@ -323,12 +323,20 @@ where
         let arg_in_target = &target_link_info.template_parameters[id];
         write!(result, "    {}: ", arg_in_target.name).unwrap();
         match arg {
-            ConcreteTemplateArg::Provided(concrete_type, how_do_we_know_the_template_arg) => {
+            ConcreteTemplateArg::Type(concrete_type, how_do_we_know_the_template_arg) => {
                 writeln!(
                     result,
                     "type {} /* {} */,",
                     concrete_type.display(linker_types),
                     how_do_we_know_the_template_arg
+                )
+                .unwrap();
+            }
+            ConcreteTemplateArg::Value(value, how_do_we_know_the_template_arg) => {
+                writeln!(
+                    result,
+                    "{} /* {} */,",
+                    value, how_do_we_know_the_template_arg
                 )
                 .unwrap();
             }

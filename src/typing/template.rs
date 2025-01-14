@@ -135,7 +135,6 @@ impl Display for HowDoWeKnowTheTemplateArg {
     }
 }
 
-
 /// Represents the value we're passing into a template argument.
 ///
 /// It is the instantiated variant of [TemplateArg]
@@ -143,7 +142,8 @@ impl Display for HowDoWeKnowTheTemplateArg {
 /// And it is passed to a [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant]'s [Parameter]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteTemplateArg {
-    Provided(ConcreteType, HowDoWeKnowTheTemplateArg),
+    Type(ConcreteType, HowDoWeKnowTheTemplateArg),
+    Value(Value, HowDoWeKnowTheTemplateArg),
     /// It has not been explicitly provided,
     /// yet [crate::typing::type_inference] may replace this value when it can figure it out from the context
     NotProvided,
@@ -152,14 +152,14 @@ pub enum ConcreteTemplateArg {
 impl ConcreteTemplateArg {
     #[track_caller]
     pub fn unwrap_type(&self) -> &ConcreteType {
-        let Self::Provided(t, _) = self else {
+        let Self::Type(t, _) = self else {
             unreachable!()
         };
         t
     }
     #[track_caller]
     pub fn unwrap_value(&self) -> &Value {
-        let ConcreteType::Value(v) = self.unwrap_type() else {
+        let Self::Value(v, _) = self else {
             unreachable!()
         };
         v
