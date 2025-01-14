@@ -151,7 +151,7 @@ impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner {
             ConcreteType::Named(name) => {
-                f.write_str(&self.linker_types[*name].link_info.get_full_name())
+                f.write_str(&self.linker_types[name.id].link_info.get_full_name())
             }
             ConcreteType::Array(arr_box) => {
                 let (elem_typ, arr_size) = arr_box.deref();
