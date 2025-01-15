@@ -12,6 +12,7 @@ use crate::typing::template::{ConcreteTemplateArg, ConcreteTemplateArgs};
 use crate::{typing::concrete_type::ConcreteType, value::Value};
 
 use super::shared::*;
+use std::fmt::Write;
 
 #[derive(Debug)]
 pub struct VerilogCodegenBackend;
@@ -22,9 +23,6 @@ impl super::CodeGenBackend for VerilogCodegenBackend {
     }
     fn output_dir_name(&self) -> &str {
         "verilog_output"
-    }
-    fn comment(&self) -> &str {
-        "//"
     }
     fn codegen(
         &self,
@@ -63,18 +61,20 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
     }
 }
 
-struct CodeGenerationContext<'g, 'out, Stream: std::fmt::Write> {
+struct CodeGenerationContext<'g> {
+    /// Generate code to this variable
+    program_text: String,
+
     md: &'g Module,
     instance: &'g InstantiatedModule,
     linker: &'g Linker,
-    program_text: &'out mut Stream,
 
     use_latency: bool,
 
     needed_untils: FlatAlloc<i64, WireIDMarker>,
 }
 
-impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> {
+impl<'g> CodeGenerationContext<'g> {
     /// This is for making the resulting Verilog a little nicer to read
     fn can_inline(&self, wire: &RealWire) -> bool {
         match &wire.source {
@@ -141,10 +141,22 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
         Ok(())
     }
 
+    fn comment_out(&mut self, f : impl FnOnce(&mut Self)) {
+        let store_program_text_temporary = std::mem::replace(&mut self.program_text, String::new());
+        f(self);
+        let added_text = std::mem::replace(&mut self.program_text, store_program_text_temporary);
+
+        write!(self.program_text, "// {}\n", added_text.replace("\n", "\n// ")).unwrap();
+    }
+
     fn write_verilog_code(&mut self) {
+        self.comment_out(|new_self| {
+            let name = &self.instance.name;
+            write!(new_self.program_text, "{name}").unwrap();
+        });
         match self.md.link_info.is_extern {
             IsExtern::Normal => {
-                self.write_module_signature(false);
+                self.write_module_signature();
                 self.write_wire_declarations();
                 self.write_submodules();
                 self.write_multiplexers();
@@ -153,22 +165,24 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             IsExtern::Extern => {
                 // Do nothing, it's provided externally
                 writeln!(self.program_text, "// Provided externally").unwrap();
-                self.write_module_signature(true);
+                self.comment_out(|new_self| {
+                    new_self.write_module_signature();
+                });
             }
             IsExtern::Builtin => {
-                self.write_module_signature(false);
+                self.write_module_signature();
                 self.write_builtins();
                 self.write_endmodule();
             }
         }
     }
 
-    fn write_module_signature(&mut self, commented_out: bool) {
-        let comment_text = if commented_out { "// " } else { "" };
+    fn write_module_signature(&mut self) {
         // First output the interface of the module
+        let clk_name = self.md.get_clock_name();
         write!(
             self.program_text,
-            "{comment_text}module {}(\n{comment_text}\tinput clk",
+            "module {}(\n\tinput {clk_name}",
             mangle(&self.instance.name)
         )
         .unwrap();
@@ -180,11 +194,11 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             let wire_decl = typ_to_declaration(&port_wire.typ, &wire_name);
             write!(
                 self.program_text,
-                ",\n{comment_text}\t{input_or_output} {wire_doc} {wire_decl}"
+                ",\n\t{input_or_output} {wire_doc} {wire_decl}"
             )
             .unwrap();
         }
-        write!(self.program_text, "\n{comment_text});\n\n").unwrap();
+        write!(self.program_text, "\n);\n\n").unwrap();
 
         // Add latency registers for the interface declarations
         // Should not appear in the program text for extern modules
@@ -495,17 +509,15 @@ fn gen_verilog_code(
     linker: &Linker,
     use_latency: bool,
 ) -> String {
-    let mut program_text = String::new();
-
     let mut ctx = CodeGenerationContext {
         md,
         instance,
         linker,
-        program_text: &mut program_text,
+        program_text: String::new(),
         use_latency,
         needed_untils: instance.compute_needed_untils(),
     };
     ctx.write_verilog_code();
 
-    program_text
+    ctx.program_text
 }

@@ -17,9 +17,6 @@ impl super::CodeGenBackend for VHDLCodegenBackend {
     fn output_dir_name(&self) -> &str {
         "vhdl_output"
     }
-    fn comment(&self) -> &str {
-        "--"
-    }
     fn codegen(&self, md: &Module, instance: &InstantiatedModule, linker: &Linker, use_latency: bool) -> String {
         gen_vhdl_code(md, instance, use_latency)
     }
