@@ -157,6 +157,8 @@ pub struct InstantiatedPort {
 pub struct InstantiatedModule {
     /// Unique name involving all template arguments
     pub name: String,
+    /// Used in code generation. Only contains characters allowed in SV and VHDL
+    pub mangled_name: String,
     pub errors: ErrorStore,
     /// This matches the ports in [Module::ports]. Ports are not `None` when they are not part of this instantiation.
     pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
@@ -332,9 +334,22 @@ struct InstantiationContext<'fl, 'l> {
     linker: &'l Linker,
 }
 
+/// Mangle the module name for use in code generation
+fn mangle_name(str: &str) -> String {
+    let mut result = String::with_capacity(str.len());
+    for c in str.chars() {
+        if c.is_whitespace() || c == ':' {
+            continue;
+        }
+        result.push(if c.is_alphanumeric() { c } else { '_' });
+    }
+    result
+}
+
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn extract(self) -> InstantiatedModule {
         InstantiatedModule {
+            mangled_name: mangle_name(&self.name),
             name: self.name,
             wires: self.wires,
             submodules: self.submodules,

@@ -183,7 +183,7 @@ impl<'g> CodeGenerationContext<'g> {
         write!(
             self.program_text,
             "module {}(\n\tinput {clk_name}",
-            mangle(&self.instance.name)
+            &self.instance.mangled_name
         )
         .unwrap();
         for (_id, port) in self.instance.interface_ports.iter_valids() {
@@ -306,7 +306,7 @@ impl<'g> CodeGenerationContext<'g> {
             if sm_md.link_info.is_extern == IsExtern::Extern {
                 self.write_template_args(&sm_md.link_info, &sm.template_args);
             } else {
-                self.program_text.write_str(&sm_inst.name).unwrap();
+                self.program_text.write_str(&sm_inst.mangled_name).unwrap();
             };
             let sm_name = &sm.name;
             let submodule_clk_name = sm_md.get_clock_name();

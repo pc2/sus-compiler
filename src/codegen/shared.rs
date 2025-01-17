@@ -5,17 +5,6 @@ use std::borrow::Cow;
 use crate::{instantiation::RealWire, linker::get_builtin_type, TypeUUID};
 
 
-pub fn mangle(str: &str) -> String {
-    let mut result = String::with_capacity(str.len());
-    for c in str.chars() {
-        if c.is_whitespace() || c == ':' {
-            continue;
-        }
-        result.push(if c.is_alphanumeric() { c } else { '_' });
-    }
-    result
-}
-
 pub fn get_type_name_size(id: TypeUUID) -> u64 {
     if id == get_builtin_type("int") {
         32 // TODO concrete int sizes

@@ -53,10 +53,6 @@ fn typ_to_declaration(mut typ: &ConcreteType) -> String {
 }
 
 impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> {
-    fn instance_name(&self) -> String {
-        mangle(&self.instance.name)
-    }
-
     fn write_vhdl_code(&mut self) {
         match self.md.link_info.is_extern {
             IsExtern::Normal => {
@@ -82,7 +78,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 
     fn write_entity(&mut self, commented_out: bool) {
         let comment_text = if commented_out { "-- " } else { "" };
-        let instance_name = self.instance_name();
+        let instance_name = &self.instance.name;
 
         let mut it = self.instance.interface_ports.iter_valids().peekable();
         let end = if it.peek().is_some() { ";" } else { "" };
@@ -115,7 +111,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
     }
 
     fn write_architecture(&mut self) {
-        let instance_name = self.instance_name();
+        let instance_name = &self.instance.name;
         writeln!(
             &mut self.program_text,
             "architecture Behavioral of {instance_name} is"
