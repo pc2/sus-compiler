@@ -21,6 +21,7 @@ enum NamedLocal {
     Declaration(FlatID),
     SubModule(FlatID),
     TemplateType(TemplateID),
+    DomainDecl(DomainID)
 }
 
 enum LocalOrGlobal {
@@ -235,6 +236,7 @@ struct FlatteningContext<'l, 'errs> {
     errors: &'errs ErrorCollector<'l>,
 
     working_on_link_info: &'l LinkInfo,
+    domains: &'l FlatAlloc<DomainInfo, DomainIDMarker>,
     instructions: FlatAlloc<Instruction, FlatIDMarker>,
     type_alloc: TypingAllocator,
     named_domain_alloc: UUIDAllocator<DomainIDMarker>,
@@ -323,8 +325,14 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                             }));
                             TemplateArgKind::Value(wire_read_id)
                         }
-                        Some(NamedLocal::SubModule(_sm)) => {
-                            self.errors.error(name_span, format!("{name} does not name a Type or a Value. Local submodules are not allowed!"));
+                        Some(NamedLocal::SubModule(sm)) => {
+                            self.errors.error(name_span, format!("{name} does not name a Type or a Value. Local submodules are not allowed!"))
+                                .info_obj_same_file(self.instructions[sm].unwrap_submodule());
+                            return;
+                        }
+                        Some(NamedLocal::DomainDecl(dom)) => {
+                            self.errors.error(name_span, format!("{name} does not name a Type or a Value. Domains are not allowed!"))
+                                .info_obj_same_file(&self.domains[dom]);
                             return;
                         }
                         None => {
@@ -489,6 +497,18 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
                     ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
                 }
+                LocalOrGlobal::Local(span, NamedLocal::DomainDecl(domain_id)) => {
+                    self.errors
+                        .error(
+                            span,
+                            format!(
+                                "This is not a {accepted_text}, it is a domain instead!"
+                            ),
+                        )
+                        .info_obj_same_file(&self.domains[domain_id]);
+
+                    ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
+                }
                 LocalOrGlobal::Local(span, NamedLocal::TemplateType(template_id)) => {
                     ModuleOrWrittenType::WrittenType(WrittenType::TemplateVariable(span, template_id))
                 }
@@ -537,6 +557,11 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 NamedLocal::TemplateType(template_id) => {
                     err_ref.info_obj_same_file(
                         &self.working_on_link_info.template_parameters[template_id],
+                    );
+                }
+                NamedLocal::DomainDecl(domain_id) => {
+                    err_ref.info_obj_same_file(
+                        &self.domains[domain_id],
                     );
                 }
             }
@@ -984,7 +1009,18 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                                 "Expected a value, but instead found template type '{}'",
                                 self.working_on_link_info.template_parameters[template_id].name
                             ),
-                        );
+                        ).info_obj_same_file(&self.working_on_link_info.template_parameters[template_id]);
+                        PartialWireReference::Error
+                    }
+                    NamedLocal::DomainDecl(domain_id) => {
+                        let domain = &self.domains[domain_id];
+                        self.errors.error(
+                            span,
+                            format!(
+                                "Expected a value, but instead found domain '{}'",
+                                domain.name
+                            ),
+                        ).info_same_file(span, format!("Domain {} declared here", domain.name));
                         PartialWireReference::Error
                     }
                 },
@@ -1510,14 +1546,14 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
     }
 }
 
-/// Flattens all modules in the project.
+/// Flattens all globals in the project.
 ///
-/// Requires that first, all modules have been initialized.
-pub fn flatten_all_modules(linker: &mut Linker) {
+/// Requires that first, all globals have been initialized.
+pub fn flatten_all_globals(linker: &mut Linker) {
     let linker_files : *const ArenaAllocator<FileData, FileUUIDMarker> = &linker.files;
     // SAFETY we won't be touching the files anywere. This is just to get the compiler to stop complaining about linker going into the closure. 
     for (_file_id, file) in unsafe{&*linker_files} {
-        let mut span_debugger = SpanDebugger::new("flatten_all_modules", file);
+        let mut span_debugger = SpanDebugger::new("flatten_all_globals", file);
         let mut associated_value_iter = file.associated_values.iter();
 
         let mut cursor = Cursor::new_at_root(&file.tree, &file.file_text);
@@ -1526,123 +1562,140 @@ pub fn flatten_all_modules(linker: &mut Linker) {
             cursor.go_down(kind!("global_object"), |cursor| {
                 let global_obj = *associated_value_iter.next().expect("Iterator cannot be exhausted");
 
-                let errors_globals = GlobalResolver::take_errors_globals(linker, global_obj);
-                let globals = GlobalResolver::new(linker, global_obj, errors_globals);
-
-                let (ports_to_visit, fields_to_visit, default_declaration_context) = match global_obj {
-                    GlobalUUID::Module(module_uuid) => {
-                        let md = &globals[module_uuid];
-                        (md.ports.id_range().into_iter(), UUIDRange::empty().into_iter(), DeclarationContext::PlainWire)
-                    }
-                    GlobalUUID::Type(type_uuid) => {
-                        let typ = &globals[type_uuid];
-                        (UUIDRange::empty().into_iter(), typ.fields.id_range().into_iter(), DeclarationContext::StructField)
-                    }
-                    GlobalUUID::Constant(const_uuid) => {
-                        (UUIDRange::empty().into_iter(), UUIDRange::empty().into_iter(), DeclarationContext::Generative(GenerativeKind::PlainGenerative))
-                    }
-                };
-
-                let mut context = FlatteningContext {
-                    globals : &globals,
-                    ports_to_visit,
-                    fields_to_visit,
-                    default_declaration_context,
-                    errors: &globals.errors,
-                    working_on_link_info: linker.get_link_info(global_obj),
-                    instructions: FlatAlloc::new(),
-                    type_alloc: TypingAllocator { type_variable_alloc: UUIDAllocator::new(), domain_variable_alloc: UUIDAllocator::new() },
-                    named_domain_alloc: UUIDAllocator::new(),
-                    local_variable_context: LocalVariableContext::new_initial(),
-                };
-
-                context.flatten_global(cursor);
-    
-                // Make sure all ports have been visited
-                assert!(context.ports_to_visit.is_empty());
-
-                let mut instructions = context.instructions;
-                let type_alloc = context.type_alloc;
-
-                let errors_globals = globals.decommission(&linker.files);
-
-                let link_info : &mut LinkInfo = match global_obj {
-                    GlobalUUID::Module(module_uuid) => {
-                        let md = &mut linker.modules[module_uuid];
-                        // Set all declaration_instruction values
-                        for (decl_id, instr) in &instructions {
-                            if let Instruction::Declaration(decl) = instr {
-                                match decl.decl_kind {
-                                    DeclarationKind::NotPort => {},
-                                    DeclarationKind::RegularPort { is_input:_, port_id } => {
-                                        let port = &mut md.ports[port_id];
-                                        assert_eq!(port.name_span, decl.name_span);
-                                        port.declaration_instruction = decl_id;
-                                    }
-                                    DeclarationKind::GenerativeInput(this_template_id) => {
-                                        let ParameterKind::Generative(GenerativeParameterKind { decl_span:_, declaration_instruction }) = 
-                                            &mut md.link_info.template_parameters[this_template_id].kind else {unreachable!()};
-                    
-                                        *declaration_instruction = decl_id;
-                                    }
-                                    DeclarationKind::StructField { field_id:_ } => unreachable!("No Struct fields in Modules")
-                                }
-                            }
-                        }
-                        for (_id, port) in &md.ports {
-                            let Instruction::Declaration(decl) =
-                                &mut instructions[port.declaration_instruction]
-                            else {
-                                unreachable!()
-                            };
-                            decl.typ.domain = DomainType::Physical(port.domain);
-                        }
-                
-                        &mut md.link_info
-                    }
-                    GlobalUUID::Type(type_uuid) => {
-                        let typ = &mut linker.types[type_uuid];
-                        
-                        // Set all declaration_instruction values
-                        for (decl_id, instr) in &instructions {
-                            if let Instruction::Declaration(decl) = instr {
-                                match decl.decl_kind {
-                                    DeclarationKind::NotPort => {assert!(decl.identifier_type == IdentifierType::Generative, "If a variable isn't generative, then it MUST be a struct field")}
-                                    DeclarationKind::StructField { field_id } => {
-                                        let field = &mut typ.fields[field_id];
-                                        assert_eq!(field.name_span, decl.name_span);
-                                        field.declaration_instruction = decl_id;
-                                    }
-                                    DeclarationKind::RegularPort { is_input:_, port_id:_ } => {unreachable!("No ports in structs")}
-                                    DeclarationKind::GenerativeInput(this_template_id) => {
-                                        let ParameterKind::Generative(GenerativeParameterKind { decl_span:_, declaration_instruction }) = 
-                                            &mut typ.link_info.template_parameters[this_template_id].kind else {unreachable!()};
-                    
-                                        *declaration_instruction = decl_id;
-                                    }
-                                }
-                            }
-                        }
-                        &mut typ.link_info
-                    }
-                    GlobalUUID::Constant(const_uuid) => {
-                        let cst = &mut linker.constants[const_uuid];
-
-                        cst.output_decl = instructions.iter().find(|(_decl_id, instr)| {
-                            if let Instruction::Declaration(decl) = instr {
-                                decl.name_span == cst.link_info.name_span
-                            } else {false}
-                        }).unwrap().0;
-
-                        &mut cst.link_info
-                    }
-                };
-
-                link_info.reabsorb_errors_globals(errors_globals, AFTER_FLATTEN_CP);
-                link_info.type_variable_alloc = type_alloc;
-                link_info.instructions = instructions;
+                flatten_global(linker, global_obj, cursor);
             });
         });
         span_debugger.defuse();
     }
+}
+
+fn flatten_global(linker: &mut Linker, global_obj : GlobalUUID, cursor: &mut Cursor<'_>) {
+    let errors_globals = GlobalResolver::take_errors_globals(linker, global_obj);
+    let globals = GlobalResolver::new(linker, global_obj, errors_globals);
+
+    let mut local_variable_context = LocalVariableContext::new_initial();
+
+    let (ports_to_visit, fields_to_visit, default_declaration_context, domains) = match global_obj {
+        GlobalUUID::Module(module_uuid) => {
+            let md = &globals[module_uuid];
+
+            for (id, domain) in &md.domains {
+                if let Err(conflict) = local_variable_context.add_declaration(&domain.name, NamedLocal::DomainDecl(id)) {
+                    let NamedLocal::DomainDecl(conflict) = conflict else {unreachable!()};
+
+                    globals.errors.error(domain.name_span.unwrap(), format!("Conflicting domain declaration. Domain '{}' was already declared earlier", domain.name))
+                    .info_obj_same_file(&md.domains[conflict]);
+                }
+            }
+
+            (md.ports.id_range().into_iter(), UUIDRange::empty().into_iter(), DeclarationContext::PlainWire, &md.domains)
+        }
+        GlobalUUID::Type(type_uuid) => {
+            let typ = &globals[type_uuid];
+            (UUIDRange::empty().into_iter(), typ.fields.id_range().into_iter(), DeclarationContext::StructField, &FlatAlloc::EMPTY_FLAT_ALLOC)
+        }
+        GlobalUUID::Constant(const_uuid) => {
+            (UUIDRange::empty().into_iter(), UUIDRange::empty().into_iter(), DeclarationContext::Generative(GenerativeKind::PlainGenerative), &FlatAlloc::EMPTY_FLAT_ALLOC)
+        }
+    };
+
+    let mut context = FlatteningContext {
+        globals : &globals,
+        ports_to_visit,
+        fields_to_visit,
+        domains,
+        default_declaration_context,
+        errors: &globals.errors,
+        working_on_link_info: linker.get_link_info(global_obj),
+        instructions: FlatAlloc::new(),
+        type_alloc: TypingAllocator { type_variable_alloc: UUIDAllocator::new(), domain_variable_alloc: UUIDAllocator::new() },
+        named_domain_alloc: UUIDAllocator::new(),
+        local_variable_context,
+    };
+
+    context.flatten_global(cursor);
+    
+    // Make sure all ports have been visited
+    assert!(context.ports_to_visit.is_empty());
+
+    let mut instructions = context.instructions;
+    let type_alloc = context.type_alloc;
+
+    let errors_globals = globals.decommission(&linker.files);
+
+    let link_info : &mut LinkInfo = match global_obj {
+        GlobalUUID::Module(module_uuid) => {
+            let md = &mut linker.modules[module_uuid];
+            // Set all declaration_instruction values
+            for (decl_id, instr) in &instructions {
+                if let Instruction::Declaration(decl) = instr {
+                    match decl.decl_kind {
+                        DeclarationKind::NotPort => {},
+                        DeclarationKind::RegularPort { is_input:_, port_id } => {
+                            let port = &mut md.ports[port_id];
+                            assert_eq!(port.name_span, decl.name_span);
+                            port.declaration_instruction = decl_id;
+                        }
+                        DeclarationKind::GenerativeInput(this_template_id) => {
+                            let ParameterKind::Generative(GenerativeParameterKind { decl_span:_, declaration_instruction }) = 
+                                &mut md.link_info.template_parameters[this_template_id].kind else {unreachable!()};
+    
+                            *declaration_instruction = decl_id;
+                        }
+                        DeclarationKind::StructField { field_id:_ } => unreachable!("No Struct fields in Modules")
+                    }
+                }
+            }
+            for (_id, port) in &md.ports {
+                let Instruction::Declaration(decl) =
+                    &mut instructions[port.declaration_instruction]
+                else {
+                    unreachable!()
+                };
+                decl.typ.domain = DomainType::Physical(port.domain);
+            }
+
+            &mut md.link_info
+        }
+        GlobalUUID::Type(type_uuid) => {
+            let typ = &mut linker.types[type_uuid];
+        
+            // Set all declaration_instruction values
+            for (decl_id, instr) in &instructions {
+                if let Instruction::Declaration(decl) = instr {
+                    match decl.decl_kind {
+                        DeclarationKind::NotPort => {assert!(decl.identifier_type == IdentifierType::Generative, "If a variable isn't generative, then it MUST be a struct field")}
+                        DeclarationKind::StructField { field_id } => {
+                            let field = &mut typ.fields[field_id];
+                            assert_eq!(field.name_span, decl.name_span);
+                            field.declaration_instruction = decl_id;
+                        }
+                        DeclarationKind::RegularPort { is_input:_, port_id:_ } => {unreachable!("No ports in structs")}
+                        DeclarationKind::GenerativeInput(this_template_id) => {
+                            let ParameterKind::Generative(GenerativeParameterKind { decl_span:_, declaration_instruction }) = 
+                                &mut typ.link_info.template_parameters[this_template_id].kind else {unreachable!()};
+    
+                            *declaration_instruction = decl_id;
+                        }
+                    }
+                }
+            }
+            &mut typ.link_info
+        }
+        GlobalUUID::Constant(const_uuid) => {
+            let cst = &mut linker.constants[const_uuid];
+
+            cst.output_decl = instructions.iter().find(|(_decl_id, instr)| {
+                if let Instruction::Declaration(decl) = instr {
+                    decl.name_span == cst.link_info.name_span
+                } else {false}
+            }).unwrap().0;
+
+            &mut cst.link_info
+        }
+    };
+
+    link_info.reabsorb_errors_globals(errors_globals, AFTER_FLATTEN_CP);
+    link_info.type_variable_alloc = type_alloc;
+    link_info.instructions = instructions;
 }

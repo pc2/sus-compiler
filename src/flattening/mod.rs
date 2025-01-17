@@ -14,7 +14,7 @@ use crate::typing::type_inference::{DomainVariableIDMarker, TypeVariableIDMarker
 use std::cell::OnceCell;
 use std::ops::Deref;
 
-pub use flatten::flatten_all_modules;
+pub use flatten::flatten_all_globals;
 pub use initialization::gather_initial_file_data;
 pub use typechecking::typecheck_all_modules;
 pub use lints::perform_lints;
@@ -184,9 +184,10 @@ pub enum PortOrInterface {
 /// 
 /// Right now this only contains the domain name, but when actual clock domains are implemented (#7), 
 /// this will contain information about the Clock. 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DomainInfo {
     pub name: String,
+    pub name_span: Option<Span>
 }
 
 /// With this struct, we convert the domains of a submodule, to their connecting domains in the containing module

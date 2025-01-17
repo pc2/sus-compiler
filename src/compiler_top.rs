@@ -14,7 +14,7 @@ use crate::{
 };
 
 use crate::flattening::{
-    flatten_all_modules, gather_initial_file_data, perform_lints, typecheck_all_modules, Module
+    flatten_all_globals, gather_initial_file_data, perform_lints, typecheck_all_modules, Module
 };
 
 const STD_LIB_PATH: &str = env!("SUS_COMPILER_STD_LIB_PATH");
@@ -145,7 +145,7 @@ impl Linker {
         }
         if config().early_exit == EarlyExitUpTo::Initialize {return}
 
-        flatten_all_modules(self);
+        flatten_all_globals(self);
         config().for_each_debug_module(config().debug_print_module_contents, &self.modules, |md| {
             md.print_flattened_module(&self.files[md.link_info.file]);
         });

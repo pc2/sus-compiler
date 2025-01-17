@@ -481,6 +481,8 @@ pub struct FlatAlloc<T, IndexMarker> {
 }
 
 impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
+    pub const EMPTY_FLAT_ALLOC : Self = Self::new();
+
     pub const fn new() -> Self {
         Self {
             data: Vec::new(),

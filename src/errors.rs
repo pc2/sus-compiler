@@ -5,7 +5,7 @@ use std::thread::panicking;
 
 use crate::{alloc::ArenaAllocator, typing::template::Parameter};
 
-use crate::flattening::{Declaration, Instruction, Interface, Module, Port, SubModuleInstance};
+use crate::flattening::{Declaration, DomainInfo, Instruction, Interface, Module, Port, SubModuleInstance};
 use crate::linker::{checkpoint::ErrorCheckpoint, FileData, LinkInfo};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -226,14 +226,20 @@ impl<'ec> ErrorReference<'ec> {
         self.existing_info(obj.make_global_info(&self.err_collector.files))
     }
     pub fn info_obj_same_file<Obj: ErrorInfoObject>(&self, obj: &Obj) -> &Self {
-        self.existing_info(obj.make_info(self.err_collector.file))
+        if let Some(info) = obj.make_info(self.err_collector.file) {
+            self.existing_info(info);
+        }
+        self
     }
     pub fn info_obj_different_file<Obj: ErrorInfoObject>(
         &self,
         obj: &Obj,
         file: FileUUID,
     ) -> &Self {
-        self.existing_info(obj.make_info(file))
+        if let Some(info) = obj.make_info(file) {
+            self.existing_info(info);
+        }
+        self
     }
     pub fn add_info_list(&self, mut info_list: Vec<ErrorInfo>) {
         self.err_collector.error_store.borrow_mut().errors[self.pos].infos.append(&mut info_list);
@@ -251,7 +257,7 @@ impl<'ec> ErrorReference<'ec> {
 
 /// This represents objects that can be given as info to an error in a straight-forward way.
 pub trait ErrorInfoObject {
-    fn make_info(&self, file: FileUUID) -> ErrorInfo;
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo>;
 }
 
 /// This represents objects that can be given as info to an error in a straight-forward way.
@@ -265,32 +271,32 @@ pub trait FileKnowingErrorInfoObject {
 // Trait implementations in the compiler
 
 impl ErrorInfoObject for Declaration {
-    fn make_info(&self, file: FileUUID) -> ErrorInfo {
-        ErrorInfo {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
             position: self.name_span,
             file,
             info: format!("'{}' declared here", &self.name),
-        }
+        })
     }
 }
 
 impl ErrorInfoObject for SubModuleInstance {
-    fn make_info(&self, file: FileUUID) -> ErrorInfo {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
         let (position, info) = if let Some((name, span)) = &self.name {
             (*span, format!("{name} declared here"))
         } else {
             (self.module_ref.name_span, "Used here".to_owned())
         };
-        ErrorInfo {
+        Some(ErrorInfo {
             position,
             file,
             info,
-        }
+        })
     }
 }
 
 impl ErrorInfoObject for Instruction {
-    fn make_info(&self, file: FileUUID) -> ErrorInfo {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
         match self {
             Instruction::SubModule(sm) => sm.make_info(file),
             Instruction::Declaration(decl) => decl.make_info(file),
@@ -299,23 +305,33 @@ impl ErrorInfoObject for Instruction {
     }
 }
 
+impl ErrorInfoObject for DomainInfo {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
+            position: self.name_span?,
+            file,
+            info: format!("Domain '{}' declared here", self.name),
+        })
+    }
+}
+
 impl ErrorInfoObject for Parameter {
-    fn make_info(&self, file: FileUUID) -> ErrorInfo {
-        ErrorInfo {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
             position: self.name_span,
             file,
             info: format!("Parameter '{}' declared here", self.name),
-        }
+        })
     }
 }
 
 impl ErrorInfoObject for Port {
-    fn make_info(&self, file: FileUUID) -> ErrorInfo {
-        ErrorInfo {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
             position: self.name_span,
             file,
             info: format!("Port '{}' declared here", &self.name),
-        }
+        })
     }
 }
 

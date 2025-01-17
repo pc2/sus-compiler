@@ -286,7 +286,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                         let wire = &context.wires[connecting_wire.maps_to_wire];
                         context.type_substitutor.unify_report_error(&wire.typ, &concrete_port.typ, submod_instr.module_ref.get_total_span(), || {
                             let abstract_port = &sub_module.ports[port_id];
-                            let port_declared_here = abstract_port.make_info(sub_module.link_info.file);
+                            let port_declared_here = abstract_port.make_info(sub_module.link_info.file).unwrap();
 
                             (format!("Port '{}'", abstract_port.name), vec![port_declared_here])
                         });

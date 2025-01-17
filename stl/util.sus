@@ -3,14 +3,14 @@ module DualPortMem #(T, int SIZE) {
 
 	state T[SIZE] mem
 
-	domain write
+	domain write_clk
 	interface write : bool write, int addr, T data
 
 	if write {
 		mem[addr] = data
 	}
 
-	domain read
+	domain read_clk
 	interface read : int read_addr -> T read_data
 
 	CrossDomain #(T: type T[SIZE]) cross_mem
@@ -46,11 +46,11 @@ module FIFO #(
 	initial read_addr = 0
 	initial write_addr = 0
 
-	domain push
+	domain push_clk
 	output bool ready'0
 	interface push : bool push'READY_SLACK, T data_in'READY_SLACK
 
-	domain pop
+	domain pop_clk
 	interface pop : bool pop -> bool data_valid, T data_out
 	
 	CrossDomain write_to_pop

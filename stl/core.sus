@@ -6,9 +6,9 @@ __builtin__ module LatencyOffset #(T, int OFFSET) {
 
 // Compiler Intrinsic
 __builtin__ module CrossDomain #(T) {
-    domain in
+    domain in_clk
     interface in_domain : T in'0
-    domain out
+    domain out_clk
     interface out_domain : -> T out'0
 }
 

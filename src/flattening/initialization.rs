@@ -38,7 +38,7 @@ impl<'linker> InitializationContext<'linker> {
     fn gather_initial_global_object(&mut self, cursor: &mut Cursor) -> (Span, String) {
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
         let name = self.file_text[name_span].to_owned();
-        self.domains.alloc(DomainInfo { name: "clk".to_string() });
+        self.domains.alloc(DomainInfo { name: "clk".to_string(), name_span: None });
         if cursor.optional_field(field!("template_declaration_arguments")) {
             cursor.list(kind!("template_declaration_arguments"), |cursor| {
                 let (kind, decl_span) = cursor.kind_span();
@@ -144,7 +144,7 @@ impl<'linker> InitializationContext<'linker> {
 
                             self.implicit_clk_domain = false;
                         }
-                        self.domains.alloc(DomainInfo { name: name.to_owned() })
+                        self.domains.alloc(DomainInfo { name: name.to_owned(), name_span: Some(domain_name_span) })
                     });
                 }
                 kind!("interface_statement") => {

@@ -1020,3 +1020,10 @@ module implicit_domain_forbidden {
 
 	output int port_after_domain
 }
+
+module conflicting_domain_with_port_name {
+	domain my_domain
+	input int my_domain
+
+	domain my_domain
+}

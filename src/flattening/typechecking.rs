@@ -109,7 +109,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         match wire_ref_root {
             WireReferenceRoot::LocalDecl(id, _) => {
                 let decl_root = self.working_on.instructions[*id].unwrap_declaration();
-                decl_root.make_info(self.errors.file)
+                decl_root.make_info(self.errors.file).unwrap()
             }
             WireReferenceRoot::NamedConstant(cst) => {
                 let linker_cst = &self.globals[cst.id];
@@ -117,7 +117,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
             WireReferenceRoot::SubModulePort(port) => {
                 let (decl, file) = self.get_decl_of_module_port(port.port, port.submodule_decl);
-                decl.make_info(file)
+                decl.make_info(file).unwrap()
             }
         }
     }
@@ -462,7 +462,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         &write_to_type,
                         from_expr.span,
                         || {
-                            ("function argument".to_string(), vec![decl.make_info(file)])
+                            ("function argument".to_string(), vec![decl.make_info(file).unwrap()])
                         }
                     );
                 }
@@ -526,13 +526,11 @@ pub fn apply_types(
     }
 
     // Assign names to all of the domains in this module
-    working_on.domains = leftover_domain_alloc.into_range().map(|id| DomainInfo {
-        name: {
-            if let Some(name) = working_on.domains.get(id) {
-                name.name.clone()
-            } else {
-                format!("domain_{}", id.get_hidden_value())
-            }
+    working_on.domains = leftover_domain_alloc.into_range().map(|id| {
+        if let Some(work_on_domain) = working_on.domains.get(id) {
+            work_on_domain.clone()
+        } else {
+            DomainInfo {name: format!("domain_{}", id.get_hidden_value()), name_span: None}
         }
     });
 
