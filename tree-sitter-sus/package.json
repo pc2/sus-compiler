@@ -37,5 +37,13 @@
     "install": "node-gyp-build",
     "prebuildify": "prebuildify --napi --strip"
   },
-  "repository": "https://github.com/pc2/tree-sitter-sus"
+  "repository": "https://github.com/pc2/tree-sitter-sus",
+  "tree-sitter": [
+    {
+      "scope": "source.sus",
+      "file-types": [
+        "sus"
+      ]
+    }
+  ]
 }
