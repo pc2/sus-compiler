@@ -542,7 +542,6 @@ impl FuncCallInstruction {
 #[derive(Debug)]
 pub struct IfStatement {
     pub condition: FlatID,
-    pub is_when: bool,
     pub is_generative: bool,
     pub then_start: FlatID,
     pub then_end_else_start: FlatID,
