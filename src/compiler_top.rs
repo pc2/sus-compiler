@@ -66,6 +66,8 @@ impl Linker {
         // File doesn't yet exist
         assert!(!self.files.iter().any(|fd| fd.1.file_identifier == file_identifier));
 
+        println!("Adding File: {file_identifier}");
+
         let mut parser = Parser::new();
         parser.set_language(&tree_sitter_sus::language()).unwrap();
         let tree = parser.parse(&text, None).unwrap();

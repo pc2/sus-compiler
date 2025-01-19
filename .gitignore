@@ -6,3 +6,4 @@
 **/*.out
 **/*.vcd
 **/*.fst
+sus-lsp/
