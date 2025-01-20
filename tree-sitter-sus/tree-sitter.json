@@ -1,0 +1,29 @@
+{
+  "grammars": [
+    {
+      "name": "sus",
+      "camelcase": "Sus",
+      "scope": "source.sus",
+      "path": ".",
+      "file-types": [
+        "sus"
+      ]
+    }
+  ],
+  "metadata": {
+    "version": "0.0.1",
+    "license": "MIT",
+    "description": "sus grammar for tree-sitter",
+    "links": {
+      "repository": "https://github.com/pc2/tree-sitter-sus"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "go": true,
+    "node": true,
+    "python": true,
+    "rust": true,
+    "swift": true
+  }
+}

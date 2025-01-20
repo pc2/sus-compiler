@@ -29,7 +29,7 @@ clap = { version = "4.5.21", features = ["derive", "wrap_help"] }
 arrayvec = "0.7.6"
 
 # Tree sitter
-tree-sitter = "~0.22.2"
+tree-sitter = "~0.24.7"
 tree-sitter-sus = {version = "~0.2.0-devel", path = "./tree-sitter-sus"}
 
 sus-proc-macro = {version = "~0.2.0-devel", path = "./sus-proc-macro"}
