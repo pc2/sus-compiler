@@ -1047,66 +1047,66 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                 ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[test.sus:904:23]
+     ╭─[test.sus:904:25]
      │
- 904 │ ╭─▶     if decoder.is_jump() : int target_addr {
-     │ │                            ────────┬────────  
-     │ │                                    ╰────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+ 904 │ ╭─▶     when decoder.is_jump() : int target_addr {
+     │ │                              ────────┬────────  
+     │ │                                      ╰────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ┆ ┆   
  906 │ ├─▶     }
      │ │           
      │ ╰─────────── Parent node 'if_statement'
 ─────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[test.sus:907:23]
+     ╭─[test.sus:907:25]
      │
- 907 │ ╭─▶     if decoder.is_load() : int reg_to, int addr {
-     │ │                            ───────────┬──────────  
-     │ │                                       ╰──────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+ 907 │ ╭─▶     when decoder.is_load() : int reg_to, int addr {
+     │ │                              ───────────┬──────────  
+     │ │                                         ╰──────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ┆ ┆   
  909 │ ├─▶     }
      │ │           
      │ ╰─────────── Parent node 'if_statement'
 ─────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[test.sus:910:5]
+     ╭─[test.sus:910:7]
      │
- 910 │ ╭─▶     if decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │ │          ─────────────────────────┬─────────────────────────  
-     │ │                                   ╰─────────────────────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+ 910 │ ╭─▶     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │ │            ─────────────────────────┬─────────────────────────  
+     │ │                                     ╰─────────────────────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ┆ ┆   
  912 │ ├─▶     }
      │ │           
      │ ╰─────────── Parent node 'if_statement'
 ─────╯
 Error: A function called in this context may only return one result. Split this function call into a separate line instead.
-     ╭─[test.sus:904:5]
+     ╭─[test.sus:904:7]
      │
  893 │     interface is_jump
      │               ───┬───  
      │                  ╰───── Interface 'is_jump' defined here
      │ 
- 904 │     if decoder.is_jump() : int target_addr {
-     │        ────────┬────────  
-     │                ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
+ 904 │     when decoder.is_jump() : int target_addr {
+     │          ────────┬────────  
+     │                  ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
 ─────╯
 Error: A function called in this context may only return one result. Split this function call into a separate line instead.
-     ╭─[test.sus:907:5]
+     ╭─[test.sus:907:7]
      │
  894 │     interface is_load
      │               ───┬───  
      │                  ╰───── Interface 'is_load' defined here
      │ 
- 907 │     if decoder.is_load() : int reg_to, int addr {
-     │        ────────┬────────  
-     │                ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
+ 907 │     when decoder.is_load() : int reg_to, int addr {
+     │          ────────┬────────  
+     │                  ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
 ─────╯
 Error: No Global of the name 'op' was found. Did you forget to import it?
-     ╭─[test.sus:910:57]
+     ╭─[test.sus:910:59]
      │
- 910 │     if decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │                                                            ─┬  
-     │                                                             ╰── No Global of the name 'op' was found. Did you forget to import it?
+ 910 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │                                                              ─┬  
+     │                                                               ╰── No Global of the name 'op' was found. Did you forget to import it?
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:900:42]
