@@ -88,6 +88,7 @@ impl Linker {
             found
         } else {
             let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
+            
             let file_uuid = self.add_file(uri.to_string(), file_text, manager);
             self.recompile_all();
             file_uuid
