@@ -88,6 +88,7 @@ impl Linker {
             found
         } else {
             let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
+            
             let file_uuid = self.add_file(uri.to_string(), file_text, manager);
             self.recompile_all();
             file_uuid
@@ -414,9 +415,9 @@ fn handle_request(
             )))
         }
         request::SemanticTokensFullRequest::METHOD => {
+            println!("SemanticTokensFullRequest: {params}");
             let params: SemanticTokensParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
-            println!("SemanticTokensFullRequest");
 
             let uuid = linker.ensure_contains_file(&params.text_document.uri, manager);
 
@@ -539,7 +540,7 @@ fn handle_notification(
             push_all_errors(&connection, &linker)?;
         }
         other => {
-            println!("got notification: {other:?}");
+            println!("got other notification: {other:?}");
         }
     }
     Ok(())

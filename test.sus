@@ -1027,3 +1027,15 @@ module conflicting_domain_with_port_name {
 
 	domain my_domain
 }
+
+module make_infinite_type_help #(T) {
+	interface make_infinite_type_help: T[3] a -> T b
+
+	b = a[0]
+}
+
+module make_infinite_type {
+	make_infinite_type_help mtinf
+
+	mtinf.a = mtinf.b
+}
