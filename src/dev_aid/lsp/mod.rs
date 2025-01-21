@@ -414,9 +414,9 @@ fn handle_request(
             )))
         }
         request::SemanticTokensFullRequest::METHOD => {
-            println!("SemanticTokensFullRequest: {params}");
             let params: SemanticTokensParams =
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
+            println!("SemanticTokensFullRequest");
 
             let uuid = linker.ensure_contains_file(&params.text_document.uri, manager);
 
@@ -539,7 +539,7 @@ fn handle_notification(
             push_all_errors(&connection, &linker)?;
         }
         other => {
-            println!("got other notification: {other:?}");
+            println!("got notification: {other:?}");
         }
     }
     Ok(())

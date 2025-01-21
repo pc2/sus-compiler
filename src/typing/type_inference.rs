@@ -10,7 +10,7 @@ use crate::block_vector::{BlockVec, BlockVecIter};
 use crate::errors::ErrorInfo;
 use crate::prelude::*;
 
-use crate::alloc::{UUIDAllocator, UUIDMarker, UUIDRange, UUID};
+use crate::alloc::{UUIDAllocator, UUIDMarker, UUID};
 use crate::value::Value;
 
 use super::abstract_type::AbstractType;
@@ -92,7 +92,7 @@ impl<F : Fn() -> (String, Vec<ErrorInfo>)> UnifyErrorReport for F {
 
 
 
-impl<MyType : HindleyMilner<VariableIDMarker>+Clone+Debug, VariableIDMarker : UUIDMarker> TypeSubstitutor<MyType, VariableIDMarker> {
+impl<MyType : HindleyMilner<VariableIDMarker>+Clone, VariableIDMarker : UUIDMarker> TypeSubstitutor<MyType, VariableIDMarker> {
     pub fn new() -> Self {
         Self {
             substitution_map: BlockVec::new(),
@@ -113,14 +113,10 @@ impl<MyType : HindleyMilner<VariableIDMarker>+Clone+Debug, VariableIDMarker : UU
         UUID::from_hidden_value(self.substitution_map.alloc(OnceCell::new()))
     }
 
-    pub fn id_range(&self) -> UUIDRange<VariableIDMarker> {
-        UUIDRange::new_with_length(self.substitution_map.len())
-    }
-
     /// Returns false if the types couldn't be unified
     #[must_use]
     fn unify(&self, a: &MyType, b: &MyType) -> bool {
-        let result = match a.get_hm_info() {
+        match a.get_hm_info() {
             HindleyMilnerInfo::TypeFunc(tf_a) => {
                 match b.get_hm_info() {
                     HindleyMilnerInfo::TypeFunc(tf_b) => {
@@ -148,11 +144,7 @@ impl<MyType : HindleyMilner<VariableIDMarker>+Clone+Debug, VariableIDMarker : UU
                     true
                 }
             }
-        };
-        #[cfg(debug_assertions)]
-        self.check_no_unknown_loop();
-
-        result
+        }
     }
     pub fn unify_must_succeed(&self, a: &MyType, b: &MyType) {
         assert!(self.unify(a, b), "This unification cannot fail. Usually because we're unifying with a Written Type");
@@ -175,64 +167,6 @@ impl<MyType : HindleyMilner<VariableIDMarker>+Clone+Debug, VariableIDMarker : UU
 
     pub fn iter(&self) -> BlockVecIter<'_, OnceCell<MyType>, BLOCK_SIZE> {
         self.into_iter()
-    }
-
-    /// Used for sanity-checking. The graph of Unknown nodes must be non-cyclical, such that we don't create infinite types
-    /// 
-    /// Implements https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
-    pub fn check_no_unknown_loop(&self) {
-        #[derive(Clone, Copy)]
-        struct NodeInfo {
-            is_not_part_of_loop: bool,
-            is_part_of_stack: bool
-        }
-        fn is_node_infinite_loop<MyType : HindleyMilner<VariableIDMarker>+Clone+Debug, VariableIDMarker : UUIDMarker>(
-            slf : &TypeSubstitutor<MyType, VariableIDMarker>,
-            node_in_path : &mut FlatAlloc<NodeInfo, VariableIDMarker>,
-            unknown_id: UUID<VariableIDMarker>
-        ) -> bool {
-            // This is the core check we're doing. If this triggers then we have an infinite loop
-            if node_in_path[unknown_id].is_not_part_of_loop { // Early exit, so we don't do the same thing over and over
-                return false;
-            }
-            
-            let mut is_infinite_loop = false;
-
-            if let Some(substitutes_to) = slf[unknown_id].get() {
-                if node_in_path[unknown_id].is_part_of_stack {
-                    is_infinite_loop = true;
-                } else {
-                    node_in_path[unknown_id].is_part_of_stack = true;
-                    substitutes_to.for_each_unknown(&mut |id| {
-                        if !is_infinite_loop {
-                            if is_node_infinite_loop(slf, node_in_path, id) {
-                                is_infinite_loop = true;
-                            }
-                        }
-                    });
-                    node_in_path[unknown_id].is_part_of_stack = false;
-                }
-
-                if is_infinite_loop {
-                    eprintln!("{unknown_id:?} => {substitutes_to:?}");
-                }
-            }
-            node_in_path[unknown_id].is_not_part_of_loop = true;
-            is_infinite_loop
-        }
-
-        let mut node_in_path : FlatAlloc<NodeInfo, VariableIDMarker> = FlatAlloc::with_size(self.substitution_map.len(), NodeInfo{
-            is_not_part_of_loop: false,
-            is_part_of_stack: false,
-        });
-        
-        for id in self.id_range() {
-            if !node_in_path[id].is_not_part_of_loop {
-                if is_node_infinite_loop(self, &mut node_in_path, id) {
-                    panic!("Cyclic Type Substitution Found! See Above. On node {id:?} => {:?}", self[id])
-                }
-            }
-        }
     }
 }
 
@@ -283,9 +217,6 @@ pub trait HindleyMilner<VariableIDMarker: UUIDMarker> : Sized {
     /// 
     /// Returns true when no Unknowns remain
     fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, VariableIDMarker>) -> bool;
-
-    /// Recursively called for each Unknown that is part of this. Used by [TypeSubstitutor::check_no_unknown_loop]
-    fn for_each_unknown(&self, f : &mut impl FnMut(UUID<VariableIDMarker>));
 }
 
 /// [HindleyMilnerInfo] `TypeFuncIdent` for [AbstractType]
@@ -325,18 +256,9 @@ impl HindleyMilner<TypeVariableIDMarker> for AbstractType {
             },
             AbstractType::Unknown(var) => {
                 let Some(replacement) = substitutor.substitution_map[var.get_hidden_value()].get() else {return false};
-                assert!(!std::ptr::eq(self, replacement));
                 *self = replacement.clone();
                 self.fully_substitute(substitutor)
             }
-        }
-    }
-
-    fn for_each_unknown(&self, f : &mut impl FnMut(TypeVariableID)) {
-        match self {
-            AbstractType::Template(_) | AbstractType::Named(_) => {}
-            AbstractType::Array(array_content) => array_content.for_each_unknown(f),
-            AbstractType::Unknown(uuid) => f(*uuid)
         }
     }
 }
@@ -365,13 +287,6 @@ impl HindleyMilner<DomainVariableIDMarker> for DomainType {
                 *self = substitutor.substitution_map[var.get_hidden_value()].get().expect("It's impossible for domain variables to remain, as any unset domain variable would have been replaced with a new physical domain").clone();
                 self.fully_substitute(substitutor)
             }
-        }
-    }
-
-    fn for_each_unknown(&self, f : &mut impl FnMut(DomainVariableID)) {
-        match self {
-            DomainType::Generative | DomainType::Physical(_) => {}
-            DomainType::Unknown(uuid) => f(*uuid)
         }
     }
 }
@@ -424,18 +339,6 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
                 *self = replacement.clone();
                 self.fully_substitute(substitutor)
             }
-        }
-    }
-
-    fn for_each_unknown(&self, f : &mut impl FnMut(ConcreteTypeVariableID)) {
-        match self {
-            ConcreteType::Named(_) | ConcreteType::Value(_) => {}
-            ConcreteType::Unknown(uuid) => f(*uuid),
-            ConcreteType::Array(arr_typ) => {
-                let (arr_typ, arr_sz) = arr_typ.deref();
-                arr_typ.for_each_unknown(f);
-                arr_sz.for_each_unknown(f);
-            },
         }
     }
 }
