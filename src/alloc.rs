@@ -123,6 +123,9 @@ impl<IndexMarker> UUIDRange<IndexMarker> {
     pub fn new(from: UUID<IndexMarker>, to: UUID<IndexMarker>) -> Self {
         Self(from, to)
     }
+    pub fn new_with_length(len: usize) -> Self {
+        UUIDRange(UUID(0, PhantomData), UUID(len, PhantomData))
+    }
     pub fn empty() -> Self {
         UUIDRange(UUID(0, PhantomData), UUID(0, PhantomData))
     }
@@ -493,6 +496,14 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
         Self {
             data: Vec::with_capacity(cap),
             _ph: PhantomData,
+        }
+    }
+    pub fn with_size(size: usize, v: T) -> Self where T: Clone {
+        let mut data = Vec::new();
+        data.resize(size, v);
+        Self {
+            data,
+            _ph: PhantomData
         }
     }
     pub fn get_next_alloc_id(&self) -> UUID<IndexMarker> {
