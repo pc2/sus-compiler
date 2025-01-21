@@ -1345,3 +1345,35 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │               ────┬────  
       │                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Error: Could not fully figure out the type of this object. type_variable_0
+      ╭─[test.sus:1038:2]
+      │
+ 1038 │     make_infinite_type_help mtinf
+      │     ───────────┬───────────  
+      │                ╰───────────── Could not fully figure out the type of this object. type_variable_0
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_0
+      ╭─[test.sus:1040:12]
+      │
+ 1040 │     mtinf.a = mtinf.b
+      │               ───┬───  
+      │                  ╰───── Could not fully figure out the type of this object. type_variable_0
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_0[]
+      ╭─[test.sus:1040:2]
+      │
+ 1040 │     mtinf.a = mtinf.b
+      │     ───┬───  
+      │        ╰───── Could not fully figure out the type of this object. type_variable_0[]
+──────╯
+Error: Typing Error: connection: Creating Infinite Types is Forbidden! expects a type_variable_0[] but was given a type_variable_0
+      ╭─[test.sus:1040:12]
+      │
+ 1032 │     interface make_infinite_type_help: T[3] a -> T b
+      │                                             ┬  
+      │                                             ╰── 'a' declared here
+      │ 
+ 1040 │     mtinf.a = mtinf.b
+      │               ───┬───  
+      │                  ╰───── Typing Error: connection: Creating Infinite Types is Forbidden! expects a type_variable_0[] but was given a type_variable_0
+──────╯

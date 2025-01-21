@@ -3,7 +3,7 @@
 use std::cell::{OnceCell, RefCell};
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut, Index};
+use std::ops::{BitAnd, Deref, DerefMut, Index};
 use std::thread::panicking;
 
 use crate::block_vector::{BlockVec, BlockVecIter};
@@ -90,7 +90,23 @@ impl<F : Fn() -> (String, Vec<ErrorInfo>)> UnifyErrorReport for F {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnifyResult {
+    Success,
+    NoMatchingTypeFunc,
+    NoInfiniteTypes
+}
+impl BitAnd for UnifyResult {
+    type Output = UnifyResult;
 
+    fn bitand(self, rhs: Self) -> Self::Output {
+        if self == UnifyResult::Success {
+            rhs
+        } else {
+            self
+        }
+    }
+}
 
 impl<MyType : HindleyMilner<VariableIDMarker>+Clone+Debug, VariableIDMarker : UUIDMarker> TypeSubstitutor<MyType, VariableIDMarker> {
     pub fn new() -> Self {
@@ -117,49 +133,101 @@ impl<MyType : HindleyMilner<VariableIDMarker>+Clone+Debug, VariableIDMarker : UU
         UUIDRange::new_with_length(self.substitution_map.len())
     }
 
-    /// Returns false if the types couldn't be unified
-    #[must_use]
-    fn unify(&self, a: &MyType, b: &MyType) -> bool {
-        let result = match a.get_hm_info() {
-            HindleyMilnerInfo::TypeFunc(tf_a) => {
-                match b.get_hm_info() {
-                    HindleyMilnerInfo::TypeFunc(tf_b) => {
-                        if tf_a != tf_b {
-                            return false;
-                        }
-                        MyType::unify_all_args(a, b, &mut |arg_a, arg_b| {
-                            self.unify(arg_a, arg_b)
-                        })
-                    }
-                    HindleyMilnerInfo::TypeVar(_) => self.unify(b, a)
+    fn does_typ_reference_var_recurse_with_substitution(&self, does_this: &MyType, reference_this: UUID<VariableIDMarker>) -> bool {
+        let mut does_it_reference_it = false;
+        does_this.for_each_unknown(&mut |v: UUID<VariableIDMarker>| {
+            if v == reference_this {
+                does_it_reference_it = true;
+            } else if let Some(found_substitution) = self[v].get() {
+                does_it_reference_it |= self.does_typ_reference_var_recurse_with_substitution(found_substitution, reference_this);
+            }
+        });
+        does_it_reference_it
+    }
+
+    fn try_fill_empty_var<'s>(&'s self, empty_var: UUID<VariableIDMarker>, mut replace_with: &'s MyType) -> UnifyResult {
+        assert!(self[empty_var].get().is_none());
+
+        // 1-deep Unknowns should be dug out, becuase they don't create infinite types
+        while let HindleyMilnerInfo::TypeVar(unknown_synonym) = replace_with.get_hm_info() {
+            if let Some(found_subst) = self[unknown_synonym].get() {
+                replace_with = found_subst;
+            } else {
+                if unknown_synonym == empty_var {
+                    return UnifyResult::Success;
+                } else {
+                    assert!(self[empty_var].set(replace_with.clone()).is_ok());
+                    return UnifyResult::Success;
                 }
             }
-            HindleyMilnerInfo::TypeVar(var) => {
-                if let HindleyMilnerInfo::TypeVar(var2) = b.get_hm_info() {
-                    if var == var2 {
-                        return true;
+        }
+
+        if self.does_typ_reference_var_recurse_with_substitution(replace_with, empty_var) {
+            UnifyResult::NoInfiniteTypes
+        } else {
+            assert!(self[empty_var].set(replace_with.clone()).is_ok());
+            UnifyResult::Success
+        }
+    }
+
+    /// Returns false if the types couldn't be unified
+    /// Unification is loosely based on this video: https://www.youtube.com/watch?v=KNbRLTLniZI
+    /// 
+    /// The main change is that I don't keep a substitution list, 
+    /// but immediately apply substitutions to [Self::substitution_map]
+    #[must_use]
+    fn unify(&self, a: &MyType, b: &MyType) -> UnifyResult {
+        let result = match (a.get_hm_info(), b.get_hm_info(), a, b) {
+            (HindleyMilnerInfo::TypeVar(a_var), HindleyMilnerInfo::TypeVar(b_var), _, _) => {
+                if a_var == b_var {
+                    UnifyResult::Success // Same var, all ok
+                } else {
+                    match (self[a_var].get(), self[b_var].get()) {
+                        (None, None) => {
+                            assert!(self[a_var].set(b.clone()).is_ok());
+                            UnifyResult::Success
+                        }
+                        (None, Some(subs_b)) => self.try_fill_empty_var(a_var, subs_b),
+                        (Some(subs_a), None) => self.try_fill_empty_var(b_var, subs_a),
+                        (Some(subs_a), Some(subs_b)) => self.unify(subs_a, subs_b)
                     }
                 }
-                let typ_cell = &self.substitution_map[var.get_hidden_value()];
-                if let Some(found) = typ_cell.get() {
-                    self.unify(found, b)
+            }
+            (HindleyMilnerInfo::TypeFunc(tf_a), HindleyMilnerInfo::TypeFunc(tf_b), _, _) => {
+                if tf_a != tf_b {
+                    UnifyResult::NoMatchingTypeFunc
                 } else {
-                    assert!(typ_cell.set(b.clone()).is_ok());
-                    true
+                    MyType::unify_all_args(a, b, &mut |arg_a, arg_b| {
+                        self.unify(arg_a, arg_b)
+                    })
+                }
+            }
+            (HindleyMilnerInfo::TypeFunc(_), HindleyMilnerInfo::TypeVar(v), tf, _)
+            | (HindleyMilnerInfo::TypeVar(v), HindleyMilnerInfo::TypeFunc(_), _, tf) => {
+                if let Some(subs) = self[v].get() {
+                    self.unify(subs, tf)
+                } else {
+                    self.try_fill_empty_var(v, tf)
                 }
             }
         };
-        #[cfg(debug_assertions)]
-        self.check_no_unknown_loop();
+
+        // Very expensive, only enable if there are issues
+        //#[cfg(debug_assertions)]
+        //self.check_no_unknown_loop();
 
         result
     }
     pub fn unify_must_succeed(&self, a: &MyType, b: &MyType) {
-        assert!(self.unify(a, b), "This unification cannot fail. Usually because we're unifying with a Written Type");
+        assert!(self.unify(a, b) == UnifyResult::Success, "This unification cannot fail. Usually because we're unifying with a Written Type");
     }
     pub fn unify_report_error<Report : UnifyErrorReport>(&self, found: &MyType, expected: &MyType, span: Span, reporter: Report) {
-        if !self.unify(found, expected) {
-            let (context, infos) = reporter.report();
+        let unify_result = self.unify(found, expected);
+        if unify_result != UnifyResult::Success {
+            let (mut context, infos) = reporter.report();
+            if unify_result == UnifyResult::NoInfiniteTypes {
+                context.push_str(": Creating Infinite Types is Forbidden!");
+            }
             self.failed_unifications.borrow_mut().push(FailedUnification {
                 found: found.clone(),
                 expected: expected.clone(),
@@ -277,7 +345,7 @@ pub trait HindleyMilner<VariableIDMarker: UUIDMarker> : Sized {
     /// If any pair couldn't be unified, return false
     /// 
     /// This is never called by the user, only by [TypeSubstitutor::unify]
-    fn unify_all_args<F : FnMut(&Self, &Self) -> bool>(left : &Self, right : &Self, unify : &mut F) -> bool;
+    fn unify_all_args<F : FnMut(&Self, &Self) -> UnifyResult>(left : &Self, right : &Self, unify : &mut F) -> UnifyResult;
 
     /// Has to be implemented separately per type
     /// 
@@ -286,6 +354,16 @@ pub trait HindleyMilner<VariableIDMarker: UUIDMarker> : Sized {
 
     /// Recursively called for each Unknown that is part of this. Used by [TypeSubstitutor::check_no_unknown_loop]
     fn for_each_unknown(&self, f : &mut impl FnMut(UUID<VariableIDMarker>));
+
+    fn contains_unknown(&self, var : UUID<VariableIDMarker>) -> bool {
+        let mut contains_var = false;
+        self.for_each_unknown(&mut |v: UUID<VariableIDMarker>| {
+            if v == var {
+                contains_var = true;
+            }
+        });
+        contains_var
+    }
 }
 
 /// [HindleyMilnerInfo] `TypeFuncIdent` for [AbstractType]
@@ -308,10 +386,10 @@ impl HindleyMilner<TypeVariableIDMarker> for AbstractType {
         }
     }
 
-    fn unify_all_args<F : FnMut(&Self, &Self) -> bool>(left : &Self, right : &Self, unify : &mut F) -> bool {
+    fn unify_all_args<F : FnMut(&Self, &Self) -> UnifyResult>(left : &Self, right : &Self, unify : &mut F) -> UnifyResult {
         match (left, right) {
-            (AbstractType::Template(na), AbstractType::Template(nb)) => {assert!(*na == *nb); true}, // Already covered by get_hm_info
-            (AbstractType::Named(na), AbstractType::Named(nb)) => {assert!(*na == *nb); true}, // Already covered by get_hm_info
+            (AbstractType::Template(na), AbstractType::Template(nb)) => {assert!(*na == *nb); UnifyResult::Success}, // Already covered by get_hm_info
+            (AbstractType::Named(na), AbstractType::Named(nb)) => {assert!(*na == *nb); UnifyResult::Success}, // Already covered by get_hm_info
             (AbstractType::Array(arr_typ), AbstractType::Array(arr_typ_2)) => unify(arr_typ, arr_typ_2),
             (_, _) => unreachable!("All others should have been eliminated by get_hm_info check")
         }
@@ -352,9 +430,9 @@ impl HindleyMilner<DomainVariableIDMarker> for DomainType {
         }
     }
 
-    fn unify_all_args<F : FnMut(&Self, &Self) -> bool>(_left : &Self, _right : &Self, _unify : &mut F) -> bool {
+    fn unify_all_args<F : FnMut(&Self, &Self) -> UnifyResult>(_left : &Self, _right : &Self, _unify : &mut F) -> UnifyResult {
         // No sub-args
-        true
+        UnifyResult::Success
     }
 
     /// For domains, always returns true. Or rather it should, since any leftover unconnected domains should be assigned an ID of their own by the type checker
@@ -398,10 +476,10 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
         }
     }
 
-    fn unify_all_args<F : FnMut(&Self, &Self) -> bool>(left : &Self, right : &Self, unify : &mut F) -> bool {
+    fn unify_all_args<F : FnMut(&Self, &Self) -> UnifyResult>(left : &Self, right : &Self, unify : &mut F) -> UnifyResult {
         match (left, right) {
-            (ConcreteType::Named(na), ConcreteType::Named(nb)) => {assert!(*na == *nb); true} // Already covered by get_hm_info
-            (ConcreteType::Value(v_1), ConcreteType::Value(v_2)) => {assert!(*v_1 == *v_2); true} // Already covered by get_hm_info
+            (ConcreteType::Named(na), ConcreteType::Named(nb)) => {assert!(*na == *nb); UnifyResult::Success} // Already covered by get_hm_info
+            (ConcreteType::Value(v_1), ConcreteType::Value(v_2)) => {assert!(*v_1 == *v_2); UnifyResult::Success} // Already covered by get_hm_info
             (ConcreteType::Array(arr_typ_1), ConcreteType::Array(arr_typ_2)) => {
                 let (arr_typ_1_arr, arr_typ_1_sz) = arr_typ_1.deref();
                 let (arr_typ_2_arr, arr_typ_2_sz) = arr_typ_2.deref();

@@ -1,3 +1,6 @@
+Adding File: /home/lennart/.sus/0.2.0-devel/stl/core.sus
+Adding File: /home/lennart/.sus/0.2.0-devel/stl/util.sus
+Adding File: test.sus
 TREE SITTER module! LatencyOffset
 TREE SITTER module! CrossDomain
 TREE SITTER module! IntToBits
@@ -113,6 +116,8 @@ TREE SITTER module! sized_int_add
 TREE SITTER module! use_sized_int_add
 TREE SITTER module! implicit_domain_forbidden
 TREE SITTER module! conflicting_domain_with_port_name
+TREE SITTER module! make_infinite_type_help
+TREE SITTER module! make_infinite_type
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -221,6 +226,8 @@ Typechecking sized_int_add
 Typechecking use_sized_int_add
 Typechecking implicit_domain_forbidden
 Typechecking conflicting_domain_with_port_name
+Typechecking make_infinite_type_help
+Typechecking make_infinite_type
 Instantiating IntToBits
 Concrete Typechecking IntToBits
 Latency Counting IntToBits
@@ -547,3 +554,4 @@ Latency Counting sized_int_add
 Latency Counting use_sized_int_add
 Not Instantiating implicit_domain_forbidden due to flattening errors
 Not Instantiating conflicting_domain_with_port_name due to flattening errors
+Not Instantiating make_infinite_type due to flattening errors
