@@ -15,7 +15,7 @@ rust-version = "1.78"
 [dependencies]
 
 # Tree sitter
-tree-sitter = "~0.22.2"
+tree-sitter = "~0.24.7"
 tree-sitter-sus = {version = "~0.2.0-devel", path = "../tree-sitter-sus"}
 
 # proc_macro utils
