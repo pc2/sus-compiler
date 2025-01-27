@@ -1117,23 +1117,23 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             let position_if_literal = cursor.span();
             cursor.field(field!("condition"));
             let (condition, condition_is_generative) = self.flatten_expr(cursor);
-            let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement {
+            match(is_if_literal, condition_is_generative){
+                (true, false) => {
+                    self.errors.warn(position_if_literal, "Used 'if' in a non generative context, use 'when' instead");
+                },
+                (false, true) => {
+                    self.errors.error(position_if_literal, "Used 'when' in a generative context, use 'if' instead");
+                },
+                (_, _) => ()
+            }
+
+	    let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement {
                 condition,
-                is_generative: condition_is_generative,// TODO `if` vs `when` https://github.com/pc2/sus-compiler/issues/3
+                is_generative: is_if_literal,
                 then_start: FlatID::PLACEHOLDER,
                 then_end_else_start: FlatID::PLACEHOLDER,
                 else_end: FlatID::PLACEHOLDER,
             }));
-
-            match(is_if_literal, condition_is_generative){
-                (true, false) => {
-                    self.errors.warn(position_if_literal, "Used 'if' in a non generative context");
-                },
-                (false, true) => {
-                    self.errors.error(position_if_literal, "Used 'when' in a generative context");
-                },
-                (_, _) => ()
-            }
 
             let then_start = self.instructions.get_next_alloc_id();
             cursor.field(field!("then_block"));
