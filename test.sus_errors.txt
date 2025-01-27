@@ -1293,3 +1293,31 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │         ──┬──  
      │           ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: Used 'when' in a generative context, use 'if' instead
+      ╭─[test.sus:1024:9]
+      │
+ 1024 │         when WIDTH <= BASE_CASE_SIZE {
+      │         ──┬─  
+      │           ╰─── Used 'when' in a generative context, use 'if' instead
+──────╯
+Warning: Used 'if' in a non generative context, use 'when' instead
+      ╭─[test.sus:1027:25]
+      │
+ 1027 │                         if bits[I] {
+      │                         ─┬  
+      │                          ╰── Used 'if' in a non generative context, use 'when' instead
+──────╯
+Warning: Used 'if' in a non generative context, use 'when' instead
+      ╭─[test.sus:1029:32]
+      │
+ 1029 │                         } else if !bits[I] {
+      │                                ─┬  
+      │                                 ╰── Used 'if' in a non generative context, use 'when' instead
+──────╯
+Error: Used 'when' in a generative context, use 'if' instead
+      ╭─[test.sus:1034:16]
+      │
+ 1034 │         } else when WIDTH > BASE_CASE_SIZE {
+      │                ──┬─  
+      │                  ╰─── Used 'when' in a generative context, use 'if' instead
+──────╯

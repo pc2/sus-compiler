@@ -111,6 +111,7 @@ TREE SITTER module! xyz
 TREE SITTER module! numbersToAddUp
 TREE SITTER module! sized_int_add
 TREE SITTER module! use_sized_int_add
+TREE SITTER module! IfTesting
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -217,6 +218,7 @@ Typechecking xyz
 Typechecking numbersToAddUp
 Typechecking sized_int_add
 Typechecking use_sized_int_add
+Typechecking IfTesting
 Instantiating IntToBits
 Concrete Typechecking IntToBits
 Latency Counting IntToBits

@@ -1011,3 +1011,27 @@ module use_sized_int_add {
 
 	c = sized_int_add(a, b)
 }
+
+
+/// Test if when seperation
+module IfTesting #(int WIDTH) {
+        // Should be chosen based on what's most efficient for the target architecture
+        gen int BASE_CASE_SIZE = 5
+
+        interface PopCount : bool[WIDTH] bits -> int popcount
+
+
+        when WIDTH <= BASE_CASE_SIZE {
+                int[WIDTH] cvt
+                for int I in 0..WIDTH {
+                        if bits[I] {
+                                cvt[I] = 1
+                        } else if !bits[I] {
+                                cvt[I] = 0
+                        }
+                }
+                reg popcount = +cvt
+        } else when WIDTH > BASE_CASE_SIZE {
+        }
+}
+
