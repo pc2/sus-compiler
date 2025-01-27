@@ -4,6 +4,7 @@ use std::ops::Deref;
 use crate::linker::get_builtin_type;
 use crate::value::Value;
 
+use super::template::ConcreteTemplateArg;
 use super::template::ConcreteTemplateArgs;
 use super::type_inference::ConcreteTypeVariableID;
 
@@ -60,7 +61,18 @@ impl ConcreteType {
     }
     pub fn contains_unknown(&self) -> bool {
         match self {
-            ConcreteType::Named(_) => false,
+            ConcreteType::Named(global_ref) => {
+                global_ref
+                    .template_args
+                    .iter()
+                    .any(|concrete_template_arg| match concrete_template_arg.1 {
+                        ConcreteTemplateArg::Type(concrete_type, _) => {
+                            concrete_type.contains_unknown()
+                        }
+                        ConcreteTemplateArg::Value(..) => false,
+                        ConcreteTemplateArg::NotProvided => true,
+                    })
+            }
             ConcreteType::Value(_) => false,
             ConcreteType::Array(arr_box) => {
                 let (arr_arr, arr_size) = arr_box.deref();
