@@ -130,7 +130,7 @@ module.exports = grammar({
         ),
 
         if_statement: $ => seq(
-            field('if_literal',choice(
+            field('statement_type',choice(
                 'when',
                 'if'
             )),

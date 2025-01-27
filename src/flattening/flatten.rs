@@ -1112,24 +1112,24 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
     fn flatten_if_statement(&mut self, cursor: &mut Cursor) {
         cursor.go_down(kind!("if_statement"), |cursor| {
-            cursor.field(field!("if_literal"));
-            let is_if_literal = cursor.kind() == kw!("if");
-            let position_if_literal = cursor.span();
+            cursor.field(field!("statement_type"));
+            let keyword_is_if = cursor.kind() == kw!("if");
+            let position_statement_keyword = cursor.span();
             cursor.field(field!("condition"));
             let (condition, condition_is_generative) = self.flatten_expr(cursor);
-            match(is_if_literal, condition_is_generative){
+            match(keyword_is_if, condition_is_generative){
                 (true, false) => {
-                    self.errors.warn(position_if_literal, "Used 'if' in a non generative context, use 'when' instead");
+                    self.errors.warn(position_statement_keyword, "Used 'if' in a non generative context, use 'when' instead");
                 },
                 (false, true) => {
-                    self.errors.error(position_if_literal, "Used 'when' in a generative context, use 'if' instead");
+                    self.errors.error(position_statement_keyword, "Used 'when' in a generative context, use 'if' instead");
                 },
                 (_, _) => ()
             }
 
 	    let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement {
                 condition,
-                is_generative: is_if_literal,
+                is_generative: keyword_is_if,
                 then_start: FlatID::PLACEHOLDER,
                 then_end_else_start: FlatID::PLACEHOLDER,
                 else_end: FlatID::PLACEHOLDER,

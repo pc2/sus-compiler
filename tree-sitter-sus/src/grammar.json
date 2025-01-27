@@ -552,7 +552,7 @@
       "members": [
         {
           "type": "FIELD",
-          "name": "if_literal",
+          "name": "statement_type",
           "content": {
             "type": "CHOICE",
             "members": [

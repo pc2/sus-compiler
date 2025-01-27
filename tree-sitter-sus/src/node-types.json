@@ -893,7 +893,7 @@
           }
         ]
       },
-      "if_literal": {
+      "statement_type": {
         "multiple": false,
         "required": true,
         "types": [
