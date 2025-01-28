@@ -69,6 +69,14 @@ module FIFO #(
 	ready = LatencyOffset #(OFFSET: -ALMOST_FULL_TRESHOLD)(r)
 }
 
+module JoinDomains #(T1, T2, int OFFSET) {
+	interface identity1 : T1 i1'0 -> T1 o1'0
+	interface identity2 : T2 i2'OFFSET -> T2 o2'OFFSET
+
+	o1 = i1
+	o2 = i2
+}
+
 module Iterator {
 	// action
 	interface start : bool start, int up_to

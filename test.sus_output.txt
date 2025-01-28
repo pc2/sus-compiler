@@ -9,6 +9,7 @@ TREE SITTER module! true
 TREE SITTER module! false
 TREE SITTER module! DualPortMem
 TREE SITTER module! FIFO
+TREE SITTER module! JoinDomains
 TREE SITTER module! Iterator
 TREE SITTER module! FixedSizeIterator
 TREE SITTER module! SlowClockGenerator
@@ -121,6 +122,7 @@ Typechecking IntToBits
 Typechecking BitsToInt
 Typechecking DualPortMem
 Typechecking FIFO
+Typechecking JoinDomains
 Typechecking Iterator
 Typechecking FixedSizeIterator
 Typechecking SlowClockGenerator
