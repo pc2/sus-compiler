@@ -1,95 +1,3 @@
-Warning: Unused port 'ready'
-    ╭─[util.sus:88:2]
-    │
- 50 │     output bool ready'0
-    │                 ──┬──  
-    │                   ╰──── Port 'ready' declared here
-    │ 
- 88 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──────────────────────┬────────────────────── ┬  
-    │                           ╰────────────────────────── Unused port 'ready'
-    │                                                   │  
-    │                                                   ╰── f declared here
-────╯
-Warning: Unused port 'push'
-    ╭─[util.sus:88:2]
-    │
- 51 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
-    │                           ──┬─  
-    │                             ╰─── Port 'push' declared here
-    │ 
- 88 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──────────────────────┬────────────────────── ┬  
-    │                           ╰────────────────────────── Unused port 'push'
-    │                                                   │  
-    │                                                   ╰── f declared here
-────╯
-Warning: Unused port 'data_in'
-    ╭─[util.sus:88:2]
-    │
- 51 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
-    │                                               ───┬───  
-    │                                                  ╰───── Port 'data_in' declared here
-    │ 
- 88 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──────────────────────┬────────────────────── ┬  
-    │                           ╰────────────────────────── Unused port 'data_in'
-    │                                                   │  
-    │                                                   ╰── f declared here
-────╯
-Warning: Unused port 'pop'
-    ╭─[util.sus:88:2]
-    │
- 54 │     interface pop : bool pop -> bool data_valid, T data_out
-    │                          ─┬─  
-    │                           ╰─── Port 'pop' declared here
-    │ 
- 88 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──────────────────────┬────────────────────── ┬  
-    │                           ╰────────────────────────── Unused port 'pop'
-    │                                                   │  
-    │                                                   ╰── f declared here
-────╯
-Warning: Unused port 'data_valid'
-    ╭─[util.sus:88:2]
-    │
- 54 │     interface pop : bool pop -> bool data_valid, T data_out
-    │                                      ─────┬────  
-    │                                           ╰────── Port 'data_valid' declared here
-    │ 
- 88 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──────────────────────┬────────────────────── ┬  
-    │                           ╰────────────────────────── Unused port 'data_valid'
-    │                                                   │  
-    │                                                   ╰── f declared here
-────╯
-Warning: Unused port 'data_out'
-    ╭─[util.sus:88:2]
-    │
- 54 │     interface pop : bool pop -> bool data_valid, T data_out
-    │                                                    ────┬───  
-    │                                                        ╰───── Port 'data_out' declared here
-    │ 
- 88 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──────────────────────┬────────────────────── ┬  
-    │                           ╰────────────────────────── Unused port 'data_out'
-    │                                                   │  
-    │                                                   ╰── f declared here
-────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[util.sus:192:10]
-     │
- 192 │     int[20] arr
-     │             ─┬─  
-     │              ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[util.sus:194:9]
-     │
- 194 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
-     │            ───┬──  
-     │               ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
 Error: 'contains_submodule_submodule' conflicts with other declarations:
      ╭─[test.sus:441:8]
      │
@@ -873,9 +781,9 @@ Error: BITWIDTH is not a valid template argument of ::FIFO
      │            ────┬───  
      │                ╰───── BITWIDTH is not a valid template argument of ::FIFO
      │
-     ├─[util.sus:36:8]
+     ├─[util.sus:22:8]
      │
-  36 │ module FIFO #(
+  22 │ module FIFO #(
      │        ──┬─  
      │          ╰─── 'FIFO' defined here
 ─────╯
@@ -1376,4 +1284,108 @@ Error: Typing Error: connection: Creating Infinite Types is Forbidden! expects a
  1040 │     mtinf.a = mtinf.b
       │               ───┬───  
       │                  ╰───── Typing Error: connection: Creating Infinite Types is Forbidden! expects a type_variable_0[] but was given a type_variable_0
+──────╯
+Warning: Unused port 'ready'
+      ╭─[test.sus:1060:2]
+      │
+ 1060 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+      │     ──────────────────────┬────────────────────── ┬  
+      │                           ╰────────────────────────── Unused port 'ready'
+      │                                                   │  
+      │                                                   ╰── f declared here
+      │
+      ├─[util.sus:36:14]
+      │
+   36 │     output bool ready'0
+      │                 ──┬──  
+      │                   ╰──── Port 'ready' declared here
+──────╯
+Warning: Unused port 'push'
+      ╭─[test.sus:1060:2]
+      │
+ 1060 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+      │     ──────────────────────┬────────────────────── ┬  
+      │                           ╰────────────────────────── Unused port 'push'
+      │                                                   │  
+      │                                                   ╰── f declared here
+      │
+      ├─[util.sus:37:24]
+      │
+   37 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
+      │                           ──┬─  
+      │                             ╰─── Port 'push' declared here
+──────╯
+Warning: Unused port 'data_in'
+      ╭─[test.sus:1060:2]
+      │
+ 1060 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+      │     ──────────────────────┬────────────────────── ┬  
+      │                           ╰────────────────────────── Unused port 'data_in'
+      │                                                   │  
+      │                                                   ╰── f declared here
+      │
+      ├─[util.sus:37:44]
+      │
+   37 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
+      │                                               ───┬───  
+      │                                                  ╰───── Port 'data_in' declared here
+──────╯
+Warning: Unused port 'pop'
+      ╭─[test.sus:1060:2]
+      │
+ 1060 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+      │     ──────────────────────┬────────────────────── ┬  
+      │                           ╰────────────────────────── Unused port 'pop'
+      │                                                   │  
+      │                                                   ╰── f declared here
+      │
+      ├─[util.sus:40:23]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                          ─┬─  
+      │                           ╰─── Port 'pop' declared here
+──────╯
+Warning: Unused port 'data_valid'
+      ╭─[test.sus:1060:2]
+      │
+ 1060 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+      │     ──────────────────────┬────────────────────── ┬  
+      │                           ╰────────────────────────── Unused port 'data_valid'
+      │                                                   │  
+      │                                                   ╰── f declared here
+      │
+      ├─[util.sus:40:35]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                                      ─────┬────  
+      │                                           ╰────── Port 'data_valid' declared here
+──────╯
+Warning: Unused port 'data_out'
+      ╭─[test.sus:1060:2]
+      │
+ 1060 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+      │     ──────────────────────┬────────────────────── ┬  
+      │                           ╰────────────────────────── Unused port 'data_out'
+      │                                                   │  
+      │                                                   ╰── f declared here
+      │
+      ├─[util.sus:40:49]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                                                    ────┬───  
+      │                                                        ╰───── Port 'data_out' declared here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[test.sus:1081:10]
+      │
+ 1081 │     int[20] arr
+      │             ─┬─  
+      │              ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[test.sus:1083:9]
+      │
+ 1083 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
+      │            ───┬──  
+      │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯

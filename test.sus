@@ -1039,3 +1039,46 @@ module make_infinite_type {
 
 	mtinf.a = mtinf.b
 }
+
+// Examples that used to be in util.sus
+
+module UseDualPortMem {
+	interface UseDualPortMem : 
+		bool do_write'0,
+		int addr'0,
+		bool[500] data'0 ->
+		bool[500] read_data'0
+		
+	DualPortMem #(SIZE: 128, T: type bool[500]) mem
+
+	mem.write(do_write, addr, data)
+
+	read_data = mem.read(addr)
+}
+
+module example_FIFO {
+	FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+}
+
+module use_Iterator {
+	interface start_iteration : bool do_start
+	input int[10] myArr
+	output int outVal
+
+	Iterator arrayStream
+
+	// if do_start {arrayStream.start(10)}
+	arrayStream.start(do_start, 10)
+
+	// if arrayIter.iter() : int value {...}
+	bool iter_valid, int value = arrayStream.iter()
+	if iter_valid {
+		outVal = myArr[value]
+	}
+}
+
+module UseSlice {
+	int[20] arr
+
+	int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
+}
