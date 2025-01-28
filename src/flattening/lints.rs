@@ -100,6 +100,9 @@ fn make_fanins(instructions: &FlatAlloc<Instruction, FlatIDMarker>) -> FlatAlloc
                 }
             }
             Instruction::Declaration(decl) => {
+                if let Some(lat_spec) = decl.latency_specifier {
+                    collector_func(lat_spec);
+                }
                 decl.typ_expr.for_each_generative_input(&mut collector_func);
             }
             Instruction::Expression(wire) => {
