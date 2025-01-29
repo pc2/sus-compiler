@@ -1082,3 +1082,18 @@ module UseSlice {
 
 	int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
 }
+
+
+module UseBuiltinConstants {
+	gen int INT_ARR_SIZE = sizeof #(T: type int[10][10])
+
+	assert #(C: INT_ARR_SIZE == 3200)
+
+	assert #(C: clog2 #(V: 15) == 4)
+	assert #(C: clog2 #(V: 16) == 4)
+	assert #(C: clog2 #(V: 17) == 5)
+}
+
+module FailingAssert {
+	assert #(C: 15 + 3 == 19)
+}

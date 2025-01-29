@@ -1464,7 +1464,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                 }
 
                 cursor.field(field!("expr_or_decl"));
-                let (kind, span) = cursor.kind_span();
+                let kind = cursor.kind();
 
                 if kind == kind!("declaration") {
                     let _ = self.flatten_declaration::<true>(self.default_declaration_context, false, true, cursor);
@@ -1472,7 +1472,6 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                     if kind == kind!("func_call") {
                         self.flatten_assign_function_call(Vec::new(), cursor);
                     } else {
-                        self.errors.warn(span, "The result of this operation is not used");
                         let _ = self.flatten_expr(cursor);
                     }
                 }
@@ -1636,12 +1635,7 @@ fn flatten_global(linker: &mut Linker, global_obj : GlobalUUID, cursor: &mut Cur
                             assert_eq!(port.name_span, decl.name_span);
                             port.declaration_instruction = decl_id;
                         }
-                        DeclarationKind::GenerativeInput(this_template_id) => {
-                            let ParameterKind::Generative(GenerativeParameterKind { decl_span:_, declaration_instruction }) = 
-                                &mut md.link_info.template_parameters[this_template_id].kind else {unreachable!()};
-    
-                            *declaration_instruction = decl_id;
-                        }
+                        DeclarationKind::GenerativeInput(_) => {}
                         DeclarationKind::StructField { field_id:_ } => unreachable!("No Struct fields in Modules")
                     }
                 }
@@ -1671,12 +1665,7 @@ fn flatten_global(linker: &mut Linker, global_obj : GlobalUUID, cursor: &mut Cur
                             field.declaration_instruction = decl_id;
                         }
                         DeclarationKind::RegularPort { is_input:_, port_id:_ } => {unreachable!("No ports in structs")}
-                        DeclarationKind::GenerativeInput(this_template_id) => {
-                            let ParameterKind::Generative(GenerativeParameterKind { decl_span:_, declaration_instruction }) = 
-                                &mut typ.link_info.template_parameters[this_template_id].kind else {unreachable!()};
-    
-                            *declaration_instruction = decl_id;
-                        }
+                        DeclarationKind::GenerativeInput(_) => {}
                     }
                 }
             }
@@ -1694,6 +1683,18 @@ fn flatten_global(linker: &mut Linker, global_obj : GlobalUUID, cursor: &mut Cur
             &mut cst.link_info
         }
     };
+
+    // Make the template parameters point to the proper declaration instructions
+    for (decl_id, instr) in &mut instructions {
+        if let Instruction::Declaration(decl) = instr {
+            if let DeclarationKind::GenerativeInput(this_template_id) = decl.decl_kind {
+                let ParameterKind::Generative(GenerativeParameterKind { decl_span:_, declaration_instruction }) = 
+                    &mut link_info.template_parameters[this_template_id].kind else {unreachable!()};
+
+                *declaration_instruction = decl_id;
+            }
+        }
+    }
 
     link_info.reabsorb_errors_globals(errors_globals, AFTER_FLATTEN_CP);
     link_info.type_variable_alloc = type_alloc;

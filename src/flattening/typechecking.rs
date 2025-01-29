@@ -144,6 +144,8 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 decl_root.typ.clone()
             }
             WireReferenceRoot::NamedConstant(cst) => {
+                self.typecheck_template_global(cst);
+                
                 let linker_cst = &self.globals[cst.id];
                 let decl = linker_cst.link_info.instructions[linker_cst.output_decl].unwrap_declaration();
                 let typ = AbstractType::Unknown(self.type_checker.alloc_typ_variable());

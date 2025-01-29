@@ -28,10 +28,19 @@ use crate::typing::template::Parameters;
 use self::checkpoint::CheckPoint;
 
 const BUILTIN_TYPES: [&'static str; 2] = ["bool", "int"];
+const BUILTIN_CONSTANTS: [&'static str; 6] = ["__crash_compiler", "true", "false", "assert", "sizeof", "clog2"];
 
 pub const fn get_builtin_type(name: &'static str) -> TypeUUID {
     if let Some(is_type) = const_str_position(name, &BUILTIN_TYPES) {
         TypeUUID::from_hidden_value(is_type)
+    } else {
+        unreachable!()
+    }
+}
+
+pub const fn get_builtin_const(name: &'static str) -> ConstantUUID {
+    if let Some(is_type) = const_str_position(name, &BUILTIN_CONSTANTS) {
+        ConstantUUID::from_hidden_value(is_type)
     } else {
         unreachable!()
     }
@@ -165,6 +174,24 @@ pub enum GlobalUUID {
     Module(ModuleUUID),
     Type(TypeUUID),
     Constant(ConstantUUID),
+}
+
+impl GlobalUUID {
+    #[track_caller]
+    pub fn unwrap_module(&self) -> ModuleUUID {
+        let GlobalUUID::Module(id) = self else {unreachable!("Not a ModuleUUID!")};
+        *id
+    }
+    #[track_caller]
+    pub fn unwrap_type(&self) -> TypeUUID {
+        let GlobalUUID::Type(id) = self else {unreachable!("Not a TypeUUID!")};
+        *id
+    }
+    #[track_caller]
+    pub fn unwrap_const(&self) -> ConstantUUID {
+        let GlobalUUID::Constant(id) = self else {unreachable!("Not a ConstantUUID!")};
+        *id
+    }
 }
 
 impl From<ModuleUUID> for GlobalUUID {

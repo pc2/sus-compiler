@@ -7,6 +7,9 @@ TREE SITTER module! int
 TREE SITTER module! __crash_compiler
 TREE SITTER module! true
 TREE SITTER module! false
+TREE SITTER module! assert
+TREE SITTER module! sizeof
+TREE SITTER module! clog2
 TREE SITTER module! DualPortMem
 TREE SITTER module! FIFO
 TREE SITTER module! JoinDomains
@@ -116,6 +119,8 @@ TREE SITTER module! UseDualPortMem
 TREE SITTER module! example_FIFO
 TREE SITTER module! use_Iterator
 TREE SITTER module! UseSlice
+TREE SITTER module! UseBuiltinConstants
+TREE SITTER module! FailingAssert
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -227,6 +232,8 @@ Typechecking UseDualPortMem
 Typechecking example_FIFO
 Typechecking use_Iterator
 Typechecking UseSlice
+Typechecking UseBuiltinConstants
+Typechecking FailingAssert
 Instantiating IntToBits
 Concrete Typechecking IntToBits
 Latency Counting IntToBits
@@ -554,3 +561,7 @@ Instantiating Slice
 Concrete Typechecking Slice
 Latency Counting Slice
 Latency Counting UseSlice
+Instantiating UseBuiltinConstants
+Concrete Typechecking UseBuiltinConstants
+Latency Counting UseBuiltinConstants
+Instantiating FailingAssert

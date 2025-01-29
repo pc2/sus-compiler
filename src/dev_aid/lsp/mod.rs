@@ -2,7 +2,7 @@ mod hover_info;
 mod semantic_tokens;
 mod tree_walk;
 
-use crate::{compiler_top::LinkerExtraFileInfoManager, prelude::*};
+use crate::{compiler_top::LinkerExtraFileInfoManager, linker::GlobalUUID, prelude::*};
 
 use hover_info::hover;
 use lsp_types::{notification::*, request::Request, *};
@@ -17,7 +17,7 @@ use crate::{
     linker::FileData,
 };
 
-use tree_walk::{get_selected_object, InModule, LocationInfo};
+use tree_walk::{get_selected_object, InGlobal, LocationInfo};
 
 use self::tree_walk::RefersTo;
 
@@ -271,14 +271,14 @@ fn gather_references_in_file(
     ref_locations
 }
 
-fn for_each_local_reference_in_module(
+fn for_each_local_reference_in_global(
     linker: &Linker,
-    md_id: ModuleUUID,
+    obj_id: GlobalUUID,
     local: FlatID,
 ) -> Vec<Span> {
     let mut ref_locations = Vec::new();
-    tree_walk::visit_all_in_module(linker, md_id, |span, info| {
-        if let LocationInfo::InModule(_, _, f_id, _) = info {
+    tree_walk::visit_all_in_module(linker, obj_id, |span, info| {
+        if let LocationInfo::InGlobal(_, _, f_id, _) = info {
             if local == f_id {
                 ref_locations.push(span);
             }
@@ -293,7 +293,7 @@ fn gather_all_references_in_one_file(linker: &Linker, file_id: FileUUID, pos: us
         if refers_to.is_global() {
             gather_references_in_file(&linker, &linker.files[file_id], refers_to)
         } else if let Some(local) = refers_to.local {
-            for_each_local_reference_in_module(&linker, local.0, local.1)
+            for_each_local_reference_in_global(&linker, local.0, local.1)
         } else {
             Vec::new()
         }
@@ -322,7 +322,7 @@ fn gather_all_references_across_all_files(
                 }
             }
         } else if let Some(local) = refers_to.local {
-            let found_refs = for_each_local_reference_in_module(&linker, local.0, local.1);
+            let found_refs = for_each_local_reference_in_global(&linker, local.0, local.1);
             for r in &found_refs {
                 assert!(location.size() == r.size())
             }
@@ -381,17 +381,17 @@ fn handle_request(
             if let Some((_location, info)) = get_selected_object(linker, file_uuid, pos)
             {
                 match info {
-                    LocationInfo::InModule(_md_id, md, _decl_id, InModule::NamedLocal(decl)) => {
-                        goto_definition_list.push((decl.name_span, md.link_info.file));
+                    LocationInfo::InGlobal(_obj_id, link_info, _decl_id, InGlobal::NamedLocal(decl)) => {
+                        goto_definition_list.push((decl.name_span, link_info.file));
                     }
-                    LocationInfo::InModule(
-                        _md_id,
-                        md,
+                    LocationInfo::InGlobal(
+                        _obj_id,
+                        link_info,
                         _decl_id,
-                        InModule::NamedSubmodule(submod_decl),
+                        InGlobal::NamedSubmodule(submod_decl),
                     ) => goto_definition_list
-                        .push((submod_decl.name.as_ref().unwrap().1, md.link_info.file)),
-                    LocationInfo::InModule(_, _, _, InModule::Temporary(_)) => {}
+                        .push((submod_decl.name.as_ref().unwrap().1, link_info.file)),
+                    LocationInfo::InGlobal(_, _, _, InGlobal::Temporary(_)) => {}
                     LocationInfo::Type(_, _) => {}
                     LocationInfo::Parameter(_, link_info, _, template_arg) => {
                         goto_definition_list.push((template_arg.name_span, link_info.file))

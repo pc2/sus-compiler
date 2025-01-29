@@ -1,3 +1,5 @@
+use num::BigInt;
+
 use crate::prelude::*;
 use std::ops::Deref;
 
@@ -55,6 +57,39 @@ impl ConcreteType {
                 arr_arr.contains_unknown() || arr_size.contains_unknown()
             }
             ConcreteType::Unknown(_) => true,
+        }
+    }
+    /// Returns the size of this type in *wires*. So int #(MAX: 255) would return '8'
+    /// 
+    /// If it contains any Unknowns, then returns None
+    pub fn sizeof(&self) -> Option<BigInt> {
+        match self {
+            ConcreteType::Named(uuid) => Some(Self::sizeof_named(*uuid).into()),
+            ConcreteType::Value(_value) => unreachable!("Root of ConcreteType cannot be a value"),
+            ConcreteType::Array(arr_box) => {
+                let (typ, size) = arr_box.deref();
+
+                let mut typ_sz = typ.sizeof()?;
+
+                let ConcreteType::Value(arr_sz) = size else {return None};
+
+                typ_sz *= arr_sz.unwrap_integer();
+
+                Some(typ_sz)
+            }
+            ConcreteType::Unknown(_uuid) => None
+        }
+    }
+
+    /// TODO #50 Ranged Int work & ConcreteGlobalReference should be integrated
+    pub fn sizeof_named(id: TypeUUID) -> u64 {
+        if id == get_builtin_type("int") {
+            32 // TODO concrete int sizes
+        } else if id == get_builtin_type("bool") {
+            1
+        } else {
+            println!("TODO Named Structs Size");
+            1 // todo!() // Named structs are not implemented yet
         }
     }
 }

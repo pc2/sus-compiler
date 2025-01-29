@@ -14,7 +14,7 @@ use crate::{
 
 use crate::typing::{abstract_type::DomainType, template::ParameterKind};
 
-use super::tree_walk::{self, InModule, LocationInfo};
+use super::tree_walk::{self, InGlobal, LocationInfo};
 
 const NUM_INTERFACE_DISTINGUISHERS: u32 = 5;
 const TOKEN_TYPES: [SemanticTokenType; 8] = [
@@ -146,13 +146,13 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
         result.push((
             span,
             match item {
-                LocationInfo::InModule(_md_id, _md, _, InModule::NamedLocal(decl)) => {
+                LocationInfo::InGlobal(_md_id, _md, _, InGlobal::NamedLocal(decl)) => {
                     IDEIdentifierType::from_identifier_typ(decl.identifier_type, decl.typ.domain)
                 }
-                LocationInfo::InModule(_md_id, _, _, InModule::NamedSubmodule(_)) => {
+                LocationInfo::InGlobal(_md_id, _, _, InGlobal::NamedSubmodule(_)) => {
                     IDEIdentifierType::Interface
                 }
-                LocationInfo::InModule(_md_id, _, _, InModule::Temporary(_)) => return,
+                LocationInfo::InGlobal(_md_id, _, _, InGlobal::Temporary(_)) => return,
                 LocationInfo::Type(_, _) => return,
                 LocationInfo::Parameter(_id, _link_info, _, template_arg) => {
                     match &template_arg.kind {

@@ -40,7 +40,7 @@ fn typ_to_declaration(mut typ: &ConcreteType) -> String {
     }
     match typ {
         ConcreteType::Named(id) => {
-            let sz = get_type_name_size(*id);
+            let sz = ConcreteType::sizeof_named(*id);
             if sz == 1 {
                 format!("{array_string} std_logic")
             } else {

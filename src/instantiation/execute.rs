@@ -196,14 +196,52 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
     }
 
+    fn get_first_template_argument_value(&self, cst_ref: &GlobalReference<ConstantUUID>) -> (&Value, Span) {
+        let first_arg = cst_ref.unwrap_first_template_argument();
+        let value_instruction = first_arg.kind.unwrap_value();
+        (self.generation_state[value_instruction].unwrap_generation_value(), first_arg.value_span)
+    }
+
     /// TODO make builtins that depend on parameters
-    fn get_named_constant_value(&self, cst_ref: &GlobalReference<ConstantUUID>) -> Value {
+    fn get_named_constant_value(&self, cst_ref: &GlobalReference<ConstantUUID>) -> ExecutionResult<Value> {
         let linker_cst = &self.linker.constants[cst_ref.id];
 
-        if linker_cst.link_info.is_extern == IsExtern::Builtin {
+        Ok(if linker_cst.link_info.is_extern == IsExtern::Builtin {
             match linker_cst.link_info.name.as_str() {
                 "true" => Value::Bool(true),
                 "false" => Value::Bool(false),
+                "clog2" => {
+                    let (val, span) = self.get_first_template_argument_value(cst_ref);
+                    let int_val = val.unwrap_integer();
+                    if *int_val > BigInt::ZERO {
+                        let int_val_minus_one : BigInt = int_val - 1;
+
+                        Value::Integer(BigInt::from(int_val_minus_one.bits()))
+                    } else {
+                        return Err((span, format!("clog2 argument must be > 0, found {int_val}")))
+                    }
+                }
+                "assert" => {
+                    let (condition, span) = self.get_first_template_argument_value(cst_ref);
+
+                    if condition.unwrap_bool() {
+                        Value::Bool(true)
+                    } else {
+                        return Err((span, "Assertion failed".into()))
+                    }
+                }
+                "sizeof" => {
+                    let first_arg = cst_ref.unwrap_first_template_argument();
+                    let wr_typ = first_arg.kind.unwrap_type();
+
+                    let concrete_typ = self.concretize_type(wr_typ)?;
+
+                    let Some(typ_sz) = concrete_typ.sizeof() else {
+                        return Err((first_arg.value_span, "This is an incomplete type".into()))
+                    };
+
+                    Value::Integer(typ_sz)
+                }
                 "__crash_compiler" => {
                     cst_ref.get_total_span().debug();
                     panic!("__crash_compiler Intentional ICE. This is for debugging the compiler and LSP.")
@@ -212,12 +250,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             }
         } else {
             todo!("Custom Constants");
-        }
+        })
     }
 
     // Points to the wire in the hardware that corresponds to the root of this.
-    fn determine_wire_ref_root(&mut self, wire_ref_root: &WireReferenceRoot) -> RealWireRefRoot {
-        match wire_ref_root {
+    fn determine_wire_ref_root(&mut self, wire_ref_root: &WireReferenceRoot) -> ExecutionResult<RealWireRefRoot> {
+        Ok(match wire_ref_root {
             &WireReferenceRoot::LocalDecl(decl_id, _) => match &self.generation_state[decl_id] {
                 SubModuleOrWire::Wire(w) => RealWireRefRoot::Wire {
                     wire_id: *w,
@@ -228,16 +266,16 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 SubModuleOrWire::Unnasigned => unreachable!(),
             },
             WireReferenceRoot::NamedConstant(cst) => {
-                RealWireRefRoot::Constant(self.get_named_constant_value(cst))
+                RealWireRefRoot::Constant(self.get_named_constant_value(cst)?)
             }
             WireReferenceRoot::SubModulePort(port) => {
-                return self.instantiate_port_wire_ref_root(
+                return Ok(self.instantiate_port_wire_ref_root(
                     port.port,
                     port.submodule_decl,
                     port.port_name_span,
-                );
+                ));
             }
-        }
+        })
     }
 
     /// [Self::determine_wire_ref_root] may have included a preamble path already, this must be built upon by this function
@@ -302,7 +340,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             WriteModifiers::Connection {
                 num_regs,
                 regs_span: _,
-            } => match self.determine_wire_ref_root(&target_wire_ref.root) {
+            } => match self.determine_wire_ref_root(&target_wire_ref.root)? {
                 RealWireRefRoot::Wire {
                     wire_id: target_wire,
                     preamble,
@@ -380,7 +418,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 self.generation_state.get_generation_value(decl_id)?.clone()
             }
             WireReferenceRoot::NamedConstant(cst) => {
-                self.get_named_constant_value(cst)
+                self.get_named_constant_value(cst)?
             }
             &WireReferenceRoot::SubModulePort(_) => {
                 todo!("Don't yet support compile time functions")
@@ -523,9 +561,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         wire_ref_root: &WireReferenceRoot,
         original_instruction: FlatID,
         domain: DomainID,
-    ) -> (WireID, Vec<RealWirePathElem>) {
-        let root = self.determine_wire_ref_root(wire_ref_root);
-        match root {
+    ) -> ExecutionResult<(WireID, Vec<RealWirePathElem>)> {
+        let root = self.determine_wire_ref_root(wire_ref_root)?;
+        Ok(match root {
             RealWireRefRoot::Wire { wire_id, preamble } => (wire_id, preamble),
             RealWireRefRoot::Generative(decl_id) => {
                 let value = self.generation_state[decl_id]
@@ -540,7 +578,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 self.alloc_wire_for_const(value, original_instruction, domain),
                 Vec::new(),
             ),
-        }
+        })
     }
     fn expression_to_real_wire(
         &mut self,
@@ -551,7 +589,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         let source = match &expression.source {
             ExpressionSource::WireRef(wire_ref) => {
                 let (root_wire, path_preamble) =
-                    self.get_wire_ref_root_as_wire(&wire_ref.root, original_instruction, domain);
+                    self.get_wire_ref_root_as_wire(&wire_ref.root, original_instruction, domain)?;
                 let path = self.instantiate_wire_ref_path(path_preamble, &wire_ref.path, domain);
 
                 if path.is_empty() {

@@ -314,19 +314,6 @@ pub enum WireReferencePathElement {
     },
 }
 
-impl WireReferencePathElement {
-    fn for_each_dependency<F: FnMut(FlatID)>(path: &[WireReferencePathElement], mut f: F) {
-        for p in path {
-            match p {
-                WireReferencePathElement::ArrayAccess {
-                    idx,
-                    bracket_span: _,
-                } => f(*idx),
-            }
-        }
-    }
-}
-
 /// The root of a [WireReference]. Basically where the wire reference starts. 
 /// 
 /// This can be a local declaration, a global constant, the port of a submodule. 

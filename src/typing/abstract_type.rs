@@ -1,4 +1,4 @@
-use crate::alloc::{ArenaAllocator, UUID};
+use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
 use crate::value::Value;
 use std::ops::Deref;

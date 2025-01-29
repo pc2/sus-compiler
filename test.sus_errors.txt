@@ -657,13 +657,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ┬  
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Warning: The result of this operation is not used
-     ╭─[test.sus:707:2]
-     │
- 707 │     mm.a
-     │     ──┬─  
-     │       ╰─── The result of this operation is not used
-─────╯
 Error: Port 'a' is used, but the instantiated module has this port disabled
      ╭─[test.sus:707:5]
      │
@@ -1144,20 +1137,6 @@ Error: ABC does not name a Type or a Value.
      │           ─┬─  
      │            ╰─── ABC does not name a Type or a Value.
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_21
-     ╭─[test.sus:960:14]
-     │
- 960 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
-     │                 ────────────────┬────────────────  
-     │                                 ╰────────────────── Could not fully figure out the type of this object. type_variable_21
-─────╯
-Error: Could not fully figure out the type of this object. type_variable_22
-     ╭─[test.sus:960:14]
-     │
- 960 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
-     │                 ────────────────┬────────────────  
-     │                                 ╰────────────────── Could not fully figure out the type of this object. type_variable_22
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:953:13]
      │
@@ -1388,4 +1367,11 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1083 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
       │            ───┬──  
       │               ╰──── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Assertion failed
+      ╭─[test.sus:1098:14]
+      │
+ 1098 │     assert #(C: 15 + 3 == 19)
+      │                 ──────┬─────  
+      │                       ╰─────── Assertion failed
 ──────╯

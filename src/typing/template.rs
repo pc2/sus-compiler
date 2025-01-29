@@ -1,4 +1,4 @@
-use crate::{prelude::*, value::Value};
+use crate::{alloc::UUID, prelude::*, value::Value};
 
 use super::{abstract_type::AbstractType, concrete_type::ConcreteType};
 use crate::flattening::WrittenType;
@@ -26,6 +26,10 @@ impl<ID> GlobalReference<ID> {
             result = Span::new_overarching(result, template_span.outer_span());
         }
         result
+    }
+    /// Used for builtins, like clog2, assert, sizeof, etc
+    pub fn unwrap_first_template_argument(&self) -> &TemplateArg {
+        self.template_args[UUID::from_hidden_value(0)].as_ref().unwrap()
     }
 }
 
