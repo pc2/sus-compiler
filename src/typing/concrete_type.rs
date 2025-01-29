@@ -54,13 +54,6 @@ impl ConcreteType {
         };
         v
     }
-    pub fn down_array(&self) -> &ConcreteType {
-        let ConcreteType::Array(arr_box) = self else {
-            unreachable!("Must be an array! Is {self:?} instead")
-        };
-        let (sub, _sz) = arr_box.deref();
-        sub
-    }
     pub fn contains_unknown(&self) -> bool {
         match self {
             ConcreteType::Named(global_ref) => {
@@ -88,7 +81,7 @@ impl ConcreteType {
     /// If it contains any Unknowns, then returns None
     pub fn sizeof(&self) -> Option<BigInt> {
         match self {
-            ConcreteType::Named(uuid) => Some(Self::sizeof_named(*uuid).into()),
+            ConcreteType::Named(reference) => Some(Self::sizeof_named(reference).into()),
             ConcreteType::Value(_value) => unreachable!("Root of ConcreteType cannot be a value"),
             ConcreteType::Array(arr_box) => {
                 let (typ, size) = arr_box.deref();
@@ -105,11 +98,11 @@ impl ConcreteType {
         }
     }
 
-    /// TODO #50 Ranged Int work & ConcreteGlobalReference should be integrated
-    pub fn sizeof_named(id: TypeUUID) -> u64 {
-        if id == get_builtin_type("int") {
+    /// TODO #50 Ranged Int work should be integrated
+    pub fn sizeof_named(type_ref: &ConcreteGlobalReference<TypeUUID>) -> u64 {
+        if type_ref.id == get_builtin_type("int") {
             32 // TODO concrete int sizes
-        } else if id == get_builtin_type("bool") {
+        } else if type_ref.id == get_builtin_type("bool") {
             1
         } else {
             println!("TODO Named Structs Size");

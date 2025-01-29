@@ -40,7 +40,7 @@ fn typ_to_declaration(mut typ: &ConcreteType) -> String {
     }
     match typ {
         ConcreteType::Named(reference) => {
-            let sz = ConcreteType::sizeof_named(reference.id);
+            let sz = ConcreteType::sizeof_named(reference);
             if sz == 1 {
                 format!("{array_string} std_logic")
             } else {
