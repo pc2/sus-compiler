@@ -470,7 +470,7 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
     fn get_hm_info(&self) -> HindleyMilnerInfo<ConcreteTypeHMInfo, ConcreteTypeVariableIDMarker> {
         match self {
             ConcreteType::Unknown(var_id) => HindleyMilnerInfo::TypeVar(*var_id),
-            ConcreteType::Named(named_id) => HindleyMilnerInfo::TypeFunc(ConcreteTypeHMInfo::Named(*named_id)),
+            ConcreteType::Named(named_id) => HindleyMilnerInfo::TypeFunc(ConcreteTypeHMInfo::Named(named_id.id)),
             ConcreteType::Value(v) => HindleyMilnerInfo::TypeFunc(ConcreteTypeHMInfo::Value(v)),
             ConcreteType::Array(_) => HindleyMilnerInfo::TypeFunc(ConcreteTypeHMInfo::Array),
         }

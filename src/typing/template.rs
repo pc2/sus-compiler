@@ -1,11 +1,12 @@
-use crate::{alloc::UUID, prelude::*, value::Value};
 
+use crate::{alloc::UUID, prelude::*, value::Value};
 use super::{abstract_type::AbstractType, concrete_type::ConcreteType};
 use crate::flattening::WrittenType;
+use std::fmt::Display;
 
-/// References any [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant], 
-/// and includes any template arguments. 
-/// 
+/// References any [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant],
+/// and includes any template arguments.
+///
 /// As an example, this is the struct in charge of representing:
 /// ```sus
 /// FIFO #(DEPTH : 32, T : type int)
@@ -34,10 +35,10 @@ impl<ID> GlobalReference<ID> {
 }
 
 /// The template parameters of an object ([crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant])
-/// 
+///
 /// See [crate::linker::LinkInfo]
-/// 
-/// Not to be confused with [TemplateArg], which is the argument passed to this parameter. 
+///
+/// Not to be confused with [TemplateArg], which is the argument passed to this parameter.
 #[derive(Debug)]
 pub struct Parameter {
     pub name: String,
@@ -58,7 +59,7 @@ pub struct GenerativeParameterKind {
 pub struct TypeParameterKind {}
 
 /// See [Parameter]
-/// 
+///
 /// Must match the [TemplateArgKind] that is passed
 #[derive(Debug)]
 pub enum ParameterKind {
@@ -83,12 +84,12 @@ impl ParameterKind {
     }
 }
 
-/// An argument passed to a template parameter. 
-/// 
+/// An argument passed to a template parameter.
+///
 /// See [GlobalReference]
-/// 
-/// Not to be confused with [Parameter], which it is passed into. 
-/// 
+///
+/// Not to be confused with [Parameter], which it is passed into.
+///
 /// When instantiated, this becomes a [ConcreteTemplateArg]
 #[derive(Debug)]
 pub struct TemplateArg {
@@ -98,7 +99,7 @@ pub struct TemplateArg {
 }
 
 /// See [TemplateArg]
-/// 
+///
 /// The argument kind passed to [ParameterKind], which it must match
 #[derive(Debug)]
 pub enum TemplateArgKind {
@@ -130,19 +131,26 @@ pub enum HowDoWeKnowTheTemplateArg {
     Inferred,
 }
 
-impl HowDoWeKnowTheTemplateArg {
-    pub fn to_str(&self) -> &'static str {
-        match self {
+impl Display for HowDoWeKnowTheTemplateArg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
             HowDoWeKnowTheTemplateArg::Given => "given",
             HowDoWeKnowTheTemplateArg::Inferred => "inferred",
-        }
+        })
     }
 }
 
-/// Represents the value we're passing into a template argument. 
-/// 
+// --------------------------------------------------
+// IMPORTANT: To those seeking to refactor this struct: don't.
+// It may look like [ConcreteTemplateArg::Value] duplicates [ConcreteType::Value], or that the whole thing could be replaced by [ConcreteType] itself.
+// But the [ConcreteTemplateArg::Type] and [ConcreteTemplateArg::Value] cases differentiate often enough, and semantically are more similar to [ParameterKind].
+// Attempting to merge these uses with [ConcreteType] internals only leads to confusion.
+// --------------------------------------------------
+
+/// Represents the value we're passing into a template argument.
+///
 /// It is the instantiated variant of [TemplateArg]
-/// 
+///
 /// And it is passed to a [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant]'s [Parameter]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteTemplateArg {
@@ -156,20 +164,24 @@ pub enum ConcreteTemplateArg {
 impl ConcreteTemplateArg {
     #[track_caller]
     pub fn unwrap_type(&self) -> &ConcreteType {
-        let Self::Type(t, _) = self else {unreachable!()};
+        let Self::Type(t, _) = self else {
+            unreachable!()
+        };
         t
     }
     #[track_caller]
     pub fn unwrap_value(&self) -> &Value {
-        let Self::Value(v, _) = self else {unreachable!()};
+        let Self::Value(v, _) = self else {
+            unreachable!()
+        };
         v
     }
 }
 
 /// See [TemplateArg]
 pub type TemplateArgs = FlatAlloc<Option<TemplateArg>, TemplateIDMarker>;
-/// Applies to both Template Type args and Template Value args. 
-/// 
+/// Applies to both Template Type args and Template Value args.
+///
 /// For Types this is the Type, for Values this is unified with the parameter declaration type
 pub type TemplateAbstractTypes = FlatAlloc<AbstractType, TemplateIDMarker>;
 /// See [Parameter]
