@@ -1,4 +1,4 @@
-use crate::typing::template::{TemplateArgKind, TemplateArgs};
+use crate::typing::template::{TVec, TemplateArg, TemplateArgKind};
 
 use crate::prelude::*;
 
@@ -50,7 +50,7 @@ impl WireReferencePathElement {
 }
 
 pub fn for_each_generative_input_in_template_args(
-    template_args: &TemplateArgs,
+    template_args: &TVec<Option<TemplateArg>>,
     f: &mut impl FnMut(FlatID),
 ) {
     for (_id, t_arg) in template_args.iter_valids() {

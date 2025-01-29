@@ -1,4 +1,4 @@
-use crate::{flattening::{Instruction, NamedConstant}, prelude::*, typing::template::{GenerativeParameterKind, ParameterKind, TypeParameterKind}};
+use crate::{flattening::{Instruction, NamedConstant}, prelude::*, typing::template::{GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind}};
 
 pub mod checkpoint;
 mod resolver;
@@ -23,7 +23,7 @@ use crate::errors::{CompileError, ErrorInfo, ErrorLevel, ErrorStore};
 
 use crate::flattening::{StructType, TypingAllocator};
 
-use crate::typing::template::Parameters;
+
 
 use self::checkpoint::CheckPoint;
 
@@ -114,7 +114,7 @@ pub struct LinkInfo {
     /// Is only temporary. It's used during typechecking to allocate the type unification block
     pub type_variable_alloc: TypingAllocator,
 
-    pub template_parameters: Parameters,
+    pub template_parameters: TVec<Parameter>,
 
     /// Created in Stage 2: Flattening. type data is filled out during Typechecking
     pub instructions: FlatAlloc<Instruction, FlatIDMarker>,

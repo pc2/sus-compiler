@@ -3,7 +3,7 @@ use crate::prelude::*;
 use crate::value::Value;
 use std::ops::Deref;
 
-use super::template::{GlobalReference, TemplateAbstractTypes, Parameters};
+use super::template::{GlobalReference, Parameter, TVec};
 use super::type_inference::{DomainVariableID, DomainVariableIDMarker, TypeSubstitutor, TypeVariableID, TypeVariableIDMarker, UnifyErrorReport};
 use crate::flattening::{BinaryOperator, StructType, TypingAllocator, UnaryOperator, WrittenType};
 use crate::linker::get_builtin_type;
@@ -105,7 +105,7 @@ pub struct TypeUnifier {
 
 impl TypeUnifier {
     pub fn new(
-        parameters: &Parameters,
+        parameters: &TVec<Parameter>,
         typing_alloc: TypingAllocator
     ) -> Self {
         Self {
@@ -151,7 +151,11 @@ impl TypeUnifier {
     /// This should always be what happens first to a given variable. 
     /// 
     /// Therefore it should be impossible that one of the internal unifications ever fails
-    pub fn unify_with_written_type_substitute_templates_must_succeed(&self, wr_typ: &WrittenType, typ: &AbstractType, template_type_args: &TemplateAbstractTypes) {
+    /// 
+    /// template_type_args applies to both Template Type args and Template Value args.
+    ///
+    /// For Types this is the Type, for Values this is unified with the parameter declaration type
+    pub fn unify_with_written_type_substitute_templates_must_succeed(&self, wr_typ: &WrittenType, typ: &AbstractType, template_type_args: &TVec<AbstractType>) {
         match wr_typ {
             WrittenType::Error(_span) => {} // Already an error, don't unify
             WrittenType::TemplateVariable(_span, argument_id) => {

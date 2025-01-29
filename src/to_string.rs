@@ -1,5 +1,6 @@
 use crate::prelude::*;
 
+use crate::typing::template::{Parameter, TVec};
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
 use crate::flattening::{
@@ -9,7 +10,7 @@ use crate::linker::{FileData, LinkInfo};
 use crate::typing::{
     abstract_type::{AbstractType, DomainType},
     concrete_type::ConcreteType,
-    template::{ConcreteTemplateArg, ConcreteTemplateArgs, Parameters},
+    template::ConcreteTemplateArg,
 };
 
 use std::{
@@ -20,7 +21,7 @@ use std::{
 use std::fmt::Write;
 use std::ops::Deref;
 
-pub fn map_to_type_names(parameters: &Parameters) -> FlatAlloc<String, TemplateIDMarker> {
+pub fn map_to_type_names(parameters: &TVec<Parameter>) -> FlatAlloc<String, TemplateIDMarker> {
     parameters.map(|(_id, v)| v.name.clone())
 }
 
@@ -34,7 +35,7 @@ impl TemplateNameGetter for FlatAlloc<String, TemplateIDMarker> {
         &self[id]
     }
 }
-impl TemplateNameGetter for Parameters {
+impl TemplateNameGetter for TVec<Parameter> {
     fn get_template_name(&self, id: TemplateID) -> &str {
         &self[id].name
     }
@@ -306,7 +307,7 @@ impl Module {
 
 pub fn pretty_print_concrete_instance<TypVec>(
     target_link_info: &LinkInfo,
-    given_template_args: &ConcreteTemplateArgs,
+    given_template_args: &TVec<ConcreteTemplateArg>,
     linker_types: &TypVec,
 ) -> String
 where

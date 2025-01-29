@@ -524,6 +524,7 @@ pub enum DelayedConstraintStatus {
     /// The constraint can be removed
     Resolved,
     /// Progress was made, (potentially enabling other parts to continue), but the constraint cannot be removed
+    #[allow(unused)]
     Progress,
     /// No progress was made, if all constraints return [DelayedConstraintStatus::NoProgress] then type resolution deadlocked and cannot finish. 
     NoProgress

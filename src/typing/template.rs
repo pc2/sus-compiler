@@ -15,8 +15,8 @@ use std::fmt::Display;
 pub struct GlobalReference<ID> {
     pub name_span: Span,
     pub id: ID,
-    pub template_args: TemplateArgs,
-    pub template_arg_types: TemplateAbstractTypes,
+    pub template_args: TVec<Option<TemplateArg>>,
+    pub template_arg_types: TVec<AbstractType>,
     pub template_span: Option<BracketSpan>,
 }
 
@@ -178,13 +178,5 @@ impl ConcreteTemplateArg {
     }
 }
 
-/// See [TemplateArg]
-pub type TemplateArgs = FlatAlloc<Option<TemplateArg>, TemplateIDMarker>;
-/// Applies to both Template Type args and Template Value args.
-///
-/// For Types this is the Type, for Values this is unified with the parameter declaration type
-pub type TemplateAbstractTypes = FlatAlloc<AbstractType, TemplateIDMarker>;
-/// See [Parameter]
-pub type Parameters = FlatAlloc<Parameter, TemplateIDMarker>;
-/// See [ConcreteTemplateArg]
-pub type ConcreteTemplateArgs = FlatAlloc<ConcreteTemplateArg, TemplateIDMarker>;
+/// A convienent type alias for all places where lists of template args are needed
+pub type TVec<T> = FlatAlloc<T, TemplateIDMarker>;

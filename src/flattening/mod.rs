@@ -164,8 +164,10 @@ pub struct NamedConstant {
 /// TODO: Structs #8
 #[derive(Debug)]
 pub struct StructField {
+    #[allow(unused)]
     pub name: String,
     pub name_span: Span,
+    #[allow(unused)]
     pub decl_span: Span,
     /// This is only set after flattening is done. Initially just [UUID::PLACEHOLDER]
     pub declaration_instruction: FlatID,

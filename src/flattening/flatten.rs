@@ -13,7 +13,7 @@ use super::parser::Cursor;
 use super::*;
 
 use crate::typing::template::{
-    GenerativeParameterKind, TemplateArg, TemplateArgKind, TemplateArgs, ParameterKind
+    GenerativeParameterKind, ParameterKind, TVec, TemplateArg, TemplateArgKind
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -282,7 +282,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
         }
     }
 
-    fn flatten_template_args(&mut self, found_global: GlobalUUID, has_template_args: bool, cursor: &mut Cursor) -> TemplateArgs {
+    fn flatten_template_args(&mut self, found_global: GlobalUUID, has_template_args: bool, cursor: &mut Cursor) -> TVec<Option<TemplateArg>> {
         let link_info = self.globals.get_link_info(found_global);
         let full_object_name = link_info.get_full_name();
 
@@ -1593,7 +1593,7 @@ fn flatten_global(linker: &mut Linker, global_obj : GlobalUUID, cursor: &mut Cur
             let typ = &globals[type_uuid];
             (UUIDRange::empty().into_iter(), typ.fields.id_range().into_iter(), DeclarationContext::StructField, &FlatAlloc::EMPTY_FLAT_ALLOC)
         }
-        GlobalUUID::Constant(const_uuid) => {
+        GlobalUUID::Constant(_const_uuid) => {
             (UUIDRange::empty().into_iter(), UUIDRange::empty().into_iter(), DeclarationContext::Generative(GenerativeKind::PlainGenerative), &FlatAlloc::EMPTY_FLAT_ALLOC)
         }
     };

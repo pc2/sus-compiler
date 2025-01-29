@@ -6,8 +6,8 @@ use std::ops::Deref;
 use crate::linker::get_builtin_type;
 use crate::value::Value;
 
-use super::template::ConcreteTemplateArg;
-use super::template::ConcreteTemplateArgs;
+use super::template::{ConcreteTemplateArg, TVec};
+
 use super::type_inference::ConcreteTypeVariableID;
 
 pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
@@ -23,7 +23,7 @@ pub const INT_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalRe
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConcreteGlobalReference<ID> {
     pub id: ID,
-    pub template_args: ConcreteTemplateArgs,
+    pub template_args: TVec<ConcreteTemplateArg>,
 }
 
 /// A post-instantiation type. These fully define what wires should be generated for a given object. 

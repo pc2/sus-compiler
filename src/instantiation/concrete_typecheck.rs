@@ -173,7 +173,7 @@ fn can_expression_be_value_inferred(link_info: &LinkInfo, expr_id: FlatID) -> Op
     Some(*template_id)
 }
 
-fn try_to_attach_value_to_template_arg(template_wire_referernce: FlatID, found_value: &ConcreteType, template_args: &mut ConcreteTemplateArgs, submodule_link_info: &LinkInfo) {
+fn try_to_attach_value_to_template_arg(template_wire_referernce: FlatID, found_value: &ConcreteType, template_args: &mut TVec<ConcreteTemplateArg>, submodule_link_info: &LinkInfo) {
     let ConcreteType::Value(v) = found_value else {return}; // We don't have a value to assign
     if let Some(template_id) = can_expression_be_value_inferred(submodule_link_info, template_wire_referernce) {
         if let ConcreteTemplateArg::NotProvided = &template_args[template_id] {
@@ -182,7 +182,7 @@ fn try_to_attach_value_to_template_arg(template_wire_referernce: FlatID, found_v
     }
 }
 
-fn infer_parameters_by_walking_type(port_wr_typ: &WrittenType, connected_typ: &ConcreteType, template_args: &mut ConcreteTemplateArgs, submodule_link_info: &LinkInfo) {
+fn infer_parameters_by_walking_type(port_wr_typ: &WrittenType, connected_typ: &ConcreteType, template_args: &mut TVec<ConcreteTemplateArg>, submodule_link_info: &LinkInfo) {
     match port_wr_typ {
         WrittenType::Error(_) => {} // Can't continue, bad written type
         WrittenType::Named(_) => {} // Seems we've run out of type to check

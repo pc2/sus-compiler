@@ -8,7 +8,7 @@ use crate::flattening::{DeclarationKind, Instruction, Module, Port};
 use crate::instantiation::{
     InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem, CALCULATE_LATENCY_LATER,
 };
-use crate::typing::template::{ConcreteTemplateArg, ConcreteTemplateArgs};
+use crate::typing::template::{ConcreteTemplateArg, TVec};
 use crate::{typing::concrete_type::ConcreteType, value::Value};
 
 use super::shared::*;
@@ -333,7 +333,7 @@ impl<'g> CodeGenerationContext<'g> {
     fn write_template_args(
         &mut self,
         link_info: &LinkInfo,
-        concrete_template_args: &ConcreteTemplateArgs,
+        concrete_template_args: &TVec<ConcreteTemplateArg>,
     ) {
         self.program_text.write_str(&link_info.name).unwrap();
         self.program_text.write_str(" #(").unwrap();

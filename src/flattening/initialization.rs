@@ -9,15 +9,14 @@ use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
 use crate::{file_position::FileText, flattening::Module, instantiation::InstantiationCache};
 
 use crate::typing::template::{
-    GenerativeParameterKind, Parameter, ParameterKind, Parameters,
-    TypeParameterKind,
+    GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind
 };
 
 use super::parser::Cursor;
 use super::*;
 
 struct InitializationContext<'linker> {
-    parameters: Parameters,
+    parameters: TVec<Parameter>,
 
     // module-only stuff
     ports: FlatAlloc<Port, PortIDMarker>,

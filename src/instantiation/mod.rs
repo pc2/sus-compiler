@@ -8,6 +8,7 @@ mod unique_names;
 use unique_names::UniqueNames;
 
 use crate::prelude::*;
+use crate::typing::template::{ConcreteTemplateArg, TVec};
 use crate::typing::type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor};
 
 use std::cell::OnceCell;
@@ -21,10 +22,7 @@ use crate::{
     value::Value,
 };
 
-use crate::typing::{
-    concrete_type::ConcreteType,
-    template::ConcreteTemplateArgs,
-};
+use crate::typing::concrete_type::ConcreteType;
 
 use self::latency_algorithm::SpecifiedLatency;
 
@@ -134,7 +132,7 @@ pub struct SubModule {
     pub interface_call_sites: FlatAlloc<Vec<Span>, InterfaceIDMarker>,
     pub name: String,
     pub module_uuid: ModuleUUID,
-    pub template_args: ConcreteTemplateArgs,
+    pub template_args: TVec<ConcreteTemplateArg>,
 }
 
 /// Generated from [Module::ports]
@@ -209,7 +207,7 @@ impl SubModuleOrWire {
 /// Also, with incremental builds (#49) this will be a prime area for investigation
 #[derive(Debug)]
 pub struct InstantiationCache {
-    cache: RefCell<HashMap<ConcreteTemplateArgs, Rc<InstantiatedModule>>>,
+    cache: RefCell<HashMap<TVec<ConcreteTemplateArg>, Rc<InstantiatedModule>>>,
 }
 
 impl InstantiationCache {
@@ -223,7 +221,7 @@ impl InstantiationCache {
         &self,
         md: &Module,
         linker: &Linker,
-        template_args: ConcreteTemplateArgs,
+        template_args: TVec<ConcreteTemplateArg>,
     ) -> Option<Rc<InstantiatedModule>> {
         let cache_borrow = self.cache.borrow();
 
@@ -276,7 +274,7 @@ impl InstantiationCache {
 
     // Also passes over invalid instances. Instance validity should not be assumed!
     // Only used for things like syntax highlighting
-    pub fn for_each_instance<F: FnMut(&ConcreteTemplateArgs, &Rc<InstantiatedModule>)>(
+    pub fn for_each_instance<F: FnMut(&TVec<ConcreteTemplateArg>, &Rc<InstantiatedModule>)>(
         &self,
         mut f: F,
     ) {
@@ -329,7 +327,7 @@ struct InstantiationContext<'fl, 'l> {
     interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     errors: ErrorCollector<'l>,
 
-    template_args: &'fl ConcreteTemplateArgs,
+    template_args: &'fl TVec<ConcreteTemplateArg>,
     md: &'fl Module,
     linker: &'l Linker,
 }
@@ -363,7 +361,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 fn perform_instantiation(
     md: &Module,
     linker: &Linker,
-    template_args: &ConcreteTemplateArgs,
+    template_args: &TVec<ConcreteTemplateArg>,
 ) -> InstantiatedModule {
     let mut context = InstantiationContext {
         name: pretty_print_concrete_instance(&md.link_info, template_args, &linker.types),
