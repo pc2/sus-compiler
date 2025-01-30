@@ -168,7 +168,7 @@ fn push_all_errors(
         let mut diag_vec: Vec<Diagnostic> = Vec::new();
 
         linker.for_all_errors_in_file(file_id, |err| {
-            diag_vec.push(convert_diagnostic(err, &file_data.file_text, &linker));
+            diag_vec.push(convert_diagnostic(err, &file_data.file_text, linker));
         });
 
         let params = &PublishDiagnosticsParams {
@@ -289,9 +289,9 @@ fn gather_all_references_in_one_file(linker: &Linker, file_id: FileUUID, pos: us
     if let Some((_location, hover_info)) = get_selected_object(linker, file_id, pos) {
         let refers_to = RefersTo::from(hover_info);
         if refers_to.is_global() {
-            gather_references_in_file(&linker, &linker.files[file_id], refers_to)
+            gather_references_in_file(linker, &linker.files[file_id], refers_to)
         } else if let Some(local) = refers_to.local {
-            for_each_local_reference_in_global(&linker, local.0, local.1)
+            for_each_local_reference_in_global(linker, local.0, local.1)
         } else {
             Vec::new()
         }
@@ -311,20 +311,20 @@ fn gather_all_references_across_all_files(
         let refers_to = RefersTo::from(hover_info);
         if refers_to.is_global() {
             for (other_file_id, other_file) in &linker.files {
-                let found_refs = gather_references_in_file(&linker, other_file, refers_to);
+                let found_refs = gather_references_in_file(linker, other_file, refers_to);
                 for r in &found_refs {
                     assert!(location.size() == r.size())
                 }
-                if found_refs.len() > 0 {
+                if !found_refs.is_empty() {
                     ref_locations.push((other_file_id, found_refs))
                 }
             }
         } else if let Some(local) = refers_to.local {
-            let found_refs = for_each_local_reference_in_global(&linker, local.0, local.1);
+            let found_refs = for_each_local_reference_in_global(linker, local.0, local.1);
             for r in &found_refs {
                 assert!(location.size() == r.size())
             }
-            if found_refs.len() > 0 {
+            if !found_refs.is_empty() {
                 ref_locations.push((file_id, found_refs))
             }
         }
@@ -499,7 +499,7 @@ fn handle_request(
             let (file_uuid, position) =
                 linker.location_in_file(&params.text_document_position, manager);
 
-            serde_json::to_value(&CompletionResponse::Array(gather_completions(
+            serde_json::to_value(CompletionResponse::Array(gather_completions(
                 linker, file_uuid, position,
             )))
         }
@@ -529,13 +529,13 @@ fn handle_notification(
             assert!(only_change.range.is_none());
             linker.update_text(&params.text_document.uri, only_change.text, manager);
 
-            push_all_errors(connection, &linker)?;
+            push_all_errors(connection, linker)?;
         }
         notification::DidChangeWatchedFiles::METHOD => {
             println!("Workspace Files modified");
             (*linker, *manager) = initialize_all_files(initialize_params);
 
-            push_all_errors(&connection, &linker)?;
+            push_all_errors(connection, linker)?;
         }
         other => {
             println!("got other notification: {other:?}");

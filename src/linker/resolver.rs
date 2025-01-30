@@ -89,10 +89,10 @@ impl<'linker> GlobalResolver<'linker> {
         }
     }
     /// Get the [ErrorCollector] and [ResolvedGlobals] out of this
-    pub fn decommission<'linker_files>(
+    pub fn decommission(
         self,
-        linker_files: &'linker_files ArenaAllocator<FileData, FileUUIDMarker>,
-    ) -> (ErrorCollector<'linker_files>, ResolvedGlobals) {
+        linker_files: &ArenaAllocator<FileData, FileUUIDMarker>,
+    ) -> (ErrorCollector<'_>, ResolvedGlobals) {
         let errors = self.errors.re_attach(linker_files);
         let resolved_globals = self.resolved_globals.into_inner();
         (errors, resolved_globals)
@@ -113,7 +113,7 @@ impl<'linker> GlobalResolver<'linker> {
     }
 
     /// SAFETY: Files are never touched, and as long as this object is managed properly linker will also exist long enough.
-    pub fn resolve_global<'slf>(&'slf self, name_span: Span) -> Option<GlobalUUID> {
+    pub fn resolve_global(&self, name_span: Span) -> Option<GlobalUUID> {
         let name = &self.file_data.file_text[name_span];
 
         let mut resolved_globals = self.resolved_globals.borrow_mut();
@@ -179,7 +179,7 @@ impl<'linker> GlobalResolver<'linker> {
     }
 }
 
-impl<'l> Index<ModuleUUID> for GlobalResolver<'l> {
+impl Index<ModuleUUID> for GlobalResolver<'_> {
     type Output = Module;
 
     fn index(&self, index: ModuleUUID) -> &Self::Output {
@@ -191,7 +191,7 @@ impl<'l> Index<ModuleUUID> for GlobalResolver<'l> {
         &self.linker.modules[index]
     }
 }
-impl<'l> Index<TypeUUID> for GlobalResolver<'l> {
+impl Index<TypeUUID> for GlobalResolver<'_> {
     type Output = StructType;
 
     fn index(&self, index: TypeUUID) -> &Self::Output {
@@ -203,7 +203,7 @@ impl<'l> Index<TypeUUID> for GlobalResolver<'l> {
         &self.linker.types[index]
     }
 }
-impl<'l> Index<ConstantUUID> for GlobalResolver<'l> {
+impl Index<ConstantUUID> for GlobalResolver<'_> {
     type Output = NamedConstant;
 
     fn index(&self, index: ConstantUUID) -> &Self::Output {

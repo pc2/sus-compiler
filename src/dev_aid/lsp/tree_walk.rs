@@ -46,7 +46,7 @@ pub struct RefersTo {
     pub parameter: Option<(GlobalUUID, TemplateID)>,
 }
 
-impl<'linker> From<LocationInfo<'linker>> for RefersTo {
+impl From<LocationInfo<'_>> for RefersTo {
     fn from(info: LocationInfo) -> Self {
         let mut result = RefersTo {
             local: None,
@@ -366,7 +366,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
             if let ParameterKind::Type(TypeParameterKind {}) = &template_arg.kind {
                 self.visit(
                     template_arg.name_span,
-                    LocationInfo::Parameter(name_elem, &link_info, template_id, template_arg),
+                    LocationInfo::Parameter(name_elem, link_info, template_id, template_arg),
                 );
             }
         }
@@ -375,12 +375,12 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
     fn walk_link_info(&mut self, obj_id: GlobalUUID) {
         let link_info = self.linker.get_link_info(obj_id);
         if !(self.should_prune)(link_info.span) {
-            self.walk_name_and_template_arguments(obj_id, &link_info);
+            self.walk_name_and_template_arguments(obj_id, link_info);
 
             for (id, inst) in &link_info.instructions {
                 match inst {
                     Instruction::SubModule(sm) => {
-                        self.walk_global_reference(obj_id, &link_info, &sm.module_ref);
+                        self.walk_global_reference(obj_id, link_info, &sm.module_ref);
                         if let Some((_sm_name, sm_name_span)) = &sm.name {
                             self.visit(
                                 *sm_name_span,
@@ -394,7 +394,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                         }
                     }
                     Instruction::Declaration(decl) => {
-                        self.walk_type(obj_id, &link_info, &decl.typ_expr);
+                        self.walk_type(obj_id, link_info, &decl.typ_expr);
                         if decl.declaration_itself_is_not_written_to {
                             self.visit(
                                 decl.name_span,

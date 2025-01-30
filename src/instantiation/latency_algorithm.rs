@@ -339,7 +339,7 @@ pub fn solve_latencies(
     let mut ports_to_place = Vec::with_capacity(inputs.len() + outputs.len());
 
     // If no latencies are given, we have to initialize an arbitrary one ourselves. Prefer input ports over output ports over regular wires
-    if specified_latencies.len() == 0 {
+    if specified_latencies.is_empty() {
         let wire = *inputs.first().unwrap_or(outputs.first().unwrap_or(&0));
         specified_latencies.push(SpecifiedLatency { wire, latency: 0 });
     }
@@ -371,7 +371,7 @@ pub fn solve_latencies(
     // First forward run from the initial latency assignment to discover other ports
     count_latency_all_in_list::<false>(
         &mut working_latencies,
-        &fanouts,
+        fanouts,
         &specified_latencies,
         &mut stack,
     )?;
@@ -381,7 +381,7 @@ pub fn solve_latencies(
     // Then backward run
     count_latency_all_in_list::<true>(
         &mut working_latencies,
-        &fanins,
+        fanins,
         &specified_latencies,
         &mut stack,
     )?;
@@ -395,17 +395,12 @@ pub fn solve_latencies(
         if chosen_port.is_input {
             count_latency::<false>(
                 &mut working_latencies,
-                &fanouts,
+                fanouts,
                 chosen_port.wire,
                 &mut stack,
             )?;
         } else {
-            count_latency::<true>(
-                &mut working_latencies,
-                &fanins,
-                chosen_port.wire,
-                &mut stack,
-            )?;
+            count_latency::<true>(&mut working_latencies, fanins, chosen_port.wire, &mut stack)?;
         }
         inform_all_ports(&mut ports_to_place, &working_latencies)?;
         clear_unpinned_latencies(&mut working_latencies);
@@ -417,7 +412,7 @@ pub fn solve_latencies(
     for idx in 0..working_latencies.len() {
         if working_latencies[idx].is_pinned() {
             // it's a defined latency!
-            count_latency::<false>(&mut working_latencies, &fanouts, idx, &mut stack)?;
+            count_latency::<false>(&mut working_latencies, fanouts, idx, &mut stack)?;
         }
     }
 
@@ -435,7 +430,7 @@ pub fn solve_latencies(
     // Finally we add in the backwards latencies. TODO maybe be more conservative here?
     for idx in 0..working_latencies.len() {
         if working_latencies[idx].is_pinned() {
-            count_latency::<true>(&mut working_latencies, &fanins, idx, &mut stack)?;
+            count_latency::<true>(&mut working_latencies, fanins, idx, &mut stack)?;
         }
     }
 

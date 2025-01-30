@@ -83,7 +83,7 @@ impl<MyType: HindleyMilner<VariableIDMarker>, VariableIDMarker: UUIDMarker>
 pub trait UnifyErrorReport {
     fn report(self) -> (String, Vec<ErrorInfo>);
 }
-impl<'s> UnifyErrorReport for &'s str {
+impl UnifyErrorReport for &str {
     fn report(self) -> (String, Vec<ErrorInfo>) {
         (self.to_string(), Vec::new())
     }
@@ -109,6 +109,14 @@ impl BitAnd for UnifyResult {
         } else {
             self
         }
+    }
+}
+
+impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: UUIDMarker> Default
+    for TypeSubstitutor<MyType, VariableIDMarker>
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -172,13 +180,11 @@ impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: 
         while let HindleyMilnerInfo::TypeVar(unknown_synonym) = replace_with.get_hm_info() {
             if let Some(found_subst) = self[unknown_synonym].get() {
                 replace_with = found_subst;
+            } else if unknown_synonym == empty_var {
+                return UnifyResult::Success;
             } else {
-                if unknown_synonym == empty_var {
-                    return UnifyResult::Success;
-                } else {
-                    assert!(self[empty_var].set(replace_with.clone()).is_ok());
-                    return UnifyResult::Success;
-                }
+                assert!(self[empty_var].set(replace_with.clone()).is_ok());
+                return UnifyResult::Success;
             }
         }
 
@@ -305,10 +311,8 @@ impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: 
                 } else {
                     node_in_path[unknown_id].is_part_of_stack = true;
                     substitutes_to.for_each_unknown(&mut |id| {
-                        if !is_infinite_loop {
-                            if is_node_infinite_loop(slf, node_in_path, id) {
-                                is_infinite_loop = true;
-                            }
+                        if !is_infinite_loop && is_node_infinite_loop(slf, node_in_path, id) {
+                            is_infinite_loop = true;
                         }
                     });
                     node_in_path[unknown_id].is_part_of_stack = false;
@@ -331,13 +335,13 @@ impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: 
         );
 
         for id in self.id_range() {
-            if !node_in_path[id].is_not_part_of_loop {
-                if is_node_infinite_loop(self, &mut node_in_path, id) {
-                    panic!(
-                        "Cyclic Type Substitution Found! See Above. On node {id:?} => {:?}",
-                        self[id]
-                    )
-                }
+            if !node_in_path[id].is_not_part_of_loop
+                && is_node_infinite_loop(self, &mut node_in_path, id)
+            {
+                panic!(
+                    "Cyclic Type Substitution Found! See Above. On node {id:?} => {:?}",
+                    self[id]
+                )
             }
         }
     }
@@ -384,9 +388,7 @@ pub trait HindleyMilner<VariableIDMarker: UUIDMarker>: Sized {
     where
         Self: 'slf;
 
-    fn get_hm_info<'slf>(
-        &'slf self,
-    ) -> HindleyMilnerInfo<Self::TypeFuncIdent<'slf>, VariableIDMarker>;
+    fn get_hm_info(&self) -> HindleyMilnerInfo<Self::TypeFuncIdent<'_>, VariableIDMarker>;
 
     /// Iterate through all arguments and unify them
     ///
@@ -519,7 +521,7 @@ impl HindleyMilner<DomainVariableIDMarker> for DomainType {
         match self {
             DomainType::Generative | DomainType::Physical(_) => true, // Do nothing, These are done already
             DomainType::Unknown(var) => {
-                *self = substitutor.substitution_map[var.get_hidden_value()].get().expect("It's impossible for domain variables to remain, as any unset domain variable would have been replaced with a new physical domain").clone();
+                *self = *substitutor.substitution_map[var.get_hidden_value()].get().expect("It's impossible for domain variables to remain, as any unset domain variable would have been replaced with a new physical domain");
                 self.fully_substitute(substitutor)
             }
         }
@@ -657,7 +659,7 @@ impl<T> DelayedConstraintsList<T> {
     ///
     /// Calls [DelayedConstraint::report_could_not_resolve_error] on all constraints that weren't resolved
     pub fn resolve_delayed_constraints(mut self, shared_object: &mut T) {
-        while self.0.len() > 0 {
+        while !self.0.is_empty() {
             let mut progress_made = false;
             self.0
                 .retain_mut(|constraint| match constraint.try_apply(shared_object) {
@@ -672,7 +674,7 @@ impl<T> DelayedConstraintsList<T> {
                     DelayedConstraintStatus::NoProgress => true,
                 });
             if !progress_made {
-                for constraint in std::mem::replace(&mut self.0, Vec::new()) {
+                for constraint in std::mem::take(&mut self.0) {
                     constraint.report_could_not_resolve_error(shared_object);
                 }
                 return; // Exit

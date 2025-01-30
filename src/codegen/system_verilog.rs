@@ -142,13 +142,13 @@ impl<'g> CodeGenerationContext<'g> {
     }
 
     fn comment_out(&mut self, f: impl FnOnce(&mut Self)) {
-        let store_program_text_temporary = std::mem::replace(&mut self.program_text, String::new());
+        let store_program_text_temporary = std::mem::take(&mut self.program_text);
         f(self);
         let added_text = std::mem::replace(&mut self.program_text, store_program_text_temporary);
 
-        write!(
+        writeln!(
             self.program_text,
-            "// {}\n",
+            "// {}",
             added_text.replace("\n", "\n// ")
         )
         .unwrap();
@@ -218,7 +218,7 @@ impl<'g> CodeGenerationContext<'g> {
         match value {
             Value::Bool(_) | Value::Integer(_) | Value::Unset => {
                 let v_str = value.inline_constant_to_string();
-                write!(self.program_text, "{to} = {v_str};\n").unwrap();
+                writeln!(self.program_text, "{to} = {v_str};").unwrap();
             }
             Value::Array(arr) => {
                 for (idx, v) in arr.iter().enumerate() {
@@ -254,7 +254,7 @@ impl<'g> CodeGenerationContext<'g> {
             match &w.source {
                 RealWireDataSource::Select { root, path } => {
                     let wire_name = self.wire_name(*root, w.absolute_latency);
-                    let path = self.wire_ref_path_to_string(&path, w.absolute_latency);
+                    let path = self.wire_ref_path_to_string(path, w.absolute_latency);
                     writeln!(self.program_text, " = {wire_name}{path};").unwrap();
                 }
                 RealWireDataSource::UnaryOp { op, right } => {
@@ -362,7 +362,7 @@ impl<'g> CodeGenerationContext<'g> {
                 first = false;
             }
             self.program_text.write_char('.').unwrap();
-            self.program_text.write_str(&arg_name).unwrap();
+            self.program_text.write_str(arg_name).unwrap();
             self.program_text.write_char('(').unwrap();
             self.program_text.write_str(&arg_value).unwrap();
             self.program_text.write_char(')').unwrap();
@@ -447,7 +447,7 @@ impl<'g> CodeGenerationContext<'g> {
                     .md
                     .unwrap_port(PortID::from_hidden_value(1), false, "bits");
                 for i in 0..32 {
-                    write!(self.program_text, "\tassign bits[{i}] = value[{i}];\n").unwrap();
+                    writeln!(self.program_text, "\tassign bits[{i}] = value[{i}];").unwrap();
                 }
             }
             "BitsToInt" => {
@@ -458,7 +458,7 @@ impl<'g> CodeGenerationContext<'g> {
                     .md
                     .unwrap_port(PortID::from_hidden_value(1), false, "value");
                 for i in 0..32 {
-                    write!(self.program_text, "\tassign value[{i}] = bits[{i}];\n").unwrap();
+                    writeln!(self.program_text, "\tassign value[{i}] = bits[{i}];").unwrap();
                 }
             }
             other => {

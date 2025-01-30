@@ -201,14 +201,14 @@ pub fn pretty_print_many_spans(file_data: &FileData, spans: &[(String, Range<usi
 
     let config = ariadne_config();
 
-    if spans.len() == 0 {
+    if spans.is_empty() {
         return;
     }
 
     let mut report: ReportBuilder<'_, Range<usize>> =
         Report::build(ReportKind::Advice, (), spans[0].1.start).with_config(config);
 
-    for (text, span) in spans.into_iter().rev() {
+    for (text, span) in spans.iter().rev() {
         // If span not in file, just don't print it. This happens.
         if span.end > text_len {
             println!(

@@ -251,7 +251,7 @@ struct FlatteningContext<'l, 'errs> {
     default_declaration_context: DeclarationContext,
 }
 
-impl<'l, 'errs> FlatteningContext<'l, 'errs> {
+impl FlatteningContext<'_, '_> {
     fn flatten_parameters(&mut self, cursor: &mut Cursor) {
         let mut parameters_to_visit = self
             .working_on_link_info
@@ -983,7 +983,7 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         .info_obj(&(md, interface));
                     }
 
-                    if interface.func_call_outputs.len() >= 1 {
+                    if !interface.func_call_outputs.is_empty() {
                         ExpressionSource::WireRef(WireReference::simple_port(PortReference {
                             submodule_name_span: fc.interface_reference.name_span,
                             submodule_decl: fc.interface_reference.submodule_decl,
@@ -1006,35 +1006,33 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
             return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| {
                 self.flatten_expr(cursor)
             });
-        } else {
-            if let Some(wr) = self.flatten_wire_reference(cursor).expect_wireref(self) {
-                let mut is_comptime = match wr.root {
-                    WireReferenceRoot::LocalDecl(uuid, _span) => self.instructions[uuid]
-                        .unwrap_declaration()
-                        .identifier_type
-                        .is_generative(),
-                    WireReferenceRoot::NamedConstant(_) => true,
-                    WireReferenceRoot::SubModulePort(_) => false,
-                };
+        } else if let Some(wr) = self.flatten_wire_reference(cursor).expect_wireref(self) {
+            let mut is_comptime = match wr.root {
+                WireReferenceRoot::LocalDecl(uuid, _span) => self.instructions[uuid]
+                    .unwrap_declaration()
+                    .identifier_type
+                    .is_generative(),
+                WireReferenceRoot::NamedConstant(_) => true,
+                WireReferenceRoot::SubModulePort(_) => false,
+            };
 
-                for elem in &wr.path {
-                    match elem {
-                        WireReferencePathElement::ArrayAccess {
-                            idx,
-                            bracket_span: _,
-                        } => {
-                            is_comptime &= self.instructions[*idx]
-                                .unwrap_expression()
-                                .typ
-                                .domain
-                                .is_generative()
-                        }
+            for elem in &wr.path {
+                match elem {
+                    WireReferencePathElement::ArrayAccess {
+                        idx,
+                        bracket_span: _,
+                    } => {
+                        is_comptime &= self.instructions[*idx]
+                            .unwrap_expression()
+                            .typ
+                            .domain
+                            .is_generative()
                     }
                 }
-                (ExpressionSource::WireRef(wr), is_comptime)
-            } else {
-                (ExpressionSource::new_error(), false)
             }
+            (ExpressionSource::WireRef(wr), is_comptime)
+        } else {
+            (ExpressionSource::new_error(), false)
         };
 
         let wire_instance = Expression {
@@ -1540,13 +1538,9 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
                         ))
                     } else {
                         // It's _expression
-                        if let Some(wire_ref) =
-                            self.flatten_wire_reference(cursor).expect_wireref(self)
-                        {
-                            Some((wire_ref, write_modifiers))
-                        } else {
-                            None
-                        }
+                        self.flatten_wire_reference(cursor)
+                            .expect_wireref(self)
+                            .map(|wire_ref| (wire_ref, write_modifiers))
                     },
                     span,
                 )

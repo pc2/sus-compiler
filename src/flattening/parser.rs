@@ -97,11 +97,9 @@ impl<'t> Cursor<'t> {
     #[must_use]
     pub fn optional_field(&mut self, field_id: NonZeroU16) -> bool {
         // If a previous call to field already found this field, then we must immediately skip it.
-        if self.current_field_was_already_consumed {
-            if !self.cursor.goto_next_sibling() {
-                self.current_field_was_already_consumed = false;
-                return false;
-            }
+        if self.current_field_was_already_consumed && !self.cursor.goto_next_sibling() {
+            self.current_field_was_already_consumed = false;
+            return false;
         }
         loop {
             if let Some(found) = self.cursor.field_id() {
@@ -342,11 +340,9 @@ impl<'t> Cursor<'t> {
         let mut depth = 0;
         assert!(self.cursor.goto_first_child());
         loop {
-            if !self.push_potential_node_error(errors) {
-                if self.cursor.goto_first_child() {
-                    depth += 1;
-                    continue;
-                }
+            if !self.push_potential_node_error(errors) && self.cursor.goto_first_child() {
+                depth += 1;
+                continue;
             }
             while !self.cursor.goto_next_sibling() {
                 assert!(self.cursor.goto_parent());

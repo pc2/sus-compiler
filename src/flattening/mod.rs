@@ -104,7 +104,7 @@ impl Module {
                 ),
             )
             .info_obj(self);
-        return None;
+        None
     }
 
     pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {

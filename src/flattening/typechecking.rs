@@ -76,7 +76,7 @@ struct TypeCheckingContext<'l, 'errs> {
     runtime_condition_stack: Vec<ConditionStackElem>,
 }
 
-impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
+impl TypeCheckingContext<'_, '_> {
     fn get_decl_of_module_port(
         &self,
         port: PortID,
@@ -106,7 +106,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             );
         FullType {
             typ,
-            domain: port_local_domain.clone(),
+            domain: port_local_domain,
         }
     }
 
@@ -118,7 +118,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
             WireReferenceRoot::NamedConstant(cst) => {
                 let linker_cst = &self.globals[cst.id];
-                linker_cst.link_info.make_global_info(&self.errors.files)
+                linker_cst.link_info.make_global_info(self.errors.files)
             }
             WireReferenceRoot::SubModulePort(port) => {
                 let (decl, file) = self.get_decl_of_module_port(port.port, port.submodule_decl);
@@ -309,7 +309,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     self.runtime_condition_stack.push(ConditionStackElem {
                         ends_at: if_stmt.else_end,
                         span: condition_expr.span,
-                        domain: condition_expr.typ.domain.clone(),
+                        domain: condition_expr.typ.domain,
                     });
                 }
             }
@@ -335,7 +335,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     self.type_checker
                         .unify_with_written_type_substitute_templates_must_succeed(
                             &decl.typ_expr,
-                            &argument_type,
+                            argument_type,
                             &global_ref.template_arg_types, // Yes that's right. We already must substitute the templates for type variables here
                         );
                 }
@@ -354,7 +354,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
 
                         self.type_checker.typecheck_write_to_abstract(
                             &argument_expr.typ.typ,
-                            &argument_type,
+                            argument_type,
                             argument_expr.span,
                             "generative template argument",
                         );

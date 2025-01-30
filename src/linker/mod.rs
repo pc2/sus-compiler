@@ -214,6 +214,12 @@ pub struct Linker {
     global_namespace: HashMap<String, NamespaceElement>,
 }
 
+impl Default for Linker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Linker {
     pub fn new() -> Linker {
         Linker {
@@ -372,7 +378,7 @@ impl Linker {
         f(FileBuilder {
             file_id,
             tree: &file_data.tree,
-            file_data: &file_data,
+            file_data,
             files: &self.files,
             other_parsing_errors: &other_parsing_errors,
             associated_values: &mut associated_values,
@@ -403,7 +409,7 @@ pub struct FileBuilder<'linker> {
     constants: &'linker mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
 }
 
-impl<'linker> FileBuilder<'linker> {
+impl FileBuilder<'_> {
     fn add_name(&mut self, name: String, new_obj_id: GlobalUUID) {
         match self.global_namespace.entry(name) {
             std::collections::hash_map::Entry::Occupied(mut occ) => {

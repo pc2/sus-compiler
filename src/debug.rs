@@ -33,11 +33,11 @@ struct TouchedSpansHistory {
 
 thread_local! {
     static SPANS_HISTORY : RefCell<TouchedSpansHistory> =
-        RefCell::new(TouchedSpansHistory{
+        const { RefCell::new(TouchedSpansHistory{
             span_history : [DEFAULT_RANGE; SPAN_TOUCH_HISTORY_SIZE],
             num_spans : 0,
             in_use : false
-        });
+        }) };
 }
 
 fn print_most_recent_spans(file_data: &FileData) {
@@ -111,7 +111,7 @@ impl<'text> SpanDebugger<'text> {
     }
 }
 
-impl<'text> Drop for SpanDebugger<'text> {
+impl Drop for SpanDebugger<'_> {
     fn drop(&mut self) {
         if !self.defused {
             println!("Panic happened in Span-guarded context: {}", self.context);

@@ -240,8 +240,6 @@ impl Linker {
             }
             span_debugger.defuse();
         }
-        if config().early_exit == EarlyExitUpTo::Instantiate {
-            return;
-        }
+        if config().early_exit == EarlyExitUpTo::Instantiate {}
     }
 }

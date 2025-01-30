@@ -60,7 +60,7 @@ fn typ_to_declaration(mut typ: &ConcreteType) -> String {
     }
 }
 
-impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> {
+impl<Stream: std::fmt::Write> CodeGenerationContext<'_, '_, Stream> {
     fn write_vhdl_code(&mut self) {
         match self.md.link_info.is_extern {
             IsExtern::Normal => {
@@ -104,9 +104,9 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             let port_direction = if port.is_input { "in" } else { "out" };
             let port_type = typ_to_declaration(&port_wire.typ);
             let end = if it.peek().is_some() { ";" } else { "" };
-            write!(
+            writeln!(
                 self.program_text,
-                "{comment_text}        {port_name} : {port_direction} {port_type}{end}\n"
+                "{comment_text}        {port_name} : {port_direction} {port_type}{end}"
             )
             .unwrap();
         }
@@ -143,7 +143,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                         return false;
                     }
                 }
-                return true;
+                true
             })
             .map(|(_, wire)| {
                 let signal_name = wire_name_self_latency(wire, self.use_latency);

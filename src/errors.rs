@@ -46,6 +46,12 @@ pub struct ErrorStore {
     pub did_error: bool,
 }
 
+impl Default for ErrorStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ErrorStore {
     pub fn new() -> ErrorStore {
         ErrorStore {
@@ -128,10 +134,7 @@ impl<'linker> ErrorCollector<'linker> {
         }
     }
     /// To re-attach this [ErrorCollector] to a new [Linker]. Mostly to get around the borrow checker
-    pub fn re_attach<'new_linker>(
-        self,
-        files: &'new_linker ArenaAllocator<FileData, FileUUIDMarker>,
-    ) -> ErrorCollector<'new_linker> {
+    pub fn re_attach(self, files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorCollector<'_> {
         ErrorCollector {
             error_store: RefCell::new(self.error_store.replace(ErrorStore::new())),
             file: self.file,
@@ -192,7 +195,7 @@ impl<'linker> ErrorCollector<'linker> {
     }
 }
 
-impl<'l> Drop for ErrorCollector<'l> {
+impl Drop for ErrorCollector<'_> {
     fn drop(&mut self) {
         if !self.error_store.borrow().is_untouched() && !panicking() {
             panic!("ErrorCollector should have been emptied!");
@@ -210,7 +213,7 @@ pub struct ErrorReference<'ec> {
     pos: usize,
 }
 
-impl<'ec> ErrorReference<'ec> {
+impl ErrorReference<'_> {
     pub fn existing_info(&self, error_info: ErrorInfo) -> &Self {
         assert!(
             error_info.position.debug().into_range().end
@@ -232,7 +235,7 @@ impl<'ec> ErrorReference<'ec> {
         self.info((span, self.err_collector.file), reason)
     }
     pub fn info_obj<Obj: FileKnowingErrorInfoObject>(&self, obj: &Obj) -> &Self {
-        self.existing_info(obj.make_global_info(&self.err_collector.files))
+        self.existing_info(obj.make_global_info(self.err_collector.files))
     }
     pub fn info_obj_same_file<Obj: ErrorInfoObject>(&self, obj: &Obj) -> &Self {
         if let Some(info) = obj.make_info(self.err_collector.file) {

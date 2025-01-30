@@ -11,6 +11,12 @@ pub struct ListOfLists<T> {
     start_ends: Vec<usize>,
 }
 
+impl<T> Default for ListOfLists<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> ListOfLists<T> {
     pub fn new() -> Self {
         Self::new_with_groups_capacity(0)
@@ -99,10 +105,8 @@ impl<T> ListOfLists<T> {
             cumulative_sum += found_value;
         }
 
-        let mut partially_initialize_buf: Vec<MaybeUninit<T>> = (0..cumulative_sum)
-            .into_iter()
-            .map(|_| MaybeUninit::uninit())
-            .collect();
+        let mut partially_initialize_buf: Vec<MaybeUninit<T>> =
+            (0..cumulative_sum).map(|_| MaybeUninit::uninit()).collect();
 
         for (to_idx, data) in iter {
             let found_idx = &mut start_ends[to_idx + 1];
@@ -148,7 +152,7 @@ impl<T: Clone> ListOfLists<T> {
     pub fn from_slice_slice(slice_slice: &[&[T]]) -> Self {
         slice_slice
             .iter()
-            .map(|sub_slice| sub_slice.into_iter().cloned())
+            .map(|sub_slice| sub_slice.iter().cloned())
             .collect()
     }
 }
@@ -264,7 +268,7 @@ impl<'a, T> IntoIterator for &'a ListOfLists<T> {
         ListOfListsIter {
             buf: &self.buf,
             start: 0,
-            ends_iter: self.start_ends[1..].into_iter(),
+            ends_iter: self.start_ends[1..].iter(),
         }
     }
 }
@@ -278,7 +282,7 @@ impl<'a, T> IntoIterator for &'a mut ListOfLists<T> {
         ListOfListsIterMut {
             buf: &mut self.buf,
             start: 0,
-            ends_iter: self.start_ends[1..].into_iter(),
+            ends_iter: self.start_ends[1..].iter(),
         }
     }
 }

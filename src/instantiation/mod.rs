@@ -210,6 +210,12 @@ pub struct InstantiationCache {
     cache: RefCell<HashMap<TVec<ConcreteType>, Rc<InstantiatedModule>>>,
 }
 
+impl Default for InstantiationCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InstantiationCache {
     pub fn new() -> Self {
         Self {
@@ -344,7 +350,7 @@ fn mangle_name(str: &str) -> String {
     result
 }
 
-impl<'fl, 'l> InstantiationContext<'fl, 'l> {
+impl InstantiationContext<'_, '_> {
     fn extract(self) -> InstantiatedModule {
         InstantiatedModule {
             mangled_name: mangle_name(&self.name),

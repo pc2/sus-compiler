@@ -83,7 +83,7 @@ fn convert_to_semantic_tokens(
     };
 
     ide_tokens
-        .into_iter()
+        .iter_mut()
         .map(|(span, ide_kind)| {
             let typ = get_semantic_token_type_from_ide_token(*ide_kind);
             let mod_bits = get_modifiers_for_token(*ide_kind);

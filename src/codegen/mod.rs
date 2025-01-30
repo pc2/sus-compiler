@@ -58,7 +58,7 @@ pub trait CodeGenBackend {
             return; // Continue
         }
         println!("Instantiating success: {inst_name}");
-        let code = self.codegen(md, &inst, linker, true); // hardcode use_latency = true for now. Maybe forever, we'll see
+        let code = self.codegen(md, inst, linker, true); // hardcode use_latency = true for now. Maybe forever, we'll see
         write!(out_file, "{code}").unwrap();
     }
 

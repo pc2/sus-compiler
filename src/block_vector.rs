@@ -67,11 +67,11 @@ impl<T, const BLOCK_SIZE: usize> BlockVec<T, BLOCK_SIZE> {
 
     /// Critically, since appending to [BlockVec] is non-mutable, it is possible to do so while holding a [BlockVecIter].
     /// BlockVecIter only iterates up to the size the BlockVec had when [BlockVec::iter] was called
-    pub fn iter<'s>(&'s self) -> BlockVecIter<'s, T, BLOCK_SIZE> {
+    pub fn iter(&self) -> BlockVecIter<'_, T, BLOCK_SIZE> {
         self.into_iter()
     }
 
-    pub fn iter_mut<'s>(&'s mut self) -> BlockVecIterMut<'s, T, BLOCK_SIZE> {
+    pub fn iter_mut(&mut self) -> BlockVecIterMut<'_, T, BLOCK_SIZE> {
         self.into_iter()
     }
 }
@@ -159,7 +159,7 @@ impl<'bv, T, const BLOCK_SIZE: usize> Iterator for BlockVecIter<'bv, T, BLOCK_SI
 
             Some(self.block_vec.index(selected_idx))
         } else {
-            return None;
+            None
         }
     }
 }
@@ -196,7 +196,7 @@ impl<'bv, T, const BLOCK_SIZE: usize> Iterator for BlockVecIterMut<'bv, T, BLOCK
             let original_ref: *mut T = self.block_vec.index_mut(selected_idx);
             Some(unsafe { &mut *original_ref })
         } else {
-            return None;
+            None
         }
     }
 }
@@ -236,7 +236,7 @@ impl<T, const BLOCK_SIZE: usize> Iterator for BlockVecConsumingIter<T, BLOCK_SIZ
             let found = &mut self.current_block.as_mut().unwrap().as_mut_slice()[idx_in_block];
             unsafe { Some(found.assume_init_read()) }
         } else {
-            return None;
+            None
         }
     }
 }
@@ -249,7 +249,7 @@ impl<T, const BLOCK_SIZE: usize> IntoIterator for BlockVec<T, BLOCK_SIZE> {
     fn into_iter(mut self) -> Self::IntoIter {
         let total_vec_size = self.length.get();
         self.length.set(0);
-        let block_vec = std::mem::replace(self.blocks.get_mut(), Vec::new());
+        let block_vec = std::mem::take(self.blocks.get_mut());
         let block_vec_iter = block_vec.into_iter();
         BlockVecConsumingIter {
             block_vec_iter,
@@ -262,7 +262,7 @@ impl<T, const BLOCK_SIZE: usize> IntoIterator for BlockVec<T, BLOCK_SIZE> {
 
 impl<T, const BLOCK_SIZE: usize> Drop for BlockVecConsumingIter<T, BLOCK_SIZE> {
     fn drop(&mut self) {
-        while let Some(_) = self.next() {} // Automatically drops all remaining elements of the iterator
+        for _ in self.by_ref() {} // Automatically drops all remaining elements of the iterator
     }
 }
 

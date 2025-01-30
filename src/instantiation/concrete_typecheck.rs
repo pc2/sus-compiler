@@ -16,7 +16,7 @@ use super::*;
 
 use crate::typing::type_inference::HindleyMilner;
 
-impl<'fl, 'l> InstantiationContext<'fl, 'l> {
+impl InstantiationContext<'_, '_> {
     fn walk_type_along_path(
         &self,
         mut current_type_in_progress: ConcreteType,
@@ -69,7 +69,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             .walk_type_along_path(self.wires[this_wire_id].typ.clone(), &s.to_path);
                         self.type_substitutor.unify_report_error(
                             &destination_typ,
-                            &source_typ,
+                            source_typ,
                             span,
                             "write wire access",
                         );
@@ -187,7 +187,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
     fn finalize(&mut self) {
         for (_id, w) in &mut self.wires {
-            if w.typ.fully_substitute(&self.type_substitutor) == false {
+            if !w.typ.fully_substitute(&self.type_substitutor) {
                 let typ_as_str = w.typ.display(&self.linker.types);
 
                 let span = self.md.get_instruction_span(w.original_instruction);

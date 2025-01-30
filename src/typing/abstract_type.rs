@@ -133,11 +133,11 @@ impl TypeUnifier {
             WrittenType::Error(_span) => {} // Already an error, don't unify
             WrittenType::TemplateVariable(_span, argument_id) => {
                 self.type_substitutor
-                    .unify_must_succeed(&typ, &AbstractType::Template(*argument_id));
+                    .unify_must_succeed(typ, &AbstractType::Template(*argument_id));
             }
             WrittenType::Named(global_reference) => {
                 self.type_substitutor
-                    .unify_must_succeed(&typ, &AbstractType::Named(global_reference.id));
+                    .unify_must_succeed(typ, &AbstractType::Named(global_reference.id));
             }
             WrittenType::Array(_span, array_content_and_size) => {
                 let (arr_content, _size_flat, _array_bracket_span) = array_content_and_size.deref();
@@ -175,11 +175,11 @@ impl TypeUnifier {
             WrittenType::Error(_span) => {} // Already an error, don't unify
             WrittenType::TemplateVariable(_span, argument_id) => {
                 self.type_substitutor
-                    .unify_must_succeed(&typ, &template_type_args[*argument_id]);
+                    .unify_must_succeed(typ, &template_type_args[*argument_id]);
             }
             WrittenType::Named(global_reference) => {
                 self.type_substitutor
-                    .unify_must_succeed(&typ, &AbstractType::Named(global_reference.id));
+                    .unify_must_succeed(typ, &AbstractType::Named(global_reference.id));
             }
             WrittenType::Array(_span, array_content_and_size) => {
                 let (arr_content, _size_flat, _array_bracket_span) = array_content_and_size.deref();
@@ -336,7 +336,7 @@ impl TypeUnifier {
         // The case of writes to generatives from non-generatives should be fully covered by flattening
         if !from_domain.is_generative() && !to_domain.is_generative() {
             self.domain_substitutor
-                .unify_report_error(&from_domain, &to_domain, span, context);
+                .unify_report_error(from_domain, to_domain, span, context);
         }
     }
 
@@ -391,8 +391,8 @@ impl TypeUnifier {
         output_typ: &AbstractType,
     ) {
         self.type_substitutor
-            .unify_report_error(&idx_type, &INT_TYPE, idx_span, "array index");
-        self.unify_with_array_of(&arr_type, output_typ.clone(), arr_span);
+            .unify_report_error(idx_type, &INT_TYPE, idx_span, "array index");
+        self.unify_with_array_of(arr_type, output_typ.clone(), arr_span);
     }
 
     pub fn typecheck_write_to_abstract<Context: UnifyErrorReport>(
@@ -403,7 +403,7 @@ impl TypeUnifier {
         context: Context,
     ) {
         self.type_substitutor
-            .unify_report_error(&found, &expected, span, context);
+            .unify_report_error(found, expected, span, context);
     }
 
     pub fn typecheck_write_to<Context: UnifyErrorReport + Clone>(
@@ -419,7 +419,7 @@ impl TypeUnifier {
 
     pub fn finalize_domain_type(&mut self, typ_domain: &mut DomainType) {
         use super::type_inference::HindleyMilner;
-        assert!(typ_domain.fully_substitute(&self.domain_substitutor) == true);
+        assert!(typ_domain.fully_substitute(&self.domain_substitutor));
     }
 
     pub fn finalize_abstract_type(
@@ -430,7 +430,7 @@ impl TypeUnifier {
         errors: &ErrorCollector,
     ) {
         use super::type_inference::HindleyMilner;
-        if typ.fully_substitute(&self.type_substitutor) == false {
+        if !typ.fully_substitute(&self.type_substitutor) {
             let typ_as_string = typ.display(types, &self.template_type_names);
             errors.error(
                 span,

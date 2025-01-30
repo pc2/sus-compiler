@@ -33,7 +33,7 @@ struct InitializationContext<'linker> {
     file_text: &'linker FileText,
 }
 
-impl<'linker> InitializationContext<'linker> {
+impl InitializationContext<'_> {
     fn gather_initial_global_object(&mut self, cursor: &mut Cursor) -> (Span, String) {
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
         let name = self.file_text[name_span].to_owned();
@@ -277,7 +277,7 @@ pub fn gather_initial_file_data(mut builder: FileBuilder) {
     let mut cursor = Cursor::new_at_root(builder.tree, &builder.file_data.file_text);
     cursor.list_and_report_errors(
         kind!("source_file"),
-        &builder.other_parsing_errors,
+        builder.other_parsing_errors,
         |cursor| {
             let parsing_errors = ErrorCollector::new_empty(builder.file_id, builder.files);
             cursor.report_all_decendant_errors(&parsing_errors);

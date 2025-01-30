@@ -23,7 +23,7 @@ struct HoverCollector<'l> {
     file_data: &'l FileData,
 }
 
-impl<'l> HoverCollector<'l> {
+impl HoverCollector<'_> {
     fn documentation(&mut self, d: &Documentation) {
         self.list
             .push(MarkedString::String(d.to_string(&self.file_data.file_text)))
@@ -56,7 +56,7 @@ impl<'l> HoverCollector<'l> {
                     let value_str = match &inst.generation_state[id] {
                         SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => unreachable!(),
                         SubModuleOrWire::CompileTimeValue(v) => format!(" = {}", v),
-                        SubModuleOrWire::Unnasigned => format!("never assigned to"),
+                        SubModuleOrWire::Unnasigned => "never assigned to".to_string(),
                     };
                     self.monospace(value_str);
                 } else {
@@ -241,10 +241,11 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             let link_info = linker.get_link_info(global);
             hover.documentation_link_info(link_info);
             let file = &linker.files[link_info.file];
-            hover.sus_code(format!(
-                "{}",
-                link_info.get_full_name_and_template_args(&file.file_text)
-            ));
+            hover.sus_code(
+                link_info
+                    .get_full_name_and_template_args(&file.file_text)
+                    .to_string(),
+            );
             match global {
                 GlobalUUID::Module(md_uuid) => {
                     let md = &linker.modules[md_uuid];

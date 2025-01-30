@@ -34,7 +34,7 @@ macro_rules! caught_by_typecheck {
 
 pub type ExecutionResult<T> = Result<T, (Span, String)>;
 
-impl<'fl> GenerationState<'fl> {
+impl GenerationState<'_> {
     fn span_of(&self, v: FlatID) -> Span {
         let instr = &self.md.link_info.instructions[v];
         match instr {
@@ -114,7 +114,7 @@ impl<'fl> GenerationState<'fl> {
     }
 }
 
-impl<'fl> Index<FlatID> for GenerationState<'fl> {
+impl Index<FlatID> for GenerationState<'_> {
     type Output = SubModuleOrWire;
 
     fn index(&self, index: FlatID) -> &Self::Output {
@@ -122,7 +122,7 @@ impl<'fl> Index<FlatID> for GenerationState<'fl> {
     }
 }
 
-impl<'fl> IndexMut<FlatID> for GenerationState<'fl> {
+impl IndexMut<FlatID> for GenerationState<'_> {
     fn index_mut(&mut self, index: FlatID) -> &mut Self::Output {
         &mut self.generation_state[index]
     }
@@ -170,7 +170,7 @@ enum RealWireRefRoot {
     Constant(Value),
 }
 
-impl<'fl, 'l> InstantiationContext<'fl, 'l> {
+impl InstantiationContext<'_, '_> {
     /// Uses the current context to turn a [WrittenType] into a [ConcreteType].
     ///
     /// Failures are fatal.
