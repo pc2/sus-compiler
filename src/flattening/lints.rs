@@ -1,10 +1,10 @@
-use crate::linker::{IsExtern, LinkInfo, AFTER_LINTS_CP};
+use crate::linker::{get_builtin_const, IsExtern, LinkInfo, AFTER_LINTS_CP};
 use crate::prelude::*;
-use crate::typing::template::TemplateInputKind;
+use crate::typing::template::ParameterKind;
 
 use super::walk::for_each_generative_input_in_template_args;
 
-use super::{Instruction, Module, WireReferencePathElement};
+use super::{ExpressionSource, Instruction, Module, WireReferencePathElement, WireReferenceRoot};
 
 
 pub fn perform_lints(linker: &mut Linker) {
@@ -22,8 +22,8 @@ pub fn perform_lints(linker: &mut Linker) {
 */
 fn extern_objects_may_not_have_type_template_args(link_info: &LinkInfo, errors: &ErrorCollector) {
     if link_info.is_extern == IsExtern::Extern {
-        for (_id, arg) in &link_info.template_arguments {
-            if let TemplateInputKind::Type(..) = &arg.kind {
+        for (_id, arg) in &link_info.template_parameters {
+            if let ParameterKind::Type(..) = &arg.kind {
                 errors.error(arg.name_span, "'extern' modules may not have 'type' arguments. Convert to bool[] first");
             }
         }
@@ -46,10 +46,25 @@ fn find_unused_variables(md: &Module, errors: &ErrorCollector) {
 
     let mut wire_to_explore_queue: Vec<FlatID> = Vec::new();
 
+    // Output ports
     for (_id, port) in &md.ports {
         if !port.is_input {
             is_instance_used_map[port.declaration_instruction] = true;
             wire_to_explore_queue.push(port.declaration_instruction);
+        }
+    }
+
+    // All asserts
+    for (assert_instr_id, instr) in &md.link_info.instructions {
+        if let Instruction::Expression(expr) = instr {
+            if let ExpressionSource::WireRef(wr) = &expr.source {
+                if let WireReferenceRoot::NamedConstant(cst) = &wr.root {
+                    if cst.id == get_builtin_const("assert") {
+                        is_instance_used_map[assert_instr_id] = true;
+                        wire_to_explore_queue.push(assert_instr_id);
+                    }
+                }
+            }
         }
     }
 
@@ -78,7 +93,7 @@ fn make_fanins(instructions: &FlatAlloc<Instruction, FlatIDMarker>) -> FlatAlloc
         instructions.map(|_| Vec::new());
 
     for (inst_id, inst) in instructions.iter() {
-        let mut collector_func = |id| instruction_fanins[inst_id].push(id);
+        let mut collector_func = |id| {instruction_fanins[inst_id].push(id);};
         match inst {
             Instruction::Write(conn) => {
                 if let Some(flat_root) = conn.to.root.get_root_flat() {
@@ -100,10 +115,13 @@ fn make_fanins(instructions: &FlatAlloc<Instruction, FlatIDMarker>) -> FlatAlloc
                 }
             }
             Instruction::Declaration(decl) => {
+                if let Some(lat_spec) = decl.latency_specifier {
+                    collector_func(lat_spec);
+                }
                 decl.typ_expr.for_each_generative_input(&mut collector_func);
             }
-            Instruction::Wire(wire) => {
-                wire.source.for_each_dependency(collector_func);
+            Instruction::Expression(wire) => {
+                wire.source.for_each_dependency(&mut collector_func);
             }
             Instruction::IfStatement(stm) => {
                 for id in FlatIDRange::new(stm.then_start, stm.else_end) {

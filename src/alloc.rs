@@ -7,8 +7,12 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-// TODO add custom niche for more efficient Options, wait until custom niches are stabilized (https://internals.rust-lang.org/t/nonmaxusize-and-niche-value-optimisation/19661)
-// Maybe use NonZeroUsize (https://doc.rust-lang.org/std/num/struct.NonZeroUsize.html)
+/// UUIDs are type-safe integers. They are used for [FlatAlloc] and [ArenaAllocator]
+/// 
+/// They don't support arithmetic, as they're just meant to represent pointers. 
+/// 
+/// TODO add custom niche for more efficient Options, wait until custom niches are stabilized (https://internals.rust-lang.org/t/nonmaxusize-and-niche-value-optimisation/19661)
+/// Maybe use NonZeroUsize (https://doc.rust-lang.org/std/num/struct.NonZeroUsize.html)
 pub struct UUID<IndexMarker>(usize, PhantomData<IndexMarker>);
 
 impl<IndexMarker> Clone for UUID<IndexMarker> {
@@ -29,6 +33,7 @@ impl<IndexMarker> Hash for UUID<IndexMarker> {
     }
 }
 
+/// See [UUID]
 pub trait UUIDMarker {
     const DISPLAY_NAME: &'static str;
 }
@@ -118,6 +123,9 @@ impl<IndexMarker> UUIDRange<IndexMarker> {
     pub fn new(from: UUID<IndexMarker>, to: UUID<IndexMarker>) -> Self {
         Self(from, to)
     }
+    pub fn new_with_length(len: usize) -> Self {
+        UUIDRange(UUID(0, PhantomData), UUID(len, PhantomData))
+    }
     pub fn empty() -> Self {
         UUIDRange(UUID(0, PhantomData), UUID(0, PhantomData))
     }
@@ -130,7 +138,7 @@ impl<IndexMarker> UUIDRange<IndexMarker> {
     pub fn iter(&self) -> UUIDRangeIter<IndexMarker> {
         self.into_iter()
     }
-    pub fn map<OT, F: FnMut(UUID<IndexMarker>) -> OT>(&self, f: F) -> FlatAlloc<OT, IndexMarker> {
+    pub fn map<OT>(&self, f: impl FnMut(UUID<IndexMarker>) -> OT) -> FlatAlloc<OT, IndexMarker> {
         FlatAlloc {
             data: Vec::from_iter(self.iter().map(f)),
             _ph: PhantomData,
@@ -294,9 +302,9 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn find<F: FnMut(UUID<IndexMarker>, &T) -> bool>(
+    pub fn find(
         &self,
-        mut predicate: F,
+        mut predicate: impl FnMut(UUID<IndexMarker>, &T) -> bool,
     ) -> Option<UUID<IndexMarker>> {
         self.iter()
             .find(|(id, v)| predicate(*id, v))
@@ -420,9 +428,9 @@ impl<T, IndexMarker> ArenaVector<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn find<F: FnMut(UUID<IndexMarker>, &T) -> bool>(
+    pub fn find(
         &self,
-        mut predicate: F,
+        mut predicate: impl FnMut(UUID<IndexMarker>, &T) -> bool,
     ) -> Option<UUID<IndexMarker>> {
         self.iter()
             .find(|(id, v)| predicate(*id, v))
@@ -476,6 +484,8 @@ pub struct FlatAlloc<T, IndexMarker> {
 }
 
 impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
+    pub const EMPTY_FLAT_ALLOC : Self = Self::new();
+
     pub const fn new() -> Self {
         Self {
             data: Vec::new(),
@@ -486,6 +496,14 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
         Self {
             data: Vec::with_capacity(cap),
             _ph: PhantomData,
+        }
+    }
+    pub fn with_size(size: usize, v: T) -> Self where T: Clone {
+        let mut data = Vec::new();
+        data.resize(size, v);
+        Self {
+            data,
+            _ph: PhantomData
         }
     }
     pub fn get_next_alloc_id(&self) -> UUID<IndexMarker> {
@@ -519,18 +537,18 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> FlatAllocIterMut<'a, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn map<OT, F: FnMut((UUID<IndexMarker>, &T)) -> OT>(
+    pub fn map<OT>(
         &self,
-        f: F,
+        f: impl FnMut((UUID<IndexMarker>, &T)) -> OT,
     ) -> FlatAlloc<OT, IndexMarker> {
         FlatAlloc {
             data: Vec::from_iter(self.iter().map(f)),
             _ph: PhantomData,
         }
     }
-    pub fn find<F: FnMut(UUID<IndexMarker>, &T) -> bool>(
+    pub fn find(
         &self,
-        mut predicate: F,
+        mut predicate: impl FnMut(UUID<IndexMarker>, &T) -> bool,
     ) -> Option<UUID<IndexMarker>> {
         self.iter()
             .find(|(id, v)| predicate(*id, v))

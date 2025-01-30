@@ -1012,6 +1012,90 @@ module use_sized_int_add {
 	c = sized_int_add(a, b)
 }
 
+module implicit_domain_forbidden {
+	input int bad_port
+
+	domain bad_domain
+
+	output int port_after_domain
+}
+
+module conflicting_domain_with_port_name {
+	domain my_domain
+	input int my_domain
+
+	domain my_domain
+}
+
+module make_infinite_type_help #(T) {
+	interface make_infinite_type_help: T[3] a -> T b
+
+	b = a[0]
+}
+
+module make_infinite_type {
+	make_infinite_type_help mtinf
+
+	mtinf.a = mtinf.b
+}
+
+// Examples that used to be in util.sus
+
+module UseDualPortMem {
+	interface UseDualPortMem : 
+		bool do_write'0,
+		int addr'0,
+		bool[500] data'0 ->
+		bool[500] read_data'0
+		
+	DualPortMem #(SIZE: 128, T: type bool[500]) mem
+
+	mem.write(do_write, addr, data)
+
+	read_data = mem.read(addr)
+}
+
+module example_FIFO {
+	FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+}
+
+module use_Iterator {
+	interface start_iteration : bool do_start
+	input int[10] myArr
+	output int outVal
+
+	Iterator arrayStream
+
+	// if do_start {arrayStream.start(10)}
+	arrayStream.start(do_start, 10)
+
+	// if arrayIter.iter() : int value {...}
+	bool iter_valid, int value = arrayStream.iter()
+	if iter_valid {
+		outVal = myArr[value]
+	}
+}
+
+module UseSlice {
+	int[20] arr
+
+	int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
+}
+
+
+module UseBuiltinConstants {
+	gen int INT_ARR_SIZE = sizeof #(T: type int[10][10])
+
+	assert #(C: INT_ARR_SIZE == 3200)
+
+	assert #(C: clog2 #(V: 15) == 4)
+	assert #(C: clog2 #(V: 16) == 4)
+	assert #(C: clog2 #(V: 17) == 5)
+}
+
+module FailingAssert {
+	assert #(C: 15 + 3 == 19)
+}
 
 /// Test if when seperation
 module IfTesting #(int WIDTH) {
@@ -1034,4 +1118,3 @@ module IfTesting #(int WIDTH) {
         } else when WIDTH > BASE_CASE_SIZE {
         }
 }
-

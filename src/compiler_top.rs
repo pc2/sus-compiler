@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
-use crate::linker::{get_builtin_type, AFTER_INITIAL_PARSE_CP};
+use crate::linker::{get_builtin_const, get_builtin_type, AFTER_INITIAL_PARSE_CP};
 use crate::prelude::*;
 
 use tree_sitter::Parser;
@@ -14,11 +14,12 @@ use crate::{
 };
 
 use crate::flattening::{
-    flatten_all_modules, gather_initial_file_data, perform_lints, typecheck_all_modules, Module
+    flatten_all_globals, gather_initial_file_data, perform_lints, typecheck_all_modules, Module
 };
 
 const STD_LIB_PATH: &str = env!("SUS_COMPILER_STD_LIB_PATH");
 
+/// Any extra operations that should happen when files are added or removed from the linker. Such as caching line offsets. 
 pub trait LinkerExtraFileInfoManager {
     /// This is there to give an acceptable identifier that can be printed
     fn convert_filename(&self, path : &PathBuf) -> String {
@@ -44,6 +45,13 @@ impl Linker {
 
         assert_eq!(self.types[get_builtin_type("int")].link_info.name, "int");
         assert_eq!(self.types[get_builtin_type("bool")].link_info.name, "bool");
+
+        assert_eq!(self.constants[get_builtin_const("true")].link_info.name, "true");
+        assert_eq!(self.constants[get_builtin_const("false")].link_info.name, "false");
+        assert_eq!(self.constants[get_builtin_const("__crash_compiler")].link_info.name, "__crash_compiler");
+        assert_eq!(self.constants[get_builtin_const("assert")].link_info.name, "assert");
+        assert_eq!(self.constants[get_builtin_const("sizeof")].link_info.name, "sizeof");
+        assert_eq!(self.constants[get_builtin_const("clog2")].link_info.name, "clog2");
     }
 
     pub fn add_all_files_in_directory<ExtraInfoManager : LinkerExtraFileInfoManager>(&mut self, directory : &PathBuf, info_mngr : &mut ExtraInfoManager) {
@@ -144,7 +152,7 @@ impl Linker {
         }
         if config().early_exit == EarlyExitUpTo::Initialize {return}
 
-        flatten_all_modules(self);
+        flatten_all_globals(self);
         config().for_each_debug_module(config().debug_print_module_contents, &self.modules, |md| {
             md.print_flattened_module(&self.files[md.link_info.file]);
         });
@@ -173,7 +181,7 @@ impl Linker {
                 &self.files[md.link_info.file],
             );
             // Can immediately instantiate modules that have no template args
-            if md.link_info.template_arguments.is_empty() {
+            if md.link_info.template_parameters.is_empty() {
                 let _inst = md.instantiations.instantiate(md, self, FlatAlloc::new());
             }
             span_debugger.defuse();

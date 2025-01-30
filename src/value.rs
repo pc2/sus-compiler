@@ -4,32 +4,45 @@ use num::BigInt;
 
 use crate::flattening::{BinaryOperator, UnaryOperator};
 
-use crate::typing::
-    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE}
-;
+use crate::typing::{
+    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
+    type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor}
+};
 
+/// Top type for any kind of compiletime value while executing. 
+/// 
+/// These are used during execution ([crate::instantiation::execute])
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
     Bool(bool),
     Integer(BigInt),
     Array(Box<[Value]>),
+    /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
     Error,
 }
 
 impl Value {
-    pub fn get_concrete_type_of_constant(&self) -> ConcreteType {
+    /// Traverses the Value, to create a best-effort [ConcreteType] for it. 
+    /// So '1' becomes [INT_CONCRETE_TYPE], 
+    /// but `Value::Array([])` becomes `ConcreteType::Array(ConcreteType::Unknown)`
+    /// 
+    /// Panics when arrays contain mutually incompatible types
+    pub fn get_type_best_effort(&self, type_substitutor: &mut TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>) -> ConcreteType {
         match self {
             Value::Bool(_) => BOOL_CONCRETE_TYPE,
             Value::Integer(_) => INT_CONCRETE_TYPE,
-            Value::Array(_b) => {
-                unreachable!("Can't express arrays as constants (yet?)");
-                /*let content_typ = if let Some(b_first) = b.first() {
-                    b_first.get_type()
-                } else {
-                    Type::Invalid
+            Value::Array(arr) => {
+                let mut arr_iter = arr.iter();
+                let Some(fst) = arr_iter.next() else {return ConcreteType::Unknown(type_substitutor.alloc())};
+                let typ = fst.get_type_best_effort(type_substitutor);
+
+                for other in arr_iter {
+                    // Assert the types are correct
+                    assert!(other.is_of_type(&typ));
                 }
-                Type::Array(Box::new((content_typ, b.len())))*/
+
+                ConcreteType::Array(Box::new((typ, ConcreteType::Value(Value::Integer(arr.len().into())))))
             }
             Value::Unset | Value::Error => unreachable!(),
         }
@@ -82,10 +95,10 @@ impl Value {
     }
 }
 
-pub fn compute_unary_op(op: UnaryOperator, v: &TypedValue) -> TypedValue {
-    if v.value == Value::Error {
+pub fn compute_unary_op(op: UnaryOperator, v: &Value) -> Value {
+    if *v == Value::Error {
         unreachable!("unary op on Value::Error!")
-        //return TypedValue{typ : , value : Value::Error}
+        //return Value::Error
     }
     match op {
         UnaryOperator::Or => {
@@ -98,11 +111,10 @@ pub fn compute_unary_op(op: UnaryOperator, v: &TypedValue) -> TypedValue {
             todo!("Array Values")
         }
         UnaryOperator::Not => {
-            assert_eq!(v.typ, BOOL_CONCRETE_TYPE);
-            let Value::Bool(b) = &v.value else {
+            let Value::Bool(b) = v else {
                 unreachable!("Only not bool supported, should be caught by abstract typecheck")
             };
-            TypedValue::make_bool(!*b)
+            Value::Bool(!*b)
         }
         UnaryOperator::Sum => {
             todo!("Array Values")
@@ -111,89 +123,48 @@ pub fn compute_unary_op(op: UnaryOperator, v: &TypedValue) -> TypedValue {
             todo!("Array Values")
         }
         UnaryOperator::Negate => {
-            assert_eq!(v.typ, INT_CONCRETE_TYPE);
-            let Value::Integer(v) = &v.value else {
+            let Value::Integer(v) = v else {
                 panic!()
             };
-            TypedValue::make_integer(-v)
+            Value::Integer(-v)
         }
     }
 }
 
-pub fn compute_binary_op(left: &TypedValue, op: BinaryOperator, right: &TypedValue) -> TypedValue {
-    if left.value == Value::Error || right.value == Value::Error {
+pub fn compute_binary_op(left: &Value, op: BinaryOperator, right: &Value) -> Value {
+    if *left == Value::Error || *right == Value::Error {
         unreachable!("binary op on Value::Error!")
         //return Value::Error
     }
-    let lv = &left.value;
-    let rv = &right.value;
     match op {
-        BinaryOperator::Equals => TypedValue::make_bool(lv == rv),
-        BinaryOperator::NotEquals => TypedValue::make_bool(lv != rv),
+        BinaryOperator::Equals => Value::Bool(left == right),
+        BinaryOperator::NotEquals => Value::Bool(left != right),
         BinaryOperator::GreaterEq => {
-            TypedValue::make_bool(lv.unwrap_integer() >= rv.unwrap_integer())
+            Value::Bool(left.unwrap_integer() >= right.unwrap_integer())
         }
-        BinaryOperator::Greater => TypedValue::make_bool(lv.unwrap_integer() > rv.unwrap_integer()),
+        BinaryOperator::Greater => Value::Bool(left.unwrap_integer() > right.unwrap_integer()),
         BinaryOperator::LesserEq => {
-            TypedValue::make_bool(lv.unwrap_integer() <= rv.unwrap_integer())
+            Value::Bool(left.unwrap_integer() <= right.unwrap_integer())
         }
-        BinaryOperator::Lesser => TypedValue::make_bool(lv.unwrap_integer() < rv.unwrap_integer()),
-        BinaryOperator::Add => TypedValue::make_integer(lv.unwrap_integer() + rv.unwrap_integer()),
+        BinaryOperator::Lesser => Value::Bool(left.unwrap_integer() < right.unwrap_integer()),
+        BinaryOperator::Add => Value::Integer(left.unwrap_integer() + right.unwrap_integer()),
         BinaryOperator::Subtract => {
-            TypedValue::make_integer(lv.unwrap_integer() - rv.unwrap_integer())
+            Value::Integer(left.unwrap_integer() - right.unwrap_integer())
         }
         BinaryOperator::Multiply => {
-            TypedValue::make_integer(lv.unwrap_integer() * rv.unwrap_integer())
+            Value::Integer(left.unwrap_integer() * right.unwrap_integer())
         }
         BinaryOperator::Divide => {
-            TypedValue::make_integer(lv.unwrap_integer() / rv.unwrap_integer())
+            Value::Integer(left.unwrap_integer() / right.unwrap_integer())
         }
         BinaryOperator::Modulo => {
-            TypedValue::make_integer(lv.unwrap_integer() % rv.unwrap_integer())
+            Value::Integer(left.unwrap_integer() % right.unwrap_integer())
         }
-        BinaryOperator::And => TypedValue::make_bool(lv.unwrap_bool() & rv.unwrap_bool()),
-        BinaryOperator::Or => TypedValue::make_bool(lv.unwrap_bool() & rv.unwrap_bool()),
-        BinaryOperator::Xor => TypedValue::make_bool(lv.unwrap_bool() & rv.unwrap_bool()),
+        BinaryOperator::And => Value::Bool(left.unwrap_bool() & right.unwrap_bool()),
+        BinaryOperator::Or => Value::Bool(left.unwrap_bool() & right.unwrap_bool()),
+        BinaryOperator::Xor => Value::Bool(left.unwrap_bool() & right.unwrap_bool()),
         //BinaryOperator::ShiftLeft => todo!(), // Still a bit iffy about shift operator inclusion
         //BinaryOperator::ShiftRight => todo!()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct TypedValue {
-    pub value: Value,
-    pub typ: ConcreteType,
-}
-
-impl TypedValue {
-    pub fn make_bool(b: bool) -> Self {
-        Self {
-            typ: BOOL_CONCRETE_TYPE,
-            value: Value::Bool(b),
-        }
-    }
-    pub fn make_integer(i: BigInt) -> Self {
-        Self {
-            typ: INT_CONCRETE_TYPE,
-            value: Value::Integer(i),
-        }
-    }
-    /// panics if the value can't be typed.
-    pub fn from_value(value: Value) -> Self {
-        Self {
-            typ: value.get_concrete_type_of_constant(),
-            value,
-        }
-    }
-
-    #[track_caller]
-    pub fn unwrap_integer(&self) -> &BigInt {
-        self.value.unwrap_integer()
-    }
-
-    #[track_caller]
-    pub fn unwrap_bool(&self) -> bool {
-        self.value.unwrap_bool()
     }
 }
 
@@ -207,18 +178,11 @@ impl ConcreteType {
                 let mut arr = Vec::new();
                 if arr_size > 0 {
                     let content_typ = arr_typ.get_initial_val();
-                    arr.resize(arr_size as usize, content_typ);
+                    arr.resize(arr_size, content_typ);
                 }
                 Value::Array(arr.into_boxed_slice())
             }
             ConcreteType::Value(_) | ConcreteType::Unknown(_) => unreachable!(),
-        }
-    }
-
-    pub fn get_initial_typed_val(self) -> TypedValue {
-        TypedValue {
-            value: self.get_initial_val(),
-            typ : self,
         }
     }
 }

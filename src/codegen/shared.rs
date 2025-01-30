@@ -2,30 +2,7 @@
 
 use std::borrow::Cow;
 
-use crate::{instantiation::RealWire, linker::get_builtin_type, TypeUUID};
-
-
-pub fn mangle(str: &str) -> String {
-    let mut result = String::with_capacity(str.len());
-    for c in str.chars() {
-        if c.is_whitespace() || c == ':' {
-            continue;
-        }
-        result.push(if c.is_alphanumeric() { c } else { '_' });
-    }
-    result
-}
-
-pub fn get_type_name_size(id: TypeUUID) -> u64 {
-    if id == get_builtin_type("int") {
-        32 // TODO concrete int sizes
-    } else if id == get_builtin_type("bool") {
-        1
-    } else {
-        println!("TODO Named Structs Size");
-        1 // todo!() // Named structs are not implemented yet
-    }
-}
+use crate::instantiation::RealWire;
 
 pub fn wire_name_with_latency(wire: &RealWire, absolute_latency: i64, use_latency: bool) -> Cow<str> {
     assert!(wire.absolute_latency <= absolute_latency);

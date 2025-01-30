@@ -1,31 +1,53 @@
 use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
 use crate::value::Value;
-
 use std::ops::Deref;
 
-use super::template::{GlobalReference, TemplateAbstractTypes, TemplateInputs};
+use super::template::{GlobalReference, Parameter, TVec};
 use super::type_inference::{DomainVariableID, DomainVariableIDMarker, TypeSubstitutor, TypeVariableID, TypeVariableIDMarker, UnifyErrorReport};
 use crate::flattening::{BinaryOperator, StructType, TypingAllocator, UnaryOperator, WrittenType};
 use crate::linker::get_builtin_type;
 use crate::to_string::map_to_type_names;
 
-/// This contains only the information that can be easily type-checked.
+/// This contains only the information that can be type-checked before template instantiation.
 ///
 /// Its most important components are the names and structure of types.
 ///
 /// What isn't included are the parameters of types. So Array Sizes for example.
+/// 
+/// This is such that useful information can still be given for modules that haven't been instantiated. 
+/// 
+/// Not to be confused with [WrittenType], which is the in-source text representation. 
+/// 
+/// Not to be confused with [crate::typing::concrete_type::ConcreteType], which is the
+/// post-instantiation type. 
+/// 
+/// [AbstractType]s don't actually get converted to [crate::typing::concrete_type::ConcreteType]s. 
+/// Instead [crate::typing::concrete_type::ConcreteType] gets created from [WrittenType] directly. 
 #[derive(Debug, Clone)]
 pub enum AbstractType {
-    Unknown(TypeVariableID),
     Template(TemplateID),
     Named(TypeUUID),
     Array(Box<AbstractType>),
+    /// Referencing [AbstractType::Unknown] is a strong code smell. 
+    /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
+    /// 
+    /// It should only occur in creation `AbstractType::Unknown(self.type_substitutor.alloc())`
+    Unknown(TypeVariableID),
 }
 
 pub const BOOL_TYPE: AbstractType = AbstractType::Named(get_builtin_type("bool"));
 pub const INT_TYPE: AbstractType = AbstractType::Named(get_builtin_type("int"));
 
+/// These represent (clock) domains. While clock domains are included under this umbrella, domains can use the same clock. 
+/// The use case for non-clock-domains is to separate Latency Counting domains. So different pipelines where it doesn't 
+/// necessarily make sense that their values are related by a fixed number of clock cycles. 
+/// 
+/// Domains are resolved pre-instantiation, because dynamic domain merging doesn't seem like a valuable use case. 
+/// 
+/// As a convenience, we make [DomainType::Generative] a special case for a domain. 
+/// 
+/// The fun thing is that we can now use this domain info for syntax highlighting, giving wires in different domains a different color. 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DomainType {
     /// Generative conflicts with nothing
@@ -36,7 +58,12 @@ pub enum DomainType {
     /// These are unified by Hindley-Milner unification
     /// 
     /// They always point to non-generative domains. 
-    DomainVariable(DomainVariableID)
+    /// 
+    /// Referencing [DomainType::Unknown] is a strong code smell. 
+    /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
+    /// 
+    /// It should only occur in creation `DomainType::Unknown(self.domain_substitutor.alloc())`
+    Unknown(DomainVariableID)
 }
 
 impl DomainType {
@@ -50,22 +77,26 @@ impl DomainType {
         match self {
             DomainType::Generative => true,
             DomainType::Physical(_) => false,
-            DomainType::DomainVariable(_) => false,
+            DomainType::Unknown(_) => false,
         }
     }
 }
 
+/// Represents all typing information needed in the Flattening Stage. 
+/// 
+/// At the time being, this consists of the structural type ([AbstractType]), IE, if it's an `int`, `bool`, or `int[]`
+/// And the domain ([DomainType]), which tracks part of what (clock) domain this wire is. 
 #[derive(Debug, Clone)]
 pub struct FullType {
     pub typ: AbstractType,
     pub domain: DomainType,
 }
 
-/// Unification of domains?
+/// Performs Hindley-Milner typing during Flattening. (See [TypeSubstitutor])
+/// 
+/// 'A U 'x -> Substitute 'x = 'A
 ///
-/// 'A U 'x -> 'x = 'A
-///
-/// 'x U 'y -> 'x = 'y
+/// 'x U 'y -> Substitute 'x = 'y
 pub struct TypeUnifier {
     pub template_type_names: FlatAlloc<String, TemplateIDMarker>,
     pub type_substitutor: TypeSubstitutor<AbstractType, TypeVariableIDMarker>,
@@ -74,11 +105,11 @@ pub struct TypeUnifier {
 
 impl TypeUnifier {
     pub fn new(
-        template_inputs: &TemplateInputs,
+        parameters: &TVec<Parameter>,
         typing_alloc: TypingAllocator
     ) -> Self {
         Self {
-            template_type_names: map_to_type_names(template_inputs),
+            template_type_names: map_to_type_names(parameters),
             type_substitutor: TypeSubstitutor::init(&typing_alloc.type_variable_alloc),
             domain_substitutor: TypeSubstitutor::init(&typing_alloc.domain_variable_alloc)
         }
@@ -120,7 +151,11 @@ impl TypeUnifier {
     /// This should always be what happens first to a given variable. 
     /// 
     /// Therefore it should be impossible that one of the internal unifications ever fails
-    pub fn unify_with_written_type_substitute_templates_must_succeed(&self, wr_typ: &WrittenType, typ: &AbstractType, template_type_args: &TemplateAbstractTypes) {
+    /// 
+    /// template_type_args applies to both Template Type args and Template Value args.
+    ///
+    /// For Types this is the Type, for Values this is unified with the parameter declaration type
+    pub fn unify_with_written_type_substitute_templates_must_succeed(&self, wr_typ: &WrittenType, typ: &AbstractType, template_type_args: &TVec<AbstractType>) {
         match wr_typ {
             WrittenType::Error(_span) => {} // Already an error, don't unify
             WrittenType::TemplateVariable(_span, argument_id) => {
@@ -322,7 +357,7 @@ impl TypeUnifier {
     pub fn finalize_abstract_type(&mut self, types: &ArenaAllocator<StructType, TypeUUIDMarker>, typ: &mut AbstractType, span: Span, errors: &ErrorCollector) {
         use super::type_inference::HindleyMilner;
         if typ.fully_substitute(&self.type_substitutor) == false {
-            let typ_as_string = typ.to_string(types, &self.template_type_names);
+            let typ_as_string = typ.display(types, &self.template_type_names);
             errors.error(span, format!("Could not fully figure out the type of this object. {typ_as_string}"));
         }
     }

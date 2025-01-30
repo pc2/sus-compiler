@@ -6,8 +6,9 @@ __builtin__ module LatencyOffset #(T, int OFFSET) {
 
 // Compiler Intrinsic
 __builtin__ module CrossDomain #(T) {
+    domain in_clk
     interface in_domain : T in'0
-    domain out
+    domain out_clk
     interface out_domain : -> T out'0
 }
 
@@ -34,3 +35,25 @@ __builtin__ const bool __crash_compiler {}
 __builtin__ const bool true {}
 // False, as in '0'
 __builtin__ const bool false {}
+
+// Fails to execute if C == false
+__builtin__ const bool assert #(bool C) {}
+
+// Returns the size of the given type, in bits. 
+//
+// `sizeof #(T: type bool) = 1`
+// `sizeof #(T: type bool[50]) = 50`
+// `sizeof #(T: type int[10][10]) = 3200`
+__builtin__ const int sizeof #(T) {}
+
+
+// Computes the Log2 of a value, rounded up. 
+// 
+// Typically used to find the size in bits that the address would need to be to address into a memory of size V. 
+//
+// Requires V > 0
+//
+// `clog2 #(V: 15) = 4`
+// `clog2 #(V: 16) = 4`
+// `clog2 #(V: 17) = 5`
+__builtin__ const int clog2 #(int V) {}

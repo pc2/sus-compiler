@@ -1,6 +1,6 @@
 
 use crate::{
-    flattening::{DeclarationPortInfo, Instruction}, linker::IsExtern, typing::concrete_type::ConcreteType, FlatAlloc, InstantiatedModule, Linker, Module, WireIDMarker
+    flattening::{DeclarationKind, Instruction}, linker::IsExtern, typing::concrete_type::ConcreteType, FlatAlloc, InstantiatedModule, Linker, Module, WireIDMarker
 };
 use std::ops::Deref;
 use std::fmt::Write;
@@ -16,9 +16,6 @@ impl super::CodeGenBackend for VHDLCodegenBackend {
     }
     fn output_dir_name(&self) -> &str {
         "vhdl_output"
-    }
-    fn comment(&self) -> &str {
-        "--"
     }
     fn codegen(&self, md: &Module, instance: &InstantiatedModule, linker: &Linker, use_latency: bool) -> String {
         gen_vhdl_code(md, instance, use_latency)
@@ -42,8 +39,8 @@ fn typ_to_declaration(mut typ: &ConcreteType) -> String {
         typ = content_typ;
     }
     match typ {
-        ConcreteType::Named(id) => {
-            let sz = get_type_name_size(*id);
+        ConcreteType::Named(reference) => {
+            let sz = ConcreteType::sizeof_named(reference);
             if sz == 1 {
                 format!("{array_string} std_logic")
             } else {
@@ -56,10 +53,6 @@ fn typ_to_declaration(mut typ: &ConcreteType) -> String {
 }
 
 impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> {
-    fn instance_name(&self) -> String {
-        mangle(&self.instance.name)
-    }
-
     fn write_vhdl_code(&mut self) {
         match self.md.link_info.is_extern {
             IsExtern::Normal => {
@@ -85,13 +78,14 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 
     fn write_entity(&mut self, commented_out: bool) {
         let comment_text = if commented_out { "-- " } else { "" };
-        let instance_name = self.instance_name();
+        let instance_name = &self.instance.name;
 
         let mut it = self.instance.interface_ports.iter_valids().peekable();
         let end = if it.peek().is_some() { ";" } else { "" };
+        let clk_name = self.md.get_clock_name();
         write!(
             self.program_text,
-            "{comment_text}entity {} is (\n{comment_text}    port (\n        clk : in std_logic{end}\n",
+            "{comment_text}entity {} is (\n{comment_text}    port (\n        {clk_name} : in std_logic{end}\n",
             instance_name
         )
         .unwrap();
@@ -117,7 +111,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
     }
 
     fn write_architecture(&mut self) {
-        let instance_name = self.instance_name();
+        let instance_name = &self.instance.name;
         writeln!(
             &mut self.program_text,
             "architecture Behavioral of {instance_name} is"
@@ -137,7 +131,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 if let Instruction::Declaration(wire_decl) =
                     &self.md.link_info.instructions[wire.original_instruction]
                 {
-                    if let DeclarationPortInfo::RegularPort { .. } = wire_decl.is_port {
+                    if let DeclarationKind::RegularPort { .. } = wire_decl.decl_kind {
                         return false;
                     }
                 }

@@ -1,10 +1,11 @@
 use crate::prelude::*;
 
 use std::cell::RefCell;
+use std::thread::panicking;
 
-use crate::{alloc::ArenaAllocator, typing::template::TemplateInput};
+use crate::{alloc::ArenaAllocator, typing::template::Parameter};
 
-use crate::flattening::{Declaration, Instruction, Interface, Module, Port, SubModuleInstance};
+use crate::flattening::{Declaration, DomainInfo, Instruction, Interface, Module, Port, SubModuleInstance};
 use crate::linker::{checkpoint::ErrorCheckpoint, FileData, LinkInfo};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -13,6 +14,9 @@ pub enum ErrorLevel {
     Warning,
 }
 
+/// Represents a comment about a location in the source code.
+/// 
+/// Multiple infos can be attached to a single [CompileError]
 #[derive(Debug, Clone)]
 pub struct ErrorInfo {
     pub position: Span,
@@ -20,6 +24,9 @@ pub struct ErrorInfo {
     pub info: String,
 }
 
+/// Represents an error or warning that the compiler produced. They can be shown in the IDE, or on the CLI
+/// 
+/// All errors for a single file are stored together, which is why this struct does not contain a FileUUID
 #[derive(Debug, Clone)]
 pub struct CompileError {
     pub position: Span,
@@ -30,7 +37,7 @@ pub struct CompileError {
 
 /// Stores all errors gathered within a context for reporting to the user.
 ///
-/// Only editable by converting to a ErrorCollector using [ErrorStore::take_for_editing]
+/// Only editable by converting to a ErrorCollector using [ErrorCollector::from_storage]
 #[derive(Debug, Clone)]
 pub struct ErrorStore {
     errors: Vec<CompileError>,
@@ -178,12 +185,17 @@ impl<'linker> ErrorCollector<'linker> {
 
 impl<'l> Drop for ErrorCollector<'l> {
     fn drop(&mut self) {
-        if !self.error_store.borrow().is_untouched() {
+        if !self.error_store.borrow().is_untouched() && !panicking() {
             panic!("ErrorCollector should have been emptied!");
         }
     }
 }
 
+/// Intermediary struct to make adding infos far easier. 
+/// 
+/// Use as:
+/// 
+///     errors.warn(span, "Unused Variable").info(span2, file2, "In module").info(blablabla)
 pub struct ErrorReference<'ec> {
     err_collector: &'ec ErrorCollector<'ec>,
     pos: usize,
@@ -214,14 +226,20 @@ impl<'ec> ErrorReference<'ec> {
         self.existing_info(obj.make_global_info(&self.err_collector.files))
     }
     pub fn info_obj_same_file<Obj: ErrorInfoObject>(&self, obj: &Obj) -> &Self {
-        self.existing_info(obj.make_info(self.err_collector.file))
+        if let Some(info) = obj.make_info(self.err_collector.file) {
+            self.existing_info(info);
+        }
+        self
     }
     pub fn info_obj_different_file<Obj: ErrorInfoObject>(
         &self,
         obj: &Obj,
         file: FileUUID,
     ) -> &Self {
-        self.existing_info(obj.make_info(file))
+        if let Some(info) = obj.make_info(file) {
+            self.existing_info(info);
+        }
+        self
     }
     pub fn add_info_list(&self, mut info_list: Vec<ErrorInfo>) {
         self.err_collector.error_store.borrow_mut().errors[self.pos].infos.append(&mut info_list);
@@ -239,9 +257,10 @@ impl<'ec> ErrorReference<'ec> {
 
 /// This represents objects that can be given as info to an error in a straight-forward way.
 pub trait ErrorInfoObject {
-    fn make_info(&self, file: FileUUID) -> ErrorInfo;
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo>;
 }
 
+/// This represents objects that can be given as info to an error in a straight-forward way.
 pub trait FileKnowingErrorInfoObject {
     fn make_global_info(
         &self,
@@ -252,32 +271,32 @@ pub trait FileKnowingErrorInfoObject {
 // Trait implementations in the compiler
 
 impl ErrorInfoObject for Declaration {
-    fn make_info(&self, file: FileUUID) -> ErrorInfo {
-        ErrorInfo {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
             position: self.name_span,
             file,
             info: format!("'{}' declared here", &self.name),
-        }
+        })
     }
 }
 
 impl ErrorInfoObject for SubModuleInstance {
-    fn make_info(&self, file: FileUUID) -> ErrorInfo {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
         let (position, info) = if let Some((name, span)) = &self.name {
             (*span, format!("{name} declared here"))
         } else {
             (self.module_ref.name_span, "Used here".to_owned())
         };
-        ErrorInfo {
+        Some(ErrorInfo {
             position,
             file,
             info,
-        }
+        })
     }
 }
 
 impl ErrorInfoObject for Instruction {
-    fn make_info(&self, file: FileUUID) -> ErrorInfo {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
         match self {
             Instruction::SubModule(sm) => sm.make_info(file),
             Instruction::Declaration(decl) => decl.make_info(file),
@@ -286,23 +305,33 @@ impl ErrorInfoObject for Instruction {
     }
 }
 
-impl ErrorInfoObject for TemplateInput {
-    fn make_info(&self, file: FileUUID) -> ErrorInfo {
-        ErrorInfo {
+impl ErrorInfoObject for DomainInfo {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
+            position: self.name_span?,
+            file,
+            info: format!("Domain '{}' declared here", self.name),
+        })
+    }
+}
+
+impl ErrorInfoObject for Parameter {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
             position: self.name_span,
             file,
             info: format!("Parameter '{}' declared here", self.name),
-        }
+        })
     }
 }
 
 impl ErrorInfoObject for Port {
-    fn make_info(&self, file: FileUUID) -> ErrorInfo {
-        ErrorInfo {
+    fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
+        Some(ErrorInfo {
             position: self.name_span,
             file,
             info: format!("Port '{}' declared here", &self.name),
-        }
+        })
     }
 }
 

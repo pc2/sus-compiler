@@ -7,18 +7,18 @@ TREE SITTER module! int
 TREE SITTER module! __crash_compiler
 TREE SITTER module! true
 TREE SITTER module! false
+TREE SITTER module! assert
+TREE SITTER module! sizeof
+TREE SITTER module! clog2
 TREE SITTER module! DualPortMem
-TREE SITTER module! UseDualPortMem
 TREE SITTER module! FIFO
-TREE SITTER module! example_FIFO
-TREE SITTER module! use_Iterator
+TREE SITTER module! JoinDomains
 TREE SITTER module! Iterator
 TREE SITTER module! FixedSizeIterator
 TREE SITTER module! SlowClockGenerator
 TREE SITTER module! SplitAt
 TREE SITTER module! Abs
 TREE SITTER module! Slice
-TREE SITTER module! useSlice
 TREE SITTER module! BitSelect
 TREE SITTER module! PopCount
 TREE SITTER module! TreeAdd
@@ -111,23 +111,30 @@ TREE SITTER module! xyz
 TREE SITTER module! numbersToAddUp
 TREE SITTER module! sized_int_add
 TREE SITTER module! use_sized_int_add
+TREE SITTER module! implicit_domain_forbidden
+TREE SITTER module! conflicting_domain_with_port_name
+TREE SITTER module! make_infinite_type_help
+TREE SITTER module! make_infinite_type
+TREE SITTER module! UseDualPortMem
+TREE SITTER module! example_FIFO
+TREE SITTER module! use_Iterator
+TREE SITTER module! UseSlice
+TREE SITTER module! UseBuiltinConstants
+TREE SITTER module! FailingAssert
 TREE SITTER module! IfTesting
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
 Typechecking BitsToInt
 Typechecking DualPortMem
-Typechecking UseDualPortMem
 Typechecking FIFO
-Typechecking example_FIFO
-Typechecking use_Iterator
+Typechecking JoinDomains
 Typechecking Iterator
 Typechecking FixedSizeIterator
 Typechecking SlowClockGenerator
 Typechecking SplitAt
 Typechecking Abs
 Typechecking Slice
-Typechecking useSlice
 Typechecking BitSelect
 Typechecking PopCount
 Typechecking TreeAdd
@@ -218,6 +225,16 @@ Typechecking xyz
 Typechecking numbersToAddUp
 Typechecking sized_int_add
 Typechecking use_sized_int_add
+Typechecking implicit_domain_forbidden
+Typechecking conflicting_domain_with_port_name
+Typechecking make_infinite_type_help
+Typechecking make_infinite_type
+Typechecking UseDualPortMem
+Typechecking example_FIFO
+Typechecking use_Iterator
+Typechecking UseSlice
+Typechecking UseBuiltinConstants
+Typechecking FailingAssert
 Typechecking IfTesting
 Instantiating IntToBits
 Concrete Typechecking IntToBits
@@ -225,45 +242,12 @@ Latency Counting IntToBits
 Instantiating BitsToInt
 Concrete Typechecking BitsToInt
 Latency Counting BitsToInt
-Instantiating UseDualPortMem
-Concrete Typechecking UseDualPortMem
-Instantiating DualPortMem
-Concrete Typechecking DualPortMem
-Instantiating CrossDomain
-Concrete Typechecking CrossDomain
-Latency Counting CrossDomain
-Latency Counting DualPortMem
-Latency Counting UseDualPortMem
-Instantiating example_FIFO
-Concrete Typechecking example_FIFO
-Instantiating FIFO
-Concrete Typechecking FIFO
-Instantiating CrossDomain
-Concrete Typechecking CrossDomain
-Latency Counting CrossDomain
-Instantiating CrossDomain
-Concrete Typechecking CrossDomain
-Latency Counting CrossDomain
-Instantiating LatencyOffset
-Concrete Typechecking LatencyOffset
-Latency Counting LatencyOffset
-Latency Counting FIFO
-Latency Counting example_FIFO
-Instantiating use_Iterator
-Concrete Typechecking use_Iterator
 Instantiating Iterator
 Concrete Typechecking Iterator
 Latency Counting Iterator
-Latency Counting use_Iterator
 Instantiating Abs
 Concrete Typechecking Abs
 Latency Counting Abs
-Instantiating useSlice
-Concrete Typechecking useSlice
-Instantiating Slice
-Concrete Typechecking Slice
-Latency Counting Slice
-Latency Counting useSlice
 Instantiating example_md
 Concrete Typechecking example_md
 Latency Counting example_md
@@ -543,3 +527,43 @@ Instantiating sized_int_add
 Concrete Typechecking sized_int_add
 Latency Counting sized_int_add
 Latency Counting use_sized_int_add
+Not Instantiating implicit_domain_forbidden due to flattening errors
+Not Instantiating conflicting_domain_with_port_name due to flattening errors
+Not Instantiating make_infinite_type due to flattening errors
+Instantiating UseDualPortMem
+Concrete Typechecking UseDualPortMem
+Instantiating DualPortMem
+Concrete Typechecking DualPortMem
+Instantiating CrossDomain
+Concrete Typechecking CrossDomain
+Latency Counting CrossDomain
+Latency Counting DualPortMem
+Latency Counting UseDualPortMem
+Instantiating example_FIFO
+Concrete Typechecking example_FIFO
+Instantiating FIFO
+Concrete Typechecking FIFO
+Instantiating CrossDomain
+Concrete Typechecking CrossDomain
+Latency Counting CrossDomain
+Instantiating CrossDomain
+Concrete Typechecking CrossDomain
+Latency Counting CrossDomain
+Instantiating LatencyOffset
+Concrete Typechecking LatencyOffset
+Latency Counting LatencyOffset
+Latency Counting FIFO
+Latency Counting example_FIFO
+Instantiating use_Iterator
+Concrete Typechecking use_Iterator
+Latency Counting use_Iterator
+Instantiating UseSlice
+Concrete Typechecking UseSlice
+Instantiating Slice
+Concrete Typechecking Slice
+Latency Counting Slice
+Latency Counting UseSlice
+Instantiating UseBuiltinConstants
+Concrete Typechecking UseBuiltinConstants
+Latency Counting UseBuiltinConstants
+Instantiating FailingAssert

@@ -6,20 +6,20 @@
 
 use std::ops::{Deref, Index, IndexMut};
 
-use crate::linker::{get_builtin_type, IsExtern};
+use crate::linker::IsExtern;
 use crate::prelude::*;
-use crate::typing::template::{GlobalReference, HowDoWeKnowTheTemplateArg};
+use crate::typing::template::GlobalReference;
 
 use num::BigInt;
 
 use crate::flattening::*;
-use crate::value::{compute_binary_op, compute_unary_op, TypedValue, Value};
 use crate::util::add_to_small_set;
+use crate::value::{compute_binary_op, compute_unary_op, Value};
 
 use crate::typing::{
     abstract_type::DomainType,
     concrete_type::{ConcreteType, INT_CONCRETE_TYPE},
-    template::{ConcreteTemplateArg, TemplateArgKind},
+    template::TemplateArgKind,
 };
 
 use super::*;
@@ -40,7 +40,7 @@ impl<'fl> GenerationState<'fl> {
         let instr = &self.md.link_info.instructions[v];
         match instr {
             Instruction::Declaration(d) => d.name_span,
-            Instruction::Wire(w) => w.span,
+            Instruction::Expression(expr) => expr.span,
             _ => unreachable!(),
         }
     }
@@ -76,12 +76,12 @@ impl<'fl> GenerationState<'fl> {
         *target = to_write;
         Ok(())
     }
-    fn get_generation_value(&self, v: FlatID) -> ExecutionResult<&TypedValue> {
+    fn get_generation_value(&self, v: FlatID) -> ExecutionResult<&Value> {
         if let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] {
-            if let Value::Unset | Value::Error = &vv.value {
+            if let Value::Unset | Value::Error = vv {
                 Err((
                     self.span_of(v),
-                    format!("This variable is set but it's {:?}!", vv.value),
+                    format!("This variable is set but it's {:?}!", vv),
                 ))
             } else {
                 Ok(vv)
@@ -129,18 +129,17 @@ impl<'fl> IndexMut<FlatID> for GenerationState<'fl> {
     }
 }
 
-fn array_access(tv: &TypedValue, idx: &BigInt, span: BracketSpan) -> ExecutionResult<TypedValue> {
-    let typ = tv.typ.down_array().clone();
-
-    let Value::Array(arr) = &tv.value else {
+fn array_access<'v>(
+    arr_val: &'v Value,
+    idx: &BigInt,
+    span: BracketSpan,
+) -> ExecutionResult<&'v Value> {
+    let Value::Array(arr) = arr_val else {
         caught_by_typecheck!("Value must be an array")
     };
 
     if let Some(elem) = usize::try_from(idx).ok().and_then(|idx| arr.get(idx)) {
-        Ok(TypedValue {
-            typ,
-            value: elem.clone(),
-        })
+        Ok(elem)
     } else {
         Err((
             span.outer_span(),
@@ -152,6 +151,20 @@ fn array_access(tv: &TypedValue, idx: &BigInt, span: BracketSpan) -> ExecutionRe
     }
 }
 
+/// Temporary intermediary struct
+///
+/// See [WireReferenceRoot]
+#[derive(Debug, Clone)]
+enum RealWireRefRoot {
+    /// The preamble isn't really used yet, but it's there for when we have submodule arrays (soon)
+    Wire {
+        wire_id: WireID,
+        preamble: Vec<RealWirePathElem>,
+    },
+    Generative(FlatID),
+    Constant(Value),
+}
+
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     /// Uses the current context to turn a [WrittenType] into a [ConcreteType].
     ///
@@ -159,12 +172,21 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn concretize_type(&self, typ: &WrittenType) -> ExecutionResult<ConcreteType> {
         Ok(match typ {
             WrittenType::Error(_) => caught_by_typecheck!("Error Type"),
-            WrittenType::TemplateVariable(_, template_id) => self.template_args[*template_id].unwrap_type().clone(),
-            WrittenType::Named(named_type) => ConcreteType::Named(named_type.id),
+            WrittenType::TemplateVariable(_, template_id) => {
+                self.template_args[*template_id].clone()
+            }
+            WrittenType::Named(named_type) => {
+                ConcreteType::Named(crate::typing::concrete_type::ConcreteGlobalReference {
+                    id: named_type.id,
+                    template_args: FlatAlloc::new(),
+                })
+            }
             WrittenType::Array(_, arr_box) => {
                 let (arr_content_typ, arr_size_wire, _bracket_span) = arr_box.deref();
                 let inner_typ = self.concretize_type(arr_content_typ)?;
-                let arr_size = self.generation_state.get_generation_integer(*arr_size_wire)?;
+                let arr_size = self
+                    .generation_state
+                    .get_generation_integer(*arr_size_wire)?;
                 ConcreteType::Array(Box::new((
                     inner_typ,
                     ConcreteType::Value(Value::Integer(arr_size.clone())),
@@ -187,28 +209,66 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
     }
 
+    fn get_first_template_argument_value(&self, cst_ref: &GlobalReference<ConstantUUID>) -> (&Value, Span) {
+        let first_arg = cst_ref.unwrap_first_template_argument();
+        let value_instruction = first_arg.kind.unwrap_value();
+        (self.generation_state[value_instruction].unwrap_generation_value(), first_arg.value_span)
+    }
+
     /// TODO make builtins that depend on parameters
-    fn get_named_constant_value(&self, cst_ref: &GlobalReference<ConstantUUID>) -> TypedValue {
+    fn get_named_constant_value(&self, cst_ref: &GlobalReference<ConstantUUID>) -> ExecutionResult<Value> {
         let linker_cst = &self.linker.constants[cst_ref.id];
 
-        if linker_cst.link_info.is_extern == IsExtern::Builtin {
+        Ok(if linker_cst.link_info.is_extern == IsExtern::Builtin {
             match linker_cst.link_info.name.as_str() {
-                "true" => TypedValue{value: Value::Bool(true), typ: ConcreteType::Named(get_builtin_type("bool"))},
-                "false" => TypedValue{value: Value::Bool(false), typ: ConcreteType::Named(get_builtin_type("bool"))},
+                "true" => Value::Bool(true),
+                "false" => Value::Bool(false),
+                "clog2" => {
+                    let (val, span) = self.get_first_template_argument_value(cst_ref);
+                    let int_val = val.unwrap_integer();
+                    if *int_val > BigInt::ZERO {
+                        let int_val_minus_one : BigInt = int_val - 1;
+
+                        Value::Integer(BigInt::from(int_val_minus_one.bits()))
+                    } else {
+                        return Err((span, format!("clog2 argument must be > 0, found {int_val}")))
+                    }
+                }
+                "assert" => {
+                    let (condition, span) = self.get_first_template_argument_value(cst_ref);
+
+                    if condition.unwrap_bool() {
+                        Value::Bool(true)
+                    } else {
+                        return Err((span, "Assertion failed".into()))
+                    }
+                }
+                "sizeof" => {
+                    let first_arg = cst_ref.unwrap_first_template_argument();
+                    let wr_typ = first_arg.kind.unwrap_type();
+
+                    let concrete_typ = self.concretize_type(wr_typ)?;
+
+                    let Some(typ_sz) = concrete_typ.sizeof() else {
+                        return Err((first_arg.value_span, "This is an incomplete type".into()))
+                    };
+
+                    Value::Integer(typ_sz)
+                }
                 "__crash_compiler" => {
                     cst_ref.get_total_span().debug();
                     panic!("__crash_compiler Intentional ICE. This is for debugging the compiler and LSP.")
                 }
-                other => unreachable!("{other} is not a known builtin constant")
+                other => unreachable!("{other} is not a known builtin constant"),
             }
         } else {
             todo!("Custom Constants");
-        }
+        })
     }
 
     // Points to the wire in the hardware that corresponds to the root of this.
-    fn determine_wire_ref_root(&mut self, wire_ref_root: &WireReferenceRoot) -> RealWireRefRoot {
-        match wire_ref_root {
+    fn determine_wire_ref_root(&mut self, wire_ref_root: &WireReferenceRoot) -> ExecutionResult<RealWireRefRoot> {
+        Ok(match wire_ref_root {
             &WireReferenceRoot::LocalDecl(decl_id, _) => match &self.generation_state[decl_id] {
                 SubModuleOrWire::Wire(w) => RealWireRefRoot::Wire {
                     wire_id: *w,
@@ -219,16 +279,16 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 SubModuleOrWire::Unnasigned => unreachable!(),
             },
             WireReferenceRoot::NamedConstant(cst) => {
-                RealWireRefRoot::Constant(self.get_named_constant_value(cst))
+                RealWireRefRoot::Constant(self.get_named_constant_value(cst)?)
             }
             WireReferenceRoot::SubModulePort(port) => {
-                return self.instantiate_port_wire_ref_root(
+                return Ok(self.instantiate_port_wire_ref_root(
                     port.port,
                     port.submodule_decl,
                     port.port_name_span,
-                );
+                ));
             }
-        }
+        })
     }
 
     /// [Self::determine_wire_ref_root] may have included a preamble path already, this must be built upon by this function
@@ -265,13 +325,6 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         num_regs: i64,
         original_instruction: FlatID,
     ) {
-        let from = ConnectFrom {
-            num_regs,
-            from,
-            condition : self.condition_stack.clone().into_boxed_slice(),
-            original_connection: original_instruction,
-        };
-
         let RealWireDataSource::Multiplexer {
             is_state: _,
             sources,
@@ -280,7 +333,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             caught_by_typecheck!("Should only be a writeable wire here")
         };
 
-        sources.push(MultiplexerSource { from, to_path });
+        sources.push(MultiplexerSource {
+            to_path,
+            num_regs,
+            from,
+            condition: self.condition_stack.clone().into_boxed_slice(),
+            original_connection: original_instruction,
+        });
     }
 
     fn instantiate_connection(
@@ -294,7 +353,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             WriteModifiers::Connection {
                 num_regs,
                 regs_span: _,
-            } => match self.determine_wire_ref_root(&target_wire_ref.root) {
+            } => match self.determine_wire_ref_root(&target_wire_ref.root)? {
                 RealWireRefRoot::Wire {
                     wire_id: target_wire,
                     preamble,
@@ -321,11 +380,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     else {
                         unreachable!()
                     };
-                    let mut new_val = std::mem::replace(&mut v_writable.value, Value::Error);
+                    let mut new_val = std::mem::replace(v_writable, Value::Error);
                     self.generation_state.write_gen_variable(
                         &mut new_val,
                         &target_wire_ref.path,
-                        found_v.value,
+                        found_v,
                     )?;
 
                     let SubModuleOrWire::CompileTimeValue(v_writable) =
@@ -333,7 +392,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     else {
                         unreachable!()
                     };
-                    v_writable.value = new_val;
+                    *v_writable = new_val;
                 }
                 RealWireRefRoot::Constant(_cst) => {
                     caught_by_typecheck!("Cannot assign to constants");
@@ -357,22 +416,19 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 self.generation_state.write_gen_variable(
                     initial_value,
                     &target_wire_ref.path,
-                    found_v.value,
+                    found_v,
                 )?;
             }
         }
         Ok(())
     }
-    fn compute_compile_time_wireref(
-        &self,
-        wire_ref: &WireReference,
-    ) -> ExecutionResult<TypedValue> {
-        let mut work_on_value: TypedValue = match &wire_ref.root {
+    fn compute_compile_time_wireref(&self, wire_ref: &WireReference) -> ExecutionResult<Value> {
+        let mut work_on_value: Value = match &wire_ref.root {
             &WireReferenceRoot::LocalDecl(decl_id, _span) => {
                 self.generation_state.get_generation_value(decl_id)?.clone()
             }
             WireReferenceRoot::NamedConstant(cst) => {
-                self.get_named_constant_value(cst)
+                self.get_named_constant_value(cst)?
             }
             &WireReferenceRoot::SubModulePort(_) => {
                 todo!("Don't yet support compile time functions")
@@ -384,30 +440,32 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
                     let idx = self.generation_state.get_generation_integer(idx)?;
 
-                    array_access(&work_on_value, idx, bracket_span)?
+                    array_access(&work_on_value, idx, bracket_span)?.clone()
                 }
             }
         }
 
         Ok(work_on_value)
     }
-    fn compute_compile_time(&mut self, wire_inst: &WireInstance) -> ExecutionResult<TypedValue> {
-        Ok(match &wire_inst.source {
-            WireSource::WireRef(wire_ref) => self.compute_compile_time_wireref(wire_ref)?,
-            &WireSource::UnaryOp { op, right } => {
+    fn compute_compile_time(&mut self, expression: &Expression) -> ExecutionResult<Value> {
+        Ok(match &expression.source {
+            ExpressionSource::WireRef(wire_ref) => {
+                self.compute_compile_time_wireref(wire_ref)?.clone()
+            }
+            &ExpressionSource::UnaryOp { op, right } => {
                 let right_val = self.generation_state.get_generation_value(right)?;
                 compute_unary_op(op, right_val)
             }
-            &WireSource::BinaryOp { op, left, right } => {
+            &ExpressionSource::BinaryOp { op, left, right } => {
                 let left_val = self.generation_state.get_generation_value(left)?;
                 let right_val = self.generation_state.get_generation_value(right)?;
 
                 match op {
                     BinaryOperator::Divide | BinaryOperator::Modulo => {
                         use num::Zero;
-                        if right_val.value.unwrap_integer().is_zero() {
+                        if right_val.unwrap_integer().is_zero() {
                             return Err((
-                                wire_inst.span,
+                                expression.span,
                                 format!(
                                     "Divide or Modulo by zero: {} / 0",
                                     left_val.unwrap_integer()
@@ -420,20 +478,21 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
                 compute_binary_op(left_val, op, right_val)
             }
-            WireSource::Constant(value) => TypedValue::from_value(value.clone()),
+            ExpressionSource::Constant(value) => value.clone(),
         })
     }
+
     fn alloc_wire_for_const(
         &mut self,
-        value: TypedValue,
+        value: Value,
         original_instruction: FlatID,
         domain: DomainID,
     ) -> WireID {
         self.wires.alloc(RealWire {
-            source: RealWireDataSource::Constant { value: value.value },
+            typ: value.get_type_best_effort(&mut self.type_substitutor),
+            source: RealWireDataSource::Constant { value },
             original_instruction,
             domain,
-            typ: value.typ,
             name: self.unique_name_producer.get_unique_name(""),
             specified_latency: CALCULATE_LATENCY_LATER,
             absolute_latency: CALCULATE_LATENCY_LATER,
@@ -474,8 +533,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             wire_found.maps_to_wire
         } else {
             let port_data = &self.linker.modules[submod_instance.module_uuid].ports[port_id];
-            let submodule_instruction =
-                self.md.link_info.instructions[submod_instance.original_instruction].unwrap_submodule();
+            let submodule_instruction = self.md.link_info.instructions
+                [submod_instance.original_instruction]
+                .unwrap_submodule();
             let source = if port_data.is_input {
                 RealWireDataSource::Multiplexer {
                     is_state: None,
@@ -490,7 +550,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 original_instruction: submod_instance.original_instruction,
                 domain: domain.unwrap_physical(),
                 typ: ConcreteType::Unknown(self.type_substitutor.alloc()),
-                name: self.unique_name_producer.get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
+                name: self
+                    .unique_name_producer
+                    .get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
                 specified_latency: CALCULATE_LATENCY_LATER,
                 absolute_latency: CALCULATE_LATENCY_LATER,
             });
@@ -501,7 +563,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Vec::new()
             };
 
-            *wire_found = Some(UsedPort {
+            *wire_found = Some(SubModulePort {
                 maps_to_wire: new_wire,
                 name_refs,
             });
@@ -514,9 +576,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         wire_ref_root: &WireReferenceRoot,
         original_instruction: FlatID,
         domain: DomainID,
-    ) -> (WireID, Vec<RealWirePathElem>) {
-        let root = self.determine_wire_ref_root(wire_ref_root);
-        match root {
+    ) -> ExecutionResult<(WireID, Vec<RealWirePathElem>)> {
+        let root = self.determine_wire_ref_root(wire_ref_root)?;
+        Ok(match root {
             RealWireRefRoot::Wire { wire_id, preamble } => (wire_id, preamble),
             RealWireRefRoot::Generative(decl_id) => {
                 let value = self.generation_state[decl_id]
@@ -531,18 +593,18 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 self.alloc_wire_for_const(value, original_instruction, domain),
                 Vec::new(),
             ),
-        }
+        })
     }
-    fn wire_to_real_wire(
+    fn expression_to_real_wire(
         &mut self,
-        w: &WireInstance,
+        expression: &Expression,
         original_instruction: FlatID,
         domain: DomainID,
     ) -> ExecutionResult<WireID> {
-        let source = match &w.source {
-            WireSource::WireRef(wire_ref) => {
+        let source = match &expression.source {
+            ExpressionSource::WireRef(wire_ref) => {
                 let (root_wire, path_preamble) =
-                    self.get_wire_ref_root_as_wire(&wire_ref.root, original_instruction, domain);
+                    self.get_wire_ref_root_as_wire(&wire_ref.root, original_instruction, domain)?;
                 let path = self.instantiate_wire_ref_path(path_preamble, &wire_ref.path, domain);
 
                 if path.is_empty() {
@@ -555,21 +617,21 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     path,
                 }
             }
-            &WireSource::UnaryOp { op, right } => {
+            &ExpressionSource::UnaryOp { op, right } => {
                 let right = self.get_wire_or_constant_as_wire(right, domain);
                 RealWireDataSource::UnaryOp { op, right }
             }
-            &WireSource::BinaryOp { op, left, right } => {
+            &ExpressionSource::BinaryOp { op, left, right } => {
                 let left = self.get_wire_or_constant_as_wire(left, domain);
                 let right = self.get_wire_or_constant_as_wire(right, domain);
                 RealWireDataSource::BinaryOp { op, left, right }
             }
-            WireSource::Constant(_) => {
+            ExpressionSource::Constant(_) => {
                 unreachable!("Constant cannot be non-compile-time");
             }
         };
         Ok(self.wires.alloc(RealWire {
-            name : self.unique_name_producer.get_unique_name(""),
+            name: self.unique_name_producer.get_unique_name(""),
             typ: ConcreteType::Unknown(self.type_substitutor.alloc()),
             original_instruction,
             domain,
@@ -587,10 +649,12 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         let typ = self.concretize_type(&wire_decl.typ_expr)?;
 
         Ok(if wire_decl.identifier_type == IdentifierType::Generative {
-            let value = if let DeclarationPortInfo::GenerativeInput(template_id) = wire_decl.is_port {
+            let value = if let DeclarationKind::GenerativeInput(template_id) = wire_decl.decl_kind {
+                // Only for template arguments, we must initialize their value to the value they've been assigned in the template instantiation
                 self.template_args[template_id].unwrap_value().clone()
             } else {
-                typ.get_initial_typed_val()
+                // Empty initial value
+                typ.get_initial_val()
             };
             SubModuleOrWire::CompileTimeValue(value)
         } else {
@@ -626,10 +690,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         })
     }
 
-    fn instantiate_code_block(
-        &mut self,
-        block_range: FlatIDRange,
-    ) -> ExecutionResult<()> {
+    fn instantiate_code_block(&mut self, block_range: FlatIDRange) -> ExecutionResult<()> {
         let mut instruction_range = block_range.into_iter();
         while let Some(original_instruction) = instruction_range.next() {
             let instr = &self.md.link_info.instructions[original_instruction];
@@ -638,7 +699,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::SubModule(submodule) => {
                     let sub_module = &self.linker.modules[submodule.module_ref.id];
 
-                    let name_origin = if let Some((name, _span)) = &submodule.name {name} else {""};
+                    let name_origin = if let Some((name, _span)) = &submodule.name {
+                        name
+                    } else {
+                        ""
+                    };
                     let port_map = sub_module.ports.map(|_| None);
                     let interface_call_sites = sub_module.interfaces.map(|_| Vec::new());
                     let mut template_args =
@@ -647,16 +712,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     for (_id, v) in &submodule.module_ref.template_args {
                         template_args.alloc(match v {
                             Some(arg) => match &arg.kind {
-                                TemplateArgKind::Type(typ) => ConcreteTemplateArg::Type(
-                                    self.concretize_type(typ)?,
-                                    HowDoWeKnowTheTemplateArg::Given
-                                ),
-                                TemplateArgKind::Value(v) => ConcreteTemplateArg::Value(
-                                    self.generation_state.get_generation_value(*v)?.clone(),
-                                    HowDoWeKnowTheTemplateArg::Given
-                                ),
+                                TemplateArgKind::Type(typ) => self.concretize_type(typ)?,
+                                TemplateArgKind::Value(v) => 
+                                    ConcreteType::Value(self.generation_state.get_generation_value(*v)?.clone()),
                             },
-                            None => ConcreteTemplateArg::NotProvided,
+                            None => ConcreteType::Unknown(self.type_substitutor.alloc()),
                         });
                     }
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule {
@@ -664,7 +724,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         instance: OnceCell::new(),
                         port_map,
                         interface_call_sites,
-                        name : self.unique_name_producer.get_unique_name(name_origin),
+                        name: self.unique_name_producer.get_unique_name(name_origin),
                         module_uuid: submodule.module_ref.id,
                         template_args,
                     }))
@@ -672,16 +732,19 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::Declaration(wire_decl) => {
                     self.instantiate_declaration(wire_decl, original_instruction)?
                 }
-                Instruction::Wire(w) => match w.typ.domain {
+                Instruction::Expression(expr) => match expr.typ.domain {
                     DomainType::Generative => {
-                        let value_computed = self.compute_compile_time(w)?;
+                        let value_computed = self.compute_compile_time(expr)?;
                         SubModuleOrWire::CompileTimeValue(value_computed)
                     }
                     DomainType::Physical(domain) => {
-                        let wire_found = self.wire_to_real_wire(w, original_instruction, domain)?;
+                        let wire_found =
+                            self.expression_to_real_wire(expr, original_instruction, domain)?;
                         SubModuleOrWire::Wire(wire_found)
                     }
-                    DomainType::DomainVariable(_) => unreachable!("Domain variables have been eliminated by type checking")
+                    DomainType::Unknown(_) => {
+                        unreachable!("Domain variables have been eliminated by type checking")
+                    }
                 },
                 Instruction::Write(conn) => {
                     self.instantiate_connection(
@@ -712,7 +775,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     for (port, arg) in
                         std::iter::zip(fc.func_call_inputs.iter(), fc.arguments.iter())
                     {
-                        let from = self.get_wire_or_constant_as_wire(*arg, domain.unwrap_physical());
+                        let from =
+                            self.get_wire_or_constant_as_wire(*arg, domain.unwrap_physical());
                         let port_wire = self.get_submodule_port(submod_id, port, None);
                         self.instantiate_write_to_wire(
                             port_wire,
@@ -728,8 +792,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 Instruction::IfStatement(stm) => {
                     let then_range = FlatIDRange::new(stm.then_start, stm.then_end_else_start);
                     let else_range = FlatIDRange::new(stm.then_end_else_start, stm.else_end);
-                    let if_condition_wire = self.md.link_info.instructions[stm.condition].unwrap_wire();
-                    match if_condition_wire.typ.domain {
+                    let if_condition_expr =
+                        self.md.link_info.instructions[stm.condition].unwrap_expression();
+                    match if_condition_expr.typ.domain {
                         DomainType::Generative => {
                             let condition_val =
                                 self.generation_state.get_generation_value(stm.condition)?;
@@ -742,7 +807,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         }
                         DomainType::Physical(_domain) => {
                             let condition_wire = self.generation_state[stm.condition].unwrap_wire();
-                            self.condition_stack.push(ConditionStackElem{condition_wire, inverse : false});
+                            self.condition_stack.push(ConditionStackElem {
+                                condition_wire,
+                                inverse: false,
+                            });
                             self.instantiate_code_block(then_range)?;
 
                             if !else_range.is_empty() {
@@ -753,7 +821,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                             // Get rid of the condition
                             let _ = self.condition_stack.pop().unwrap();
                         }
-                        DomainType::DomainVariable(_) => unreachable!("Domain variables have been eliminated by type checking")
+                        DomainType::Unknown(_) => {
+                            unreachable!("Domain variables have been eliminated by type checking")
+                        }
                     }
                     instruction_range.skip_to(stm.else_end);
                     continue;
@@ -771,8 +841,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         .unwrap_integer()
                         .clone();
                     if start_val > end_val {
-                        let start_flat = &self.md.link_info.instructions[stm.start].unwrap_wire();
-                        let end_flat = &self.md.link_info.instructions[stm.end].unwrap_wire();
+                        let start_flat =
+                            &self.md.link_info.instructions[stm.start].unwrap_expression();
+                        let end_flat = &self.md.link_info.instructions[stm.end].unwrap_expression();
                         return Err((
                             Span::new_overarching(start_flat.span, end_flat.span),
                             format!("for loop range end is before begin: {start_val}:{end_val}"),
@@ -787,7 +858,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         else {
                             unreachable!()
                         };
-                        *v = TypedValue::make_integer(current_val.clone());
+                        *v = Value::Integer(current_val.clone());
                         current_val += 1;
                         self.instantiate_code_block(stm.loop_body)?;
                     }

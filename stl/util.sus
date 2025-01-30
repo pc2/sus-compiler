@@ -3,33 +3,20 @@ module DualPortMem #(T, int SIZE) {
 
 	state T[SIZE] mem
 
+	domain write_clk
 	interface write : bool write, int addr, T data
 
 	when write {
 		mem[addr] = data
 	}
 
-	domain read
+	domain read_clk
 	interface read : int read_addr -> T read_data
 
 	CrossDomain #(T: type T[SIZE]) cross_mem
 	cross_mem.in = mem
 	
 	read_data = cross_mem.out[read_addr]
-}
-
-module UseDualPortMem {
-	interface UseDualPortMem : 
-		bool do_write'0,
-		int addr'0,
-		bool[500] data'0 ->
-		bool[500] read_data'0
-		
-	DualPortMem #(SIZE: 128, T: type bool[500]) mem
-
-	mem.write(do_write, addr, data)
-
-	read_data = mem.read(addr)
 }
 
 module FIFO #(
@@ -45,11 +32,11 @@ module FIFO #(
 	initial read_addr = 0
 	initial write_addr = 0
 
-	domain push
+	domain push_clk
 	output bool ready'0
 	interface push : bool push'READY_SLACK, T data_in'READY_SLACK
 
-	domain pop
+	domain pop_clk
 	interface pop : bool pop -> bool data_valid, T data_out
 	
 	CrossDomain write_to_pop
@@ -82,28 +69,9 @@ module FIFO #(
 	ready = LatencyOffset #(OFFSET: -ALMOST_FULL_TRESHOLD)(r)
 }
 
-
-module example_FIFO {
-	FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-}
-
-
-
-module use_Iterator {
-	interface start_iteration : bool do_start
-	input int[10] myArr
-	output int outVal
-
-	Iterator arrayStream
-
-	// if do_start {arrayStream.start(10)}
-	arrayStream.start(do_start, 10)
-
-	// if arrayIter.iter() : int value {...}
-	bool iter_valid, int value = arrayStream.iter()
-	when iter_valid {
-		outVal = myArr[value]
-	}
+module JoinDomains #(T1, T2, int OFFSET) {
+	interface identity1 : T1 i1'0 -> T1 o1'0
+	interface identity2 : T2 i2'OFFSET -> T2 o2'OFFSET
 }
 
 module Iterator {
@@ -185,12 +153,6 @@ module Slice #(T, int SIZE, int OUT_SIZE, int FROM) {
 	for int I in 0..OUT_SIZE {
 		result[I] = vals[I + FROM]
 	}
-}
-
-module useSlice {
-	int[20] arr
-
-	int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
 }
 
 module BitSelect #(int SIZE) {

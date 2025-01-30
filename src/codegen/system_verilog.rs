@@ -4,14 +4,15 @@ use std::ops::Deref;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
 
-use crate::flattening::{DeclarationPortInfo, Instruction, Module, Port};
+use crate::flattening::{DeclarationKind, Instruction, Module, Port};
 use crate::instantiation::{
     InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem, CALCULATE_LATENCY_LATER,
 };
-use crate::typing::template::{ConcreteTemplateArg, ConcreteTemplateArgs};
+use crate::typing::template::TVec;
 use crate::{typing::concrete_type::ConcreteType, value::Value};
 
 use super::shared::*;
+use std::fmt::Write;
 
 #[derive(Debug)]
 pub struct VerilogCodegenBackend;
@@ -22,9 +23,6 @@ impl super::CodeGenBackend for VerilogCodegenBackend {
     }
     fn output_dir_name(&self) -> &str {
         "verilog_output"
-    }
-    fn comment(&self) -> &str {
-        "//"
     }
     fn codegen(
         &self,
@@ -50,8 +48,8 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
         typ = content_typ;
     }
     match typ {
-        ConcreteType::Named(id) => {
-            let sz = get_type_name_size(*id);
+        ConcreteType::Named(reference) => {
+            let sz = ConcreteType::sizeof_named(reference);
             if sz == 1 {
                 format!("{array_string} {var_name}")
             } else {
@@ -63,18 +61,20 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
     }
 }
 
-struct CodeGenerationContext<'g, 'out, Stream: std::fmt::Write> {
+struct CodeGenerationContext<'g> {
+    /// Generate code to this variable
+    program_text: String,
+
     md: &'g Module,
     instance: &'g InstantiatedModule,
     linker: &'g Linker,
-    program_text: &'out mut Stream,
 
     use_latency: bool,
 
     needed_untils: FlatAlloc<i64, WireIDMarker>,
 }
 
-impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> {
+impl<'g> CodeGenerationContext<'g> {
     /// This is for making the resulting Verilog a little nicer to read
     fn can_inline(&self, wire: &RealWire) -> bool {
         match &wire.source {
@@ -131,19 +131,32 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 
                 let var_decl = typ_to_declaration(&w.typ, &to);
 
+                let clk_name = self.md.get_clock_name();
                 writeln!(
                     self.program_text,
-                    "/*latency*/ logic {var_decl}; always_ff @(posedge clk) begin {to} <= {from}; end"
+                    "/*latency*/ logic {var_decl}; always_ff @(posedge {clk_name}) begin {to} <= {from}; end"
                 ).unwrap();
             }
         }
         Ok(())
     }
 
+    fn comment_out(&mut self, f : impl FnOnce(&mut Self)) {
+        let store_program_text_temporary = std::mem::replace(&mut self.program_text, String::new());
+        f(self);
+        let added_text = std::mem::replace(&mut self.program_text, store_program_text_temporary);
+
+        write!(self.program_text, "// {}\n", added_text.replace("\n", "\n// ")).unwrap();
+    }
+
     fn write_verilog_code(&mut self) {
+        self.comment_out(|new_self| {
+            let name = &self.instance.name;
+            write!(new_self.program_text, "{name}").unwrap();
+        });
         match self.md.link_info.is_extern {
             IsExtern::Normal => {
-                self.write_module_signature(false);
+                self.write_module_signature();
                 self.write_wire_declarations();
                 self.write_submodules();
                 self.write_multiplexers();
@@ -152,23 +165,25 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             IsExtern::Extern => {
                 // Do nothing, it's provided externally
                 writeln!(self.program_text, "// Provided externally").unwrap();
-                self.write_module_signature(true);
+                self.comment_out(|new_self| {
+                    new_self.write_module_signature();
+                });
             }
             IsExtern::Builtin => {
-                self.write_module_signature(false);
+                self.write_module_signature();
                 self.write_builtins();
                 self.write_endmodule();
             }
         }
     }
 
-    fn write_module_signature(&mut self, commented_out: bool) {
-        let comment_text = if commented_out { "// " } else { "" };
+    fn write_module_signature(&mut self) {
         // First output the interface of the module
+        let clk_name = self.md.get_clock_name();
         write!(
             self.program_text,
-            "{comment_text}module {}(\n{comment_text}\tinput clk",
-            mangle(&self.instance.name)
+            "module {}(\n\tinput {clk_name}",
+            &self.instance.mangled_name
         )
         .unwrap();
         for (_id, port) in self.instance.interface_ports.iter_valids() {
@@ -179,11 +194,11 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             let wire_decl = typ_to_declaration(&port_wire.typ, &wire_name);
             write!(
                 self.program_text,
-                ",\n{comment_text}\t{input_or_output} {wire_doc} {wire_decl}"
+                ",\n\t{input_or_output} {wire_doc} {wire_decl}"
             )
             .unwrap();
         }
-        write!(self.program_text, "\n{comment_text});\n\n").unwrap();
+        write!(self.program_text, "\n);\n\n").unwrap();
 
         // Add latency registers for the interface declarations
         // Should not appear in the program text for extern modules
@@ -221,7 +236,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 &self.md.link_info.instructions[w.original_instruction]
             {
                 // Don't print named inputs and outputs, already did that in interface
-                if let DeclarationPortInfo::RegularPort { .. } = wire_decl.is_port {
+                if let DeclarationKind::RegularPort { .. } = wire_decl.decl_kind {
                     continue;
                 }
             }
@@ -281,6 +296,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
     }
 
     fn write_submodules(&mut self) {
+        let parent_clk_name = self.md.get_clock_name();
         for (_id, sm) in &self.instance.submodules {
             let sm_md = &self.linker.modules[sm.module_uuid];
             let sm_inst: &InstantiatedModule = sm
@@ -290,11 +306,12 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             if sm_md.link_info.is_extern == IsExtern::Extern {
                 self.write_template_args(&sm_md.link_info, &sm.template_args);
             } else {
-                self.program_text.write_str(&sm_inst.name).unwrap();
+                self.program_text.write_str(&sm_inst.mangled_name).unwrap();
             };
             let sm_name = &sm.name;
+            let submodule_clk_name = sm_md.get_clock_name();
             writeln!(self.program_text, " {sm_name}(").unwrap();
-            write!(self.program_text, "\t.clk(clk)").unwrap();
+            write!(self.program_text, "\t.{submodule_clk_name}({parent_clk_name})").unwrap();
             for (port_id, iport) in sm_inst.interface_ports.iter_valids() {
                 let port_name =
                     wire_name_self_latency(&sm_inst.wires[iport.wire], self.use_latency);
@@ -316,21 +333,21 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
     fn write_template_args(
         &mut self,
         link_info: &LinkInfo,
-        concrete_template_args: &ConcreteTemplateArgs,
+        concrete_template_args: &TVec<ConcreteType>,
     ) {
         self.program_text.write_str(&link_info.name).unwrap();
         self.program_text.write_str(" #(").unwrap();
         let mut first = true;
         concrete_template_args.iter().for_each(|(arg_id, arg)| {
-            let arg_name = &link_info.template_arguments[arg_id].name;
+            let arg_name = &link_info.template_parameters[arg_id].name;
             let arg_value = match arg {
-                ConcreteTemplateArg::Type(..) => {
+                ConcreteType::Named(..) | ConcreteType::Array(..) => {
                     unreachable!("No extern module type arguments. Should have been caught by Lint")
                 }
-                ConcreteTemplateArg::Value(typed_value, _) => {
-                    typed_value.value.inline_constant_to_string()
+                ConcreteType::Value(value) => {
+                    value.inline_constant_to_string()
                 }
-                ConcreteTemplateArg::NotProvided => unreachable!("All args are known at codegen"),
+                ConcreteType::Unknown(_) => unreachable!("All args are known at codegen"),
             };
             if first {
                 self.program_text.write_char(',').unwrap();
@@ -352,7 +369,8 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     let output_name = wire_name_self_latency(w, self.use_latency);
                     let arrow_str = if is_state.is_some() {
-                        writeln!(self.program_text, "always_ff @(posedge clk) begin").unwrap();
+                        let clk_name = self.md.get_clock_name();
+                        writeln!(self.program_text, "always_ff @(posedge {clk_name}) begin").unwrap();
                         "<="
                     } else {
                         writeln!(self.program_text, "always_comb begin\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches").unwrap();
@@ -364,9 +382,9 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
 
                     for s in sources {
                         let path = self.wire_ref_path_to_string(&s.to_path, w.absolute_latency);
-                        let from_name = self.wire_name(s.from.from, w.absolute_latency);
+                        let from_name = self.wire_name(s.from, w.absolute_latency);
                         self.program_text.write_char('\t').unwrap();
-                        for cond in s.from.condition.iter() {
+                        for cond in s.condition.iter() {
                             let cond_name = self.wire_name(cond.condition_wire, w.absolute_latency);
                             let invert = if cond.inverse { "!" } else { "" };
                             write!(self.program_text, "if({invert}{cond_name}) ").unwrap();
@@ -491,17 +509,15 @@ fn gen_verilog_code(
     linker: &Linker,
     use_latency: bool,
 ) -> String {
-    let mut program_text = String::new();
-
     let mut ctx = CodeGenerationContext {
         md,
         instance,
         linker,
-        program_text: &mut program_text,
+        program_text: String::new(),
         use_latency,
         needed_untils: instance.compute_needed_untils(),
     };
     ctx.write_verilog_code();
 
-    program_text
+    ctx.program_text
 }

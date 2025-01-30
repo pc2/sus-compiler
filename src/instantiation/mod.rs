@@ -8,6 +8,7 @@ mod unique_names;
 use unique_names::UniqueNames;
 
 use crate::prelude::*;
+use crate::typing::template::TVec;
 use crate::typing::type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor};
 
 use std::cell::OnceCell;
@@ -18,34 +19,26 @@ use crate::{
     config,
     errors::{CompileError, ErrorStore},
     to_string::pretty_print_concrete_instance,
-    value::{TypedValue, Value},
+    value::Value,
 };
 
-use crate::typing::{
-    concrete_type::ConcreteType,
-    template::ConcreteTemplateArgs,
-};
+use crate::typing::concrete_type::ConcreteType;
 
 use self::latency_algorithm::SpecifiedLatency;
 
 // Temporary value before proper latency is given
 pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
 
-#[derive(Debug)]
-pub struct ConnectFrom {
-    pub num_regs: i64,
-    pub from: WireID,
-    pub condition: Box<[ConditionStackElem]>,
-    pub original_connection: FlatID,
-}
-
+/// See [MultiplexerSource]
+/// 
+/// This is the post-instantiation equivalent of [crate::flattening::WireReferencePathElement]
 #[derive(Debug, Clone)]
 pub enum RealWirePathElem {
     ArrayAccess { span: BracketSpan, idx_wire: WireID },
 }
 
 impl RealWirePathElem {
-    fn for_each_wire_in_path<F: FnMut(WireID)>(path: &[RealWirePathElem], mut f: F) {
+    fn for_each_wire_in_path(path: &[RealWirePathElem], mut f: impl FnMut(WireID)) {
         for v in path {
             match v {
                 RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
@@ -56,12 +49,21 @@ impl RealWirePathElem {
     }
 }
 
+/// One arm of a multiplexer. Each arm has an attached condition that is also stored here. 
+/// 
+/// See [RealWireDataSource::Multiplexer]
 #[derive(Debug)]
 pub struct MultiplexerSource {
     pub to_path: Vec<RealWirePathElem>,
-    pub from: ConnectFrom,
+    pub num_regs: i64,
+    pub from: WireID,
+    pub condition: Box<[ConditionStackElem]>,
+    pub original_connection: FlatID,
 }
 
+/// Where a [RealWire] gets its data, be it an operator, read-only value, constant, etc. 
+/// 
+/// This is the post-instantiation equivalent of [crate::flattening::ExpressionSource]
 #[derive(Debug)]
 pub enum RealWireDataSource {
     ReadOnly,
@@ -87,6 +89,11 @@ pub enum RealWireDataSource {
     },
 }
 
+/// An actual instantiated wire of an [InstantiatedModule] (See [InstantiatedModule::wires])
+/// 
+/// It can have a latency count and domain. All wires have a name, either the name they were given by the user, or a generated name like _1, _13
+/// 
+/// Generated from a [crate::flattening::Expression] instruction
 #[derive(Debug)]
 pub struct RealWire {
     pub source: RealWireDataSource,
@@ -101,23 +108,34 @@ pub struct RealWire {
     pub absolute_latency: i64,
 }
 
+/// See [SubModule]
+/// 
+/// This represents a port of such a submodule
 #[derive(Debug)]
-pub struct UsedPort {
+pub struct SubModulePort {
     pub maps_to_wire: WireID,
     pub name_refs: Vec<Span>,
 }
 
+/// An actual instantiated submodule of an [InstantiatedModule] (See [InstantiatedModule::submodules])
+/// 
+/// All submodules have a name, either the name they were given by the user, or a generated name like _1, _13
+/// 
+/// When generating RTL code, one submodule object generates a single submodule instantiation
+/// 
+/// Generated from a [crate::flattening::SubModuleInstance] instruction
 #[derive(Debug)]
 pub struct SubModule {
     pub original_instruction: FlatID,
     pub instance: OnceCell<Rc<InstantiatedModule>>,
-    pub port_map: FlatAlloc<Option<UsedPort>, PortIDMarker>,
+    pub port_map: FlatAlloc<Option<SubModulePort>, PortIDMarker>,
     pub interface_call_sites: FlatAlloc<Vec<Span>, InterfaceIDMarker>,
     pub name: String,
     pub module_uuid: ModuleUUID,
-    pub template_args: ConcreteTemplateArgs,
+    pub template_args: TVec<ConcreteType>,
 }
 
+/// Generated from [Module::ports]
 #[derive(Debug)]
 pub struct InstantiatedPort {
     pub wire: WireID,
@@ -127,23 +145,33 @@ pub struct InstantiatedPort {
     pub domain: DomainID,
 }
 
+/// [InstantiatedModule] are the final product we're trying to produce with the compiler. 
+/// They amount to little more than a collection of wires, multiplexers and submodules. 
+/// 
+/// With the submodules, they form a tree structure, of nested [InstantiatedModule] references. 
+/// 
+/// Generated when instantiating a [Module]
 #[derive(Debug)]
 pub struct InstantiatedModule {
     /// Unique name involving all template arguments
     pub name: String,
+    /// Used in code generation. Only contains characters allowed in SV and VHDL
+    pub mangled_name: String,
     pub errors: ErrorStore,
-    /// This matches the ports in [Module::module_ports]. Ports are not None when they are not part of this instantiation.
+    /// This matches the ports in [Module::ports]. Ports are not `None` when they are not part of this instantiation.
     pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+    /// See [GenerationState]
     pub generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
 }
 
+/// See [GenerationState]
 #[derive(Debug, Clone)]
 pub enum SubModuleOrWire {
     SubModule(SubModuleID),
     Wire(WireID),
-    CompileTimeValue(TypedValue),
+    CompileTimeValue(Value),
     // Variable doesn't exist yet
     Unnasigned,
 }
@@ -157,7 +185,7 @@ impl SubModuleOrWire {
         *result
     }
     #[track_caller]
-    pub fn unwrap_generation_value(&self) -> &TypedValue {
+    pub fn unwrap_generation_value(&self) -> &Value {
         let Self::CompileTimeValue(result) = self else {
             unreachable!("SubModuleOrWire::unwrap_generation_value failed! Is {self:?} instead")
         };
@@ -172,23 +200,17 @@ impl SubModuleOrWire {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum RealWireRefRoot {
-    /// The preamble isn't really used yet, but it's there for when we have submodule arrays (soon)
-    Wire {
-        wire_id: WireID,
-        preamble: Vec<RealWirePathElem>,
-    },
-    Generative(FlatID),
-    Constant(TypedValue),
-}
-
+/// Stored per module [Module]. 
+/// With this you can instantiate a module for different sets of template arguments. 
+/// It caches the instantiations that have been made, such that they need not be repeated. 
+/// 
+/// Also, with incremental builds (#49) this will be a prime area for investigation
 #[derive(Debug)]
-pub struct InstantiationList {
-    cache: RefCell<HashMap<ConcreteTemplateArgs, Rc<InstantiatedModule>>>,
+pub struct InstantiationCache {
+    cache: RefCell<HashMap<TVec<ConcreteType>, Rc<InstantiatedModule>>>,
 }
 
-impl InstantiationList {
+impl InstantiationCache {
     pub fn new() -> Self {
         Self {
             cache: RefCell::new(HashMap::new()),
@@ -199,7 +221,7 @@ impl InstantiationList {
         &self,
         md: &Module,
         linker: &Linker,
-        template_args: ConcreteTemplateArgs,
+        template_args: TVec<ConcreteType>,
     ) -> Option<Rc<InstantiatedModule>> {
         let cache_borrow = self.cache.borrow();
 
@@ -237,7 +259,7 @@ impl InstantiationList {
         }
     }
 
-    pub fn for_each_error<F: FnMut(&CompileError)>(&self, func: &mut F) {
+    pub fn for_each_error(&self, func: &mut impl FnMut(&CompileError)) {
         let cache_borrow = self.cache.borrow();
         for inst in cache_borrow.values() {
             for err in &inst.errors {
@@ -252,29 +274,44 @@ impl InstantiationList {
 
     // Also passes over invalid instances. Instance validity should not be assumed!
     // Only used for things like syntax highlighting
-    pub fn for_each_instance<'s, F: FnMut(&ConcreteTemplateArgs, &Rc<InstantiatedModule>)>(
+    pub fn for_each_instance(
         &self,
-        mut f: F,
+        mut f: impl FnMut(&TVec<ConcreteType>, &Rc<InstantiatedModule>),
     ) {
         let borrow = self.cache.borrow();
         for (k, v) in borrow.iter() {
-            f(k, &v)
+            f(k, v)
         }
     }
 }
 
+/// Every [crate::flattening::Instruction] has an associated value (See [SubModuleOrWire]). 
+/// They are either what this local name is currently referencing (either a wire instance or a submodule instance). 
+/// Or in the case of Generative values, the current value in the generative variable. 
 #[derive(Debug)]
 struct GenerationState<'fl> {
     generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
     md: &'fl Module,
 }
 
+/// Runtime conditions applied to a [crate::flattening::Write]
+/// 
+/// ```sus
+/// state int a
+/// when x {
+///   a = 3
+/// } else {
+///   a = 2
+/// }
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConditionStackElem {
     pub condition_wire : WireID,
+    /// When this is an else-branch
     pub inverse : bool
 }
 
+/// As with other contexts, this is the shared state we're lugging around while executing & typechecking a module. 
 struct InstantiationContext<'fl, 'l> {
     name: String,
     generation_state: GenerationState<'fl>,
@@ -290,14 +327,27 @@ struct InstantiationContext<'fl, 'l> {
     interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     errors: ErrorCollector<'l>,
 
-    template_args: &'fl ConcreteTemplateArgs,
+    template_args: &'fl TVec<ConcreteType>,
     md: &'fl Module,
     linker: &'l Linker,
+}
+
+/// Mangle the module name for use in code generation
+fn mangle_name(str: &str) -> String {
+    let mut result = String::with_capacity(str.len());
+    for c in str.chars() {
+        if c.is_whitespace() || c == ':' {
+            continue;
+        }
+        result.push(if c.is_alphanumeric() { c } else { '_' });
+    }
+    result
 }
 
 impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     fn extract(self) -> InstantiatedModule {
         InstantiatedModule {
+            mangled_name: mangle_name(&self.name),
             name: self.name,
             wires: self.wires,
             submodules: self.submodules,
@@ -311,7 +361,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 fn perform_instantiation(
     md: &Module,
     linker: &Linker,
-    template_args: &ConcreteTemplateArgs,
+    template_args: &TVec<ConcreteType>,
 ) -> InstantiatedModule {
     let mut context = InstantiationContext {
         name: pretty_print_concrete_instance(&md.link_info, template_args, &linker.types),

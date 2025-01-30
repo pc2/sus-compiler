@@ -1,95 +1,17 @@
-Warning: Unused port 'ready'
-    ╭─[util.sus:87:2]
+Warning: Unused Variable: This variable does not affect the output ports of this module
+    ╭─[util.sus:73:27]
     │
- 49 │     output bool ready'0
-    │                 ──┬──  
-    │                   ╰──── Port 'ready' declared here
-    │ 
- 87 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──────────────────────┬────────────────────── ┬  
-    │                           ╰────────────────────────── Unused port 'ready'
-    │                                                   │  
-    │                                                   ╰── f declared here
-────╯
-Warning: Unused port 'push'
-    ╭─[util.sus:87:2]
-    │
- 50 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
-    │                           ──┬─  
-    │                             ╰─── Port 'push' declared here
-    │ 
- 87 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──────────────────────┬────────────────────── ┬  
-    │                           ╰────────────────────────── Unused port 'push'
-    │                                                   │  
-    │                                                   ╰── f declared here
-────╯
-Warning: Unused port 'data_in'
-    ╭─[util.sus:87:2]
-    │
- 50 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
-    │                                               ───┬───  
-    │                                                  ╰───── Port 'data_in' declared here
-    │ 
- 87 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──────────────────────┬────────────────────── ┬  
-    │                           ╰────────────────────────── Unused port 'data_in'
-    │                                                   │  
-    │                                                   ╰── f declared here
-────╯
-Warning: Unused port 'pop'
-    ╭─[util.sus:87:2]
-    │
- 53 │     interface pop : bool pop -> bool data_valid, T data_out
-    │                          ─┬─  
-    │                           ╰─── Port 'pop' declared here
-    │ 
- 87 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──────────────────────┬────────────────────── ┬  
-    │                           ╰────────────────────────── Unused port 'pop'
-    │                                                   │  
-    │                                                   ╰── f declared here
-────╯
-Warning: Unused port 'data_valid'
-    ╭─[util.sus:87:2]
-    │
- 53 │     interface pop : bool pop -> bool data_valid, T data_out
-    │                                      ─────┬────  
-    │                                           ╰────── Port 'data_valid' declared here
-    │ 
- 87 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──────────────────────┬────────────────────── ┬  
-    │                           ╰────────────────────────── Unused port 'data_valid'
-    │                                                   │  
-    │                                                   ╰── f declared here
-────╯
-Warning: Unused port 'data_out'
-    ╭─[util.sus:87:2]
-    │
- 53 │     interface pop : bool pop -> bool data_valid, T data_out
-    │                                                    ────┬───  
-    │                                                        ╰───── Port 'data_out' declared here
-    │ 
- 87 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
-    │     ──────────────────────┬────────────────────── ┬  
-    │                           ╰────────────────────────── Unused port 'data_out'
-    │                                                   │  
-    │                                                   ╰── f declared here
+ 73 │     interface identity1 : T1 i1'0 -> T1 o1'0
+    │                              ─┬  
+    │                               ╰── Unused Variable: This variable does not affect the output ports of this module
 ────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[util.sus:191:10]
-     │
- 191 │     int[20] arr
-     │             ─┬─  
-     │              ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[util.sus:193:9]
-     │
- 193 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
-     │            ───┬──  
-     │               ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
+    ╭─[util.sus:74:27]
+    │
+ 74 │     interface identity2 : T2 i2'OFFSET -> T2 o2'OFFSET
+    │                              ─┬  
+    │                               ╰── Unused Variable: This variable does not affect the output ports of this module
+────╯
 Error: 'contains_submodule_submodule' conflicts with other declarations:
      ╭─[test.sus:441:8]
      │
@@ -518,6 +440,7 @@ Error: ::doNothing does not have a main interface. You should explicitly specify
  431 │ module doNothing {}
      │        ────┬────  
      │            ╰────── Module 'doNothing' defined here. module ::doNothing #():
+domain clk:
 
      │ 
  445 │     doNothing()
@@ -537,6 +460,7 @@ Error: ::doNothing does not have a main interface. You should explicitly specify
  431 │ module doNothing {}
      │        ────┬────  
      │            ╰────── Module 'doNothing' defined here. module ::doNothing #():
+domain clk:
 
      │ 
  601 │     doNothing()
@@ -593,7 +517,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Could not fully instantiate ::FIFO #(
-    T: type ::bool[20] /* inferred */,
+    T: type ::bool[20],
     DEPTH: /* Could not infer */
     READY_SLACK: /* Could not infer */
 )
@@ -602,7 +526,7 @@ Error: Could not fully instantiate ::FIFO #(
  649 │     FIFO fiii
      │          ──┬─  
      │            ╰─── Could not fully instantiate ::FIFO #(
-    T: type ::bool[20] /* inferred */,
+    T: type ::bool[20],
     DEPTH: /* Could not infer */
     READY_SLACK: /* Could not infer */
 )
@@ -623,9 +547,9 @@ Error: MIN is not a valid template argument of ::int
      │           ─┬─  
      │            ╰─── MIN is not a valid template argument of ::int
      │
-     ├─[core.sus:28:20]
+     ├─[core.sus:29:20]
      │
-  28 │ __builtin__ struct int {}
+  29 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -636,9 +560,9 @@ Error: MAX is not a valid template argument of ::int
      │                   ─┬─  
      │                    ╰─── MAX is not a valid template argument of ::int
      │
-     ├─[core.sus:28:20]
+     ├─[core.sus:29:20]
      │
-  28 │ __builtin__ struct int {}
+  29 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -690,6 +614,7 @@ Error: ::no_port_module does not have a main interface. You should explicitly sp
  675 │ module no_port_module {}
      │        ───────┬──────  
      │               ╰──────── Module 'no_port_module' defined here. module ::no_port_module #():
+domain clk:
 
      │ 
  678 │     no_port_module()
@@ -702,6 +627,7 @@ Error: ::no_port_module does not have a main interface. You should explicitly sp
  675 │ module no_port_module {}
      │        ───────┬──────  
      │               ╰──────── Module 'no_port_module' defined here. module ::no_port_module #():
+domain clk:
 
      │ 
  681 │     int x = no_port()
@@ -745,13 +671,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ┬  
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Warning: The result of this operation is not used
-     ╭─[test.sus:707:2]
-     │
- 707 │     mm.a
-     │     ──┬─  
-     │       ╰─── The result of this operation is not used
-─────╯
 Error: Port 'a' is used, but the instantiated module has this port disabled
      ╭─[test.sus:707:5]
      │
@@ -766,13 +685,6 @@ Error: Port 'a' is used, but the instantiated module has this port disabled
  707 │     mm.a
      │        ┬  
      │        ╰── Port 'a' is used, but the instantiated module has this port disabled
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: {concrete_type_variable_0}
-     ╭─[test.sus:705:2]
-     │
- 705 │     mod_with_unused_interface mm
-     │     ────────────┬────────────  
-     │                 ╰────────────── Could not finalize this type, some parameters were still unknown: {concrete_type_variable_0}
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:750:30]
@@ -823,9 +735,9 @@ Error: beep is not a valid template argument of ::int
      │                              ──┬─  
      │                                ╰─── beep is not a valid template argument of ::int
      │
-     ├─[core.sus:28:20]
+     ├─[core.sus:29:20]
      │
-  28 │ __builtin__ struct int {}
+  29 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -836,9 +748,9 @@ Error: BEEP is not a valid template argument of ::int
      │                                            ──┬─  
      │                                              ╰─── BEEP is not a valid template argument of ::int
      │
-     ├─[core.sus:28:20]
+     ├─[core.sus:29:20]
      │
-  28 │ __builtin__ struct int {}
+  29 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -849,9 +761,9 @@ Error: ::int is not a named wire: local or constant, it is a Struct instead!
      │                                                  ─┬─  
      │                                                   ╰─── ::int is not a named wire: local or constant, it is a Struct instead!
      │
-     ├─[core.sus:28:20]
+     ├─[core.sus:29:20]
      │
-  28 │ __builtin__ struct int {}
+  29 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── Defined here
 ─────╯
@@ -869,9 +781,9 @@ Error: BITWIDTH is not a valid template argument of ::FIFO
      │            ────┬───  
      │                ╰───── BITWIDTH is not a valid template argument of ::FIFO
      │
-     ├─[util.sus:35:8]
+     ├─[util.sus:22:8]
      │
-  35 │ module FIFO #(
+  22 │ module FIFO #(
      │        ──┬─  
      │          ╰─── 'FIFO' defined here
 ─────╯
@@ -1121,6 +1033,7 @@ Error: ::no_main_interface does not have a main interface. You should explicitly
  916 │ module no_main_interface {
      │        ────────┬────────  
      │                ╰────────── Module 'no_main_interface' defined here. module ::no_main_interface #():
+domain clk:
 
      │ 
  923 │     int x = no_interface_named()
@@ -1133,6 +1046,7 @@ Error: ::no_main_interface does not have a main interface. You should explicitly
  916 │ module no_main_interface {
      │        ────────┬────────  
      │                ╰────────── Module 'no_main_interface' defined here. module ::no_main_interface #():
+domain clk:
 
      │ 
  924 │     int y = no_main_interface()
@@ -1217,9 +1131,9 @@ Error: ABC is not a valid template argument of ::int
      │           ─┬─  
      │            ╰─── ABC is not a valid template argument of ::int
      │
-     ├─[core.sus:28:20]
+     ├─[core.sus:29:20]
      │
-  28 │ __builtin__ struct int {}
+  29 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -1229,20 +1143,6 @@ Error: ABC does not name a Type or a Value.
  962 │     int #(ABC) x
      │           ─┬─  
      │            ╰─── ABC does not name a Type or a Value.
-─────╯
-Error: Could not fully figure out the type of this object. type_variable_21
-     ╭─[test.sus:960:14]
-     │
- 960 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
-     │                 ────────────────┬────────────────  
-     │                                 ╰────────────────── Could not fully figure out the type of this object. type_variable_21
-─────╯
-Error: Could not fully figure out the type of this object. type_variable_22
-     ╭─[test.sus:960:14]
-     │
- 960 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
-     │                 ────────────────┬────────────────  
-     │                                 ╰────────────────── Could not fully figure out the type of this object. type_variable_22
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:953:13]
@@ -1293,31 +1193,227 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │         ──┬──  
      │           ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Used 'when' in a generative context, use 'if' instead
-      ╭─[test.sus:1024:9]
+Error: When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
+      ╭─[test.sus:1018:2]
       │
- 1024 │         when WIDTH <= BASE_CASE_SIZE {
+ 1016 │     input int bad_port
+      │           ──────┬─────  
+      │                 ╰─────── A domain should be explicitly defined before this port
+      │ 
+ 1018 │     domain bad_domain
+      │     ────────┬────────  
+      │             ╰────────── When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[test.sus:1016:12]
+      │
+ 1016 │     input int bad_port
+      │               ────┬───  
+      │                   ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Conflicting domain declaration. Domain 'my_domain' was already declared earlier
+      ╭─[test.sus:1027:9]
+      │
+ 1024 │     domain my_domain
+      │            ────┬────  
+      │                ╰────── Domain 'my_domain' declared here
+      │ 
+ 1027 │     domain my_domain
+      │            ────┬────  
+      │                ╰────── Conflicting domain declaration. Domain 'my_domain' was already declared earlier
+──────╯
+Error: This declaration conflicts with a previous declaration in the same scope
+      ╭─[test.sus:1025:12]
+      │
+ 1024 │     domain my_domain
+      │            ────┬────  
+      │                ╰────── Domain 'my_domain' declared here
+ 1025 │     input int my_domain
+      │               ────┬────  
+      │                   ╰────── This declaration conflicts with a previous declaration in the same scope
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[test.sus:1025:12]
+      │
+ 1025 │     input int my_domain
+      │               ────┬────  
+      │                   ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_0
+      ╭─[test.sus:1037:2]
+      │
+ 1037 │     make_infinite_type_help mtinf
+      │     ───────────┬───────────  
+      │                ╰───────────── Could not fully figure out the type of this object. type_variable_0
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_0
+      ╭─[test.sus:1039:12]
+      │
+ 1039 │     mtinf.a = mtinf.b
+      │               ───┬───  
+      │                  ╰───── Could not fully figure out the type of this object. type_variable_0
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_0[]
+      ╭─[test.sus:1039:2]
+      │
+ 1039 │     mtinf.a = mtinf.b
+      │     ───┬───  
+      │        ╰───── Could not fully figure out the type of this object. type_variable_0[]
+──────╯
+Error: Typing Error: connection: Creating Infinite Types is Forbidden! expects a type_variable_0[] but was given a type_variable_0
+      ╭─[test.sus:1039:12]
+      │
+ 1031 │     interface make_infinite_type_help: T[3] a -> T b
+      │                                             ┬  
+      │                                             ╰── 'a' declared here
+      │ 
+ 1039 │     mtinf.a = mtinf.b
+      │               ───┬───  
+      │                  ╰───── Typing Error: connection: Creating Infinite Types is Forbidden! expects a type_variable_0[] but was given a type_variable_0
+──────╯
+Warning: Unused port 'ready'
+      ╭─[test.sus:1059:2]
+      │
+ 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+      │     ──────────────────────┬────────────────────── ┬  
+      │                           ╰────────────────────────── Unused port 'ready'
+      │                                                   │  
+      │                                                   ╰── f declared here
+      │
+      ├─[util.sus:36:14]
+      │
+   36 │     output bool ready'0
+      │                 ──┬──  
+      │                   ╰──── Port 'ready' declared here
+──────╯
+Warning: Unused port 'push'
+      ╭─[test.sus:1059:2]
+      │
+ 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+      │     ──────────────────────┬────────────────────── ┬  
+      │                           ╰────────────────────────── Unused port 'push'
+      │                                                   │  
+      │                                                   ╰── f declared here
+      │
+      ├─[util.sus:37:24]
+      │
+   37 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
+      │                           ──┬─  
+      │                             ╰─── Port 'push' declared here
+──────╯
+Warning: Unused port 'data_in'
+      ╭─[test.sus:1059:2]
+      │
+ 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+      │     ──────────────────────┬────────────────────── ┬  
+      │                           ╰────────────────────────── Unused port 'data_in'
+      │                                                   │  
+      │                                                   ╰── f declared here
+      │
+      ├─[util.sus:37:44]
+      │
+   37 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
+      │                                               ───┬───  
+      │                                                  ╰───── Port 'data_in' declared here
+──────╯
+Warning: Unused port 'pop'
+      ╭─[test.sus:1059:2]
+      │
+ 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+      │     ──────────────────────┬────────────────────── ┬  
+      │                           ╰────────────────────────── Unused port 'pop'
+      │                                                   │  
+      │                                                   ╰── f declared here
+      │
+      ├─[util.sus:40:23]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                          ─┬─  
+      │                           ╰─── Port 'pop' declared here
+──────╯
+Warning: Unused port 'data_valid'
+      ╭─[test.sus:1059:2]
+      │
+ 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+      │     ──────────────────────┬────────────────────── ┬  
+      │                           ╰────────────────────────── Unused port 'data_valid'
+      │                                                   │  
+      │                                                   ╰── f declared here
+      │
+      ├─[util.sus:40:35]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                                      ─────┬────  
+      │                                           ╰────── Port 'data_valid' declared here
+──────╯
+Warning: Unused port 'data_out'
+      ╭─[test.sus:1059:2]
+      │
+ 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+      │     ──────────────────────┬────────────────────── ┬  
+      │                           ╰────────────────────────── Unused port 'data_out'
+      │                                                   │  
+      │                                                   ╰── f declared here
+      │
+      ├─[util.sus:40:49]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                                                    ────┬───  
+      │                                                        ╰───── Port 'data_out' declared here
+──────╯
+Warning: Used 'if' in a non generative context, use 'when' instead
+      ╭─[test.sus:1074:2]
+      │
+ 1074 │     if iter_valid {
+      │     ─┬  
+      │      ╰── Used 'if' in a non generative context, use 'when' instead
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[test.sus:1080:10]
+      │
+ 1080 │     int[20] arr
+      │             ─┬─  
+      │              ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[test.sus:1082:9]
+      │
+ 1082 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
+      │            ───┬──  
+      │               ╰──── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Assertion failed
+      ╭─[test.sus:1097:14]
+      │
+ 1097 │     assert #(C: 15 + 3 == 19)
+      │                 ──────┬─────  
+      │                       ╰─────── Assertion failed
+──────╯
+Error: Used 'when' in a generative context, use 'if' instead
+      ╭─[test.sus:1108:9]
+      │
+ 1108 │         when WIDTH <= BASE_CASE_SIZE {
       │         ──┬─  
       │           ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
 Warning: Used 'if' in a non generative context, use 'when' instead
-      ╭─[test.sus:1027:25]
+      ╭─[test.sus:1111:25]
       │
- 1027 │                         if bits[I] {
+ 1111 │                         if bits[I] {
       │                         ─┬  
       │                          ╰── Used 'if' in a non generative context, use 'when' instead
 ──────╯
 Warning: Used 'if' in a non generative context, use 'when' instead
-      ╭─[test.sus:1029:32]
+      ╭─[test.sus:1113:32]
       │
- 1029 │                         } else if !bits[I] {
+ 1113 │                         } else if !bits[I] {
       │                                ─┬  
       │                                 ╰── Used 'if' in a non generative context, use 'when' instead
 ──────╯
 Error: Used 'when' in a generative context, use 'if' instead
-      ╭─[test.sus:1034:16]
+      ╭─[test.sus:1118:16]
       │
- 1034 │         } else when WIDTH > BASE_CASE_SIZE {
+ 1118 │         } else when WIDTH > BASE_CASE_SIZE {
       │                ──┬─  
       │                  ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
