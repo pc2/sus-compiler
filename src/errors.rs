@@ -60,7 +60,7 @@ impl ErrorStore {
         }
     }
 
-    pub fn take<'linker>(&mut self) -> Self {
+    pub fn take(&mut self) -> Self {
         std::mem::replace(self, ErrorStore::new())
     }
 
@@ -145,7 +145,7 @@ impl<'linker> ErrorCollector<'linker> {
 
     fn assert_span_good(&self, span: Span) {
         span.debug();
-        let rng = span.into_range();
+        let rng = span.as_range();
         assert!(rng.end <= self.file_len); // Don't need to verify start, since Span already enforces start <= end
     }
     fn push_diagnostic(
@@ -216,7 +216,7 @@ pub struct ErrorReference<'ec> {
 impl ErrorReference<'_> {
     pub fn existing_info(&self, error_info: ErrorInfo) -> &Self {
         assert!(
-            error_info.position.debug().into_range().end
+            error_info.position.debug().as_range().end
                 <= self.err_collector.files[error_info.file].file_text.len()
         );
         self.err_collector.error_store.borrow_mut().errors[self.pos]

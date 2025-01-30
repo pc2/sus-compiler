@@ -157,7 +157,7 @@ impl<T: Clone> ListOfLists<T> {
     }
 }
 
-impl<'a, T> Index<usize> for ListOfLists<T> {
+impl<T> Index<usize> for ListOfLists<T> {
     type Output = [T];
 
     fn index(&self, index: usize) -> &[T] {
@@ -166,7 +166,7 @@ impl<'a, T> Index<usize> for ListOfLists<T> {
     }
 }
 
-impl<'a, T> IndexMut<usize> for ListOfLists<T> {
+impl<T> IndexMut<usize> for ListOfLists<T> {
     fn index_mut(&mut self, index: usize) -> &mut [T] {
         assert!(index < self.len());
         &mut self.buf[self.start_ends[index]..self.start_ends[index + 1]]
@@ -184,9 +184,7 @@ impl<'a, T> Iterator for ListOfListsFlatOriginIter<'a, T> {
     type Item = (usize, &'a T);
 
     fn next(&mut self) -> Option<(usize, &'a T)> {
-        let Some((idx, item)) = self.buf_iter.next() else {
-            return None;
-        };
+        let (idx, item) = self.buf_iter.next()?;
 
         // Skip through blocks of 0 size
         while idx == self.ends[self.cur_slice_idx] {
@@ -207,9 +205,7 @@ impl<'a, T> Iterator for ListOfListsFlatOriginIterMut<'a, T> {
     type Item = (usize, &'a mut T);
 
     fn next(&mut self) -> Option<(usize, &'a mut T)> {
-        let Some((idx, item)) = self.buf_iter.next() else {
-            return None;
-        };
+        let (idx, item) = self.buf_iter.next()?;
 
         // Skip through blocks of 0 size
         while idx == self.ends[self.cur_slice_idx] {

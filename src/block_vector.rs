@@ -82,8 +82,8 @@ impl<T, const BLOCK_SIZE: usize> Drop for BlockVec<T, BLOCK_SIZE> {
         let num_remaining = self.length.get() % BLOCK_SIZE;
 
         let block_vec = self.blocks.get_mut();
-        for i in 0..num_full_blocks {
-            for v in block_vec[i].deref_mut() {
+        for i in block_vec.iter_mut() {
+            for v in i.deref_mut() {
                 unsafe {
                     v.assume_init_drop();
                 }
@@ -92,8 +92,8 @@ impl<T, const BLOCK_SIZE: usize> Drop for BlockVec<T, BLOCK_SIZE> {
 
         if num_remaining > 0 {
             let last_block = block_vec[num_full_blocks].deref_mut();
-            for i in 0..num_remaining {
-                unsafe { last_block[i].assume_init_drop() };
+            for element in last_block.iter_mut().take(num_remaining) {
+                unsafe { element.assume_init_drop() };
             }
         }
     }
@@ -266,7 +266,7 @@ impl<T, const BLOCK_SIZE: usize> Drop for BlockVecConsumingIter<T, BLOCK_SIZE> {
     }
 }
 
-impl<'bv, T, const BLOCK_SIZE: usize> FromIterator<T> for BlockVec<T, BLOCK_SIZE> {
+impl<T, const BLOCK_SIZE: usize> FromIterator<T> for BlockVec<T, BLOCK_SIZE> {
     fn from_iter<Iter: IntoIterator<Item = T>>(iter: Iter) -> Self {
         let new_coll = BlockVec::new();
         for v in iter {

@@ -231,6 +231,6 @@ impl LinkInfo {
         self.resolved_globals = resolved_globals;
         self.errors = errors.into_storage();
         self.checkpoints
-            .push(CheckPoint::checkpoint(&self.errors, &self.resolved_globals));
+            .push(CheckPoint::new(&self.errors, &self.resolved_globals));
     }
 }

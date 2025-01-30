@@ -1,5 +1,5 @@
 use std::ffi::OsStr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
@@ -23,7 +23,7 @@ const STD_LIB_PATH: &str = env!("SUS_COMPILER_STD_LIB_PATH");
 /// Any extra operations that should happen when files are added or removed from the linker. Such as caching line offsets.
 pub trait LinkerExtraFileInfoManager {
     /// This is there to give an acceptable identifier that can be printed
-    fn convert_filename(&self, path: &PathBuf) -> String {
+    fn convert_filename(&self, path: &Path) -> String {
         path.to_string_lossy().into_owned()
     }
     fn on_file_added(&mut self, _file_id: FileUUID, _linker: &Linker) {}

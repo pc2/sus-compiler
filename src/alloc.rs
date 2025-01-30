@@ -13,11 +13,12 @@ use std::{
 ///
 /// TODO add custom niche for more efficient Options, wait until custom niches are stabilized (https://internals.rust-lang.org/t/nonmaxusize-and-niche-value-optimisation/19661)
 /// Maybe use NonZeroUsize (https://doc.rust-lang.org/std/num/struct.NonZeroUsize.html)
+#[allow(clippy::upper_case_acronyms)]
 pub struct UUID<IndexMarker>(usize, PhantomData<IndexMarker>);
 
 impl<IndexMarker> Clone for UUID<IndexMarker> {
     fn clone(&self) -> Self {
-        Self(self.0, PhantomData)
+        *self
     }
 }
 impl<IndexMarker> Copy for UUID<IndexMarker> {}
@@ -98,7 +99,7 @@ impl<IndexMarker> UUIDAllocator<IndexMarker> {
         }
         result
     }
-    pub fn into_range(&self) -> UUIDRange<IndexMarker> {
+    pub fn as_range(&self) -> UUIDRange<IndexMarker> {
         UUIDRange(UUID::from_hidden_value(0), self.cur)
     }
 }
@@ -172,7 +173,7 @@ impl<IndexMarker: UUIDMarker> Debug for UUIDRange<IndexMarker> {
 
 impl<IndexMarker> Clone for UUIDRange<IndexMarker> {
     fn clone(&self) -> Self {
-        Self(self.0, self.1)
+        *self
     }
 }
 impl<IndexMarker> Copy for UUIDRange<IndexMarker> {}

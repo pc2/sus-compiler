@@ -286,7 +286,7 @@ impl Module {
         for (id, inst) in &self.link_info.instructions {
             println!("    {id:?}: {inst:?}");
             let span = self.get_instruction_span(id);
-            spans_print.push((format!("{id:?}"), span.into_range()));
+            spans_print.push((format!("{id:?}"), span.as_range()));
         }
         pretty_print_many_spans(file_data, &spans_print);
     }

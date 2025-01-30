@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::{ops::Range, path::PathBuf};
 
 use crate::compiler_top::LinkerExtraFileInfoManager;
@@ -53,7 +54,7 @@ pub struct FileSourcesManager {
 }
 
 impl LinkerExtraFileInfoManager for FileSourcesManager {
-    fn convert_filename(&self, path: &PathBuf) -> String {
+    fn convert_filename(&self, path: &Path) -> String {
         path.to_string_lossy().into_owned()
     }
 
@@ -124,7 +125,7 @@ pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
     // Assert that span is in file
     let _ = &linker.files[file].file_text[error.position];
 
-    let error_span = error.position.into_range();
+    let error_span = error.position.as_range();
 
     let config = ariadne_config();
     let mut report: ReportBuilder<'_, (FileUUID, Range<usize>)> =
@@ -136,7 +137,7 @@ pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
     );
 
     for info in &error.infos {
-        let info_span = info.position.into_range();
+        let info_span = info.position.as_range();
         // Assert that span is in file
         let _ = &linker.files[info.file].file_text[info.position];
         report = report.with_label(

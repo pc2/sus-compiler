@@ -579,7 +579,7 @@ pub fn apply_types(
     }
 
     // Assign names to all of the domains in this module
-    working_on.domains = leftover_domain_alloc.into_range().map(|id| {
+    working_on.domains = leftover_domain_alloc.as_range().map(|id| {
         if let Some(work_on_domain) = working_on.domains.get(id) {
             work_on_domain.clone()
         } else {

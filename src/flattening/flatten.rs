@@ -1199,13 +1199,7 @@ impl FlatteningContext<'_, '_> {
             self.errors
                 .error(expr_span, "A constant is not a wire reference");
             PartialWireReference::Error
-        } else if kind == kind!("unary_op") {
-            self.errors.error(
-                expr_span,
-                "The result of an operator is not a wire reference",
-            );
-            PartialWireReference::Error
-        } else if kind == kind!("binary_op") {
+        } else if kind == kind!("unary_op") || kind == kind!("binary_op") {
             self.errors.error(
                 expr_span,
                 "The result of an operator is not a wire reference",

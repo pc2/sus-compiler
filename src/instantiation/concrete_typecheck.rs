@@ -356,7 +356,7 @@ fn concretize_written_type_with_possible_template_args(
 
 impl SubmoduleTypecheckConstraint {
     /// Directly named type and value parameters are immediately unified, but latency count deltas can only be computed from the latency counting graph
-    fn try_infer_latency_counts(&mut self, context: &mut InstantiationContext) {
+    fn try_infer_latency_counts(&mut self, _context: &mut InstantiationContext) {
         // TODO
     }
 }

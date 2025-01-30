@@ -27,7 +27,7 @@ impl Span {
     /// Only really used for having a span with the maximum size.
     pub const MAX_POSSIBLE_SPAN: Span = Span(0, usize::MAX);
 
-    pub fn into_range(&self) -> Range<usize> {
+    pub fn as_range(&self) -> Range<usize> {
         self.debug();
         self.0..self.1
     }
@@ -60,7 +60,7 @@ impl Span {
 
 impl PartialOrd for Span {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0.partial_cmp(&other.0)
+        Some(self.cmp(other))
     }
 }
 impl Ord for Span {
@@ -159,12 +159,10 @@ impl FileText {
     }
     /// Clamps the linecol to be within the file, so cannot error.
     pub fn linecol_to_byte_clamp(&self, linecol: LineCol) -> usize {
-        let line_end = if linecol.line + 1 < self.lines_start_at.len() {
-            self.lines_start_at[linecol.line + 1] - 1
-        } else if linecol.line + 1 == self.lines_start_at.len() {
-            self.file_text.len()
-        } else {
-            return self.file_text.len();
+        let line_end = match (linecol.line + 1).cmp(&self.lines_start_at.len()) {
+            std::cmp::Ordering::Less => self.lines_start_at[linecol.line + 1] - 1,
+            std::cmp::Ordering::Equal => self.file_text.len(),
+            std::cmp::Ordering::Greater => return self.file_text.len(),
         };
         let line_start = self.lines_start_at[linecol.line];
         let line_text = &self.file_text[line_start..line_end];
@@ -199,6 +197,6 @@ impl Index<Span> for FileText {
 
     fn index(&self, index: Span) -> &str {
         index.debug();
-        &self.file_text[index.into_range()]
+        &self.file_text[index.as_range()]
     }
 }

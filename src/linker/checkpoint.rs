@@ -24,7 +24,7 @@ pub struct CheckPoint {
 }
 
 impl CheckPoint {
-    pub fn checkpoint(errors: &ErrorStore, resolved_globals: &ResolvedGlobals) -> CheckPoint {
+    pub fn new(errors: &ErrorStore, resolved_globals: &ResolvedGlobals) -> CheckPoint {
         CheckPoint {
             errors_cp: errors.checkpoint(),
             resolved_globals_cp: resolved_globals.checkpoint(),

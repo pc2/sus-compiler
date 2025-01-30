@@ -1,4 +1,7 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 fn main() {
     let mut install_dir = get_sus_dir();
@@ -29,7 +32,7 @@ fn get_sus_dir() -> PathBuf {
 }
 
 // Helper function to copy a directory and its contents recursively
-fn copy_dir(src: &str, dst: &PathBuf) -> std::io::Result<()> {
+fn copy_dir(src: &str, dst: &Path) -> std::io::Result<()> {
     for entry in fs::read_dir(src)? {
         let entry = entry?;
         let path = entry.path();

@@ -78,10 +78,9 @@ impl<'g> CodeGenerationContext<'g> {
     /// This is for making the resulting Verilog a little nicer to read
     fn can_inline(&self, wire: &RealWire) -> bool {
         match &wire.source {
-            RealWireDataSource::Constant { value } => match value {
-                Value::Bool(_) | Value::Integer(_) => true,
-                _other => false,
-            },
+            RealWireDataSource::Constant {
+                value: Value::Bool(_) | Value::Integer(_),
+            } => true,
             _other => false,
         }
     }

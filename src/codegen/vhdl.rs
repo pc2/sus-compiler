@@ -23,7 +23,7 @@ impl super::CodeGenBackend for VHDLCodegenBackend {
         &self,
         md: &Module,
         instance: &InstantiatedModule,
-        linker: &Linker,
+        _linker: &Linker,
         use_latency: bool,
     ) -> String {
         gen_vhdl_code(md, instance, use_latency)
@@ -35,7 +35,7 @@ struct CodeGenerationContext<'g, 'out, Stream: std::fmt::Write> {
     instance: &'g InstantiatedModule,
     program_text: &'out mut Stream,
     use_latency: bool,
-    needed_untils: FlatAlloc<i64, WireIDMarker>,
+    _needed_untils: FlatAlloc<i64, WireIDMarker>,
 }
 
 fn typ_to_declaration(mut typ: &ConcreteType) -> String {
@@ -163,16 +163,18 @@ impl<Stream: std::fmt::Write> CodeGenerationContext<'_, '_, Stream> {
     }
 }
 
-fn gen_vhdl_code(md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String {
+// TODO This should be removed as soon as this feature is usable
+#[allow(unreachable_code)]
+fn gen_vhdl_code(_md: &Module, _instance: &InstantiatedModule, _use_latency: bool) -> String {
     todo!("VHDl codegen is unfinshed");
     let mut program_text = String::new();
 
     let mut ctx = CodeGenerationContext {
-        md,
-        instance,
-        use_latency,
+        md: _md,
+        instance: _instance,
+        use_latency: _use_latency,
         program_text: &mut program_text,
-        needed_untils: instance.compute_needed_untils(),
+        _needed_untils: _instance.compute_needed_untils(),
     };
     ctx.write_vhdl_code();
 

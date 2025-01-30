@@ -417,12 +417,12 @@ pub fn solve_latencies(
     }
 
     // First pin all these latencies
-    for idx in 0..working_latencies.len() {
-        if working_latencies[idx].is_set() {
+    for latency in working_latencies.iter_mut() {
+        if latency.is_set() {
             // it's a defined latency!
-            if !working_latencies[idx].is_pinned() {
+            if !latency.is_pinned() {
                 // Just to avoid the is_pinned check in pin()
-                working_latencies[idx].pin();
+                latency.pin();
             }
         }
     }
@@ -496,7 +496,6 @@ mod tests {
         fanins: &ListOfLists<FanInOut>,
         specified_latencies: Vec<SpecifiedLatency>,
     ) -> Result<Vec<i64>, LatencyCountingError> {
-        let fanins = fanins.into();
         let fanouts = convert_fanin_to_fanout(fanins);
 
         let inputs = infer_ports(fanins);
@@ -515,7 +514,7 @@ mod tests {
                 return false;
             }
         }
-        return true;
+        true
     }
 
     #[test]

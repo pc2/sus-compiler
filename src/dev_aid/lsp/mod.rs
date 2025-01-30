@@ -7,7 +7,7 @@ use crate::{compiler_top::LinkerExtraFileInfoManager, linker::GlobalUUID, prelud
 use hover_info::hover;
 use lsp_types::{notification::*, request::Request, *};
 use semantic_tokens::{make_semantic_tokens, semantic_token_capabilities};
-use std::{collections::HashMap, error::Error, net::SocketAddr, path::PathBuf};
+use std::{collections::HashMap, error::Error, net::SocketAddr, path::Path};
 
 use crate::{
     config::config,
@@ -191,7 +191,7 @@ fn push_all_errors(
 struct LSPFileManager {}
 
 impl LinkerExtraFileInfoManager for LSPFileManager {
-    fn convert_filename(&self, path: &PathBuf) -> String {
+    fn convert_filename(&self, path: &Path) -> String {
         Url::from_file_path(path).unwrap().into()
     }
 }

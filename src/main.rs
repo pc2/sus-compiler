@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         config::TargetLanguage::SystemVerilog => {
             Box::new(VerilogCodegenBackend) as Box<dyn CodeGenBackend>
         }
-        config::TargetLanguage::VHDL => Box::new(VHDLCodegenBackend) as Box<dyn CodeGenBackend>,
+        config::TargetLanguage::Vhdl => Box::new(VHDLCodegenBackend) as Box<dyn CodeGenBackend>,
     };
 
     if config.use_lsp {
