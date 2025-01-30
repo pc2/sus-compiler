@@ -82,7 +82,7 @@ impl<T, const BLOCK_SIZE: usize> Drop for BlockVec<T, BLOCK_SIZE> {
         let num_remaining = self.length.get() % BLOCK_SIZE;
 
         let block_vec = self.blocks.get_mut();
-        for i in block_vec.iter_mut() {
+        for i in block_vec.iter_mut().take(num_full_blocks) {
             for v in i.deref_mut() {
                 unsafe {
                     v.assume_init_drop();
