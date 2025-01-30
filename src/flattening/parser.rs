@@ -194,13 +194,13 @@ impl<'t> Cursor<'t> {
     }
 
     #[track_caller]
-    pub fn go_down<OT, F: FnOnce(&mut Self) -> OT>(&mut self, kind: u16, func: F) -> OT {
+    pub fn go_down<OT>(&mut self, kind: u16, func: impl FnOnce(&mut Self) -> OT) -> OT {
         self.assert_is_kind(kind);
 
         self.go_down_no_check(func)
     }
 
-    pub fn go_down_no_check<OT, F: FnOnce(&mut Self) -> OT>(&mut self, func: F) -> OT {
+    pub fn go_down_no_check<OT>(&mut self, func: impl FnOnce(&mut Self) -> OT) -> OT {
         if !self.cursor.goto_first_child() {
             self.print_stack();
             panic!("Could not go down this node!");
@@ -219,7 +219,7 @@ impl<'t> Cursor<'t> {
 
     /// Goes down the current node, checks it's kind, and then iterates through 'item' fields.
     #[track_caller]
-    pub fn list<F: FnMut(&mut Self)>(&mut self, parent_kind: u16, mut func: F) {
+    pub fn list(&mut self, parent_kind: u16, mut func: impl FnMut(&mut Self)) {
         self.assert_is_kind(parent_kind);
 
         if self.cursor.goto_first_child() {
@@ -251,10 +251,10 @@ impl<'t> Cursor<'t> {
     ///
     /// The function given should return OT, and from the valid outputs this function constructs a output list
     #[track_caller]
-    pub fn collect_list<OT, F: FnMut(&mut Self) -> OT>(
+    pub fn collect_list<OT>(
         &mut self,
         parent_kind: u16,
-        mut func: F,
+        mut func: impl FnMut(&mut Self) -> OT,
     ) -> Vec<OT> {
         let mut result = Vec::new();
 
@@ -268,10 +268,10 @@ impl<'t> Cursor<'t> {
 
     /// Goes down the current node, checks it's kind, and then selects the 'content' field. Useful for constructs like seq('[', field('content', $.expr), ']')
     #[track_caller]
-    pub fn go_down_content<OT, F: FnOnce(&mut Self) -> OT>(
+    pub fn go_down_content<OT>(
         &mut self,
         parent_kind: u16,
-        func: F,
+        func: impl FnOnce(&mut Self) -> OT,
     ) -> OT {
         self.go_down(parent_kind, |self2| {
             self2.field(field!("content"));
@@ -361,11 +361,11 @@ impl<'t> Cursor<'t> {
 
     /// Goes down the current node, checks it's kind, and then iterates through 'item' fields.
     #[track_caller]
-    pub fn list_and_report_errors<F: FnMut(&mut Self)>(
+    pub fn list_and_report_errors(
         &mut self,
         parent_kind: u16,
         errors: &ErrorCollector,
-        mut func: F,
+        mut func: impl FnMut(&mut Self),
     ) {
         self.assert_is_kind(parent_kind);
         if self.cursor.goto_first_child() {

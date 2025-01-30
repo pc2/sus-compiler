@@ -6,7 +6,7 @@ use std::ops::Deref;
 use crate::linker::get_builtin_type;
 use crate::value::Value;
 
-use super::template::{ConcreteTemplateArg, TVec};
+use super::template::TVec;
 
 use super::type_inference::ConcreteTypeVariableID;
 
@@ -23,7 +23,7 @@ pub const INT_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalRe
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConcreteGlobalReference<ID> {
     pub id: ID,
-    pub template_args: TVec<ConcreteTemplateArg>,
+    pub template_args: TVec<ConcreteType>,
 }
 
 /// A post-instantiation type. These fully define what wires should be generated for a given object. 
@@ -60,13 +60,7 @@ impl ConcreteType {
                 global_ref
                     .template_args
                     .iter()
-                    .any(|concrete_template_arg| match concrete_template_arg.1 {
-                        ConcreteTemplateArg::Type(concrete_type, _) => {
-                            concrete_type.contains_unknown()
-                        }
-                        ConcreteTemplateArg::Value(..) => false,
-                        ConcreteTemplateArg::NotProvided => true,
-                    })
+                    .any(|concrete_template_arg| concrete_template_arg.1.contains_unknown())
             }
             ConcreteType::Value(_) => false,
             ConcreteType::Array(arr_box) => {

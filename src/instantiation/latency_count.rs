@@ -99,7 +99,7 @@ struct LatencyDomainInfo {
 }
 
 impl RealWireDataSource {
-    fn iter_sources_with_min_latency<F: FnMut(WireID, i64)>(&self, mut f: F) {
+    fn iter_sources_with_min_latency(&self, mut f: impl FnMut(WireID, i64)) {
         match self {
             RealWireDataSource::ReadOnly => {}
             RealWireDataSource::Multiplexer {

@@ -10,7 +10,6 @@ use crate::linker::{FileData, LinkInfo};
 use crate::typing::{
     abstract_type::{AbstractType, DomainType},
     concrete_type::ConcreteType,
-    template::ConcreteTemplateArg,
 };
 
 use std::{
@@ -78,14 +77,10 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
 }
 
 impl WrittenType {
-    pub fn display<
-        'a,
-        TypVec: Index<TypeUUID, Output = StructType>,
-        TemplateVec: TemplateNameGetter,
-    >(
+    pub fn display<'a>(
         &'a self,
-        linker_types: &'a TypVec,
-        template_names: &'a TemplateVec,
+        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
+        template_names: &'a impl TemplateNameGetter,
     ) -> impl Display + 'a {
         WrittenTypeDisplay {
             inner: self,
@@ -98,7 +93,7 @@ impl WrittenType {
 #[derive(Debug)]
 pub struct AbstractTypeDisplay<
     'a,
-    TypVec: Index<TypeUUID, Output = StructType>,
+    TypVec: ,
     TemplateVec: TemplateNameGetter,
 > {
     inner: &'a AbstractType,
@@ -126,14 +121,10 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
 }
 
 impl AbstractType {
-    pub fn display<
-        'a,
-        TypVec: Index<TypeUUID, Output = StructType>,
-        TemplateVec: TemplateNameGetter,
-    >(
+    pub fn display<'a>(
         &'a self,
-        linker_types: &'a TypVec,
-        template_names: &'a TemplateVec,
+        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
+        template_names: &'a impl TemplateNameGetter,
     ) -> impl Display + 'a {
         AbstractTypeDisplay {
             inner: self,
@@ -305,14 +296,11 @@ impl Module {
     }
 }
 
-pub fn pretty_print_concrete_instance<TypVec>(
+pub fn pretty_print_concrete_instance(
     target_link_info: &LinkInfo,
-    given_template_args: &TVec<ConcreteTemplateArg>,
-    linker_types: &TypVec,
-) -> String
-where
-    TypVec: Index<TypeUUID, Output = StructType>,
-{
+    given_template_args: &TVec<ConcreteType>,
+    linker_types: &impl Index<TypeUUID, Output = StructType>,
+) -> String {
     assert!(given_template_args.len() == target_link_info.template_parameters.len());
     let object_full_name = target_link_info.get_full_name();
     if given_template_args.is_empty() {
@@ -324,24 +312,14 @@ where
         let arg_in_target = &target_link_info.template_parameters[id];
         write!(result, "    {}: ", arg_in_target.name).unwrap();
         match arg {
-            ConcreteTemplateArg::Type(concrete_type, how_do_we_know_the_template_arg) => {
-                writeln!(
-                    result,
-                    "type {} /* {} */,",
-                    concrete_type.display(linker_types),
-                    how_do_we_know_the_template_arg
-                )
+            ConcreteType::Named(_) | ConcreteType::Array(_) => {
+                writeln!(result, "type {},", arg.display(linker_types))
                 .unwrap();
             }
-            ConcreteTemplateArg::Value(value, how_do_we_know_the_template_arg) => {
-                writeln!(
-                    result,
-                    "{} /* {} */,",
-                    value, how_do_we_know_the_template_arg
-                )
-                .unwrap();
+            ConcreteType::Value(value) => {
+                writeln!(result, "{value},").unwrap();
             }
-            ConcreteTemplateArg::NotProvided => {
+            ConcreteType::Unknown(_) => {
                 writeln!(result, "/* Could not infer */").unwrap();
             }
         }

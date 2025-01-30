@@ -2,9 +2,10 @@
 use std::ops::Deref;
 
 use crate::errors::ErrorInfoObject;
-use crate::flattening::{DeclarationKind, WireReferenceRoot, ExpressionSource, WrittenType};
+use crate::flattening::{DeclarationKind, ExpressionSource, WireReferenceRoot, WrittenType};
 use crate::linker::LinkInfo;
-use crate::typing::template::{ConcreteTemplateArg, HowDoWeKnowTheTemplateArg};
+use crate::typing::concrete_type::ConcreteGlobalReference;
+use crate::typing::template::TemplateArgKind;
 use crate::typing::{
     concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
     type_inference::{FailedUnification, DelayedConstraint, DelayedConstraintStatus, DelayedConstraintsList},
@@ -137,7 +138,20 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
     pub fn typecheck(&mut self) {
         let mut delayed_constraints : DelayedConstraintsList<Self> = DelayedConstraintsList::new();
-        for (sm_id, _sm) in &self.submodules {
+        for (sm_id, sm) in &self.submodules {
+            let sub_module = &self.linker.modules[sm.module_uuid];
+
+            for (port_id, p) in sm.port_map.iter_valids() {
+                let wire = &self.wires[p.maps_to_wire];
+
+                let port_decl_instr = sub_module.ports[port_id].declaration_instruction;
+                let port_decl = sub_module.link_info.instructions[port_decl_instr].unwrap_declaration();
+
+                let typ_for_inference = concretize_written_type_with_possible_template_args(&port_decl.typ_expr, &sm.template_args, &sub_module.link_info, &self.type_substitutor);
+
+                self.type_substitutor.unify_must_succeed(&wire.typ, &typ_for_inference);
+            }
+            
             delayed_constraints.push(SubmoduleTypecheckConstraint {sm_id});
         }
 
@@ -173,76 +187,76 @@ fn can_expression_be_value_inferred(link_info: &LinkInfo, expr_id: FlatID) -> Op
     Some(*template_id)
 }
 
-fn try_to_attach_value_to_template_arg(template_wire_referernce: FlatID, found_value: &ConcreteType, template_args: &mut TVec<ConcreteTemplateArg>, submodule_link_info: &LinkInfo) {
-    let ConcreteType::Value(v) = found_value else {return}; // We don't have a value to assign
-    if let Some(template_id) = can_expression_be_value_inferred(submodule_link_info, template_wire_referernce) {
-        if let ConcreteTemplateArg::NotProvided = &template_args[template_id] {
-            template_args[template_id] = ConcreteTemplateArg::Value(v.clone(), HowDoWeKnowTheTemplateArg::Inferred)
-        }
-    }
-}
-
-fn infer_parameters_by_walking_type(port_wr_typ: &WrittenType, connected_typ: &ConcreteType, template_args: &mut TVec<ConcreteTemplateArg>, submodule_link_info: &LinkInfo) {
-    match port_wr_typ {
-        WrittenType::Error(_) => {} // Can't continue, bad written type
-        WrittenType::Named(_) => {} // Seems we've run out of type to check
-        WrittenType::Array(_span, written_arr_box) => {
-            let ConcreteType::Array(concrete_arr_box) = connected_typ else {return}; // Can't continue, type not worked out. TODO should we seed concrete types with derivates from AbstractTypes?
-            let (written_arr, written_size_var, _) = written_arr_box.deref();
-            let (concrete_arr, concrete_size) = concrete_arr_box.deref();
-
-            infer_parameters_by_walking_type(written_arr, concrete_arr, template_args, submodule_link_info); // Recurse down
-
-            try_to_attach_value_to_template_arg(*written_size_var, concrete_size, template_args, submodule_link_info); // Potential place for template inference!
-        }
-        WrittenType::TemplateVariable(_span, template_id) => {
-            if !connected_typ.contains_unknown() {
-                if let ConcreteTemplateArg::NotProvided = &template_args[*template_id] {
-                    template_args[*template_id] = ConcreteTemplateArg::Type(connected_typ.clone(), HowDoWeKnowTheTemplateArg::Inferred)
+fn concretize_written_type_with_possible_template_args(
+    written_typ: &WrittenType,
+    template_args: &TVec<ConcreteType>,
+    link_info: &LinkInfo,
+    type_substitutor: &TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>
+) -> ConcreteType {
+    match written_typ {
+        WrittenType::Error(_span) => ConcreteType::Unknown(type_substitutor.alloc()),
+        WrittenType::TemplateVariable(_span, uuid) => template_args[*uuid].clone(),
+        WrittenType::Named(global_reference) => {
+            let object_template_args : TVec<ConcreteType> = global_reference.template_args.map(|(_arg_id, arg)| -> ConcreteType {
+                if let Some(arg) = arg {
+                    match &arg.kind {
+                        TemplateArgKind::Type(arg_wr_typ) => {
+                            concretize_written_type_with_possible_template_args(arg_wr_typ, template_args, link_info, type_substitutor)
+                        }
+                        TemplateArgKind::Value(uuid) => {
+                            if let Some(found_template_arg) = can_expression_be_value_inferred(link_info, *uuid) {
+                                template_args[found_template_arg].clone()
+                            } else {
+                                ConcreteType::Unknown(type_substitutor.alloc())
+                            }
+                        }
+                    }
+                } else {
+                    ConcreteType::Unknown(type_substitutor.alloc())
                 }
-            }
+            });
+
+            ConcreteType::Named(ConcreteGlobalReference{
+                id: global_reference.id,
+                template_args: object_template_args
+            })
+        }
+        WrittenType::Array(_span, arr_box) => {
+            let (arr_content_wr, arr_idx_id, _arr_brackets) = arr_box.deref();
+
+            let arr_content_concrete = concretize_written_type_with_possible_template_args(arr_content_wr, template_args, link_info, type_substitutor);
+            let arr_idx_concrete = if let Some(found_template_arg) = can_expression_be_value_inferred(link_info, *arr_idx_id) {
+                template_args[found_template_arg].clone()
+            } else {
+                ConcreteType::Unknown(type_substitutor.alloc())
+            };
+
+            ConcreteType::Array(Box::new((arr_content_concrete, arr_idx_concrete)))
         }
     }
 }
 
 impl SubmoduleTypecheckConstraint {
-    fn try_infer_parameters(&mut self, context: &mut InstantiationContext) {
-        let sm = &mut context.submodules[self.sm_id];
-
-        let sub_module = &context.linker.modules[sm.module_uuid];
-
-        for (id, p) in sm.port_map.iter_valids() {
-            let wire = &context.wires[p.maps_to_wire];
-
-            let mut wire_typ_clone = wire.typ.clone();
-            wire_typ_clone.fully_substitute(&context.type_substitutor);
-
-            let port_decl_instr = sub_module.ports[id].declaration_instruction;
-            let port_decl = sub_module.link_info.instructions[port_decl_instr].unwrap_declaration();
-
-            infer_parameters_by_walking_type(&port_decl.typ_expr, &wire_typ_clone, &mut sm.template_args, &sub_module.link_info);
-        }
+    /// Directly named type and value parameters are immediately unified, but latency count deltas can only be computed from the latency counting graph
+    fn try_infer_latency_counts(&mut self, context: &mut InstantiationContext) {
+        // TODO
     }
-
 }
 
 impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConstraint {
     fn try_apply(&mut self, context : &mut InstantiationContext) -> DelayedConstraintStatus {
-        // Try to infer template arguments based on the connections to the ports of the module
-        self.try_infer_parameters(context);
+        // Try to infer template arguments based on the connections to the ports of the module. 
+        self.try_infer_latency_counts(context);
 
-        let sm = &context.submodules[self.sm_id];
+        let sm = &mut context.submodules[self.sm_id];
 
         let submod_instr = context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
         let sub_module = &context.linker.modules[sm.module_uuid];
 
         // Check if there's any argument that isn't known
-        for (_id, arg) in &sm.template_args {
-            match arg {
-                ConcreteTemplateArg::NotProvided => {
-                    return DelayedConstraintStatus::NoProgress;
-                }
-                ConcreteTemplateArg::Type(..) | ConcreteTemplateArg::Value(..) => {}
+        for (_id, arg) in &mut sm.template_args {
+            if !arg.fully_substitute(&context.type_substitutor) { // We don't actually *need* to already fully_substitute here, but it's convenient and saves some work
+                return DelayedConstraintStatus::NoProgress;
             }
         }
 

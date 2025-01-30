@@ -1,8 +1,7 @@
 
-use crate::{alloc::UUID, prelude::*, value::Value};
-use super::{abstract_type::AbstractType, concrete_type::ConcreteType};
+use crate::{alloc::UUID, prelude::*};
+use super::abstract_type::AbstractType;
 use crate::flattening::WrittenType;
-use std::fmt::Display;
 
 /// References any [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant],
 /// and includes any template arguments.
@@ -121,60 +120,6 @@ impl TemplateArgKind {
             unreachable!("TemplateArgKind::unwrap_value on {self:?}")
         };
         *v
-    }
-}
-
-/// Tracks how we arrived at this value through type inference. (See [crate::typing::type_inference])
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum HowDoWeKnowTheTemplateArg {
-    Given,
-    Inferred,
-}
-
-impl Display for HowDoWeKnowTheTemplateArg {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            HowDoWeKnowTheTemplateArg::Given => "given",
-            HowDoWeKnowTheTemplateArg::Inferred => "inferred",
-        })
-    }
-}
-
-// --------------------------------------------------
-// IMPORTANT: To those seeking to refactor this struct: don't.
-// It may look like [ConcreteTemplateArg::Value] duplicates [ConcreteType::Value], or that the whole thing could be replaced by [ConcreteType] itself.
-// But the [ConcreteTemplateArg::Type] and [ConcreteTemplateArg::Value] cases differentiate often enough, and semantically are more similar to [ParameterKind].
-// Attempting to merge these uses with [ConcreteType] internals only leads to confusion.
-// --------------------------------------------------
-
-/// Represents the value we're passing into a template argument.
-///
-/// It is the instantiated variant of [TemplateArg]
-///
-/// And it is passed to a [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant]'s [Parameter]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ConcreteTemplateArg {
-    Type(ConcreteType, HowDoWeKnowTheTemplateArg),
-    Value(Value, HowDoWeKnowTheTemplateArg),
-    /// It has not been explicitly provided,
-    /// yet [crate::typing::type_inference] may replace this value when it can figure it out from the context
-    NotProvided,
-}
-
-impl ConcreteTemplateArg {
-    #[track_caller]
-    pub fn unwrap_type(&self) -> &ConcreteType {
-        let Self::Type(t, _) = self else {
-            unreachable!()
-        };
-        t
-    }
-    #[track_caller]
-    pub fn unwrap_value(&self) -> &Value {
-        let Self::Value(v, _) = self else {
-            unreachable!()
-        };
-        v
     }
 }
 

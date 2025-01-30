@@ -138,7 +138,7 @@ impl<IndexMarker> UUIDRange<IndexMarker> {
     pub fn iter(&self) -> UUIDRangeIter<IndexMarker> {
         self.into_iter()
     }
-    pub fn map<OT, F: FnMut(UUID<IndexMarker>) -> OT>(&self, f: F) -> FlatAlloc<OT, IndexMarker> {
+    pub fn map<OT>(&self, f: impl FnMut(UUID<IndexMarker>) -> OT) -> FlatAlloc<OT, IndexMarker> {
         FlatAlloc {
             data: Vec::from_iter(self.iter().map(f)),
             _ph: PhantomData,
@@ -302,9 +302,9 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn find<F: FnMut(UUID<IndexMarker>, &T) -> bool>(
+    pub fn find(
         &self,
-        mut predicate: F,
+        mut predicate: impl FnMut(UUID<IndexMarker>, &T) -> bool,
     ) -> Option<UUID<IndexMarker>> {
         self.iter()
             .find(|(id, v)| predicate(*id, v))
@@ -428,9 +428,9 @@ impl<T, IndexMarker> ArenaVector<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn find<F: FnMut(UUID<IndexMarker>, &T) -> bool>(
+    pub fn find(
         &self,
-        mut predicate: F,
+        mut predicate: impl FnMut(UUID<IndexMarker>, &T) -> bool,
     ) -> Option<UUID<IndexMarker>> {
         self.iter()
             .find(|(id, v)| predicate(*id, v))
@@ -537,18 +537,18 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub fn iter_mut<'a>(&'a mut self) -> FlatAllocIterMut<'a, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn map<OT, F: FnMut((UUID<IndexMarker>, &T)) -> OT>(
+    pub fn map<OT>(
         &self,
-        f: F,
+        f: impl FnMut((UUID<IndexMarker>, &T)) -> OT,
     ) -> FlatAlloc<OT, IndexMarker> {
         FlatAlloc {
             data: Vec::from_iter(self.iter().map(f)),
             _ph: PhantomData,
         }
     }
-    pub fn find<F: FnMut(UUID<IndexMarker>, &T) -> bool>(
+    pub fn find(
         &self,
-        mut predicate: F,
+        mut predicate: impl FnMut(UUID<IndexMarker>, &T) -> bool,
     ) -> Option<UUID<IndexMarker>> {
         self.iter()
             .find(|(id, v)| predicate(*id, v))

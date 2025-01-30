@@ -8,7 +8,7 @@ mod unique_names;
 use unique_names::UniqueNames;
 
 use crate::prelude::*;
-use crate::typing::template::{ConcreteTemplateArg, TVec};
+use crate::typing::template::TVec;
 use crate::typing::type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor};
 
 use std::cell::OnceCell;
@@ -38,7 +38,7 @@ pub enum RealWirePathElem {
 }
 
 impl RealWirePathElem {
-    fn for_each_wire_in_path<F: FnMut(WireID)>(path: &[RealWirePathElem], mut f: F) {
+    fn for_each_wire_in_path(path: &[RealWirePathElem], mut f: impl FnMut(WireID)) {
         for v in path {
             match v {
                 RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
@@ -132,7 +132,7 @@ pub struct SubModule {
     pub interface_call_sites: FlatAlloc<Vec<Span>, InterfaceIDMarker>,
     pub name: String,
     pub module_uuid: ModuleUUID,
-    pub template_args: TVec<ConcreteTemplateArg>,
+    pub template_args: TVec<ConcreteType>,
 }
 
 /// Generated from [Module::ports]
@@ -207,7 +207,7 @@ impl SubModuleOrWire {
 /// Also, with incremental builds (#49) this will be a prime area for investigation
 #[derive(Debug)]
 pub struct InstantiationCache {
-    cache: RefCell<HashMap<TVec<ConcreteTemplateArg>, Rc<InstantiatedModule>>>,
+    cache: RefCell<HashMap<TVec<ConcreteType>, Rc<InstantiatedModule>>>,
 }
 
 impl InstantiationCache {
@@ -221,7 +221,7 @@ impl InstantiationCache {
         &self,
         md: &Module,
         linker: &Linker,
-        template_args: TVec<ConcreteTemplateArg>,
+        template_args: TVec<ConcreteType>,
     ) -> Option<Rc<InstantiatedModule>> {
         let cache_borrow = self.cache.borrow();
 
@@ -259,7 +259,7 @@ impl InstantiationCache {
         }
     }
 
-    pub fn for_each_error<F: FnMut(&CompileError)>(&self, func: &mut F) {
+    pub fn for_each_error(&self, func: &mut impl FnMut(&CompileError)) {
         let cache_borrow = self.cache.borrow();
         for inst in cache_borrow.values() {
             for err in &inst.errors {
@@ -274,9 +274,9 @@ impl InstantiationCache {
 
     // Also passes over invalid instances. Instance validity should not be assumed!
     // Only used for things like syntax highlighting
-    pub fn for_each_instance<F: FnMut(&TVec<ConcreteTemplateArg>, &Rc<InstantiatedModule>)>(
+    pub fn for_each_instance(
         &self,
-        mut f: F,
+        mut f: impl FnMut(&TVec<ConcreteType>, &Rc<InstantiatedModule>),
     ) {
         let borrow = self.cache.borrow();
         for (k, v) in borrow.iter() {
@@ -327,7 +327,7 @@ struct InstantiationContext<'fl, 'l> {
     interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     errors: ErrorCollector<'l>,
 
-    template_args: &'fl TVec<ConcreteTemplateArg>,
+    template_args: &'fl TVec<ConcreteType>,
     md: &'fl Module,
     linker: &'l Linker,
 }
@@ -361,7 +361,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 fn perform_instantiation(
     md: &Module,
     linker: &Linker,
-    template_args: &TVec<ConcreteTemplateArg>,
+    template_args: &TVec<ConcreteType>,
 ) -> InstantiatedModule {
     let mut context = InstantiationContext {
         name: pretty_print_concrete_instance(&md.link_info, template_args, &linker.types),

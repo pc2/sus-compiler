@@ -262,7 +262,7 @@ impl Linker {
             GlobalUUID::Constant(cst_id) => &mut constants[cst_id].link_info
         }
     }
-    fn for_all_duplicate_declaration_errors<F: FnMut(&CompileError)>(&self, file_uuid: FileUUID, f: &mut F) {
+    fn for_all_duplicate_declaration_errors(&self, file_uuid: FileUUID, f: &mut impl FnMut(&CompileError)) {
         // Conflicting Declarations
         for item in &self.global_namespace {
             let NamespaceElement::Colission(colission) = &item.1 else {
@@ -302,10 +302,10 @@ impl Linker {
         }
     }
 
-    fn for_all_errors_after_compile<F: FnMut(&CompileError)>(
+    fn for_all_errors_after_compile(
         &self,
         file_uuid: FileUUID,
-        func: &mut F,
+        func: &mut impl FnMut(&CompileError),
     ) {
         for v in &self.files[file_uuid].associated_values {
             match v {
@@ -322,7 +322,7 @@ impl Linker {
         }
     }
 
-    pub fn for_all_errors_in_file<F: FnMut(&CompileError)>(&self, file_uuid: FileUUID, mut f: F) {
+    pub fn for_all_errors_in_file(&self, file_uuid: FileUUID, mut f: impl FnMut(&CompileError)) {
         for err in &self.files[file_uuid].parsing_errors {
             f(err);
         }
@@ -373,7 +373,7 @@ impl Linker {
         self.files.free(file_uuid);
     }
 
-    pub fn with_file_builder<F: FnOnce(FileBuilder<'_>)>(&mut self, file_id: FileUUID, f: F) {
+    pub fn with_file_builder(&mut self, file_id: FileUUID, f: impl FnOnce(FileBuilder<'_>)) {
         let mut associated_values = Vec::new();
         let mut parsing_errors =
             std::mem::replace(&mut self.files[file_id].parsing_errors, ErrorStore::new());

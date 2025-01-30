@@ -8,7 +8,7 @@ use crate::flattening::{DeclarationKind, Instruction, Module, Port};
 use crate::instantiation::{
     InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem, CALCULATE_LATENCY_LATER,
 };
-use crate::typing::template::{ConcreteTemplateArg, TVec};
+use crate::typing::template::TVec;
 use crate::{typing::concrete_type::ConcreteType, value::Value};
 
 use super::shared::*;
@@ -333,7 +333,7 @@ impl<'g> CodeGenerationContext<'g> {
     fn write_template_args(
         &mut self,
         link_info: &LinkInfo,
-        concrete_template_args: &TVec<ConcreteTemplateArg>,
+        concrete_template_args: &TVec<ConcreteType>,
     ) {
         self.program_text.write_str(&link_info.name).unwrap();
         self.program_text.write_str(" #(").unwrap();
@@ -341,13 +341,13 @@ impl<'g> CodeGenerationContext<'g> {
         concrete_template_args.iter().for_each(|(arg_id, arg)| {
             let arg_name = &link_info.template_parameters[arg_id].name;
             let arg_value = match arg {
-                ConcreteTemplateArg::Type(..) => {
+                ConcreteType::Named(..) | ConcreteType::Array(..) => {
                     unreachable!("No extern module type arguments. Should have been caught by Lint")
                 }
-                ConcreteTemplateArg::Value(value, _) => {
+                ConcreteType::Value(value) => {
                     value.inline_constant_to_string()
                 }
-                ConcreteTemplateArg::NotProvided => unreachable!("All args are known at codegen"),
+                ConcreteType::Unknown(_) => unreachable!("All args are known at codegen"),
             };
             if first {
                 self.program_text.write_char(',').unwrap();

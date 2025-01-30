@@ -8,7 +8,7 @@ use std::ops::{Deref, Index, IndexMut};
 
 use crate::linker::IsExtern;
 use crate::prelude::*;
-use crate::typing::template::{GlobalReference, HowDoWeKnowTheTemplateArg};
+use crate::typing::template::GlobalReference;
 
 use num::BigInt;
 
@@ -19,7 +19,7 @@ use crate::value::{compute_binary_op, compute_unary_op, Value};
 use crate::typing::{
     abstract_type::DomainType,
     concrete_type::{ConcreteType, INT_CONCRETE_TYPE},
-    template::{ConcreteTemplateArg, TemplateArgKind},
+    template::TemplateArgKind,
 };
 
 use super::*;
@@ -173,7 +173,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         Ok(match typ {
             WrittenType::Error(_) => caught_by_typecheck!("Error Type"),
             WrittenType::TemplateVariable(_, template_id) => {
-                self.template_args[*template_id].unwrap_type().clone()
+                self.template_args[*template_id].clone()
             }
             WrittenType::Named(named_type) => {
                 ConcreteType::Named(crate::typing::concrete_type::ConcreteGlobalReference {
@@ -712,16 +712,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     for (_id, v) in &submodule.module_ref.template_args {
                         template_args.alloc(match v {
                             Some(arg) => match &arg.kind {
-                                TemplateArgKind::Type(typ) => ConcreteTemplateArg::Type(
-                                    self.concretize_type(typ)?,
-                                    HowDoWeKnowTheTemplateArg::Given,
-                                ),
-                                TemplateArgKind::Value(v) => ConcreteTemplateArg::Value(
-                                    self.generation_state.get_generation_value(*v)?.clone(),
-                                    HowDoWeKnowTheTemplateArg::Given,
-                                ),
+                                TemplateArgKind::Type(typ) => self.concretize_type(typ)?,
+                                TemplateArgKind::Value(v) => 
+                                    ConcreteType::Value(self.generation_state.get_generation_value(*v)?.clone()),
                             },
-                            None => ConcreteTemplateArg::NotProvided,
+                            None => ConcreteType::Unknown(self.type_substitutor.alloc()),
                         });
                     }
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule {
