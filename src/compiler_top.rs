@@ -41,12 +41,12 @@ impl Linker {
         if !config().ci {
             println!("Standard Library Directory: {STD_LIB_PATH}");
         }
-        let stl_path = PathBuf::from_str(STD_LIB_PATH).expect("Standard library directory is not a valid path?");
-        self.add_all_files_in_directory(&stl_path, info_mngr);
+        let std_path = PathBuf::from_str(STD_LIB_PATH).expect("Standard library directory is not a valid path?");
+        self.add_all_files_in_directory(&std_path, info_mngr);
 
         // Sanity check for the names the compiler knows internally. 
-        // They are defined in stl/core.sus
-        // Critically, stl/core.sus MUST be the first file to be loaded into the linker. Otherwise the IDs don't point to the correct objects
+        // They are defined in std/core.sus
+        // Critically, std/core.sus MUST be the first file to be loaded into the linker. Otherwise the IDs don't point to the correct objects
         assert_eq!(self.types[get_builtin_type!("int")].link_info.name, "int");
         assert_eq!(self.types[get_builtin_type!("bool")].link_info.name, "bool");
 

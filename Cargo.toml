@@ -12,7 +12,7 @@ keywords = ["sus", "fpga", "vlsi", "hdl", "verilog"]
 categories = ["compilers", "text-processing"]
 rust-version = "1.80"
 
-include = ["/src", "/stl/*", "/README.md", "/LICENSE", "/CHANGELOG.md", "/build.rs", "/rustfmt.toml"]
+include = ["/src", "/std/*", "/README.md", "/LICENSE", "/CHANGELOG.md", "/build.rs", "/rustfmt.toml"]
 
 [workspace]
 members = [

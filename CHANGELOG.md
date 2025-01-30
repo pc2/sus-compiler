@@ -18,10 +18,17 @@
 - Change sus stl installation directory to $HOME/.sus/VERSION/stl
 
 ## 0.2.0 (indev)
-- Add Type Inference
-- Add Generative Parameter Inference
+- Add Template Inference
+    - Type
+    - Generative Value
+    - Latency Count Inference
+- Add if/when distinction
+- Add `assert`, `clog2` and `sizeof`
+- Rename standard library: stl => std
 
 ### Technical Changes
 - Hindley-Milner for Concrete Typing
 - Submodule Instantiation done During Concrete Typing
 - tree-sitter-sus has been merged into sus-compiler and is no longer a separate repository
+- Rewrote HM Unifier because it didn't properly handle infinite types
+- Add test.sus_regression.sh testing to CI

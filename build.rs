@@ -3,11 +3,11 @@ use std::{fs, path::PathBuf};
 fn main() {
     let mut install_dir = get_sus_dir();
     install_dir.push(env!("CARGO_PKG_VERSION"));
-    install_dir.push("stl");
+    install_dir.push("std");
     
     fs::create_dir_all(&install_dir).expect("Failed to create std_lib directory");
 
-    copy_dir("stl", &install_dir).expect("Failed to copy STL folder");
+    copy_dir("std", &install_dir).expect("Failed to copy STD folder");
 
     // Print the path to make it available during the build
     println!("cargo:rustc-env=SUS_COMPILER_STD_LIB_PATH={}", install_dir.display());

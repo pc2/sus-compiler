@@ -78,7 +78,7 @@ pub fn get_builtin_type(token_stream: TokenStream) -> TokenStream {
 
     let object_name = string_literal.value();
 
-    let core_file_text = std::fs::read_to_string("stl/core.sus").unwrap();
+    let core_file_text = std::fs::read_to_string("std/core.sus").unwrap();
 
     let re = Regex::new(r"__builtin__\s+struct\s+([a-zA-Z0-9_]+)\s*(?:#\(.*\))?\s*\{").unwrap();
 
@@ -93,7 +93,7 @@ pub fn get_builtin_type(token_stream: TokenStream) -> TokenStream {
     
     quote_spanned!(
         string_literal.span() =>
-        compile_error!("Unknown builtin type was not found in stl/core.sus")
+        compile_error!("Unknown builtin type was not found in std/core.sus")
     ).into()
 }
 
@@ -103,7 +103,7 @@ pub fn get_builtin_const(token_stream: TokenStream) -> TokenStream {
 
     let object_name = string_literal.value();
 
-    let core_file_text = std::fs::read_to_string("stl/core.sus").unwrap();
+    let core_file_text = std::fs::read_to_string("std/core.sus").unwrap();
 
     let re = Regex::new(r"__builtin__\s+const\s+.+\s+([a-zA-Z0-9_]+)\s*(?:#\(.*\))?\s*\{").unwrap();
 
@@ -118,6 +118,6 @@ pub fn get_builtin_const(token_stream: TokenStream) -> TokenStream {
     
     quote_spanned!(
         string_literal.span() =>
-        compile_error!("Unknown builtin const was not found in stl/core.sus")
+        compile_error!("Unknown builtin const was not found in std/core.sus")
     ).into()
 }
