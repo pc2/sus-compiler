@@ -552,8 +552,21 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "STRING",
-          "value": "if"
+          "type": "FIELD",
+          "name": "statement_type",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "when"
+              },
+              {
+                "type": "STRING",
+                "value": "if"
+              }
+            ]
+          }
         },
         {
           "type": "FIELD",

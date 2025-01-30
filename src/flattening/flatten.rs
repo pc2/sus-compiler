@@ -1154,18 +1154,30 @@ impl<'l, 'errs> FlatteningContext<'l, 'errs> {
 
     fn flatten_if_statement(&mut self, cursor: &mut Cursor) {
         cursor.go_down(kind!("if_statement"), |cursor| {
+            cursor.field(field!("statement_type"));
+            let keyword_is_if = cursor.kind() == kw!("if");
+            let position_statement_keyword = cursor.span();
             cursor.field(field!("condition"));
             let (condition, condition_is_generative) = self.flatten_expr(cursor);
+            match(keyword_is_if, condition_is_generative){
+                (true, false) => {
+                    self.errors.warn(position_statement_keyword, "Used 'if' in a non generative context, use 'when' instead");
+                },
+                (false, true) => {
+                    self.errors.error(position_statement_keyword, "Used 'when' in a generative context, use 'if' instead");
+                },
+                (_, _) => ()
+            }
 
-            let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement {
+	    let if_id = self.instructions.alloc(Instruction::IfStatement(IfStatement {
                 condition,
-                is_generative: condition_is_generative,// TODO `if` vs `when` https://github.com/pc2/sus-compiler/issues/3
+                is_generative: keyword_is_if,
                 then_start: FlatID::PLACEHOLDER,
                 then_end_else_start: FlatID::PLACEHOLDER,
                 else_end: FlatID::PLACEHOLDER,
             }));
-            let then_start = self.instructions.get_next_alloc_id();
 
+            let then_start = self.instructions.get_next_alloc_id();
             cursor.field(field!("then_block"));
             self.flatten_code(cursor);
 

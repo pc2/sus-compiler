@@ -893,6 +893,20 @@
           }
         ]
       },
+      "statement_type": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "if",
+            "named": false
+          },
+          {
+            "type": "when",
+            "named": false
+          }
+        ]
+      },
       "then_block": {
         "multiple": false,
         "required": true,
@@ -1574,6 +1588,10 @@
   },
   {
     "type": "type",
+    "named": false
+  },
+  {
+    "type": "when",
     "named": false
   },
   {

@@ -76,7 +76,7 @@ module.exports = grammar({
             'const',
             field('const_type', $._type)
         ),
-        
+
         // Template Declaration
 
         template_declaration_arguments: $ => seq(
@@ -99,9 +99,9 @@ module.exports = grammar({
             newlineSepSeq($, choice(
                 $.block,
                 $.decl_assign_statement,
-    
-                // Decls should only allow a single declaration, and cannot contain expressions, 
-                // but we allow some tolerance in the grammar here, so we can generate better errors after. 
+
+                // Decls should only allow a single declaration, and cannot contain expressions,
+                // but we allow some tolerance in the grammar here, so we can generate better errors after.
                 $.assign_left_side,
                 $.if_statement,
                 $.for_statement,
@@ -130,7 +130,10 @@ module.exports = grammar({
         ),
 
         if_statement: $ => seq(
-            'if',
+            field('statement_type',choice(
+                'when',
+                'if'
+            )),
             field('condition', $._expression),
             //optional(field('conditional_bindings', $.interface_ports)),
             field('then_block', $.block),
@@ -158,7 +161,7 @@ module.exports = grammar({
             'domain',
             field('name', $.identifier),
         ),
-        
+
         interface_statement: $ => seq(
             'interface',//field('interface_kind', choice('action', 'query', 'trigger')),
             field('name', $.identifier),
@@ -268,7 +271,7 @@ module.exports = grammar({
             '.',
             field('name', $.identifier)
         )),
-        
+
         parenthesis_expression_list: $ => seq(
             '(',
             sepSeq($._expression, $._comma),
@@ -299,7 +302,7 @@ module.exports = grammar({
             // Template
             optional(field('template_args', $.template_args))
         ),
-        
+
         template_args: $ => seq(
             '#(',
             commaSepSeq($, $.template_arg),
@@ -345,3 +348,4 @@ module.exports = grammar({
         $.multi_line_comment
     ]
 });
+

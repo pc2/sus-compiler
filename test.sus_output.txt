@@ -121,6 +121,7 @@ TREE SITTER module! use_Iterator
 TREE SITTER module! UseSlice
 TREE SITTER module! UseBuiltinConstants
 TREE SITTER module! FailingAssert
+TREE SITTER module! IfTesting
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -234,6 +235,7 @@ Typechecking use_Iterator
 Typechecking UseSlice
 Typechecking UseBuiltinConstants
 Typechecking FailingAssert
+Typechecking IfTesting
 Instantiating IntToBits
 Concrete Typechecking IntToBits
 Latency Counting IntToBits

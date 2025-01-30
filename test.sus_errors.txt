@@ -1,3 +1,17 @@
+Warning: Unused Variable: This variable does not affect the output ports of this module
+    ╭─[util.sus:73:27]
+    │
+ 73 │     interface identity1 : T1 i1'0 -> T1 o1'0
+    │                              ─┬  
+    │                               ╰── Unused Variable: This variable does not affect the output ports of this module
+────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+    ╭─[util.sus:74:27]
+    │
+ 74 │     interface identity2 : T2 i2'OFFSET -> T2 o2'OFFSET
+    │                              ─┬  
+    │                               ╰── Unused Variable: This variable does not affect the output ports of this module
+────╯
 Error: 'contains_submodule_submodule' conflicts with other declarations:
      ╭─[test.sus:441:8]
      │
@@ -945,66 +959,66 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                 ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[test.sus:904:23]
+     ╭─[test.sus:904:25]
      │
- 904 │ ╭─▶     if decoder.is_jump() : int target_addr {
-     │ │                            ────────┬────────  
-     │ │                                    ╰────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+ 904 │ ╭─▶     when decoder.is_jump() : int target_addr {
+     │ │                              ────────┬────────  
+     │ │                                      ╰────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ┆ ┆   
  906 │ ├─▶     }
      │ │           
      │ ╰─────────── Parent node 'if_statement'
 ─────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[test.sus:907:23]
+     ╭─[test.sus:907:25]
      │
- 907 │ ╭─▶     if decoder.is_load() : int reg_to, int addr {
-     │ │                            ───────────┬──────────  
-     │ │                                       ╰──────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+ 907 │ ╭─▶     when decoder.is_load() : int reg_to, int addr {
+     │ │                              ───────────┬──────────  
+     │ │                                         ╰──────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ┆ ┆   
  909 │ ├─▶     }
      │ │           
      │ ╰─────────── Parent node 'if_statement'
 ─────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[test.sus:910:5]
+     ╭─[test.sus:910:7]
      │
- 910 │ ╭─▶     if decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │ │          ─────────────────────────┬─────────────────────────  
-     │ │                                   ╰─────────────────────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+ 910 │ ╭─▶     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │ │            ─────────────────────────┬─────────────────────────  
+     │ │                                     ╰─────────────────────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ┆ ┆   
  912 │ ├─▶     }
      │ │           
      │ ╰─────────── Parent node 'if_statement'
 ─────╯
 Error: A function called in this context may only return one result. Split this function call into a separate line instead.
-     ╭─[test.sus:904:5]
+     ╭─[test.sus:904:7]
      │
  893 │     interface is_jump
      │               ───┬───  
      │                  ╰───── Interface 'is_jump' defined here
      │ 
- 904 │     if decoder.is_jump() : int target_addr {
-     │        ────────┬────────  
-     │                ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
+ 904 │     when decoder.is_jump() : int target_addr {
+     │          ────────┬────────  
+     │                  ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
 ─────╯
 Error: A function called in this context may only return one result. Split this function call into a separate line instead.
-     ╭─[test.sus:907:5]
+     ╭─[test.sus:907:7]
      │
  894 │     interface is_load
      │               ───┬───  
      │                  ╰───── Interface 'is_load' defined here
      │ 
- 907 │     if decoder.is_load() : int reg_to, int addr {
-     │        ────────┬────────  
-     │                ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
+ 907 │     when decoder.is_load() : int reg_to, int addr {
+     │          ────────┬────────  
+     │                  ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
 ─────╯
 Error: No Global of the name 'op' was found. Did you forget to import it?
-     ╭─[test.sus:910:57]
+     ╭─[test.sus:910:59]
      │
- 910 │     if decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │                                                            ─┬  
-     │                                                             ╰── No Global of the name 'op' was found. Did you forget to import it?
+ 910 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │                                                              ─┬  
+     │                                                               ╰── No Global of the name 'op' was found. Did you forget to import it?
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[test.sus:900:42]
@@ -1180,87 +1194,87 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │           ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
-      ╭─[test.sus:1019:2]
+      ╭─[test.sus:1018:2]
       │
- 1017 │     input int bad_port
+ 1016 │     input int bad_port
       │           ──────┬─────  
       │                 ╰─────── A domain should be explicitly defined before this port
       │ 
- 1019 │     domain bad_domain
+ 1018 │     domain bad_domain
       │     ────────┬────────  
       │             ╰────────── When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[test.sus:1017:12]
+      ╭─[test.sus:1016:12]
       │
- 1017 │     input int bad_port
+ 1016 │     input int bad_port
       │               ────┬───  
       │                   ╰───── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Conflicting domain declaration. Domain 'my_domain' was already declared earlier
-      ╭─[test.sus:1028:9]
+      ╭─[test.sus:1027:9]
       │
- 1025 │     domain my_domain
+ 1024 │     domain my_domain
       │            ────┬────  
       │                ╰────── Domain 'my_domain' declared here
       │ 
- 1028 │     domain my_domain
+ 1027 │     domain my_domain
       │            ────┬────  
       │                ╰────── Conflicting domain declaration. Domain 'my_domain' was already declared earlier
 ──────╯
 Error: This declaration conflicts with a previous declaration in the same scope
-      ╭─[test.sus:1026:12]
+      ╭─[test.sus:1025:12]
       │
- 1025 │     domain my_domain
+ 1024 │     domain my_domain
       │            ────┬────  
       │                ╰────── Domain 'my_domain' declared here
- 1026 │     input int my_domain
+ 1025 │     input int my_domain
       │               ────┬────  
       │                   ╰────── This declaration conflicts with a previous declaration in the same scope
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[test.sus:1026:12]
+      ╭─[test.sus:1025:12]
       │
- 1026 │     input int my_domain
+ 1025 │     input int my_domain
       │               ────┬────  
       │                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not fully figure out the type of this object. type_variable_0
-      ╭─[test.sus:1038:2]
+      ╭─[test.sus:1037:2]
       │
- 1038 │     make_infinite_type_help mtinf
+ 1037 │     make_infinite_type_help mtinf
       │     ───────────┬───────────  
       │                ╰───────────── Could not fully figure out the type of this object. type_variable_0
 ──────╯
 Error: Could not fully figure out the type of this object. type_variable_0
-      ╭─[test.sus:1040:12]
+      ╭─[test.sus:1039:12]
       │
- 1040 │     mtinf.a = mtinf.b
+ 1039 │     mtinf.a = mtinf.b
       │               ───┬───  
       │                  ╰───── Could not fully figure out the type of this object. type_variable_0
 ──────╯
 Error: Could not fully figure out the type of this object. type_variable_0[]
-      ╭─[test.sus:1040:2]
+      ╭─[test.sus:1039:2]
       │
- 1040 │     mtinf.a = mtinf.b
+ 1039 │     mtinf.a = mtinf.b
       │     ───┬───  
       │        ╰───── Could not fully figure out the type of this object. type_variable_0[]
 ──────╯
 Error: Typing Error: connection: Creating Infinite Types is Forbidden! expects a type_variable_0[] but was given a type_variable_0
-      ╭─[test.sus:1040:12]
+      ╭─[test.sus:1039:12]
       │
- 1032 │     interface make_infinite_type_help: T[3] a -> T b
+ 1031 │     interface make_infinite_type_help: T[3] a -> T b
       │                                             ┬  
       │                                             ╰── 'a' declared here
       │ 
- 1040 │     mtinf.a = mtinf.b
+ 1039 │     mtinf.a = mtinf.b
       │               ───┬───  
       │                  ╰───── Typing Error: connection: Creating Infinite Types is Forbidden! expects a type_variable_0[] but was given a type_variable_0
 ──────╯
 Warning: Unused port 'ready'
-      ╭─[test.sus:1060:2]
+      ╭─[test.sus:1059:2]
       │
- 1060 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │     ──────────────────────┬────────────────────── ┬  
       │                           ╰────────────────────────── Unused port 'ready'
       │                                                   │  
@@ -1273,9 +1287,9 @@ Warning: Unused port 'ready'
       │                   ╰──── Port 'ready' declared here
 ──────╯
 Warning: Unused port 'push'
-      ╭─[test.sus:1060:2]
+      ╭─[test.sus:1059:2]
       │
- 1060 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │     ──────────────────────┬────────────────────── ┬  
       │                           ╰────────────────────────── Unused port 'push'
       │                                                   │  
@@ -1288,9 +1302,9 @@ Warning: Unused port 'push'
       │                             ╰─── Port 'push' declared here
 ──────╯
 Warning: Unused port 'data_in'
-      ╭─[test.sus:1060:2]
+      ╭─[test.sus:1059:2]
       │
- 1060 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │     ──────────────────────┬────────────────────── ┬  
       │                           ╰────────────────────────── Unused port 'data_in'
       │                                                   │  
@@ -1303,9 +1317,9 @@ Warning: Unused port 'data_in'
       │                                                  ╰───── Port 'data_in' declared here
 ──────╯
 Warning: Unused port 'pop'
-      ╭─[test.sus:1060:2]
+      ╭─[test.sus:1059:2]
       │
- 1060 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │     ──────────────────────┬────────────────────── ┬  
       │                           ╰────────────────────────── Unused port 'pop'
       │                                                   │  
@@ -1318,9 +1332,9 @@ Warning: Unused port 'pop'
       │                           ╰─── Port 'pop' declared here
 ──────╯
 Warning: Unused port 'data_valid'
-      ╭─[test.sus:1060:2]
+      ╭─[test.sus:1059:2]
       │
- 1060 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │     ──────────────────────┬────────────────────── ┬  
       │                           ╰────────────────────────── Unused port 'data_valid'
       │                                                   │  
@@ -1333,9 +1347,9 @@ Warning: Unused port 'data_valid'
       │                                           ╰────── Port 'data_valid' declared here
 ──────╯
 Warning: Unused port 'data_out'
-      ╭─[test.sus:1060:2]
+      ╭─[test.sus:1059:2]
       │
- 1060 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │     ──────────────────────┬────────────────────── ┬  
       │                           ╰────────────────────────── Unused port 'data_out'
       │                                                   │  
@@ -1347,24 +1361,59 @@ Warning: Unused port 'data_out'
       │                                                    ────┬───  
       │                                                        ╰───── Port 'data_out' declared here
 ──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[test.sus:1081:10]
+Warning: Used 'if' in a non generative context, use 'when' instead
+      ╭─[test.sus:1074:2]
       │
- 1081 │     int[20] arr
+ 1074 │     if iter_valid {
+      │     ─┬  
+      │      ╰── Used 'if' in a non generative context, use 'when' instead
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[test.sus:1080:10]
+      │
+ 1080 │     int[20] arr
       │             ─┬─  
       │              ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[test.sus:1083:9]
+      ╭─[test.sus:1082:9]
       │
- 1083 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
+ 1082 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
       │            ───┬──  
       │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Assertion failed
-      ╭─[test.sus:1098:14]
+      ╭─[test.sus:1097:14]
       │
- 1098 │     assert #(C: 15 + 3 == 19)
+ 1097 │     assert #(C: 15 + 3 == 19)
       │                 ──────┬─────  
       │                       ╰─────── Assertion failed
+──────╯
+Error: Used 'when' in a generative context, use 'if' instead
+      ╭─[test.sus:1108:9]
+      │
+ 1108 │         when WIDTH <= BASE_CASE_SIZE {
+      │         ──┬─  
+      │           ╰─── Used 'when' in a generative context, use 'if' instead
+──────╯
+Warning: Used 'if' in a non generative context, use 'when' instead
+      ╭─[test.sus:1111:25]
+      │
+ 1111 │                         if bits[I] {
+      │                         ─┬  
+      │                          ╰── Used 'if' in a non generative context, use 'when' instead
+──────╯
+Warning: Used 'if' in a non generative context, use 'when' instead
+      ╭─[test.sus:1113:32]
+      │
+ 1113 │                         } else if !bits[I] {
+      │                                ─┬  
+      │                                 ╰── Used 'if' in a non generative context, use 'when' instead
+──────╯
+Error: Used 'when' in a generative context, use 'if' instead
+      ╭─[test.sus:1118:16]
+      │
+ 1118 │         } else when WIDTH > BASE_CASE_SIZE {
+      │                ──┬─  
+      │                  ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
