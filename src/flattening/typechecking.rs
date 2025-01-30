@@ -22,16 +22,16 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
     for module_uuid in module_uuids {
         let global_id = GlobalUUID::Module(module_uuid);
         let errs_globals = GlobalResolver::take_errors_globals(linker, global_id);
-        let globals = GlobalResolver::new(linker, global_id, errs_globals);
 
-        let ctx_info_string = format!("Typechecking {}", &globals.obj_link_info.name);
+        let working_on: &Module = &linker.modules[module_uuid];
+        let globals = GlobalResolver::new(linker, &working_on.link_info, errs_globals);
+
+        let ctx_info_string = format!("Typechecking {}", &working_on.link_info.name);
         println!("{ctx_info_string}");
         let mut span_debugger = SpanDebugger::new(
             &ctx_info_string,
-            &linker.files[globals.obj_link_info.file],
+            &linker.files[working_on.link_info.file],
         );
-
-        let working_on: &Module = &linker.modules[module_uuid];
 
         let mut context = TypeCheckingContext {
             globals : &globals,

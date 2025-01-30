@@ -197,9 +197,11 @@ enum NamespaceElement {
     Colission(Box<[GlobalUUID]>),
 }
 
-/// The global object that collects all [Module]s, [StructType]s, and [NamedConstant]s that are in the SUS codebase. 
+/// The global singleton object that collects all [Module]s, [StructType]s, and [NamedConstant]s that are in the current SUS codebase. 
 /// 
 /// There should only be one [Linker] globally. 
+/// 
+/// See [LinkInfo], this contains shared data between all global objects in the whole progam. 
 /// 
 /// It also keeps track of the global namespace. 
 /// 
@@ -402,7 +404,6 @@ impl<'linker> FileBuilder<'linker> {
                     NamespaceElement::Global(g) => Box::new([*g, new_obj_id]),
                     NamespaceElement::Colission(coll) => {
                         let mut vec = std::mem::replace(coll, Box::new([])).into_vec();
-                        vec.reserve(1); // Make sure to only allocate one extra element
                         vec.push(new_obj_id);
                         vec.into_boxed_slice()
                     }

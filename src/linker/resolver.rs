@@ -48,7 +48,6 @@ struct LinkingErrorLocation {
 pub struct GlobalResolver<'linker> {
     linker: &'linker Linker,
     pub file_data: &'linker FileData,
-    pub obj_link_info: &'linker LinkInfo,
 
     pub errors: ErrorCollector<'linker>,
     resolved_globals: RefCell<ResolvedGlobals>
@@ -63,15 +62,12 @@ impl<'linker> GlobalResolver<'linker> {
 
         (errors, resolved_globals)
     }
-    pub fn new(linker: &'linker Linker, global_obj: GlobalUUID, errors_globals: (ErrorStore, ResolvedGlobals)) -> Self {
-        let obj_link_info = linker.get_link_info(global_obj);
-
+    pub fn new(linker: &'linker Linker, obj_link_info: &'linker LinkInfo, errors_globals: (ErrorStore, ResolvedGlobals)) -> Self {
         let file_data = &linker.files[obj_link_info.file];
 
         GlobalResolver {
             linker,
             file_data,
-            obj_link_info,
             errors: ErrorCollector::from_storage(errors_globals.0, obj_link_info.file, &linker.files),
             resolved_globals: RefCell::new(errors_globals.1),
         }

@@ -1570,7 +1570,8 @@ pub fn flatten_all_globals(linker: &mut Linker) {
 
 fn flatten_global(linker: &mut Linker, global_obj : GlobalUUID, cursor: &mut Cursor<'_>) {
     let errors_globals = GlobalResolver::take_errors_globals(linker, global_obj);
-    let globals = GlobalResolver::new(linker, global_obj, errors_globals);
+    let obj_link_info = linker.get_link_info(global_obj);
+    let globals = GlobalResolver::new(linker, obj_link_info, errors_globals);
 
     let mut local_variable_context = LocalVariableContext::new_initial();
 
