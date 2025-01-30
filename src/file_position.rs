@@ -76,8 +76,8 @@ impl Display for Span {
     }
 }
 
-/// A span for something that is between brackets. The assumption is that the brackets are 1 byte each. 
-/// 
+/// A span for something that is between brackets. The assumption is that the brackets are 1 byte each.
+///
 /// This struct is provided to improve readability on using these spans
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct BracketSpan(Span);

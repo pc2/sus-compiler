@@ -3,7 +3,7 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-/// Basically `Vec<Vec<T>>`, but reduces pointer chasing by laying the nested vectors all out sequentially. Read-only. 
+/// Basically `Vec<Vec<T>>`, but reduces pointer chasing by laying the nested vectors all out sequentially. Read-only.
 #[derive(Debug, Clone)]
 pub struct ListOfLists<T> {
     buf: Vec<T>,

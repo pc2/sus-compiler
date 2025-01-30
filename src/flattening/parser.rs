@@ -31,10 +31,10 @@ fn print_current_node_indented<'ft>(file_text: &'ft FileText, cursor: &TreeCurso
     node_name
 }
 
-/// Wraps the tree-sitter [TreeCursor] for a more functional-style interface. 
-/// 
-/// Especially with regards to going up and down the syntax tree, this module provides [Self::go_down] and friends. 
-/// 
+/// Wraps the tree-sitter [TreeCursor] for a more functional-style interface.
+///
+/// Especially with regards to going up and down the syntax tree, this module provides [Self::go_down] and friends.
+///
 /// This module also handles documentation comment gathering
 #[derive(Clone)]
 pub struct Cursor<'t> {

@@ -1,9 +1,11 @@
-
 use crate::{
-    flattening::{DeclarationKind, Instruction}, linker::IsExtern, typing::concrete_type::ConcreteType, FlatAlloc, InstantiatedModule, Linker, Module, WireIDMarker
+    flattening::{DeclarationKind, Instruction},
+    linker::IsExtern,
+    typing::concrete_type::ConcreteType,
+    FlatAlloc, InstantiatedModule, Linker, Module, WireIDMarker,
 };
-use std::ops::Deref;
 use std::fmt::Write;
+use std::ops::Deref;
 
 use super::shared::*;
 
@@ -17,7 +19,13 @@ impl super::CodeGenBackend for VHDLCodegenBackend {
     fn output_dir_name(&self) -> &str {
         "vhdl_output"
     }
-    fn codegen(&self, md: &Module, instance: &InstantiatedModule, linker: &Linker, use_latency: bool) -> String {
+    fn codegen(
+        &self,
+        md: &Module,
+        instance: &InstantiatedModule,
+        linker: &Linker,
+        use_latency: bool,
+    ) -> String {
         gen_vhdl_code(md, instance, use_latency)
     }
 }

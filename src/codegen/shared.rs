@@ -4,7 +4,11 @@ use std::borrow::Cow;
 
 use crate::instantiation::RealWire;
 
-pub fn wire_name_with_latency(wire: &RealWire, absolute_latency: i64, use_latency: bool) -> Cow<str> {
+pub fn wire_name_with_latency(
+    wire: &RealWire,
+    absolute_latency: i64,
+    use_latency: bool,
+) -> Cow<str> {
     assert!(wire.absolute_latency <= absolute_latency);
     if use_latency && (wire.absolute_latency != absolute_latency) {
         if absolute_latency < 0 {

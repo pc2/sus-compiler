@@ -8,14 +8,18 @@ use super::walk::for_each_generative_input_in_template_args;
 
 use super::{ExpressionSource, Instruction, Module, WireReferencePathElement, WireReferenceRoot};
 
-
 pub fn perform_lints(linker: &mut Linker) {
     for (_, md) in &mut linker.modules {
-        let errors = ErrorCollector::from_storage(md.link_info.errors.take(), md.link_info.file, &linker.files);
+        let errors = ErrorCollector::from_storage(
+            md.link_info.errors.take(),
+            md.link_info.file,
+            &linker.files,
+        );
         let resolved_globals = md.link_info.resolved_globals.take();
         find_unused_variables(md, &errors);
         extern_objects_may_not_have_type_template_args(&md.link_info, &errors);
-        md.link_info.reabsorb_errors_globals((errors, resolved_globals), AFTER_LINTS_CP);
+        md.link_info
+            .reabsorb_errors_globals((errors, resolved_globals), AFTER_LINTS_CP);
     }
 }
 
@@ -26,7 +30,10 @@ fn extern_objects_may_not_have_type_template_args(link_info: &LinkInfo, errors: 
     if link_info.is_extern == IsExtern::Extern {
         for (_id, arg) in &link_info.template_parameters {
             if let ParameterKind::Type(..) = &arg.kind {
-                errors.error(arg.name_span, "'extern' modules may not have 'type' arguments. Convert to bool[] first");
+                errors.error(
+                    arg.name_span,
+                    "'extern' modules may not have 'type' arguments. Convert to bool[] first",
+                );
             }
         }
     }
@@ -38,7 +45,7 @@ fn extern_objects_may_not_have_type_template_args(link_info: &LinkInfo, errors: 
 fn find_unused_variables(md: &Module, errors: &ErrorCollector) {
     match md.link_info.is_extern {
         IsExtern::Normal => {}
-        IsExtern::Extern | IsExtern::Builtin => {return} // Don't report unused variables for extern modules. 
+        IsExtern::Extern | IsExtern::Builtin => return, // Don't report unused variables for extern modules.
     }
 
     let instruction_fanins = make_fanins(&md.link_info.instructions);
@@ -89,13 +96,17 @@ fn find_unused_variables(md: &Module, errors: &ErrorCollector) {
     }
 }
 
-fn make_fanins(instructions: &FlatAlloc<Instruction, FlatIDMarker>) -> FlatAlloc<Vec<FlatID>, FlatIDMarker> {
+fn make_fanins(
+    instructions: &FlatAlloc<Instruction, FlatIDMarker>,
+) -> FlatAlloc<Vec<FlatID>, FlatIDMarker> {
     // Setup Wire Fanouts List for faster processing
     let mut instruction_fanins: FlatAlloc<Vec<FlatID>, FlatIDMarker> =
         instructions.map(|_| Vec::new());
 
     for (inst_id, inst) in instructions.iter() {
-        let mut collector_func = |id| {instruction_fanins[inst_id].push(id);};
+        let mut collector_func = |id| {
+            instruction_fanins[inst_id].push(id);
+        };
         match inst {
             Instruction::Write(conn) => {
                 if let Some(flat_root) = conn.to.root.get_root_flat() {

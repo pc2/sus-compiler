@@ -141,12 +141,17 @@ impl<'g> CodeGenerationContext<'g> {
         Ok(())
     }
 
-    fn comment_out(&mut self, f : impl FnOnce(&mut Self)) {
+    fn comment_out(&mut self, f: impl FnOnce(&mut Self)) {
         let store_program_text_temporary = std::mem::replace(&mut self.program_text, String::new());
         f(self);
         let added_text = std::mem::replace(&mut self.program_text, store_program_text_temporary);
 
-        write!(self.program_text, "// {}\n", added_text.replace("\n", "\n// ")).unwrap();
+        write!(
+            self.program_text,
+            "// {}\n",
+            added_text.replace("\n", "\n// ")
+        )
+        .unwrap();
     }
 
     fn write_verilog_code(&mut self) {
@@ -311,7 +316,11 @@ impl<'g> CodeGenerationContext<'g> {
             let sm_name = &sm.name;
             let submodule_clk_name = sm_md.get_clock_name();
             writeln!(self.program_text, " {sm_name}(").unwrap();
-            write!(self.program_text, "\t.{submodule_clk_name}({parent_clk_name})").unwrap();
+            write!(
+                self.program_text,
+                "\t.{submodule_clk_name}({parent_clk_name})"
+            )
+            .unwrap();
             for (port_id, iport) in sm_inst.interface_ports.iter_valids() {
                 let port_name =
                     wire_name_self_latency(&sm_inst.wires[iport.wire], self.use_latency);
@@ -344,9 +353,7 @@ impl<'g> CodeGenerationContext<'g> {
                 ConcreteType::Named(..) | ConcreteType::Array(..) => {
                     unreachable!("No extern module type arguments. Should have been caught by Lint")
                 }
-                ConcreteType::Value(value) => {
-                    value.inline_constant_to_string()
-                }
+                ConcreteType::Value(value) => value.inline_constant_to_string(),
                 ConcreteType::Unknown(_) => unreachable!("All args are known at codegen"),
             };
             if first {
@@ -370,7 +377,8 @@ impl<'g> CodeGenerationContext<'g> {
                     let output_name = wire_name_self_latency(w, self.use_latency);
                     let arrow_str = if is_state.is_some() {
                         let clk_name = self.md.get_clock_name();
-                        writeln!(self.program_text, "always_ff @(posedge {clk_name}) begin").unwrap();
+                        writeln!(self.program_text, "always_ff @(posedge {clk_name}) begin")
+                            .unwrap();
                         "<="
                     } else {
                         writeln!(self.program_text, "always_comb begin\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches").unwrap();

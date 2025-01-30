@@ -91,11 +91,7 @@ impl WrittenType {
 }
 
 #[derive(Debug)]
-pub struct AbstractTypeDisplay<
-    'a,
-    TypVec: ,
-    TemplateVec: TemplateNameGetter,
-> {
+pub struct AbstractTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
     inner: &'a AbstractType,
     linker_types: &'a TypVec,
     template_names: &'a TemplateVec,
@@ -313,8 +309,7 @@ pub fn pretty_print_concrete_instance(
         write!(result, "    {}: ", arg_in_target.name).unwrap();
         match arg {
             ConcreteType::Named(_) | ConcreteType::Array(_) => {
-                writeln!(result, "type {},", arg.display(linker_types))
-                .unwrap();
+                writeln!(result, "type {},", arg.display(linker_types)).unwrap();
             }
             ConcreteType::Value(value) => {
                 writeln!(result, "{value},").unwrap();

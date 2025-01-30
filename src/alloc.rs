@@ -8,9 +8,9 @@ use std::{
 };
 
 /// UUIDs are type-safe integers. They are used for [FlatAlloc] and [ArenaAllocator]
-/// 
-/// They don't support arithmetic, as they're just meant to represent pointers. 
-/// 
+///
+/// They don't support arithmetic, as they're just meant to represent pointers.
+///
 /// TODO add custom niche for more efficient Options, wait until custom niches are stabilized (https://internals.rust-lang.org/t/nonmaxusize-and-niche-value-optimisation/19661)
 /// Maybe use NonZeroUsize (https://doc.rust-lang.org/std/num/struct.NonZeroUsize.html)
 pub struct UUID<IndexMarker>(usize, PhantomData<IndexMarker>);
@@ -59,29 +59,29 @@ impl<IndexMarker> UUID<IndexMarker> {
 }
 
 pub struct UUIDAllocator<IndexMarker> {
-    cur : UUID<IndexMarker>
+    cur: UUID<IndexMarker>,
 }
 
 impl<IndexMarker> Clone for UUIDAllocator<IndexMarker> {
     fn clone(&self) -> Self {
-        Self { cur: self.cur.clone() }
+        Self {
+            cur: self.cur.clone(),
+        }
     }
 }
 
 impl<IndexMarker> UUIDAllocator<IndexMarker> {
     pub fn new() -> Self {
         Self {
-            cur: UUID(0, PhantomData)
+            cur: UUID(0, PhantomData),
         }
     }
     pub fn new_start_from(start: UUID<IndexMarker>) -> Self {
-        Self {
-            cur: start
-        }
+        Self { cur: start }
     }
     pub fn alloc(&mut self) -> UUID<IndexMarker> {
         let allocated_id = self.cur;
-        self.cur.0+=1;
+        self.cur.0 += 1;
         allocated_id
     }
     pub fn peek(&self) -> UUID<IndexMarker> {
@@ -101,7 +101,9 @@ impl<IndexMarker> UUIDAllocator<IndexMarker> {
 
 impl<IndexMarker: UUIDMarker> std::fmt::Debug for UUIDAllocator<IndexMarker> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        f.debug_struct("UUIDAllocator").field("count: ", &self.cur.0).finish()
+        f.debug_struct("UUIDAllocator")
+            .field("count: ", &self.cur.0)
+            .finish()
     }
 }
 
@@ -484,7 +486,7 @@ pub struct FlatAlloc<T, IndexMarker> {
 }
 
 impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
-    pub const EMPTY_FLAT_ALLOC : Self = Self::new();
+    pub const EMPTY_FLAT_ALLOC: Self = Self::new();
 
     pub const fn new() -> Self {
         Self {
@@ -498,12 +500,15 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
             _ph: PhantomData,
         }
     }
-    pub fn with_size(size: usize, v: T) -> Self where T: Clone {
+    pub fn with_size(size: usize, v: T) -> Self
+    where
+        T: Clone,
+    {
         let mut data = Vec::new();
         data.resize(size, v);
         Self {
             data,
-            _ph: PhantomData
+            _ph: PhantomData,
         }
     }
     pub fn get_next_alloc_id(&self) -> UUID<IndexMarker> {

@@ -66,7 +66,7 @@ fn cvt_location_list_of_lists(
         for span in vec {
             let range = span_to_lsp_range(&file.file_text, span);
             result.push(Location {
-                uri : uri.clone(),
+                uri: uri.clone(),
                 range,
             })
         }
@@ -78,17 +78,17 @@ impl Linker {
     fn find_uri(&self, uri: &Url) -> Option<FileUUID> {
         self.find_file(uri.as_str())
     }
-    fn update_text(&mut self, uri: &Url, new_file_text: String, manager : &mut LSPFileManager) {
+    fn update_text(&mut self, uri: &Url, new_file_text: String, manager: &mut LSPFileManager) {
         self.add_or_update_file(uri.as_str(), new_file_text, manager);
 
         self.recompile_all();
     }
-    fn ensure_contains_file(&mut self, uri: &Url, manager : &mut LSPFileManager) -> FileUUID {
+    fn ensure_contains_file(&mut self, uri: &Url, manager: &mut LSPFileManager) -> FileUUID {
         if let Some(found) = self.find_uri(uri) {
             found
         } else {
             let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
-            
+
             let file_uuid = self.add_file(uri.to_string(), file_text, manager);
             self.recompile_all();
             file_uuid
@@ -97,7 +97,7 @@ impl Linker {
     fn location_in_file(
         &mut self,
         text_pos: &lsp_types::TextDocumentPositionParams,
-        manager : &mut LSPFileManager,
+        manager: &mut LSPFileManager,
     ) -> (FileUUID, usize) {
         let file_id = self.ensure_contains_file(&text_pos.text_document.uri, manager);
         let file_data = &self.files[file_id];
@@ -114,7 +114,7 @@ impl Linker {
 fn convert_diagnostic(
     err: &CompileError,
     main_file_text: &FileText,
-    linker: &Linker
+    linker: &Linker,
 ) -> Diagnostic {
     assert!(
         main_file_text.is_span_valid(err.position),
@@ -168,11 +168,7 @@ fn push_all_errors(
         let mut diag_vec: Vec<Diagnostic> = Vec::new();
 
         linker.for_all_errors_in_file(file_id, |err| {
-            diag_vec.push(convert_diagnostic(
-                err,
-                &file_data.file_text,
-                &linker
-            ));
+            diag_vec.push(convert_diagnostic(err, &file_data.file_text, &linker));
         });
 
         let params = &PublishDiagnosticsParams {
@@ -195,20 +191,22 @@ fn push_all_errors(
 struct LSPFileManager {}
 
 impl LinkerExtraFileInfoManager for LSPFileManager {
-    fn convert_filename(&self, path : &PathBuf) -> String {
+    fn convert_filename(&self, path: &PathBuf) -> String {
         Url::from_file_path(path).unwrap().into()
     }
 }
 
 fn initialize_all_files(init_params: &InitializeParams) -> (Linker, LSPFileManager) {
     let mut linker = Linker::new();
-    let mut manager = LSPFileManager{};
+    let mut manager = LSPFileManager {};
 
     linker.add_standard_library(&mut manager);
 
     if let Some(workspace_folder) = &init_params.workspace_folders {
         for folder in workspace_folder {
-            let Ok(path) = folder.uri.to_file_path() else {continue};
+            let Ok(path) = folder.uri.to_file_path() else {
+                continue;
+            };
 
             linker.add_all_files_in_directory(&path, &mut manager);
         }
@@ -338,7 +336,7 @@ fn handle_request(
     method: &str,
     params: serde_json::Value,
     linker: &mut Linker,
-    manager : &mut LSPFileManager,
+    manager: &mut LSPFileManager,
 ) -> Result<serde_json::Value, serde_json::Error> {
     match method {
         request::HoverRequest::METHOD => {
@@ -351,8 +349,7 @@ fn handle_request(
             let file_data = &linker.files[file_uuid];
             let mut hover_list: Vec<MarkedString> = Vec::new();
 
-            let range = if let Some((location, info)) =
-                get_selected_object(linker, file_uuid, pos)
+            let range = if let Some((location, info)) = get_selected_object(linker, file_uuid, pos)
             {
                 if config().lsp_debug_mode {
                     hover_list.push(MarkedString::String(format!("{info:?}")))
@@ -378,10 +375,14 @@ fn handle_request(
 
             let mut goto_definition_list: Vec<SpanFile> = Vec::new();
 
-            if let Some((_location, info)) = get_selected_object(linker, file_uuid, pos)
-            {
+            if let Some((_location, info)) = get_selected_object(linker, file_uuid, pos) {
                 match info {
-                    LocationInfo::InGlobal(_obj_id, link_info, _decl_id, InGlobal::NamedLocal(decl)) => {
+                    LocationInfo::InGlobal(
+                        _obj_id,
+                        link_info,
+                        _decl_id,
+                        InGlobal::NamedLocal(decl),
+                    ) => {
                         goto_definition_list.push((decl.name_span, link_info.file));
                     }
                     LocationInfo::InGlobal(
@@ -422,8 +423,7 @@ fn handle_request(
             let uuid = linker.ensure_contains_file(&params.text_document.uri, manager);
 
             serde_json::to_value(SemanticTokensResult::Tokens(make_semantic_tokens(
-                uuid,
-                linker,
+                uuid, linker,
             )))
         }
         request::DocumentHighlightRequest::METHOD => {
@@ -431,7 +431,8 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("DocumentHighlight");
 
-            let (file_id, pos) = linker.location_in_file(&params.text_document_position_params, manager);
+            let (file_id, pos) =
+                linker.location_in_file(&params.text_document_position_params, manager);
             let file_data = &linker.files[file_id];
 
             let ref_locations = gather_all_references_in_one_file(linker, file_id, pos);
@@ -452,8 +453,7 @@ fn handle_request(
 
             let (file_id, pos) = linker.location_in_file(&params.text_document_position, manager);
 
-            let ref_locations =
-                gather_all_references_across_all_files(linker, file_id, pos);
+            let ref_locations = gather_all_references_across_all_files(linker, file_id, pos);
 
             serde_json::to_value(cvt_location_list_of_lists(ref_locations, linker))
         }
@@ -464,8 +464,7 @@ fn handle_request(
 
             let (file_id, pos) = linker.location_in_file(&params.text_document_position, manager);
 
-            let ref_locations_lists =
-                gather_all_references_across_all_files(linker, file_id, pos);
+            let ref_locations_lists = gather_all_references_across_all_files(linker, file_id, pos);
 
             let changes: HashMap<_, _> = ref_locations_lists
                 .into_iter()
@@ -497,12 +496,11 @@ fn handle_request(
                 serde_json::from_value(params).expect("JSON Encoding Error while parsing params");
             println!("Completion");
 
-            let (file_uuid, position) = linker.location_in_file(&params.text_document_position, manager);
+            let (file_uuid, position) =
+                linker.location_in_file(&params.text_document_position, manager);
 
             serde_json::to_value(&CompletionResponse::Array(gather_completions(
-                linker,
-                file_uuid,
-                position,
+                linker, file_uuid, position,
             )))
         }
         req => {
@@ -568,7 +566,8 @@ fn main_loop(
                     return Ok(());
                 }
 
-                let response_value = handle_request(&req.method, req.params, &mut linker, &mut manager);
+                let response_value =
+                    handle_request(&req.method, req.params, &mut linker, &mut manager);
 
                 let result = response_value.unwrap();
                 let response = lsp_server::Response {

@@ -6,11 +6,11 @@ use crate::flattening::{BinaryOperator, UnaryOperator};
 
 use crate::typing::{
     concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
-    type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor}
+    type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor},
 };
 
-/// Top type for any kind of compiletime value while executing. 
-/// 
+/// Top type for any kind of compiletime value while executing.
+///
 /// These are used during execution ([crate::instantiation::execute])
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
@@ -23,18 +23,23 @@ pub enum Value {
 }
 
 impl Value {
-    /// Traverses the Value, to create a best-effort [ConcreteType] for it. 
-    /// So '1' becomes [INT_CONCRETE_TYPE], 
+    /// Traverses the Value, to create a best-effort [ConcreteType] for it.
+    /// So '1' becomes [INT_CONCRETE_TYPE],
     /// but `Value::Array([])` becomes `ConcreteType::Array(ConcreteType::Unknown)`
-    /// 
+    ///
     /// Panics when arrays contain mutually incompatible types
-    pub fn get_type_best_effort(&self, type_substitutor: &mut TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>) -> ConcreteType {
+    pub fn get_type_best_effort(
+        &self,
+        type_substitutor: &mut TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
+    ) -> ConcreteType {
         match self {
             Value::Bool(_) => BOOL_CONCRETE_TYPE,
             Value::Integer(_) => INT_CONCRETE_TYPE,
             Value::Array(arr) => {
                 let mut arr_iter = arr.iter();
-                let Some(fst) = arr_iter.next() else {return ConcreteType::Unknown(type_substitutor.alloc())};
+                let Some(fst) = arr_iter.next() else {
+                    return ConcreteType::Unknown(type_substitutor.alloc());
+                };
                 let typ = fst.get_type_best_effort(type_substitutor);
 
                 for other in arr_iter {
@@ -42,7 +47,10 @@ impl Value {
                     assert!(other.is_of_type(&typ));
                 }
 
-                ConcreteType::Array(Box::new((typ, ConcreteType::Value(Value::Integer(arr.len().into())))))
+                ConcreteType::Array(Box::new((
+                    typ,
+                    ConcreteType::Value(Value::Integer(arr.len().into())),
+                )))
             }
             Value::Unset | Value::Error => unreachable!(),
         }
@@ -123,9 +131,7 @@ pub fn compute_unary_op(op: UnaryOperator, v: &Value) -> Value {
             todo!("Array Values")
         }
         UnaryOperator::Negate => {
-            let Value::Integer(v) = v else {
-                panic!()
-            };
+            let Value::Integer(v) = v else { panic!() };
             Value::Integer(-v)
         }
     }
@@ -139,27 +145,15 @@ pub fn compute_binary_op(left: &Value, op: BinaryOperator, right: &Value) -> Val
     match op {
         BinaryOperator::Equals => Value::Bool(left == right),
         BinaryOperator::NotEquals => Value::Bool(left != right),
-        BinaryOperator::GreaterEq => {
-            Value::Bool(left.unwrap_integer() >= right.unwrap_integer())
-        }
+        BinaryOperator::GreaterEq => Value::Bool(left.unwrap_integer() >= right.unwrap_integer()),
         BinaryOperator::Greater => Value::Bool(left.unwrap_integer() > right.unwrap_integer()),
-        BinaryOperator::LesserEq => {
-            Value::Bool(left.unwrap_integer() <= right.unwrap_integer())
-        }
+        BinaryOperator::LesserEq => Value::Bool(left.unwrap_integer() <= right.unwrap_integer()),
         BinaryOperator::Lesser => Value::Bool(left.unwrap_integer() < right.unwrap_integer()),
         BinaryOperator::Add => Value::Integer(left.unwrap_integer() + right.unwrap_integer()),
-        BinaryOperator::Subtract => {
-            Value::Integer(left.unwrap_integer() - right.unwrap_integer())
-        }
-        BinaryOperator::Multiply => {
-            Value::Integer(left.unwrap_integer() * right.unwrap_integer())
-        }
-        BinaryOperator::Divide => {
-            Value::Integer(left.unwrap_integer() / right.unwrap_integer())
-        }
-        BinaryOperator::Modulo => {
-            Value::Integer(left.unwrap_integer() % right.unwrap_integer())
-        }
+        BinaryOperator::Subtract => Value::Integer(left.unwrap_integer() - right.unwrap_integer()),
+        BinaryOperator::Multiply => Value::Integer(left.unwrap_integer() * right.unwrap_integer()),
+        BinaryOperator::Divide => Value::Integer(left.unwrap_integer() / right.unwrap_integer()),
+        BinaryOperator::Modulo => Value::Integer(left.unwrap_integer() % right.unwrap_integer()),
         BinaryOperator::And => Value::Bool(left.unwrap_bool() & right.unwrap_bool()),
         BinaryOperator::Or => Value::Bool(left.unwrap_bool() & right.unwrap_bool()),
         BinaryOperator::Xor => Value::Bool(left.unwrap_bool() & right.unwrap_bool()),
