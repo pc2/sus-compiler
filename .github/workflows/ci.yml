@@ -28,10 +28,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CARGO_INCREMENTAL: 0
+    steps:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
     - name: format
       run: cargo fmt --check
     - name: clippy
-      run: cargo clippy --check
+      run: cargo clippy -- -Dwarnings
