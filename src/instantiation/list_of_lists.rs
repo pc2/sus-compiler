@@ -3,12 +3,18 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-/// Basically `Vec<Vec<T>>`, but reduces pointer chasing by laying the nested vectors all out sequentially. Read-only. 
+/// Basically `Vec<Vec<T>>`, but reduces pointer chasing by laying the nested vectors all out sequentially. Read-only.
 #[derive(Debug, Clone)]
 pub struct ListOfLists<T> {
     buf: Vec<T>,
     // A list of #groups+1 offsets in buf array. The end of each one is the start of the next one. They are laid out sequentially
     start_ends: Vec<usize>,
+}
+
+impl<T> Default for ListOfLists<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T> ListOfLists<T> {
@@ -99,10 +105,8 @@ impl<T> ListOfLists<T> {
             cumulative_sum += found_value;
         }
 
-        let mut partially_initialize_buf: Vec<MaybeUninit<T>> = (0..cumulative_sum)
-            .into_iter()
-            .map(|_| MaybeUninit::uninit())
-            .collect();
+        let mut partially_initialize_buf: Vec<MaybeUninit<T>> =
+            (0..cumulative_sum).map(|_| MaybeUninit::uninit()).collect();
 
         for (to_idx, data) in iter {
             let found_idx = &mut start_ends[to_idx + 1];
@@ -148,12 +152,12 @@ impl<T: Clone> ListOfLists<T> {
     pub fn from_slice_slice(slice_slice: &[&[T]]) -> Self {
         slice_slice
             .iter()
-            .map(|sub_slice| sub_slice.into_iter().cloned())
+            .map(|sub_slice| sub_slice.iter().cloned())
             .collect()
     }
 }
 
-impl<'a, T> Index<usize> for ListOfLists<T> {
+impl<T> Index<usize> for ListOfLists<T> {
     type Output = [T];
 
     fn index(&self, index: usize) -> &[T] {
@@ -162,7 +166,7 @@ impl<'a, T> Index<usize> for ListOfLists<T> {
     }
 }
 
-impl<'a, T> IndexMut<usize> for ListOfLists<T> {
+impl<T> IndexMut<usize> for ListOfLists<T> {
     fn index_mut(&mut self, index: usize) -> &mut [T] {
         assert!(index < self.len());
         &mut self.buf[self.start_ends[index]..self.start_ends[index + 1]]
@@ -180,9 +184,7 @@ impl<'a, T> Iterator for ListOfListsFlatOriginIter<'a, T> {
     type Item = (usize, &'a T);
 
     fn next(&mut self) -> Option<(usize, &'a T)> {
-        let Some((idx, item)) = self.buf_iter.next() else {
-            return None;
-        };
+        let (idx, item) = self.buf_iter.next()?;
 
         // Skip through blocks of 0 size
         while idx == self.ends[self.cur_slice_idx] {
@@ -203,9 +205,7 @@ impl<'a, T> Iterator for ListOfListsFlatOriginIterMut<'a, T> {
     type Item = (usize, &'a mut T);
 
     fn next(&mut self) -> Option<(usize, &'a mut T)> {
-        let Some((idx, item)) = self.buf_iter.next() else {
-            return None;
-        };
+        let (idx, item) = self.buf_iter.next()?;
 
         // Skip through blocks of 0 size
         while idx == self.ends[self.cur_slice_idx] {
@@ -264,7 +264,7 @@ impl<'a, T> IntoIterator for &'a ListOfLists<T> {
         ListOfListsIter {
             buf: &self.buf,
             start: 0,
-            ends_iter: self.start_ends[1..].into_iter(),
+            ends_iter: self.start_ends[1..].iter(),
         }
     }
 }
@@ -278,7 +278,7 @@ impl<'a, T> IntoIterator for &'a mut ListOfLists<T> {
         ListOfListsIterMut {
             buf: &mut self.buf,
             start: 0,
-            ends_iter: self.start_ends[1..].into_iter(),
+            ends_iter: self.start_ends[1..].iter(),
         }
     }
 }

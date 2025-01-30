@@ -6,9 +6,7 @@ use crate::typing::template::ParameterKind;
 use crate::typing::type_inference::{FailedUnification, HindleyMilner};
 
 use crate::debug::SpanDebugger;
-use crate::linker::{
-    GlobalResolver, GlobalUUID, AFTER_TYPECHECK_CP
-};
+use crate::linker::{GlobalResolver, GlobalUUID, AFTER_TYPECHECK_CP};
 
 use crate::typing::{
     abstract_type::{DomainType, TypeUnifier, BOOL_TYPE, INT_TYPE},
@@ -18,7 +16,7 @@ use crate::typing::{
 use super::*;
 
 pub fn typecheck_all_modules(linker: &mut Linker) {
-    let module_uuids : Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
+    let module_uuids: Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
     for module_uuid in module_uuids {
         let global_id = GlobalUUID::Module(module_uuid);
         let errs_globals = GlobalResolver::take_errors_globals(linker, global_id);
@@ -28,17 +26,15 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
 
         let ctx_info_string = format!("Typechecking {}", &working_on.link_info.name);
         println!("{ctx_info_string}");
-        let mut span_debugger = SpanDebugger::new(
-            &ctx_info_string,
-            &linker.files[working_on.link_info.file],
-        );
+        let mut span_debugger =
+            SpanDebugger::new(&ctx_info_string, &linker.files[working_on.link_info.file]);
 
         let mut context = TypeCheckingContext {
-            globals : &globals,
+            globals: &globals,
             errors: &globals.errors,
             type_checker: TypeUnifier::new(
                 &working_on.link_info.template_parameters,
-                working_on.link_info.type_variable_alloc.clone()
+                working_on.link_info.type_variable_alloc.clone(),
             ),
             runtime_condition_stack: Vec::new(),
             working_on: &working_on.link_info,
@@ -51,10 +47,17 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
 
         // Grab another mutable copy of md so it doesn't force a borrow conflict
         let working_on_mut = &mut linker.modules[module_uuid];
-        apply_types(type_checker, working_on_mut, &errs_and_globals.0, &linker.types);
+        apply_types(
+            type_checker,
+            working_on_mut,
+            &errs_and_globals.0,
+            &linker.types,
+        );
 
-        working_on_mut.link_info.reabsorb_errors_globals(errs_and_globals, AFTER_TYPECHECK_CP);
-        
+        working_on_mut
+            .link_info
+            .reabsorb_errors_globals(errs_and_globals, AFTER_TYPECHECK_CP);
+
         span_debugger.defuse();
     }
 }
@@ -73,7 +76,7 @@ struct TypeCheckingContext<'l, 'errs> {
     runtime_condition_stack: Vec<ConditionStackElem>,
 }
 
-impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
+impl TypeCheckingContext<'_, '_> {
     fn get_decl_of_module_port(
         &self,
         port: PortID,
@@ -95,17 +98,19 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         let port_interface = submodule_module.ports[port].domain;
         let port_local_domain = submodule_inst.local_interface_domains[port_interface];
         let typ = AbstractType::Unknown(self.type_checker.alloc_typ_variable());
-        self.type_checker.unify_with_written_type_substitute_templates_must_succeed(&decl.typ_expr, &typ, &submodule_inst.module_ref.template_arg_types);
+        self.type_checker
+            .unify_with_written_type_substitute_templates_must_succeed(
+                &decl.typ_expr,
+                &typ,
+                &submodule_inst.module_ref.template_arg_types,
+            );
         FullType {
             typ,
-            domain: port_local_domain.clone(),
+            domain: port_local_domain,
         }
     }
 
-    fn get_wire_ref_info(
-        &self,
-        wire_ref_root: &WireReferenceRoot,
-    ) -> ErrorInfo {
+    fn get_wire_ref_info(&self, wire_ref_root: &WireReferenceRoot) -> ErrorInfo {
         match wire_ref_root {
             WireReferenceRoot::LocalDecl(id, _) => {
                 let decl_root = self.working_on.instructions[*id].unwrap_declaration();
@@ -113,7 +118,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
             WireReferenceRoot::NamedConstant(cst) => {
                 let linker_cst = &self.globals[cst.id];
-                linker_cst.link_info.make_global_info(&self.errors.files)
+                linker_cst.link_info.make_global_info(self.errors.files)
             }
             WireReferenceRoot::SubModulePort(port) => {
                 let (decl, file) = self.get_decl_of_module_port(port.port, port.submodule_decl);
@@ -122,22 +127,27 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     }
 
-    /// Wire references are used in two contexts: 
+    /// Wire references are used in two contexts:
     /// - Reading from a wire
     /// - Writing to a wire
-    /// 
+    ///
     /// The AbstractTypes just get unified
-    /// 
-    /// But the domains behave differently. 
-    /// - Reading: 
-    ///     The domains combine to form the lowest common denominator. 
+    ///
+    /// But the domains behave differently.
+    /// - Reading:
+    ///     The domains combine to form the lowest common denominator.
     ///     If all are generative this becomes generative
     ///     At least one non-generative domain makes the whole thing non-generative
     ///     It should be supplied with a generative output_typ domain when generative, and an unknown domain variable otherwise
-    /// - Writing: 
+    /// - Writing:
     ///     The output_typ domain should be generative when wire_ref.root is generative, or a generative value is required such as with "initial"
     ///     When wire_ref.root is not generative, it should be an unknown domain variable
-    fn typecheck_wire_reference(&self, wire_ref: &WireReference, whole_span: Span, output_typ: &FullType) {
+    fn typecheck_wire_reference(
+        &self,
+        wire_ref: &WireReference,
+        whole_span: Span,
+        output_typ: &FullType,
+    ) {
         let root_type = match &wire_ref.root {
             WireReferenceRoot::LocalDecl(id, _) => {
                 let decl_root = self.working_on.instructions[*id].unwrap_declaration();
@@ -145,45 +155,67 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
             WireReferenceRoot::NamedConstant(cst) => {
                 self.typecheck_template_global(cst);
-                
+
                 let linker_cst = &self.globals[cst.id];
-                let decl = linker_cst.link_info.instructions[linker_cst.output_decl].unwrap_declaration();
+                let decl =
+                    linker_cst.link_info.instructions[linker_cst.output_decl].unwrap_declaration();
                 let typ = AbstractType::Unknown(self.type_checker.alloc_typ_variable());
-                self.type_checker.unify_with_written_type_substitute_templates_must_succeed(&decl.typ_expr, &typ, &cst.template_arg_types);
+                self.type_checker
+                    .unify_with_written_type_substitute_templates_must_succeed(
+                        &decl.typ_expr,
+                        &typ,
+                        &cst.template_arg_types,
+                    );
                 FullType {
                     typ,
-                    domain: DomainType::Generative
+                    domain: DomainType::Generative,
                 }
             }
             WireReferenceRoot::SubModulePort(port) => {
                 self.get_type_of_port(port.port, port.submodule_decl)
             }
         };
-        self.type_checker.unify_domains(&root_type.domain, &output_typ.domain, whole_span, "wire reference root with root type");
-        
+        self.type_checker.unify_domains(
+            &root_type.domain,
+            &output_typ.domain,
+            whole_span,
+            "wire reference root with root type",
+        );
+
         let mut current_type_in_progress = root_type.typ;
         for p in &wire_ref.path {
             match p {
                 &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
                     let idx_expr = self.working_on.instructions[idx].unwrap_expression();
 
-                    let new_resulting_variable = AbstractType::Unknown(self.type_checker.alloc_typ_variable());
+                    let new_resulting_variable =
+                        AbstractType::Unknown(self.type_checker.alloc_typ_variable());
                     let arr_span = bracket_span.outer_span();
                     self.type_checker.typecheck_array_access(
                         &current_type_in_progress,
                         &idx_expr.typ.typ,
                         arr_span,
                         idx_expr.span,
-                        &new_resulting_variable
+                        &new_resulting_variable,
                     );
 
-                    self.type_checker.unify_domains(&idx_expr.typ.domain, &output_typ.domain, idx_expr.span, "array access index");
+                    self.type_checker.unify_domains(
+                        &idx_expr.typ.domain,
+                        &output_typ.domain,
+                        idx_expr.span,
+                        "array access index",
+                    );
                     current_type_in_progress = new_resulting_variable;
                 }
             }
         }
 
-        self.type_checker.type_substitutor.unify_report_error(&current_type_in_progress, &output_typ.typ, whole_span, "variable reference");
+        self.type_checker.type_substitutor.unify_report_error(
+            &current_type_in_progress,
+            &output_typ.typ,
+            whole_span,
+            "variable reference",
+        );
     }
 
     fn control_flow_visit_instruction(&mut self, inst_id: FlatID) {
@@ -199,8 +231,10 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
             }
             Instruction::FuncCall(_) => {}
             Instruction::Declaration(decl) => {
-                // For both runtime, and compiletime declarations. 
-                decl.declaration_runtime_depth.set(self.runtime_condition_stack.len()).unwrap();
+                // For both runtime, and compiletime declarations.
+                decl.declaration_runtime_depth
+                    .set(self.runtime_condition_stack.len())
+                    .unwrap();
             }
             Instruction::Expression(_) => {}
             Instruction::Write(conn) => {
@@ -215,11 +249,13 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         (decl, self.errors.file)
                     }
                     WireReferenceRoot::NamedConstant(cst) => {
-                        self.errors.error(cst.name_span, "Cannot assign to a global");
+                        self.errors
+                            .error(cst.name_span, "Cannot assign to a global");
                         return;
                     }
                     WireReferenceRoot::SubModulePort(port) => {
-                        let module_port_decl = self.get_decl_of_module_port(port.port, port.submodule_decl);
+                        let module_port_decl =
+                            self.get_decl_of_module_port(port.port, port.submodule_decl);
 
                         if !module_port_decl.0.decl_kind.is_io_port().unwrap() {
                             self.errors
@@ -239,17 +275,15 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         if decl.identifier_type.is_generative() {
                             // Check that this generative declaration isn't used in a non-compiletime if
                             if let Some(root_flat) = conn.to.root.get_root_flat() {
-                                let to_decl = self.working_on.instructions[root_flat]
-                                    .unwrap_declaration();
+                                let to_decl =
+                                    self.working_on.instructions[root_flat].unwrap_declaration();
 
-                                let found_decl_depth = *to_decl.declaration_runtime_depth.get().unwrap();
-                                if self.runtime_condition_stack.len() > found_decl_depth
-                                {
+                                let found_decl_depth =
+                                    *to_decl.declaration_runtime_depth.get().unwrap();
+                                if self.runtime_condition_stack.len() > found_decl_depth {
                                     let err_ref = self.errors.error(conn.to_span, "Cannot write to generative variables in runtime conditional block");
                                     err_ref.info_obj_different_file(decl, file);
-                                    for elem in &self.runtime_condition_stack
-                                        [found_decl_depth..]
-                                    {
+                                    for elem in &self.runtime_condition_stack[found_decl_depth..] {
                                         err_ref.info((elem.span, file), "Runtime condition here");
                                     }
                                 }
@@ -269,12 +303,13 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                 }
             }
             Instruction::IfStatement(if_stmt) => {
-                let condition_expr = self.working_on.instructions[if_stmt.condition].unwrap_expression();
+                let condition_expr =
+                    self.working_on.instructions[if_stmt.condition].unwrap_expression();
                 if !condition_expr.typ.domain.is_generative() {
                     self.runtime_condition_stack.push(ConditionStackElem {
                         ends_at: if_stmt.else_end,
                         span: condition_expr.span,
-                        domain: condition_expr.typ.domain.clone(),
+                        domain: condition_expr.typ.domain,
                     });
                 }
             }
@@ -292,17 +327,17 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         for (parameter_id, argument_type) in &global_ref.template_arg_types {
             let parameter = &target_link_info.template_parameters[parameter_id];
             match &parameter.kind {
-                ParameterKind::Type(_) => {} // Do nothing, nothing to unify with. Maybe in the future traits? 
+                ParameterKind::Type(_) => {} // Do nothing, nothing to unify with. Maybe in the future traits?
                 ParameterKind::Generative(parameter) => {
-                    let decl = target_link_info.instructions[parameter.declaration_instruction].unwrap_declaration();
+                    let decl = target_link_info.instructions[parameter.declaration_instruction]
+                        .unwrap_declaration();
 
-                    self.type_checker.unify_with_written_type_substitute_templates_must_succeed(
-                        &decl.typ_expr,
-                        &argument_type,
-                        &global_ref.template_arg_types // Yes that's right. We already must substitute the templates for type variables here
-                    );
-
-
+                    self.type_checker
+                        .unify_with_written_type_substitute_templates_must_succeed(
+                            &decl.typ_expr,
+                            argument_type,
+                            &global_ref.template_arg_types, // Yes that's right. We already must substitute the templates for type variables here
+                        );
                 }
             }
 
@@ -311,16 +346,17 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     TemplateArgKind::Type(wr_typ) => {
                         self.typecheck_written_type(wr_typ);
                         // This slot will not have been filled out yet
-                        self.type_checker.unify_with_written_type_must_succeed(wr_typ, argument_type);
+                        self.type_checker
+                            .unify_with_written_type_must_succeed(wr_typ, argument_type);
                     }
                     TemplateArgKind::Value(val) => {
                         let argument_expr = self.working_on.instructions[*val].unwrap_expression();
 
                         self.type_checker.typecheck_write_to_abstract(
                             &argument_expr.typ.typ,
-                            &argument_type,
+                            argument_type,
                             argument_expr.span,
-                            "generative template argument"
+                            "generative template argument",
                         );
                     }
                 }
@@ -328,10 +364,10 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         }
     }
 
-    /// Critically, this is different from [TypeUnifier::unify_with_written_type]. 
-    /// That one unifies a given typ with the written type, without checking the written type. 
-    /// 
-    /// This function checks the written type itself. 
+    /// Critically, this is different from [TypeUnifier::unify_with_written_type].
+    /// That one unifies a given typ with the written type, without checking the written type.
+    ///
+    /// This function checks the written type itself.
     fn typecheck_written_type(&self, wr_typ: &WrittenType) {
         match wr_typ {
             WrittenType::Error(_) => {}
@@ -349,7 +385,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     &idx_expr.typ.typ,
                     &INT_TYPE,
                     idx_expr.span,
-                    "array size"
+                    "array size",
                 );
             }
         }
@@ -365,7 +401,12 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     /// outside of a condition block
     fn join_with_condition(&self, ref_domain: &DomainType, span: Span) {
         if let Some(condition_domain) = self.get_current_condition_domain() {
-            self.type_checker.unify_domains(ref_domain, &condition_domain.0, span, "condition join");
+            self.type_checker.unify_domains(
+                ref_domain,
+                &condition_domain.0,
+                span,
+                "condition join",
+            );
         }
     }
 
@@ -382,22 +423,24 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         &latency_specifier_expr.typ.typ,
                         &INT_TYPE,
                         latency_specifier_expr.span,
-                        "latency specifier"
+                        "latency specifier",
                     );
                 }
-                
+
                 self.typecheck_written_type(&decl.typ_expr);
 
                 // Unify with the type written in the source code
-                self.type_checker.unify_with_written_type_must_succeed(&decl.typ_expr, &decl.typ.typ);
+                self.type_checker
+                    .unify_with_written_type_must_succeed(&decl.typ_expr, &decl.typ.typ);
             }
             Instruction::IfStatement(stm) => {
-                let condition_expr = &self.working_on.instructions[stm.condition].unwrap_expression();
+                let condition_expr =
+                    &self.working_on.instructions[stm.condition].unwrap_expression();
                 self.type_checker.typecheck_write_to_abstract(
                     &condition_expr.typ.typ,
                     &BOOL_TYPE,
                     condition_expr.span,
-                    "if statement condition"
+                    "if statement condition",
                 );
             }
             Instruction::ForStatement(stm) => {
@@ -409,13 +452,13 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     &start.typ.typ,
                     &loop_var.typ.typ,
                     start.span,
-                    "for loop start"
+                    "for loop start",
                 );
                 self.type_checker.typecheck_write_to_abstract(
                     &end.typ.typ,
                     &loop_var.typ.typ,
                     end.span,
-                    "for loop end"
+                    "for loop end",
                 );
             }
             Instruction::Expression(expr) => {
@@ -429,7 +472,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                             op,
                             &right_expr.typ,
                             &expr.typ,
-                            right_expr.span
+                            right_expr.span,
                         );
                     }
                     &ExpressionSource::BinaryOp { op, left, right } => {
@@ -441,10 +484,13 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                             &right_expr.typ,
                             left_expr.span,
                             right_expr.span,
-                            &expr.typ
+                            &expr.typ,
                         )
                     }
-                    ExpressionSource::Constant(value) => self.type_checker.unify_with_constant(&expr.typ.typ, value, expr.span),
+                    ExpressionSource::Constant(value) => {
+                        self.type_checker
+                            .unify_with_constant(&expr.typ.typ, value, expr.span)
+                    }
                 };
             }
             Instruction::FuncCall(fc) => {
@@ -464,8 +510,11 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                         &write_to_type,
                         from_expr.span,
                         || {
-                            ("function argument".to_string(), vec![decl.make_info(file).unwrap()])
-                        }
+                            (
+                                "function argument".to_string(),
+                                vec![decl.make_info(file).unwrap()],
+                            )
+                        },
                     );
                 }
             }
@@ -484,12 +533,12 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
                     from_expr.span,
                     || {
                         let write_context = match conn.write_modifiers {
-                            WriteModifiers::Connection {..} => "connection",
-                            WriteModifiers::Initial { initial_kw_span: _ } => "initial value"
+                            WriteModifiers::Connection { .. } => "connection",
+                            WriteModifiers::Initial { initial_kw_span: _ } => "initial value",
                         };
                         let declared_here = self.get_wire_ref_info(&conn.to.root);
                         (write_context.to_string(), vec![declared_here])
-                    }
+                    },
                 );
             }
         }
@@ -500,7 +549,7 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
         Some((last.domain, last.span))
     }
 
-    /// Should be followed up by a [apply_types] call to actually apply all the checked types. 
+    /// Should be followed up by a [apply_types] call to actually apply all the checked types.
     fn typecheck(&mut self) {
         for elem_id in self.working_on.instructions.id_range() {
             self.control_flow_visit_instruction(elem_id);
@@ -509,30 +558,35 @@ impl<'l, 'errs> TypeCheckingContext<'l, 'errs> {
     }
 }
 
-
 // ====== Free functions for actually applying the result of type checking ======
 
 pub fn apply_types(
     mut type_checker: TypeUnifier,
     working_on: &mut Module,
     errors: &ErrorCollector,
-    types: &ArenaAllocator<StructType, TypeUUIDMarker>
+    types: &ArenaAllocator<StructType, TypeUUIDMarker>,
 ) {
-    // Set the remaining domain variables that aren't associated with a module port. 
-    // We just find domain IDs that haven't been 
-    let mut leftover_domain_alloc = UUIDAllocator::new_start_from(working_on.domains.get_next_alloc_id());
+    // Set the remaining domain variables that aren't associated with a module port.
+    // We just find domain IDs that haven't been
+    let mut leftover_domain_alloc =
+        UUIDAllocator::new_start_from(working_on.domains.get_next_alloc_id());
     for d in type_checker.domain_substitutor.iter() {
         if d.get().is_none() {
-            assert!(d.set(DomainType::Physical(leftover_domain_alloc.alloc())).is_ok());
+            assert!(d
+                .set(DomainType::Physical(leftover_domain_alloc.alloc()))
+                .is_ok());
         }
     }
 
     // Assign names to all of the domains in this module
-    working_on.domains = leftover_domain_alloc.into_range().map(|id| {
+    working_on.domains = leftover_domain_alloc.as_range().map(|id| {
         if let Some(work_on_domain) = working_on.domains.get(id) {
             work_on_domain.clone()
         } else {
-            DomainInfo {name: format!("domain_{}", id.get_hidden_value()), name_span: None}
+            DomainInfo {
+                name: format!("domain_{}", id.get_hidden_value()),
+                name_span: None,
+            }
         }
     });
 
@@ -547,16 +601,25 @@ pub fn apply_types(
                     }
                 }
             }
-            Instruction::Declaration(decl) => type_checker.finalize_type(types, &mut decl.typ, decl.name_span, errors),
-            Instruction::Write(Write { to_type, to_span, to, .. }) => {
+            Instruction::Declaration(decl) => {
+                type_checker.finalize_type(types, &mut decl.typ, decl.name_span, errors)
+            }
+            Instruction::Write(Write {
+                to_type,
+                to_span,
+                to,
+                ..
+            }) => {
                 type_checker.finalize_type(types, to_type, *to_span, errors);
                 if let WireReferenceRoot::NamedConstant(cst) = &mut to.root {
                     type_checker.finalize_global_ref(types, cst, errors);
                 }
             }
-            // TODO Submodule domains may not be crossed either? 
+            // TODO Submodule domains may not be crossed either?
             Instruction::SubModule(sm) => {
-                for (_domain_id_in_submodule, domain_assigned_to_it_here) in &mut sm.local_interface_domains {
+                for (_domain_id_in_submodule, domain_assigned_to_it_here) in
+                    &mut sm.local_interface_domains
+                {
                     type_checker.finalize_domain_type(domain_assigned_to_it_here);
                 }
                 type_checker.finalize_global_ref(types, &mut sm.module_ref, errors);
@@ -566,13 +629,24 @@ pub fn apply_types(
     }
 
     // Print all errors
-    for FailedUnification{mut found, mut expected, span, context, infos} in type_checker.type_substitutor.extract_errors() {
+    for FailedUnification {
+        mut found,
+        mut expected,
+        span,
+        context,
+        infos,
+    } in type_checker.type_substitutor.extract_errors()
+    {
         // Not being able to fully substitute is not an issue. We just display partial types
         let _ = found.fully_substitute(&type_checker.type_substitutor);
         let _ = expected.fully_substitute(&type_checker.type_substitutor);
 
-        let expected_name = expected.display(types, &type_checker.template_type_names).to_string();
-        let found_name = found.display(types, &type_checker.template_type_names).to_string();
+        let expected_name = expected
+            .display(types, &type_checker.template_type_names)
+            .to_string();
+        let found_name = found
+            .display(types, &type_checker.template_type_names)
+            .to_string();
         errors
             .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
             .add_info_list(infos);
@@ -582,7 +656,14 @@ pub fn apply_types(
             "{expected_name} != {found_name}"
         );
     }
-    for FailedUnification{mut found, mut expected, span, context, infos} in type_checker.domain_substitutor.extract_errors() {
+    for FailedUnification {
+        mut found,
+        mut expected,
+        span,
+        context,
+        infos,
+    } in type_checker.domain_substitutor.extract_errors()
+    {
         assert!(found.fully_substitute(&type_checker.domain_substitutor));
         assert!(expected.fully_substitute(&type_checker.domain_substitutor));
 

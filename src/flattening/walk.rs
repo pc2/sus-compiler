@@ -2,7 +2,7 @@ use crate::typing::template::{TVec, TemplateArg, TemplateArgKind};
 
 use crate::prelude::*;
 
-use super::{WireReferencePathElement, WireReferenceRoot, ExpressionSource, WrittenType};
+use super::{ExpressionSource, WireReferencePathElement, WireReferenceRoot, WrittenType};
 
 impl ExpressionSource {
     /// Enumerates all instructions that this instruction depends on. This includes (maybe compiletime) wires, and submodules.
@@ -13,10 +13,12 @@ impl ExpressionSource {
                     WireReferenceRoot::LocalDecl(decl_id, _) => func(*decl_id),
                     WireReferenceRoot::NamedConstant(cst) => {
                         for (_id, arg) in &cst.template_args {
-                            let Some(arg) = arg else {continue};
+                            let Some(arg) = arg else { continue };
                             match &arg.kind {
-                                TemplateArgKind::Type(written_type) => written_type.for_each_generative_input(func),
-                                TemplateArgKind::Value(uuid) => {func(*uuid)}
+                                TemplateArgKind::Type(written_type) => {
+                                    written_type.for_each_generative_input(func)
+                                }
+                                TemplateArgKind::Value(uuid) => func(*uuid),
                             }
                         }
                     }

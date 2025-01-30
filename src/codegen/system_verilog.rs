@@ -78,10 +78,9 @@ impl<'g> CodeGenerationContext<'g> {
     /// This is for making the resulting Verilog a little nicer to read
     fn can_inline(&self, wire: &RealWire) -> bool {
         match &wire.source {
-            RealWireDataSource::Constant { value } => match value {
-                Value::Bool(_) | Value::Integer(_) => true,
-                _other => false,
-            },
+            RealWireDataSource::Constant {
+                value: Value::Bool(_) | Value::Integer(_),
+            } => true,
             _other => false,
         }
     }
@@ -141,12 +140,17 @@ impl<'g> CodeGenerationContext<'g> {
         Ok(())
     }
 
-    fn comment_out(&mut self, f : impl FnOnce(&mut Self)) {
-        let store_program_text_temporary = std::mem::replace(&mut self.program_text, String::new());
+    fn comment_out(&mut self, f: impl FnOnce(&mut Self)) {
+        let store_program_text_temporary = std::mem::take(&mut self.program_text);
         f(self);
         let added_text = std::mem::replace(&mut self.program_text, store_program_text_temporary);
 
-        write!(self.program_text, "// {}\n", added_text.replace("\n", "\n// ")).unwrap();
+        writeln!(
+            self.program_text,
+            "// {}",
+            added_text.replace("\n", "\n// ")
+        )
+        .unwrap();
     }
 
     fn write_verilog_code(&mut self) {
@@ -213,7 +217,7 @@ impl<'g> CodeGenerationContext<'g> {
         match value {
             Value::Bool(_) | Value::Integer(_) | Value::Unset => {
                 let v_str = value.inline_constant_to_string();
-                write!(self.program_text, "{to} = {v_str};\n").unwrap();
+                writeln!(self.program_text, "{to} = {v_str};").unwrap();
             }
             Value::Array(arr) => {
                 for (idx, v) in arr.iter().enumerate() {
@@ -249,7 +253,7 @@ impl<'g> CodeGenerationContext<'g> {
             match &w.source {
                 RealWireDataSource::Select { root, path } => {
                     let wire_name = self.wire_name(*root, w.absolute_latency);
-                    let path = self.wire_ref_path_to_string(&path, w.absolute_latency);
+                    let path = self.wire_ref_path_to_string(path, w.absolute_latency);
                     writeln!(self.program_text, " = {wire_name}{path};").unwrap();
                 }
                 RealWireDataSource::UnaryOp { op, right } => {
@@ -311,7 +315,11 @@ impl<'g> CodeGenerationContext<'g> {
             let sm_name = &sm.name;
             let submodule_clk_name = sm_md.get_clock_name();
             writeln!(self.program_text, " {sm_name}(").unwrap();
-            write!(self.program_text, "\t.{submodule_clk_name}({parent_clk_name})").unwrap();
+            write!(
+                self.program_text,
+                "\t.{submodule_clk_name}({parent_clk_name})"
+            )
+            .unwrap();
             for (port_id, iport) in sm_inst.interface_ports.iter_valids() {
                 let port_name =
                     wire_name_self_latency(&sm_inst.wires[iport.wire], self.use_latency);
@@ -344,9 +352,7 @@ impl<'g> CodeGenerationContext<'g> {
                 ConcreteType::Named(..) | ConcreteType::Array(..) => {
                     unreachable!("No extern module type arguments. Should have been caught by Lint")
                 }
-                ConcreteType::Value(value) => {
-                    value.inline_constant_to_string()
-                }
+                ConcreteType::Value(value) => value.inline_constant_to_string(),
                 ConcreteType::Unknown(_) => unreachable!("All args are known at codegen"),
             };
             if first {
@@ -355,7 +361,7 @@ impl<'g> CodeGenerationContext<'g> {
                 first = false;
             }
             self.program_text.write_char('.').unwrap();
-            self.program_text.write_str(&arg_name).unwrap();
+            self.program_text.write_str(arg_name).unwrap();
             self.program_text.write_char('(').unwrap();
             self.program_text.write_str(&arg_value).unwrap();
             self.program_text.write_char(')').unwrap();
@@ -370,7 +376,8 @@ impl<'g> CodeGenerationContext<'g> {
                     let output_name = wire_name_self_latency(w, self.use_latency);
                     let arrow_str = if is_state.is_some() {
                         let clk_name = self.md.get_clock_name();
-                        writeln!(self.program_text, "always_ff @(posedge {clk_name}) begin").unwrap();
+                        writeln!(self.program_text, "always_ff @(posedge {clk_name}) begin")
+                            .unwrap();
                         "<="
                     } else {
                         writeln!(self.program_text, "always_comb begin\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches").unwrap();
@@ -439,7 +446,7 @@ impl<'g> CodeGenerationContext<'g> {
                     .md
                     .unwrap_port(PortID::from_hidden_value(1), false, "bits");
                 for i in 0..32 {
-                    write!(self.program_text, "\tassign bits[{i}] = value[{i}];\n").unwrap();
+                    writeln!(self.program_text, "\tassign bits[{i}] = value[{i}];").unwrap();
                 }
             }
             "BitsToInt" => {
@@ -450,7 +457,7 @@ impl<'g> CodeGenerationContext<'g> {
                     .md
                     .unwrap_port(PortID::from_hidden_value(1), false, "value");
                 for i in 0..32 {
-                    write!(self.program_text, "\tassign value[{i}] = bits[{i}];\n").unwrap();
+                    writeln!(self.program_text, "\tassign value[{i}] = bits[{i}];").unwrap();
                 }
             }
             other => {

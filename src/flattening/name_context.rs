@@ -1,9 +1,8 @@
-
-/// This keeps track of the variables that are in the current scope. 
-/// 
+/// This keeps track of the variables that are in the current scope.
+///
 /// Each [super::Declaration] and [super::SubModuleInstance] should be added here at some point
-/// 
-/// Must be maintained manually. 
+///
+/// Must be maintained manually.
 /// When a new scope is entered, call [Self::new_frame],
 /// when exiting a scope call [Self::pop_frame]
 pub struct LocalVariableContext<'file, Obj: Copy> {

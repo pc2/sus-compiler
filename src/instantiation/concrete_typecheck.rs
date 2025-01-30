@@ -1,4 +1,3 @@
-
 use std::ops::Deref;
 
 use crate::errors::ErrorInfoObject;
@@ -8,26 +7,35 @@ use crate::typing::concrete_type::ConcreteGlobalReference;
 use crate::typing::template::TemplateArgKind;
 use crate::typing::{
     concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
-    type_inference::{FailedUnification, DelayedConstraint, DelayedConstraintStatus, DelayedConstraintsList},
+    type_inference::{
+        DelayedConstraint, DelayedConstraintStatus, DelayedConstraintsList, FailedUnification,
+    },
 };
 
 use super::*;
 
 use crate::typing::type_inference::HindleyMilner;
 
-impl<'fl, 'l> InstantiationContext<'fl, 'l> {
+impl InstantiationContext<'_, '_> {
     fn walk_type_along_path(
         &self,
         mut current_type_in_progress: ConcreteType,
-        path: &[RealWirePathElem]
+        path: &[RealWirePathElem],
     ) -> ConcreteType {
         for p in path {
             let typ_after_applying_array = ConcreteType::Unknown(self.type_substitutor.alloc());
             match p {
-                RealWirePathElem::ArrayAccess {span: _, idx_wire: _} => { // TODO #28 integer size <-> array bound check
+                RealWirePathElem::ArrayAccess {
+                    span: _,
+                    idx_wire: _,
+                } => {
+                    // TODO #28 integer size <-> array bound check
                     let arr_size = ConcreteType::Unknown(self.type_substitutor.alloc());
                     let arr_box = Box::new((typ_after_applying_array.clone(), arr_size));
-                    self.type_substitutor.unify_must_succeed(&current_type_in_progress, &ConcreteType::Array(arr_box));
+                    self.type_substitutor.unify_must_succeed(
+                        &current_type_in_progress,
+                        &ConcreteType::Array(arr_box),
+                    );
                     current_type_in_progress = typ_after_applying_array;
                 }
             }
@@ -37,7 +45,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
 
     fn make_array_of(&self, concrete_typ: ConcreteType) -> ConcreteType {
-        ConcreteType::Array(Box::new((concrete_typ, ConcreteType::Unknown(self.type_substitutor.alloc()))))
+        ConcreteType::Array(Box::new((
+            concrete_typ,
+            ConcreteType::Unknown(self.type_substitutor.alloc()),
+        )))
     }
 
     fn typecheck_all_wires(&self) {
@@ -54,8 +65,14 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     }
                     for s in sources {
                         let source_typ = &self.wires[s.from].typ;
-                        let destination_typ = self.walk_type_along_path(self.wires[this_wire_id].typ.clone(), &s.to_path);
-                        self.type_substitutor.unify_report_error(&destination_typ, &source_typ, span, "write wire access");
+                        let destination_typ = self
+                            .walk_type_along_path(self.wires[this_wire_id].typ.clone(), &s.to_path);
+                        self.type_substitutor.unify_report_error(
+                            &destination_typ,
+                            source_typ,
+                            span,
+                            "write wire access",
+                        );
                     }
                 }
                 &RealWireDataSource::UnaryOp { op, right } => {
@@ -63,38 +80,100 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     let (input_typ, output_typ) = match op {
                         UnaryOperator::Not => (BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE),
                         UnaryOperator::Negate => (INT_CONCRETE_TYPE, INT_CONCRETE_TYPE),
-                        UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => (self.make_array_of(BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
-                        UnaryOperator::Sum | UnaryOperator::Product => (self.make_array_of(INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
+                        UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => {
+                            (self.make_array_of(BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
+                        }
+                        UnaryOperator::Sum | UnaryOperator::Product => {
+                            (self.make_array_of(INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
+                        }
                     };
 
-                    self.type_substitutor.unify_report_error(&self.wires[right].typ, &input_typ, span, "unary input");
-                    self.type_substitutor.unify_report_error(&self.wires[this_wire_id].typ, &output_typ, span, "unary output");
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[right].typ,
+                        &input_typ,
+                        span,
+                        "unary input",
+                    );
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[this_wire_id].typ,
+                        &output_typ,
+                        span,
+                        "unary output",
+                    );
                 }
                 &RealWireDataSource::BinaryOp { op, left, right } => {
                     // TODO overloading
                     let ((in_left, in_right), out) = match op {
-                        BinaryOperator::And => ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
-                        BinaryOperator::Or => ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
-                        BinaryOperator::Xor => ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
-                        BinaryOperator::Add => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
-                        BinaryOperator::Subtract => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
-                        BinaryOperator::Multiply => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
-                        BinaryOperator::Divide => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
-                        BinaryOperator::Modulo => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE),
-                        BinaryOperator::Equals => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
-                        BinaryOperator::NotEquals => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
-                        BinaryOperator::GreaterEq => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
-                        BinaryOperator::Greater => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
-                        BinaryOperator::LesserEq => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
-                        BinaryOperator::Lesser => ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE),
+                        BinaryOperator::And => {
+                            ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
+                        }
+                        BinaryOperator::Or => {
+                            ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
+                        }
+                        BinaryOperator::Xor => {
+                            ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
+                        }
+                        BinaryOperator::Add => {
+                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
+                        }
+                        BinaryOperator::Subtract => {
+                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
+                        }
+                        BinaryOperator::Multiply => {
+                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
+                        }
+                        BinaryOperator::Divide => {
+                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
+                        }
+                        BinaryOperator::Modulo => {
+                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
+                        }
+                        BinaryOperator::Equals => {
+                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
+                        }
+                        BinaryOperator::NotEquals => {
+                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
+                        }
+                        BinaryOperator::GreaterEq => {
+                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
+                        }
+                        BinaryOperator::Greater => {
+                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
+                        }
+                        BinaryOperator::LesserEq => {
+                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
+                        }
+                        BinaryOperator::Lesser => {
+                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
+                        }
                     };
-                    self.type_substitutor.unify_report_error(&self.wires[this_wire_id].typ, &out, span, "binary output");
-                    self.type_substitutor.unify_report_error(&self.wires[left].typ, &in_left, span, "binary left");
-                    self.type_substitutor.unify_report_error(&self.wires[right].typ, &in_right, span, "binary right");
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[this_wire_id].typ,
+                        &out,
+                        span,
+                        "binary output",
+                    );
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[left].typ,
+                        &in_left,
+                        span,
+                        "binary left",
+                    );
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[right].typ,
+                        &in_right,
+                        span,
+                        "binary right",
+                    );
                 }
                 RealWireDataSource::Select { root, path } => {
                     let found_typ = self.walk_type_along_path(self.wires[*root].typ.clone(), path);
-                    self.type_substitutor.unify_report_error(&found_typ, &self.wires[this_wire_id].typ, span, "wire access");
+                    self.type_substitutor.unify_report_error(
+                        &found_typ,
+                        &self.wires[this_wire_id].typ,
+                        span,
+                        "wire access",
+                    );
                 }
                 RealWireDataSource::Constant { value } => {
                     assert!(
@@ -108,9 +187,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
     fn finalize(&mut self) {
         for (_id, w) in &mut self.wires {
-            if w.typ.fully_substitute(&self.type_substitutor) == false {
+            if !w.typ.fully_substitute(&self.type_substitutor) {
                 let typ_as_str = w.typ.display(&self.linker.types);
-                
+
                 let span = self.md.get_instruction_span(w.original_instruction);
                 span.debug();
                 self.errors.error(span, format!("Could not finalize this type, some parameters were still unknown: {typ_as_str}"));
@@ -118,11 +197,18 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
 
         // Print all errors
-        for FailedUnification{mut found, mut expected, span, context, infos} in self.type_substitutor.extract_errors() {
+        for FailedUnification {
+            mut found,
+            mut expected,
+            span,
+            context,
+            infos,
+        } in self.type_substitutor.extract_errors()
+        {
             // Not being able to fully substitute is not an issue. We just display partial types
             let _ = found.fully_substitute(&self.type_substitutor);
             let _ = expected.fully_substitute(&self.type_substitutor);
-    
+
             let expected_name = expected.display(&self.linker.types).to_string();
             let found_name = found.display(&self.linker.types).to_string();
             self.errors
@@ -137,7 +223,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
 
     pub fn typecheck(&mut self) {
-        let mut delayed_constraints : DelayedConstraintsList<Self> = DelayedConstraintsList::new();
+        let mut delayed_constraints: DelayedConstraintsList<Self> = DelayedConstraintsList::new();
         for (sm_id, sm) in &self.submodules {
             let sub_module = &self.linker.modules[sm.module_uuid];
 
@@ -145,14 +231,21 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 let wire = &self.wires[p.maps_to_wire];
 
                 let port_decl_instr = sub_module.ports[port_id].declaration_instruction;
-                let port_decl = sub_module.link_info.instructions[port_decl_instr].unwrap_declaration();
+                let port_decl =
+                    sub_module.link_info.instructions[port_decl_instr].unwrap_declaration();
 
-                let typ_for_inference = concretize_written_type_with_possible_template_args(&port_decl.typ_expr, &sm.template_args, &sub_module.link_info, &self.type_substitutor);
+                let typ_for_inference = concretize_written_type_with_possible_template_args(
+                    &port_decl.typ_expr,
+                    &sm.template_args,
+                    &sub_module.link_info,
+                    &self.type_substitutor,
+                );
 
-                self.type_substitutor.unify_must_succeed(&wire.typ, &typ_for_inference);
+                self.type_substitutor
+                    .unify_must_succeed(&wire.typ, &typ_for_inference);
             }
-            
-            delayed_constraints.push(SubmoduleTypecheckConstraint {sm_id});
+
+            delayed_constraints.push(SubmoduleTypecheckConstraint { sm_id });
         }
 
         self.typecheck_all_wires();
@@ -164,13 +257,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 }
 
 struct SubmoduleTypecheckConstraint {
-    sm_id: SubModuleID
+    sm_id: SubModuleID,
 }
 
-/// Part of Template Value Inference. 
-/// 
+/// Part of Template Value Inference.
+///
 /// Specifically, for code like this:
-/// 
+///
 /// ```sus
 /// module add_all #(int Size) {
 ///     input int[Size] arr // We're targeting the 'Size' within the array size
@@ -179,11 +272,19 @@ struct SubmoduleTypecheckConstraint {
 /// ```
 fn can_expression_be_value_inferred(link_info: &LinkInfo, expr_id: FlatID) -> Option<TemplateID> {
     let expr = link_info.instructions[expr_id].unwrap_expression();
-    let ExpressionSource::WireRef(wr) = &expr.source else {return None};
-    if !wr.path.is_empty() {return None} // Must be a plain, no fuss reference to a de
-    let WireReferenceRoot::LocalDecl(wire_declaration, _span) = &wr.root else {return None};
+    let ExpressionSource::WireRef(wr) = &expr.source else {
+        return None;
+    };
+    if !wr.path.is_empty() {
+        return None;
+    } // Must be a plain, no fuss reference to a de
+    let WireReferenceRoot::LocalDecl(wire_declaration, _span) = &wr.root else {
+        return None;
+    };
     let template_arg_decl = link_info.instructions[*wire_declaration].unwrap_declaration();
-    let DeclarationKind::GenerativeInput(template_id) = &template_arg_decl.decl_kind else {return None};
+    let DeclarationKind::GenerativeInput(template_id) = &template_arg_decl.decl_kind else {
+        return None;
+    };
     Some(*template_id)
 }
 
@@ -191,41 +292,58 @@ fn concretize_written_type_with_possible_template_args(
     written_typ: &WrittenType,
     template_args: &TVec<ConcreteType>,
     link_info: &LinkInfo,
-    type_substitutor: &TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>
+    type_substitutor: &TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
 ) -> ConcreteType {
     match written_typ {
         WrittenType::Error(_span) => ConcreteType::Unknown(type_substitutor.alloc()),
         WrittenType::TemplateVariable(_span, uuid) => template_args[*uuid].clone(),
         WrittenType::Named(global_reference) => {
-            let object_template_args : TVec<ConcreteType> = global_reference.template_args.map(|(_arg_id, arg)| -> ConcreteType {
-                if let Some(arg) = arg {
-                    match &arg.kind {
-                        TemplateArgKind::Type(arg_wr_typ) => {
-                            concretize_written_type_with_possible_template_args(arg_wr_typ, template_args, link_info, type_substitutor)
-                        }
-                        TemplateArgKind::Value(uuid) => {
-                            if let Some(found_template_arg) = can_expression_be_value_inferred(link_info, *uuid) {
-                                template_args[found_template_arg].clone()
-                            } else {
-                                ConcreteType::Unknown(type_substitutor.alloc())
+            let object_template_args: TVec<ConcreteType> =
+                global_reference
+                    .template_args
+                    .map(|(_arg_id, arg)| -> ConcreteType {
+                        if let Some(arg) = arg {
+                            match &arg.kind {
+                                TemplateArgKind::Type(arg_wr_typ) => {
+                                    concretize_written_type_with_possible_template_args(
+                                        arg_wr_typ,
+                                        template_args,
+                                        link_info,
+                                        type_substitutor,
+                                    )
+                                }
+                                TemplateArgKind::Value(uuid) => {
+                                    if let Some(found_template_arg) =
+                                        can_expression_be_value_inferred(link_info, *uuid)
+                                    {
+                                        template_args[found_template_arg].clone()
+                                    } else {
+                                        ConcreteType::Unknown(type_substitutor.alloc())
+                                    }
+                                }
                             }
+                        } else {
+                            ConcreteType::Unknown(type_substitutor.alloc())
                         }
-                    }
-                } else {
-                    ConcreteType::Unknown(type_substitutor.alloc())
-                }
-            });
+                    });
 
-            ConcreteType::Named(ConcreteGlobalReference{
+            ConcreteType::Named(ConcreteGlobalReference {
                 id: global_reference.id,
-                template_args: object_template_args
+                template_args: object_template_args,
             })
         }
         WrittenType::Array(_span, arr_box) => {
             let (arr_content_wr, arr_idx_id, _arr_brackets) = arr_box.deref();
 
-            let arr_content_concrete = concretize_written_type_with_possible_template_args(arr_content_wr, template_args, link_info, type_substitutor);
-            let arr_idx_concrete = if let Some(found_template_arg) = can_expression_be_value_inferred(link_info, *arr_idx_id) {
+            let arr_content_concrete = concretize_written_type_with_possible_template_args(
+                arr_content_wr,
+                template_args,
+                link_info,
+                type_substitutor,
+            );
+            let arr_idx_concrete = if let Some(found_template_arg) =
+                can_expression_be_value_inferred(link_info, *arr_idx_id)
+            {
                 template_args[found_template_arg].clone()
             } else {
                 ConcreteType::Unknown(type_substitutor.alloc())
@@ -238,24 +356,26 @@ fn concretize_written_type_with_possible_template_args(
 
 impl SubmoduleTypecheckConstraint {
     /// Directly named type and value parameters are immediately unified, but latency count deltas can only be computed from the latency counting graph
-    fn try_infer_latency_counts(&mut self, context: &mut InstantiationContext) {
+    fn try_infer_latency_counts(&mut self, _context: &mut InstantiationContext) {
         // TODO
     }
 }
 
 impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConstraint {
-    fn try_apply(&mut self, context : &mut InstantiationContext) -> DelayedConstraintStatus {
-        // Try to infer template arguments based on the connections to the ports of the module. 
+    fn try_apply(&mut self, context: &mut InstantiationContext) -> DelayedConstraintStatus {
+        // Try to infer template arguments based on the connections to the ports of the module.
         self.try_infer_latency_counts(context);
 
         let sm = &mut context.submodules[self.sm_id];
 
-        let submod_instr = context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
+        let submod_instr =
+            context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
         let sub_module = &context.linker.modules[sm.module_uuid];
 
         // Check if there's any argument that isn't known
         for (_id, arg) in &mut sm.template_args {
-            if !arg.fully_substitute(&context.type_substitutor) { // We don't actually *need* to already fully_substitute here, but it's convenient and saves some work
+            if !arg.fully_substitute(&context.type_substitutor) {
+                // We don't actually *need* to already fully_substitute here, but it's convenient and saves some work
                 return DelayedConstraintStatus::NoProgress;
             }
         }
@@ -285,25 +405,32 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                     (Some(_concrete_port), None) => {
                         // Port is enabled, but not used
                         let source_code_port = &sub_module.ports[port_id];
-                        context.errors
+                        context
+                            .errors
                             .warn(
                                 submod_instr.module_ref.get_total_span(),
                                 format!("Unused port '{}'", source_code_port.name),
                             )
-                            .info_obj_different_file(
-                                source_code_port,
-                                sub_module.link_info.file,
-                            )
+                            .info_obj_different_file(source_code_port, sub_module.link_info.file)
                             .info_obj_same_file(submod_instr);
                     }
                     (Some(concrete_port), Some(connecting_wire)) => {
                         let wire = &context.wires[connecting_wire.maps_to_wire];
-                        context.type_substitutor.unify_report_error(&wire.typ, &concrete_port.typ, submod_instr.module_ref.get_total_span(), || {
-                            let abstract_port = &sub_module.ports[port_id];
-                            let port_declared_here = abstract_port.make_info(sub_module.link_info.file).unwrap();
+                        context.type_substitutor.unify_report_error(
+                            &wire.typ,
+                            &concrete_port.typ,
+                            submod_instr.module_ref.get_total_span(),
+                            || {
+                                let abstract_port = &sub_module.ports[port_id];
+                                let port_declared_here =
+                                    abstract_port.make_info(sub_module.link_info.file).unwrap();
 
-                            (format!("Port '{}'", abstract_port.name), vec![port_declared_here])
-                        });
+                                (
+                                    format!("Port '{}'", abstract_port.name),
+                                    vec![port_declared_here],
+                                )
+                            },
+                        );
                     }
                 }
             }
@@ -341,7 +468,9 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                 }
             }
 
-            sm.instance.set(instance).expect("Can only set the instance of a submodule once");
+            sm.instance
+                .set(instance)
+                .expect("Can only set the instance of a submodule once");
             DelayedConstraintStatus::Resolved
         } else {
             context.errors.error(
@@ -352,15 +481,22 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
         }
     }
 
-    fn report_could_not_resolve_error(&self, context : &InstantiationContext) {
+    fn report_could_not_resolve_error(&self, context: &InstantiationContext) {
         let sm = &context.submodules[self.sm_id];
 
-        let submod_instr = context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
+        let submod_instr =
+            context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
         let sub_module = &context.linker.modules[sm.module_uuid];
 
-        let submodule_template_args_string = pretty_print_concrete_instance(&sub_module.link_info, &sm.template_args, &context.linker.types);
+        let submodule_template_args_string = pretty_print_concrete_instance(
+            &sub_module.link_info,
+            &sm.template_args,
+            &context.linker.types,
+        );
         let message = format!("Could not fully instantiate {submodule_template_args_string}");
 
-        context.errors.error(submod_instr.get_most_relevant_span(), message);
+        context
+            .errors
+            .error(submod_instr.get_most_relevant_span(), message);
     }
 }

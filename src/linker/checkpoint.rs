@@ -3,19 +3,19 @@ use crate::errors::ErrorStore;
 use super::{LinkInfo, ResolvedGlobals};
 
 /// Checkpoints [LinkInfo::errors]
-/// 
+///
 /// For incremental builds (#49)
 #[derive(Debug, Clone, Copy)]
 pub struct ErrorCheckpoint(pub usize, pub bool);
 
 /// Checkpoints [LinkInfo::resolved_globals]
-/// 
+///
 /// For incremental builds (#49)
 #[derive(Debug, Clone, Copy)]
 pub struct ResolvedGlobalsCheckpoint(pub usize, pub bool);
 
 /// See [LinkInfo::checkpoints]
-/// 
+///
 /// For incremental builds (#49)
 #[derive(Debug, Clone, Copy)]
 pub struct CheckPoint {
@@ -24,7 +24,7 @@ pub struct CheckPoint {
 }
 
 impl CheckPoint {
-    pub fn checkpoint(errors: &ErrorStore, resolved_globals: &ResolvedGlobals) -> CheckPoint {
+    pub fn new(errors: &ErrorStore, resolved_globals: &ResolvedGlobals) -> CheckPoint {
         CheckPoint {
             errors_cp: errors.checkpoint(),
             resolved_globals_cp: resolved_globals.checkpoint(),

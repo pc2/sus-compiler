@@ -1,4 +1,10 @@
-use crate::{flattening::{Instruction, NamedConstant}, prelude::*, typing::template::{GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind}};
+use crate::{
+    flattening::{Instruction, NamedConstant},
+    prelude::*,
+    typing::template::{
+        GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind,
+    },
+};
 
 pub mod checkpoint;
 mod resolver;
@@ -12,17 +18,11 @@ use std::{
 
 use tree_sitter::Tree;
 
-use crate::{
-    alloc::ArenaAllocator,
-    file_position::FileText,
-    flattening::Module
-};
+use crate::{alloc::ArenaAllocator, file_position::FileText, flattening::Module};
 
 use crate::errors::{CompileError, ErrorInfo, ErrorLevel, ErrorStore};
 
 use crate::flattening::{StructType, TypingAllocator};
-
-
 
 use self::checkpoint::CheckPoint;
 
@@ -47,36 +47,36 @@ impl Documentation {
     }
 }
 
-/// [Module], [StructType], or [NamedConstant] annotation that specifies exceptions to code generation. 
+/// [Module], [StructType], or [NamedConstant] annotation that specifies exceptions to code generation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IsExtern {
     /// Code is generated for this through the regular channel (See [crate::codegen])
-    /// 
+    ///
     /// ```sus
     /// module md {}
     /// ```
     Normal,
     /// Modules that are provided externally, and thus no code should be generated for these
-    /// 
+    ///
     /// ```sus
     /// extern module md {}
     /// ```
     Extern,
     /// Builtins, like escape hatches for Latency Counting & domains
-    /// 
+    ///
     /// ```sus
     /// __builtin__ module md {}
     /// ```
-    Builtin
+    Builtin,
 }
 
-pub const AFTER_INITIAL_PARSE_CP : usize = 0;
-pub const AFTER_FLATTEN_CP : usize = 1;
-pub const AFTER_TYPECHECK_CP : usize = 2;
-pub const AFTER_LINTS_CP : usize = 3;
+pub const AFTER_INITIAL_PARSE_CP: usize = 0;
+pub const AFTER_FLATTEN_CP: usize = 1;
+pub const AFTER_TYPECHECK_CP: usize = 2;
+pub const AFTER_LINTS_CP: usize = 3;
 
 /// Represents any global. Stored in [Linker] and each is uniquely indexed by [GlobalUUID]
-/// 
+///
 /// Base class for [Module], [StructType], [NamedConstant]
 #[derive(Debug)]
 pub struct LinkInfo {
@@ -87,10 +87,10 @@ pub struct LinkInfo {
     pub documentation: Documentation,
     pub errors: ErrorStore,
     pub resolved_globals: ResolvedGlobals,
-    pub is_extern : IsExtern,
+    pub is_extern: IsExtern,
 
     /// Created in Stage 2: Flattening
-    /// 
+    ///
     /// Is only temporary. It's used during typechecking to allocate the type unification block
     pub type_variable_alloc: TypingAllocator,
 
@@ -99,12 +99,12 @@ pub struct LinkInfo {
     /// Created in Stage 2: Flattening. type data is filled out during Typechecking
     pub instructions: FlatAlloc<Instruction, FlatIDMarker>,
 
-    /// Reset checkpoints. These are to reset errors and resolved_globals for incremental compilation. 
-    /// 
+    /// Reset checkpoints. These are to reset errors and resolved_globals for incremental compilation.
+    ///
     /// TODO the system is there, just need to actually do incremental compilation (#49)
-    /// 
+    ///
     /// Right now it already functions as a sanity check, to make sure no steps in building modules/types are skipped
-    pub checkpoints : ArrayVec<CheckPoint, 4>
+    pub checkpoints: ArrayVec<CheckPoint, 4>,
 }
 
 impl LinkInfo {
@@ -118,26 +118,20 @@ impl LinkInfo {
         let mut template_args: Vec<&str> = Vec::new();
         for (_id, t) in &self.template_parameters {
             match &t.kind {
-                ParameterKind::Type(TypeParameterKind {  }) => {
-                    template_args.push(&t.name)
-                }
+                ParameterKind::Type(TypeParameterKind {}) => template_args.push(&t.name),
                 ParameterKind::Generative(GenerativeParameterKind {
                     decl_span,
                     declaration_instruction: _,
-                }) => template_args.push(&file_text[*decl_span])
+                }) => template_args.push(&file_text[*decl_span]),
             }
         }
 
-        format!(
-            "{} #({})",
-            self.get_full_name(),
-            template_args.join(", ")
-        )
+        format!("{} #({})", self.get_full_name(), template_args.join(", "))
     }
 }
 
-/// Data associated with a file. Such as the text, the parse tree, and all [Module]s, [StructType]s, or [NamedConstant]s. 
-/// 
+/// Data associated with a file. Such as the text, the parse tree, and all [Module]s, [StructType]s, or [NamedConstant]s.
+///
 /// All FileDatas are stored in [Linker::files], and indexed by [FileUUID]
 pub struct FileData {
     pub file_identifier: String,
@@ -159,17 +153,23 @@ pub enum GlobalUUID {
 impl GlobalUUID {
     #[track_caller]
     pub fn unwrap_module(&self) -> ModuleUUID {
-        let GlobalUUID::Module(id) = self else {unreachable!("Not a ModuleUUID!")};
+        let GlobalUUID::Module(id) = self else {
+            unreachable!("Not a ModuleUUID!")
+        };
         *id
     }
     #[track_caller]
     pub fn unwrap_type(&self) -> TypeUUID {
-        let GlobalUUID::Type(id) = self else {unreachable!("Not a TypeUUID!")};
+        let GlobalUUID::Type(id) = self else {
+            unreachable!("Not a TypeUUID!")
+        };
         *id
     }
     #[track_caller]
     pub fn unwrap_const(&self) -> ConstantUUID {
-        let GlobalUUID::Constant(id) = self else {unreachable!("Not a ConstantUUID!")};
+        let GlobalUUID::Constant(id) = self else {
+            unreachable!("Not a ConstantUUID!")
+        };
         *id
     }
 }
@@ -197,14 +197,14 @@ enum NamespaceElement {
     Colission(Box<[GlobalUUID]>),
 }
 
-/// The global singleton object that collects all [Module]s, [StructType]s, and [NamedConstant]s that are in the current SUS codebase. 
-/// 
-/// There should only be one [Linker] globally. 
-/// 
-/// See [LinkInfo], this contains shared data between all global objects in the whole progam. 
-/// 
-/// It also keeps track of the global namespace. 
-/// 
+/// The global singleton object that collects all [Module]s, [StructType]s, and [NamedConstant]s that are in the current SUS codebase.
+///
+/// There should only be one [Linker] globally.
+///
+/// See [LinkInfo], this contains shared data between all global objects in the whole progam.
+///
+/// It also keeps track of the global namespace.
+///
 /// Incremental operations such as adding and removing files can be performed on this
 pub struct Linker {
     pub types: ArenaAllocator<StructType, TypeUUIDMarker>,
@@ -212,6 +212,12 @@ pub struct Linker {
     pub constants: ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
     pub files: ArenaAllocator<FileData, FileUUIDMarker>,
     global_namespace: HashMap<String, NamespaceElement>,
+}
+
+impl Default for Linker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Linker {
@@ -229,22 +235,26 @@ impl Linker {
         match global {
             GlobalUUID::Module(md_id) => &self.modules[md_id].link_info,
             GlobalUUID::Type(typ_id) => &self.types[typ_id].link_info,
-            GlobalUUID::Constant(cst_id) => &self.constants[cst_id].link_info
+            GlobalUUID::Constant(cst_id) => &self.constants[cst_id].link_info,
         }
     }
     pub fn get_link_info_mut<'l>(
         modules: &'l mut ArenaAllocator<Module, ModuleUUIDMarker>,
         types: &'l mut ArenaAllocator<StructType, TypeUUIDMarker>,
         constants: &'l mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
-        global: GlobalUUID
+        global: GlobalUUID,
     ) -> &'l mut LinkInfo {
         match global {
             GlobalUUID::Module(md_id) => &mut modules[md_id].link_info,
             GlobalUUID::Type(typ_id) => &mut types[typ_id].link_info,
-            GlobalUUID::Constant(cst_id) => &mut constants[cst_id].link_info
+            GlobalUUID::Constant(cst_id) => &mut constants[cst_id].link_info,
         }
     }
-    fn for_all_duplicate_declaration_errors(&self, file_uuid: FileUUID, f: &mut impl FnMut(&CompileError)) {
+    fn for_all_duplicate_declaration_errors(
+        &self,
+        file_uuid: FileUUID,
+        f: &mut impl FnMut(&CompileError),
+    ) {
         // Conflicting Declarations
         for item in &self.global_namespace {
             let NamespaceElement::Colission(colission) = &item.1 else {
@@ -254,7 +264,9 @@ impl Linker {
                 colission.iter().map(|id| self.get_link_info(*id)).collect();
 
             for (idx, info) in infos.iter().enumerate() {
-                if info.file != file_uuid {continue}
+                if info.file != file_uuid {
+                    continue;
+                }
                 let mut conflict_infos = Vec::new();
                 for (idx_2, conflicts_with) in infos.iter().enumerate() {
                     if idx_2 == idx {
@@ -273,7 +285,7 @@ impl Linker {
                     .collect();
 
                 let reason = format!("'{this_object_name}' conflicts with other declarations:");
-                
+
                 f(&CompileError {
                     position: info.name_span,
                     reason,
@@ -360,12 +372,13 @@ impl Linker {
         let mut parsing_errors =
             std::mem::replace(&mut self.files[file_id].parsing_errors, ErrorStore::new());
         let file_data = &self.files[file_id];
-        let other_parsing_errors = ErrorCollector::from_storage(parsing_errors.take(), file_id, &self.files);
+        let other_parsing_errors =
+            ErrorCollector::from_storage(parsing_errors.take(), file_id, &self.files);
 
         f(FileBuilder {
             file_id,
             tree: &file_data.tree,
-            file_data: &file_data,
+            file_data,
             files: &self.files,
             other_parsing_errors: &other_parsing_errors,
             associated_values: &mut associated_values,
@@ -396,7 +409,7 @@ pub struct FileBuilder<'linker> {
     constants: &'linker mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
 }
 
-impl<'linker> FileBuilder<'linker> {
+impl FileBuilder<'_> {
     fn add_name(&mut self, name: String, new_obj_id: GlobalUUID) {
         match self.global_namespace.entry(name) {
             std::collections::hash_map::Entry::Occupied(mut occ) => {

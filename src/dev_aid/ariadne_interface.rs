@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::{ops::Range, path::PathBuf};
 
 use crate::compiler_top::LinkerExtraFileInfoManager;
@@ -12,7 +13,6 @@ use crate::{
 
 use ariadne::*;
 
-
 impl Cache<FileUUID> for (&Linker, &mut ArenaVector<Source<String>, FileUUIDMarker>) {
     type Storage = String;
 
@@ -21,18 +21,21 @@ impl Cache<FileUUID> for (&Linker, &mut ArenaVector<Source<String>, FileUUIDMark
     }
     fn display<'a>(&self, id: &'a FileUUID) -> Option<Box<dyn std::fmt::Display + 'a>> {
         if config().ci {
-            let filename = self.0.files[*id].file_identifier.rsplit("/").next().unwrap_or(self.0.files[*id].file_identifier.as_str());
+            let filename = self.0.files[*id]
+                .file_identifier
+                .rsplit("/")
+                .next()
+                .unwrap_or(self.0.files[*id].file_identifier.as_str());
             Some(Box::new(filename.to_string()))
         } else {
             Some(Box::new(self.0.files[*id].file_identifier.clone()))
         }
-
     }
 }
 
 struct NamedSource<'s> {
-    source : Source, 
-    name : &'s str
+    source: Source,
+    name: &'s str,
 }
 
 impl Cache<()> for NamedSource<'_> {
@@ -47,37 +50,35 @@ impl Cache<()> for NamedSource<'_> {
 }
 
 pub struct FileSourcesManager {
-    pub file_sources: ArenaVector<Source, FileUUIDMarker>
+    pub file_sources: ArenaVector<Source, FileUUIDMarker>,
 }
 
 impl LinkerExtraFileInfoManager for FileSourcesManager {
-    fn convert_filename(&self, path : &PathBuf) -> String {
+    fn convert_filename(&self, path: &Path) -> String {
         path.to_string_lossy().into_owned()
     }
 
-    fn on_file_added(&mut self, file_id : FileUUID, linker : &Linker) {
+    fn on_file_added(&mut self, file_id: FileUUID, linker: &Linker) {
         let source = Source::from(linker.files[file_id].file_text.file_text.clone());
 
         self.file_sources.insert(file_id, source);
     }
 
-    fn on_file_updated(&mut self, file_id : FileUUID, linker : &Linker) {
+    fn on_file_updated(&mut self, file_id: FileUUID, linker: &Linker) {
         let source = Source::from(linker.files[file_id].file_text.file_text.clone());
-        
+
         self.file_sources[file_id] = source;
     }
 
-    fn before_file_remove(&mut self, file_id : FileUUID, _linker : &Linker) {
+    fn before_file_remove(&mut self, file_id: FileUUID, _linker: &Linker) {
         self.file_sources.remove(file_id)
     }
 }
 
-pub fn compile_all(
-    file_paths: Vec<PathBuf>,
-) -> (Linker, FileSourcesManager) {
+pub fn compile_all(file_paths: Vec<PathBuf>) -> (Linker, FileSourcesManager) {
     let mut linker = Linker::new();
-    let mut file_source_manager = FileSourcesManager{
-        file_sources: ArenaVector::new()
+    let mut file_source_manager = FileSourcesManager {
+        file_sources: ArenaVector::new(),
     };
     linker.add_standard_library(&mut file_source_manager);
 
@@ -90,7 +91,11 @@ pub fn compile_all(
             }
         };
 
-        linker.add_file(file_path.to_string_lossy().into_owned(), file_text, &mut file_source_manager);
+        linker.add_file(
+            file_path.to_string_lossy().into_owned(),
+            file_text,
+            &mut file_source_manager,
+        );
     }
 
     linker.recompile_all();
@@ -120,7 +125,7 @@ pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
     // Assert that span is in file
     let _ = &linker.files[file].file_text[error.position];
 
-    let error_span = error.position.into_range();
+    let error_span = error.position.as_range();
 
     let config = ariadne_config();
     let mut report: ReportBuilder<'_, (FileUUID, Range<usize>)> =
@@ -132,7 +137,7 @@ pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
     );
 
     for info in &error.infos {
-        let info_span = info.position.into_range();
+        let info_span = info.position.as_range();
         // Assert that span is in file
         let _ = &linker.files[info.file].file_text[info.position];
         report = report.with_label(
@@ -157,13 +162,13 @@ pub fn print_all_errors(
     }
 }
 
-pub fn pretty_print_spans_in_reverse_order(file_data : &FileData, spans: Vec<Range<usize>>) {
+pub fn pretty_print_spans_in_reverse_order(file_data: &FileData, spans: Vec<Range<usize>>) {
     let text_len = file_data.file_text.len();
-    let mut source = NamedSource{
-        source : Source::from(file_data.file_text.file_text.clone()),
-        name : &file_data.file_identifier
+    let mut source = NamedSource {
+        source: Source::from(file_data.file_text.file_text.clone()),
+        name: &file_data.file_identifier,
     };
-    
+
     for span in spans.into_iter().rev() {
         // If span not in file, just don't print it. This happens.
         if span.end > text_len {
@@ -190,21 +195,21 @@ pub fn pretty_print_spans_in_reverse_order(file_data : &FileData, spans: Vec<Ran
 
 pub fn pretty_print_many_spans(file_data: &FileData, spans: &[(String, Range<usize>)]) {
     let text_len = file_data.file_text.len();
-    let mut source = NamedSource{
-        source : Source::from(file_data.file_text.file_text.clone()),
-        name : &file_data.file_identifier
+    let mut source = NamedSource {
+        source: Source::from(file_data.file_text.file_text.clone()),
+        name: &file_data.file_identifier,
     };
 
     let config = ariadne_config();
 
-    if spans.len() == 0 {
+    if spans.is_empty() {
         return;
     }
 
     let mut report: ReportBuilder<'_, Range<usize>> =
         Report::build(ReportKind::Advice, (), spans[0].1.start).with_config(config);
 
-    for (text, span) in spans.into_iter().rev() {
+    for (text, span) in spans.iter().rev() {
         // If span not in file, just don't print it. This happens.
         if span.end > text_len {
             println!(

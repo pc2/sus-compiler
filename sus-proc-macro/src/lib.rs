@@ -1,4 +1,3 @@
-
 use proc_macro::TokenStream;
 
 use quote::{quote, quote_spanned};
@@ -87,14 +86,16 @@ pub fn get_builtin_type(token_stream: TokenStream) -> TokenStream {
         if found_name == object_name {
             return quote! {
                 crate::prelude::TypeUUID::from_hidden_value(#idx)
-            }.into();
+            }
+            .into();
         }
     }
-    
+
     quote_spanned!(
         string_literal.span() =>
         compile_error!("Unknown builtin type was not found in std/core.sus")
-    ).into()
+    )
+    .into()
 }
 
 #[proc_macro]
@@ -112,12 +113,14 @@ pub fn get_builtin_const(token_stream: TokenStream) -> TokenStream {
         if found_name == object_name {
             return quote! {
                 crate::prelude::ConstantUUID::from_hidden_value(#idx)
-            }.into();
+            }
+            .into();
         }
     }
-    
+
     quote_spanned!(
         string_literal.span() =>
         compile_error!("Unknown builtin const was not found in std/core.sus")
-    ).into()
+    )
+    .into()
 }

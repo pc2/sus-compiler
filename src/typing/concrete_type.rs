@@ -26,19 +26,19 @@ pub struct ConcreteGlobalReference<ID> {
     pub template_args: TVec<ConcreteType>,
 }
 
-/// A post-instantiation type. These fully define what wires should be generated for a given object. 
-/// So as opposed to [crate::typing::abstract_type::AbstractType], type parameters are filled out with concrete values. 
-/// 
+/// A post-instantiation type. These fully define what wires should be generated for a given object.
+/// So as opposed to [crate::typing::abstract_type::AbstractType], type parameters are filled out with concrete values.
+///
 /// Examples: `bool[3]`, `int #(MAX: 20)`
-/// 
+///
 /// Not to be confused with [crate::typing::abstract_type::AbstractType] which represents pre-instantiation types,
-/// or [crate::flattening::WrittenType] which represents the textual in-editor data. 
+/// or [crate::flattening::WrittenType] which represents the textual in-editor data.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteType {
     Named(ConcreteGlobalReference<TypeUUID>),
     Value(Value),
     Array(Box<(ConcreteType, ConcreteType)>),
-    /// Referencing [ConcreteType::Unknown] is a strong code smell. 
+    /// Referencing [ConcreteType::Unknown] is a strong code smell.
     /// It is likely you should use [crate::typing::type_inference::TypeSubstitutor::unify_must_succeed]
     /// or [crate::typing::type_inference::TypeSubstitutor::unify_report_error] instead
     ///
@@ -56,12 +56,10 @@ impl ConcreteType {
     }
     pub fn contains_unknown(&self) -> bool {
         match self {
-            ConcreteType::Named(global_ref) => {
-                global_ref
-                    .template_args
-                    .iter()
-                    .any(|concrete_template_arg| concrete_template_arg.1.contains_unknown())
-            }
+            ConcreteType::Named(global_ref) => global_ref
+                .template_args
+                .iter()
+                .any(|concrete_template_arg| concrete_template_arg.1.contains_unknown()),
             ConcreteType::Value(_) => false,
             ConcreteType::Array(arr_box) => {
                 let (arr_arr, arr_size) = arr_box.deref();
@@ -71,7 +69,7 @@ impl ConcreteType {
         }
     }
     /// Returns the size of this type in *wires*. So int #(MAX: 255) would return '8'
-    /// 
+    ///
     /// If it contains any Unknowns, then returns None
     pub fn sizeof(&self) -> Option<BigInt> {
         match self {
@@ -82,13 +80,15 @@ impl ConcreteType {
 
                 let mut typ_sz = typ.sizeof()?;
 
-                let ConcreteType::Value(arr_sz) = size else {return None};
+                let ConcreteType::Value(arr_sz) = size else {
+                    return None;
+                };
 
                 typ_sz *= arr_sz.unwrap_integer();
 
                 Some(typ_sz)
             }
-            ConcreteType::Unknown(_uuid) => None
+            ConcreteType::Unknown(_uuid) => None,
         }
     }
 

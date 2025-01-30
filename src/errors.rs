@@ -5,7 +5,9 @@ use std::thread::panicking;
 
 use crate::{alloc::ArenaAllocator, typing::template::Parameter};
 
-use crate::flattening::{Declaration, DomainInfo, Instruction, Interface, Module, Port, SubModuleInstance};
+use crate::flattening::{
+    Declaration, DomainInfo, Instruction, Interface, Module, Port, SubModuleInstance,
+};
 use crate::linker::{checkpoint::ErrorCheckpoint, FileData, LinkInfo};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,7 +17,7 @@ pub enum ErrorLevel {
 }
 
 /// Represents a comment about a location in the source code.
-/// 
+///
 /// Multiple infos can be attached to a single [CompileError]
 #[derive(Debug, Clone)]
 pub struct ErrorInfo {
@@ -25,7 +27,7 @@ pub struct ErrorInfo {
 }
 
 /// Represents an error or warning that the compiler produced. They can be shown in the IDE, or on the CLI
-/// 
+///
 /// All errors for a single file are stored together, which is why this struct does not contain a FileUUID
 #[derive(Debug, Clone)]
 pub struct CompileError {
@@ -44,6 +46,12 @@ pub struct ErrorStore {
     pub did_error: bool,
 }
 
+impl Default for ErrorStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ErrorStore {
     pub fn new() -> ErrorStore {
         ErrorStore {
@@ -52,7 +60,7 @@ impl ErrorStore {
         }
     }
 
-    pub fn take<'linker>(&mut self) -> Self {
+    pub fn take(&mut self) -> Self {
         std::mem::replace(self, ErrorStore::new())
     }
 
@@ -113,7 +121,11 @@ impl<'linker> ErrorCollector<'linker> {
         self.error_store.replace(ErrorStore::new())
     }
     /// Turn an [ErrorStore] into [ErrorCollector]
-    pub fn from_storage(error_store: ErrorStore, file: FileUUID, files: &'linker ArenaAllocator<FileData, FileUUIDMarker>) -> Self {
+    pub fn from_storage(
+        error_store: ErrorStore,
+        file: FileUUID,
+        files: &'linker ArenaAllocator<FileData, FileUUIDMarker>,
+    ) -> Self {
         Self {
             error_store: RefCell::new(error_store),
             file,
@@ -122,7 +134,7 @@ impl<'linker> ErrorCollector<'linker> {
         }
     }
     /// To re-attach this [ErrorCollector] to a new [Linker]. Mostly to get around the borrow checker
-    pub fn re_attach<'new_linker>(self, files: &'new_linker ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorCollector<'new_linker> {
+    pub fn re_attach(self, files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorCollector<'_> {
         ErrorCollector {
             error_store: RefCell::new(self.error_store.replace(ErrorStore::new())),
             file: self.file,
@@ -133,7 +145,7 @@ impl<'linker> ErrorCollector<'linker> {
 
     fn assert_span_good(&self, span: Span) {
         span.debug();
-        let rng = span.into_range();
+        let rng = span.as_range();
         assert!(rng.end <= self.file_len); // Don't need to verify start, since Span already enforces start <= end
     }
     fn push_diagnostic(
@@ -183,7 +195,7 @@ impl<'linker> ErrorCollector<'linker> {
     }
 }
 
-impl<'l> Drop for ErrorCollector<'l> {
+impl Drop for ErrorCollector<'_> {
     fn drop(&mut self) {
         if !self.error_store.borrow().is_untouched() && !panicking() {
             panic!("ErrorCollector should have been emptied!");
@@ -191,20 +203,20 @@ impl<'l> Drop for ErrorCollector<'l> {
     }
 }
 
-/// Intermediary struct to make adding infos far easier. 
-/// 
+/// Intermediary struct to make adding infos far easier.
+///
 /// Use as:
-/// 
+///
 ///     errors.warn(span, "Unused Variable").info(span2, file2, "In module").info(blablabla)
 pub struct ErrorReference<'ec> {
     err_collector: &'ec ErrorCollector<'ec>,
     pos: usize,
 }
 
-impl<'ec> ErrorReference<'ec> {
+impl ErrorReference<'_> {
     pub fn existing_info(&self, error_info: ErrorInfo) -> &Self {
         assert!(
-            error_info.position.debug().into_range().end
+            error_info.position.debug().as_range().end
                 <= self.err_collector.files[error_info.file].file_text.len()
         );
         self.err_collector.error_store.borrow_mut().errors[self.pos]
@@ -223,7 +235,7 @@ impl<'ec> ErrorReference<'ec> {
         self.info((span, self.err_collector.file), reason)
     }
     pub fn info_obj<Obj: FileKnowingErrorInfoObject>(&self, obj: &Obj) -> &Self {
-        self.existing_info(obj.make_global_info(&self.err_collector.files))
+        self.existing_info(obj.make_global_info(self.err_collector.files))
     }
     pub fn info_obj_same_file<Obj: ErrorInfoObject>(&self, obj: &Obj) -> &Self {
         if let Some(info) = obj.make_info(self.err_collector.file) {
@@ -242,7 +254,9 @@ impl<'ec> ErrorReference<'ec> {
         self
     }
     pub fn add_info_list(&self, mut info_list: Vec<ErrorInfo>) {
-        self.err_collector.error_store.borrow_mut().errors[self.pos].infos.append(&mut info_list);
+        self.err_collector.error_store.borrow_mut().errors[self.pos]
+            .infos
+            .append(&mut info_list);
     }
     pub fn suggest_replace<S: Into<String>>(&self, replace_span: Span, replace_with: S) -> &Self {
         self.info_same_file(
@@ -262,10 +276,7 @@ pub trait ErrorInfoObject {
 
 /// This represents objects that can be given as info to an error in a straight-forward way.
 pub trait FileKnowingErrorInfoObject {
-    fn make_global_info(
-        &self,
-        files: &ArenaAllocator<FileData, FileUUIDMarker>,
-    ) -> ErrorInfo;
+    fn make_global_info(&self, files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo;
 }
 
 // Trait implementations in the compiler
@@ -336,10 +347,7 @@ impl ErrorInfoObject for Port {
 }
 
 impl FileKnowingErrorInfoObject for LinkInfo {
-    fn make_global_info(
-        &self,
-        _files: &ArenaAllocator<FileData, FileUUIDMarker>,
-    ) -> ErrorInfo {
+    fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
         ErrorInfo {
             position: self.name_span,
             file: self.file,
@@ -350,10 +358,7 @@ impl FileKnowingErrorInfoObject for LinkInfo {
 
 /// For interfaces of this module
 impl FileKnowingErrorInfoObject for (&'_ Module, &'_ Interface) {
-    fn make_global_info(
-        &self,
-        _files: &ArenaAllocator<FileData, FileUUIDMarker>,
-    ) -> ErrorInfo {
+    fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
         let (md, interface) = *self;
         ErrorInfo {
             position: interface.name_span,
@@ -364,11 +369,9 @@ impl FileKnowingErrorInfoObject for (&'_ Module, &'_ Interface) {
 }
 
 impl FileKnowingErrorInfoObject for Module {
-    fn make_global_info(
-        &self,
-        files: &ArenaAllocator<FileData, FileUUIDMarker>,
-    ) -> ErrorInfo {
-        let ports_str = self.make_all_ports_info_string(&files[self.link_info.file].file_text, None);
+    fn make_global_info(&self, files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
+        let ports_str =
+            self.make_all_ports_info_string(&files[self.link_info.file].file_text, None);
 
         ErrorInfo {
             position: self.link_info.name_span,

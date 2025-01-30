@@ -1,9 +1,11 @@
-
 use crate::{
-    flattening::{DeclarationKind, Instruction}, linker::IsExtern, typing::concrete_type::ConcreteType, FlatAlloc, InstantiatedModule, Linker, Module, WireIDMarker
+    flattening::{DeclarationKind, Instruction},
+    linker::IsExtern,
+    typing::concrete_type::ConcreteType,
+    FlatAlloc, InstantiatedModule, Linker, Module, WireIDMarker,
 };
-use std::ops::Deref;
 use std::fmt::Write;
+use std::ops::Deref;
 
 use super::shared::*;
 
@@ -17,7 +19,13 @@ impl super::CodeGenBackend for VHDLCodegenBackend {
     fn output_dir_name(&self) -> &str {
         "vhdl_output"
     }
-    fn codegen(&self, md: &Module, instance: &InstantiatedModule, linker: &Linker, use_latency: bool) -> String {
+    fn codegen(
+        &self,
+        md: &Module,
+        instance: &InstantiatedModule,
+        _linker: &Linker,
+        use_latency: bool,
+    ) -> String {
         gen_vhdl_code(md, instance, use_latency)
     }
 }
@@ -27,7 +35,7 @@ struct CodeGenerationContext<'g, 'out, Stream: std::fmt::Write> {
     instance: &'g InstantiatedModule,
     program_text: &'out mut Stream,
     use_latency: bool,
-    needed_untils: FlatAlloc<i64, WireIDMarker>,
+    _needed_untils: FlatAlloc<i64, WireIDMarker>,
 }
 
 fn typ_to_declaration(mut typ: &ConcreteType) -> String {
@@ -52,7 +60,7 @@ fn typ_to_declaration(mut typ: &ConcreteType) -> String {
     }
 }
 
-impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> {
+impl<Stream: std::fmt::Write> CodeGenerationContext<'_, '_, Stream> {
     fn write_vhdl_code(&mut self) {
         match self.md.link_info.is_extern {
             IsExtern::Normal => {
@@ -96,9 +104,9 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
             let port_direction = if port.is_input { "in" } else { "out" };
             let port_type = typ_to_declaration(&port_wire.typ);
             let end = if it.peek().is_some() { ";" } else { "" };
-            write!(
+            writeln!(
                 self.program_text,
-                "{comment_text}        {port_name} : {port_direction} {port_type}{end}\n"
+                "{comment_text}        {port_name} : {port_direction} {port_type}{end}"
             )
             .unwrap();
         }
@@ -135,7 +143,7 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
                         return false;
                     }
                 }
-                return true;
+                true
             })
             .map(|(_, wire)| {
                 let signal_name = wire_name_self_latency(wire, self.use_latency);
@@ -155,16 +163,18 @@ impl<'g, 'out, Stream: std::fmt::Write> CodeGenerationContext<'g, 'out, Stream> 
     }
 }
 
-fn gen_vhdl_code(md: &Module, instance: &InstantiatedModule, use_latency: bool) -> String {
+// TODO This should be removed as soon as this feature is usable
+#[allow(unreachable_code)]
+fn gen_vhdl_code(_md: &Module, _instance: &InstantiatedModule, _use_latency: bool) -> String {
     todo!("VHDl codegen is unfinshed");
     let mut program_text = String::new();
 
     let mut ctx = CodeGenerationContext {
-        md,
-        instance,
-        use_latency,
+        md: _md,
+        instance: _instance,
+        use_latency: _use_latency,
         program_text: &mut program_text,
-        needed_untils: instance.compute_needed_untils(),
+        _needed_untils: _instance.compute_needed_untils(),
     };
     ctx.write_vhdl_code();
 

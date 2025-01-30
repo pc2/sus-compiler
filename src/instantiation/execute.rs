@@ -34,7 +34,7 @@ macro_rules! caught_by_typecheck {
 
 pub type ExecutionResult<T> = Result<T, (Span, String)>;
 
-impl<'fl> GenerationState<'fl> {
+impl GenerationState<'_> {
     fn span_of(&self, v: FlatID) -> Span {
         let instr = &self.md.link_info.instructions[v];
         match instr {
@@ -114,7 +114,7 @@ impl<'fl> GenerationState<'fl> {
     }
 }
 
-impl<'fl> Index<FlatID> for GenerationState<'fl> {
+impl Index<FlatID> for GenerationState<'_> {
     type Output = SubModuleOrWire;
 
     fn index(&self, index: FlatID) -> &Self::Output {
@@ -122,7 +122,7 @@ impl<'fl> Index<FlatID> for GenerationState<'fl> {
     }
 }
 
-impl<'fl> IndexMut<FlatID> for GenerationState<'fl> {
+impl IndexMut<FlatID> for GenerationState<'_> {
     fn index_mut(&mut self, index: FlatID) -> &mut Self::Output {
         &mut self.generation_state[index]
     }
@@ -170,7 +170,7 @@ enum RealWireRefRoot {
     Constant(Value),
 }
 
-impl<'fl, 'l> InstantiationContext<'fl, 'l> {
+impl InstantiationContext<'_, '_> {
     /// Uses the current context to turn a [WrittenType] into a [ConcreteType].
     ///
     /// Failures are fatal.
@@ -214,14 +214,23 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
         }
     }
 
-    fn get_first_template_argument_value(&self, cst_ref: &GlobalReference<ConstantUUID>) -> (&Value, Span) {
+    fn get_first_template_argument_value(
+        &self,
+        cst_ref: &GlobalReference<ConstantUUID>,
+    ) -> (&Value, Span) {
         let first_arg = cst_ref.unwrap_first_template_argument();
         let value_instruction = first_arg.kind.unwrap_value();
-        (self.generation_state[value_instruction].unwrap_generation_value(), first_arg.value_span)
+        (
+            self.generation_state[value_instruction].unwrap_generation_value(),
+            first_arg.value_span,
+        )
     }
 
     /// TODO make builtins that depend on parameters
-    fn get_named_constant_value(&self, cst_ref: &GlobalReference<ConstantUUID>) -> ExecutionResult<Value> {
+    fn get_named_constant_value(
+        &self,
+        cst_ref: &GlobalReference<ConstantUUID>,
+    ) -> ExecutionResult<Value> {
         let linker_cst = &self.linker.constants[cst_ref.id];
 
         Ok(if linker_cst.link_info.is_extern == IsExtern::Builtin {
@@ -232,11 +241,11 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     let (val, span) = self.get_first_template_argument_value(cst_ref);
                     let int_val = val.unwrap_integer();
                     if *int_val > BigInt::ZERO {
-                        let int_val_minus_one : BigInt = int_val - 1;
+                        let int_val_minus_one: BigInt = int_val - 1;
 
                         Value::Integer(BigInt::from(int_val_minus_one.bits()))
                     } else {
-                        return Err((span, format!("clog2 argument must be > 0, found {int_val}")))
+                        return Err((span, format!("clog2 argument must be > 0, found {int_val}")));
                     }
                 }
                 "assert" => {
@@ -245,7 +254,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     if condition.unwrap_bool() {
                         Value::Bool(true)
                     } else {
-                        return Err((span, "Assertion failed".into()))
+                        return Err((span, "Assertion failed".into()));
                     }
                 }
                 "sizeof" => {
@@ -255,7 +264,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     let concrete_typ = self.concretize_type(wr_typ)?;
 
                     let Some(typ_sz) = concrete_typ.sizeof() else {
-                        return Err((first_arg.value_span, "This is an incomplete type".into()))
+                        return Err((first_arg.value_span, "This is an incomplete type".into()));
                     };
 
                     Value::Integer(typ_sz)
@@ -272,7 +281,10 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
     }
 
     // Points to the wire in the hardware that corresponds to the root of this.
-    fn determine_wire_ref_root(&mut self, wire_ref_root: &WireReferenceRoot) -> ExecutionResult<RealWireRefRoot> {
+    fn determine_wire_ref_root(
+        &mut self,
+        wire_ref_root: &WireReferenceRoot,
+    ) -> ExecutionResult<RealWireRefRoot> {
         Ok(match wire_ref_root {
             &WireReferenceRoot::LocalDecl(decl_id, _) => match &self.generation_state[decl_id] {
                 SubModuleOrWire::Wire(w) => RealWireRefRoot::Wire {
@@ -432,9 +444,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
             &WireReferenceRoot::LocalDecl(decl_id, _span) => {
                 self.generation_state.get_generation_value(decl_id)?.clone()
             }
-            WireReferenceRoot::NamedConstant(cst) => {
-                self.get_named_constant_value(cst)?
-            }
+            WireReferenceRoot::NamedConstant(cst) => self.get_named_constant_value(cst)?,
             &WireReferenceRoot::SubModulePort(_) => {
                 todo!("Don't yet support compile time functions")
             }
@@ -718,8 +728,9 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                         template_args.alloc(match v {
                             Some(arg) => match &arg.kind {
                                 TemplateArgKind::Type(typ) => self.concretize_type(typ)?,
-                                TemplateArgKind::Value(v) => 
-                                    ConcreteType::Value(self.generation_state.get_generation_value(*v)?.clone()),
+                                TemplateArgKind::Value(v) => ConcreteType::Value(
+                                    self.generation_state.get_generation_value(*v)?.clone(),
+                                ),
                             },
                             None => ConcreteType::Unknown(self.type_substitutor.alloc()),
                         });

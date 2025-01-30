@@ -50,30 +50,49 @@ pub struct GlobalResolver<'linker> {
     pub file_data: &'linker FileData,
 
     pub errors: ErrorCollector<'linker>,
-    resolved_globals: RefCell<ResolvedGlobals>
+    resolved_globals: RefCell<ResolvedGlobals>,
 }
 
 impl<'linker> GlobalResolver<'linker> {
-    pub fn take_errors_globals(linker: &mut Linker, global_obj: GlobalUUID) -> (ErrorStore, ResolvedGlobals) {
-        let obj_link_info = Linker::get_link_info_mut(&mut linker.modules, &mut linker.types, &mut linker.constants, global_obj);
+    pub fn take_errors_globals(
+        linker: &mut Linker,
+        global_obj: GlobalUUID,
+    ) -> (ErrorStore, ResolvedGlobals) {
+        let obj_link_info = Linker::get_link_info_mut(
+            &mut linker.modules,
+            &mut linker.types,
+            &mut linker.constants,
+            global_obj,
+        );
 
         let errors = obj_link_info.errors.take();
         let resolved_globals = obj_link_info.resolved_globals.take();
 
         (errors, resolved_globals)
     }
-    pub fn new(linker: &'linker Linker, obj_link_info: &'linker LinkInfo, errors_globals: (ErrorStore, ResolvedGlobals)) -> Self {
+    pub fn new(
+        linker: &'linker Linker,
+        obj_link_info: &'linker LinkInfo,
+        errors_globals: (ErrorStore, ResolvedGlobals),
+    ) -> Self {
         let file_data = &linker.files[obj_link_info.file];
 
         GlobalResolver {
             linker,
             file_data,
-            errors: ErrorCollector::from_storage(errors_globals.0, obj_link_info.file, &linker.files),
+            errors: ErrorCollector::from_storage(
+                errors_globals.0,
+                obj_link_info.file,
+                &linker.files,
+            ),
             resolved_globals: RefCell::new(errors_globals.1),
         }
     }
     /// Get the [ErrorCollector] and [ResolvedGlobals] out of this
-    pub fn decommission<'linker_files>(self, linker_files: &'linker_files ArenaAllocator<FileData, FileUUIDMarker>) -> (ErrorCollector<'linker_files>, ResolvedGlobals) {
+    pub fn decommission(
+        self,
+        linker_files: &ArenaAllocator<FileData, FileUUIDMarker>,
+    ) -> (ErrorCollector<'_>, ResolvedGlobals) {
         let errors = self.errors.re_attach(linker_files);
         let resolved_globals = self.resolved_globals.into_inner();
         (errors, resolved_globals)
@@ -83,7 +102,7 @@ impl<'linker> GlobalResolver<'linker> {
         let named_type = match global {
             GlobalUUID::Module(_) => "Module",
             GlobalUUID::Type(_) => "Struct",
-            GlobalUUID::Constant(_) => "Constant"
+            GlobalUUID::Constant(_) => "Constant",
         };
         let link_info = self.linker.get_link_info(global);
         LinkingErrorLocation {
@@ -94,7 +113,7 @@ impl<'linker> GlobalResolver<'linker> {
     }
 
     /// SAFETY: Files are never touched, and as long as this object is managed properly linker will also exist long enough.
-    pub fn resolve_global<'slf>(&'slf self, name_span: Span) -> Option<GlobalUUID> {
+    pub fn resolve_global(&self, name_span: Span) -> Option<GlobalUUID> {
         let name = &self.file_data.file_text[name_span];
 
         let mut resolved_globals = self.resolved_globals.borrow_mut();
@@ -133,7 +152,13 @@ impl<'linker> GlobalResolver<'linker> {
         }
     }
 
-    pub fn not_expected_global_error<ID: Copy>(&self, global_ref: &GlobalReference<ID>, expected: &str) where GlobalUUID: From<ID> {
+    pub fn not_expected_global_error<ID: Copy>(
+        &self,
+        global_ref: &GlobalReference<ID>,
+        expected: &str,
+    ) where
+        GlobalUUID: From<ID>,
+    {
         // SAFETY: The allocated linker objects aren't going to change.
         let info = self.get_linking_error_location(GlobalUUID::from(global_ref.id));
         let name = &info.full_name;
@@ -146,38 +171,44 @@ impl<'linker> GlobalResolver<'linker> {
     }
 
     pub fn get_link_info(&self, id: GlobalUUID) -> &LinkInfo {
-        self.resolved_globals.borrow_mut().referenced_globals.push(id);
+        self.resolved_globals
+            .borrow_mut()
+            .referenced_globals
+            .push(id);
         self.linker.get_link_info(id)
     }
 }
 
-impl<'l> Index<ModuleUUID> for GlobalResolver<'l> {
+impl Index<ModuleUUID> for GlobalResolver<'_> {
     type Output = Module;
 
     fn index(&self, index: ModuleUUID) -> &Self::Output {
-        self.resolved_globals.borrow_mut()
+        self.resolved_globals
+            .borrow_mut()
             .referenced_globals
             .push(GlobalUUID::Module(index));
 
         &self.linker.modules[index]
     }
 }
-impl<'l> Index<TypeUUID> for GlobalResolver<'l> {
+impl Index<TypeUUID> for GlobalResolver<'_> {
     type Output = StructType;
 
     fn index(&self, index: TypeUUID) -> &Self::Output {
-        self.resolved_globals.borrow_mut()
+        self.resolved_globals
+            .borrow_mut()
             .referenced_globals
             .push(GlobalUUID::Type(index));
 
         &self.linker.types[index]
     }
 }
-impl<'l> Index<ConstantUUID> for GlobalResolver<'l> {
+impl Index<ConstantUUID> for GlobalResolver<'_> {
     type Output = NamedConstant;
 
     fn index(&self, index: ConstantUUID) -> &Self::Output {
-        self.resolved_globals.borrow_mut()
+        self.resolved_globals
+            .borrow_mut()
             .referenced_globals
             .push(GlobalUUID::Constant(index));
 
@@ -186,18 +217,20 @@ impl<'l> Index<ConstantUUID> for GlobalResolver<'l> {
 }
 
 impl LinkInfo {
-    pub fn reabsorb_errors_globals(&mut self, (errors, resolved_globals): (ErrorCollector, ResolvedGlobals), checkpoint_id: usize) {
+    pub fn reabsorb_errors_globals(
+        &mut self,
+        (errors, resolved_globals): (ErrorCollector, ResolvedGlobals),
+        checkpoint_id: usize,
+    ) {
         // Store errors and resolved_globals back into module
         assert!(self.resolved_globals.is_untouched());
         assert!(self.errors.is_untouched());
         let expected_checkpoint = self.checkpoints.len();
         assert_eq!(expected_checkpoint, checkpoint_id, "The new checkpoint is not what was expected. The new checkpoint was {checkpoint_id}, whereas the expected next checkpoint is {expected_checkpoint}");
-        
+
         self.resolved_globals = resolved_globals;
         self.errors = errors.into_storage();
-        self.checkpoints.push(CheckPoint::checkpoint(
-            &self.errors,
-            &self.resolved_globals,
-        ));
+        self.checkpoints
+            .push(CheckPoint::new(&self.errors, &self.resolved_globals));
     }
 }

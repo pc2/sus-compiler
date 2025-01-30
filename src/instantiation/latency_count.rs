@@ -53,7 +53,7 @@ fn make_path_info_string(
 
         write_path_elem_to_string(
             &mut result,
-            &decl_name,
+            decl_name,
             to_absolute_latency,
             prev_decl_absolute_latency,
         );
@@ -70,9 +70,7 @@ fn filter_unique_write_flats<'w>(
 ) -> Vec<&'w crate::flattening::Write> {
     let mut result: Vec<&'w crate::flattening::Write> = Vec::new();
     for w in writes {
-        if let Instruction::Write(original_write) =
-            &instructions[w.mux_input.original_connection]
-        {
+        if let Instruction::Write(original_write) = &instructions[w.mux_input.original_connection] {
             if !result
                 .iter()
                 .any(|found_write| std::ptr::eq(*found_write, original_write))
@@ -136,7 +134,7 @@ impl InstantiatedModule {
     /// If needed only the same cycle it is generated, then this is equal to [RealWire::absolute_latency].
     pub fn compute_needed_untils(&self) -> FlatAlloc<i64, WireIDMarker> {
         let mut result = self.wires.map(|(_id, w)| w.absolute_latency);
-        
+
         for (_id, w) in &self.wires {
             w.source.iter_sources_with_min_latency(|other, _| {
                 let nu = &mut result[other];
@@ -149,7 +147,7 @@ impl InstantiatedModule {
     }
 }
 
-impl<'fl, 'l> InstantiationContext<'fl, 'l> {
+impl InstantiationContext<'_, '_> {
     fn make_wire_to_latency_map(&self) -> WireToLatencyMap {
         const PLACEHOLDER: usize = usize::MAX;
 
@@ -290,7 +288,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
 
         fanins
     }
-    
+
     // Returns a proper interface if all ports involved did not produce an error. If a port did produce an error then returns None.
     // Computes all latencies involved
     pub fn compute_latencies(&mut self) {
@@ -336,8 +334,8 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                 domain_info.initial_values.clone(),
             ) {
                 Ok(latencies) => {
-                    for (_id, (node, lat)) in
-                        zip(domain_info.latency_node_meanings.iter(), latencies.iter()).enumerate()
+                    for (node, lat) in
+                        zip(domain_info.latency_node_meanings.iter(), latencies.iter())
                     {
                         let wire = &mut self.wires[*node];
                         wire.absolute_latency = *lat;
@@ -346,7 +344,7 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                                 self.md.get_instruction_span(wire.original_instruction);
                             self.errors.error(
                                 source_location,
-                                format!("Latency Counting couldn't reach this node"),
+                                "Latency Counting couldn't reach this node".to_string(),
                             );
                         }
                     }
@@ -476,12 +474,13 @@ impl<'fl, 'l> InstantiationContext<'fl, 'l> {
                     &self.wires[latency_node_meanings[conflict_path.first().unwrap().wire]];
                 let end_wire =
                     &self.wires[latency_node_meanings[conflict_path.last().unwrap().wire]];
-                let start_decl =
-                    self.md.link_info.instructions[start_wire.original_instruction].unwrap_declaration();
-                let end_decl =
-                    self.md.link_info.instructions[end_wire.original_instruction].unwrap_declaration();
-                let end_latency_decl =
-                    self.md.link_info.instructions[end_decl.latency_specifier.unwrap()].unwrap_expression();
+                let start_decl = self.md.link_info.instructions[start_wire.original_instruction]
+                    .unwrap_declaration();
+                let end_decl = self.md.link_info.instructions[end_wire.original_instruction]
+                    .unwrap_declaration();
+                let end_latency_decl = self.md.link_info.instructions
+                    [end_decl.latency_specifier.unwrap()]
+                .unwrap_expression();
 
                 let writes_involved =
                     self.gather_all_mux_inputs(latency_node_meanings, &conflict_path);

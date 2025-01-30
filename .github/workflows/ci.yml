@@ -19,18 +19,19 @@ jobs:
       with:
         submodules: recursive
     - name: Build
-      # Don't try to build codegen, as it needs to link against LLVM
       run: cargo build --verbose --all-features
     - name: Run tests
       run: cargo test --verbose --all-features
     - name: Run regression test
       run: ./target/debug/sus_compiler test.sus --ci --nocolor 1> test.sus_output_ci.txt 2> test.sus_errors_ci.txt || true && diff test.sus_output_ci.txt test.sus_output.txt && diff test.sus_errors_ci.txt test.sus_errors.txt
-
-  # check-fmt:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - uses: actions/checkout@v4
-  #     with:
-  #       submodules: recursive
-  #   - name: cargo fmt --check
-  #     run: cargo fmt --check
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_INCREMENTAL: 0
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - name: format
+      run: cargo fmt --check
+    - name: clippy
+      run: cargo clippy --check
