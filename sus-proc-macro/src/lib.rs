@@ -1,6 +1,8 @@
+
 use proc_macro::TokenStream;
 
 use quote::{quote, quote_spanned};
+use regex::Regex;
 use syn::{parse_macro_input, LitStr};
 
 #[proc_macro]
@@ -68,4 +70,54 @@ pub fn field(token_stream: TokenStream) -> TokenStream {
         )
     }
     .into()
+}
+
+#[proc_macro]
+pub fn get_builtin_type(token_stream: TokenStream) -> TokenStream {
+    let string_literal: LitStr = parse_macro_input!(token_stream);
+
+    let object_name = string_literal.value();
+
+    let core_file_text = std::fs::read_to_string("stl/core.sus").unwrap();
+
+    let re = Regex::new(r"__builtin__\s+struct\s+([a-zA-Z0-9_]+)\s*(?:#\(.*\))?\s*\{").unwrap();
+
+    for (idx, c) in re.captures_iter(&core_file_text).enumerate() {
+        let (_full, [found_name]) = c.extract();
+        if found_name == object_name {
+            return quote! {
+                crate::prelude::TypeUUID::from_hidden_value(#idx)
+            }.into();
+        }
+    }
+    
+    quote_spanned!(
+        string_literal.span() =>
+        compile_error!("Unknown builtin type was not found in stl/core.sus")
+    ).into()
+}
+
+#[proc_macro]
+pub fn get_builtin_const(token_stream: TokenStream) -> TokenStream {
+    let string_literal: LitStr = parse_macro_input!(token_stream);
+
+    let object_name = string_literal.value();
+
+    let core_file_text = std::fs::read_to_string("stl/core.sus").unwrap();
+
+    let re = Regex::new(r"__builtin__\s+const\s+.+\s+([a-zA-Z0-9_]+)\s*(?:#\(.*\))?\s*\{").unwrap();
+
+    for (idx, c) in re.captures_iter(&core_file_text).enumerate() {
+        let (_full, [found_name]) = c.extract();
+        if found_name == object_name {
+            return quote! {
+                crate::prelude::ConstantUUID::from_hidden_value(#idx)
+            }.into();
+        }
+    }
+    
+    quote_spanned!(
+        string_literal.span() =>
+        compile_error!("Unknown builtin const was not found in stl/core.sus")
+    ).into()
 }

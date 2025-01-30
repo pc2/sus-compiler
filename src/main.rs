@@ -2,7 +2,6 @@
 
 mod alloc;
 mod block_vector;
-mod util;
 
 mod config;
 mod debug;

@@ -15,8 +15,7 @@ use tree_sitter::Tree;
 use crate::{
     alloc::ArenaAllocator,
     file_position::FileText,
-    flattening::Module,
-    util::const_str_position,
+    flattening::Module
 };
 
 use crate::errors::{CompileError, ErrorInfo, ErrorLevel, ErrorStore};
@@ -26,25 +25,6 @@ use crate::flattening::{StructType, TypingAllocator};
 
 
 use self::checkpoint::CheckPoint;
-
-const BUILTIN_TYPES: [&'static str; 2] = ["bool", "int"];
-const BUILTIN_CONSTANTS: [&'static str; 6] = ["__crash_compiler", "true", "false", "assert", "sizeof", "clog2"];
-
-pub const fn get_builtin_type(name: &'static str) -> TypeUUID {
-    if let Some(is_type) = const_str_position(name, &BUILTIN_TYPES) {
-        TypeUUID::from_hidden_value(is_type)
-    } else {
-        unreachable!()
-    }
-}
-
-pub const fn get_builtin_const(name: &'static str) -> ConstantUUID {
-    if let Some(is_type) = const_str_position(name, &BUILTIN_CONSTANTS) {
-        ConstantUUID::from_hidden_value(is_type)
-    } else {
-        unreachable!()
-    }
-}
 
 /// Documentation can be attached to [Module], [StructType], [NamedConstant], [crate::flattening::Declaration]
 #[derive(Debug, Clone)]

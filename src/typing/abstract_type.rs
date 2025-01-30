@@ -1,3 +1,5 @@
+use sus_proc_macro::get_builtin_type;
+
 use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
 use crate::value::Value;
@@ -6,7 +8,6 @@ use std::ops::Deref;
 use super::template::{GlobalReference, Parameter, TVec};
 use super::type_inference::{DomainVariableID, DomainVariableIDMarker, TypeSubstitutor, TypeVariableID, TypeVariableIDMarker, UnifyErrorReport};
 use crate::flattening::{BinaryOperator, StructType, TypingAllocator, UnaryOperator, WrittenType};
-use crate::linker::get_builtin_type;
 use crate::to_string::map_to_type_names;
 
 /// This contains only the information that can be type-checked before template instantiation.
@@ -36,8 +37,8 @@ pub enum AbstractType {
     Unknown(TypeVariableID),
 }
 
-pub const BOOL_TYPE: AbstractType = AbstractType::Named(get_builtin_type("bool"));
-pub const INT_TYPE: AbstractType = AbstractType::Named(get_builtin_type("int"));
+pub const BOOL_TYPE: AbstractType = AbstractType::Named(get_builtin_type!("bool"));
+pub const INT_TYPE: AbstractType = AbstractType::Named(get_builtin_type!("int"));
 
 /// These represent (clock) domains. While clock domains are included under this umbrella, domains can use the same clock. 
 /// The use case for non-clock-domains is to separate Latency Counting domains. So different pipelines where it doesn't 

@@ -3,9 +3,10 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
-use crate::linker::{get_builtin_const, get_builtin_type, AFTER_INITIAL_PARSE_CP};
+use crate::linker::AFTER_INITIAL_PARSE_CP;
 use crate::prelude::*;
 
+use sus_proc_macro::{get_builtin_const, get_builtin_type};
 use tree_sitter::Parser;
 
 use crate::{
@@ -43,15 +44,18 @@ impl Linker {
         let stl_path = PathBuf::from_str(STD_LIB_PATH).expect("Standard library directory is not a valid path?");
         self.add_all_files_in_directory(&stl_path, info_mngr);
 
-        assert_eq!(self.types[get_builtin_type("int")].link_info.name, "int");
-        assert_eq!(self.types[get_builtin_type("bool")].link_info.name, "bool");
+        // Sanity check for the names the compiler knows internally. 
+        // They are defined in stl/core.sus
+        // Critically, stl/core.sus MUST be the first file to be loaded into the linker. Otherwise the IDs don't point to the correct objects
+        assert_eq!(self.types[get_builtin_type!("int")].link_info.name, "int");
+        assert_eq!(self.types[get_builtin_type!("bool")].link_info.name, "bool");
 
-        assert_eq!(self.constants[get_builtin_const("true")].link_info.name, "true");
-        assert_eq!(self.constants[get_builtin_const("false")].link_info.name, "false");
-        assert_eq!(self.constants[get_builtin_const("__crash_compiler")].link_info.name, "__crash_compiler");
-        assert_eq!(self.constants[get_builtin_const("assert")].link_info.name, "assert");
-        assert_eq!(self.constants[get_builtin_const("sizeof")].link_info.name, "sizeof");
-        assert_eq!(self.constants[get_builtin_const("clog2")].link_info.name, "clog2");
+        assert_eq!(self.constants[get_builtin_const!("true")].link_info.name, "true");
+        assert_eq!(self.constants[get_builtin_const!("false")].link_info.name, "false");
+        assert_eq!(self.constants[get_builtin_const!("__crash_compiler")].link_info.name, "__crash_compiler");
+        assert_eq!(self.constants[get_builtin_const!("assert")].link_info.name, "assert");
+        assert_eq!(self.constants[get_builtin_const!("sizeof")].link_info.name, "sizeof");
+        assert_eq!(self.constants[get_builtin_const!("clog2")].link_info.name, "clog2");
     }
 
     pub fn add_all_files_in_directory<ExtraInfoManager : LinkerExtraFileInfoManager>(&mut self, directory : &PathBuf, info_mngr : &mut ExtraInfoManager) {

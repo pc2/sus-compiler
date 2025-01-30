@@ -1,4 +1,6 @@
-use crate::linker::{get_builtin_const, IsExtern, LinkInfo, AFTER_LINTS_CP};
+use sus_proc_macro::get_builtin_const;
+
+use crate::linker::{IsExtern, LinkInfo, AFTER_LINTS_CP};
 use crate::prelude::*;
 use crate::typing::template::ParameterKind;
 
@@ -59,7 +61,7 @@ fn find_unused_variables(md: &Module, errors: &ErrorCollector) {
         if let Instruction::Expression(expr) = instr {
             if let ExpressionSource::WireRef(wr) = &expr.source {
                 if let WireReferenceRoot::NamedConstant(cst) = &wr.root {
-                    if cst.id == get_builtin_const("assert") {
+                    if cst.id == get_builtin_const!("assert") {
                         is_instance_used_map[assert_instr_id] = true;
                         wire_to_explore_queue.push(assert_instr_id);
                     }

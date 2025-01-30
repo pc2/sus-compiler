@@ -13,7 +13,6 @@ use crate::typing::template::GlobalReference;
 use num::BigInt;
 
 use crate::flattening::*;
-use crate::util::add_to_small_set;
 use crate::value::{compute_binary_op, compute_unary_op, Value};
 
 use crate::typing::{
@@ -148,6 +147,12 @@ fn array_access<'v>(
                 arr.len()
             ),
         ))
+    }
+}
+
+fn add_to_small_set<T: Eq>(set_vec: &mut Vec<T>, elem: T) {
+    if !set_vec.contains(&elem) {
+        set_vec.push(elem);
     }
 }
 
