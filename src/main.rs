@@ -21,8 +21,8 @@ mod linker;
 
 mod compiler_top;
 
-use std::io::Write;
 use std::error::Error;
+use std::io::Write;
 
 use prelude::*;
 
@@ -38,8 +38,10 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let file_paths = config.files.clone();
 
     let codegen_backend = match config.target_language {
-        config::TargetLanguage::SystemVerilog => Box::new(VerilogCodegenBackend) as Box<dyn CodeGenBackend>,
-        config::TargetLanguage::VHDL => Box::new(VHDLCodegenBackend) as Box<dyn CodeGenBackend>,
+        config::TargetLanguage::SystemVerilog => {
+            Box::new(VerilogCodegenBackend) as Box<dyn CodeGenBackend>
+        }
+        config::TargetLanguage::Vhdl => Box::new(VHDLCodegenBackend) as Box<dyn CodeGenBackend>,
     };
 
     if config.use_lsp {

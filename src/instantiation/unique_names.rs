@@ -1,32 +1,30 @@
 use std::collections::HashMap;
 
-/// Generates ascending IDs for locals, while keeping the name information as much as possible. 
-/// 
+/// Generates ascending IDs for locals, while keeping the name information as much as possible.
+///
 /// For example, when generating multiple names for the string "beep" it returns:
 /// - beep
 /// - beep_2
 /// - beep_3
 /// - ...
 pub struct UniqueNames {
-    name_map : HashMap<String, i64>
+    name_map: HashMap<String, i64>,
 }
 
 impl UniqueNames {
     pub fn new() -> Self {
-        let mut name_map : HashMap<String, i64> = HashMap::new();
+        let mut name_map: HashMap<String, i64> = HashMap::new();
         name_map.insert(String::new(), 1);
-        Self {
-            name_map
-        }
+        Self { name_map }
     }
-    pub fn get_unique_name<S : Into<String> + AsRef<str>>(&mut self, name : S) -> String {
+    pub fn get_unique_name<S: Into<String> + AsRef<str>>(&mut self, name: S) -> String {
         let name_ref = name.as_ref();
         if let Some(found_id) = self.name_map.get_mut(name_ref) {
             let result = format!("{name_ref}_{found_id}");
             *found_id += 1;
             result
         } else {
-            let result : String = name.into();
+            let result: String = name.into();
             self.name_map.insert(result.clone(), 2);
             result
         }

@@ -1,7 +1,6 @@
-
-use crate::{alloc::UUID, prelude::*};
 use super::abstract_type::AbstractType;
 use crate::flattening::WrittenType;
+use crate::{alloc::UUID, prelude::*};
 
 /// References any [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant],
 /// and includes any template arguments.
@@ -29,7 +28,9 @@ impl<ID> GlobalReference<ID> {
     }
     /// Used for builtins, like clog2, assert, sizeof, etc
     pub fn unwrap_first_template_argument(&self) -> &TemplateArg {
-        self.template_args[UUID::from_hidden_value(0)].as_ref().unwrap()
+        self.template_args[UUID::from_hidden_value(0)]
+            .as_ref()
+            .unwrap()
     }
 }
 

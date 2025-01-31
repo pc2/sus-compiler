@@ -8,16 +8,17 @@ use std::{
 };
 
 /// UUIDs are type-safe integers. They are used for [FlatAlloc] and [ArenaAllocator]
-/// 
-/// They don't support arithmetic, as they're just meant to represent pointers. 
-/// 
+///
+/// They don't support arithmetic, as they're just meant to represent pointers.
+///
 /// TODO add custom niche for more efficient Options, wait until custom niches are stabilized (https://internals.rust-lang.org/t/nonmaxusize-and-niche-value-optimisation/19661)
 /// Maybe use NonZeroUsize (https://doc.rust-lang.org/std/num/struct.NonZeroUsize.html)
+#[allow(clippy::upper_case_acronyms)]
 pub struct UUID<IndexMarker>(usize, PhantomData<IndexMarker>);
 
 impl<IndexMarker> Clone for UUID<IndexMarker> {
     fn clone(&self) -> Self {
-        Self(self.0, PhantomData)
+        *self
     }
 }
 impl<IndexMarker> Copy for UUID<IndexMarker> {}
@@ -59,29 +60,33 @@ impl<IndexMarker> UUID<IndexMarker> {
 }
 
 pub struct UUIDAllocator<IndexMarker> {
-    cur : UUID<IndexMarker>
+    cur: UUID<IndexMarker>,
 }
 
 impl<IndexMarker> Clone for UUIDAllocator<IndexMarker> {
     fn clone(&self) -> Self {
-        Self { cur: self.cur.clone() }
+        Self { cur: self.cur }
+    }
+}
+
+impl<IndexMarker> Default for UUIDAllocator<IndexMarker> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 impl<IndexMarker> UUIDAllocator<IndexMarker> {
     pub fn new() -> Self {
         Self {
-            cur: UUID(0, PhantomData)
+            cur: UUID(0, PhantomData),
         }
     }
     pub fn new_start_from(start: UUID<IndexMarker>) -> Self {
-        Self {
-            cur: start
-        }
+        Self { cur: start }
     }
     pub fn alloc(&mut self) -> UUID<IndexMarker> {
         let allocated_id = self.cur;
-        self.cur.0+=1;
+        self.cur.0 += 1;
         allocated_id
     }
     pub fn peek(&self) -> UUID<IndexMarker> {
@@ -94,14 +99,16 @@ impl<IndexMarker> UUIDAllocator<IndexMarker> {
         }
         result
     }
-    pub fn into_range(&self) -> UUIDRange<IndexMarker> {
+    pub fn as_range(&self) -> UUIDRange<IndexMarker> {
         UUIDRange(UUID::from_hidden_value(0), self.cur)
     }
 }
 
 impl<IndexMarker: UUIDMarker> std::fmt::Debug for UUIDAllocator<IndexMarker> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        f.debug_struct("UUIDAllocator").field("count: ", &self.cur.0).finish()
+        f.debug_struct("UUIDAllocator")
+            .field("count: ", &self.cur.0)
+            .finish()
     }
 }
 
@@ -166,7 +173,7 @@ impl<IndexMarker: UUIDMarker> Debug for UUIDRange<IndexMarker> {
 
 impl<IndexMarker> Clone for UUIDRange<IndexMarker> {
     fn clone(&self) -> Self {
-        Self(self.0, self.1)
+        *self
     }
 }
 impl<IndexMarker> Copy for UUIDRange<IndexMarker> {}
@@ -287,7 +294,7 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
     }
     pub fn free(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> T {
         self.free_slots.push(uuid);
-        std::mem::replace(&mut self.data[uuid], None).unwrap()
+        self.data[uuid].take().unwrap()
     }
     pub fn clear(&mut self) {
         self.data.clear();
@@ -296,10 +303,10 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
     pub fn is_empty(&self) -> bool {
         self.data.len() == self.free_slots.len()
     }
-    pub fn iter<'a>(&'a self) -> FlatOptionIterator<'a, T, IndexMarker> {
+    pub fn iter(&self) -> FlatOptionIterator<'_, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn iter_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
+    pub fn iter_mut(&mut self) -> FlatOptionIteratorMut<'_, T, IndexMarker> {
         self.into_iter()
     }
     pub fn find(
@@ -405,6 +412,12 @@ pub struct ArenaVector<T, IndexMarker> {
     _ph: PhantomData<IndexMarker>,
 }
 
+impl<T, IndexMarker> Default for ArenaVector<T, IndexMarker> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T, IndexMarker> ArenaVector<T, IndexMarker> {
     pub fn new() -> Self {
         Self {
@@ -422,10 +435,10 @@ impl<T, IndexMarker> ArenaVector<T, IndexMarker> {
     pub fn remove(&mut self, UUID(uuid, _): UUID<IndexMarker>) {
         self.data[uuid] = None;
     }
-    pub fn iter<'a>(&'a self) -> FlatOptionIterator<'a, T, IndexMarker> {
+    pub fn iter(&self) -> FlatOptionIterator<'_, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn iter_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
+    pub fn iter_mut(&mut self) -> FlatOptionIteratorMut<'_, T, IndexMarker> {
         self.into_iter()
     }
     pub fn find(
@@ -483,8 +496,14 @@ pub struct FlatAlloc<T, IndexMarker> {
     _ph: PhantomData<IndexMarker>,
 }
 
+impl<T, IndexMarker> Default for FlatAlloc<T, IndexMarker> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
-    pub const EMPTY_FLAT_ALLOC : Self = Self::new();
+    pub const EMPTY_FLAT_ALLOC: Self = Self::new();
 
     pub const fn new() -> Self {
         Self {
@@ -498,12 +517,15 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
             _ph: PhantomData,
         }
     }
-    pub fn with_size(size: usize, v: T) -> Self where T: Clone {
+    pub fn with_size(size: usize, v: T) -> Self
+    where
+        T: Clone,
+    {
         let mut data = Vec::new();
         data.resize(size, v);
         Self {
             data,
-            _ph: PhantomData
+            _ph: PhantomData,
         }
     }
     pub fn get_next_alloc_id(&self) -> UUID<IndexMarker> {
@@ -511,7 +533,10 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
         UUID(uuid, PhantomData)
     }
     pub fn last_id(&self) -> UUID<IndexMarker> {
-        assert!(self.data.len() >= 1, "Can't get last_id on empty FlatAlloc");
+        assert!(
+            !self.data.is_empty(),
+            "Can't get last_id on empty FlatAlloc"
+        );
         UUID(self.data.len() - 1, PhantomData)
     }
     pub fn alloc(&mut self, value: T) -> UUID<IndexMarker> {
@@ -531,10 +556,10 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub fn clear(&mut self) {
         self.data.clear();
     }
-    pub fn iter<'a>(&'a self) -> FlatAllocIter<'a, T, IndexMarker> {
+    pub fn iter(&self) -> FlatAllocIter<'_, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn iter_mut<'a>(&'a mut self) -> FlatAllocIterMut<'a, T, IndexMarker> {
+    pub fn iter_mut(&mut self) -> FlatAllocIterMut<'_, T, IndexMarker> {
         self.into_iter()
     }
     pub fn map<OT>(
@@ -584,13 +609,13 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
 }
 
 impl<T, IndexMarker> FlatAlloc<Option<T>, IndexMarker> {
-    pub fn iter_valids<'a>(&'a self) -> FlatOptionIterator<'a, T, IndexMarker> {
+    pub fn iter_valids(&self) -> FlatOptionIterator<'_, T, IndexMarker> {
         FlatOptionIterator {
             it: self.data.iter().enumerate(),
             _ph: PhantomData,
         }
     }
-    pub fn iter_valids_mut<'a>(&'a mut self) -> FlatOptionIteratorMut<'a, T, IndexMarker> {
+    pub fn iter_valids_mut(&mut self) -> FlatOptionIteratorMut<'_, T, IndexMarker> {
         FlatOptionIteratorMut {
             it: self.data.iter_mut().enumerate(),
             _ph: PhantomData,
@@ -656,7 +681,7 @@ impl<'a, T, IndexMarker> Iterator for FlatAllocIter<'a, T, IndexMarker> {
         self.iter.size_hint()
     }
 }
-impl<'a, T, IndexMarker> ExactSizeIterator for FlatAllocIter<'a, T, IndexMarker> {
+impl<T, IndexMarker> ExactSizeIterator for FlatAllocIter<'_, T, IndexMarker> {
     fn len(&self) -> usize {
         self.iter.len()
     }
@@ -691,7 +716,7 @@ impl<'a, T, IndexMarker> Iterator for FlatAllocIterMut<'a, T, IndexMarker> {
         self.iter.size_hint()
     }
 }
-impl<'a, T, IndexMarker> ExactSizeIterator for FlatAllocIterMut<'a, T, IndexMarker> {
+impl<T, IndexMarker> ExactSizeIterator for FlatAllocIterMut<'_, T, IndexMarker> {
     fn len(&self) -> usize {
         self.iter.len()
     }

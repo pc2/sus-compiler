@@ -1,8 +1,8 @@
+mod concrete_typecheck;
 mod execute;
 mod latency_algorithm;
 mod latency_count;
 mod list_of_lists;
-mod concrete_typecheck;
 mod unique_names;
 
 use unique_names::UniqueNames;
@@ -30,7 +30,7 @@ use self::latency_algorithm::SpecifiedLatency;
 pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
 
 /// See [MultiplexerSource]
-/// 
+///
 /// This is the post-instantiation equivalent of [crate::flattening::WireReferencePathElement]
 #[derive(Debug, Clone)]
 pub enum RealWirePathElem {
@@ -49,8 +49,8 @@ impl RealWirePathElem {
     }
 }
 
-/// One arm of a multiplexer. Each arm has an attached condition that is also stored here. 
-/// 
+/// One arm of a multiplexer. Each arm has an attached condition that is also stored here.
+///
 /// See [RealWireDataSource::Multiplexer]
 #[derive(Debug)]
 pub struct MultiplexerSource {
@@ -61,8 +61,8 @@ pub struct MultiplexerSource {
     pub original_connection: FlatID,
 }
 
-/// Where a [RealWire] gets its data, be it an operator, read-only value, constant, etc. 
-/// 
+/// Where a [RealWire] gets its data, be it an operator, read-only value, constant, etc.
+///
 /// This is the post-instantiation equivalent of [crate::flattening::ExpressionSource]
 #[derive(Debug)]
 pub enum RealWireDataSource {
@@ -90,9 +90,9 @@ pub enum RealWireDataSource {
 }
 
 /// An actual instantiated wire of an [InstantiatedModule] (See [InstantiatedModule::wires])
-/// 
+///
 /// It can have a latency count and domain. All wires have a name, either the name they were given by the user, or a generated name like _1, _13
-/// 
+///
 /// Generated from a [crate::flattening::Expression] instruction
 #[derive(Debug)]
 pub struct RealWire {
@@ -109,7 +109,7 @@ pub struct RealWire {
 }
 
 /// See [SubModule]
-/// 
+///
 /// This represents a port of such a submodule
 #[derive(Debug)]
 pub struct SubModulePort {
@@ -118,11 +118,11 @@ pub struct SubModulePort {
 }
 
 /// An actual instantiated submodule of an [InstantiatedModule] (See [InstantiatedModule::submodules])
-/// 
+///
 /// All submodules have a name, either the name they were given by the user, or a generated name like _1, _13
-/// 
+///
 /// When generating RTL code, one submodule object generates a single submodule instantiation
-/// 
+///
 /// Generated from a [crate::flattening::SubModuleInstance] instruction
 #[derive(Debug)]
 pub struct SubModule {
@@ -145,11 +145,11 @@ pub struct InstantiatedPort {
     pub domain: DomainID,
 }
 
-/// [InstantiatedModule] are the final product we're trying to produce with the compiler. 
-/// They amount to little more than a collection of wires, multiplexers and submodules. 
-/// 
-/// With the submodules, they form a tree structure, of nested [InstantiatedModule] references. 
-/// 
+/// [InstantiatedModule] are the final product we're trying to produce with the compiler.
+/// They amount to little more than a collection of wires, multiplexers and submodules.
+///
+/// With the submodules, they form a tree structure, of nested [InstantiatedModule] references.
+///
 /// Generated when instantiating a [Module]
 #[derive(Debug)]
 pub struct InstantiatedModule {
@@ -200,14 +200,20 @@ impl SubModuleOrWire {
     }
 }
 
-/// Stored per module [Module]. 
-/// With this you can instantiate a module for different sets of template arguments. 
-/// It caches the instantiations that have been made, such that they need not be repeated. 
-/// 
+/// Stored per module [Module].
+/// With this you can instantiate a module for different sets of template arguments.
+/// It caches the instantiations that have been made, such that they need not be repeated.
+///
 /// Also, with incremental builds (#49) this will be a prime area for investigation
 #[derive(Debug)]
 pub struct InstantiationCache {
     cache: RefCell<HashMap<TVec<ConcreteType>, Rc<InstantiatedModule>>>,
+}
+
+impl Default for InstantiationCache {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl InstantiationCache {
@@ -285,9 +291,9 @@ impl InstantiationCache {
     }
 }
 
-/// Every [crate::flattening::Instruction] has an associated value (See [SubModuleOrWire]). 
-/// They are either what this local name is currently referencing (either a wire instance or a submodule instance). 
-/// Or in the case of Generative values, the current value in the generative variable. 
+/// Every [crate::flattening::Instruction] has an associated value (See [SubModuleOrWire]).
+/// They are either what this local name is currently referencing (either a wire instance or a submodule instance).
+/// Or in the case of Generative values, the current value in the generative variable.
 #[derive(Debug)]
 struct GenerationState<'fl> {
     generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
@@ -295,7 +301,7 @@ struct GenerationState<'fl> {
 }
 
 /// Runtime conditions applied to a [crate::flattening::Write]
-/// 
+///
 /// ```sus
 /// state int a
 /// when x {
@@ -306,12 +312,12 @@ struct GenerationState<'fl> {
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConditionStackElem {
-    pub condition_wire : WireID,
+    pub condition_wire: WireID,
     /// When this is an else-branch
-    pub inverse : bool
+    pub inverse: bool,
 }
 
-/// As with other contexts, this is the shared state we're lugging around while executing & typechecking a module. 
+/// As with other contexts, this is the shared state we're lugging around while executing & typechecking a module.
 struct InstantiationContext<'fl, 'l> {
     name: String,
     generation_state: GenerationState<'fl>,
@@ -322,7 +328,7 @@ struct InstantiationContext<'fl, 'l> {
 
     // Used for Execution
     unique_name_producer: UniqueNames,
-    condition_stack : Vec<ConditionStackElem>,
+    condition_stack: Vec<ConditionStackElem>,
 
     interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     errors: ErrorCollector<'l>,
@@ -344,7 +350,7 @@ fn mangle_name(str: &str) -> String {
     result
 }
 
-impl<'fl, 'l> InstantiationContext<'fl, 'l> {
+impl InstantiationContext<'_, '_> {
     fn extract(self) -> InstantiatedModule {
         InstantiatedModule {
             mangled_name: mangle_name(&self.name),
@@ -367,7 +373,10 @@ fn perform_instantiation(
         name: pretty_print_concrete_instance(&md.link_info, template_args, &linker.types),
         generation_state: GenerationState {
             md,
-            generation_state: md.link_info.instructions.map(|(_, _)| SubModuleOrWire::Unnasigned),
+            generation_state: md
+                .link_info
+                .instructions
+                .map(|(_, _)| SubModuleOrWire::Unnasigned),
         },
         type_substitutor: TypeSubstitutor::new(),
         condition_stack: Vec::new(),

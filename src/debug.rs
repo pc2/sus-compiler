@@ -1,6 +1,9 @@
 use std::{cell::RefCell, ops::Range};
 
-use crate::{alloc::ArenaAllocator, config::ConfigStruct, flattening::Module, linker::FileData, pretty_print_spans_in_reverse_order, ModuleUUIDMarker};
+use crate::{
+    alloc::ArenaAllocator, config::ConfigStruct, flattening::Module, linker::FileData,
+    pretty_print_spans_in_reverse_order, ModuleUUIDMarker,
+};
 
 /// Many duplicates will be produced, and filtering them out in the code itself is inefficient. Therefore just keep a big buffer and deduplicate as needed
 const SPAN_TOUCH_HISTORY_SIZE: usize = 256;
@@ -30,11 +33,11 @@ struct TouchedSpansHistory {
 
 thread_local! {
     static SPANS_HISTORY : RefCell<TouchedSpansHistory> =
-        RefCell::new(TouchedSpansHistory{
+        const { RefCell::new(TouchedSpansHistory{
             span_history : [DEFAULT_RANGE; SPAN_TOUCH_HISTORY_SIZE],
             num_spans : 0,
             in_use : false
-        });
+        }) };
 }
 
 fn print_most_recent_spans(file_data: &FileData) {
@@ -108,7 +111,7 @@ impl<'text> SpanDebugger<'text> {
     }
 }
 
-impl<'text> Drop for SpanDebugger<'text> {
+impl Drop for SpanDebugger<'_> {
     fn drop(&mut self) {
         if !self.defused {
             println!("Panic happened in Span-guarded context: {}", self.context);
@@ -117,11 +120,14 @@ impl<'text> Drop for SpanDebugger<'text> {
     }
 }
 
-
-
 impl ConfigStruct {
-    /// The reason we pass an explicit bool here is because it merges the "if config().debug_xyz" with the for loop. 
-    pub fn for_each_debug_module<F : FnMut(&Module)>(&self, should_debug: bool, modules: &ArenaAllocator<Module, ModuleUUIDMarker>, mut f : F) {
+    /// The reason we pass an explicit bool here is because it merges the "if config().debug_xyz" with the for loop.
+    pub fn for_each_debug_module<F: FnMut(&Module)>(
+        &self,
+        should_debug: bool,
+        modules: &ArenaAllocator<Module, ModuleUUIDMarker>,
+        mut f: F,
+    ) {
         if should_debug {
             for (_, md) in modules {
                 let passes_whitelist = if let Some(wl) = &self.debug_whitelist {

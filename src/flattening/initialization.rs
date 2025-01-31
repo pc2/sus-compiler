@@ -9,7 +9,7 @@ use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
 use crate::{file_position::FileText, flattening::Module, instantiation::InstantiationCache};
 
 use crate::typing::template::{
-    GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind
+    GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind,
 };
 
 use super::parser::Cursor;
@@ -22,9 +22,9 @@ struct InitializationContext<'linker> {
     ports: FlatAlloc<Port, PortIDMarker>,
     interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
     domains: FlatAlloc<DomainInfo, DomainIDMarker>,
-    /// This is initially true, but when the first `domain xyz` statement is encountered this is set to false. 
+    /// This is initially true, but when the first `domain xyz` statement is encountered this is set to false.
     implicit_clk_domain: bool,
-    
+
     // struct-only stuff
     fields: FlatAlloc<StructField, FieldIDMarker>,
 
@@ -33,11 +33,14 @@ struct InitializationContext<'linker> {
     file_text: &'linker FileText,
 }
 
-impl<'linker> InitializationContext<'linker> {
+impl InitializationContext<'_> {
     fn gather_initial_global_object(&mut self, cursor: &mut Cursor) -> (Span, String) {
         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
         let name = self.file_text[name_span].to_owned();
-        self.domains.alloc(DomainInfo { name: "clk".to_string(), name_span: None });
+        self.domains.alloc(DomainInfo {
+            name: "clk".to_string(),
+            name_span: None,
+        });
         if cursor.optional_field(field!("template_declaration_arguments")) {
             cursor.list(kind!("template_declaration_arguments"), |cursor| {
                 let (kind, decl_span) = cursor.kind_span();
@@ -57,7 +60,7 @@ impl<'linker> InitializationContext<'linker> {
                         cursor.field(field!("type"));
                         let name_span = cursor.field_span(field!("name"), kind!("identifier"));
                         let name = self.file_text[name_span].to_owned();
-                        
+
                         self.parameters.alloc(Parameter {
                             name,
                             name_span,
@@ -67,9 +70,8 @@ impl<'linker> InitializationContext<'linker> {
                             }),
                         });
                     }),
-                    _other => cursor.could_not_match()
+                    _other => cursor.could_not_match(),
                 }
-                
             });
         }
 
@@ -108,13 +110,13 @@ impl<'linker> InitializationContext<'linker> {
                 if cursor.kind() == kind!("declaration") {
                     let whole_decl_span = cursor.span();
                     cursor.go_down_no_check(|cursor| {
-                        let is_input = cursor.optional_field(field!("io_port_modifiers")).then(|| {
-                            match cursor.kind() {
+                        let is_input = cursor.optional_field(field!("io_port_modifiers")).then(
+                            || match cursor.kind() {
                                 kw!("input") => true,
                                 kw!("output") => false,
                                 _ => cursor.could_not_match(),
-                            }
-                        });
+                            },
+                        );
                         self.finish_gather_decl(is_input, whole_decl_span, cursor);
                     });
                 }
@@ -228,7 +230,12 @@ impl<'linker> InitializationContext<'linker> {
         self.ports.range_since(list_start_at)
     }
 
-    fn finish_gather_decl(&mut self, is_input: Option<bool>, whole_decl_span: Span, cursor: &mut Cursor) {
+    fn finish_gather_decl(
+        &mut self,
+        is_input: Option<bool>,
+        whole_decl_span: Span,
+        cursor: &mut Cursor,
+    ) {
         // If generative input it's a template arg
         let is_generative = if cursor.optional_field(field!("declaration_modifiers")) {
             cursor.kind() == kw!("gen")
@@ -254,11 +261,11 @@ impl<'linker> InitializationContext<'linker> {
                 });
             }
             (false, None) => {
-                self.fields.alloc(StructField{
+                self.fields.alloc(StructField {
                     name: name.clone(),
                     name_span,
                     decl_span,
-                    declaration_instruction: FlatID::PLACEHOLDER
+                    declaration_instruction: FlatID::PLACEHOLDER,
                 });
             }
             _other => {}
@@ -270,7 +277,7 @@ pub fn gather_initial_file_data(mut builder: FileBuilder) {
     let mut cursor = Cursor::new_at_root(builder.tree, &builder.file_data.file_text);
     cursor.list_and_report_errors(
         kind!("source_file"),
-        &builder.other_parsing_errors,
+        builder.other_parsing_errors,
         |cursor| {
             let parsing_errors = ErrorCollector::new_empty(builder.file_id, builder.files);
             cursor.report_all_decendant_errors(&parsing_errors);
@@ -283,35 +290,36 @@ pub fn gather_initial_file_data(mut builder: FileBuilder) {
     );
 }
 
-
 enum GlobalObjectKind {
     Module,
     Const,
-    Struct
+    Struct,
 }
 
-fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorCollector, span: Span, cursor: &mut Cursor) {
-    let is_extern = match cursor.optional_field(field!("extern_marker")).then(|| cursor.kind()) {
+fn initialize_global_object(
+    builder: &mut FileBuilder,
+    parsing_errors: ErrorCollector,
+    span: Span,
+    cursor: &mut Cursor,
+) {
+    let is_extern = match cursor
+        .optional_field(field!("extern_marker"))
+        .then(|| cursor.kind())
+    {
         None => IsExtern::Normal,
         Some(kw!("extern")) => IsExtern::Extern,
         Some(kw!("__builtin__")) => IsExtern::Builtin,
-        Some(_) => cursor.could_not_match()
+        Some(_) => cursor.could_not_match(),
     };
-    
+
     cursor.field(field!("object_type"));
     let global_obj_kind = match cursor.kind() {
-        kw!("module") => {
-            GlobalObjectKind::Module
-        }
-        kind!("const_and_type") => {
-            GlobalObjectKind::Const
-        }
-        kw!("struct") => {
-            GlobalObjectKind::Struct
-        }
-        _other => cursor.could_not_match()
+        kw!("module") => GlobalObjectKind::Module,
+        kind!("const_and_type") => GlobalObjectKind::Const,
+        kw!("struct") => GlobalObjectKind::Struct,
+        _other => cursor.could_not_match(),
     };
-    
+
     let mut ctx = InitializationContext {
         ports: FlatAlloc::new(),
         interfaces: FlatAlloc::new(),
@@ -326,7 +334,10 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
     let (name_span, name) = ctx.gather_initial_global_object(cursor);
 
     let mut link_info = LinkInfo {
-        type_variable_alloc: TypingAllocator{domain_variable_alloc: UUIDAllocator::new(), type_variable_alloc: UUIDAllocator::new()},
+        type_variable_alloc: TypingAllocator {
+            domain_variable_alloc: UUIDAllocator::new(),
+            type_variable_alloc: UUIDAllocator::new(),
+        },
         template_parameters: ctx.parameters,
         instructions: FlatAlloc::new(),
         documentation: cursor.extract_gathered_comments(),
@@ -337,10 +348,13 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
         errors: ErrorStore::new(),
         is_extern,
         resolved_globals: ResolvedGlobals::empty(),
-        checkpoints: ArrayVec::new()
+        checkpoints: ArrayVec::new(),
     };
 
-    link_info.reabsorb_errors_globals((ctx.errors, ResolvedGlobals::empty()), AFTER_INITIAL_PARSE_CP);
+    link_info.reabsorb_errors_globals(
+        (ctx.errors, ResolvedGlobals::empty()),
+        AFTER_INITIAL_PARSE_CP,
+    );
 
     match global_obj_kind {
         GlobalObjectKind::Module => {
@@ -356,13 +370,13 @@ fn initialize_global_object(builder: &mut FileBuilder, parsing_errors: ErrorColl
         GlobalObjectKind::Struct => {
             builder.add_type(StructType {
                 link_info,
-                fields: ctx.fields
+                fields: ctx.fields,
             });
         }
         GlobalObjectKind::Const => {
             builder.add_const(NamedConstant {
                 link_info,
-                output_decl: FlatID::PLACEHOLDER
+                output_decl: FlatID::PLACEHOLDER,
             });
         }
     }

@@ -24,7 +24,7 @@ pub enum EarlyExitUpTo {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 pub enum TargetLanguage {
     SystemVerilog,
-    VHDL,
+    Vhdl,
 }
 
 /// All command-line flags are converted to this struct, of which the singleton instance can be acquired using [crate::config::config]
@@ -55,7 +55,7 @@ fn command_builder() -> Command {
             .default_value("25000")
             .help("Set the LSP TCP socket port")
             .value_parser(|socket_int : &str| {
-                match u16::from_str_radix(socket_int, 10) {
+                match socket_int.parse::<u16>() {
                     Ok(port) => Ok(port),
                     Err(_) => Err("Must be a valid port 0-65535")
                 }
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn test_socket_invalid_port() {
-        let config = parse_args(&["", "--lsp", "--socket", "1234567890"]);
+        let config = parse_args(["", "--lsp", "--socket", "1234567890"]);
         assert!(config.is_err());
         let err = config.unwrap_err();
         assert_eq!(err.kind(), clap::error::ErrorKind::ValueValidation);
@@ -200,7 +200,7 @@ mod tests {
 
     #[test]
     fn test_socket_require_lsp() {
-        let config = parse_args(&["", "--socket", "1500"]);
+        let config = parse_args(["", "--socket", "1500"]);
         assert!(config.is_err());
         let err = config.unwrap_err();
         assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn test_lsp_debug_require_lsp() {
-        let config = parse_args(&["", "--lsp-debug"]);
+        let config = parse_args(["", "--lsp-debug"]);
         assert!(config.is_err());
         let err = config.unwrap_err();
         assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
@@ -216,13 +216,13 @@ mod tests {
 
     #[test]
     fn test_lsp_no_color() {
-        let config = parse_args(&["", "--lsp"]).unwrap();
-        assert_eq!(config.use_color, false)
+        let config = parse_args(["", "--lsp"]).unwrap();
+        assert!(!config.use_color)
     }
 
     #[test]
     fn test_automatic_codegen() {
-        let config = parse_args(&[""]).unwrap();
-        assert_eq!(config.codegen, true)
+        let config = parse_args([""]).unwrap();
+        assert!(config.codegen)
     }
 }

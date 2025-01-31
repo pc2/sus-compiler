@@ -75,7 +75,6 @@ impl UUIDMarker for FieldIDMarker {
 }
 pub type FieldID = UUID<FieldIDMarker>;
 
-
 pub struct TemplateIDMarker;
 impl UUIDMarker for TemplateIDMarker {
     const DISPLAY_NAME: &'static str = "template_arg_";
