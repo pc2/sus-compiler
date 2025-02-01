@@ -21,9 +21,12 @@ mod linker;
 
 mod compiler_top;
 
-use std::error::Error;
-use std::io::Write;
+use std::collections::HashSet;
+use std::io::{self, Write};
+use std::path::PathBuf;
+use std::{error::Error, sync::mpsc::channel};
 
+use notify::Watcher;
 use prelude::*;
 
 use codegen::{CodeGenBackend, VHDLCodegenBackend, VerilogCodegenBackend};
@@ -77,6 +80,35 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         };
 
         codegen_backend.codegen_with_dependencies(&linker, md.1, &format!("{md_name}_standalone"));
+    }
+
+    if config.watch {
+        let canonical_file_paths = config
+            .files
+            .iter()
+            .map(|file| file.canonicalize())
+            .collect::<Result<Vec<PathBuf>, io::Error>>()?;
+        let canonical_dirs = canonical_file_paths
+            .iter()
+            .map(|path| -> Result<PathBuf, String> {
+                Ok(path
+                    .parent()
+                    .ok_or_else(|| format!("Failed to get base dir of \"{}\"", path.display()))?
+                    .to_path_buf())
+            })
+            .collect::<Result<HashSet<PathBuf>, String>>()?;
+        dbg!(&canonical_dirs);
+        dbg!(&canonical_file_paths);
+
+        let (tx, rx) = channel();
+        let mut watcher = notify::recommended_watcher(tx)?;
+        for dir in &canonical_dirs {
+            watcher.watch(dir, notify::RecursiveMode::NonRecursive)?;
+        }
+
+        for event in rx {
+            dbg!(event);
+        }
     }
 
     Ok(())

@@ -42,6 +42,7 @@ pub struct ConfigStruct {
     pub use_color: bool,
     pub ci: bool,
     pub target_language: TargetLanguage,
+    pub watch: bool,
     pub files: Vec<PathBuf>,
 }
 
@@ -103,14 +104,18 @@ fn command_builder() -> Command {
             .help("Disables color printing in the errors of the sus_compiler output")
             .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("ci")
-                .long("ci")
-                .help("Makes the compiler output as environment agnostic as possible")
-                .action(clap::ArgAction::SetTrue))
+            .long("ci")
+            .help("Makes the compiler output as environment agnostic as possible")
+            .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("target")
             .long("target")
             .help("Sets the target HDL")
             .value_parser(clap::builder::EnumValueParser::<TargetLanguage>::new())
             .default_value("system-verilog"))
+        .arg(Arg::new("watch")
+            .long("watch")
+            .help("Keeps the compiler running after finishing inital compilation and recompiles if any of [files] change")
+            .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("files")
             .action(clap::ArgAction::Append)
             .help(".sus Files")
@@ -149,6 +154,7 @@ where
     let codegen_module_and_dependencies_one_file = matches.get_one("standalone").cloned();
     let ci = matches.get_flag("ci");
     let target_language = *matches.get_one("target").unwrap();
+    let watch = matches.get_flag("watch");
     let file_paths: Vec<PathBuf> = match matches.get_many("files") {
         Some(files) => files.cloned().collect(),
         None => std::fs::read_dir(".")
@@ -172,6 +178,7 @@ where
         use_color,
         ci,
         target_language,
+        watch,
         files: file_paths,
     })
 }
