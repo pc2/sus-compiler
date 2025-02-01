@@ -3,6 +3,7 @@ mod initialization;
 mod lints;
 mod name_context;
 mod parser;
+mod port_latency_inference;
 mod typechecking;
 mod walk;
 
@@ -17,6 +18,7 @@ use std::ops::Deref;
 pub use flatten::flatten_all_globals;
 pub use initialization::gather_initial_file_data;
 pub use lints::perform_lints;
+use port_latency_inference::PortLatencyInferenceInfo;
 pub use typechecking::typecheck_all_modules;
 
 use crate::linker::{Documentation, LinkInfo};
@@ -50,6 +52,9 @@ pub struct Module {
     ///
     /// [Port::declaration_instruction] are set in Stage 2: Flattening
     pub ports: FlatAlloc<Port, PortIDMarker>,
+
+    /// Created in Stage 2: Flattening
+    pub latency_inference_info: PortLatencyInferenceInfo,
 
     /// Created in Stage 1: Initialization
     pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,
