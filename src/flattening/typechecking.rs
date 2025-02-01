@@ -1,4 +1,4 @@
-use crate::alloc::ArenaAllocator;
+use crate::alloc::{zip_eq3, ArenaAllocator};
 use crate::errors::{ErrorInfo, ErrorInfoObject, FileKnowingErrorInfoObject};
 use crate::prelude::*;
 use crate::typing::abstract_type::AbstractType;
@@ -324,8 +324,11 @@ impl TypeCheckingContext<'_, '_> {
         let global_obj: GlobalUUID = global_ref.id.into();
         let target_link_info = self.globals.get_link_info(global_obj);
 
-        for (parameter_id, argument_type) in &global_ref.template_arg_types {
-            let parameter = &target_link_info.template_parameters[parameter_id];
+        for (_parameter_id, argument_type, parameter, given_template_arg) in zip_eq3(
+            &global_ref.template_arg_types,
+            &target_link_info.template_parameters,
+            &global_ref.template_args,
+        ) {
             match &parameter.kind {
                 ParameterKind::Type(_) => {} // Do nothing, nothing to unify with. Maybe in the future traits?
                 ParameterKind::Generative(parameter) => {
@@ -341,7 +344,7 @@ impl TypeCheckingContext<'_, '_> {
                 }
             }
 
-            if let Some(given_arg) = &global_ref.template_args[parameter_id] {
+            if let Some(given_arg) = given_template_arg {
                 match &given_arg.kind {
                     TemplateArgKind::Type(wr_typ) => {
                         self.typecheck_written_type(wr_typ);

@@ -1,5 +1,6 @@
 use std::ops::Deref;
 
+use crate::alloc::{zip_eq, zip_eq3};
 use crate::errors::ErrorInfoObject;
 use crate::flattening::{DeclarationKind, ExpressionSource, WireReferenceRoot, WrittenType};
 use crate::linker::LinkInfo;
@@ -385,9 +386,9 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
             context.linker,
             sm.template_args.clone(),
         ) {
-            for (port_id, concrete_port) in &instance.interface_ports {
-                let connecting_wire = &sm.port_map[port_id];
-
+            for (_port_id, concrete_port, source_code_port, connecting_wire) in
+                zip_eq3(&instance.interface_ports, &sub_module.ports, &sm.port_map)
+            {
                 match (concrete_port, connecting_wire) {
                     (None, None) => {} // Invalid port not connected, good!
                     (None, Some(connecting_wire)) => {
@@ -395,7 +396,6 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                         // A question may be "What if no port was in the source code? There would be no error reported"
                         // But this is okay, because nonvisible ports are only possible for function calls
                         // We have a second routine that reports invalid interfaces.
-                        let source_code_port = &sub_module.ports[port_id];
                         for span in &connecting_wire.name_refs {
                             context.errors.error(*span, format!("Port '{}' is used, but the instantiated module has this port disabled", source_code_port.name))
                                 .info_obj_different_file(source_code_port, sub_module.link_info.file)
@@ -404,7 +404,6 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                     }
                     (Some(_concrete_port), None) => {
                         // Port is enabled, but not used
-                        let source_code_port = &sub_module.ports[port_id];
                         context
                             .errors
                             .warn(
@@ -421,12 +420,12 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                             &concrete_port.typ,
                             submod_instr.module_ref.get_total_span(),
                             || {
-                                let abstract_port = &sub_module.ports[port_id];
-                                let port_declared_here =
-                                    abstract_port.make_info(sub_module.link_info.file).unwrap();
+                                let port_declared_here = source_code_port
+                                    .make_info(sub_module.link_info.file)
+                                    .unwrap();
 
                                 (
-                                    format!("Port '{}'", abstract_port.name),
+                                    format!("Port '{}'", source_code_port.name),
                                     vec![port_declared_here],
                                 )
                             },
@@ -434,9 +433,10 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                     }
                 }
             }
-            for (interface_id, interface_references) in &sm.interface_call_sites {
+            for (_interface_id, interface_references, sm_interface) in
+                zip_eq(&sm.interface_call_sites, &sub_module.interfaces)
+            {
                 if !interface_references.is_empty() {
-                    let sm_interface = &sub_module.interfaces[interface_id];
                     let interface_name = &sm_interface.name;
                     if let Some(representative_port) = sm_interface
                         .func_call_inputs

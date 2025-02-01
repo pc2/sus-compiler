@@ -1,3 +1,4 @@
+use crate::alloc::zip_eq;
 use crate::prelude::*;
 
 use crate::typing::template::{Parameter, TVec};
@@ -304,8 +305,9 @@ pub fn pretty_print_concrete_instance(
     }
 
     let mut result = format!("{object_full_name} #(\n");
-    for (id, arg) in given_template_args {
-        let arg_in_target = &target_link_info.template_parameters[id];
+    for (_id, arg, arg_in_target) in
+        zip_eq(given_template_args, &target_link_info.template_parameters)
+    {
         write!(result, "    {}: ", arg_in_target.name).unwrap();
         match arg {
             ConcreteType::Named(_) | ConcreteType::Array(_) => {

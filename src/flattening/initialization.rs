@@ -361,6 +361,7 @@ fn initialize_global_object(
             builder.add_module(Module {
                 link_info,
                 ports: ctx.ports,
+                latency_inference_info: PortLatencyInferenceInfo::default(),
                 domains: ctx.domains,
                 implicit_clk_domain: ctx.implicit_clk_domain,
                 interfaces: ctx.interfaces,

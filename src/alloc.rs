@@ -734,3 +734,99 @@ impl<'a, T, IndexMarker> IntoIterator for &'a mut FlatAlloc<T, IndexMarker> {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct ZippedIterator<
+    IDMarker,
+    OA,
+    OB,
+    IterA: Iterator<Item = (UUID<IDMarker>, OA)>,
+    IterB: Iterator<Item = (UUID<IDMarker>, OB)>,
+> {
+    iter_a: IterA,
+    iter_b: IterB,
+}
+
+impl<
+        IDMarker,
+        OA,
+        OB,
+        IterA: Iterator<Item = (UUID<IDMarker>, OA)>,
+        IterB: Iterator<Item = (UUID<IDMarker>, OB)>,
+    > Iterator for ZippedIterator<IDMarker, OA, OB, IterA, IterB>
+{
+    type Item = (UUID<IDMarker>, OA, OB);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match (self.iter_a.next(), self.iter_b.next()) {
+            (None, None) => None,
+            (Some((id_a, a)), Some((id_b, b))) => {
+                assert!(id_a == id_b);
+                Some((id_a, a, b))
+            }
+            _ => unreachable!("Unbalanced Iterators"),
+        }
+    }
+}
+
+pub fn zip_eq<IDMarker, OA, OB>(
+    iter_a: impl IntoIterator<Item = (UUID<IDMarker>, OA)>,
+    iter_b: impl IntoIterator<Item = (UUID<IDMarker>, OB)>,
+) -> impl Iterator<Item = (UUID<IDMarker>, OA, OB)> {
+    ZippedIterator {
+        iter_a: iter_a.into_iter(),
+        iter_b: iter_b.into_iter(),
+    }
+}
+
+#[derive(Debug)]
+pub struct ZippedIterator3<
+    IDMarker,
+    OA,
+    OB,
+    OC,
+    IterA: Iterator<Item = (UUID<IDMarker>, OA)>,
+    IterB: Iterator<Item = (UUID<IDMarker>, OB)>,
+    IterC: Iterator<Item = (UUID<IDMarker>, OC)>,
+> {
+    iter_a: IterA,
+    iter_b: IterB,
+    iter_c: IterC,
+}
+
+impl<
+        IDMarker,
+        OA,
+        OB,
+        OC,
+        IterA: Iterator<Item = (UUID<IDMarker>, OA)>,
+        IterB: Iterator<Item = (UUID<IDMarker>, OB)>,
+        IterC: Iterator<Item = (UUID<IDMarker>, OC)>,
+    > Iterator for ZippedIterator3<IDMarker, OA, OB, OC, IterA, IterB, IterC>
+{
+    type Item = (UUID<IDMarker>, OA, OB, OC);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match (self.iter_a.next(), self.iter_b.next(), self.iter_c.next()) {
+            (None, None, None) => None,
+            (Some((id_a, a)), Some((id_b, b)), Some((id_c, c))) => {
+                assert!(id_a == id_b);
+                assert!(id_a == id_c);
+                Some((id_a, a, b, c))
+            }
+            _ => unreachable!("Unbalanced Iterators"),
+        }
+    }
+}
+
+pub fn zip_eq3<IDMarker, OA, OB, OC>(
+    iter_a: impl IntoIterator<Item = (UUID<IDMarker>, OA)>,
+    iter_b: impl IntoIterator<Item = (UUID<IDMarker>, OB)>,
+    iter_c: impl IntoIterator<Item = (UUID<IDMarker>, OC)>,
+) -> impl Iterator<Item = (UUID<IDMarker>, OA, OB, OC)> {
+    ZippedIterator3 {
+        iter_a: iter_a.into_iter(),
+        iter_b: iter_b.into_iter(),
+        iter_c: iter_c.into_iter(),
+    }
+}
