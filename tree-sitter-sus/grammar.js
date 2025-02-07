@@ -48,7 +48,8 @@ const PREC = {
     additive: 6,
     multiplicative: 7,
     unary: 8,
-    postscript_op : 9
+    postscript_op : 9,
+    doc_comment: 10
 }
 
 module.exports = grammar({
@@ -332,6 +333,7 @@ module.exports = grammar({
 
         // Extras
 
+        doc_comment: $ => prec(PREC.doc_comment, /\/\/\/[^\n]*/),
         single_line_comment: $ => /\/\/[^\n]*/,
         multi_line_comment: $ => /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\//,
     },
@@ -344,6 +346,7 @@ module.exports = grammar({
 
     extras: $ => [
         /[ \t\r]+/, // Non newline whitespace
+        $.doc_comment,
         $.single_line_comment,
         $.multi_line_comment
     ]
