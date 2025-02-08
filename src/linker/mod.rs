@@ -42,7 +42,8 @@ impl Documentation {
         for s in self.gathered.iter() {
             let text = &file_text[*s];
 
-            if text.trim().is_empty() { // Force a newline by adding a blank comment (like Rust does it?)
+            if text.trim().is_empty() {
+                // Force a newline by adding a blank comment (like Rust does it?)
                 // need two spaces beforehand to force a newline in markdown, according to https://github.com/microsoft/vscode/issues/86291#issuecomment-561841915
                 result.push_str("  \n");
             } else {
