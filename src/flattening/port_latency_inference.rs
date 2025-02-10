@@ -29,10 +29,13 @@ struct PortGroup {
 ///
 /// portA'4 -> portB'L-3
 ///
-/// That would create a inference candidate for template var 'L' with an offset of 7. (L == 7 iff portA' - portB' == 0)
+/// That would create a inference candidate for template var 'L' with an offset of 7. (L == 7 iff |portA| - |portB| == 0)
+///
+/// So |from| + offset + L == |to|
+///
+/// L = |to| - |from| - offset
 #[derive(Debug, Clone)]
 struct LatencyInferenceCandidate {
-    template_id: TemplateID,
     from: PortID,
     to: PortID,
     offset: i64,
@@ -162,43 +165,82 @@ fn recurse_down_expression(
     }
 }
 
+/// The basic way latency count inference works is as follows: 
+/// On the module interface, ports may be marked with latency annotations. 
+/// These annotations can be simple constants (portA'0, portB'-3, etc),
+/// or larger expressions involving some template parameter, such as portC'L, portD'L+3-2
+///
+/// Whereever there is a difference in the latency annitation between two ports of exactly
+/// 1x a variable + some constant offset, the port pair becomes eligible for latency inference
+/// 
+/// When the module is flattened, we can immediately construct for every template parameter, 
+/// a list of all port pairs that may be used to infer the value of this parameter. 
+/// 
+/// Once we come to actually performing said inference [Self::try_infer_var], we take the list
+/// of absolute latencies we know for these ports, and take the minimum latency we could find. 
+/// This ensures that instantiating the module cannot ever expand beyond the context in which
+/// it is inferred. Finally, all 
 #[derive(Default, Debug)]
 pub struct PortLatencyInferenceInfo {
     //port_latency_groups: Vec<Vec<PortGroup>>,
-    inference_candidates: Vec<LatencyInferenceCandidate>,
+    inference_candidates: TVec<Vec<LatencyInferenceCandidate>>,
 }
 
-pub fn make_port_latency_inference_info(
-    ports: &FlatAlloc<Port, PortIDMarker>,
-    instructions: &FlatAlloc<Instruction, FlatIDMarker>,
-    num_template_args: usize,
-) -> PortLatencyInferenceInfo {
-    let port_infos = ports.map(|(_port_id, port)| {
-        let decl = instructions[port.declaration_instruction].unwrap_declaration();
+impl PortLatencyInferenceInfo {
+    pub fn make(
+        ports: &FlatAlloc<Port, PortIDMarker>,
+        instructions: &FlatAlloc<Instruction, FlatIDMarker>,
+        num_template_args: usize,
+    ) -> PortLatencyInferenceInfo {
+        let port_infos = ports.map(|(_port_id, port)| {
+            let decl = instructions[port.declaration_instruction].unwrap_declaration();
 
-        decl.latency_specifier.and_then(|latency_spec| {
-            recurse_down_expression(instructions, latency_spec, num_template_args)
-        })
-    });
+            decl.latency_specifier.and_then(|latency_spec| {
+                recurse_down_expression(instructions, latency_spec, num_template_args)
+            })
+        });
 
-    let mut inference_candidates = Vec::new();
+        let mut inference_candidates = FlatAlloc::with_size(num_template_args, Vec::new());
 
-    for (from, from_info) in port_infos.iter_valids() {
-        for (to, to_info) in port_infos.iter_valids() {
-            if let Some((template_id, offset)) =
-                PortLatencyLinearity::is_pair_latency_candidate(from_info, to_info)
-            {
-                inference_candidates.push(LatencyInferenceCandidate {
-                    template_id,
-                    from,
-                    to,
-                    offset,
-                });
+        for (from, from_info) in port_infos.iter_valids() {
+            for (to, to_info) in port_infos.iter_valids() {
+                if ports[from].domain != ports[to].domain {
+                    continue; // ports on different domains cannot be related in latency counting
+                }
+                if let Some((template_id, offset)) =
+                    PortLatencyLinearity::is_pair_latency_candidate(from_info, to_info)
+                {
+                    inference_candidates[template_id].push(LatencyInferenceCandidate {
+                        from,
+                        to,
+                        offset,
+                    });
+                }
             }
+        }
+
+        PortLatencyInferenceInfo {
+            inference_candidates,
         }
     }
 
-    PortLatencyInferenceInfo {
-        inference_candidates,
+    /// To infer a specific specific variable, we look at all
+    pub fn try_infer_var(
+        &self,
+        template_var: TemplateID,
+        port_latencies: &FlatAlloc<Option<i64>, PortIDMarker>,
+    ) -> Option<i64> {
+        let mut inferred_variable_value = i64::MAX;
+
+        for candidate in &self.inference_candidates[template_var] {
+            let from_latency = port_latencies[candidate.from]?;
+            let to_latency = port_latencies[candidate.to]?;
+
+            let this_pair_infers_to = to_latency - from_latency - candidate.offset;
+
+            inferred_variable_value = i64::min(inferred_variable_value, this_pair_infers_to);
+        }
+
+        (inferred_variable_value != i64::MAX).then_some(inferred_variable_value)
     }
 }

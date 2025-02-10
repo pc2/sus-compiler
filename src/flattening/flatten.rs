@@ -1,5 +1,4 @@
 use crate::alloc::{ArenaAllocator, UUIDAllocator, UUIDRange, UUID};
-use crate::flattening::port_latency_inference::make_port_latency_inference_info;
 use crate::typing::abstract_type::{AbstractType, DomainType};
 use crate::{alloc::UUIDRangeIter, prelude::*};
 
@@ -1785,7 +1784,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
                 decl.typ.domain = DomainType::Physical(port.domain);
             }
 
-            md.latency_inference_info = make_port_latency_inference_info(
+            md.latency_inference_info = PortLatencyInferenceInfo::make(
                 &md.ports,
                 &instructions,
                 md.link_info.template_parameters.len(),

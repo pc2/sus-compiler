@@ -62,18 +62,19 @@ struct LatencyStackElem<'d> {
 }
 
 /// The node for the latency-counting graph. See [solve_latencies]
-///
-/// TODO make this only take up 8 bytes with bitfield
 #[derive(Clone, Copy)]
 struct LatencyNode {
     abs_lat: i64,
     pinned: bool,
+    #[allow(unused)]
+    poisoned: bool,
 }
 
 impl LatencyNode {
     const UNSET: LatencyNode = LatencyNode {
         abs_lat: i64::MIN,
         pinned: false,
+        poisoned: false,
     };
 
     fn get(&self) -> i64 {
@@ -102,6 +103,7 @@ impl LatencyNode {
         LatencyNode {
             abs_lat,
             pinned: true,
+            poisoned: false,
         }
     }
     fn assert_is_set(&self) {
