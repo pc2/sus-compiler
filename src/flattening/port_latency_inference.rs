@@ -165,21 +165,21 @@ fn recurse_down_expression(
     }
 }
 
-/// The basic way latency count inference works is as follows: 
-/// On the module interface, ports may be marked with latency annotations. 
+/// The basic way latency count inference works is as follows:
+/// On the module interface, ports may be marked with latency annotations.
 /// These annotations can be simple constants (portA'0, portB'-3, etc),
 /// or larger expressions involving some template parameter, such as portC'L, portD'L+3-2
 ///
 /// Whereever there is a difference in the latency annitation between two ports of exactly
 /// 1x a variable + some constant offset, the port pair becomes eligible for latency inference
-/// 
-/// When the module is flattened, we can immediately construct for every template parameter, 
-/// a list of all port pairs that may be used to infer the value of this parameter. 
-/// 
+///
+/// When the module is flattened, we can immediately construct for every template parameter,
+/// a list of all port pairs that may be used to infer the value of this parameter.
+///
 /// Once we come to actually performing said inference [Self::try_infer_var], we take the list
-/// of absolute latencies we know for these ports, and take the minimum latency we could find. 
+/// of absolute latencies we know for these ports, and take the minimum latency we could find.
 /// This ensures that instantiating the module cannot ever expand beyond the context in which
-/// it is inferred. Finally, all 
+/// it is inferred. Finally, all
 #[derive(Default, Debug)]
 pub struct PortLatencyInferenceInfo {
     //port_latency_groups: Vec<Vec<PortGroup>>,
