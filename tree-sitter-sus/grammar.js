@@ -48,8 +48,7 @@ const PREC = {
     additive: 6,
     multiplicative: 7,
     unary: 8,
-    postscript_op : 9,
-    doc_comment: 10
+    postscript_op : 9
 }
 
 module.exports = grammar({
@@ -332,9 +331,12 @@ module.exports = grammar({
         _linebreak: $ => repeat1('\n'), // For things that must be separated by at least one newline (whitespace after is to optimize gobbling up any extra newlines)
 
         // Extras
-
-        doc_comment: $ => prec(PREC.doc_comment, /\/\/\/[^\n]*/),
+        
+        // These must be kept in this order for precedence, so that
+        // '///' is not interpreted as a single_line_comment of '/'
+        doc_comment: $ => /\/\/\/[^\n]*/,
         single_line_comment: $ => /\/\/[^\n]*/,
+
         multi_line_comment: $ => /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\//,
     },
 

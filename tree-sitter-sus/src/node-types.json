@@ -544,11 +544,6 @@
     }
   },
   {
-    "type": "doc_comment",
-    "named": true,
-    "fields": {}
-  },
-  {
     "type": "domain_statement",
     "named": true,
     "fields": {
@@ -1514,6 +1509,10 @@
   {
     "type": "const",
     "named": false
+  },
+  {
+    "type": "doc_comment",
+    "named": true
   },
   {
     "type": "domain",

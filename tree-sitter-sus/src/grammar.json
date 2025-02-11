@@ -1748,12 +1748,8 @@
       }
     },
     "doc_comment": {
-      "type": "PREC",
-      "value": 10,
-      "content": {
-        "type": "PATTERN",
-        "value": "\\/\\/\\/[^\\n]*"
-      }
+      "type": "PATTERN",
+      "value": "\\/\\/\\/[^\\n]*"
     },
     "single_line_comment": {
       "type": "PATTERN",
