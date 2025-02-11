@@ -9,6 +9,9 @@ use crate::value::Value;
 use super::template::TVec;
 
 use super::type_inference::ConcreteTypeVariableID;
+use super::type_inference::ConcreteTypeVariableIDMarker;
+use super::type_inference::HindleyMilner;
+use super::type_inference::TypeSubstitutor;
 
 pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
     id: get_builtin_type!("bool"),
@@ -47,12 +50,29 @@ pub enum ConcreteType {
 }
 
 impl ConcreteType {
+    pub fn new_int(int: BigInt) -> Self {
+        Self::Value(Value::Integer(int))
+    }
     #[track_caller]
     pub fn unwrap_value(&self) -> &Value {
         let ConcreteType::Value(v) = self else {
             unreachable!("unwrap_value on {self:?}")
         };
         v
+    }
+    #[track_caller]
+    pub fn unwrap_named(&self) -> &ConcreteGlobalReference<TypeUUID> {
+        let ConcreteType::Named(v) = self else {
+            unreachable!("unwrap_named")
+        };
+        v
+    }
+    pub fn down_array(&self) -> &ConcreteType {
+        let ConcreteType::Array(arr_box) = self else {
+            unreachable!("Must be an array!")
+        };
+        let (sub, _sz) = arr_box.deref();
+        sub
     }
     pub fn contains_unknown(&self) -> bool {
         match self {
@@ -101,6 +121,18 @@ impl ConcreteType {
         } else {
             println!("TODO Named Structs Size");
             1 // todo!() // Named structs are not implemented yet
+        }
+    }
+    pub fn try_fully_substitute(
+        &self,
+        substitutor: &TypeSubstitutor<Self, ConcreteTypeVariableIDMarker>,
+    ) -> Option<Self> {
+        if self.contains_unknown() {
+            None
+        } else {
+            let mut self_clone = self.clone();
+            self_clone.fully_substitute(substitutor);
+            Some(self_clone)
         }
     }
 }

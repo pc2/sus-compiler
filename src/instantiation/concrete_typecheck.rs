@@ -1,6 +1,8 @@
 use std::ops::Deref;
 
-use crate::alloc::{zip_eq, zip_eq3};
+use sus_proc_macro::get_builtin_type;
+
+use crate::alloc::{zip_eq, zip_eq3, UUID};
 use crate::errors::ErrorInfoObject;
 use crate::flattening::{DeclarationKind, ExpressionSource, WireReferenceRoot, WrittenType};
 use crate::linker::LinkInfo;
@@ -52,7 +54,7 @@ impl InstantiationContext<'_, '_> {
         )))
     }
 
-    fn typecheck_all_wires(&self) {
+    fn typecheck_all_wires(&self, delayed_constraints: &mut DelayedConstraintsList<Self>) {
         for this_wire_id in self.wires.id_range() {
             let this_wire = &self.wires[this_wire_id];
             let span = self.md.get_instruction_span(this_wire.original_instruction);
@@ -104,6 +106,14 @@ impl InstantiationContext<'_, '_> {
                 }
                 &RealWireDataSource::BinaryOp { op, left, right } => {
                     // TODO overloading
+                    // Typecheck generic INT
+                    delayed_constraints.push(BinaryOpTypecheckConstraint::new(
+                        op,
+                        left,
+                        right,
+                        this_wire_id,
+                        span,
+                    ));
                     let ((in_left, in_right), out) = match op {
                         BinaryOperator::And => {
                             ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
@@ -249,7 +259,7 @@ impl InstantiationContext<'_, '_> {
             delayed_constraints.push(SubmoduleTypecheckConstraint { sm_id });
         }
 
-        self.typecheck_all_wires();
+        self.typecheck_all_wires(&mut delayed_constraints);
 
         delayed_constraints.resolve_delayed_constraints(self);
 
@@ -498,5 +508,81 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
         context
             .errors
             .error(submod_instr.get_most_relevant_span(), message);
+    }
+}
+
+#[derive(Debug)]
+struct BinaryOpTypecheckConstraint {
+    _op: BinaryOperator,
+    left: UUID<WireIDMarker>,
+    right: UUID<WireIDMarker>,
+    out: UUID<WireIDMarker>,
+    span: Span,
+}
+
+impl BinaryOpTypecheckConstraint {
+    fn new(
+        _op: BinaryOperator,
+        left: UUID<WireIDMarker>,
+        right: UUID<WireIDMarker>,
+        out: UUID<WireIDMarker>,
+        span: Span,
+    ) -> Self {
+        Self {
+            _op,
+            left,
+            right,
+            out,
+            span,
+        }
+    }
+}
+
+impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstraint {
+    fn try_apply(&mut self, context: &mut InstantiationContext<'_, '_>) -> DelayedConstraintStatus {
+        if context.wires[self.out].typ.contains_unknown()
+            || context.wires[self.left].typ.contains_unknown()
+            || context.wires[self.right].typ.contains_unknown()
+        {
+            return DelayedConstraintStatus::NoProgress;
+        }
+        let left_size = context.wires[self.left]
+            .typ
+            .try_fully_substitute(&context.type_substitutor)
+            .unwrap()
+            .unwrap_named()
+            .template_args[UUID::from_hidden_value(0)]
+        .unwrap_value()
+        .unwrap_integer()
+        .clone();
+        let right_size = context.wires[self.right]
+            .typ
+            .try_fully_substitute(&context.type_substitutor)
+            .unwrap()
+            .unwrap_named()
+            .template_args[UUID::from_hidden_value(0)]
+        .unwrap_value()
+        .unwrap_integer()
+        .clone();
+        let out_size = left_size + right_size;
+        let mut template_args: FlatAlloc<ConcreteType, TemplateIDMarker> = FlatAlloc::new();
+        template_args.alloc(ConcreteType::new_int(out_size));
+        let expected_out = ConcreteType::Named(ConcreteGlobalReference {
+            id: get_builtin_type!("int"),
+            template_args,
+        });
+
+        context.type_substitutor.unify_report_error(
+            &context.wires[self.out].typ,
+            &expected_out,
+            self.span,
+            "binary output",
+        );
+
+        DelayedConstraintStatus::Resolved
+    }
+
+    fn report_could_not_resolve_error(&self, _context: &InstantiationContext<'_, '_>) {
+        todo!()
     }
 }
