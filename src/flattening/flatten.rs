@@ -478,7 +478,7 @@ impl FlatteningContext<'_, '_> {
 
             cursor.field(field!("arr_idx"));
             let (array_size_wire_id, is_generative, bracket_span) =
-                self.flatten_array_bracket(cursor);
+                self.flatten_array_bracket_type(cursor);
             self.must_be_generative(is_generative, "Array Size", span);
 
             WrittenType::Array(
@@ -778,15 +778,43 @@ impl FlatteningContext<'_, '_> {
         })
     }
 
-    fn flatten_array_bracket(
+    // function to flatten a straightforward xxx[size] array type without the extra
+    // complications of the syntax of other array operations
+    fn flatten_array_bracket_type(
         &mut self,
         cursor: &mut Cursor,
     ) -> (FlatID, bool /*Is generative */, BracketSpan) {
         let bracket_span = BracketSpan::from_outer(cursor.span());
-        cursor.go_down_content(kind!("array_bracket_expression"), |cursor| {
+        cursor.go_down_content(kind!("array_bracket_type"), |cursor| {
             let (expr, is_generative) = self.flatten_expr(cursor);
             (expr, is_generative, bracket_span)
         })
+    }
+
+    fn flatten_array_bracket(
+        &mut self,
+        cursor: &mut Cursor,
+    ) -> (WireReferencePathElement, bool /*Is generative */, BracketSpan) {
+        let bracket_span = BracketSpan::from_outer(cursor.span());
+        cursor.go_down(kind!("array_bracket_expression"), |cursor| {
+            if cursor.optional_field(field!("index")) {
+                let (expr, is_generative) = self.flatten_expr(cursor);
+                return (WireReferencePathElement::ArrayAccess { idx:expr, bracket_span }, is_generative, bracket_span)
+            } else {
+                cursor.field(field!("slice"));
+                cursor.go_down(kind!("slice"), |cursor| {
+                    cursor.field(field!("index_a"));
+                    let (expr_a, a_generative) = self.flatten_expr(cursor);
+                    cursor.field(field!("index_b"));
+                    let (expr_b, b_generative) = self.flatten_expr(cursor);
+                    
+
+                    return (WireReferencePathElement::ArraySlice { idx_a:expr_a, idx_b:expr_b, bracket_span }, a_generative && b_generative, bracket_span)
+                })   
+            }
+            
+        })
+       
     }
 
     fn alloc_error(&mut self, span: Span) -> FlatID {
@@ -1027,6 +1055,22 @@ impl FlatteningContext<'_, '_> {
                             .typ
                             .domain
                             .is_generative()
+                    },
+                    WireReferencePathElement::ArraySlice {
+                        idx_a,
+                        idx_b,
+                        bracket_span: _
+                    } => {
+                        is_comptime &= self.instructions[*idx_a]
+                            .unwrap_expression()
+                            .typ
+                            .domain
+                            .is_generative();
+                        is_comptime &= self.instructions[*idx_b]
+                            .unwrap_expression()
+                            .typ
+                            .domain
+                            .is_generative()
                     }
                 }
             }
@@ -1121,7 +1165,7 @@ impl FlatteningContext<'_, '_> {
 
                 cursor.field(field!("arr_idx"));
                 let arr_idx_span = cursor.span();
-                let (idx, _is_generative, bracket_span) = self.flatten_array_bracket(cursor);
+                let (access, _is_generative, bracket_span) = self.flatten_array_bracket(cursor);
 
                 // only unpack the subexpr after flattening the idx, so we catch all errors
                 match &mut flattened_arr_expr {
@@ -1138,7 +1182,7 @@ impl FlatteningContext<'_, '_> {
                     PartialWireReference::Error => {}
                     PartialWireReference::WireReference(wr) => {
                         wr.path
-                            .push(WireReferencePathElement::ArrayAccess { idx, bracket_span });
+                            .push(access);
                     }
                 }
 

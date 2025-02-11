@@ -969,7 +969,7 @@
           "name": "arr_idx",
           "content": {
             "type": "SYMBOL",
-            "name": "array_bracket_expression"
+            "name": "array_bracket_type"
           }
         }
       ]
@@ -1469,7 +1469,7 @@
         }
       ]
     },
-    "array_bracket_expression": {
+    "array_bracket_type": {
       "type": "SEQ",
       "members": [
         {
@@ -1487,6 +1487,65 @@
         {
           "type": "STRING",
           "value": "]"
+        }
+      ]
+    },
+    "array_bracket_expression": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "["
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "slice",
+              "content": {
+                "type": "SYMBOL",
+                "name": "slice"
+              }
+            },
+            {
+              "type": "FIELD",
+              "name": "index",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_expression"
+              }
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "]"
+        }
+      ]
+    },
+    "slice": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "index_a",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_expression"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": ":"
+        },
+        {
+          "type": "FIELD",
+          "name": "index_b",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_expression"
+          }
         }
       ]
     },

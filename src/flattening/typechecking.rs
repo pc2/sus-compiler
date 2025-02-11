@@ -191,7 +191,7 @@ impl TypeCheckingContext<'_, '_> {
                     let new_resulting_variable =
                         AbstractType::Unknown(self.type_checker.alloc_typ_variable());
                     let arr_span = bracket_span.outer_span();
-                    self.type_checker.typecheck_array_access(
+                    self.type_checker.typecheck_array_index(
                         &current_type_in_progress,
                         &idx_expr.typ.typ,
                         arr_span,
@@ -204,6 +204,42 @@ impl TypeCheckingContext<'_, '_> {
                         &output_typ.domain,
                         idx_expr.span,
                         "array access index",
+                    );
+                    current_type_in_progress = new_resulting_variable;
+                },
+                &WireReferencePathElement::ArraySlice {
+                    idx_a,
+                    idx_b,
+                    bracket_span 
+                } => {
+                    panic!("aaab");
+                    let idx_expr_a = self.working_on.instructions[idx_a].unwrap_expression();
+                    let idx_expr_b = self.working_on.instructions[idx_b].unwrap_expression();
+
+                    let new_resulting_variable =
+                        AbstractType::Unknown(self.type_checker.alloc_typ_variable());
+                    let arr_span = bracket_span.outer_span();
+                    self.type_checker.typecheck_array_slice(
+                        &current_type_in_progress,
+                        &idx_expr_a.typ.typ,
+                        &idx_expr_b.typ.typ,
+                        arr_span,
+                        idx_expr_a.span,
+                        idx_expr_b.span,
+                        &new_resulting_variable,
+                    );
+
+                    self.type_checker.unify_domains(
+                        &idx_expr_a.typ.domain,
+                        &output_typ.domain,
+                        idx_expr_a.span,
+                        "array slice start index",
+                    );
+                    self.type_checker.unify_domains(
+                        &idx_expr_b.typ.domain,
+                        &output_typ.domain,
+                        idx_expr_b.span,
+                        "array slice end index",
                     );
                     current_type_in_progress = new_resulting_variable;
                 }

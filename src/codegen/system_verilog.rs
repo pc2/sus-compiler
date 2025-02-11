@@ -109,6 +109,16 @@ impl<'g> CodeGenerationContext<'g> {
                 RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
                     let idx_wire_name = self.wire_name(*idx_wire, absolute_latency);
                     format!("[{idx_wire_name}]")
+                },
+                RealWirePathElem::ArraySlice {
+                    span,
+                    idx_a_wire,
+                    idx_b_wire 
+                } => {
+                    let idx_wire_name_a = self.wire_name(*idx_a_wire, absolute_latency);
+                    let idx_wire_name_b = self.wire_name(*idx_b_wire, absolute_latency);
+
+                    format!("[{idx_wire_name_a}:{idx_wire_name_b}]")
                 }
             });
         }
