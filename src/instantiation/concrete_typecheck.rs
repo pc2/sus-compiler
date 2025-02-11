@@ -540,30 +540,27 @@ impl BinaryOpTypecheckConstraint {
 
 impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstraint {
     fn try_apply(&mut self, context: &mut InstantiationContext<'_, '_>) -> DelayedConstraintStatus {
-        if context.wires[self.out].typ.contains_unknown()
-            || context.wires[self.left].typ.contains_unknown()
+        if context.wires[self.left].typ.contains_unknown()
             || context.wires[self.right].typ.contains_unknown()
         {
             return DelayedConstraintStatus::NoProgress;
         }
-        let left_size = context.wires[self.left]
+        let left_complete_type = context.wires[self.left]
             .typ
             .try_fully_substitute(&context.type_substitutor)
-            .unwrap()
-            .unwrap_named()
-            .template_args[UUID::from_hidden_value(0)]
-        .unwrap_value()
-        .unwrap_integer()
-        .clone();
-        let right_size = context.wires[self.right]
+            .unwrap();
+        let left_size = left_complete_type.unwrap_named().template_args[UUID::from_hidden_value(0)]
+            .unwrap_value()
+            .unwrap_integer();
+        let right_complete_type = context.wires[self.right]
             .typ
             .try_fully_substitute(&context.type_substitutor)
-            .unwrap()
-            .unwrap_named()
-            .template_args[UUID::from_hidden_value(0)]
-        .unwrap_value()
-        .unwrap_integer()
-        .clone();
+            .unwrap();
+        #[rustfmt::skip]
+        let right_size = right_complete_type.unwrap_named().template_args
+            [UUID::from_hidden_value(0)]
+            .unwrap_value()
+            .unwrap_integer();
         let out_size = left_size + right_size;
         let mut template_args: FlatAlloc<ConcreteType, TemplateIDMarker> = FlatAlloc::new();
         template_args.alloc(ConcreteType::new_int(out_size));
