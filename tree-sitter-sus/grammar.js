@@ -301,6 +301,12 @@ module.exports = grammar({
         
         slice: $ => seq(
             field('index_a', $._expression),
+            optional(
+                seq(
+                    ':',
+                    field('index_step', $._expression)
+                )
+            ),
             ':',
             field('index_b', $._expression)
         ),

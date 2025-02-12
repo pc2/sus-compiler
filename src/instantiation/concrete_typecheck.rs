@@ -233,8 +233,8 @@ impl InstantiationContext<'_, '_> {
 
             let expected_name = expected.display(&self.linker.types).to_string();
             let found_name = found.display(&self.linker.types).to_string();
-            self.errors
-                .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
+            self.errors // todo: undo adding (concrete)
+                .error(span, format!("Typing Error (concrete): {context} expects a {expected_name} but was given a {found_name}"))
                 .add_info_list(infos);
 
             assert!(

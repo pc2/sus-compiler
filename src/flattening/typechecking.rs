@@ -685,9 +685,9 @@ pub fn apply_types(
             .to_string();
         let found_name = found
             .display(types, &type_checker.template_type_names)
-            .to_string();
+            .to_string(); // todo remove (abstracts)
         errors
-            .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
+            .error(span, format!("Typing Error (abstracts): {context} expects a {expected_name} but was given a {found_name}"))
             .add_info_list(infos);
 
         assert!(
