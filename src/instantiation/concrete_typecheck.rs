@@ -52,12 +52,16 @@ impl InstantiationContext<'_, '_> {
                     );
                     current_type_in_progress = typ_after_applying_array;*/
                     // TODO #28 integer size <-> array bound check
+                    // todo: must make this use the size resulting from the slice, maybe by 
+                    // unifying with an expression of idx_b_wire - idx_a_wire?
                     let arr_size = ConcreteType::Unknown(self.type_substitutor.alloc());
                     let arr_box = Box::new((typ_after_applying_array.clone(), arr_size));
                     self.type_substitutor.unify_must_succeed(
                         &current_type_in_progress,
-                        &ConcreteType::Array(arr_box),
+                        &typ_after_applying_array,
                     );
+
+                    
                     current_type_in_progress = typ_after_applying_array;
                 }
             }

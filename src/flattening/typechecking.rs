@@ -212,7 +212,6 @@ impl TypeCheckingContext<'_, '_> {
                     idx_b,
                     bracket_span 
                 } => {
-                    panic!("aaab");
                     let idx_expr_a = self.working_on.instructions[idx_a].unwrap_expression();
                     let idx_expr_b = self.working_on.instructions[idx_b].unwrap_expression();
 

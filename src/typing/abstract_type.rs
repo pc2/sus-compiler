@@ -405,7 +405,6 @@ impl TypeUnifier {
         idx_b_span: Span,
         output_typ: &AbstractType,
     ) {
-        panic!("aaaa");
         self.type_substitutor
             .unify_report_error(idx_a_type, &INT_TYPE, idx_a_span, "array start index");
         self.type_substitutor

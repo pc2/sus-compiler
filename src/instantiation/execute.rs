@@ -190,7 +190,6 @@ fn array_slice<'v>(
     idx_b: &BigInt,
     span: BracketSpan,
 ) -> ExecutionResult<Vec<Value>> {
-    panic!("bbbb");
     let Value::Array(arr) = arr_val else {
         caught_by_typecheck!("Value must be an array")
     };
@@ -201,7 +200,8 @@ fn array_slice<'v>(
         if let Some(idx_b) = usize::try_from(idx_b).ok(){
             let mut result = Vec::with_capacity((idx_b-idx_a) as usize); // todo must be abs of size, could be a backwards slice
 
-            for idx in idx_a..idx_b {
+            // because in rust 0..n does not include n, but HDLs generally do
+            for idx in idx_a..(idx_b+1) {
                 if let Some(value) = arr.get(idx) {
                     result.push(value.clone());
                 } else {
