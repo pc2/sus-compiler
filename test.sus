@@ -1118,3 +1118,9 @@ module IfTesting #(int WIDTH) {
         } else when WIDTH > BASE_CASE_SIZE {
         }
 }
+
+module test {
+	gen int[2] p
+
+	int zsda = p[0]
+}

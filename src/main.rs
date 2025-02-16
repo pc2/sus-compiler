@@ -9,6 +9,7 @@ mod errors;
 mod file_position;
 mod flattening;
 mod instantiation;
+mod latency;
 mod prelude;
 mod to_string;
 mod typing;

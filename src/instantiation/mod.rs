@@ -1,8 +1,5 @@
 mod concrete_typecheck;
 mod execute;
-mod latency_algorithm;
-mod latency_count;
-mod list_of_lists;
 mod unique_names;
 
 use unique_names::UniqueNames;
@@ -24,8 +21,6 @@ use crate::{
 
 use crate::typing::concrete_type::ConcreteType;
 
-use self::latency_algorithm::SpecifiedLatency;
-
 // Temporary value before proper latency is given
 pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
 
@@ -38,7 +33,7 @@ pub enum RealWirePathElem {
 }
 
 impl RealWirePathElem {
-    fn for_each_wire_in_path(path: &[RealWirePathElem], mut f: impl FnMut(WireID)) {
+    pub fn for_each_wire_in_path(path: &[RealWirePathElem], mut f: impl FnMut(WireID)) {
         for v in path {
             match v {
                 RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
@@ -318,24 +313,24 @@ pub struct ConditionStackElem {
 }
 
 /// As with other contexts, this is the shared state we're lugging around while executing & typechecking a module.
-struct InstantiationContext<'fl, 'l> {
-    name: String,
+pub struct InstantiationContext<'fl, 'l> {
+    pub name: String,
+    pub wires: FlatAlloc<RealWire, WireIDMarker>,
+    pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+
+    pub type_substitutor: TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
+
+    /// Used for Execution
     generation_state: GenerationState<'fl>,
-    wires: FlatAlloc<RealWire, WireIDMarker>,
-    submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
-
-    type_substitutor: TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
-
-    // Used for Execution
     unique_name_producer: UniqueNames,
     condition_stack: Vec<ConditionStackElem>,
 
-    interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
-    errors: ErrorCollector<'l>,
+    pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
+    pub errors: ErrorCollector<'l>,
 
-    template_args: &'fl TVec<ConcreteType>,
-    md: &'fl Module,
-    linker: &'l Linker,
+    pub template_args: &'fl TVec<ConcreteType>,
+    pub md: &'fl Module,
+    pub linker: &'l Linker,
 }
 
 /// Mangle the module name for use in code generation

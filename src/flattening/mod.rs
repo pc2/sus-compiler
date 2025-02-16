@@ -3,7 +3,6 @@ mod initialization;
 mod lints;
 mod name_context;
 mod parser;
-mod port_latency_inference;
 mod typechecking;
 mod walk;
 
@@ -15,10 +14,10 @@ use crate::typing::type_inference::{DomainVariableIDMarker, TypeVariableIDMarker
 use std::cell::OnceCell;
 use std::ops::Deref;
 
+use crate::latency::port_latency_inference::PortLatencyInferenceInfo;
 pub use flatten::flatten_all_globals;
 pub use initialization::gather_initial_file_data;
 pub use lints::perform_lints;
-use port_latency_inference::PortLatencyInferenceInfo;
 pub use typechecking::typecheck_all_modules;
 
 use crate::linker::{Documentation, LinkInfo};
@@ -327,6 +326,8 @@ pub enum WireReferenceRoot {
     /// int local_var
     /// local_var = 3
     /// ```
+    ///
+    /// [FlatID] points to [Instruction::Declaration]
     LocalDecl(FlatID, Span),
     /// ```sus
     /// bool b = true // root is global constant `true`

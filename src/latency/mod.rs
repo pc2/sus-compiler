@@ -1,17 +1,20 @@
+mod latency_algorithm;
+mod list_of_lists;
+pub mod port_latency_inference;
+
 use std::{cmp::max, iter::zip};
 
 use crate::prelude::*;
 
-use crate::{
-    flattening::{Instruction, WriteModifiers},
-    instantiation::latency_algorithm::{
-        convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError,
-    },
+use crate::flattening::{Instruction, WriteModifiers};
+
+use latency_algorithm::{
+    convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError, SpecifiedLatency,
 };
 
 use self::list_of_lists::ListOfLists;
 
-use super::*;
+use crate::instantiation::*;
 
 struct PathMuxSource<'s> {
     to_wire: &'s RealWire,

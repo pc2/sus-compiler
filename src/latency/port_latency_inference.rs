@@ -6,7 +6,9 @@ use crate::{
     value::Value,
 };
 
-use super::{BinaryOperator, Instruction, Port, UnaryOperator, WireReference, WireReferenceRoot};
+use crate::flattening::{
+    BinaryOperator, Instruction, Port, UnaryOperator, WireReference, WireReferenceRoot,
+};
 
 /*/// ports whose latency annotations require them to be at fixed predefined offsets
 ///
