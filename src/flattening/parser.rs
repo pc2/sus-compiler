@@ -283,13 +283,12 @@ impl<'t> Cursor<'t> {
         let node = self.cursor.node();
         let kind = node.kind_id();
 
-        if kind == kind!("single_line_comment") || kind == kind!("multi_line_comment") {
+        if kind == kind!("doc_comment") {
             let mut range = node.byte_range();
-            range.start += 2; // skip '/*' or '//'
-            if kind == kind!("multi_line_comment") {
-                range.end -= 2; // skip '*/'
-            }
+            range.start += 3; // skip '///'
             self.gathered_comments.push(Span::from(range));
+        } else if kind == kind!("single_line_comment") || kind == kind!("multi_line_comment") {
+            self.clear_gathered_comments();
         }
     }
 

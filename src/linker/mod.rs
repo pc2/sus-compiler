@@ -40,8 +40,15 @@ impl Documentation {
         }
         let mut result = String::with_capacity(total_length);
         for s in self.gathered.iter() {
-            result.push_str(&file_text[*s]);
-            result.push('\n');
+            let text = &file_text[*s];
+
+            if text.trim().is_empty() {
+                // Force a newline by adding a blank comment (like Rust does it?)
+                // need two spaces beforehand to force a newline in markdown, according to https://github.com/microsoft/vscode/issues/86291#issuecomment-561841915
+                result.push_str("  \n");
+            } else {
+                result.push_str(text);
+            }
         }
         result
     }

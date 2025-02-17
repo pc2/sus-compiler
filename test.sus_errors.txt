@@ -966,8 +966,8 @@ Error: While parsing 'if_statement', parser found a syntax error in a node of ty
      │ │                                      ╰────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ┆ ┆   
  906 │ ├─▶     }
-     │ │           
-     │ ╰─────────── Parent node 'if_statement'
+     │ │            
+     │ ╰──────────── Parent node 'if_statement'
 ─────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ╭─[test.sus:907:25]
@@ -977,8 +977,8 @@ Error: While parsing 'if_statement', parser found a syntax error in a node of ty
      │ │                                         ╰──────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ┆ ┆   
  909 │ ├─▶     }
-     │ │           
-     │ ╰─────────── Parent node 'if_statement'
+     │ │            
+     │ ╰──────────── Parent node 'if_statement'
 ─────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ╭─[test.sus:910:7]
@@ -988,8 +988,8 @@ Error: While parsing 'if_statement', parser found a syntax error in a node of ty
      │ │                                     ╰─────────────────────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ┆ ┆   
  912 │ ├─▶     }
-     │ │           
-     │ ╰─────────── Parent node 'if_statement'
+     │ │            
+     │ ╰──────────── Parent node 'if_statement'
 ─────╯
 Error: A function called in this context may only return one result. Split this function call into a separate line instead.
      ╭─[test.sus:904:7]
