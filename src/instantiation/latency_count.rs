@@ -112,6 +112,11 @@ impl RealWireDataSource {
                     }
                 }
             }
+            RealWireDataSource::Array { elements } => {
+                for element in elements {
+                    f(*element, 0);
+                }
+            }
             RealWireDataSource::UnaryOp { op: _, right } => {
                 f(*right, 0);
             }

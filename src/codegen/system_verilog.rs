@@ -266,6 +266,27 @@ impl<'g> CodeGenerationContext<'g> {
                     let path = self.wire_ref_path_to_string(path, w.absolute_latency);
                     writeln!(self.program_text, " = {wire_name}{path};").unwrap();
                 }
+                RealWireDataSource::Array { elements } => {
+                    write!(
+                        self.program_text,
+                        " = {{"
+                    ).unwrap();
+
+                    let first = false;
+                    for element in elements {
+                        if !first {
+                            write!(self.program_text, ", ").unwrap();
+                        }
+                        let wire_name = self.wire_name(*element, w.absolute_latency);
+                        write!(
+                            self.program_text,
+                            "{}",
+                            wire_name
+                        ).unwrap()
+                    }
+
+                    writeln!(self.program_text, "}}").unwrap();
+                }
                 RealWireDataSource::UnaryOp { op, right } => {
                     writeln!(
                         self.program_text,
@@ -414,6 +435,7 @@ impl<'g> CodeGenerationContext<'g> {
                     }
                     writeln!(self.program_text, "end").unwrap();
                 }
+                RealWireDataSource::Array { elements } => {}
                 RealWireDataSource::ReadOnly => {}
                 RealWireDataSource::Select { root: _, path: _ } => {}
                 RealWireDataSource::UnaryOp { op: _, right: _ } => {}

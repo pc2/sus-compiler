@@ -232,7 +232,7 @@ impl TypeUnifier {
     }
 
     // Unifies arr_type with output_typ[]
-    pub fn unify_with_array_of(
+    pub fn unify_with_array_access(
         &self,
         arr_type: &AbstractType,
         output_typ: AbstractType,
@@ -244,6 +244,21 @@ impl TypeUnifier {
             arr_span,
             "array access",
         );
+    }
+
+    pub fn typecheck_array_literal_element_abstr(
+        &self,
+        element_typ: &AbstractType,
+        span: Span,
+        array_typ: &AbstractType,
+    ) {
+        self.type_substitutor.unify_report_error(
+            array_typ,
+            &AbstractType::Array(Box::new(element_typ.clone())),
+            span,
+            "array literal element",
+        );
+        //could do this, consider refactoring this function: self.unify_with_array_access( output_typ, input_typ.clone(), span);
     }
 
     pub fn typecheck_unary_operator_abstr(
@@ -278,7 +293,7 @@ impl TypeUnifier {
                 span,
                 "array reduction",
             );
-            self.unify_with_array_of(input_typ, output_typ.clone(), span);
+            self.unify_with_array_access(input_typ, output_typ.clone(), span);
         }
     }
 
@@ -340,6 +355,16 @@ impl TypeUnifier {
         }
     }
 
+    pub fn typecheck_array_literal_element(
+        &self,
+        element_typ: &FullType,
+        array_typ: &FullType,
+        span: Span,
+    ) {
+        self.typecheck_array_literal_element_abstr( &element_typ.typ, span, &array_typ.typ);
+        self.unify_domains(&element_typ.domain, &array_typ.domain, span, "array literal");
+    }
+
     pub fn typecheck_unary_operator(
         &self,
         op: UnaryOperator,
@@ -392,7 +417,7 @@ impl TypeUnifier {
     ) {
         self.type_substitutor
             .unify_report_error(idx_type, &INT_TYPE, idx_span, "array index");
-        self.unify_with_array_of(arr_type, output_typ.clone(), arr_span);
+        self.unify_with_array_access(arr_type, output_typ.clone(), arr_span);
     }
 
     pub fn typecheck_array_slice(

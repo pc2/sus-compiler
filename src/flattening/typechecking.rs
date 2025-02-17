@@ -525,6 +525,36 @@ impl TypeCheckingContext<'_, '_> {
                             &expr.typ,
                         )
                     }
+                    ExpressionSource::ArrayLiteral { elements } => {
+                        
+                        if !elements.is_empty() {
+                            let first_expression = self.working_on.instructions[elements[0]].unwrap_expression();
+                            let first_type = &first_expression.typ;
+
+                            for element in elements {
+                                let element_expr = self.working_on.instructions[*element].unwrap_expression();
+                                
+                    
+                                self.type_checker.type_substitutor
+                                .unify_report_error(
+                                    &element_expr.typ.typ,
+                                    &first_type.typ,
+                                    expr.span,
+                                    "array literal"
+                                );
+                            }
+                            // todo: only unify this if the preceding one succeeded or something?
+                            // todo: this is messy, refactor into type_checker.typecheck_array_literal
+
+
+                            self.type_checker.typecheck_array_literal_element(
+                                &first_type,
+                                &expr.typ,
+                                expr.span,
+                            )
+
+                        }
+                    }
                     ExpressionSource::Constant(value) => {
                         self.type_checker
                             .unify_with_constant(&expr.typ.typ, value, expr.span)
@@ -684,9 +714,9 @@ pub fn apply_types(
             .to_string();
         let found_name = found
             .display(types, &type_checker.template_type_names)
-            .to_string(); // todo remove (abstracts)
+            .to_string();
         errors
-            .error(span, format!("Typing Error (abstracts): {context} expects a {expected_name} but was given a {found_name}"))
+            .error(span, format!("Typing Error (abstract): {context} expects a {expected_name} but was given a {found_name}"))
             .add_info_list(infos);
 
         assert!(

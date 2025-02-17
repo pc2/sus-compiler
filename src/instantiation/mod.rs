@@ -89,6 +89,9 @@ pub enum RealWireDataSource {
         left: WireID,
         right: WireID,
     },
+    Array {
+        elements: Vec<WireID>
+    },
     Select {
         root: WireID,
         path: Vec<RealWirePathElem>,

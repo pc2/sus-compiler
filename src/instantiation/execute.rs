@@ -584,6 +584,11 @@ impl InstantiationContext<'_, '_> {
             ExpressionSource::WireRef(wire_ref) => {
                 self.compute_compile_time_wireref(wire_ref)?.clone()
             }
+            ExpressionSource::ArrayLiteral { elements } => {
+                // todo: consider not using unwrap
+                let p = elements.iter().map (|e| (self.generation_state.get_generation_value(*e).unwrap().clone())).collect();
+                Value::Array(p)
+            }
             &ExpressionSource::UnaryOp { op, right } => {
                 let right_val = self.generation_state.get_generation_value(right)?;
                 compute_unary_op(op, right_val)
@@ -748,6 +753,9 @@ impl InstantiationContext<'_, '_> {
                     root: root_wire,
                     path,
                 }
+            }
+            ExpressionSource::ArrayLiteral { elements } => {
+                unreachable!("Array literals cannot be non-compile-time"); // todo, investigate
             }
             &ExpressionSource::UnaryOp { op, right } => {
                 let right = self.get_wire_or_constant_as_wire(right, domain);

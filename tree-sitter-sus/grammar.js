@@ -41,6 +41,7 @@ function commaSepSeq($, rule) {
 }
 
 const PREC = {
+    array_literal: 1, // todo this is a bad way to do it
     compare : 2,
     xor: 3,
     or: 4,
@@ -231,7 +232,8 @@ module.exports = grammar({
             $.unary_op,
             $.binary_op,
             $.func_call,
-            $.field_access
+            $.field_access,
+            $.array_literal
         ),
 
         unary_op: $ => prec(PREC.unary, seq(
@@ -277,6 +279,12 @@ module.exports = grammar({
             sepSeq($._expression, $._comma),
             ')'
         ),
+
+        array_literal: $ => prec(PREC.array_literal, seq(
+            '[',
+            sepSeq($._expression, $._comma),
+            ']'
+        )),
 
         parenthesis_expression: $ => seq(
             '(',

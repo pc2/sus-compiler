@@ -101,6 +101,30 @@ impl InstantiationContext<'_, '_> {
                         );
                     }
                 }
+                RealWireDataSource::Array { elements } => {
+                    match &this_wire.typ {
+                        ConcreteType::Array(array_type) => {
+                            
+                            let (this_type, this_size) = array_type.deref();
+
+                            // todo: unify array size!
+                    
+                            for element in elements {
+                                self.type_substitutor.unify_report_error(
+                                    &self.wires[*element].typ,
+                                    &this_type,
+                                    span,
+                                    "array element",
+                                );
+                            }
+                        }
+                        _ => {
+                            panic!("Setting non-array wire to array literal");
+                            // todo: not this
+                        }
+                    }
+                    
+                }
                 &RealWireDataSource::UnaryOp { op, right } => {
                     // TODO overloading
                     let (input_typ, output_typ) = match op {

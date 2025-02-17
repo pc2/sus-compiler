@@ -1033,7 +1033,20 @@ impl FlatteningContext<'_, '_> {
             // Explicitly return so we don't alloc another WireInstance Instruction
             return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| {
                 self.flatten_expr(cursor)
+            })
+        } else if kind == kind!("array_literal") {
+            
+            let mut all_were_compiletime = true;
+            let elements = cursor.collect_list(kind!("array_literal"), |cursor| {
+                let (expr, is_comptime) = self.flatten_expr(cursor);
+                all_were_compiletime &= is_comptime;
+                expr
             });
+
+            (
+                ExpressionSource::ArrayLiteral { elements: elements},
+                all_were_compiletime
+            )
         } else if let Some(wr) = self.flatten_wire_reference(cursor).expect_wireref(self) {
             let mut is_comptime = match wr.root {
                 WireReferenceRoot::LocalDecl(uuid, _span) => self.instructions[uuid]

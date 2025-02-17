@@ -527,6 +527,9 @@ pub enum ExpressionSource {
         left: FlatID,
         right: FlatID,
     },
+    ArrayLiteral {
+        elements: Vec<FlatID>
+    },
     Constant(Value),
 }
 
