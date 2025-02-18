@@ -9,7 +9,7 @@ use crate::linker::LinkInfo;
 use crate::typing::concrete_type::ConcreteGlobalReference;
 use crate::typing::template::TemplateArgKind;
 use crate::typing::{
-    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
+    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE},
     type_inference::{
         DelayedConstraint, DelayedConstraintStatus, DelayedConstraintsList, FailedUnification,
     },
@@ -82,12 +82,12 @@ impl InstantiationContext<'_, '_> {
                     // TODO overloading
                     let (input_typ, output_typ) = match op {
                         UnaryOperator::Not => (BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE),
-                        UnaryOperator::Negate => (INT_CONCRETE_TYPE, INT_CONCRETE_TYPE),
+                        UnaryOperator::Negate => (self.new_int_type(), self.new_int_type()),
                         UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => {
                             (self.make_array_of(BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
                         UnaryOperator::Sum | UnaryOperator::Product => {
-                            (self.make_array_of(INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
+                            (self.make_array_of(self.new_int_type()), self.new_int_type())
                         }
                     };
 
@@ -131,24 +131,30 @@ impl InstantiationContext<'_, '_> {
                             ));
                             continue;
                         }
-                        BinaryOperator::Equals => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::NotEquals => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::GreaterEq => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::Greater => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::LesserEq => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::Lesser => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
+                        BinaryOperator::Equals => (
+                            (self.new_int_type(), self.new_int_type()),
+                            BOOL_CONCRETE_TYPE,
+                        ),
+                        BinaryOperator::NotEquals => (
+                            (self.new_int_type(), self.new_int_type()),
+                            BOOL_CONCRETE_TYPE,
+                        ),
+                        BinaryOperator::GreaterEq => (
+                            (self.new_int_type(), self.new_int_type()),
+                            BOOL_CONCRETE_TYPE,
+                        ),
+                        BinaryOperator::Greater => (
+                            (self.new_int_type(), self.new_int_type()),
+                            BOOL_CONCRETE_TYPE,
+                        ),
+                        BinaryOperator::LesserEq => (
+                            (self.new_int_type(), self.new_int_type()),
+                            BOOL_CONCRETE_TYPE,
+                        ),
+                        BinaryOperator::Lesser => (
+                            (self.new_int_type(), self.new_int_type()),
+                            BOOL_CONCRETE_TYPE,
+                        ),
                     };
                     self.type_substitutor.unify_report_error(
                         &self.wires[this_wire_id].typ,

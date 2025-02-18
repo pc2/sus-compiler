@@ -2,9 +2,12 @@
 
 use std::cell::{OnceCell, RefCell};
 use std::fmt::Debug;
+use std::iter::zip;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Deref, DerefMut, Index};
 use std::thread::panicking;
+
+use sus_proc_macro::get_builtin_type;
 
 use crate::block_vector::{BlockVec, BlockVecIter};
 use crate::errors::ErrorInfo;
@@ -15,7 +18,7 @@ use crate::value::Value;
 
 use super::abstract_type::AbstractType;
 use super::abstract_type::DomainType;
-use super::concrete_type::ConcreteType;
+use super::concrete_type::{ConcreteGlobalReference, ConcreteType};
 
 pub struct TypeVariableIDMarker;
 impl UUIDMarker for TypeVariableIDMarker {
@@ -55,6 +58,18 @@ pub struct TypeSubstitutor<MyType: HindleyMilner<VariableIDMarker>, VariableIDMa
     substitution_map: BlockVec<OnceCell<MyType>, BLOCK_SIZE>,
     failed_unifications: RefCell<Vec<FailedUnification<MyType>>>,
     _ph: PhantomData<VariableIDMarker>,
+}
+
+impl TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker> {
+    pub fn new_int_type(&self) -> ConcreteType {
+        let mut template_args = FlatAlloc::new();
+        template_args.alloc(ConcreteType::Unknown(self.alloc()));
+
+        ConcreteType::Named(ConcreteGlobalReference {
+            id: get_builtin_type!("int"),
+            template_args,
+        })
+    }
 }
 
 impl<'v, MyType: HindleyMilner<VariableIDMarker> + 'v, VariableIDMarker: UUIDMarker> IntoIterator
@@ -564,8 +579,14 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
     ) -> UnifyResult {
         match (left, right) {
             (ConcreteType::Named(na), ConcreteType::Named(nb)) => {
-                assert!(*na == *nb);
-                UnifyResult::Success
+                assert!(na.template_args.len() == nb.template_args.len());
+                zip(na.template_args.iter(), nb.template_args.iter())
+                    .map(|((_, template_arg_a), (_, template_arg_b))| {
+                        unify(template_arg_a, template_arg_b)
+                    })
+                    .fold(UnifyResult::Success, |result_acc, result| {
+                        result_acc & result
+                    })
             } // Already covered by get_hm_info
             (ConcreteType::Value(v_1), ConcreteType::Value(v_2)) => {
                 assert!(*v_1 == *v_2);

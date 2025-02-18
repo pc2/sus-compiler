@@ -426,3 +426,9 @@ fn perform_instantiation(
 
     context.extract()
 }
+
+impl InstantiationContext<'_, '_> {
+    pub fn new_int_type(&self) -> ConcreteType {
+        self.type_substitutor.new_int_type()
+    }
+}

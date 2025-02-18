@@ -1,11 +1,11 @@
 use std::ops::Deref;
 
-use num::BigInt;
-
 use crate::flattening::{BinaryOperator, UnaryOperator};
+use num::BigInt;
+use sus_proc_macro::get_builtin_type;
 
 use crate::typing::{
-    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
+    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE},
     type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor},
 };
 
@@ -34,7 +34,7 @@ impl Value {
     ) -> ConcreteType {
         match self {
             Value::Bool(_) => BOOL_CONCRETE_TYPE,
-            Value::Integer(_) => INT_CONCRETE_TYPE,
+            Value::Integer(_) => type_substitutor.new_int_type(),
             Value::Array(arr) => {
                 let mut arr_iter = arr.iter();
                 let Some(fst) = arr_iter.next() else {
@@ -57,7 +57,9 @@ impl Value {
     }
     pub fn is_of_type(&self, typ: &ConcreteType) -> bool {
         match (self, typ) {
-            (Self::Integer(_), typ) if *typ == INT_CONCRETE_TYPE => true,
+            (Self::Integer(_), ConcreteType::Named(global_ref)) => {
+                global_ref.id == get_builtin_type!("int")
+            }
             (Self::Bool(_), typ) if *typ == BOOL_CONCRETE_TYPE => true,
             (Self::Array(arr_slice), ConcreteType::Array(arr_typ_box)) => {
                 let (arr_content_typ, arr_size_typ) = arr_typ_box.deref();
