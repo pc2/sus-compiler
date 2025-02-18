@@ -107,13 +107,6 @@ impl InstantiationContext<'_, '_> {
                 &RealWireDataSource::BinaryOp { op, left, right } => {
                     // TODO overloading
                     // Typecheck generic INT
-                    delayed_constraints.push(BinaryOpTypecheckConstraint::new(
-                        op,
-                        left,
-                        right,
-                        this_wire_id,
-                        span,
-                    ));
                     let ((in_left, in_right), out) = match op {
                         BinaryOperator::And => {
                             ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
@@ -124,20 +117,19 @@ impl InstantiationContext<'_, '_> {
                         BinaryOperator::Xor => {
                             ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
-                        BinaryOperator::Add => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::Subtract => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::Multiply => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::Divide => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::Modulo => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
+                        BinaryOperator::Add
+                        | BinaryOperator::Subtract
+                        | BinaryOperator::Multiply
+                        | BinaryOperator::Divide
+                        | BinaryOperator::Modulo => {
+                            delayed_constraints.push(BinaryOpTypecheckConstraint::new(
+                                op,
+                                left,
+                                right,
+                                this_wire_id,
+                                span,
+                            ));
+                            continue;
                         }
                         BinaryOperator::Equals => {
                             ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
@@ -513,7 +505,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
 
 #[derive(Debug)]
 struct BinaryOpTypecheckConstraint {
-    _op: BinaryOperator,
+    op: BinaryOperator,
     left: UUID<WireIDMarker>,
     right: UUID<WireIDMarker>,
     out: UUID<WireIDMarker>,
@@ -522,14 +514,14 @@ struct BinaryOpTypecheckConstraint {
 
 impl BinaryOpTypecheckConstraint {
     fn new(
-        _op: BinaryOperator,
+        op: BinaryOperator,
         left: UUID<WireIDMarker>,
         right: UUID<WireIDMarker>,
         out: UUID<WireIDMarker>,
         span: Span,
     ) -> Self {
         Self {
-            _op,
+            op,
             left,
             right,
             out,
@@ -557,11 +549,19 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstr
             .try_fully_substitute(&context.type_substitutor)
             .unwrap();
         #[rustfmt::skip]
-        let right_size = right_complete_type.unwrap_named().template_args
-            [UUID::from_hidden_value(0)]
+        let right_size = right_complete_type.unwrap_named().template_args[UUID::from_hidden_value(0)]
             .unwrap_value()
             .unwrap_integer();
-        let out_size = left_size + right_size;
+        let out_size = match self.op {
+            BinaryOperator::Add => left_size + right_size,
+            BinaryOperator::Subtract => left_size - right_size,
+            BinaryOperator::Multiply => left_size * right_size,
+            BinaryOperator::Divide => left_size / right_size,
+            BinaryOperator::Modulo => left_size % right_size,
+            _ => {
+                unreachable!("The BinaryOpTypecheckConstraint should only check arithmetic operation but got {}", self.op);
+            }
+        };
         let mut template_args: FlatAlloc<ConcreteType, TemplateIDMarker> = FlatAlloc::new();
         template_args.alloc(ConcreteType::new_int(out_size));
         let expected_out = ConcreteType::Named(ConcreteGlobalReference {
@@ -579,7 +579,12 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstr
         DelayedConstraintStatus::Resolved
     }
 
-    fn report_could_not_resolve_error(&self, _context: &InstantiationContext<'_, '_>) {
-        todo!()
+    fn report_could_not_resolve_error(&self, context: &InstantiationContext<'_, '_>) {
+        let message = format!(
+            "Failed to Typecheck {:?} = {:?} {} {:?}",
+            self.out, self.right, self.op, self.left
+        );
+
+        context.errors.error(self.span, message);
     }
 }
