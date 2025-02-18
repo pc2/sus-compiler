@@ -554,10 +554,10 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstr
             .unwrap_integer();
         let out_size = match self.op {
             BinaryOperator::Add => left_size + right_size,
-            BinaryOperator::Subtract => left_size - right_size,
+            BinaryOperator::Subtract => left_size.clone(),
             BinaryOperator::Multiply => left_size * right_size,
-            BinaryOperator::Divide => left_size / right_size,
-            BinaryOperator::Modulo => left_size % right_size,
+            BinaryOperator::Divide => left_size.clone(),
+            BinaryOperator::Modulo => right_size.clone(),
             _ => {
                 unreachable!("The BinaryOpTypecheckConstraint should only check arithmetic operation but got {}", self.op);
             }
