@@ -1,6 +1,18 @@
-use std::fmt::Debug;
-
-use crate::config::config;
+//! Latency Counting concerns three types of nodes:
+//! - Late nodes: These usually correspond to inputs. LC tries to make these as late as possible
+//! - Early nodes: Usually correspond to outputs. LC tries to make these as early as possible
+//!     (therby squeezing the inputs and outputs together as closely as possible)
+//! - Neutral nodes: These just need to get some absolute latency assigned.
+//!     LC will make these as early as possible, without affecting late nodes.
+//!     Neutral nodes not constrained by Late nodes get added in last, by a single backwards pass
+//!
+//! Latency counting works in two stages:
+//! - First we start from the ports (the early and late nodes).
+//!     From here we try to discover other ports, by walking the dependency graph
+//!     Any ports we discover must be unambiguously reachable at the exact same absolute latency from other ports
+//! - Once we have found all ports, and no port reports a conflicting latency, we can fill in the internal latencies
+//!     This starts from the late ports, and seeds them with the found latencies.
+//!     From here it keeps all the found latencies, such that the resulting latencies are all as early as possible.
 
 use super::list_of_lists::ListOfLists;
 
@@ -70,124 +82,112 @@ pub struct LatencyNode {
     /// We use [i64::MIN] to represent [LatencyNode::UNSET] out of convenience.
     /// Because the algorithm updates nodes by taking the max of the existing value with the new value,
     /// this makes it simple to update unset nodes the first time
+    ///
+    /// We use [i64::MAX] to represent [LatencyNode::POISONED] out of convenience too.
+    /// Because the algorithm updates nodes by taking the max of the existing value with the new value,
+    /// a poisoned node will never be updated
     abs_lat: i64,
-    /// Poisoned nodes still keep their abs_lat, so that we can still detect net-positive latency cycles
-    poisoned: bool,
     pinned: bool,
 }
 
 impl LatencyNode {
     const UNSET: LatencyNode = LatencyNode {
         abs_lat: i64::MIN,
-        poisoned: false,
+        pinned: false,
+    };
+    const POISONED: LatencyNode = LatencyNode {
+        abs_lat: i64::MAX,
         pinned: false,
     };
     fn new_pinned(abs_lat: i64) -> LatencyNode {
         let result = LatencyNode {
             abs_lat,
-            poisoned: false,
             pinned: true,
         };
-        assert!(result.is_set());
+        assert!(!result.is_unset());
         result
     }
 
     fn unwrap(&self) -> i64 {
-        assert!(self.is_set());
-        assert!(!self.poisoned);
+        assert!(!self.is_unset());
+        assert!(!self.is_poisoned());
         self.abs_lat // Poison is not allowed
     }
     /// Returns the computed Absolute Latency for this node if it's not [Self::UNSET] and not [Self::POISONED]
     pub fn get_maybe(&self) -> Option<i64> {
-        if self.abs_lat == i64::MIN || self.poisoned {
+        if self.abs_lat == i64::MIN || self.abs_lat == i64::MAX {
             None
         } else {
             Some(self.abs_lat)
         }
     }
     fn pin(&mut self) {
-        assert!(self.is_set());
+        assert!(!self.is_unset());
         assert!(!self.pinned);
         self.pinned = true;
     }
     fn unpin(&mut self) {
-        assert!(self.is_set());
+        assert!(!self.is_unset());
         assert!(self.pinned);
         self.pinned = false;
     }
-    /// So Poisoned doesn't make a node [Self::UNSET]
-    fn is_set(&self) -> bool {
-        self.abs_lat != i64::MIN
+    fn is_unset(&self) -> bool {
+        self.abs_lat == i64::MIN
+    }
+    fn is_poisoned(&self) -> bool {
+        self.abs_lat == i64::MAX
     }
     /// To be a valid starting point for latency counting, the node must:
     /// - Be set
     /// - Be pinned
     /// - Not be poisoned
     fn assert_is_valid_starting_point(&self) {
-        assert!(self.is_set());
+        assert!(!self.is_unset());
+        assert!(!self.is_poisoned());
         assert!(self.pinned);
-        assert!(!self.poisoned);
     }
-    fn update_and_pin<const BACKWARDS: bool>(
-        &mut self,
-        from: LatencyNode,
-        delta: Option<i64>,
-    ) -> LatencyNodeUpdate {
-        let mut did_update = LatencyNodeUpdate::NoChange;
-        // Handle poison cases
-        if (from.poisoned || delta.is_none()) && !self.poisoned && !self.pinned {
-            // !self.pinned, Otherwise, we're not allowed to update pinned values
-            self.poisoned = true;
-            did_update = LatencyNodeUpdate::Updated;
+    /// Returns `true` if the node was updated
+    fn update_and_pin(&mut self, from: LatencyNode, delta: Option<i64>, backwards: bool) -> bool {
+        let new_latency = if let (false, Some(delta)) = (from.abs_lat == i64::MAX, delta) {
+            from.abs_lat - delta
+        } else {
+            i64::MAX // Poison
+        };
+
+        let new_latency_may_update = if backwards {
+            new_latency < self.abs_lat
+        } else {
+            new_latency > self.abs_lat
+        };
+
+        if self.abs_lat == i64::MIN
+            || (new_latency == i64::MAX && self.abs_lat != i64::MAX)
+            || new_latency_may_update
+        {
+            // Any incompatible latency errors should have been caught by [find_net_positive_latency_cycles_and_incompatible_specified_latencies]
+            assert!(!self.pinned);
+            self.abs_lat = new_latency;
+            self.pinned = true;
+            true
+        } else {
+            false
         }
-
-        // Update node latency
-        if let Some(delta) = delta {
-            assert!(from.abs_lat != i64::MIN);
-            assert!(delta != i64::MIN);
-
-            let new_latency = from.abs_lat - delta;
-            let should_update = self.abs_lat == i64::MIN
-                || if BACKWARDS {
-                    new_latency < self.abs_lat
-                } else {
-                    new_latency > self.abs_lat
-                };
-            if should_update {
-                if self.pinned {
-                    return LatencyNodeUpdate::ErrorPinnedConflict { new_latency };
-                } else {
-                    self.abs_lat = new_latency;
-                    self.pinned = true;
-                    did_update = LatencyNodeUpdate::Updated
-                }
-            }
-        }
-
-        did_update
     }
 }
 
-impl Debug for LatencyNode {
+impl std::fmt::Debug for LatencyNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if !self.pinned {
             f.write_str("NOT_PINNED ")?; // Pins are very common, so easier to spot the non-pins
         }
-        if self.poisoned {
-            f.write_str("POISONED")?;
-        }
         if self.abs_lat == i64::MIN {
             f.write_str("UNSET")
+        } else if self.abs_lat == i64::MAX {
+            f.write_str("POISONED")
         } else {
             write!(f, "{}", self.abs_lat)
         }
     }
-}
-
-enum LatencyNodeUpdate {
-    NoChange,
-    Updated,
-    ErrorPinnedConflict { new_latency: i64 },
 }
 
 fn clear_unpinned_latencies(working_latencies: &mut [LatencyNode]) {
@@ -196,6 +196,149 @@ fn clear_unpinned_latencies(working_latencies: &mut [LatencyNode]) {
             *l = LatencyNode::UNSET;
         }
     }
+}
+
+/// I found that it was far to complex to try to do the whole of latency counting in a single pass of the graph algorithm
+/// That's why I check the "bad graph" cases first, throw the necessary errors, and then do any processing assuming no net positive latency cycles, and no incompatible latency specifications
+///
+/// In this function, we set [LatencyNode::abs_lat] to [i64::MAX] to indicate that we have already visited a specific node.
+fn find_net_positive_latency_cycles_and_incompatible_specified_latencies<'d>(
+    specified_latencies: &[SpecifiedLatency],
+    fanouts: &'d ListOfLists<FanInOut>,
+    stack: &mut Vec<LatencyStackElem<'d>>,
+) -> Result<Vec<LatencyNode>, LatencyCountingError> {
+    let mut working_latencies = vec![LatencyNode::UNSET; fanouts.len()];
+
+    assert!(stack.is_empty());
+
+    for spec_lat in specified_latencies {
+        let wl = &mut working_latencies[spec_lat.wire];
+        wl.abs_lat = spec_lat.latency;
+        wl.pin();
+    }
+
+    fn start_from<'d>(
+        working_latencies: &mut [LatencyNode],
+        fanouts: &'d ListOfLists<FanInOut>,
+        stack: &mut Vec<LatencyStackElem<'d>>,
+        start_node: &SpecifiedLatency,
+    ) -> Result<(), LatencyCountingError> {
+        working_latencies[start_node.wire].assert_is_valid_starting_point();
+
+        stack.push(LatencyStackElem {
+            node_idx: start_node.wire,
+            remaining_fanout: fanouts[start_node.wire].iter(),
+        });
+
+        while let Some(top) = stack.last_mut() {
+            let from = &mut working_latencies[top.node_idx];
+            assert!(!from.is_unset());
+            assert!(!from.is_poisoned());
+
+            let Some(&FanInOut {
+                to_node,
+                delta_latency,
+            }) = top.remaining_fanout.next()
+            else {
+                from.unpin();
+                stack.pop().unwrap();
+                continue;
+            };
+            let Some(delta) = delta_latency else { continue }; // We can safely ignore poison edges here
+
+            // Update node latency
+            let new_latency = from.abs_lat - delta;
+
+            let to = &mut working_latencies[to_node];
+            // Always overwrites UNSET, never overwrites POISONED
+            if new_latency > to.abs_lat {
+                if to.pinned {
+                    // Decide if this is a net positive latency cycle or a conflicting specified latencies error
+                    return Err(
+                        if let Some(conflict_begin) =
+                            stack.iter().position(|elem| elem.node_idx == to_node)
+                        {
+                            LatencyCountingError::NetPositiveLatencyCycle {
+                                conflict_path: stack[conflict_begin..]
+                                    .iter()
+                                    .map(|elem| SpecifiedLatency {
+                                        wire: elem.node_idx,
+                                        latency: working_latencies[elem.node_idx].unwrap(),
+                                    })
+                                    .collect(),
+                                net_roundtrip_latency: new_latency - start_node.latency,
+                            }
+                        } else {
+                            LatencyCountingError::ConflictingSpecifiedLatencies {
+                                conflict_path: stack
+                                    .iter()
+                                    .map(|elem| SpecifiedLatency {
+                                        wire: elem.node_idx,
+                                        latency: working_latencies[elem.node_idx].unwrap(),
+                                    })
+                                    .chain(std::iter::once(SpecifiedLatency {
+                                        wire: to_node,
+                                        latency: new_latency,
+                                    }))
+                                    .collect(),
+                            }
+                        },
+                    );
+                } else {
+                    to.abs_lat = new_latency;
+                    to.pinned = true;
+
+                    stack.push(LatencyStackElem {
+                        node_idx: to_node,
+                        remaining_fanout: fanouts[to_node].iter(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // First handle all specified latencies
+    for start_node in specified_latencies {
+        start_from(&mut working_latencies, fanouts, stack, start_node)?;
+    }
+
+    // Then fill in all remaining nodes
+    let mut cur_start_point = 0;
+    loop {
+        // First replace all nodes that have been explored by POISONED.
+        // POISONED tells our algorithm that this node is not part of a net-positive latency cycle
+        // And thus doesn't need to be checked anymore.
+        // Because POISONED == i64::MAX, that means the algorithm naturally won't visit these nodes anymore.
+        for l in working_latencies.iter_mut() {
+            if l.abs_lat != i64::MIN {
+                *l = LatencyNode::POISONED;
+            }
+        }
+
+        let Some(found) = working_latencies[cur_start_point..]
+            .iter()
+            .position(|n| !n.is_poisoned())
+        else {
+            break;
+        };
+        cur_start_point += found;
+
+        let start_node = SpecifiedLatency {
+            wire: cur_start_point,
+            latency: 0,
+        };
+
+        let wl = &mut working_latencies[cur_start_point];
+        wl.abs_lat = 0;
+        wl.pin();
+
+        start_from(&mut working_latencies, fanouts, stack, &start_node)?;
+    }
+
+    // Okay, no net-positive latency cycles, or conflicting specified latencies
+
+    Ok(working_latencies)
 }
 
 /// Algorithm:
@@ -209,12 +352,13 @@ fn clear_unpinned_latencies(working_latencies: &mut [LatencyNode]) {
 /// Requires working_latencies[start_node].pinned == true
 ///
 /// Leaves working_latencies[start_node].pinned == true
-fn count_latency<'d, const BACKWARDS: bool>(
+fn count_latency<'d>(
     working_latencies: &mut [LatencyNode],
     fanouts: &'d ListOfLists<FanInOut>,
     start_node: usize,
     stack: &mut Vec<LatencyStackElem<'d>>,
-) -> Result<(), LatencyCountingError> {
+    backwards: bool,
+) {
     working_latencies[start_node].assert_is_valid_starting_point();
 
     assert!(stack.is_empty());
@@ -225,80 +369,39 @@ fn count_latency<'d, const BACKWARDS: bool>(
     });
 
     while let Some(top) = stack.last_mut() {
-        if let Some(&FanInOut {
+        let from = &mut working_latencies[top.node_idx];
+        assert!(!from.is_unset());
+        assert!(!from.is_poisoned());
+
+        let Some(&FanInOut {
             to_node,
             delta_latency,
         }) = top.remaining_fanout.next()
-        {
-            assert!(working_latencies[top.node_idx].is_set());
+        else {
+            from.unpin();
+            stack.pop().unwrap();
+            continue;
+        };
 
-            match working_latencies[to_node]
-                .update_and_pin::<BACKWARDS>(working_latencies[top.node_idx], delta_latency)
-            {
-                LatencyNodeUpdate::NoChange => {} // Nothing
-                LatencyNodeUpdate::Updated => {
-                    stack.push(LatencyStackElem {
-                        node_idx: to_node,
-                        remaining_fanout: fanouts[to_node].iter(),
-                    });
-                }
-                LatencyNodeUpdate::ErrorPinnedConflict { new_latency } => {
-                    // Decide if this is a net positive latency cycle or a conflicting specified latencies error
-                    if let Some(conflict_begin) =
-                        stack.iter().position(|elem| elem.node_idx == to_node)
-                    {
-                        let mut conflict_path: Vec<SpecifiedLatency> = stack[conflict_begin..]
-                            .iter()
-                            .map(|elem| SpecifiedLatency {
-                                wire: elem.node_idx,
-                                latency: working_latencies[elem.node_idx].unwrap(),
-                            })
-                            .collect();
-                        if BACKWARDS {
-                            conflict_path.reverse();
-                        }
-                        return Err(LatencyCountingError::NetPositiveLatencyCycle {
-                            conflict_path,
-                            net_roundtrip_latency: new_latency
-                                - working_latencies[start_node].unwrap(),
-                        });
-                    } else {
-                        assert!(!BACKWARDS, "This should not appear in backwards exploration, because port conflicts should have been found in the forward pass already");
-
-                        let conflict_path = stack
-                            .iter()
-                            .map(|elem| SpecifiedLatency {
-                                wire: elem.node_idx,
-                                latency: working_latencies[elem.node_idx].unwrap(),
-                            })
-                            .chain(std::iter::once(SpecifiedLatency {
-                                wire: to_node,
-                                latency: new_latency,
-                            }))
-                            .collect();
-                        return Err(LatencyCountingError::ConflictingSpecifiedLatencies {
-                            conflict_path,
-                        });
-                    };
-                }
-            }
-        } else {
-            working_latencies[top.node_idx].unpin();
-            stack.pop();
+        let from = *from; // Break the mutable borrow
+        if working_latencies[to_node].update_and_pin(from, delta_latency, backwards) {
+            stack.push(LatencyStackElem {
+                node_idx: to_node,
+                remaining_fanout: fanouts[to_node].iter(),
+            });
         }
     }
 
     // Repin start node, because we unpinned it when unwinding the stack
     working_latencies[start_node].pin();
-
-    Ok(())
 }
 
-fn count_latency_all_in_list<'d, const BACKWARDS: bool>(
+fn count_latency_all_in_list<'d>(
     working_latencies: &mut [LatencyNode],
     fanouts: &'d ListOfLists<FanInOut>,
     nodes: &[SpecifiedLatency],
     stack: &mut Vec<LatencyStackElem<'d>>,
+    backwards: bool,
 ) -> Result<(), LatencyCountingError> {
     for start_node in nodes {
         working_latencies[start_node.wire].assert_is_valid_starting_point();
@@ -306,7 +409,13 @@ fn count_latency_all_in_list<'d, const BACKWARDS: bool>(
 
     for start_node in nodes {
         working_latencies[start_node.wire].assert_is_valid_starting_point();
-        count_latency::<BACKWARDS>(working_latencies, fanouts, start_node.wire, stack)?;
+        count_latency(
+            working_latencies,
+            fanouts,
+            start_node.wire,
+            stack,
+            backwards,
+        );
         working_latencies[start_node.wire].assert_is_valid_starting_point();
     }
 
@@ -397,7 +506,9 @@ fn solve_latencies_for_ports(
     ports: &LatencyCountingPorts,
     mut specified_latencies: Vec<SpecifiedLatency>,
 ) -> Result<Vec<LatencyNode>, LatencyCountingError> {
-    if config().debug_print_latency_graph {
+    // Cannot call config from a test case. See https://users.rust-lang.org/t/cargo-test-name-errors-with-error-invalid-value-name-for-files-file-does-not-exist/125855
+    #[cfg(not(test))]
+    if crate::config::config().debug_print_latency_graph {
         print_latency_test_case(fanins, ports, &specified_latencies);
     }
 
@@ -405,10 +516,18 @@ fn solve_latencies_for_ports(
         return Ok(Vec::new());
     }
 
-    // The current set of latencies
-    let mut working_latencies = vec![LatencyNode::UNSET; fanins.len()];
     // This stack is reused by [count_latency] calls
     let mut stack = Vec::new();
+
+    let mut working_latencies =
+        find_net_positive_latency_cycles_and_incompatible_specified_latencies(
+            &specified_latencies,
+            fanouts,
+            &mut stack,
+        )?;
+
+    working_latencies.fill(LatencyNode::UNSET);
+    assert!(stack.is_empty());
 
     // If no latencies are given, we have to initialize an arbitrary one ourselves. Prefer input ports over output ports over regular wires
     if specified_latencies.is_empty() {
@@ -437,21 +556,23 @@ fn solve_latencies_for_ports(
         .collect();
 
     // First forward run from the initial latency assignment to discover other ports
-    count_latency_all_in_list::<false>(
+    count_latency_all_in_list(
         &mut working_latencies,
         fanouts,
         &specified_latencies,
         &mut stack,
+        false,
     )?;
     inform_all_ports(&mut ports_to_place, &working_latencies)?;
     clear_unpinned_latencies(&mut working_latencies);
 
     // Then backward run
-    count_latency_all_in_list::<true>(
+    count_latency_all_in_list(
         &mut working_latencies,
         fanins,
         &specified_latencies,
         &mut stack,
+        true,
     )?;
     inform_all_ports(&mut ports_to_place, &working_latencies)?;
     clear_unpinned_latencies(&mut working_latencies);
@@ -461,16 +582,19 @@ fn solve_latencies_for_ports(
         working_latencies[chosen_port.wire] =
             LatencyNode::new_pinned(chosen_port.latency_proposal.unwrap());
 
-        if chosen_port.is_input {
-            count_latency::<false>(
-                &mut working_latencies,
-                fanouts,
-                chosen_port.wire,
-                &mut stack,
-            )?;
+        let fan = if chosen_port.is_input {
+            fanouts
         } else {
-            count_latency::<true>(&mut working_latencies, fanins, chosen_port.wire, &mut stack)?;
-        }
+            fanins
+        };
+        count_latency(
+            &mut working_latencies,
+            fan,
+            chosen_port.wire,
+            &mut stack,
+            !chosen_port.is_input,
+        );
+
         inform_all_ports(&mut ports_to_place, &working_latencies)?;
         clear_unpinned_latencies(&mut working_latencies);
     }
@@ -492,14 +616,14 @@ fn fill_in_internal_latencies(
     for idx in 0..working_latencies.len() {
         if working_latencies[idx].pinned {
             // it's a defined latency!
-            count_latency::<false>(working_latencies, fanouts, idx, &mut stack).unwrap();
+            count_latency(working_latencies, fanouts, idx, &mut stack, false);
             // These should have already been caught when exploring the ports
         }
     }
 
     // First pin all these latencies
     for latency in working_latencies.iter_mut() {
-        if latency.is_set() && !latency.poisoned {
+        if !latency.is_unset() && !latency.is_poisoned() {
             // it's a defined latency!
             if !latency.pinned {
                 // Avoid the assert on latency.pin()
@@ -511,12 +635,13 @@ fn fill_in_internal_latencies(
     // Finally we add in the backwards latencies. TODO maybe be more conservative here?
     for idx in 0..working_latencies.len() {
         if working_latencies[idx].pinned {
-            count_latency::<true>(working_latencies, fanins, idx, &mut stack).unwrap();
+            count_latency(working_latencies, fanins, idx, &mut stack, true);
             // These should have already been caught when exploring the ports
         }
     }
 }
 
+#[allow(unused)]
 fn print_latency_test_case(
     fanins: &ListOfLists<FanInOut>,
     ports: &LatencyCountingPorts,
