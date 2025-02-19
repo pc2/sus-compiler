@@ -160,9 +160,8 @@ impl LatencyNode {
             new_latency > self.abs_lat
         };
 
-        if self.abs_lat == i64::MIN
-            || (new_latency == i64::MAX && self.abs_lat != i64::MAX)
-            || new_latency_may_update
+        if (self.abs_lat == i64::MIN || new_latency == i64::MAX || new_latency_may_update)
+            && self.abs_lat != i64::MAX
         {
             // Any incompatible latency errors should have been caught by [find_net_positive_latency_cycles_and_incompatible_specified_latencies]
             assert!(!self.pinned);
@@ -371,7 +370,8 @@ fn count_latency<'d>(
     while let Some(top) = stack.last_mut() {
         let from = &mut working_latencies[top.node_idx];
         assert!(!from.is_unset());
-        assert!(!from.is_poisoned());
+        // Poison edges are allowed now
+        // assert!(!from.is_poisoned());
 
         let Some(&FanInOut {
             to_node,
@@ -604,6 +604,12 @@ fn solve_latencies_for_ports(
     Ok(working_latencies)
 }
 
+fn has_poison_edge(fanouts: &ListOfLists<FanInOut>) -> bool {
+    !fanouts
+        .iter()
+        .all(|fanout_list| fanout_list.iter().all(|f| f.delta_latency.is_some()))
+}
+
 /// All the ports should have pinned latencies assigned in the working_latencies parameter, and nothing else.
 fn fill_in_internal_latencies(
     fanins: &ListOfLists<FanInOut>,
@@ -611,6 +617,9 @@ fn fill_in_internal_latencies(
     working_latencies: &mut [LatencyNode],
 ) {
     let mut stack = Vec::new();
+
+    debug_assert!(!has_poison_edge(fanins));
+    debug_assert!(!has_poison_edge(fanouts)); // Equivalent
 
     // Now that we have all the ports, we can fill in the internal latencies
     for idx in 0..working_latencies.len() {
@@ -702,6 +711,13 @@ mod tests {
         }
     }
 
+    fn mk_poisoned(to_node: usize) -> FanInOut {
+        FanInOut {
+            to_node,
+            delta_latency: None,
+        }
+    }
+
     // makes inputs for fanins, outputs for fanouts
     fn infer_ports(fanins: &ListOfLists<FanInOut>) -> Vec<usize> {
         fanins
@@ -737,6 +753,8 @@ mod tests {
         Ok(latency_solution)
     }
 
+    /// Any node with no fanin is an input
+    /// Any node with no fanout is an output
     fn solve_latencies_infer_ports(
         fanins: &ListOfLists<FanInOut>,
         specified_latencies: Vec<SpecifiedLatency>,
@@ -1372,5 +1390,35 @@ mod tests {
         let _found_latencies =
             solve_latencies_test_case(&fanins, &fanouts, &inputs, &outputs, specified_latencies)
                 .unwrap();
+    }
+
+    #[test]
+    /// Checks that poison values properly propagate
+    fn test_poison_edges() {
+        let fanins: [&[FanInOut]; 7] = [
+            /*0*/ &[],
+            /*1*/ &[], // This is the node that should be poisoned
+            /*2*/ &[mk_fan(0, 1)],
+            /*3*/ &[mk_fan(0, 2), mk_poisoned(1)],
+            /*4*/ &[mk_fan(2, 2), mk_fan(5, 2)], // And an inference edge from 3 -> 4
+            /*5*/ &[mk_fan(3, 1), mk_fan(1, 3)],
+            /*6*/ &[mk_fan(5, 3), mk_fan(4, 4)],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+        let fanouts = convert_fanin_to_fanout(&fanins);
+        let inputs = [0, 1];
+        let outputs = [6];
+        let specified_latencies = vec![SpecifiedLatency {
+            wire: 0,
+            latency: 0,
+        }];
+
+        let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
+        let found_latencies =
+            solve_latencies_for_ports(&fanins, &fanouts, &ports, specified_latencies).unwrap();
+
+        assert!(found_latencies[0].get_maybe() == Some(0));
+        assert!(found_latencies[1].get_maybe().is_none());
+        assert!(found_latencies[6].get_maybe() == Some(9));
     }
 }
