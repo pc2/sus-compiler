@@ -122,13 +122,13 @@ impl InstantiationContext<'_, '_> {
                         | BinaryOperator::Multiply
                         | BinaryOperator::Divide
                         | BinaryOperator::Modulo => {
-                            delayed_constraints.push(BinaryOpTypecheckConstraint::new(
+                            delayed_constraints.push(BinaryOpTypecheckConstraint {
                                 op,
                                 left,
                                 right,
-                                this_wire_id,
+                                out: this_wire_id,
                                 span,
-                            ));
+                            });
                             continue;
                         }
                         BinaryOperator::Equals => (
@@ -516,24 +516,6 @@ struct BinaryOpTypecheckConstraint {
     right: UUID<WireIDMarker>,
     out: UUID<WireIDMarker>,
     span: Span,
-}
-
-impl BinaryOpTypecheckConstraint {
-    fn new(
-        op: BinaryOperator,
-        left: UUID<WireIDMarker>,
-        right: UUID<WireIDMarker>,
-        out: UUID<WireIDMarker>,
-        span: Span,
-    ) -> Self {
-        Self {
-            op,
-            left,
-            right,
-            out,
-            span,
-        }
-    }
 }
 
 impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstraint {
