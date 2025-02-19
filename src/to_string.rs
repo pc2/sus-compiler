@@ -140,8 +140,12 @@ pub struct ConcreteTypeDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
 impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner {
-            ConcreteType::Named(name) => {
-                f.write_str(&self.linker_types[name.id].link_info.get_full_name())
+            ConcreteType::Named(global_ref) => {
+                f.write_str(&self.linker_types[global_ref.id].link_info.get_full_name())?;
+                for template_arg in global_ref.template_args.iter() {
+                    write!(f, "{}", template_arg.1.display(self.linker_types))?;
+                }
+                Ok(())
             }
             ConcreteType::Array(arr_box) => {
                 let (elem_typ, arr_size) = arr_box.deref();

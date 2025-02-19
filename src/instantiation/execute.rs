@@ -11,14 +11,13 @@ use crate::prelude::*;
 use crate::typing::template::GlobalReference;
 
 use num::BigInt;
+use sus_proc_macro::get_builtin_type;
 
 use crate::flattening::*;
 use crate::value::{compute_binary_op, compute_unary_op, Value};
 
 use crate::typing::{
-    abstract_type::DomainType,
-    concrete_type::{ConcreteType, INT_CONCRETE_TYPE},
-    template::TemplateArgKind,
+    abstract_type::DomainType, concrete_type::ConcreteType, template::TemplateArgKind,
 };
 
 use super::*;
@@ -181,9 +180,29 @@ impl InstantiationContext<'_, '_> {
                 self.template_args[*template_id].clone()
             }
             WrittenType::Named(named_type) => {
+                let mut template_args = FlatAlloc::new();
+                for template_arg in named_type.template_args.iter() {
+                    let concrete_type = if let (_, Some(template_arg)) = template_arg {
+                        match &template_arg.kind {
+                            TemplateArgKind::Type(written_type) => {
+                                self.concretize_type(written_type)?
+                            }
+                            TemplateArgKind::Value(uuid) => ConcreteType::Value(
+                                self.generation_state
+                                    .get_generation_value(*uuid)
+                                    .unwrap()
+                                    .clone(),
+                            ),
+                        }
+                    } else {
+                        ConcreteType::Unknown(self.type_substitutor.alloc())
+                    };
+                    template_args.alloc(concrete_type);
+                }
+
                 ConcreteType::Named(crate::typing::concrete_type::ConcreteGlobalReference {
                     id: named_type.id,
-                    template_args: FlatAlloc::new(),
+                    template_args,
                 })
             }
             WrittenType::Array(_, arr_box) => {
@@ -320,7 +339,8 @@ impl InstantiationContext<'_, '_> {
                 &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
                     let idx_wire = self.get_wire_or_constant_as_wire(idx, domain);
                     assert_eq!(
-                        self.wires[idx_wire].typ, INT_CONCRETE_TYPE,
+                        self.wires[idx_wire].typ.unwrap_named().id,
+                        get_builtin_type!("int"),
                         "Caught by typecheck"
                     );
                     preamble.push(RealWirePathElem::ArrayAccess {
