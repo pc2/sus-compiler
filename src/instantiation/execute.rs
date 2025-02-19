@@ -6,6 +6,7 @@
 
 use std::ops::{Deref, Index, IndexMut};
 
+use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::IsExtern;
 use crate::prelude::*;
 use crate::typing::template::GlobalReference;

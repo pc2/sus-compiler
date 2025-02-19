@@ -21,9 +21,6 @@ use crate::{
 
 use crate::typing::concrete_type::ConcreteType;
 
-// Temporary value before proper latency is given
-pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
-
 /// See [MultiplexerSource]
 ///
 /// This is the post-instantiation equivalent of [crate::flattening::WireReferencePathElement]

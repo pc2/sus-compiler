@@ -9,12 +9,15 @@ use crate::prelude::*;
 use crate::flattening::{Instruction, WriteModifiers};
 
 use latency_algorithm::{
-    convert_fanin_to_fanout, solve_latencies, FanInOut, LatencyCountingError, SpecifiedLatency,
+    solve_latencies, FanInOut, LatencyCountingError, LatencyCountingPorts, SpecifiedLatency,
 };
 
 use self::list_of_lists::ListOfLists;
 
 use crate::instantiation::*;
+
+// Temporary value before proper latency is given
+pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
 
 struct PathMuxSource<'s> {
     to_wire: &'s RealWire,
@@ -95,8 +98,7 @@ struct WireToLatencyMap {
 struct LatencyDomainInfo {
     latency_node_meanings: Vec<WireID>,
     initial_values: Vec<SpecifiedLatency>,
-    input_ports: Vec<usize>,
-    output_ports: Vec<usize>,
+    ports: LatencyCountingPorts,
 }
 
 impl RealWireDataSource {
@@ -181,20 +183,13 @@ impl InstantiationContext<'_, '_> {
                 LatencyDomainInfo {
                     latency_node_meanings,
                     initial_values,
-                    input_ports: Vec::new(),
-                    output_ports: Vec::new(),
+                    ports: LatencyCountingPorts::default(),
                 }
             });
 
         for (_id, p) in self.interface_ports.iter_valids() {
-            let domain_to_edit = &mut domain_infos[p.domain];
-            let latency_node = map_wire_to_latency_node[p.wire];
-            if p.is_input {
-                &mut domain_to_edit.input_ports
-            } else {
-                &mut domain_to_edit.output_ports
-            }
-            .push(latency_node);
+            let node = map_wire_to_latency_node[p.wire];
+            domain_infos[p.domain].ports.push(node, p.is_input);
         }
 
         let mut next_port_chain: FlatAlloc<Option<(WireID, i64)>, WireIDMarker> =
@@ -276,15 +271,15 @@ impl InstantiationContext<'_, '_> {
                 .iter_sources_with_min_latency(|from, delta_latency| {
                     assert_eq!(self.wires[from].domain, domain_id);
                     fanins.push_to_last_group(FanInOut {
-                        other: latency_node_mapper.map_wire_to_latency_node[from],
-                        delta_latency,
+                        to_node: latency_node_mapper.map_wire_to_latency_node[from],
+                        delta_latency: Some(delta_latency),
                     });
                 });
 
             if let Some((from, delta_latency)) = latency_node_mapper.next_port_chain[*wire_id] {
                 fanins.push_to_last_group(FanInOut {
-                    other: latency_node_mapper.map_wire_to_latency_node[from],
-                    delta_latency,
+                    to_node: latency_node_mapper.map_wire_to_latency_node[from],
+                    delta_latency: Some(delta_latency),
                 })
             }
         }
@@ -326,14 +321,9 @@ impl InstantiationContext<'_, '_> {
                 domain_id,
             );
 
-            // Process fanouts
-            let fanouts = convert_fanin_to_fanout(&fanins);
-
             match solve_latencies(
                 &fanins,
-                &fanouts,
-                &domain_info.input_ports,
-                &domain_info.output_ports,
+                &domain_info.ports,
                 domain_info.initial_values.clone(),
             ) {
                 Ok(latencies) => {
@@ -341,14 +331,16 @@ impl InstantiationContext<'_, '_> {
                         zip(domain_info.latency_node_meanings.iter(), latencies.iter())
                     {
                         let wire = &mut self.wires[*node];
-                        wire.absolute_latency = *lat;
-                        if *lat == CALCULATE_LATENCY_LATER {
+                        if let Some(lat) = lat.get_maybe() {
+                            wire.absolute_latency = lat;
+                        } else {
                             let source_location =
                                 self.md.get_instruction_span(wire.original_instruction);
                             self.errors.error(
                                 source_location,
                                 "Latency Counting couldn't reach this node".to_string(),
                             );
+                            wire.absolute_latency = CALCULATE_LATENCY_LATER;
                         }
                     }
                 }
