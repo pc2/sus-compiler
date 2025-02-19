@@ -1511,6 +1511,10 @@
     "named": false
   },
   {
+    "type": "doc_comment",
+    "named": true
+  },
+  {
     "type": "domain",
     "named": false
   },
