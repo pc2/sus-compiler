@@ -1118,3 +1118,27 @@ module IfTesting #(int WIDTH) {
         } else when WIDTH > BASE_CASE_SIZE {
         }
 }
+
+module latency_counting_disjoint_blocks {
+	interface x : bool a -> bool b
+	interface y : bool c -> bool d
+
+	bool shared = true
+
+	b = a ^ shared
+	d = c ^ shared
+}
+
+module latency_counting_disjoint_blocks_merge_error {
+	interface x : bool a -> bool b
+	interface y : bool c -> bool d
+
+	bool shared = true
+
+	reg bool a_delayed = a
+
+	bool out_shared = a_delayed ^ c
+
+	b = a ^ shared
+	d = c ^ shared
+}

@@ -1417,3 +1417,35 @@ Error: Used 'when' in a generative context, use 'if' instead
       │                ──┬─  
       │                  ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[test.sus:1138:11]
+      │
+ 1138 │     reg bool a_delayed = a
+      │              ────┬────  
+      │                  ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[test.sus:1140:7]
+      │
+ 1140 │     bool out_shared = a_delayed ^ c
+      │          ─────┬────  
+      │               ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: There were conflicting options when merging partial latency counting solutions for this node. Options were 1 and 0
+Try specifying an explicit latency or rework the module to remove this ambiguity
+      ╭─[test.sus:1140:2]
+      │
+ 1140 │     bool out_shared = a_delayed ^ c
+      │     ───────┬───────  
+      │            ╰───────── There were conflicting options when merging partial latency counting solutions for this node. Options were 1 and 0
+Try specifying an explicit latency or rework the module to remove this ambiguity
+──────╯
+Error: There were conflicting options when merging partial latency counting solutions for this node. Options were 1 and 0
+Try specifying an explicit latency or rework the module to remove this ambiguity
+      ╭─[test.sus:1140:20]
+      │
+ 1140 │     bool out_shared = a_delayed ^ c
+      │                       ──────┬──────  
+      │                             ╰──────── There were conflicting options when merging partial latency counting solutions for this node. Options were 1 and 0
+Try specifying an explicit latency or rework the module to remove this ambiguity
+──────╯
