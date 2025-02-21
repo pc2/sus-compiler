@@ -502,6 +502,21 @@ impl<T, IndexMarker> Default for FlatAlloc<T, IndexMarker> {
     }
 }
 
+/// TODO replace once get_many_mut stabilizes (In Rust 1.86 apparently)
+pub fn get2_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut T)> {
+    match b.cmp(&a) {
+        Ordering::Equal => None,
+        Ordering::Less => {
+            let (l, r) = slice.split_at_mut(a);
+            Some((&mut r[0], &mut l[b]))
+        }
+        Ordering::Greater => {
+            let (l, r) = slice.split_at_mut(b);
+            Some((&mut l[a], &mut r[0]))
+        }
+    }
+}
+
 impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub const EMPTY_FLAT_ALLOC: Self = Self::new();
 
@@ -588,17 +603,7 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
         id_a: UUID<IndexMarker>,
         id_b: UUID<IndexMarker>,
     ) -> Option<(&mut T, &mut T)> {
-        match id_b.0.cmp(&id_a.0) {
-            Ordering::Equal => None,
-            Ordering::Less => {
-                let (l, r) = self.data.split_at_mut(id_a.0);
-                Some((&mut r[0], &mut l[id_b.0]))
-            }
-            Ordering::Greater => {
-                let (l, r) = self.data.split_at_mut(id_b.0);
-                Some((&mut l[id_a.0], &mut r[0]))
-            }
-        }
+        get2_mut(&mut self.data, id_a.0, id_b.0)
     }
     pub fn get(&self, id: UUID<IndexMarker>) -> Option<&T> {
         self.data.get(id.0)

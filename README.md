@@ -233,7 +233,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Integrate into Verilog generation
 - [x] Latency cuts
 - [x] Latency Offset
-- [ ] Latency Cuts & Latency Counting for "disjoint Input-Output blocks"
+- [x] Latency Cuts & Latency Counting for "disjoint Input-Output blocks"
 - [ ] Latency Count Inference
 - [ ] ~~Split Latencies~~
 

@@ -453,11 +453,20 @@ impl InstantiationContext<'_, '_> {
                 }
             }
             LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
-                for port in bad_ports {
+                for (port, a, b) in bad_ports {
                     let port_decl = self.md.link_info.instructions
-                        [self.wires[latency_node_meanings[port.0]].original_instruction]
+                        [self.wires[latency_node_meanings[port]].original_instruction]
                         .unwrap_declaration();
-                    self.errors.error(port_decl.name_span, format!("Cannot determine port latency. Options are {} and {}\nTry specifying an explicit latency or rework the module to remove this ambiguity", port.1, port.2));
+                    self.errors.error(port_decl.name_span, format!("Cannot determine port latency. Options are {a} and {b}\nTry specifying an explicit latency or rework the module to remove this ambiguity"));
+                }
+            }
+            LatencyCountingError::PartialSolutionMergeConflict { bad_nodes } => {
+                for (node, a, b) in bad_nodes {
+                    let node_instr_span = self.md.get_instruction_span(
+                        self.wires[latency_node_meanings[node]].original_instruction,
+                    );
+                    self.errors
+                        .error(node_instr_span, format!("There were conflicting options when merging partial latency counting solutions for this node. Options were {a} and {b}\nTry specifying an explicit latency or rework the module to remove this ambiguity"));
                 }
             }
             LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path } => {

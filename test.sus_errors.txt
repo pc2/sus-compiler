@@ -427,13 +427,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │               ──┬─  
      │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Latency Counting couldn't reach this node
-     ╭─[test.sus:415:49]
-     │
- 415 │     interface multiple_outputs_only : -> int o, int o2
-     │                                                 ───┬──  
-     │                                                    ╰──── Latency Counting couldn't reach this node
-─────╯
 Error: ::doNothing does not have a main interface. You should explicitly specify an interface to access
      ╭─[test.sus:445:2]
      │
@@ -727,6 +720,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  763 │     int beep
      │         ──┬─  
      │           ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Latency Counting couldn't reach this node
+     ╭─[test.sus:754:19]
+     │
+ 754 │     sdf.start(start, 20)
+     │                      ─┬  
+     │                       ╰── Latency Counting couldn't reach this node
 ─────╯
 Error: beep is not a valid template argument of ::int
      ╭─[test.sus:767:30]
