@@ -638,27 +638,6 @@ fn print_latency_test_case(
     println!("==== END LATENCY TEST CASE ====");
 }
 
-/// A candidate for latency inference. Passed to [try_infer_value_for] as a list of possibilities.
-///
-/// When performing said inference, we return the smallest valid candidate. All candidates _must_ try to provide a value.
-pub struct LatencyInferenceCandidate {
-    multiply_var_by: u64,
-    from: usize,
-    to: usize,
-    offset: i64,
-}
-
-pub fn try_infer_value_for(
-    absolute_latencies: &[LatencyNode],
-    inference_candidates: &[LatencyInferenceCandidate],
-) -> Option<i64> {
-    let variable_value = i64::MAX;
-    assert!(inference_candidates.len() == 0);
-    for candidate in inference_candidates {}
-
-    todo!()
-}
-
 #[derive(Debug)]
 struct PartialLatencyCountingSolution {
     /// Only the nodes marked by [Self::seeds] may be set. They must be [LatencyNode::is_valid_and_pinned]
@@ -776,11 +755,10 @@ pub fn solve_latencies(
     }
 
     let fanouts = convert_fanin_to_fanout(fanins);
-
-    let mut partial_solutions = solve_port_latencies(fanins, &fanouts, ports, specified_latencies)?;
-
     debug_assert!(!has_poison_edge(fanins));
     debug_assert!(!has_poison_edge(&fanouts)); // Equivalent
+
+    let mut partial_solutions = solve_port_latencies(fanins, &fanouts, ports, specified_latencies)?;
 
     assert!(!partial_solutions.is_empty());
 
@@ -790,46 +768,7 @@ pub fn solve_latencies(
     }
 
     if partial_solutions.len() != 1 {
-        for node in 0..fanins.len() {
-            let mut connecting_node: Option<(i64, usize)> = None;
-            let mut partial_solution_idx = 0;
-            while partial_solution_idx < partial_solutions.len() {
-                if let Some(from_latency) =
-                    partial_solutions[partial_solution_idx].latencies[node].get_maybe()
-                {
-                    // Merge this partial solution into the target partial solution
-                    if let Some((to_latency, target_idx)) = connecting_node {
-                        let mut merge_from = partial_solutions.swap_remove(partial_solution_idx);
-                        partial_solution_idx -= 1; // Compensate for +1 on next iteration
-
-                        let merge_into = &mut partial_solutions[target_idx]; // Okay, because target_idx will always be smaller than partial_solution_idx
-
-                        merge_from.offset_to_pin_node_to(node, to_latency);
-                        merge_into
-                            .conflicting_nodes
-                            .append(&mut merge_from.conflicting_nodes);
-
-                        for (idx, (to, from)) in
-                            zip(merge_into.latencies.iter_mut(), merge_from.latencies.iter())
-                                .enumerate()
-                        {
-                            match (to.get_maybe(), from.get_maybe()) {
-                                (_, None) => {} // Do nothing
-                                (None, Some(from)) => to.abs_lat = from,
-                                (Some(to), Some(from)) => {
-                                    if to != from {
-                                        merge_into.conflicting_nodes.push((idx, from));
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        connecting_node = Some((from_latency, partial_solution_idx));
-                    }
-                }
-                partial_solution_idx += 1;
-            }
-        }
+        merge_partial_solutions(fanins, &mut partial_solutions);
     }
 
     let mut solution_iter = partial_solutions.into_iter();
@@ -863,6 +802,142 @@ pub fn solve_latencies(
                 .collect(),
         })
     }
+}
+
+fn merge_partial_solutions(
+    fanins: &ListOfLists<FanInOut>,
+    partial_solutions: &mut Vec<PartialLatencyCountingSolution>,
+) {
+    for node in 0..fanins.len() {
+        let mut connecting_node: Option<(i64, usize)> = None;
+        let mut partial_solution_idx = 0;
+        while partial_solution_idx < partial_solutions.len() {
+            if let Some(from_latency) =
+                partial_solutions[partial_solution_idx].latencies[node].get_maybe()
+            {
+                // Merge this partial solution into the target partial solution
+                if let Some((to_latency, target_idx)) = connecting_node {
+                    let mut merge_from = partial_solutions.swap_remove(partial_solution_idx);
+                    partial_solution_idx -= 1; // Compensate for +1 on next iteration
+
+                    let merge_into = &mut partial_solutions[target_idx]; // Okay, because target_idx will always be smaller than partial_solution_idx
+
+                    merge_from.offset_to_pin_node_to(node, to_latency);
+                    merge_into
+                        .conflicting_nodes
+                        .append(&mut merge_from.conflicting_nodes);
+
+                    for (idx, (to, from)) in
+                        zip(merge_into.latencies.iter_mut(), merge_from.latencies.iter())
+                            .enumerate()
+                    {
+                        match (to.get_maybe(), from.get_maybe()) {
+                            (_, None) => {} // Do nothing
+                            (None, Some(from)) => to.abs_lat = from,
+                            (Some(to), Some(from)) => {
+                                if to != from {
+                                    merge_into.conflicting_nodes.push((idx, from));
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    connecting_node = Some((from_latency, partial_solution_idx));
+                }
+            }
+            partial_solution_idx += 1;
+        }
+    }
+}
+
+/// A candidate for latency inference. Passed to [try_infer_value_for] as a list of possibilities.
+///
+/// When performing said inference, we return the smallest valid candidate. All candidates _must_ try to provide a value.
+pub struct LatencyInferenceCandidate {
+    pub multiply_var_by: i64,
+    pub from: usize,
+    pub to: usize,
+    pub offset: i64,
+    pub target_to_infer: usize,
+}
+pub struct ValueToInfer<ID> {
+    /// Initially Some([i64::MAX]), decreasing. Set to None when a [LatencyInferenceCandidate] targets it, but cannot be resolved
+    pub inferred_value: Option<i64>,
+    back_reference: ID,
+}
+
+impl<ID> ValueToInfer<ID> {
+    pub fn new(back_reference: ID) -> Self {
+        Self {
+            inferred_value: Some(i64::MAX),
+            back_reference,
+        }
+    }
+    fn apply_candidate(&mut self, candidate_value: i64) {
+        if let Some(v) = &mut self.inferred_value {
+            *v = i64::min(*v, candidate_value);
+        }
+    }
+    fn spoil(&mut self) {
+        self.inferred_value = None;
+    }
+}
+
+/// Solves the whole latency counting problem. No inference
+pub fn infer_unknown_latency_edges<ID>(
+    fanins: &ListOfLists<FanInOut>,
+    ports: &LatencyCountingPorts,
+    specified_latencies: &[SpecifiedLatency],
+    inference_candidates: &[LatencyInferenceCandidate],
+    values_to_infer: &mut [ValueToInfer<ID>],
+) -> Result<(), LatencyCountingError> {
+    // Cannot call config from a test case. See https://users.rust-lang.org/t/cargo-test-name-errors-with-error-invalid-value-name-for-files-file-does-not-exist/125855
+    #[cfg(not(test))]
+    if crate::config::config().debug_print_latency_graph {
+        print_latency_test_case(fanins, ports, specified_latencies);
+    }
+
+    let fanouts = convert_fanin_to_fanout(fanins);
+
+    #[cfg(debug_assertions)]
+    for candidate in inference_candidates {
+        assert!(fanins[candidate.to].is_empty());
+        assert!(fanouts[candidate.from].is_empty());
+        assert!(ports.outputs().contains(&candidate.from));
+        assert!(ports.inputs().contains(&candidate.to));
+    }
+
+    if fanins.len() == 0 {
+        return Ok(()); // Could not infer anything
+    }
+
+    let partial_solutions = solve_port_latencies(fanins, &fanouts, ports, specified_latencies)?;
+    assert!(!partial_solutions.is_empty());
+
+    dbg!(&partial_solutions);
+
+    for candidate in inference_candidates {
+        let mut infer_me = Some(&mut values_to_infer[candidate.target_to_infer]);
+
+        for sol in &partial_solutions {
+            if let (Some(from), Some(to)) = (
+                sol.latencies[candidate.from].get_maybe(),
+                sol.latencies[candidate.to].get_maybe(),
+            ) {
+                let candidate_value = (to - from + candidate.offset) / candidate.multiply_var_by;
+                let target_to_infer = infer_me.take().expect(
+                    "At most one partial solution can have a possible value for the candidate",
+                );
+                target_to_infer.apply_candidate(candidate_value);
+            }
+        }
+
+        if let Some(infer_was_not_found) = infer_me {
+            infer_was_not_found.spoil();
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1527,6 +1602,157 @@ mod tests {
         assert!(found_latencies[1].latencies[0].get_maybe().is_none());
         assert!(found_latencies[1].latencies[1].get_maybe() == Some(0));
         assert!(found_latencies[1].latencies[6].get_maybe().is_none());
+    }
+
+    #[test]
+    /// Checks that poison values properly propagate
+    fn test_inference_no_poison() {
+        /*
+                2 -\?A
+               /      6
+              1-3 -/?B \
+             /          8 - 9 -?D 10
+            0 - 4 -\?C /|
+            | \       7 |
+            |   5 -/?B  |
+            ------------|
+        */
+        let fanins: [&[FanInOut]; 11] = [
+            /*0*/ &[],
+            /*1*/ &[mk_fan(0, 0)],
+            /*2*/ &[mk_fan(1, 1)],
+            /*3*/ &[mk_fan(1, 6)],
+            /*4*/ &[mk_fan(0, 2)],
+            /*5*/ &[mk_fan(0, 5)],
+            /*6*/ &[], // inference_edge(2) for A, inference_edge(3) for B
+            /*7*/ &[], // inference_edge(4) for C, inference_edge(5) for B
+            /*8*/ &[mk_fan(6, 3), mk_fan(7, 2), mk_fan(0, 10)],
+            /*9*/ &[mk_fan(8, 0)],
+            /*10*/ &[], // inference_edge(9), disjoint so can't be inferred
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+
+        let inputs = [0, 6, 7, 10]; // 6, 7, 10: Inputs needed for inference
+        let outputs = [8, 2, 3, 4, 5, 9]; // 2, 3, 4, 5, 9: Outputs needed for inferece
+        let specified_latencies = [];
+
+        let inference_candidates = [
+            LatencyInferenceCandidate {
+                multiply_var_by: 1,
+                from: 2,
+                to: 6,
+                offset: 0,
+                target_to_infer: 0, // A
+            },
+            LatencyInferenceCandidate {
+                multiply_var_by: 1,
+                from: 3,
+                to: 6,
+                offset: 0,
+                target_to_infer: 1, // B
+            },
+            LatencyInferenceCandidate {
+                multiply_var_by: 1,
+                from: 4,
+                to: 7,
+                offset: 0,
+                target_to_infer: 2, // C
+            },
+            LatencyInferenceCandidate {
+                multiply_var_by: 1,
+                from: 5,
+                to: 7,
+                offset: 0,
+                target_to_infer: 1, // B
+            },
+            LatencyInferenceCandidate {
+                multiply_var_by: 1,
+                from: 9,
+                to: 10,
+                offset: 0,
+                target_to_infer: 3, // D
+            },
+        ];
+        let mut values_to_infer = [
+            ValueToInfer::new("A"),
+            ValueToInfer::new("B"), // Shared by two inference candidates
+            ValueToInfer::new("C"),
+            ValueToInfer::new("D cannot be inferred"),
+        ];
+
+        let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
+
+        infer_unknown_latency_edges(
+            &fanins,
+            &ports,
+            &specified_latencies,
+            &inference_candidates,
+            &mut values_to_infer,
+        )
+        .unwrap();
+
+        assert_eq!(values_to_infer[0].inferred_value, Some(6));
+        assert_eq!(values_to_infer[1].inferred_value, Some(1));
+        assert_eq!(values_to_infer[2].inferred_value, Some(6));
+        assert_eq!(values_to_infer[3].inferred_value, None);
+    }
+
+    #[test]
+    /// Checks that poison values properly propagate
+    fn test_poison_edges_affect_inference() {
+        /*
+
+              ____        ____
+             <    \      <    \
+            0 ->?A 1 -> 3 ->?B 4
+             <    /P          /P
+              \--2           5
+        */
+        let fanins: [&[FanInOut]; 6] = [
+            /*0*/ &[mk_fan(1, -3), mk_fan(2, -10)], // Backwards edges
+            /*1*/ &[], // inference_edge(0) for A
+            /*2*/ &[mk_poisoned(1)],
+            /*3*/ &[mk_fan(1, 0), mk_fan(4, -3)],
+            /*4*/ &[], // inference_edge(3) for B
+            /*5*/ &[mk_poisoned(4)],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+
+        let inputs = [1, 4]; // 1, 4: Inputs needed for inference
+        let outputs = [0, 3]; // 0, 3: Outputs needed for inferece
+        let specified_latencies = [];
+
+        let inference_candidates = [
+            LatencyInferenceCandidate {
+                multiply_var_by: 1,
+                from: 0,
+                to: 1,
+                offset: 0,
+                target_to_infer: 0, // A
+            },
+            LatencyInferenceCandidate {
+                multiply_var_by: 1,
+                from: 3,
+                to: 4,
+                offset: 0,
+                target_to_infer: 1, // B
+            },
+        ];
+        let mut values_to_infer = [ValueToInfer::new("A"), ValueToInfer::new("B")];
+
+        let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
+
+        infer_unknown_latency_edges(
+            &fanins,
+            &ports,
+            &specified_latencies,
+            &inference_candidates,
+            &mut values_to_infer,
+        )
+        .unwrap();
+
+        assert_eq!(values_to_infer[0].inferred_value, None);
+        assert_eq!(values_to_infer[1].inferred_value, Some(3));
     }
 
     /*
