@@ -397,7 +397,7 @@ fn count_latency<'d>(
     assert!(working_latencies[start_node].is_valid_and_pinned());
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct LatencyCountingPorts {
     /// All inputs come first, then all outputs
     port_nodes: Vec<usize>,
@@ -870,7 +870,7 @@ pub struct LatencyInferenceCandidate {
 pub struct ValueToInfer<ID> {
     /// Initially Some([i64::MAX]), decreasing. Set to None when a [LatencyInferenceCandidate] targets it, but cannot be resolved
     pub inferred_value: Option<i64>,
-    back_reference: ID,
+    pub back_reference: ID,
 }
 
 impl<ID> ValueToInfer<ID> {
@@ -920,8 +920,6 @@ pub fn infer_unknown_latency_edges<ID>(
 
     let partial_solutions = solve_port_latencies(fanins, &fanouts, ports, specified_latencies)?;
     assert!(!partial_solutions.is_empty());
-
-    dbg!(&partial_solutions);
 
     for candidate in inference_candidates {
         let mut infer_me = Some(&mut values_to_infer[candidate.target_to_infer]);
