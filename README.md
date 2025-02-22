@@ -161,7 +161,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Generative Code
 - [x] Generative Parameters
 - [x] Type Templates
-- [ ] Full Template Inference
+- [x] Full Template Inference
 - [ ] Actions, Triggers and Queries
 
 ### Language Features
@@ -219,7 +219,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Hindley-Milner typing for Concrete Types
 - [x] Template Type Inference
 - [x] Generative Parameter Inference
-- [ ] Latency Count Inference
+- [x] Latency Count Inference
 - [ ] Let-syntax
 
 ### Latency Counting
@@ -234,7 +234,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Latency cuts
 - [x] Latency Offset
 - [x] Latency Cuts & Latency Counting for "disjoint Input-Output blocks"
-- [ ] Latency Count Inference
+- [x] Latency Count Inference
 - [ ] ~~Split Latencies~~
 
 ### LSP

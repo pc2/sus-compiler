@@ -1142,3 +1142,17 @@ module latency_counting_disjoint_blocks_merge_error {
 	b = a ^ shared
 	d = c ^ shared
 }
+
+
+module infer_me #(int A) {
+	interface infer_me : bool x'0, int v -> bool y'A
+
+	y = x & (v != 0)
+}
+
+module use_infer_me {
+	interface use_infer_me : bool in_val'0, int in_val_2 -> bool out_val'3
+
+	out_val = infer_me(in_val | (in_val_2 == 0), in_val_2)
+
+}

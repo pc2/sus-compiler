@@ -163,6 +163,11 @@ impl LatencyNode {
             new_latency > self.abs_lat
         };
 
+        if self.pinned && new_latency == i64::MAX {
+            return false; // Only a get-out-of-jail-free card for poison, normal traversal should still hit the assert if it's incorrect
+                          // The early exit is only here, because poison will *always* try to overwrite, and we don't want that.
+        }
+
         if (self.abs_lat == i64::MIN || new_latency == i64::MAX || new_latency_may_update)
             && self.abs_lat != i64::MAX
         {
@@ -637,8 +642,8 @@ fn print_latency_test_case(
     println!("    let fanins = ListOfLists::from_slice_slice(&fanins);");
     println!("    let inputs = {:?};", ports.inputs());
     println!("    let outputs = {:?};", ports.outputs());
-    println!("    let specified_latencies = vec!{specified_latencies:?};");
-    println!("    let _found_latencies = solve_latencies(&fanins, &fanouts, &inputs, &outputs, specified_latencies).unwrap();");
+    println!("    let specified_latencies = {specified_latencies:?};");
+    println!("    let _found_latencies = solve_latencies_test_case(&fanins, &fanouts, &inputs, &outputs, &specified_latencies).unwrap();");
     println!("}}");
     println!("==== END LATENCY TEST CASE ====");
 }
@@ -908,8 +913,13 @@ pub fn infer_unknown_latency_edges<ID>(
 
     #[cfg(debug_assertions)]
     for candidate in inference_candidates {
-        assert!(fanins[candidate.to_node].is_empty());
-        assert!(fanouts[candidate.from_node].is_empty());
+        // We do allow poison edges, just not any other edges
+        assert!(fanins[candidate.to_node]
+            .iter()
+            .all(|fan| fan.delta_latency.is_none()));
+        assert!(fanouts[candidate.from_node]
+            .iter()
+            .all(|fan| fan.delta_latency.is_none()));
         assert!(ports.outputs().contains(&candidate.from_node));
         assert!(ports.inputs().contains(&candidate.to_node));
     }
@@ -1893,5 +1903,37 @@ mod tests {
         }];
         let _found_latencies =
             solve_latencies_test_case(&fanins, &inputs, &outputs, &specified_latencies).unwrap();
+    }
+
+    #[test]
+    fn use_infer_me_crash_inference_because_poison() {
+        let fanins: [&[FanInOut]; 9] = [
+            /*0*/ &[],
+            /*1*/ &[],
+            /*2*/ &[mk_fan(8, 0)],
+            /*3*/ &[],
+            /*4*/ &[mk_fan(1, 0), mk_fan(3, 0)],
+            /*5*/ &[mk_fan(0, 0), mk_fan(4, 0)],
+            /*6*/ &[mk_fan(5, 0)],
+            /*7*/ &[mk_fan(1, 0)],
+            /*8*/ &[mk_poisoned(7)],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+        let inputs = [0, 1, 8];
+        let outputs = [2, 6];
+        let specified_latencies = [
+            SpecifiedLatency {
+                wire: 0,
+                latency: 0,
+            },
+            SpecifiedLatency {
+                wire: 2,
+                latency: 3,
+            },
+        ];
+        let fanouts = convert_fanin_to_fanout(&fanins);
+        let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
+        let _partial_solutions =
+            solve_port_latencies(&fanins, &fanouts, &ports, &specified_latencies).unwrap();
     }
 }

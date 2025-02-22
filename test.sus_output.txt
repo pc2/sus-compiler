@@ -124,6 +124,8 @@ TREE SITTER module! FailingAssert
 TREE SITTER module! IfTesting
 TREE SITTER module! latency_counting_disjoint_blocks
 TREE SITTER module! latency_counting_disjoint_blocks_merge_error
+TREE SITTER module! infer_me
+TREE SITTER module! use_infer_me
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -240,6 +242,8 @@ Typechecking FailingAssert
 Typechecking IfTesting
 Typechecking latency_counting_disjoint_blocks
 Typechecking latency_counting_disjoint_blocks_merge_error
+Typechecking infer_me
+Typechecking use_infer_me
 Instantiating IntToBits
 Concrete Typechecking IntToBits
 Latency Counting IntToBits
@@ -577,3 +581,9 @@ Latency Counting latency_counting_disjoint_blocks
 Instantiating latency_counting_disjoint_blocks_merge_error
 Concrete Typechecking latency_counting_disjoint_blocks_merge_error
 Latency Counting latency_counting_disjoint_blocks_merge_error
+Instantiating use_infer_me
+Concrete Typechecking use_infer_me
+Instantiating infer_me
+Concrete Typechecking infer_me
+Latency Counting infer_me
+Latency Counting use_infer_me
