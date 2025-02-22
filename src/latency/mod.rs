@@ -394,7 +394,7 @@ impl InstantiationContext<'_, '_> {
 
             let inference_edges = sm_md.latency_inference_info.get_inference_edges(
                 &known_template_args,
-                sm_md.domains.id_range(),
+                sm_md.named_domains,
                 sm_id,
                 &mut latency_inference_variables,
             );

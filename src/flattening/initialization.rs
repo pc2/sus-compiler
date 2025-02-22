@@ -362,6 +362,7 @@ fn initialize_global_object(
                 link_info,
                 ports: ctx.ports,
                 latency_inference_info: PortLatencyInferenceInfo::default(),
+                named_domains: ctx.domains.id_range(),
                 domains: ctx.domains,
                 implicit_clk_domain: ctx.implicit_clk_domain,
                 interfaces: ctx.interfaces,

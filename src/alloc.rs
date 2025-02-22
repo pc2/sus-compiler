@@ -780,6 +780,7 @@ impl<
 {
     type Item = (UUID<IDMarker>, OA, OB);
 
+    #[track_caller]
     fn next(&mut self) -> Option<Self::Item> {
         match (self.iter_a.next(), self.iter_b.next()) {
             (None, None) => None,
@@ -829,6 +830,7 @@ impl<
 {
     type Item = (UUID<IDMarker>, OA, OB, OC);
 
+    #[track_caller]
     fn next(&mut self) -> Option<Self::Item> {
         match (self.iter_a.next(), self.iter_b.next(), self.iter_c.next()) {
             (None, None, None) => None,
