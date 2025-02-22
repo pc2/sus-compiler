@@ -543,6 +543,14 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
             _ph: PhantomData,
         }
     }
+    #[cfg(test)]
+    // Only for testing, so only enabled with test flag
+    pub fn from_vec(data: Vec<T>) -> Self {
+        Self {
+            data,
+            _ph: PhantomData,
+        }
+    }
     pub fn get_next_alloc_id(&self) -> UUID<IndexMarker> {
         let uuid = self.data.len();
         UUID(uuid, PhantomData)
@@ -583,6 +591,16 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     ) -> FlatAlloc<OT, IndexMarker> {
         FlatAlloc {
             data: Vec::from_iter(self.iter().map(f)),
+            _ph: PhantomData,
+        }
+    }
+    pub fn map2<T2, OT>(
+        &self,
+        second: &FlatAlloc<T2, IndexMarker>,
+        f: impl FnMut((UUID<IndexMarker>, &T, &T2)) -> OT,
+    ) -> FlatAlloc<OT, IndexMarker> {
+        FlatAlloc {
+            data: Vec::from_iter(zip_eq(self.iter(), second.iter()).map(f)),
             _ph: PhantomData,
         }
     }

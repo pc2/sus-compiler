@@ -16,6 +16,11 @@
 
 use std::iter::zip;
 
+use crate::{
+    alloc::FlatAlloc,
+    prelude::{LatencyCountInferenceVarID, LatencyCountInferenceVarIDMarker},
+};
+
 use super::list_of_lists::ListOfLists;
 
 /// A wire for which a latency has been specified.
@@ -858,8 +863,9 @@ pub struct LatencyInferenceCandidate {
     pub from: usize,
     pub to: usize,
     pub offset: i64,
-    pub target_to_infer: usize,
+    pub target_to_infer: LatencyCountInferenceVarID,
 }
+
 pub struct ValueToInfer<ID> {
     /// Initially Some([i64::MAX]), decreasing. Set to None when a [LatencyInferenceCandidate] targets it, but cannot be resolved
     pub inferred_value: Option<i64>,
@@ -889,7 +895,7 @@ pub fn infer_unknown_latency_edges<ID>(
     ports: &LatencyCountingPorts,
     specified_latencies: &[SpecifiedLatency],
     inference_candidates: &[LatencyInferenceCandidate],
-    values_to_infer: &mut [ValueToInfer<ID>],
+    values_to_infer: &mut FlatAlloc<ValueToInfer<ID>, LatencyCountInferenceVarIDMarker>,
 ) -> Result<(), LatencyCountingError> {
     // Cannot call config from a test case. See https://users.rust-lang.org/t/cargo-test-name-errors-with-error-invalid-value-name-for-files-file-does-not-exist/125855
     #[cfg(not(test))]
@@ -1636,48 +1642,48 @@ mod tests {
         let outputs = [8, 2, 3, 4, 5, 9]; // 2, 3, 4, 5, 9: Outputs needed for inferece
         let specified_latencies = [];
 
+        let mut values_to_infer = FlatAlloc::new();
+        let a = values_to_infer.alloc(ValueToInfer::new(()));
+        let b = values_to_infer.alloc(ValueToInfer::new(())); // Shared by two inference candidates
+        let c = values_to_infer.alloc(ValueToInfer::new(()));
+        let d = values_to_infer.alloc(ValueToInfer::new(())); // Cannot be inferred
+
         let inference_candidates = [
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
                 from: 2,
                 to: 6,
                 offset: 0,
-                target_to_infer: 0, // A
+                target_to_infer: a,
             },
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
                 from: 3,
                 to: 6,
                 offset: 0,
-                target_to_infer: 1, // B
+                target_to_infer: b,
             },
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
                 from: 4,
                 to: 7,
                 offset: 0,
-                target_to_infer: 2, // C
+                target_to_infer: c,
             },
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
                 from: 5,
                 to: 7,
                 offset: 0,
-                target_to_infer: 1, // B
+                target_to_infer: b,
             },
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
                 from: 9,
                 to: 10,
                 offset: 0,
-                target_to_infer: 3, // D
+                target_to_infer: d,
             },
-        ];
-        let mut values_to_infer = [
-            ValueToInfer::new("A"),
-            ValueToInfer::new("B"), // Shared by two inference candidates
-            ValueToInfer::new("C"),
-            ValueToInfer::new("D cannot be inferred"),
         ];
 
         let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
@@ -1691,10 +1697,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(values_to_infer[0].inferred_value, Some(6));
-        assert_eq!(values_to_infer[1].inferred_value, Some(1));
-        assert_eq!(values_to_infer[2].inferred_value, Some(6));
-        assert_eq!(values_to_infer[3].inferred_value, None);
+        assert_eq!(values_to_infer[a].inferred_value, Some(6));
+        assert_eq!(values_to_infer[b].inferred_value, Some(1));
+        assert_eq!(values_to_infer[c].inferred_value, Some(6));
+        assert_eq!(values_to_infer[d].inferred_value, None);
     }
 
     #[test]
@@ -1722,23 +1728,26 @@ mod tests {
         let outputs = [0, 3]; // 0, 3: Outputs needed for inferece
         let specified_latencies = [];
 
+        let mut values_to_infer = FlatAlloc::new();
+        let a = values_to_infer.alloc(ValueToInfer::new(()));
+        let b = values_to_infer.alloc(ValueToInfer::new(()));
+
         let inference_candidates = [
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
                 from: 0,
                 to: 1,
                 offset: 0,
-                target_to_infer: 0, // A
+                target_to_infer: a,
             },
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
                 from: 3,
                 to: 4,
                 offset: 0,
-                target_to_infer: 1, // B
+                target_to_infer: b,
             },
         ];
-        let mut values_to_infer = [ValueToInfer::new("A"), ValueToInfer::new("B")];
 
         let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
 
@@ -1751,8 +1760,8 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(values_to_infer[0].inferred_value, None);
-        assert_eq!(values_to_infer[1].inferred_value, Some(3));
+        assert_eq!(values_to_infer[a].inferred_value, None);
+        assert_eq!(values_to_infer[b].inferred_value, Some(3));
     }
 
     /*
