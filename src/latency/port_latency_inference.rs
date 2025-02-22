@@ -10,7 +10,9 @@ use crate::flattening::{
     BinaryOperator, Instruction, Port, UnaryOperator, WireReference, WireReferenceRoot,
 };
 
-use super::latency_algorithm::ValueToInfer;
+use super::latency_algorithm::{
+    FanInOut, LatencyCountingPorts, LatencyInferenceCandidate, ValueToInfer,
+};
 
 /*/// ports whose latency annotations require them to be at fixed predefined offsets
 ///
@@ -26,19 +28,31 @@ struct PortGroup {
     port: PortID,
     relative_latency_offset: i64,
 }*/
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum EdgeInfo<ID> {
     Known {
-        offset: i64,
+        delta_latency: i64,
     },
+    /// |from| + value_of(id) * multiplier + offset = |to|
     Inferrable {
-        id: ID,
-        multiplier: i64,
+        target_to_infer: ID,
+        multiply_var_by: i64,
         offset: i64,
     },
     Poison,
 }
 
+/// A candidate from which a template variable could be inferred
+///
+/// Basically, this struct is formed for a pair of ports like this:
+///
+/// portA'4 -> portB'L-3
+///
+/// That would create a inference candidate for template var 'L' with an offset of 7. (L == 7 iff |portA| - |portB| == 0)
+///
+/// So |from| + offset + L == |to|
+///
+/// L = |to| - |from| - offset
 #[derive(Debug, Clone)]
 struct PortLatencyLinearity {
     const_factor: i64,
@@ -51,20 +65,20 @@ impl PortLatencyLinearity {
     /// Checks if the two latency annotations are offset by a constant and exactly 1x a template variable
     fn is_pair_latency_candidate(from: &Self, to: &Self) -> EdgeInfo<TemplateID> {
         let mut result = EdgeInfo::Known {
-            offset: to.const_factor - from.const_factor,
+            delta_latency: to.const_factor - from.const_factor,
         };
 
-        for (id, a, b) in zip_eq(&from.arg_linear_factor, &to.arg_linear_factor) {
+        for (target_to_infer, a, b) in zip_eq(&from.arg_linear_factor, &to.arg_linear_factor) {
             let multiplier = *b - *a;
             if multiplier != 0 {
-                let EdgeInfo::Known { offset } = result else {
+                let EdgeInfo::Known { delta_latency } = result else {
                     result = EdgeInfo::Poison; // Offset was already by multiple template vars
                     break;
                 };
                 result = EdgeInfo::Inferrable {
-                    id,
-                    multiplier,
-                    offset,
+                    target_to_infer,
+                    multiply_var_by: multiplier,
+                    offset: delta_latency,
                 }
             }
         }
@@ -184,24 +198,6 @@ fn recurse_down_expression(
     }
 }
 
-/// A candidate from which a template variable could be inferred
-///
-/// Basically, this struct is formed for a pair of ports like this:
-///
-/// portA'4 -> portB'L-3
-///
-/// That would create a inference candidate for template var 'L' with an offset of 7. (L == 7 iff |portA| - |portB| == 0)
-///
-/// So |from| + offset + L == |to|
-///
-/// L = |to| - |from| - offset
-#[derive(Debug, Clone)]
-struct LatencyInferenceCandidate {
-    from: PortID,
-    to: PortID,
-    offset: i64,
-}
-
 #[derive(Debug, Clone)]
 struct FullPortLatencyLinearity {
     domain: DomainID,
@@ -264,8 +260,7 @@ impl PortLatencyInferenceInfo {
             ValueToInfer<(ID, TemplateID)>,
             LatencyCountInferenceVarIDMarker,
         >,
-    ) -> FlatAlloc<Vec<(PortID, PortID, EdgeInfo<LatencyCountInferenceVarID>)>, DomainIDMarker>
-    {
+    ) -> FlatAlloc<InferenceEdgesForDomain, DomainIDMarker> {
         let mut updated_port_linearities = self.port_latency_linearities.clone();
         for (_, l) in &mut updated_port_linearities {
             if let Some(ll) = &mut l.latency_linearity {
@@ -276,8 +271,7 @@ impl PortLatencyInferenceInfo {
         let mut local_variables = known_template_args.map(|_| None);
 
         domains.map(|d| {
-            let mut result: Vec<(PortID, PortID, EdgeInfo<LatencyCountInferenceVarID>)> =
-                Vec::new();
+            let mut edges: Vec<(PortID, PortID, EdgeInfo<LatencyCountInferenceVarID>)> = Vec::new();
             for (from_id, from) in &updated_port_linearities {
                 if from.domain != d || !from.is_input {
                     continue; // ports on different domains cannot be related in latency counting
@@ -287,7 +281,7 @@ impl PortLatencyInferenceInfo {
                         continue; // ports on different domains cannot be related in latency counting
                     }
 
-                    result.push((
+                    edges.push((
                         from_id,
                         to_id,
                         if let (Some(from_linearity), Some(to_linearity)) =
@@ -297,17 +291,22 @@ impl PortLatencyInferenceInfo {
                                 from_linearity,
                                 to_linearity,
                             ) {
-                                EdgeInfo::Known { offset } => EdgeInfo::Known { offset },
+                                EdgeInfo::Known { delta_latency } => {
+                                    EdgeInfo::Known { delta_latency }
+                                }
                                 EdgeInfo::Inferrable {
-                                    id: template_var,
-                                    multiplier,
+                                    target_to_infer,
+                                    multiply_var_by: multiplier,
                                     offset,
                                 } => EdgeInfo::Inferrable {
-                                    id: *local_variables[template_var].get_or_insert_with(|| {
-                                        latency_inference_variables
-                                            .alloc(ValueToInfer::new((submodule_id, template_var)))
-                                    }),
-                                    multiplier,
+                                    target_to_infer: *local_variables[target_to_infer]
+                                        .get_or_insert_with(|| {
+                                            latency_inference_variables.alloc(ValueToInfer::new((
+                                                submodule_id,
+                                                target_to_infer,
+                                            )))
+                                        }),
+                                    multiply_var_by: multiplier,
                                     offset,
                                 },
                                 EdgeInfo::Poison => EdgeInfo::Poison,
@@ -318,60 +317,76 @@ impl PortLatencyInferenceInfo {
                     ));
                 }
             }
-            result
+            InferenceEdgesForDomain { edges }
         })
     }
+}
 
-    /*   let mut inference_candidates = FlatAlloc::with_size(num_template_args, Vec::new());
+#[derive(Debug)]
+pub struct InferenceEdgesForDomain {
+    edges: Vec<(PortID, PortID, EdgeInfo<LatencyCountInferenceVarID>)>,
+}
 
-        for (from, from_info) in port_infos.iter_valids() {
-            for (to, to_info) in port_infos.iter_valids() {
-                if ports[from].domain != ports[to].domain {
-                    continue; // ports on different domains cannot be related in latency counting
-                }
-                if let Some((template_id, offset)) =
-                    PortLatencyLinearity::is_pair_latency_candidate(from_info, to_info)
-                {
-                    inference_candidates[template_id].push(LatencyInferenceCandidate {
-                        from,
-                        to,
+impl InferenceEdgesForDomain {
+    pub fn apply_to_global_domain(
+        &self,
+        port_to_wire_map: &FlatAlloc<WireID, PortIDMarker>,
+        wire_to_node_map: &FlatAlloc<usize, WireIDMarker>, // These mappings are just due to implementation details of instantiation
+        inference_edges: &mut Vec<LatencyInferenceCandidate>,
+        extra_fanout: &mut [Vec<FanInOut>],
+        contributed_ports: &mut LatencyCountingPorts,
+        ports_range: UUIDRange<PortIDMarker>,
+    ) {
+        let mut port_has_already_been_registered = ports_range.map(|_| false);
+
+        for (from, to, edge_info) in &self.edges {
+            let from_node = wire_to_node_map[port_to_wire_map[*from]];
+            let to_node = wire_to_node_map[port_to_wire_map[*to]];
+
+            match *edge_info {
+                EdgeInfo::Known { delta_latency } => extra_fanout[from_node].push(FanInOut {
+                    to_node,
+                    delta_latency: Some(delta_latency),
+                }),
+                EdgeInfo::Poison => extra_fanout[from_node].push(FanInOut {
+                    to_node,
+                    delta_latency: None,
+                }),
+                EdgeInfo::Inferrable {
+                    target_to_infer,
+                    multiply_var_by,
+                    offset,
+                } => {
+                    inference_edges.push(LatencyInferenceCandidate {
+                        multiply_var_by,
+                        from_node,
+                        to_node,
                         offset,
+                        target_to_infer,
                     });
+                    if !std::mem::replace(&mut port_has_already_been_registered[*from], true) {
+                        contributed_ports.push(from_node, false); // Module inputs are outputs outside, of course
+                    }
+                    if !std::mem::replace(&mut port_has_already_been_registered[*to], true) {
+                        contributed_ports.push(to_node, true); // Module outputs are inputs outside, of course
+                    }
                 }
             }
         }
-
-        PortLatencyInferenceInfo {
-            inference_candidates,
-        }
     }
-
-    /// To infer a specific specific variable, we look at all
-    pub fn try_infer_var(
-        &self,
-        template_var: TemplateID,
-        port_latencies: &FlatAlloc<Option<i64>, PortIDMarker>,
-    ) -> Option<i64> {
-        let mut inferred_variable_value = i64::MAX;
-
-        for candidate in &self.inference_candidates[template_var] {
-            let from_latency = port_latencies[candidate.from]?;
-            let to_latency = port_latencies[candidate.to]?;
-
-            let this_pair_infers_to = to_latency - from_latency - candidate.offset;
-
-            inferred_variable_value = i64::min(inferred_variable_value, this_pair_infers_to);
-        }
-
-        (inferred_variable_value != i64::MAX).then_some(inferred_variable_value)
-    }*/
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
         alloc::{FlatAlloc, UUIDRange},
-        prelude::{DomainID, PortID, PortIDMarker},
+        latency::{
+            latency_algorithm::{
+                infer_unknown_latency_edges, mk_fan, FanInOut, LatencyCountingPorts,
+            },
+            list_of_lists::ListOfLists,
+        },
+        prelude::{DomainID, PortIDMarker, WireID},
     };
 
     use super::{FullPortLatencyLinearity, PortLatencyInferenceInfo, PortLatencyLinearity};
@@ -391,6 +406,7 @@ mod tests {
             }),
         }
     }
+
     #[test]
     fn test_get_inference_edges() {
         /*
@@ -398,7 +414,7 @@ mod tests {
                 input bool x'0
                 input bool y'3+A
 
-                output bool z'5+A
+                output bool z'5+3*A
                 output bool w'B
             }
         */
@@ -409,7 +425,7 @@ mod tests {
             FlatAlloc::with_capacity(4);
         port_latency_linearities.alloc(mk_port_linearity(first_domain, true, 0, vec![0, 0]));
         port_latency_linearities.alloc(mk_port_linearity(first_domain, true, 3, vec![1, 0]));
-        port_latency_linearities.alloc(mk_port_linearity(first_domain, false, 5, vec![1, 0]));
+        port_latency_linearities.alloc(mk_port_linearity(first_domain, false, 5, vec![3, 0]));
         port_latency_linearities.alloc(mk_port_linearity(first_domain, false, 0, vec![0, 1]));
 
         let latency_info = PortLatencyInferenceInfo {
@@ -424,5 +440,121 @@ mod tests {
             latency_info.get_inference_edges(&known_template_args, domains, (), &mut variables);
 
         dbg!(&result);
+    }
+
+    #[test]
+    fn test_infernce_end_to_end() {
+        // Outer scope
+        /*
+                2 -\?A
+               /      6
+              1-3 -/?B \
+             /          8
+            0 - 4 -\?C /|
+            | \       7 |
+            |   5 -/?B  |
+            ------------|
+        */
+        let fanins: [&[FanInOut]; 9] = [
+            /*0*/ &[],
+            /*1*/ &[mk_fan(0, 0)],
+            /*2*/ &[mk_fan(1, 1)],
+            /*3*/ &[mk_fan(1, 6)],
+            /*4*/ &[mk_fan(0, 2)],
+            /*5*/ &[mk_fan(0, 5)],
+            /*6*/ &[], // inference_edge(2) for A, inference_edge(3) for B
+            /*7*/ &[], // inference_edge(4) for C, inference_edge(5) for B
+            /*8*/ &[mk_fan(6, 3), mk_fan(7, 2), mk_fan(0, 10)],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+
+        let mut ports = LatencyCountingPorts::from_inputs_outputs(&[0], &[8]);
+
+        // Inner scope, to be inferred
+
+        /*
+            domain x
+            2: input'-A
+            3: input'-B
+            6: output'0
+
+            domain y
+            4: input'-B
+            5: input'-C
+            7: output'0
+        */
+
+        let domains = UUIDRange::new_with_length(2);
+        let mut domains_iter = domains.iter();
+        let domain_x = domains_iter.next().unwrap();
+        let domain_y = domains_iter.next().unwrap();
+
+        let mut port_latency_linearities: FlatAlloc<FullPortLatencyLinearity, PortIDMarker> =
+            FlatAlloc::with_capacity(6);
+        port_latency_linearities.alloc(mk_port_linearity(domain_x, true, 0, vec![-1, 0, 0])); // 2
+        port_latency_linearities.alloc(mk_port_linearity(domain_x, true, 0, vec![0, -1, 0])); // 3
+        port_latency_linearities.alloc(mk_port_linearity(domain_y, true, 3, vec![0, 0, -1])); // 4'C+3, which makes C 3 smaller than in [latency_algorithm::tests::test_inference_no_poison]
+        port_latency_linearities.alloc(mk_port_linearity(domain_y, true, 0, vec![0, -1, 0])); // 5
+        port_latency_linearities.alloc(mk_port_linearity(domain_x, false, 0, vec![0, 0, 0])); // 6
+        port_latency_linearities.alloc(mk_port_linearity(domain_y, false, 0, vec![0, 0, 0])); // 7
+
+        let latency_info = PortLatencyInferenceInfo {
+            port_latency_linearities,
+        };
+
+        let known_template_args = FlatAlloc::from_vec(vec![None, None, None]);
+
+        let mut values_to_infer = FlatAlloc::new();
+
+        let per_domain_edges = latency_info.get_inference_edges(
+            &known_template_args,
+            domains,
+            (),
+            &mut values_to_infer,
+        );
+
+        dbg!(&per_domain_edges);
+
+        // Because both domains of the submodule are part of the outer domain, we just merge both
+
+        let port_to_wire_map =
+            FlatAlloc::from_vec(vec![2, 3, 4, 5, 6, 7]).map(|(_, v)| WireID::from_hidden_value(*v));
+        let wire_to_node_map = FlatAlloc::from_vec(vec![0, 1, 2, 3, 4, 5, 6, 7, 7, 8]);
+
+        let mut inference_candidates = Vec::new();
+        let mut extra_fanout = Vec::new();
+        for (_, this_domain_edges) in &per_domain_edges {
+            this_domain_edges.apply_to_global_domain(
+                &port_to_wire_map,
+                &wire_to_node_map,
+                &mut inference_candidates,
+                &mut extra_fanout,
+                &mut ports,
+                latency_info.port_latency_linearities.id_range(),
+            );
+        }
+        dbg!(&inference_candidates, &extra_fanout);
+
+        let expected_inputs = [0, 6, 7]; // Inputs needed for inference
+        let expected_outputs = [8, 2, 3, 4, 5]; // Outputs needed for inferece
+
+        assert_eq!(ports.inputs(), expected_inputs);
+        assert_eq!(ports.outputs(), expected_outputs);
+
+        let specified_latencies = [];
+
+        infer_unknown_latency_edges(
+            &fanins,
+            &ports,
+            &specified_latencies,
+            &inference_candidates,
+            &mut values_to_infer,
+        )
+        .unwrap();
+
+        assert_eq!(
+            values_to_infer.map(|(_, v)| v.inferred_value),
+            FlatAlloc::from_vec(vec![Some(6), Some(1), Some(3)]) // C 3 smaller due to offset on port 4
+        );
     }
 }

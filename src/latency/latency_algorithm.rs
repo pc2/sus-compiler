@@ -858,10 +858,11 @@ fn merge_partial_solutions(
 /// A candidate for latency inference. Passed to [try_infer_value_for] as a list of possibilities.
 ///
 /// When performing said inference, we return the smallest valid candidate. All candidates _must_ try to provide a value.
+#[derive(Debug)]
 pub struct LatencyInferenceCandidate {
     pub multiply_var_by: i64,
-    pub from: usize,
-    pub to: usize,
+    pub from_node: usize,
+    pub to_node: usize,
     pub offset: i64,
     pub target_to_infer: LatencyCountInferenceVarID,
 }
@@ -907,10 +908,10 @@ pub fn infer_unknown_latency_edges<ID>(
 
     #[cfg(debug_assertions)]
     for candidate in inference_candidates {
-        assert!(fanins[candidate.to].is_empty());
-        assert!(fanouts[candidate.from].is_empty());
-        assert!(ports.outputs().contains(&candidate.from));
-        assert!(ports.inputs().contains(&candidate.to));
+        assert!(fanins[candidate.to_node].is_empty());
+        assert!(fanouts[candidate.from_node].is_empty());
+        assert!(ports.outputs().contains(&candidate.from_node));
+        assert!(ports.inputs().contains(&candidate.to_node));
     }
 
     if fanins.len() == 0 {
@@ -927,8 +928,8 @@ pub fn infer_unknown_latency_edges<ID>(
 
         for sol in &partial_solutions {
             if let (Some(from), Some(to)) = (
-                sol.latencies[candidate.from].get_maybe(),
-                sol.latencies[candidate.to].get_maybe(),
+                sol.latencies[candidate.from_node].get_maybe(),
+                sol.latencies[candidate.to_node].get_maybe(),
             ) {
                 let candidate_value = (to - from + candidate.offset) / candidate.multiply_var_by;
                 let target_to_infer = infer_me.take().expect(
@@ -947,40 +948,44 @@ pub fn infer_unknown_latency_edges<ID>(
 }
 
 #[cfg(test)]
+pub fn mk_fan(to_node: usize, delta_latency: i64) -> FanInOut {
+    FanInOut {
+        to_node,
+        delta_latency: Some(delta_latency),
+    }
+}
+
+#[cfg(test)]
+pub fn mk_poisoned(to_node: usize) -> FanInOut {
+    FanInOut {
+        to_node,
+        delta_latency: None,
+    }
+}
+
+// makes inputs for fanins, outputs for fanouts
+#[cfg(test)]
+pub fn infer_ports(fanins: &ListOfLists<FanInOut>) -> Vec<usize> {
+    fanins
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, v)| v.is_empty().then_some(idx))
+        .collect()
+}
+
+#[cfg(test)]
+impl LatencyCountingPorts {
+    pub fn from_inputs_outputs(inputs: &[usize], outputs: &[usize]) -> Self {
+        Self {
+            port_nodes: inputs.iter().chain(outputs.iter()).cloned().collect(),
+            outputs_start_at: inputs.len(),
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
-
-    fn mk_fan(to_node: usize, delta_latency: i64) -> FanInOut {
-        FanInOut {
-            to_node,
-            delta_latency: Some(delta_latency),
-        }
-    }
-
-    fn mk_poisoned(to_node: usize) -> FanInOut {
-        FanInOut {
-            to_node,
-            delta_latency: None,
-        }
-    }
-
-    // makes inputs for fanins, outputs for fanouts
-    fn infer_ports(fanins: &ListOfLists<FanInOut>) -> Vec<usize> {
-        fanins
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, v)| v.is_empty().then_some(idx))
-            .collect()
-    }
-
-    impl LatencyCountingPorts {
-        fn from_inputs_outputs(inputs: &[usize], outputs: &[usize]) -> Self {
-            Self {
-                port_nodes: inputs.iter().chain(outputs.iter()).cloned().collect(),
-                outputs_start_at: inputs.len(),
-            }
-        }
-    }
 
     fn solve_latencies_test_case(
         fanins: &ListOfLists<FanInOut>,
@@ -1651,36 +1656,36 @@ mod tests {
         let inference_candidates = [
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
-                from: 2,
-                to: 6,
+                from_node: 2,
+                to_node: 6,
                 offset: 0,
                 target_to_infer: a,
             },
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
-                from: 3,
-                to: 6,
+                from_node: 3,
+                to_node: 6,
                 offset: 0,
                 target_to_infer: b,
             },
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
-                from: 4,
-                to: 7,
+                from_node: 4,
+                to_node: 7,
                 offset: 0,
                 target_to_infer: c,
             },
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
-                from: 5,
-                to: 7,
+                from_node: 5,
+                to_node: 7,
                 offset: 0,
                 target_to_infer: b,
             },
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
-                from: 9,
-                to: 10,
+                from_node: 9,
+                to_node: 10,
                 offset: 0,
                 target_to_infer: d,
             },
@@ -1735,15 +1740,15 @@ mod tests {
         let inference_candidates = [
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
-                from: 0,
-                to: 1,
+                from_node: 0,
+                to_node: 1,
                 offset: 0,
                 target_to_infer: a,
             },
             LatencyInferenceCandidate {
                 multiply_var_by: 1,
-                from: 3,
-                to: 4,
+                from_node: 3,
+                to_node: 4,
                 offset: 0,
                 target_to_infer: b,
             },
