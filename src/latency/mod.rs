@@ -437,7 +437,7 @@ impl InstantiationContext<'_, '_> {
         let mut any_new_values = false;
         let mut all_new_values = true;
         for (_, var) in latency_inference_variables.into_iter() {
-            if let Some(inferred_value) = var.inferred_value {
+            if let Some(inferred_value) = var.get() {
                 let (submod_id, arg_id) = var.back_reference;
 
                 self.type_substitutor.unify_must_succeed(

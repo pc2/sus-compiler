@@ -1144,15 +1144,40 @@ module latency_counting_disjoint_blocks_merge_error {
 }
 
 
-module infer_me #(int A) {
-	interface infer_me : bool x'0, int v -> bool y'A
-
-	y = x & (v != 0)
-}
-
 module use_infer_me {
 	interface use_infer_me : bool in_val'0, int in_val_2 -> bool out_val'3
 
 	out_val = infer_me(in_val | (in_val_2 == 0), in_val_2)
 
 }
+
+module infer_me #(int A) {
+	interface infer_me : bool x'0 -> bool y'A
+
+	y = x
+}
+
+module infer_from_local_context {
+	interface infer_from_local_context : bool in_val -> bool out_val
+
+	reg reg reg reg reg bool heavily_pipelined_computation = in_val
+
+	out_val = infer_me(in_val) | heavily_pipelined_computation
+}
+
+module instantiate_fifo {
+	output bool request_data'0
+	input int data_received'3
+
+	FIFO #(DEPTH: 30) fifo
+
+	when fifo.ready {
+		request_data = true
+		reg reg reg reg reg int heavy_computation = data_received
+
+		fifo.push(true, heavy_computation)
+	} else {
+		request_data = false
+	}
+}
+

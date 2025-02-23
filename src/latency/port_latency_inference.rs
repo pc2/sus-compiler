@@ -584,7 +584,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            values_to_infer.map(|(_, v)| v.inferred_value),
+            values_to_infer.map(|(_, v)| v.get()),
             FlatAlloc::from_vec(vec![Some(6), Some(1), Some(3)]) // C 3 smaller due to offset on port 4
         );
     }

@@ -874,7 +874,7 @@ pub struct LatencyInferenceCandidate {
 
 pub struct ValueToInfer<ID> {
     /// Initially Some([i64::MAX]), decreasing. Set to None when a [LatencyInferenceCandidate] targets it, but cannot be resolved
-    pub inferred_value: Option<i64>,
+    inferred_value: Option<i64>,
     pub back_reference: ID,
 }
 
@@ -884,6 +884,10 @@ impl<ID> ValueToInfer<ID> {
             inferred_value: Some(i64::MAX),
             back_reference,
         }
+    }
+    pub fn get(&self) -> Option<i64> {
+        self.inferred_value
+            .and_then(|v| (v != i64::MAX).then_some(v))
     }
     fn apply_candidate(&mut self, candidate_value: i64) {
         if let Some(v) = &mut self.inferred_value {
@@ -993,6 +997,8 @@ impl LatencyCountingPorts {
 
 #[cfg(test)]
 mod tests {
+    use crate::latency::port_latency_inference;
+
     use super::*;
 
     fn solve_latencies_test_case(
@@ -1934,6 +1940,54 @@ mod tests {
         let fanouts = convert_fanin_to_fanout(&fanins);
         let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
         let _partial_solutions =
+            solve_port_latencies(&fanins, &fanouts, &ports, &specified_latencies).unwrap();
+    }
+
+    #[test]
+    fn test_crashing_fifo_use() {
+        let fanins: [&[FanInOut]; 21] = [
+            /*0*/ &[mk_fan(4, 0), mk_fan(1, 0), mk_fan(3, 0)],
+            /*1*/ &[mk_fan(10, 0), mk_fan(3, 0)],
+            /*2*/ &[mk_fan(20, 0)],
+            /*3*/ &[],
+            /*4*/ &[],
+            /*5*/ &[mk_fan(1, 0)],
+            /*6*/ &[mk_fan(0, 0)],
+            /*7*/ &[],
+            /*8*/ &[mk_fan(1, 0), mk_fan(7, 0)],
+            /*9*/ &[],
+            /*10*/ &[mk_fan(8, 0), mk_fan(9, 0)],
+            /*11*/ &[mk_fan(15, 0)],
+            /*12*/ &[],
+            /*13*/ &[mk_fan(12, 0), mk_fan(1, 0)],
+            /*14*/ &[],
+            /*15*/ &[mk_fan(13, 0), mk_fan(14, 0)],
+            /*16*/ &[mk_fan(18, 1)],
+            /*17*/ &[],
+            /*18*/ &[mk_fan(11, 0), mk_fan(17, 0)],
+            /*19*/ &[mk_fan(16, 0)],
+            /*20*/ &[mk_fan(19, -9223372036854775808)],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+        let inputs = [3, 4];
+        let outputs = [2];
+        let specified_latencies = [
+            SpecifiedLatency {
+                wire: 2,
+                latency: 0,
+            },
+            SpecifiedLatency {
+                wire: 3,
+                latency: 9223372036854775807,
+            },
+            SpecifiedLatency {
+                wire: 4,
+                latency: 9223372036854775807,
+            },
+        ];
+        let fanouts = convert_fanin_to_fanout(&fanins);
+        let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
+        let _found_latencies =
             solve_port_latencies(&fanins, &fanouts, &ports, &specified_latencies).unwrap();
     }
 }
