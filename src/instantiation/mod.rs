@@ -342,7 +342,7 @@ fn mangle_name(str: &str) -> String {
         }
         result.push(if c.is_alphanumeric() { c } else { '_' });
     }
-    result
+    result.trim_matches('_').to_owned()
 }
 
 impl InstantiationContext<'_, '_> {
