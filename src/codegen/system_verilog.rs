@@ -43,7 +43,6 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
     while let ConcreteType::Array(arr) = typ {
         let (content_typ, size) = arr.deref();
         let sz = size.unwrap_value().unwrap_integer();
-        use std::fmt::Write;
         write!(array_string, "[{}:0]", sz - 1).unwrap();
         typ = content_typ;
     }
@@ -51,9 +50,9 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
         ConcreteType::Named(reference) => {
             let sz = ConcreteType::sizeof_named(reference);
             if sz == 1 {
-                format!("{array_string} {var_name}")
+                format!(" {var_name}{array_string}")
             } else {
-                format!("{array_string}[{}:0] {var_name}", sz - 1)
+                format!("[{}:0] {var_name}{array_string}", sz - 1)
             }
         }
         ConcreteType::Array(_) => unreachable!("All arrays have been used up already"),
@@ -105,12 +104,12 @@ impl<'g> CodeGenerationContext<'g> {
     fn wire_ref_path_to_string(&self, path: &[RealWirePathElem], absolute_latency: i64) -> String {
         let mut result = String::new();
         for path_elem in path {
-            result.push_str(&match path_elem {
+            match path_elem {
                 RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
                     let idx_wire_name = self.wire_name(*idx_wire, absolute_latency);
-                    format!("[{idx_wire_name}]")
+                    write!(result, "[{idx_wire_name}]").unwrap();
                 }
-            });
+            }
         }
         result
     }
@@ -198,7 +197,7 @@ impl<'g> CodeGenerationContext<'g> {
             let wire_decl = typ_to_declaration(&port_wire.typ, &wire_name);
             write!(
                 self.program_text,
-                ",\n\t{input_or_output} {wire_doc} {wire_decl}"
+                ",\n\t{input_or_output} {wire_doc}{wire_decl}"
             )
             .unwrap();
         }
@@ -248,7 +247,7 @@ impl<'g> CodeGenerationContext<'g> {
 
             let wire_name = wire_name_self_latency(w, self.use_latency);
             let wire_decl = typ_to_declaration(&w.typ, &wire_name);
-            write!(self.program_text, "{wire_or_reg} {wire_decl}").unwrap();
+            write!(self.program_text, "{wire_or_reg}{wire_decl}").unwrap();
 
             match &w.source {
                 RealWireDataSource::Select { root, path } => {
