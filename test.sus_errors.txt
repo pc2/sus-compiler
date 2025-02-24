@@ -427,13 +427,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │               ──┬─  
      │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Latency Counting couldn't reach this node
-     ╭─[test.sus:415:49]
-     │
- 415 │     interface multiple_outputs_only : -> int o, int o2
-     │                                                 ───┬──  
-     │                                                    ╰──── Latency Counting couldn't reach this node
-─────╯
 Error: ::doNothing does not have a main interface. You should explicitly specify an interface to access
      ╭─[test.sus:445:2]
      │
@@ -727,6 +720,13 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  763 │     int beep
      │         ──┬─  
      │           ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Latency Counting couldn't reach this node
+     ╭─[test.sus:754:19]
+     │
+ 754 │     sdf.start(start, 20)
+     │                      ─┬  
+     │                       ╰── Latency Counting couldn't reach this node
 ─────╯
 Error: beep is not a valid template argument of ::int
      ╭─[test.sus:767:30]
@@ -1416,4 +1416,92 @@ Error: Used 'when' in a generative context, use 'if' instead
  1118 │         } else when WIDTH > BASE_CASE_SIZE {
       │                ──┬─  
       │                  ╰─── Used 'when' in a generative context, use 'if' instead
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[test.sus:1138:11]
+      │
+ 1138 │     reg bool a_delayed = a
+      │              ────┬────  
+      │                  ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[test.sus:1140:7]
+      │
+ 1140 │     bool out_shared = a_delayed ^ c
+      │          ─────┬────  
+      │               ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: There were conflicting options when merging partial latency counting solutions for this node. Options were 1 and 0
+Try specifying an explicit latency or rework the module to remove this ambiguity
+      ╭─[test.sus:1140:2]
+      │
+ 1140 │     bool out_shared = a_delayed ^ c
+      │     ───────┬───────  
+      │            ╰───────── There were conflicting options when merging partial latency counting solutions for this node. Options were 1 and 0
+Try specifying an explicit latency or rework the module to remove this ambiguity
+──────╯
+Error: There were conflicting options when merging partial latency counting solutions for this node. Options were 1 and 0
+Try specifying an explicit latency or rework the module to remove this ambiguity
+      ╭─[test.sus:1140:20]
+      │
+ 1140 │     bool out_shared = a_delayed ^ c
+      │                       ──────┬──────  
+      │                             ╰──────── There were conflicting options when merging partial latency counting solutions for this node. Options were 1 and 0
+Try specifying an explicit latency or rework the module to remove this ambiguity
+──────╯
+Error: Excess argument. Function takes 1 args, but 2 were passed.
+      ╭─[test.sus:1150:47]
+      │
+ 1150 │     out_val = infer_me(in_val | (in_val_2 == 0), in_val_2)
+      │                                                  ────┬───  
+      │                                                      ╰───── Excess argument. Function takes 1 args, but 2 were passed.
+      │ 
+ 1155 │     interface infer_me : bool x'0 -> bool y'A
+      │               ────┬───  
+      │                   ╰───── Interface 'infer_me' defined here
+──────╯
+Warning: Unused port 'pop'
+      ╭─[test.sus:1172:2]
+      │
+ 1172 │     FIFO #(DEPTH: 30) fifo
+      │     ────────┬──────── ──┬─  
+      │             ╰─────────────── Unused port 'pop'
+      │                         │   
+      │                         ╰─── fifo declared here
+      │
+      ├─[util.sus:40:23]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                          ─┬─  
+      │                           ╰─── Port 'pop' declared here
+──────╯
+Warning: Unused port 'data_valid'
+      ╭─[test.sus:1172:2]
+      │
+ 1172 │     FIFO #(DEPTH: 30) fifo
+      │     ────────┬──────── ──┬─  
+      │             ╰─────────────── Unused port 'data_valid'
+      │                         │   
+      │                         ╰─── fifo declared here
+      │
+      ├─[util.sus:40:35]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                                      ─────┬────  
+      │                                           ╰────── Port 'data_valid' declared here
+──────╯
+Warning: Unused port 'data_out'
+      ╭─[test.sus:1172:2]
+      │
+ 1172 │     FIFO #(DEPTH: 30) fifo
+      │     ────────┬──────── ──┬─  
+      │             ╰─────────────── Unused port 'data_out'
+      │                         │   
+      │                         ╰─── fifo declared here
+      │
+      ├─[util.sus:40:49]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                                                    ────┬───  
+      │                                                        ╰───── Port 'data_out' declared here
 ──────╯

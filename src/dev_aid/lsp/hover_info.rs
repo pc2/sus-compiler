@@ -1,13 +1,14 @@
 use std::borrow::Cow;
 
 use crate::alloc::ArenaAllocator;
+use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::prelude::*;
 use crate::to_string::pretty_print_concrete_instance;
 
 use lsp_types::{LanguageString, MarkedString};
 
 use crate::flattening::{DeclarationKind, IdentifierType, InterfaceToDomainMap, Module};
-use crate::instantiation::{SubModuleOrWire, CALCULATE_LATENCY_LATER};
+use crate::instantiation::SubModuleOrWire;
 use crate::linker::{Documentation, FileData, GlobalUUID, LinkInfo};
 
 use crate::typing::{

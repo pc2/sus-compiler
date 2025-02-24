@@ -1,13 +1,12 @@
 use std::borrow::Cow;
 use std::ops::Deref;
 
+use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
 
 use crate::flattening::{DeclarationKind, Instruction, Module, Port};
-use crate::instantiation::{
-    InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem, CALCULATE_LATENCY_LATER,
-};
+use crate::instantiation::{InstantiatedModule, RealWire, RealWireDataSource, RealWirePathElem};
 use crate::typing::template::TVec;
 use crate::{typing::concrete_type::ConcreteType, value::Value};
 

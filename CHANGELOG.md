@@ -25,6 +25,8 @@
 - Add if/when distinction
 - Add `assert`, `clog2` and `sizeof`
 - Rename standard library: stl => std
+- Add doc-comments
+
 
 ### Technical Changes
 - Hindley-Milner for Concrete Typing

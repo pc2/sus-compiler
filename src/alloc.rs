@@ -502,6 +502,21 @@ impl<T, IndexMarker> Default for FlatAlloc<T, IndexMarker> {
     }
 }
 
+/// TODO replace once get_many_mut stabilizes (In Rust 1.86 apparently)
+pub fn get2_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut T)> {
+    match b.cmp(&a) {
+        Ordering::Equal => None,
+        Ordering::Less => {
+            let (l, r) = slice.split_at_mut(a);
+            Some((&mut r[0], &mut l[b]))
+        }
+        Ordering::Greater => {
+            let (l, r) = slice.split_at_mut(b);
+            Some((&mut l[a], &mut r[0]))
+        }
+    }
+}
+
 impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub const EMPTY_FLAT_ALLOC: Self = Self::new();
 
@@ -523,6 +538,14 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     {
         let mut data = Vec::new();
         data.resize(size, v);
+        Self {
+            data,
+            _ph: PhantomData,
+        }
+    }
+    #[cfg(test)]
+    // Only for testing, so only enabled with test flag
+    pub fn from_vec(data: Vec<T>) -> Self {
         Self {
             data,
             _ph: PhantomData,
@@ -571,6 +594,16 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
             _ph: PhantomData,
         }
     }
+    pub fn map2<T2, OT>(
+        &self,
+        second: &FlatAlloc<T2, IndexMarker>,
+        f: impl FnMut((UUID<IndexMarker>, &T, &T2)) -> OT,
+    ) -> FlatAlloc<OT, IndexMarker> {
+        FlatAlloc {
+            data: Vec::from_iter(zip_eq(self.iter(), second.iter()).map(f)),
+            _ph: PhantomData,
+        }
+    }
     pub fn find(
         &self,
         mut predicate: impl FnMut(UUID<IndexMarker>, &T) -> bool,
@@ -588,17 +621,7 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
         id_a: UUID<IndexMarker>,
         id_b: UUID<IndexMarker>,
     ) -> Option<(&mut T, &mut T)> {
-        match id_b.0.cmp(&id_a.0) {
-            Ordering::Equal => None,
-            Ordering::Less => {
-                let (l, r) = self.data.split_at_mut(id_a.0);
-                Some((&mut r[0], &mut l[id_b.0]))
-            }
-            Ordering::Greater => {
-                let (l, r) = self.data.split_at_mut(id_b.0);
-                Some((&mut l[id_a.0], &mut r[0]))
-            }
-        }
+        get2_mut(&mut self.data, id_a.0, id_b.0)
     }
     pub fn get(&self, id: UUID<IndexMarker>) -> Option<&T> {
         self.data.get(id.0)
@@ -757,6 +780,7 @@ impl<
 {
     type Item = (UUID<IDMarker>, OA, OB);
 
+    #[track_caller]
     fn next(&mut self) -> Option<Self::Item> {
         match (self.iter_a.next(), self.iter_b.next()) {
             (None, None) => None,
@@ -806,6 +830,7 @@ impl<
 {
     type Item = (UUID<IDMarker>, OA, OB, OC);
 
+    #[track_caller]
     fn next(&mut self) -> Option<Self::Item> {
         match (self.iter_a.next(), self.iter_b.next(), self.iter_c.next()) {
             (None, None, None) => None,
