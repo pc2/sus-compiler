@@ -1171,13 +1171,11 @@ module instantiate_fifo {
 
 	FIFO #(DEPTH: 30) fifo
 
+	request_data = fifo.ready
 	when fifo.ready {
-		request_data = true
 		reg reg reg reg reg int heavy_computation = data_received
 
 		fifo.push(true, heavy_computation)
-	} else {
-		request_data = false
 	}
 }
 

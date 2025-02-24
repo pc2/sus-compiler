@@ -559,30 +559,27 @@ fn has_poison_edge(fanouts: &ListOfLists<FanInOut>) -> bool {
 fn fill_in_internal_latencies(
     fanins: &ListOfLists<FanInOut>,
     fanouts: &ListOfLists<FanInOut>,
-    PartialLatencyCountingSolution {
-        latencies, seeds, ..
-    }: &mut PartialLatencyCountingSolution,
+    partial_solution: &mut PartialLatencyCountingSolution,
 ) {
-    let mut stack = Vec::new();
-
     // Now that we have all the ports, we can fill in the internal latencies
-    for &idx in seeds.iter() {
-        if latencies[idx].pinned {
-            // it's a defined latency!
-            count_latency(latencies, fanouts, idx, &mut stack, false);
-            // These should have already been caught when exploring the ports
-        }
-    }
+    partial_solution.fill_in_internal_latencies(fanouts, false);
+
+    let PartialLatencyCountingSolution {
+        seeds, latencies, ..
+    } = partial_solution;
 
     // So, we've got all the foward latencies starting from the given nodes.
     // Now we also want to add the backwards latencies, but only those in the fanin of the seeds
-    stack.extend(seeds.iter().map(|s| {
-        assert!(latencies[*s].pinned);
-        LatencyStackElem {
-            node_idx: *s,
-            remaining_fanout: fanins[*s].iter(),
-        }
-    }));
+    let mut stack: Vec<LatencyStackElem> = seeds
+        .iter()
+        .map(|s| {
+            assert!(latencies[*s].pinned);
+            LatencyStackElem {
+                node_idx: *s,
+                remaining_fanout: fanins[*s].iter(),
+            }
+        })
+        .collect();
     while let Some(top) = stack.last_mut() {
         let Some(&FanInOut {
             to_node,
@@ -608,7 +605,6 @@ fn fill_in_internal_latencies(
     for idx in 0..latencies.len() {
         if latencies[idx].pinned {
             count_latency(latencies, fanins, idx, &mut stack, true);
-            // These should have already been caught when exploring the ports
         }
     }
 }
@@ -648,7 +644,7 @@ fn print_latency_test_case(
     println!("==== END LATENCY TEST CASE ====");
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PartialLatencyCountingSolution {
     /// Only the nodes marked by [Self::seeds] may be set. They must be [LatencyNode::is_valid_and_pinned]
     ///
@@ -674,6 +670,16 @@ impl PartialLatencyCountingSolution {
         }
         for conflict in &mut self.conflicting_nodes {
             conflict.1 += offset;
+        }
+    }
+
+    fn fill_in_internal_latencies(&mut self, fanouts: &ListOfLists<FanInOut>, backwards: bool) {
+        let mut stack = Vec::new();
+        // Now that we have all the ports, we can fill in the internal latencies
+        for &idx in self.seeds.iter() {
+            assert!(self.latencies[idx].pinned);
+
+            count_latency(&mut self.latencies, fanouts, idx, &mut stack, backwards);
         }
     }
 }
@@ -911,22 +917,10 @@ pub fn infer_unknown_latency_edges<ID>(
     #[cfg(not(test))]
     if crate::config::config().debug_print_latency_graph {
         print_latency_test_case(fanins, ports, specified_latencies);
+        println!("{inference_candidates:?}")
     }
 
     let fanouts = convert_fanin_to_fanout(fanins);
-
-    #[cfg(debug_assertions)]
-    for candidate in inference_candidates {
-        // We do allow poison edges, just not any other edges
-        assert!(fanins[candidate.to_node]
-            .iter()
-            .all(|fan| fan.delta_latency.is_none()));
-        assert!(fanouts[candidate.from_node]
-            .iter()
-            .all(|fan| fan.delta_latency.is_none()));
-        assert!(ports.outputs().contains(&candidate.from_node));
-        assert!(ports.inputs().contains(&candidate.to_node));
-    }
 
     if fanins.len() == 0 {
         return Ok(()); // Could not infer anything
@@ -935,13 +929,25 @@ pub fn infer_unknown_latency_edges<ID>(
     let partial_solutions = solve_port_latencies(fanins, &fanouts, ports, specified_latencies)?;
     assert!(!partial_solutions.is_empty());
 
+    let min_max_values_for_inference: Vec<(Vec<LatencyNode>, Vec<LatencyNode>)> = partial_solutions
+        .into_iter()
+        .map(|mut min_sol| {
+            let mut max_sol = min_sol.clone();
+
+            min_sol.fill_in_internal_latencies(&fanouts, false);
+            max_sol.fill_in_internal_latencies(fanins, true);
+
+            (min_sol.latencies, max_sol.latencies)
+        })
+        .collect();
+
     for candidate in inference_candidates {
         let mut infer_me = Some(&mut values_to_infer[candidate.target_to_infer]);
 
-        for sol in &partial_solutions {
+        for (min_sol, max_sol) in &min_max_values_for_inference {
             if let (Some(from), Some(to)) = (
-                sol.latencies[candidate.from_node].get_maybe(),
-                sol.latencies[candidate.to_node].get_maybe(),
+                min_sol[candidate.from_node].get_maybe(), // From nodes should be as early as possible
+                max_sol[candidate.to_node].get_maybe(),   // To nodes should be as late as possible
             ) {
                 let candidate_value = (to - from + candidate.offset) / candidate.multiply_var_by;
                 let target_to_infer = infer_me.take().expect(
@@ -997,8 +1003,6 @@ impl LatencyCountingPorts {
 
 #[cfg(test)]
 mod tests {
-    use crate::latency::port_latency_inference;
-
     use super::*;
 
     fn solve_latencies_test_case(
@@ -1944,45 +1948,27 @@ mod tests {
     }
 
     #[test]
-    fn test_crashing_fifo_use() {
-        let fanins: [&[FanInOut]; 21] = [
-            /*0*/ &[mk_fan(4, 0), mk_fan(1, 0), mk_fan(3, 0)],
-            /*1*/ &[mk_fan(10, 0), mk_fan(3, 0)],
-            /*2*/ &[mk_fan(20, 0)],
-            /*3*/ &[],
+    fn test_cant_infer_fifo() {
+        let fanins: [&[FanInOut]; 7] = [
+            /*0*/ &[mk_fan(2, 0)],
+            /*1*/ &[],
+            /*2*/ &[],
+            /*3*/ &[mk_fan(1, 5), mk_fan(2, 5)],
             /*4*/ &[],
-            /*5*/ &[mk_fan(1, 0)],
-            /*6*/ &[mk_fan(0, 0)],
-            /*7*/ &[],
-            /*8*/ &[mk_fan(1, 0), mk_fan(7, 0)],
-            /*9*/ &[],
-            /*10*/ &[mk_fan(8, 0), mk_fan(9, 0)],
-            /*11*/ &[mk_fan(15, 0)],
-            /*12*/ &[],
-            /*13*/ &[mk_fan(12, 0), mk_fan(1, 0)],
-            /*14*/ &[],
-            /*15*/ &[mk_fan(13, 0), mk_fan(14, 0)],
-            /*16*/ &[mk_fan(18, 1)],
-            /*17*/ &[],
-            /*18*/ &[mk_fan(11, 0), mk_fan(17, 0)],
-            /*19*/ &[mk_fan(16, 0)],
-            /*20*/ &[mk_fan(19, -9223372036854775808)],
+            /*5*/ &[mk_fan(6, 0), mk_fan(4, 0), mk_fan(2, 0)],
+            /*6*/ &[mk_fan(5, 0), mk_fan(3, 0), mk_fan(2, 0)],
         ];
         let fanins = ListOfLists::from_slice_slice(&fanins);
-        let inputs = [3, 4];
-        let outputs = [2];
+        let inputs = [1];
+        let outputs = [0];
         let specified_latencies = [
             SpecifiedLatency {
-                wire: 2,
+                wire: 0,
                 latency: 0,
             },
             SpecifiedLatency {
-                wire: 3,
-                latency: 9223372036854775807,
-            },
-            SpecifiedLatency {
-                wire: 4,
-                latency: 9223372036854775807,
+                wire: 1,
+                latency: 3,
             },
         ];
         let fanouts = convert_fanin_to_fanout(&fanins);

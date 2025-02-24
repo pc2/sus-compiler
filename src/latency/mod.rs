@@ -370,7 +370,7 @@ impl InstantiationContext<'_, '_> {
 
         let mut domain_inference_infos =
             latency_node_mapper.domain_infos.map(|(_domain_id, info)| {
-                PerDomainInferenceInfo::new(info.latency_node_meanings.len(), info.ports.clone())
+                PerDomainInferenceInfo::new(info.latency_node_meanings.len())
             });
 
         for (sm_id, sm) in &self.submodules {
@@ -408,7 +408,6 @@ impl InstantiationContext<'_, '_> {
                     &sm.port_map,
                     &latency_node_mapper.map_wire_to_latency_node,
                     &mut domain_inference_infos[global_domain],
-                    sm.port_map.id_range(),
                 );
             }
         }
@@ -427,7 +426,7 @@ impl InstantiationContext<'_, '_> {
             // We don't need to report the error, they'll bubble up later anyway during [solve_latencies]
             let _result = infer_unknown_latency_edges(
                 &fanins,
-                &domain_inference_info.ports,
+                &domain_info.ports,
                 &domain_info.initial_values,
                 &domain_inference_info.inference_edges,
                 &mut latency_inference_variables,

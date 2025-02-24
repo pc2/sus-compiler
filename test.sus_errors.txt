@@ -1449,3 +1449,59 @@ Try specifying an explicit latency or rework the module to remove this ambiguity
       │                             ╰──────── There were conflicting options when merging partial latency counting solutions for this node. Options were 1 and 0
 Try specifying an explicit latency or rework the module to remove this ambiguity
 ──────╯
+Error: Excess argument. Function takes 1 args, but 2 were passed.
+      ╭─[test.sus:1150:47]
+      │
+ 1150 │     out_val = infer_me(in_val | (in_val_2 == 0), in_val_2)
+      │                                                  ────┬───  
+      │                                                      ╰───── Excess argument. Function takes 1 args, but 2 were passed.
+      │ 
+ 1155 │     interface infer_me : bool x'0 -> bool y'A
+      │               ────┬───  
+      │                   ╰───── Interface 'infer_me' defined here
+──────╯
+Warning: Unused port 'pop'
+      ╭─[test.sus:1172:2]
+      │
+ 1172 │     FIFO #(DEPTH: 30) fifo
+      │     ────────┬──────── ──┬─  
+      │             ╰─────────────── Unused port 'pop'
+      │                         │   
+      │                         ╰─── fifo declared here
+      │
+      ├─[util.sus:40:23]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                          ─┬─  
+      │                           ╰─── Port 'pop' declared here
+──────╯
+Warning: Unused port 'data_valid'
+      ╭─[test.sus:1172:2]
+      │
+ 1172 │     FIFO #(DEPTH: 30) fifo
+      │     ────────┬──────── ──┬─  
+      │             ╰─────────────── Unused port 'data_valid'
+      │                         │   
+      │                         ╰─── fifo declared here
+      │
+      ├─[util.sus:40:35]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                                      ─────┬────  
+      │                                           ╰────── Port 'data_valid' declared here
+──────╯
+Warning: Unused port 'data_out'
+      ╭─[test.sus:1172:2]
+      │
+ 1172 │     FIFO #(DEPTH: 30) fifo
+      │     ────────┬──────── ──┬─  
+      │             ╰─────────────── Unused port 'data_out'
+      │                         │   
+      │                         ╰─── fifo declared here
+      │
+      ├─[util.sus:40:49]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                                                    ────┬───  
+      │                                                        ╰───── Port 'data_out' declared here
+──────╯
