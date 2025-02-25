@@ -549,6 +549,9 @@ Latency Counting CrossDomain
 Instantiating CrossDomain
 Concrete Typechecking CrossDomain
 Latency Counting CrossDomain
+Instantiating CrossDomain
+Concrete Typechecking CrossDomain
+Latency Counting CrossDomain
 Instantiating LatencyOffset
 Concrete Typechecking LatencyOffset
 Latency Counting LatencyOffset
