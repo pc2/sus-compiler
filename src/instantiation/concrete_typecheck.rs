@@ -82,13 +82,17 @@ impl InstantiationContext<'_, '_> {
                     // TODO overloading
                     let (input_typ, output_typ) = match op {
                         UnaryOperator::Not => (BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE),
-                        UnaryOperator::Negate => (self.new_int_type(), self.new_int_type()),
+                        UnaryOperator::Negate => (
+                            self.type_substitutor.new_int_type(),
+                            self.type_substitutor.new_int_type(),
+                        ),
                         UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => {
                             (self.make_array_of(BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
-                        UnaryOperator::Sum | UnaryOperator::Product => {
-                            (self.make_array_of(self.new_int_type()), self.new_int_type())
-                        }
+                        UnaryOperator::Sum | UnaryOperator::Product => (
+                            self.make_array_of(self.type_substitutor.new_int_type()),
+                            self.type_substitutor.new_int_type(),
+                        ),
                     };
 
                     self.type_substitutor.unify_report_error(
@@ -132,27 +136,45 @@ impl InstantiationContext<'_, '_> {
                             continue;
                         }
                         BinaryOperator::Equals => (
-                            (self.new_int_type(), self.new_int_type()),
+                            (
+                                self.type_substitutor.new_int_type(),
+                                self.type_substitutor.new_int_type(),
+                            ),
                             BOOL_CONCRETE_TYPE,
                         ),
                         BinaryOperator::NotEquals => (
-                            (self.new_int_type(), self.new_int_type()),
+                            (
+                                self.type_substitutor.new_int_type(),
+                                self.type_substitutor.new_int_type(),
+                            ),
                             BOOL_CONCRETE_TYPE,
                         ),
                         BinaryOperator::GreaterEq => (
-                            (self.new_int_type(), self.new_int_type()),
+                            (
+                                self.type_substitutor.new_int_type(),
+                                self.type_substitutor.new_int_type(),
+                            ),
                             BOOL_CONCRETE_TYPE,
                         ),
                         BinaryOperator::Greater => (
-                            (self.new_int_type(), self.new_int_type()),
+                            (
+                                self.type_substitutor.new_int_type(),
+                                self.type_substitutor.new_int_type(),
+                            ),
                             BOOL_CONCRETE_TYPE,
                         ),
                         BinaryOperator::LesserEq => (
-                            (self.new_int_type(), self.new_int_type()),
+                            (
+                                self.type_substitutor.new_int_type(),
+                                self.type_substitutor.new_int_type(),
+                            ),
                             BOOL_CONCRETE_TYPE,
                         ),
                         BinaryOperator::Lesser => (
-                            (self.new_int_type(), self.new_int_type()),
+                            (
+                                self.type_substitutor.new_int_type(),
+                                self.type_substitutor.new_int_type(),
+                            ),
                             BOOL_CONCRETE_TYPE,
                         ),
                     };
@@ -520,57 +542,68 @@ struct BinaryOpTypecheckConstraint {
 
 impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstraint {
     fn try_apply(&mut self, context: &mut InstantiationContext<'_, '_>) -> DelayedConstraintStatus {
-        if context.wires[self.left].typ.contains_unknown()
-            || context.wires[self.right].typ.contains_unknown()
-        {
-            return DelayedConstraintStatus::NoProgress;
+        if let (Some(left_complete_type), Some(right_complete_type)) = (
+            context.wires[self.left]
+                .typ
+                .try_fully_substitute(&context.type_substitutor),
+            context.wires[self.right]
+                .typ
+                .try_fully_substitute(&context.type_substitutor),
+        ) {
+            #[rustfmt::skip]
+            let left_size = left_complete_type.unwrap_named().template_args
+                [UUID::from_hidden_value(0)]
+                .unwrap_value()
+                .unwrap_integer();
+            #[rustfmt::skip]
+            let right_size = right_complete_type.unwrap_named().template_args
+                [UUID::from_hidden_value(0)]
+                .unwrap_value()
+                .unwrap_integer();
+            let out_size = match self.op {
+                BinaryOperator::Add => left_size + right_size,
+                BinaryOperator::Subtract => left_size.clone(),
+                BinaryOperator::Multiply => left_size * right_size,
+                BinaryOperator::Divide => left_size.clone(),
+                BinaryOperator::Modulo => right_size.clone(),
+                _ => {
+                    unreachable!("The BinaryOpTypecheckConstraint should only check arithmetic operation but got {}", self.op);
+                }
+            };
+            let mut template_args: FlatAlloc<ConcreteType, TemplateIDMarker> = FlatAlloc::new();
+            template_args.alloc(ConcreteType::new_int(out_size));
+            let expected_out = ConcreteType::Named(ConcreteGlobalReference {
+                id: get_builtin_type!("int"),
+                template_args,
+            });
+            context.type_substitutor.unify_report_error(
+                &context.wires[self.out].typ,
+                &expected_out,
+                self.span,
+                "binary output",
+            );
+            DelayedConstraintStatus::Resolved
+        } else {
+            DelayedConstraintStatus::NoProgress
         }
-        let left_complete_type = context.wires[self.left]
-            .typ
-            .try_fully_substitute(&context.type_substitutor)
-            .unwrap();
-        let left_size = left_complete_type.unwrap_named().template_args[UUID::from_hidden_value(0)]
-            .unwrap_value()
-            .unwrap_integer();
-        let right_complete_type = context.wires[self.right]
-            .typ
-            .try_fully_substitute(&context.type_substitutor)
-            .unwrap();
-        #[rustfmt::skip]
-        let right_size = right_complete_type.unwrap_named().template_args[UUID::from_hidden_value(0)]
-            .unwrap_value()
-            .unwrap_integer();
-        let out_size = match self.op {
-            BinaryOperator::Add => left_size + right_size,
-            BinaryOperator::Subtract => left_size.clone(),
-            BinaryOperator::Multiply => left_size * right_size,
-            BinaryOperator::Divide => left_size.clone(),
-            BinaryOperator::Modulo => right_size.clone(),
-            _ => {
-                unreachable!("The BinaryOpTypecheckConstraint should only check arithmetic operation but got {}", self.op);
-            }
-        };
-        let mut template_args: FlatAlloc<ConcreteType, TemplateIDMarker> = FlatAlloc::new();
-        template_args.alloc(ConcreteType::new_int(out_size));
-        let expected_out = ConcreteType::Named(ConcreteGlobalReference {
-            id: get_builtin_type!("int"),
-            template_args,
-        });
-
-        context.type_substitutor.unify_report_error(
-            &context.wires[self.out].typ,
-            &expected_out,
-            self.span,
-            "binary output",
-        );
-
-        DelayedConstraintStatus::Resolved
     }
 
     fn report_could_not_resolve_error(&self, context: &InstantiationContext<'_, '_>) {
         let message = format!(
             "Failed to Typecheck {:?} = {:?} {} {:?}",
-            self.out, self.right, self.op, self.left
+            context.wires[self.out]
+                .typ
+                .clone()
+                .fully_substitute(&context.type_substitutor),
+            context.wires[self.right]
+                .typ
+                .clone()
+                .fully_substitute(&context.type_substitutor),
+            self.op,
+            context.wires[self.left]
+                .typ
+                .clone()
+                .fully_substitute(&context.type_substitutor)
         );
 
         context.errors.error(self.span, message);

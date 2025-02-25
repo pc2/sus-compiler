@@ -180,25 +180,23 @@ impl InstantiationContext<'_, '_> {
                 self.template_args[*template_id].clone()
             }
             WrittenType::Named(named_type) => {
-                let mut template_args = FlatAlloc::new();
-                for template_arg in named_type.template_args.iter() {
-                    let concrete_type = if let (_, Some(template_arg)) = template_arg {
+                let template_args = named_type.template_args.try_map(|template_arg| {
+                    if let (_, Some(template_arg)) = template_arg {
                         match &template_arg.kind {
                             TemplateArgKind::Type(written_type) => {
-                                self.concretize_type(written_type)?
+                                self.concretize_type(written_type)
                             }
-                            TemplateArgKind::Value(uuid) => ConcreteType::Value(
+                            TemplateArgKind::Value(uuid) => Ok(ConcreteType::Value(
                                 self.generation_state
                                     .get_generation_value(*uuid)
                                     .unwrap()
                                     .clone(),
-                            ),
+                            )),
                         }
                     } else {
-                        ConcreteType::Unknown(self.type_substitutor.alloc())
-                    };
-                    template_args.alloc(concrete_type);
-                }
+                        Ok(ConcreteType::Unknown(self.type_substitutor.alloc()))
+                    }
+                })?;
 
                 ConcreteType::Named(crate::typing::concrete_type::ConcreteGlobalReference {
                     id: named_type.id,

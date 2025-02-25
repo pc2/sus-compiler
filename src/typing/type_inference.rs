@@ -2,7 +2,6 @@
 
 use std::cell::{OnceCell, RefCell};
 use std::fmt::Debug;
-use std::iter::zip;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Deref, DerefMut, Index};
 use std::thread::panicking;
@@ -13,7 +12,7 @@ use crate::block_vector::{BlockVec, BlockVecIter};
 use crate::errors::ErrorInfo;
 use crate::prelude::*;
 
-use crate::alloc::{UUIDAllocator, UUIDMarker, UUIDRange, UUID};
+use crate::alloc::{zip_eq, UUIDAllocator, UUIDMarker, UUIDRange, UUID};
 use crate::value::Value;
 
 use super::abstract_type::AbstractType;
@@ -579,9 +578,8 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
     ) -> UnifyResult {
         match (left, right) {
             (ConcreteType::Named(na), ConcreteType::Named(nb)) => {
-                assert!(na.template_args.len() == nb.template_args.len());
-                zip(na.template_args.iter(), nb.template_args.iter())
-                    .map(|((_, template_arg_a), (_, template_arg_b))| {
+                zip_eq(na.template_args.iter(), nb.template_args.iter())
+                    .map(|(_, template_arg_a, template_arg_b)| {
                         unify(template_arg_a, template_arg_b)
                     })
                     .fold(UnifyResult::Success, |result_acc, result| {

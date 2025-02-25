@@ -122,11 +122,11 @@ impl ConcreteType {
         &self,
         substitutor: &TypeSubstitutor<Self, ConcreteTypeVariableIDMarker>,
     ) -> Option<Self> {
-        if self.contains_unknown() {
+        let mut self_clone = self.clone();
+        self_clone.fully_substitute(substitutor);
+        if self_clone.contains_unknown() {
             None
         } else {
-            let mut self_clone = self.clone();
-            self_clone.fully_substitute(substitutor);
             Some(self_clone)
         }
     }
