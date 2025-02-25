@@ -1,13 +1,15 @@
 use std::ops::Deref;
 
-use crate::alloc::{zip_eq, zip_eq3};
+use sus_proc_macro::get_builtin_type;
+
+use crate::alloc::{zip_eq, zip_eq3, UUID};
 use crate::errors::ErrorInfoObject;
 use crate::flattening::{DeclarationKind, ExpressionSource, WireReferenceRoot, WrittenType};
 use crate::linker::LinkInfo;
 use crate::typing::concrete_type::ConcreteGlobalReference;
 use crate::typing::template::TemplateArgKind;
 use crate::typing::{
-    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
+    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE},
     type_inference::{
         DelayedConstraint, DelayedConstraintStatus, DelayedConstraintsList, FailedUnification,
     },
@@ -52,7 +54,7 @@ impl InstantiationContext<'_, '_> {
         )))
     }
 
-    fn typecheck_all_wires(&self) {
+    fn typecheck_all_wires(&self, delayed_constraints: &mut DelayedConstraintsList<Self>) {
         for this_wire_id in self.wires.id_range() {
             let this_wire = &self.wires[this_wire_id];
             let span = self.md.get_instruction_span(this_wire.original_instruction);
@@ -80,13 +82,17 @@ impl InstantiationContext<'_, '_> {
                     // TODO overloading
                     let (input_typ, output_typ) = match op {
                         UnaryOperator::Not => (BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE),
-                        UnaryOperator::Negate => (INT_CONCRETE_TYPE, INT_CONCRETE_TYPE),
+                        UnaryOperator::Negate => (
+                            self.type_substitutor.new_int_type(),
+                            self.type_substitutor.new_int_type(),
+                        ),
                         UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => {
                             (self.make_array_of(BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
-                        UnaryOperator::Sum | UnaryOperator::Product => {
-                            (self.make_array_of(INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
-                        }
+                        UnaryOperator::Sum | UnaryOperator::Product => (
+                            self.make_array_of(self.type_substitutor.new_int_type()),
+                            self.type_substitutor.new_int_type(),
+                        ),
                     };
 
                     self.type_substitutor.unify_report_error(
@@ -104,6 +110,7 @@ impl InstantiationContext<'_, '_> {
                 }
                 &RealWireDataSource::BinaryOp { op, left, right } => {
                     // TODO overloading
+                    // Typecheck generic INT
                     let ((in_left, in_right), out) = match op {
                         BinaryOperator::And => {
                             ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
@@ -114,39 +121,62 @@ impl InstantiationContext<'_, '_> {
                         BinaryOperator::Xor => {
                             ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
-                        BinaryOperator::Add => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
+                        BinaryOperator::Add
+                        | BinaryOperator::Subtract
+                        | BinaryOperator::Multiply
+                        | BinaryOperator::Divide
+                        | BinaryOperator::Modulo => {
+                            delayed_constraints.push(BinaryOpTypecheckConstraint {
+                                op,
+                                left,
+                                right,
+                                out: this_wire_id,
+                                span,
+                            });
+                            continue;
                         }
-                        BinaryOperator::Subtract => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::Multiply => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::Divide => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::Modulo => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::Equals => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::NotEquals => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::GreaterEq => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::Greater => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::LesserEq => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
-                        BinaryOperator::Lesser => {
-                            ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
+                        BinaryOperator::Equals => (
+                            (
+                                self.type_substitutor.new_int_type(),
+                                self.type_substitutor.new_int_type(),
+                            ),
+                            BOOL_CONCRETE_TYPE,
+                        ),
+                        BinaryOperator::NotEquals => (
+                            (
+                                self.type_substitutor.new_int_type(),
+                                self.type_substitutor.new_int_type(),
+                            ),
+                            BOOL_CONCRETE_TYPE,
+                        ),
+                        BinaryOperator::GreaterEq => (
+                            (
+                                self.type_substitutor.new_int_type(),
+                                self.type_substitutor.new_int_type(),
+                            ),
+                            BOOL_CONCRETE_TYPE,
+                        ),
+                        BinaryOperator::Greater => (
+                            (
+                                self.type_substitutor.new_int_type(),
+                                self.type_substitutor.new_int_type(),
+                            ),
+                            BOOL_CONCRETE_TYPE,
+                        ),
+                        BinaryOperator::LesserEq => (
+                            (
+                                self.type_substitutor.new_int_type(),
+                                self.type_substitutor.new_int_type(),
+                            ),
+                            BOOL_CONCRETE_TYPE,
+                        ),
+                        BinaryOperator::Lesser => (
+                            (
+                                self.type_substitutor.new_int_type(),
+                                self.type_substitutor.new_int_type(),
+                            ),
+                            BOOL_CONCRETE_TYPE,
+                        ),
                     };
                     self.type_substitutor.unify_report_error(
                         &self.wires[this_wire_id].typ,
@@ -249,7 +279,7 @@ impl InstantiationContext<'_, '_> {
             delayed_constraints.push(SubmoduleTypecheckConstraint { sm_id });
         }
 
-        self.typecheck_all_wires();
+        self.typecheck_all_wires(&mut delayed_constraints);
 
         delayed_constraints.resolve_delayed_constraints(self);
 
@@ -498,5 +528,84 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
         context
             .errors
             .error(submod_instr.get_most_relevant_span(), message);
+    }
+}
+
+#[derive(Debug)]
+struct BinaryOpTypecheckConstraint {
+    op: BinaryOperator,
+    left: UUID<WireIDMarker>,
+    right: UUID<WireIDMarker>,
+    out: UUID<WireIDMarker>,
+    span: Span,
+}
+
+impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstraint {
+    fn try_apply(&mut self, context: &mut InstantiationContext<'_, '_>) -> DelayedConstraintStatus {
+        if let (Some(left_complete_type), Some(right_complete_type)) = (
+            context.wires[self.left]
+                .typ
+                .try_fully_substitute(&context.type_substitutor),
+            context.wires[self.right]
+                .typ
+                .try_fully_substitute(&context.type_substitutor),
+        ) {
+            #[rustfmt::skip]
+            let left_size = left_complete_type.unwrap_named().template_args
+                [UUID::from_hidden_value(0)]
+                .unwrap_value()
+                .unwrap_integer();
+            #[rustfmt::skip]
+            let right_size = right_complete_type.unwrap_named().template_args
+                [UUID::from_hidden_value(0)]
+                .unwrap_value()
+                .unwrap_integer();
+            let out_size = match self.op {
+                BinaryOperator::Add => left_size + right_size,
+                BinaryOperator::Subtract => left_size.clone(),
+                BinaryOperator::Multiply => left_size * right_size,
+                BinaryOperator::Divide => left_size.clone(),
+                BinaryOperator::Modulo => right_size.clone(),
+                _ => {
+                    unreachable!("The BinaryOpTypecheckConstraint should only check arithmetic operation but got {}", self.op);
+                }
+            };
+            let mut template_args: FlatAlloc<ConcreteType, TemplateIDMarker> = FlatAlloc::new();
+            template_args.alloc(ConcreteType::new_int(out_size));
+            let expected_out = ConcreteType::Named(ConcreteGlobalReference {
+                id: get_builtin_type!("int"),
+                template_args,
+            });
+            context.type_substitutor.unify_report_error(
+                &context.wires[self.out].typ,
+                &expected_out,
+                self.span,
+                "binary output",
+            );
+            DelayedConstraintStatus::Resolved
+        } else {
+            DelayedConstraintStatus::NoProgress
+        }
+    }
+
+    fn report_could_not_resolve_error(&self, context: &InstantiationContext<'_, '_>) {
+        let message = format!(
+            "Failed to Typecheck {:?} = {:?} {} {:?}",
+            context.wires[self.out]
+                .typ
+                .clone()
+                .fully_substitute(&context.type_substitutor),
+            context.wires[self.right]
+                .typ
+                .clone()
+                .fully_substitute(&context.type_substitutor),
+            self.op,
+            context.wires[self.left]
+                .typ
+                .clone()
+                .fully_substitute(&context.type_substitutor)
+        );
+
+        context.errors.error(self.span, message);
     }
 }
