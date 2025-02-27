@@ -107,7 +107,7 @@ impl<'g> CodeGenerationContext<'g> {
             match path_elem {
                 RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
                     let idx_wire_name = self.wire_name(*idx_wire, absolute_latency);
-                    write!(result, "[{idx_wire_name}]").unwrap();
+                    result = format!("[{idx_wire_name}]{result}");
                 }
             }
         }
