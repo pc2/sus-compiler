@@ -1,5 +1,6 @@
 mod concrete_typecheck;
 mod execute;
+mod final_checks;
 mod unique_names;
 
 use unique_names::UniqueNames;
@@ -418,6 +419,9 @@ fn perform_instantiation(
 
     println!("Latency Counting {}", md.link_info.name);
     context.compute_latencies();
+
+    println!("Checking array accesses {}", md.link_info.name);
+    context.check_array_accesses();
 
     context.extract()
 }
