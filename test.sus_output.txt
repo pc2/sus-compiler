@@ -122,7 +122,7 @@ TREE SITTER module! UseSlice
 TREE SITTER module! UseBuiltinConstants
 TREE SITTER module! FailingAssert
 TREE SITTER module! IfTesting
-TREE SITTER module! multi_dim_array
+TREE SITTER module! testArrayWrite
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -237,7 +237,7 @@ Typechecking UseSlice
 Typechecking UseBuiltinConstants
 Typechecking FailingAssert
 Typechecking IfTesting
-Typechecking multi_dim_array
+Typechecking testArrayWrite
 Instantiating IntToBits
 Concrete Typechecking IntToBits
 Latency Counting IntToBits
@@ -569,6 +569,6 @@ Instantiating UseBuiltinConstants
 Concrete Typechecking UseBuiltinConstants
 Latency Counting UseBuiltinConstants
 Instantiating FailingAssert
-Instantiating multi_dim_array
-Concrete Typechecking multi_dim_array
-Latency Counting multi_dim_array
+Instantiating testArrayWrite
+Concrete Typechecking testArrayWrite
+Latency Counting testArrayWrite

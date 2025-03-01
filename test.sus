@@ -1119,16 +1119,16 @@ module IfTesting #(int WIDTH) {
         }
 }
 
+module testArrayWrite {
+	interface testArrayWrite : int[10][6][2] in_arr -> int[10][6] out_arr
 
-module multi_dim_array {
-	interface multi_dim_array : bool[10][20][30] a -> bool[10][20][30] b
+	out_arr = in_arr[0]
+
+	out_arr[5][9] = in_arr[0][5][9]
 
 	for int i in 0..10 {
-	    for int j in 0..20 {
-		    for int k in 0..30 {
-				b[k][j][i] = a[k][j][i]
-			}
+		for int j in 0..6 {
+			out_arr[j][i] = in_arr[0][j][i]
 		}
 	}
 }
-
