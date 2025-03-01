@@ -45,12 +45,20 @@ pub struct Cursor<'t> {
 }
 
 impl<'t> Cursor<'t> {
-    pub fn new_at_root(tree: &'t Tree, file_text: &'t FileText) -> Self {
-        Self {
+    pub fn new_at_root(tree: &'t Tree, file_text: &'t FileText) -> Result<Self, Span> {
+        let result = Self {
             cursor: tree.walk(),
             file_text,
             gathered_comments: Vec::new(),
             current_field_was_already_consumed: false,
+        };
+
+        let root_node = result.cursor.node();
+        if root_node.is_error() || root_node.is_missing() {
+            Err(Span::from(root_node.byte_range()))
+        } else {
+            assert!(root_node.kind_id() == kind!("source_file"));
+            Ok(result)
         }
     }
 

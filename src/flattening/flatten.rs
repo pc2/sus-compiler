@@ -1659,10 +1659,13 @@ pub fn flatten_all_globals(linker: &mut Linker) {
     let linker_files: *const ArenaAllocator<FileData, FileUUIDMarker> = &linker.files;
     // SAFETY we won't be touching the files anywere. This is just to get the compiler to stop complaining about linker going into the closure.
     for (_file_id, file) in unsafe { &*linker_files } {
+        let Ok(mut cursor) = Cursor::new_at_root(&file.tree, &file.file_text) else {
+            assert!(file.associated_values.is_empty());
+            continue; // Error already handled in initialization
+        };
+
         let mut span_debugger = SpanDebugger::new("flatten_all_globals", file);
         let mut associated_value_iter = file.associated_values.iter();
-
-        let mut cursor = Cursor::new_at_root(&file.tree, &file.file_text);
 
         cursor.list(kind!("source_file"), |cursor| {
             cursor.go_down(kind!("global_object"), |cursor| {
