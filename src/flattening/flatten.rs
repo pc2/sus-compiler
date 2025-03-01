@@ -1664,7 +1664,7 @@ pub fn flatten_all_globals(linker: &mut Linker) {
             continue; // Error already handled in initialization
         };
 
-        let mut span_debugger = SpanDebugger::new("flatten_all_globals", file);
+        let _panic_guard = SpanDebugger::new("flatten_all_globals", file);
         let mut associated_value_iter = file.associated_values.iter();
 
         cursor.list(kind!("source_file"), |cursor| {
@@ -1676,7 +1676,6 @@ pub fn flatten_all_globals(linker: &mut Linker) {
                 flatten_global(linker, global_obj, cursor);
             });
         });
-        span_debugger.defuse();
     }
 }
 
