@@ -129,6 +129,7 @@ TREE SITTER module! infer_me
 TREE SITTER module! infer_from_local_context
 TREE SITTER module! instantiate_fifo
 TREE SITTER module! inference_edge_case
+TREE SITTER module! specified_latencies_not_ports_edge_case
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -250,6 +251,7 @@ Typechecking infer_me
 Typechecking infer_from_local_context
 Typechecking instantiate_fifo
 Typechecking inference_edge_case
+Typechecking specified_latencies_not_ports_edge_case
 Instantiating IntToBits
 Concrete Typechecking IntToBits
 Latency Counting IntToBits
@@ -600,3 +602,6 @@ Latency Counting instantiate_fifo
 Instantiating inference_edge_case
 Concrete Typechecking inference_edge_case
 Latency Counting inference_edge_case
+Instantiating specified_latencies_not_ports_edge_case
+Concrete Typechecking specified_latencies_not_ports_edge_case
+Latency Counting specified_latencies_not_ports_edge_case

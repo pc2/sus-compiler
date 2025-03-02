@@ -1651,6 +1651,41 @@ mod tests {
     }
 
     #[test]
+    fn test_can_infer_through_specified_latencies() {
+        /*
+            0 -------- 3
+             \        /
+              1'0    2'5
+        */
+        let fanins: [&[FanInOut]; 4] = [
+            /*0*/ &[],
+            /*1*/ &[mk_fan(0, 0)],
+            /*2*/ &[],
+            /*3*/ &[mk_fan(0, 0), mk_fan(2, 0)],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+
+        let inputs = [0];
+        let outputs = [3];
+        let specified_latencies = [
+            SpecifiedLatency {
+                node: 1,
+                latency: 0,
+            },
+            SpecifiedLatency {
+                node: 2,
+                latency: 5,
+            },
+        ];
+
+        let found_latencies =
+            solve_latencies_test_case(&fanins, &inputs, &outputs, &specified_latencies).unwrap();
+
+        let correct_latencies = [0, 0, 5, 5];
+        assert_latencies_match_exactly(&found_latencies, &correct_latencies);
+    }
+
+    #[test]
     /// Checks that poison values properly propagate
     fn test_poison_edges() {
         let fanins: [&[FanInOut]; 7] = [

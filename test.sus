@@ -1202,3 +1202,13 @@ module inference_edge_case {
 
 	b = y(loose_inbetween)
 }
+
+module specified_latencies_not_ports_edge_case {
+	interface specified_latencies_not_ports_edge_case: bool in_port -> bool out_port
+
+	bool in_spec'0 = in_port
+
+	bool out_spec'5 = false
+
+	out_port = out_spec | in_port
+}

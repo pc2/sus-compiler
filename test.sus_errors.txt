@@ -1511,3 +1511,19 @@ Error: Could not fully instantiate ::infer_me #(
     A: /* Could not infer */
 )
 ──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[test.sus:1209:7]
+      │
+ 1209 │     bool in_spec'0 = in_port
+      │          ───┬───  
+      │             ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Cannot determine port latency. Options are 5 and 0
+Try specifying an explicit latency or rework the module to remove this ambiguity
+      ╭─[test.sus:1207:74]
+      │
+ 1207 │     interface specified_latencies_not_ports_edge_case: bool in_port -> bool out_port
+      │                                                                             ────┬───  
+      │                                                                                 ╰───── Cannot determine port latency. Options are 5 and 0
+Try specifying an explicit latency or rework the module to remove this ambiguity
+──────╯
