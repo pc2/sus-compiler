@@ -1505,3 +1505,28 @@ Warning: Unused port 'data_out'
       │                                                    ────┬───  
       │                                                        ╰───── Port 'data_out' declared here
 ──────╯
+Error: Conflicting specified latency
+
+a'0
+-> x_x'0 (+0)
+-> loose_inbetween'2 (+2)
+-> y_x'2 (+0)
+-> b'4 (+2)
+
+But this was specified as b'3
+      ╭─[test.sus:1190:52]
+      │
+ 1190 │     interface inference_edge_case: bool a'0 -> bool b'3
+      │                                         ┬             ┬  
+      │                                         ╰──────────────── 'a' declared here
+      │                                                       │  
+      │                                                       ╰── Conflicting specified latency
+
+a'0
+-> x_x'0 (+0)
+-> loose_inbetween'2 (+2)
+-> y_x'2 (+0)
+-> b'4 (+2)
+
+But this was specified as b'3
+──────╯

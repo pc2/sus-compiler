@@ -1179,3 +1179,24 @@ module instantiate_fifo {
 	}
 }
 
+// This produces a graph much like this:
+// a'0-.     .- b'3
+//  \  1\  1/   /
+//   x?-- i --y?
+//
+// Annoyingly, with the current inference implementation, it will infer x *and* y to get A: 2, conflicting b'4 with the specified b'3
+// There is no good inference here, so we must forbid inferring
+module inference_edge_case {
+	interface inference_edge_case: bool a'0 -> bool b'3
+
+	reg bool a_d = a
+
+	// infer_me #(A: 2) x
+	infer_me x
+	infer_me y
+	bool loose_inbetween = x(a)
+	loose_inbetween = a_d
+	reg b = loose_inbetween
+
+	b = y(loose_inbetween)
+}
