@@ -1186,6 +1186,8 @@ module instantiate_fifo {
 //
 // Annoyingly, with the current inference implementation, it will infer x *and* y to get A: 2, conflicting b'4 with the specified b'3
 // There is no good inference here, so we must forbid inferring
+// 
+// IDEA: Do real ports first, then use the found port values as "specified latencies" and infer submodules using ports method in a *second* run. 
 module inference_edge_case {
 	interface inference_edge_case: bool a'0 -> bool b'3
 

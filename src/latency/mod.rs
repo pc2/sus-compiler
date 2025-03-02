@@ -179,7 +179,7 @@ impl InstantiationContext<'_, '_> {
 
                         if w.specified_latency != CALCULATE_LATENCY_LATER {
                             initial_values.push(SpecifiedLatency {
-                                wire: new_idx,
+                                node: new_idx,
                                 latency: w.specified_latency,
                             });
                         }
@@ -427,6 +427,7 @@ impl InstantiationContext<'_, '_> {
             let _result = infer_unknown_latency_edges(
                 &fanins,
                 &domain_info.ports,
+                &domain_inference_info.inference_ports,
                 &domain_info.initial_values,
                 &domain_inference_info.inference_edges,
                 &mut latency_inference_variables,
@@ -465,9 +466,9 @@ impl InstantiationContext<'_, '_> {
         let mut connection_list = Vec::new();
         for window in conflict_iter.windows(2) {
             let [from, to] = window else { unreachable!() };
-            let from_wire_id = latency_node_meanings[from.wire];
+            let from_wire_id = latency_node_meanings[from.node];
             //let from_wire = &self.wires[from_wire_id];
-            let to_wire_id = latency_node_meanings[to.wire];
+            let to_wire_id = latency_node_meanings[to.node];
             let to_wire = &self.wires[to_wire_id];
             let RealWireDataSource::Multiplexer {
                 is_state: _,
@@ -576,9 +577,9 @@ impl InstantiationContext<'_, '_> {
             }
             LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path } => {
                 let start_wire =
-                    &self.wires[latency_node_meanings[conflict_path.first().unwrap().wire]];
+                    &self.wires[latency_node_meanings[conflict_path.first().unwrap().node]];
                 let end_wire =
-                    &self.wires[latency_node_meanings[conflict_path.last().unwrap().wire]];
+                    &self.wires[latency_node_meanings[conflict_path.last().unwrap().node]];
                 let start_decl = self.md.link_info.instructions[start_wire.original_instruction]
                     .unwrap_declaration();
                 let end_decl = self.md.link_info.instructions[end_wire.original_instruction]

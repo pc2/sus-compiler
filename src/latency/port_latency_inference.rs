@@ -11,7 +11,9 @@ use crate::flattening::{
     BinaryOperator, Instruction, Port, UnaryOperator, WireReference, WireReferenceRoot,
 };
 
-use super::latency_algorithm::{FanInOut, LatencyInferenceCandidate, ValueToInfer};
+use super::latency_algorithm::{
+    FanInOut, LatencyCountingPorts, LatencyInferenceCandidate, ValueToInfer,
+};
 
 /*/// ports whose latency annotations require them to be at fixed predefined offsets
 ///
@@ -357,11 +359,12 @@ pub struct InferenceEdgesForDomain {
 
 /// Gathers inference info per domain.
 ///
-/// So for each module, the parts of it's subdomains must be added
+/// So for each module, the parts of its subdomains must be added
 /// to the collector associated with the global domain this domain is connected to
 pub struct PerDomainInferenceInfo {
     pub inference_edges: Vec<LatencyInferenceCandidate>,
     pub extra_fanin: Vec<Vec<FanInOut>>,
+    pub inference_ports: LatencyCountingPorts,
 }
 
 impl PerDomainInferenceInfo {
@@ -369,6 +372,7 @@ impl PerDomainInferenceInfo {
         Self {
             inference_edges: Vec::new(),
             extra_fanin: vec![Vec::new(); num_latency_counting_nodes],
+            inference_ports: LatencyCountingPorts::default(),
         }
     }
 }
@@ -406,6 +410,8 @@ impl InferenceEdgesForDomain {
             }
         }
 
+        let mut port_has_been_visited = port_to_wire_map.map(|_| false);
+
         for (from, to, edge_info) in &self.edges {
             let (Some(from_node), Some(to_node)) = (port_to_node(*from), port_to_node(*to)) else {
                 continue; // Can't infer based on ports that aren't used
@@ -432,6 +438,17 @@ impl InferenceEdgesForDomain {
                             offset,
                             target_to_infer,
                         });
+
+                    if !std::mem::replace(&mut port_has_been_visited[*from], true) {
+                        this_domain_inference_info
+                            .inference_ports
+                            .push(from_node, false);
+                    }
+                    if !std::mem::replace(&mut port_has_been_visited[*to], true) {
+                        this_domain_inference_info
+                            .inference_ports
+                            .push(to_node, true);
+                    }
                 }
             }
         }
@@ -601,6 +618,7 @@ mod tests {
         infer_unknown_latency_edges(
             &fanins,
             &ports,
+            &domain_inference_info.inference_ports,
             &specified_latencies,
             &domain_inference_info.inference_edges,
             &mut values_to_infer,

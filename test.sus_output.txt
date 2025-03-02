@@ -596,19 +596,7 @@ Latency Counting infer_me
 Latency Counting infer_from_local_context
 Instantiating instantiate_fifo
 Concrete Typechecking instantiate_fifo
-Instantiating FIFO
-Concrete Typechecking FIFO
-Instantiating CrossDomain
-Concrete Typechecking CrossDomain
-Latency Counting CrossDomain
-Instantiating LatencyOffset
-Concrete Typechecking LatencyOffset
-Latency Counting LatencyOffset
-Latency Counting FIFO
 Latency Counting instantiate_fifo
 Instantiating inference_edge_case
 Concrete Typechecking inference_edge_case
-Instantiating infer_me
-Concrete Typechecking infer_me
-Latency Counting infer_me
 Latency Counting inference_edge_case

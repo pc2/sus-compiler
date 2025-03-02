@@ -1460,73 +1460,54 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │               ────┬───  
       │                   ╰───── Interface 'infer_me' defined here
 ──────╯
-Warning: Unused port 'pop'
+Error: Could not fully instantiate ::FIFO #(
+    T: type ::int,
+    DEPTH: 30,
+    READY_SLACK: /* Could not infer */
+)
+      ╭─[test.sus:1172:20]
+      │
+ 1172 │     FIFO #(DEPTH: 30) fifo
+      │                       ──┬─  
+      │                         ╰─── Could not fully instantiate ::FIFO #(
+    T: type ::int,
+    DEPTH: 30,
+    READY_SLACK: /* Could not infer */
+)
+──────╯
+Error: Latency Counting couldn't reach this node
+      ╭─[test.sus:1178:13]
+      │
+ 1178 │        fifo.push(true, heavy_computation)
+      │                  ──┬─  
+      │                    ╰─── Latency Counting couldn't reach this node
+──────╯
+Error: Latency Counting couldn't reach this node
       ╭─[test.sus:1172:2]
       │
  1172 │     FIFO #(DEPTH: 30) fifo
-      │     ────────┬──────── ──┬─  
-      │             ╰─────────────── Unused port 'pop'
-      │                         │   
-      │                         ╰─── fifo declared here
-      │
-      ├─[util.sus:40:23]
-      │
-   40 │     interface pop : bool pop -> bool data_valid, T data_out
-      │                          ─┬─  
-      │                           ╰─── Port 'pop' declared here
+      │     ────────┬────────  
+      │             ╰────────── Latency Counting couldn't reach this node
 ──────╯
-Warning: Unused port 'data_valid'
-      ╭─[test.sus:1172:2]
+Error: Could not fully instantiate ::infer_me #(
+    A: /* Could not infer */
+)
+      ╭─[test.sus:1197:11]
       │
- 1172 │     FIFO #(DEPTH: 30) fifo
-      │     ────────┬──────── ──┬─  
-      │             ╰─────────────── Unused port 'data_valid'
-      │                         │   
-      │                         ╰─── fifo declared here
-      │
-      ├─[util.sus:40:35]
-      │
-   40 │     interface pop : bool pop -> bool data_valid, T data_out
-      │                                      ─────┬────  
-      │                                           ╰────── Port 'data_valid' declared here
+ 1197 │     infer_me x
+      │              ┬  
+      │              ╰── Could not fully instantiate ::infer_me #(
+    A: /* Could not infer */
+)
 ──────╯
-Warning: Unused port 'data_out'
-      ╭─[test.sus:1172:2]
+Error: Could not fully instantiate ::infer_me #(
+    A: /* Could not infer */
+)
+      ╭─[test.sus:1198:11]
       │
- 1172 │     FIFO #(DEPTH: 30) fifo
-      │     ────────┬──────── ──┬─  
-      │             ╰─────────────── Unused port 'data_out'
-      │                         │   
-      │                         ╰─── fifo declared here
-      │
-      ├─[util.sus:40:49]
-      │
-   40 │     interface pop : bool pop -> bool data_valid, T data_out
-      │                                                    ────┬───  
-      │                                                        ╰───── Port 'data_out' declared here
-──────╯
-Error: Conflicting specified latency
-
-a'0
--> x_x'0 (+0)
--> loose_inbetween'2 (+2)
--> y_x'2 (+0)
--> b'4 (+2)
-
-But this was specified as b'3
-      ╭─[test.sus:1190:52]
-      │
- 1190 │     interface inference_edge_case: bool a'0 -> bool b'3
-      │                                         ┬             ┬  
-      │                                         ╰──────────────── 'a' declared here
-      │                                                       │  
-      │                                                       ╰── Conflicting specified latency
-
-a'0
--> x_x'0 (+0)
--> loose_inbetween'2 (+2)
--> y_x'2 (+0)
--> b'4 (+2)
-
-But this was specified as b'3
+ 1198 │     infer_me y
+      │              ┬  
+      │              ╰── Could not fully instantiate ::infer_me #(
+    A: /* Could not infer */
+)
 ──────╯
