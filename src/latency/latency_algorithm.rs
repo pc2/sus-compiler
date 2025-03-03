@@ -511,12 +511,16 @@ impl LatencyCountingPorts {
 struct PortLatencyCandidate {
     wire: usize,
     latency_proposal: Option<i64>,
+    /// We must not use the specified latencies pass-through when the source port itself was not found by the specified latencies themselves.
+    /// Othewise we miss out on possibilities of detecting bad ports because it's hidden by the specified latencies.
+    found_by_specified_latencies: bool,
     is_input: bool,
 }
 
 fn inform_all_ports(
     ports: &mut [PortLatencyCandidate],
     working_latencies: &[LatencyNode],
+    found_by_specified_latencies: bool,
 ) -> Result<(), LatencyCountingError> {
     let mut bad_ports = Vec::new();
     for p in ports {
@@ -534,6 +538,7 @@ fn inform_all_ports(
                 }
             }
         }
+        p.found_by_specified_latencies |= found_by_specified_latencies;
     }
     if bad_ports.is_empty() {
         Ok(())
@@ -555,8 +560,8 @@ fn solve_latencies_for_ports(
     let specified_latencies_backward =
         LatencyNode::make_solution_and_count_latencies(fanins, specified_latencies, true);
 
-    inform_all_ports(ports_to_place, &specified_latencies_forward)?;
-    inform_all_ports(ports_to_place, &specified_latencies_backward)?;
+    inform_all_ports(ports_to_place, &specified_latencies_forward, true)?;
+    inform_all_ports(ports_to_place, &specified_latencies_backward, true)?;
 
     /// Finds a port in the given list that has a defined latency, remove it from the ports list and return it
     ///
@@ -577,10 +582,18 @@ fn solve_latencies_for_ports(
         };
         result.push(new_specified_latency);
 
-        let (mut working_latencies, backwards, fans) = if chosen_port.is_input {
-            (specified_latencies_forward.clone(), false, fanouts)
+        let (latencies_source, backwards, fans) = if chosen_port.is_input {
+            (&specified_latencies_forward, false, fanouts)
         } else {
-            (specified_latencies_backward.clone(), true, fanins)
+            (&specified_latencies_backward, true, fanins)
+        };
+
+        // We may only involve the specified latencies if the fanout of the port would actually "go through" the specified latency nodes.
+        // Otherwise, we can't use them, since that might cause badly specified ports not to be detected
+        let mut working_latencies = if chosen_port.found_by_specified_latencies {
+            latencies_source.clone()
+        } else {
+            vec![LatencyNode::UNSET; fanins.len()]
         };
 
         working_latencies[new_specified_latency.node] =
@@ -588,7 +601,7 @@ fn solve_latencies_for_ports(
 
         count_latency(&mut working_latencies, fans, chosen_port.wire, backwards);
 
-        inform_all_ports(ports_to_place, &working_latencies)?;
+        inform_all_ports(ports_to_place, &working_latencies, false)?;
     }
 
     Ok(result)
@@ -691,6 +704,7 @@ fn solve_port_latencies(
                 .then_some(PortLatencyCandidate {
                     wire,
                     latency_proposal: None,
+                    found_by_specified_latencies: false,
                     is_input: idx < ports.outputs_start_at,
                 })
         })
@@ -1175,7 +1189,8 @@ mod tests {
         for starting_node in 0..7 {
             println!("starting_node: {starting_node}");
 
-            if starting_node == 5 {
+            // Apparently this edge case was fixed by including the specified latencies in future port traversals. Who could've predicted that???
+            /*if starting_node == 5 {
                 let err = solve_latencies_test_case(
                     &fanins,
                     &inputs,
@@ -1190,7 +1205,7 @@ mod tests {
                     unreachable!("{err:?}")
                 };
                 continue;
-            }
+            }*/
             let found_latencies = solve_latencies_test_case(
                 &fanins,
                 &inputs,
