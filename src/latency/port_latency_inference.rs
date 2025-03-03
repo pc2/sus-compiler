@@ -616,7 +616,7 @@ mod tests {
         let specified_latencies = [];
 
         infer_unknown_latency_edges(
-            &fanins,
+            fanins,
             &ports,
             &domain_inference_info.inference_ports,
             &specified_latencies,

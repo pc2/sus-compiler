@@ -662,7 +662,9 @@ impl<T, IndexMarker> IndexMut<UUID<IndexMarker>> for FlatAlloc<T, IndexMarker> {
 
 impl<T: Debug, IndexMarker> Debug for FlatAlloc<T, IndexMarker> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        self.data.fmt(f)
+        f.write_str("FlatAlloc::from_vec(vec!")?;
+        self.data.fmt(f)?;
+        f.write_str(")")
     }
 }
 

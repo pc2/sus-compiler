@@ -332,7 +332,7 @@ impl InstantiationContext<'_, '_> {
                 &vec![Vec::new(); domain_info.latency_node_meanings.len()], // TODO quick work, should be cleaned up
             );
 
-            match solve_latencies(&fanins, &domain_info.ports, &domain_info.initial_values) {
+            match solve_latencies(fanins, &domain_info.ports, &domain_info.initial_values) {
                 Ok(latencies) => {
                     for (node, lat) in
                         zip(domain_info.latency_node_meanings.iter(), latencies.iter())
@@ -425,7 +425,7 @@ impl InstantiationContext<'_, '_> {
 
             // We don't need to report the error, they'll bubble up later anyway during [solve_latencies]
             let _result = infer_unknown_latency_edges(
-                &fanins,
+                fanins,
                 &domain_info.ports,
                 &domain_inference_info.inference_ports,
                 &domain_info.initial_values,
