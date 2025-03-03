@@ -138,12 +138,11 @@ impl LatencyNode {
         }
         result
     }
-    fn make_solution_forwards_then_backwards(
-        fanins: &ListOfLists<FanInOut>,
+    fn make_solution_and_count_latencies(
         fanouts: &ListOfLists<FanInOut>,
         specified_latencies: &[SpecifiedLatency],
+        backwards: bool,
     ) -> Vec<LatencyNode> {
-        let mut stack = Vec::new();
         let mut latencies =
             LatencyNode::make_initial_latency_solution(fanouts.len(), specified_latencies);
 
@@ -151,8 +150,18 @@ impl LatencyNode {
         for seed in specified_latencies {
             assert!(latencies[seed.node].pinned);
 
-            count_latency(&mut latencies, fanouts, seed.node, &mut stack, false);
+            count_latency(&mut latencies, fanouts, seed.node, backwards);
         }
+
+        latencies
+    }
+    fn make_solution_forwards_then_backwards(
+        fanins: &ListOfLists<FanInOut>,
+        fanouts: &ListOfLists<FanInOut>,
+        specified_latencies: &[SpecifiedLatency],
+    ) -> Vec<LatencyNode> {
+        let mut latencies =
+            LatencyNode::make_solution_and_count_latencies(fanouts, specified_latencies, false);
 
         // So, we've got all the foward latencies starting from the given nodes.
         // Now we also want to add the backwards latencies, but only those in the fanin of the seeds
@@ -166,6 +175,7 @@ impl LatencyNode {
                 }
             })
             .collect();
+
         while let Some(top) = stack.last_mut() {
             let Some(&FanInOut {
                 to_node,
@@ -190,7 +200,7 @@ impl LatencyNode {
         // Finally we add in the backwards latencies.
         for idx in 0..latencies.len() {
             if latencies[idx].pinned {
-                count_latency(&mut latencies, fanins, idx, &mut stack, true);
+                count_latency(&mut latencies, fanins, idx, true);
             }
         }
 
@@ -425,21 +435,18 @@ fn find_net_positive_latency_cycles_and_incompatible_specified_latencies(
 /// Requires working_latencies[start_node].pinned == true
 ///
 /// Leaves working_latencies[start_node].pinned == true
-fn count_latency<'d>(
+fn count_latency(
     working_latencies: &mut [LatencyNode],
-    fanouts: &'d ListOfLists<FanInOut>,
+    fanouts: &ListOfLists<FanInOut>,
     start_node: usize,
-    stack: &mut Vec<LatencyStackElem<'d>>,
     backwards: bool,
 ) {
     assert!(working_latencies[start_node].is_valid_and_pinned());
 
-    assert!(stack.is_empty());
-
-    stack.push(LatencyStackElem {
+    let mut stack = vec![LatencyStackElem {
         node: start_node,
         remaining_fanout: fanouts[start_node].iter(),
-    });
+    }];
 
     while let Some(top) = stack.last_mut() {
         let from = &mut working_latencies[top.node];
@@ -535,14 +542,6 @@ fn inform_all_ports(
     }
 }
 
-fn clear_unpinned_latencies(working_latencies: &mut [LatencyNode]) {
-    for l in working_latencies {
-        if !l.pinned {
-            *l = LatencyNode::UNSET;
-        }
-    }
-}
-
 /// Constructs a new vector of specified latencies, from the given specified latencies, extended with any ports it could find.
 fn solve_latencies_for_ports(
     fanins: &ListOfLists<FanInOut>,
@@ -550,27 +549,14 @@ fn solve_latencies_for_ports(
     ports_to_place: &mut Vec<PortLatencyCandidate>,
     specified_latencies: &[SpecifiedLatency],
 ) -> Result<Vec<SpecifiedLatency>, LatencyCountingError> {
-    // This stack is reused by [count_latency] calls to reduce memory allocations
-    let mut stack = Vec::new();
-
-    let mut working_latencies =
-        LatencyNode::make_initial_latency_solution(fanouts.len(), &specified_latencies);
-
     // First forward run from the initial latency assignment to discover other ports
-    for (backwards, fans) in [(false, fanouts), (true, fanins)] {
-        for start_node in specified_latencies {
-            count_latency(
-                &mut working_latencies,
-                fans,
-                start_node.node,
-                &mut stack,
-                backwards,
-            );
-        }
+    let specified_latencies_forward =
+        LatencyNode::make_solution_and_count_latencies(fanouts, specified_latencies, false);
+    let specified_latencies_backward =
+        LatencyNode::make_solution_and_count_latencies(fanins, specified_latencies, true);
 
-        inform_all_ports(ports_to_place, &working_latencies)?;
-        clear_unpinned_latencies(&mut working_latencies);
-    }
+    inform_all_ports(ports_to_place, &specified_latencies_forward)?;
+    inform_all_ports(ports_to_place, &specified_latencies_backward)?;
 
     /// Finds a port in the given list that has a defined latency, remove it from the ports list and return it
     ///
@@ -591,24 +577,18 @@ fn solve_latencies_for_ports(
         };
         result.push(new_specified_latency);
 
+        let (mut working_latencies, backwards, fans) = if chosen_port.is_input {
+            (specified_latencies_forward.clone(), false, fanouts)
+        } else {
+            (specified_latencies_backward.clone(), true, fanins)
+        };
+
         working_latencies[new_specified_latency.node] =
             LatencyNode::new_pinned(new_specified_latency.latency);
 
-        let (backwards, fans) = if chosen_port.is_input {
-            (false, fanouts)
-        } else {
-            (true, fanins)
-        };
-        count_latency(
-            &mut working_latencies,
-            fans,
-            chosen_port.wire,
-            &mut stack,
-            backwards,
-        );
+        count_latency(&mut working_latencies, fans, chosen_port.wire, backwards);
 
         inform_all_ports(ports_to_place, &working_latencies)?;
-        clear_unpinned_latencies(&mut working_latencies);
     }
 
     Ok(result)
@@ -694,7 +674,7 @@ fn solve_port_latencies(
     assert!(fanins.len() >= 1);
 
     find_net_positive_latency_cycles_and_incompatible_specified_latencies(
-        &specified_latencies,
+        specified_latencies,
         fanouts,
     )?;
 
@@ -759,7 +739,7 @@ pub fn solve_latencies(
     // Cannot call config from a test case. See https://users.rust-lang.org/t/cargo-test-name-errors-with-error-invalid-value-name-for-files-file-does-not-exist/125855
     #[cfg(not(test))]
     if crate::config::config().debug_print_latency_graph {
-        print_latency_test_case(fanins, ports, &specified_latencies);
+        print_latency_test_case(fanins, ports, specified_latencies);
     }
 
     if fanins.len() == 0 {
@@ -921,7 +901,7 @@ pub fn infer_unknown_latency_edges<ID>(
     // Cannot call config from a test case. See https://users.rust-lang.org/t/cargo-test-name-errors-with-error-invalid-value-name-for-files-file-does-not-exist/125855
     #[cfg(not(test))]
     if crate::config::config().debug_print_latency_graph {
-        print_latency_test_case(fanins, ports, &specified_latencies);
+        print_latency_test_case(fanins, ports, specified_latencies);
         println!("{inference_candidates:?}")
     }
 
@@ -1194,6 +1174,7 @@ mod tests {
 
         for starting_node in 0..7 {
             println!("starting_node: {starting_node}");
+
             if starting_node == 5 {
                 let err = solve_latencies_test_case(
                     &fanins,
@@ -1301,6 +1282,11 @@ mod tests {
 
     #[test]
     fn check_conflicting_port_latency_with_any_starting_node_does_error() {
+        /*
+            i0 - 1 - 2 - 3o
+                  \ /
+              i4 - 5 - 6o
+        */
         let fanins: [&[FanInOut]; 7] = [
             /*0*/ &[],
             /*1*/ &[mk_fan(0, 0)],
