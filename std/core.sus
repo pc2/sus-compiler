@@ -28,6 +28,9 @@ __builtin__ struct bool {}
 // An integer of variable size. Right now it's not implemented yet, so this is just a 32-bit int. 
 __builtin__ struct int {}
 
+// Single precision IEEE 32-bit float. Operators are definted externally, but it's defined here for convenience. 
+__builtin__ struct float {}
+
 // For intentionally triggering an ICE for debugging. It is a constant that crashes the compiler when it is evaluated
 __builtin__ const bool __crash_compiler {}
 

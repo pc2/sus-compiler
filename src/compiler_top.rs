@@ -53,6 +53,10 @@ impl Linker {
         // Critically, std/core.sus MUST be the first file to be loaded into the linker. Otherwise the IDs don't point to the correct objects
         assert_eq!(self.types[get_builtin_type!("int")].link_info.name, "int");
         assert_eq!(self.types[get_builtin_type!("bool")].link_info.name, "bool");
+        assert_eq!(
+            self.types[get_builtin_type!("float")].link_info.name,
+            "float"
+        );
 
         assert_eq!(
             self.constants[get_builtin_const!("true")].link_info.name,

@@ -98,6 +98,8 @@ impl ConcreteType {
             32 // TODO concrete int sizes
         } else if type_ref.id == get_builtin_type!("bool") {
             1
+        } else if type_ref.id == get_builtin_type!("float") {
+            32
         } else {
             println!("TODO Named Structs Size");
             1 // todo!() // Named structs are not implemented yet
