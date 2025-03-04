@@ -4,6 +4,7 @@ TREE SITTER module! IntToBits
 TREE SITTER module! BitsToInt
 TREE SITTER module! bool
 TREE SITTER module! int
+TREE SITTER module! float
 TREE SITTER module! __crash_compiler
 TREE SITTER module! true
 TREE SITTER module! false
