@@ -589,21 +589,15 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstr
     }
 
     fn report_could_not_resolve_error(&self, context: &InstantiationContext<'_, '_>) {
+        let mut left_fully_substituted = context.wires[self.left].typ.clone();
+        left_fully_substituted.fully_substitute(&context.type_substitutor);
+        let mut right_fully_substituted = context.wires[self.right].typ.clone();
+        right_fully_substituted.fully_substitute(&context.type_substitutor);
+        let mut out_fully_substituted = context.wires[self.out].typ.clone();
+        out_fully_substituted.fully_substitute(&context.type_substitutor);
         let message = format!(
             "Failed to Typecheck {:?} = {:?} {} {:?}",
-            context.wires[self.out]
-                .typ
-                .clone()
-                .fully_substitute(&context.type_substitutor),
-            context.wires[self.right]
-                .typ
-                .clone()
-                .fully_substitute(&context.type_substitutor),
-            self.op,
-            context.wires[self.left]
-                .typ
-                .clone()
-                .fully_substitute(&context.type_substitutor)
+            out_fully_substituted, left_fully_substituted, self.op, right_fully_substituted,
         );
 
         context.errors.error(self.span, message);
