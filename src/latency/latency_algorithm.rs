@@ -88,6 +88,14 @@ impl ListOfLists<FanInOut> {
             ),
         )
     }
+    fn add_extra_fanin_and_specified_latencies(
+        self,
+        mut extra_fanin: Vec<(usize, FanInOut)>,
+        specified_latencies: &[SpecifiedLatency],
+    ) -> Self {
+        add_cycle_to_extra_fanin(specified_latencies, &mut extra_fanin);
+        self.extend_lists_with_new_elements(extra_fanin)
+    }
 }
 
 /// ONLY RUN ON FANINS
@@ -743,14 +751,13 @@ struct PartialLatencyCountingSolution {
     ///
     /// All other nodes must be [LatencyNode::UNSET]
     latencies: Vec<LatencyNode>,
-    seeds: Vec<SpecifiedLatency>,
     conflicting_nodes: Vec<(usize, i64)>, // Node, and the desired latency of the conflict
 }
 
 impl PartialLatencyCountingSolution {
-    fn offset_to_pin_node_to(&mut self, node: usize, desired_value: i64) {
-        let existing_latency_of_node = self.latencies[node].get_maybe().unwrap();
-        let offset = desired_value - existing_latency_of_node;
+    fn offset_to_pin_node_to(&mut self, spec_lat: SpecifiedLatency) {
+        let existing_latency_of_node = self.latencies[spec_lat.node].get_maybe().unwrap();
+        let offset = spec_lat.latency - existing_latency_of_node;
         if offset == 0 {
             return; // Early exit, no change needed
         }
@@ -771,68 +778,22 @@ fn solve_port_latencies(
     fanins: &ListOfLists<FanInOut>,
     fanouts: &ListOfLists<FanInOut>,
     ports: &LatencyCountingPorts,
-    specified_latencies: &[SpecifiedLatency],
 ) -> Result<Vec<Vec<SpecifiedLatency>>, LatencyCountingError> {
-    assert!(fanins.len() >= 1);
-
-    find_net_positive_latency_cycles_and_incompatible_specified_latencies(
-        specified_latencies,
-        fanouts,
-    )?;
-
     // This list contains all ports that still need to be placed. This list gathers port assignments as they happen,
     // and reports errors if port conflicts arise
-    let mut ports_to_place: Vec<PortLatencyCandidate> = ports // Only ports that don't already have their latency explicitly specified must of course still be figured out
+    let mut ports_to_place: Vec<PortLatencyCandidate> = ports
         .port_nodes
         .iter()
         .enumerate()
-        .filter_map(|(idx, &wire)| {
-            specified_latencies // Number of specified latencies is tiny. O(N²) is no biggie
-                .iter()
-                .all(|spec_lat| spec_lat.node != wire)
-                .then_some(PortLatencyCandidate {
-                    wire,
-                    latency_proposal: None,
-                    found_by_specified_latencies: false,
-                    is_input: idx < ports.outputs_start_at,
-                })
+        .map(|(idx, &wire)| PortLatencyCandidate {
+            wire,
+            latency_proposal: None,
+            found_by_specified_latencies: false,
+            is_input: idx < ports.outputs_start_at,
         })
         .collect();
 
-    // First the partial solution for the specified latencies
-    let mut all_partial_solutions: Vec<Vec<SpecifiedLatency>> = Vec::new();
-    if !specified_latencies.is_empty() {
-        all_partial_solutions.push(solve_latencies_for_ports(
-            fanins,
-            fanouts,
-            &mut ports_to_place,
-            specified_latencies,
-        )?);
-    }
-
-    add_remaining_partial_port_solutions(
-        fanins,
-        fanouts,
-        ports_to_place,
-        &mut all_partial_solutions,
-    )?;
-
-    if all_partial_solutions.is_empty() {
-        all_partial_solutions.push(vec![SpecifiedLatency {
-            node: 0,
-            latency: 0,
-        }]);
-    }
-
-    Ok(all_partial_solutions)
-}
-
-fn add_remaining_partial_port_solutions(
-    fanins: &ListOfLists<FanInOut>,
-    fanouts: &ListOfLists<FanInOut>,
-    mut ports_to_place: Vec<PortLatencyCandidate>,
-    all_partial_solutions: &mut Vec<Vec<SpecifiedLatency>>,
-) -> Result<(), LatencyCountingError> {
+    let mut all_partial_solutions = Vec::new();
     while let Some(found_port) = (!ports_to_place.is_empty()).then(|| ports_to_place.remove(0)) {
         all_partial_solutions.push(solve_latencies_for_ports(
             fanins,
@@ -844,15 +805,24 @@ fn add_remaining_partial_port_solutions(
             }],
         )?);
     }
-    Ok(())
+    Ok(all_partial_solutions)
 }
 
 /// Solves the whole latency counting problem. No inference
 pub fn solve_latencies(
     fanins: ListOfLists<FanInOut>,
+    extra_fanin: Vec<(usize, FanInOut)>,
     ports: &LatencyCountingPorts,
     specified_latencies: &[SpecifiedLatency],
 ) -> Result<Vec<LatencyNode>, LatencyCountingError> {
+    let fanouts = fanins.faninout_complement();
+    find_net_positive_latency_cycles_and_incompatible_specified_latencies(
+        specified_latencies,
+        &fanouts,
+    )?;
+
+    let fanins = fanins.add_extra_fanin_and_specified_latencies(extra_fanin, specified_latencies);
+
     // Cannot call config from a test case. See https://users.rust-lang.org/t/cargo-test-name-errors-with-error-invalid-value-name-for-files-file-does-not-exist/125855
     #[cfg(not(test))]
     if crate::config::config().debug_print_latency_graph {
@@ -867,8 +837,14 @@ pub fn solve_latencies(
     debug_assert!(!has_poison_edge(&fanins));
     debug_assert!(!has_poison_edge(&fanouts)); // Equivalent
 
-    let partial_solutions = solve_port_latencies(&fanins, &fanouts, ports, specified_latencies)?;
-    assert!(!partial_solutions.is_empty());
+    let mut partial_solutions = solve_port_latencies(&fanins, &fanouts, ports)?;
+
+    if partial_solutions.is_empty() {
+        partial_solutions.push(vec![SpecifiedLatency {
+            node: 0,
+            latency: 0,
+        }]);
+    }
 
     let mut partial_solutions: Vec<PartialLatencyCountingSolution> = partial_solutions
         .into_iter()
@@ -876,7 +852,6 @@ pub fn solve_latencies(
             latencies: LatencyNode::make_solution_forwards_then_backwards(
                 &fanins, &fanouts, &seeds,
             ),
-            seeds,
             conflicting_nodes: Vec::new(),
         })
         .collect();
@@ -885,9 +860,36 @@ pub fn solve_latencies(
         merge_partial_solutions(&fanins, &mut partial_solutions);
     }
 
+    // Polish solution: if there were no specified latencies, then we make the latency of the first port '0
+    // This is to shift the whole solution to one canonical absolute latency. Prefer:
+    // - Specified latencies
+    // - First port = '0
+    // - Node 0 = '0
+    let pinned_node = if let Some(spec) = specified_latencies.first() {
+        *spec
+    } else {
+        SpecifiedLatency {
+            node: *ports.port_nodes.first().unwrap_or(&0),
+            latency: 0,
+        }
+    };
+
+    let mut was_found = false;
+    for psol in &mut partial_solutions {
+        if !psol.latencies[pinned_node.node].is_unset() {
+            assert!(
+                !was_found,
+                "The non-merged partial solutions are of course fully disjoint"
+            );
+            was_found = true;
+            psol.offset_to_pin_node_to(pinned_node);
+        }
+    }
+    assert!(was_found);
+
     let mut solution_iter = partial_solutions.into_iter();
 
-    let mut first_solution = solution_iter.next().unwrap();
+    let first_solution = solution_iter.next().unwrap();
 
     if solution_iter.next().is_some() {
         // More than one unmerged solution remaining. Must assert that there's missing nodes in the first solution
@@ -895,12 +897,6 @@ pub fn solve_latencies(
     }
 
     if first_solution.conflicting_nodes.is_empty() {
-        // Polish solution: if there were no specified latencies, then we make the latency of the first port '0
-        if let (true, Some(first_port)) =
-            (first_solution.seeds.is_empty(), ports.port_nodes.first())
-        {
-            first_solution.offset_to_pin_node_to(*first_port, 0);
-        }
         Ok(first_solution.latencies)
     } else {
         Err(LatencyCountingError::PartialSolutionMergeConflict {
@@ -937,7 +933,10 @@ fn merge_partial_solutions(
 
                     let merge_into = &mut partial_solutions[target_idx]; // Okay, because target_idx will always be smaller than partial_solution_idx
 
-                    merge_from.offset_to_pin_node_to(node, to_latency);
+                    merge_from.offset_to_pin_node_to(SpecifiedLatency {
+                        node,
+                        latency: to_latency,
+                    });
                     merge_into
                         .conflicting_nodes
                         .append(&mut merge_from.conflicting_nodes);
@@ -1018,7 +1017,10 @@ pub fn infer_unknown_latency_edges<ID>(
     partial_submodule_info: PartialSubmoduleInfo,
     values_to_infer: &mut FlatAlloc<ValueToInfer<ID>, LatencyCountInferenceVarIDMarker>,
 ) -> Result<(), LatencyCountingError> {
-    let fanins = fanins.extend_lists_with_new_elements(partial_submodule_info.extra_fanin);
+    let fanins = fanins.add_extra_fanin_and_specified_latencies(
+        partial_submodule_info.extra_fanin,
+        specified_latencies,
+    );
 
     // Cannot call config from a test case. See https://users.rust-lang.org/t/cargo-test-name-errors-with-error-invalid-value-name-for-files-file-does-not-exist/125855
     #[cfg(not(test))]
@@ -1051,8 +1053,7 @@ pub fn infer_unknown_latency_edges<ID>(
 
     let fanouts = fanins.faninout_complement();
 
-    let partial_solutions = solve_port_latencies(&fanins, &fanouts, ports, specified_latencies)?;
-    assert!(!partial_solutions.is_empty());
+    let partial_solutions = solve_port_latencies(&fanins, &fanouts, ports)?;
 
     let mut new_edges = Vec::new();
     for partial_sol in partial_solutions {
@@ -1067,25 +1068,8 @@ pub fn infer_unknown_latency_edges<ID>(
         print_latency_test_case(&fanins, &partial_submodule_info.inference_ports, &[]);
     }
 
-    let ports_to_place: Vec<PortLatencyCandidate> = partial_submodule_info
-        .inference_ports
-        .port_nodes
-        .iter()
-        .enumerate()
-        .map(|(idx, &wire)| PortLatencyCandidate {
-            wire,
-            latency_proposal: None,
-            found_by_specified_latencies: false,
-            is_input: idx < ports.outputs_start_at,
-        })
-        .collect();
-    let mut inference_port_solutions = Vec::new();
-    add_remaining_partial_port_solutions(
-        &fanins,
-        &fanouts,
-        ports_to_place,
-        &mut inference_port_solutions,
-    )?;
+    let inference_port_solutions =
+        solve_port_latencies(&fanins, &fanouts, &partial_submodule_info.inference_ports)?;
 
     for candidate in &partial_submodule_info.inference_edges {
         let mut infer_me = Some(&mut values_to_infer[candidate.target_to_infer]);
@@ -1165,7 +1149,7 @@ mod tests {
     ) -> Result<Vec<LatencyNode>, LatencyCountingError> {
         let ports = LatencyCountingPorts::from_inputs_outputs(inputs, outputs);
 
-        solve_latencies(fanins, &ports, specified_latencies)
+        solve_latencies(fanins, Vec::new(), &ports, specified_latencies)
     }
 
     /// Any node with no fanin is an input
@@ -1830,16 +1814,11 @@ mod tests {
 
         let inputs = [0, 1];
         let outputs = [6];
-        let specified_latencies = [SpecifiedLatency {
-            node: 0,
-            latency: 0,
-        }];
 
         let fanouts = fanins.faninout_complement();
 
         let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
-        let mut partial_solutions =
-            solve_port_latencies(&fanins, &fanouts, &ports, &specified_latencies).unwrap();
+        let mut partial_solutions = solve_port_latencies(&fanins, &fanouts, &ports).unwrap();
 
         assert_specified_latency_lists_match(
             &mut partial_solutions,
@@ -2261,10 +2240,12 @@ mod tests {
                 latency: 3,
             },
         ];
+        let fanins =
+            fanins.add_extra_fanin_and_specified_latencies(Vec::new(), &specified_latencies);
+
         let fanouts = fanins.faninout_complement();
         let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
-        let _partial_solutions =
-            solve_port_latencies(&fanins, &fanouts, &ports, &specified_latencies).unwrap();
+        let _partial_solutions = solve_port_latencies(&fanins, &fanouts, &ports).unwrap();
     }
 
     #[test]
@@ -2291,10 +2272,12 @@ mod tests {
                 latency: 3,
             },
         ];
+        let fanins =
+            fanins.add_extra_fanin_and_specified_latencies(Vec::new(), &specified_latencies);
+
         let fanouts = fanins.faninout_complement();
         let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
-        let _found_latencies =
-            solve_port_latencies(&fanins, &fanouts, &ports, &specified_latencies).unwrap();
+        let _found_latencies = solve_port_latencies(&fanins, &fanouts, &ports).unwrap();
     }
 
     #[test]

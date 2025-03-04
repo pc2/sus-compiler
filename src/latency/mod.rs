@@ -326,7 +326,13 @@ impl InstantiationContext<'_, '_> {
                 domain_id,
             );
 
-            match solve_latencies(fanins, &domain_info.ports, &domain_info.initial_values) {
+            // TODO: Should include the extra edges from partial submodules too.
+            match solve_latencies(
+                fanins,
+                Vec::new(),
+                &domain_info.ports,
+                &domain_info.initial_values,
+            ) {
                 Ok(latencies) => {
                     for (node, lat) in
                         zip(domain_info.latency_node_meanings.iter(), latencies.iter())
