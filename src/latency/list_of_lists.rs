@@ -49,26 +49,22 @@ impl<T> ListOfLists<T> {
     /// `element` is to be appended to the group at index `group`.
     ///
     /// new_values_iter MUST return elements in ascending group order.
-    pub fn extend_lists_with_new_elements(
-        self,
-        new_values_iter: impl Iterator<Item = (usize, T)>,
-    ) -> Self {
+    pub fn extend_lists_with_new_elements(self, mut new_edges: Vec<(usize, T)>) -> Self {
         assert!(*self.start_ends.first().unwrap() == 0);
         assert!(*self.start_ends.last().unwrap() == self.buf.len());
 
-        let mut new_buffer =
-            Vec::with_capacity(self.buf.capacity() + new_values_iter.size_hint().0);
+        // Sort by the groups
+        new_edges.sort_by_key(|g| g.0);
+
+        let mut new_buffer = Vec::with_capacity(self.buf.capacity() + new_edges.len());
 
         let mut start_ends = self.start_ends;
         let mut old_buffer_iterator = self.buf.into_iter();
 
-        let mut new_values_iter_peekable = new_values_iter.peekable();
+        let mut new_values_iter_peekable = new_edges.into_iter().peekable();
 
         let mut cur_start_in_new_buffer = 0;
         let num_groups = start_ends.len() - 1;
-
-        // For asserting the function is used properly
-        let mut previous_group = 0;
         for group_id in 0..num_groups {
             let old_count = start_ends[group_id + 1] - start_ends[group_id];
             // Copy over old elements
@@ -77,12 +73,6 @@ impl<T> ListOfLists<T> {
             }
             // Add new elements
             while let Some(v) = new_values_iter_peekable.next_if(|v| v.0 == group_id) {
-                assert!(
-                    previous_group <= v.0,
-                    "The new values iterator given was not sorted!"
-                );
-                previous_group = v.0;
-
                 new_buffer.push(v.1);
             }
             // Update start_ends
@@ -357,7 +347,7 @@ mod tests {
             &[9, 8, 7],
         ]);
 
-        let additional_sorted_elements = [(0, 101), (2, 200), (2, 300), (3, 103)];
+        let additional_elements = vec![(0, 101), (2, 200), (3, 103), (2, 300)];
 
         let expected = ListOfLists::from_slice_slice(&[
             &[1, 9, 5, 7, 101],
@@ -367,7 +357,7 @@ mod tests {
             &[9, 8, 7],
         ]);
 
-        let new = original.extend_lists_with_new_elements(additional_sorted_elements.into_iter());
+        let new = original.extend_lists_with_new_elements(additional_elements);
 
         assert!(new == expected);
     }

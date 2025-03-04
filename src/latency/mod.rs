@@ -14,9 +14,8 @@ use crate::value::Value;
 
 use latency_algorithm::{
     infer_unknown_latency_edges, solve_latencies, FanInOut, LatencyCountingError,
-    LatencyCountingPorts, SpecifiedLatency,
+    LatencyCountingPorts, PartialSubmoduleInfo, SpecifiedLatency,
 };
-use port_latency_inference::PerDomainInferenceInfo;
 
 use self::list_of_lists::ListOfLists;
 
@@ -264,17 +263,13 @@ impl InstantiationContext<'_, '_> {
         latency_node_mapper: &WireToLatencyMap,
         latency_node_to_wire_map: &[WireID],
         domain_id: DomainID,
-        extra_fanins: &[Vec<FanInOut>],
     ) -> ListOfLists<FanInOut> {
         let mut fanins: ListOfLists<FanInOut> =
             ListOfLists::new_with_groups_capacity(latency_node_to_wire_map.len());
 
         // Wire to wire Fanin
-        for (wire_id, extra_fanin) in zip(latency_node_to_wire_map.iter(), extra_fanins.iter()) {
+        for wire_id in latency_node_to_wire_map.iter() {
             fanins.new_group();
-            for f in extra_fanin {
-                fanins.push_to_last_group(*f);
-            }
 
             self.wires[*wire_id]
                 .source
@@ -329,7 +324,6 @@ impl InstantiationContext<'_, '_> {
                 &latency_node_mapper,
                 &domain_info.latency_node_meanings,
                 domain_id,
-                &vec![Vec::new(); domain_info.latency_node_meanings.len()], // TODO quick work, should be cleaned up
             );
 
             match solve_latencies(fanins, &domain_info.ports, &domain_info.initial_values) {
@@ -368,10 +362,9 @@ impl InstantiationContext<'_, '_> {
 
         let mut latency_inference_variables = FlatAlloc::new();
 
-        let mut domain_inference_infos =
-            latency_node_mapper.domain_infos.map(|(_domain_id, info)| {
-                PerDomainInferenceInfo::new(info.latency_node_meanings.len())
-            });
+        let mut domain_inference_infos = latency_node_mapper
+            .domain_infos
+            .map(|_| PartialSubmoduleInfo::default());
 
         for (sm_id, sm) in &self.submodules {
             if sm.instance.get().is_some() {
@@ -414,22 +407,20 @@ impl InstantiationContext<'_, '_> {
 
         for (domain_id, domain_info, domain_inference_info) in zip_eq(
             latency_node_mapper.domain_infos.iter(),
-            domain_inference_infos.iter(),
+            domain_inference_infos.into_iter(),
         ) {
             let fanins = self.make_fanins(
                 &latency_node_mapper,
                 &domain_info.latency_node_meanings,
                 domain_id,
-                &domain_inference_info.extra_fanin,
             );
 
             // We don't need to report the error, they'll bubble up later anyway during [solve_latencies]
             let _result = infer_unknown_latency_edges(
                 fanins,
                 &domain_info.ports,
-                &domain_inference_info.inference_ports,
                 &domain_info.initial_values,
-                &domain_inference_info.inference_edges,
+                domain_inference_info,
                 &mut latency_inference_variables,
             );
         }

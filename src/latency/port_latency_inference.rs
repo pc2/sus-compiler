@@ -12,7 +12,8 @@ use crate::flattening::{
 };
 
 use super::latency_algorithm::{
-    FanInOut, LatencyCountingPorts, LatencyInferenceCandidate, ValueToInfer,
+    add_cycle_to_extra_fanin, FanInOut, LatencyInferenceCandidate, PartialSubmoduleInfo,
+    SpecifiedLatency, ValueToInfer,
 };
 
 /*/// ports whose latency annotations require them to be at fixed predefined offsets
@@ -357,32 +358,12 @@ pub struct InferenceEdgesForDomain {
     edges: Vec<(PortID, PortID, EdgeInfo<LatencyCountInferenceVarID>)>,
 }
 
-/// Gathers inference info per domain.
-///
-/// So for each module, the parts of its subdomains must be added
-/// to the collector associated with the global domain this domain is connected to
-pub struct PerDomainInferenceInfo {
-    pub inference_edges: Vec<LatencyInferenceCandidate>,
-    pub extra_fanin: Vec<Vec<FanInOut>>,
-    pub inference_ports: LatencyCountingPorts,
-}
-
-impl PerDomainInferenceInfo {
-    pub fn new(num_latency_counting_nodes: usize) -> Self {
-        Self {
-            inference_edges: Vec::new(),
-            extra_fanin: vec![Vec::new(); num_latency_counting_nodes],
-            inference_ports: LatencyCountingPorts::default(),
-        }
-    }
-}
-
 impl InferenceEdgesForDomain {
     pub fn apply_to_global_domain(
         &self,
         port_to_wire_map: &FlatAlloc<Option<SubModulePort>, PortIDMarker>,
         wire_to_node_map: &FlatAlloc<usize, WireIDMarker>, // These mappings are just due to implementation details of instantiation
-        this_domain_inference_info: &mut PerDomainInferenceInfo,
+        this_domain_inference_info: &mut PartialSubmoduleInfo,
     ) {
         let port_to_node = |port: PortID| -> Option<usize> {
             port_to_wire_map[port]
@@ -391,23 +372,19 @@ impl InferenceEdgesForDomain {
         };
 
         for group in &self.port_groups {
-            let valid_port_nodes: Vec<(usize, i64)> = group
+            let valid_port_nodes: Vec<SpecifiedLatency> = group
                 .iter()
                 .filter_map(|(port, relative_latency)| {
-                    port_to_node(*port).map(|node| (node, *relative_latency))
+                    port_to_node(*port).map(|node| SpecifiedLatency {
+                        node,
+                        latency: *relative_latency,
+                    })
                 })
                 .collect();
-            if valid_port_nodes.len() <= 1 {
-                continue; // Port group has shrunk too small
-            }
-            let mut last_port_node = *valid_port_nodes.last().unwrap();
-            for p in valid_port_nodes {
-                this_domain_inference_info.extra_fanin[p.0].push(FanInOut {
-                    to_node: last_port_node.0, // Because it's fan-in
-                    delta_latency: Some(last_port_node.1 - p.1),
-                });
-                last_port_node = p;
-            }
+            add_cycle_to_extra_fanin(
+                &valid_port_nodes,
+                &mut this_domain_inference_info.extra_fanin,
+            );
         }
 
         let mut port_has_been_visited = port_to_wire_map.map(|_| false);
@@ -419,10 +396,13 @@ impl InferenceEdgesForDomain {
 
             match *edge_info {
                 EdgeInfo::Poison => {
-                    this_domain_inference_info.extra_fanin[to_node].push(FanInOut {
-                        to_node: from_node, // Because it's fan-in
-                        delta_latency: None,
-                    })
+                    this_domain_inference_info.extra_fanin.push((
+                        to_node,
+                        FanInOut {
+                            to_node: from_node,
+                            delta_latency: None,
+                        },
+                    ));
                 }
                 EdgeInfo::Inferrable {
                     target_to_infer,
@@ -465,7 +445,7 @@ mod tests {
                 infer_unknown_latency_edges, mk_fan, FanInOut, LatencyCountingPorts,
             },
             list_of_lists::ListOfLists,
-            port_latency_inference::PerDomainInferenceInfo,
+            port_latency_inference::PartialSubmoduleInfo,
         },
         prelude::{DomainID, PortIDMarker, WireID},
     };
@@ -604,7 +584,7 @@ mod tests {
         });
         let wire_to_node_map = FlatAlloc::from_vec(vec![0, 1, 2, 3, 4, 5, 6, 7, 7, 8]);
 
-        let mut domain_inference_info = PerDomainInferenceInfo::new(fanins.len());
+        let mut domain_inference_info = PartialSubmoduleInfo::default();
         for (_, this_domain_edges) in &per_domain_edges {
             this_domain_edges.apply_to_global_domain(
                 &port_to_wire_map,
@@ -618,9 +598,8 @@ mod tests {
         infer_unknown_latency_edges(
             fanins,
             &ports,
-            &domain_inference_info.inference_ports,
             &specified_latencies,
-            &domain_inference_info.inference_edges,
+            domain_inference_info,
             &mut values_to_infer,
         )
         .unwrap();

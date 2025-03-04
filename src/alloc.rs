@@ -761,6 +761,41 @@ impl<'a, T, IndexMarker> IntoIterator for &'a mut FlatAlloc<T, IndexMarker> {
 }
 
 #[derive(Debug)]
+pub struct FlatAllocConsumingIter<T, IndexMarker> {
+    iter: Enumerate<std::vec::IntoIter<T>>,
+    _ph: PhantomData<IndexMarker>,
+}
+
+impl<T, IndexMarker> Iterator for FlatAllocConsumingIter<T, IndexMarker> {
+    type Item = (UUID<IndexMarker>, T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|(id, v)| (UUID(id, PhantomData), v))
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+impl<T, IndexMarker> ExactSizeIterator for FlatAllocConsumingIter<T, IndexMarker> {
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
+}
+
+impl<T, IndexMarker> IntoIterator for FlatAlloc<T, IndexMarker> {
+    type Item = (UUID<IndexMarker>, T);
+
+    type IntoIter = FlatAllocConsumingIter<T, IndexMarker>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        FlatAllocConsumingIter {
+            iter: self.data.into_iter().enumerate(),
+            _ph: PhantomData,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct ZippedIterator<
     IDMarker,
     OA,
