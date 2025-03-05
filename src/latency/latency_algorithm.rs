@@ -17,7 +17,7 @@
 use std::iter::zip;
 
 use crate::{
-    alloc::FlatAlloc,
+    alloc::{get2_mut, FlatAlloc},
     prelude::{LatencyCountInferenceVarID, LatencyCountInferenceVarIDMarker},
 };
 
@@ -36,6 +36,23 @@ impl SpecifiedLatency {
     fn get_from_specify_list(list: &[SpecifiedLatency], node: usize) -> Option<i64> {
         list.iter()
             .find_map(|spec_lat| (spec_lat.node == node).then_some(spec_lat.latency))
+    }
+    fn get_latency(list: &[SpecifiedLatency], node: usize) -> Option<i64> {
+        for elem in list {
+            if elem.node == node {
+                return Some(elem.latency);
+            }
+        }
+        None
+    }
+    fn has_duplicates(mut list: &[SpecifiedLatency]) -> bool {
+        while let Some((fst, rest)) = list.split_first() {
+            if rest.iter().any(|e| e.node == fst.node) {
+                return true;
+            }
+            list = rest;
+        }
+        false
     }
 }
 
@@ -149,14 +166,6 @@ impl LatencyNode {
         abs_lat: i64::MAX,
         pinned: false,
     };
-    fn new_pinned(abs_lat: i64) -> LatencyNode {
-        let result = LatencyNode {
-            abs_lat,
-            pinned: true,
-        };
-        assert!(!result.is_unset());
-        result
-    }
     fn make_initial_latency_solution(
         size: usize,
         specified_latencies: &[SpecifiedLatency],
@@ -164,7 +173,7 @@ impl LatencyNode {
         let mut result = vec![LatencyNode::UNSET; size];
         for spec in specified_latencies {
             let target_node = &mut result[spec.node];
-            assert!(target_node.is_unset());
+            assert!(target_node.is_unset(), "Duplicate Specified Latency");
             target_node.abs_lat = spec.latency;
             target_node.pinned = true;
             assert!(target_node.is_valid_and_pinned());
@@ -174,7 +183,6 @@ impl LatencyNode {
     fn make_solution_and_count_latencies(
         fanouts: &ListOfLists<FanInOut>,
         specified_latencies: &[SpecifiedLatency],
-        backwards: bool,
     ) -> Vec<LatencyNode> {
         let mut latencies =
             LatencyNode::make_initial_latency_solution(fanouts.len(), specified_latencies);
@@ -183,7 +191,7 @@ impl LatencyNode {
         for seed in specified_latencies {
             assert!(latencies[seed.node].pinned);
 
-            count_latency(&mut latencies, fanouts, seed.node, backwards);
+            count_latency(&mut latencies, fanouts, seed.node, false);
         }
 
         latencies
@@ -194,7 +202,7 @@ impl LatencyNode {
         specified_latencies: &[SpecifiedLatency],
     ) -> Vec<LatencyNode> {
         let mut latencies =
-            LatencyNode::make_solution_and_count_latencies(fanouts, specified_latencies, false);
+            LatencyNode::make_solution_and_count_latencies(fanouts, specified_latencies);
 
         // So, we've got all the foward latencies starting from the given nodes.
         // Now we also want to add the backwards latencies, but only those in the fanin of the seeds
@@ -574,110 +582,6 @@ impl LatencyCountingPorts {
     }
 }
 
-/// All ports that still have to be assigned a latency are placed in a list of these
-///
-/// When a port first finds a valid latency for itself, it adopts this as it's permanent latency
-///
-/// If it then in the future sees another differing latency assignment for itself, it produces a [LatencyCountingError::IndeterminablePortLatency]
-struct PortLatencyCandidate {
-    wire: usize,
-    latency_proposal: Option<i64>,
-    /// We must not use the specified latencies pass-through when the source port itself was not found by the specified latencies themselves.
-    /// Othewise we miss out on possibilities of detecting bad ports because it's hidden by the specified latencies.
-    found_by_specified_latencies: bool,
-    is_input: bool,
-}
-
-fn inform_all_ports(
-    ports: &mut [PortLatencyCandidate],
-    working_latencies: &[LatencyNode],
-    found_by_specified_latencies: bool,
-) -> Result<(), LatencyCountingError> {
-    let mut bad_ports = Vec::new();
-    for p in ports {
-        // Ports to use can't yet be pinned of course
-        debug_assert!(!working_latencies[p.wire].pinned);
-        let Some(found_latency) = working_latencies[p.wire].get_maybe() else {
-            continue;
-        };
-        match p.latency_proposal {
-            None => p.latency_proposal = Some(found_latency), // First time, set the latency
-            Some(latency_proposal) => {
-                if found_latency != latency_proposal {
-                    // Conflicting latency options for this port
-                    bad_ports.push((p.wire, latency_proposal, found_latency));
-                }
-            }
-        }
-        p.found_by_specified_latencies |= found_by_specified_latencies;
-    }
-    if bad_ports.is_empty() {
-        Ok(())
-    } else {
-        Err(LatencyCountingError::IndeterminablePortLatency { bad_ports })
-    }
-}
-
-/// Constructs a new vector of specified latencies, from the given specified latencies, extended with any ports it could find.
-fn solve_latencies_for_ports(
-    fanins: &ListOfLists<FanInOut>,
-    fanouts: &ListOfLists<FanInOut>,
-    ports_to_place: &mut Vec<PortLatencyCandidate>,
-    specified_latencies: &[SpecifiedLatency],
-) -> Result<Vec<SpecifiedLatency>, LatencyCountingError> {
-    // First forward run from the initial latency assignment to discover other ports
-    let specified_latencies_forward =
-        LatencyNode::make_solution_and_count_latencies(fanouts, specified_latencies, false);
-    let specified_latencies_backward =
-        LatencyNode::make_solution_and_count_latencies(fanins, specified_latencies, true);
-
-    inform_all_ports(ports_to_place, &specified_latencies_forward, true)?;
-    inform_all_ports(ports_to_place, &specified_latencies_backward, true)?;
-
-    /// Finds a port in the given list that has a defined latency, remove it from the ports list and return it
-    ///
-    /// The returned port has `port.latency_proposal.is_some()`
-    fn pop_a_port(ports: &mut Vec<PortLatencyCandidate>) -> Option<PortLatencyCandidate> {
-        let found_idx = ports
-            .iter()
-            .position(|port| port.latency_proposal.is_some())?;
-        Some(ports.swap_remove(found_idx))
-    }
-
-    let mut result: Vec<SpecifiedLatency> = specified_latencies.to_vec();
-    // Finally, we start specifying each unspecified port in turn, and checking for any conflicts with other ports
-    while let Some(chosen_port) = pop_a_port(ports_to_place) {
-        let new_specified_latency = SpecifiedLatency {
-            node: chosen_port.wire,
-            latency: chosen_port.latency_proposal.unwrap(),
-        };
-        result.push(new_specified_latency);
-
-        let (latencies_source, backwards, fans) = if chosen_port.is_input {
-            (&specified_latencies_forward, false, fanouts)
-        } else {
-            (&specified_latencies_backward, true, fanins)
-        };
-
-        // We may only involve the specified latencies if the fanout of the port would actually "go through" the specified latency nodes.
-        // Otherwise, we can't use them, since that might cause badly specified ports not to be detected
-        let mut working_latencies = if chosen_port.found_by_specified_latencies {
-            latencies_source.clone()
-        } else {
-            vec![LatencyNode::UNSET; fanins.len()]
-        };
-
-        working_latencies[new_specified_latency.node] =
-            LatencyNode::new_pinned(new_specified_latency.latency);
-
-        count_latency(&mut working_latencies, fans, chosen_port.wire, backwards);
-
-        inform_all_ports(ports_to_place, &working_latencies, false)?;
-    }
-
-    Ok(result)
-}
-
 fn has_poison_edge(fanouts: &ListOfLists<FanInOut>) -> bool {
     !fanouts
         .iter()
@@ -796,37 +700,84 @@ impl PartialLatencyCountingSolution {
 }
 
 fn solve_port_latencies(
-    fanins: &ListOfLists<FanInOut>,
     fanouts: &ListOfLists<FanInOut>,
     ports: &LatencyCountingPorts,
 ) -> Result<Vec<Vec<SpecifiedLatency>>, LatencyCountingError> {
-    // This list contains all ports that still need to be placed. This list gathers port assignments as they happen,
-    // and reports errors if port conflicts arise
-    let mut ports_to_place: Vec<PortLatencyCandidate> = ports
-        .port_nodes
+    let mut bad_ports: Vec<(usize, i64, i64)> = Vec::new();
+
+    let mut port_groups: Vec<Vec<SpecifiedLatency>> = ports
+        .inputs()
         .iter()
-        .enumerate()
-        .map(|(idx, &wire)| PortLatencyCandidate {
-            wire,
-            latency_proposal: None,
-            found_by_specified_latencies: false,
-            is_input: idx < ports.outputs_start_at,
+        .map(|input_port| {
+            let mut result: Vec<SpecifiedLatency> = Vec::new();
+            let start_node = SpecifiedLatency {
+                node: *input_port,
+                latency: 0,
+            };
+            result.push(start_node);
+
+            let working_latencies =
+                LatencyNode::make_solution_and_count_latencies(fanouts, &[start_node]);
+
+            for output in ports.outputs() {
+                if let Some(latency) = working_latencies[*output].get_maybe() {
+                    result.push(SpecifiedLatency {
+                        node: *output,
+                        latency,
+                    });
+                }
+            }
+
+            debug_assert!(!SpecifiedLatency::has_duplicates(&result));
+
+            result
         })
         .collect();
 
-    let mut all_partial_solutions = Vec::new();
-    while let Some(found_port) = (!ports_to_place.is_empty()).then(|| ports_to_place.remove(0)) {
-        all_partial_solutions.push(solve_latencies_for_ports(
-            fanins,
-            fanouts,
-            &mut ports_to_place,
-            &[SpecifiedLatency {
-                node: found_port.wire,
+    merge_where_possible(&mut port_groups, |merge_to, merge_from| {
+        debug_assert!(!SpecifiedLatency::has_duplicates(merge_to));
+        debug_assert!(!SpecifiedLatency::has_duplicates(merge_from));
+
+        let Some(offset) = merge_to.iter().find_map(|to| {
+            SpecifiedLatency::get_latency(merge_from, to.node)
+                .map(|from_latency| to.latency - from_latency)
+        }) else {
+            return false;
+        };
+
+        for from_node in merge_from {
+            from_node.latency += offset;
+
+            if let Some(to_node_latency) = SpecifiedLatency::get_latency(merge_to, from_node.node) {
+                if to_node_latency != from_node.latency {
+                    bad_ports.push((from_node.node, to_node_latency, from_node.latency));
+                }
+            } else {
+                merge_to.push(*from_node);
+            }
+        }
+
+        debug_assert!(!SpecifiedLatency::has_duplicates(merge_to));
+        true
+    });
+
+    for output_port in ports.outputs() {
+        if !port_groups
+            .iter()
+            .any(|pg| SpecifiedLatency::get_latency(pg, *output_port).is_some())
+        {
+            port_groups.push(vec![SpecifiedLatency {
+                node: *output_port,
                 latency: 0,
-            }],
-        )?);
+            }]);
+        }
     }
-    Ok(all_partial_solutions)
+
+    if bad_ports.is_empty() {
+        Ok(port_groups)
+    } else {
+        Err(LatencyCountingError::IndeterminablePortLatency { bad_ports })
+    }
 }
 
 /// Solves the whole latency counting problem. No inference
@@ -858,7 +809,7 @@ pub fn solve_latencies(
     debug_assert!(!has_poison_edge(&fanins));
     debug_assert!(!has_poison_edge(&fanouts)); // Equivalent
 
-    let mut partial_solutions = solve_port_latencies(&fanins, &fanouts, ports)?;
+    let mut partial_solutions = solve_port_latencies(&fanouts, ports)?;
 
     if partial_solutions.is_empty() {
         partial_solutions.push(vec![SpecifiedLatency {
@@ -868,18 +819,49 @@ pub fn solve_latencies(
     }
 
     let mut partial_solutions: Vec<PartialLatencyCountingSolution> = partial_solutions
-        .into_iter()
+        .iter()
         .map(|seeds| PartialLatencyCountingSolution {
-            latencies: LatencyNode::make_solution_forwards_then_backwards(
-                &fanins, &fanouts, &seeds,
-            ),
+            latencies: LatencyNode::make_solution_forwards_then_backwards(&fanins, &fanouts, seeds),
             conflicting_nodes: Vec::new(),
         })
         .collect();
 
-    if partial_solutions.len() >= 2 {
-        merge_partial_solutions(&fanins, &mut partial_solutions);
-    }
+    merge_where_possible(&mut partial_solutions, |merge_to, merge_from| {
+        // Find a node both share
+        let Some(joining_node) = merge_to
+            .latencies
+            .iter()
+            .zip(merge_from.latencies.iter())
+            .position(|(a, b)| a.get_maybe().is_some() && b.get_maybe().is_some())
+        else {
+            return false;
+        };
+
+        // Offset the vector we're merging to bring it in line with the target
+        merge_from.offset_to_pin_node_to(SpecifiedLatency {
+            node: joining_node,
+            latency: merge_to.latencies[joining_node].get_maybe().unwrap(),
+        });
+        merge_to
+            .conflicting_nodes
+            .append(&mut merge_from.conflicting_nodes);
+
+        for (node, (to, from)) in
+            zip(merge_to.latencies.iter_mut(), merge_from.latencies.iter()).enumerate()
+        {
+            match (to.get_maybe(), from.get_maybe()) {
+                (_, None) => {} // Do nothing
+                (None, Some(from)) => to.abs_lat = from,
+                (Some(to), Some(from)) => {
+                    if to != from {
+                        merge_to.conflicting_nodes.push((node, from));
+                    }
+                }
+            }
+        }
+
+        true
+    });
 
     // Polish solution: if there were no specified latencies, then we make the latency of the first port '0
     // This is to shift the whole solution to one canonical absolute latency. Prefer:
@@ -936,52 +918,20 @@ pub fn solve_latencies(
     }
 }
 
-fn merge_partial_solutions(
-    fanins: &ListOfLists<FanInOut>,
-    partial_solutions: &mut Vec<PartialLatencyCountingSolution>,
-) {
-    for node in 0..fanins.len() {
-        let mut connecting_node: Option<(i64, usize)> = None;
-        let mut partial_solution_idx = 0;
-        while partial_solution_idx < partial_solutions.len() {
-            if let Some(from_latency) =
-                partial_solutions[partial_solution_idx].latencies[node].get_maybe()
-            {
-                // Merge this partial solution into the target partial solution
-                if let Some((to_latency, target_idx)) = connecting_node {
-                    let mut merge_from = partial_solutions.swap_remove(partial_solution_idx);
-                    partial_solution_idx -= 1; // Compensate for +1 on next iteration
-
-                    let merge_into = &mut partial_solutions[target_idx]; // Okay, because target_idx will always be smaller than partial_solution_idx
-
-                    merge_from.offset_to_pin_node_to(SpecifiedLatency {
-                        node,
-                        latency: to_latency,
-                    });
-                    merge_into
-                        .conflicting_nodes
-                        .append(&mut merge_from.conflicting_nodes);
-
-                    for (idx, (to, from)) in
-                        zip(merge_into.latencies.iter_mut(), merge_from.latencies.iter())
-                            .enumerate()
-                    {
-                        match (to.get_maybe(), from.get_maybe()) {
-                            (_, None) => {} // Do nothing
-                            (None, Some(from)) => to.abs_lat = from,
-                            (Some(to), Some(from)) => {
-                                if to != from {
-                                    merge_into.conflicting_nodes.push((idx, from));
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    connecting_node = Some((from_latency, partial_solution_idx));
-                }
+/// merge should return true if the second argument was merged into the first argument.
+fn merge_where_possible<T>(parts: &mut Vec<T>, mut merge: impl FnMut(&mut T, &mut T) -> bool) {
+    let mut merge_to_idx = 0;
+    while merge_to_idx < parts.len() {
+        let mut merge_from_idx = merge_to_idx + 1;
+        while merge_from_idx < parts.len() {
+            let (merge_to, merge_from) = get2_mut(parts, merge_to_idx, merge_from_idx).unwrap();
+            if merge(merge_to, merge_from) {
+                parts.swap_remove(merge_from_idx);
+            } else {
+                merge_from_idx += 1;
             }
-            partial_solution_idx += 1;
         }
+        merge_to_idx += 1;
     }
 }
 
@@ -1061,7 +1011,7 @@ pub fn infer_unknown_latency_edges<ID>(
 
     let fanouts = fanins.faninout_complement();
 
-    let partial_solutions = solve_port_latencies(&fanins, &fanouts, ports)?;
+    let partial_solutions = solve_port_latencies(&fanouts, ports)?;
 
     let mut new_edges = Vec::new();
     for partial_sol in partial_solutions {
@@ -1081,7 +1031,7 @@ pub fn infer_unknown_latency_edges<ID>(
         print_latency_test_case(&fanins, &inference_ports, &[]);
     }
 
-    let inference_port_solutions = solve_port_latencies(&fanins, &fanouts, &inference_ports)?;
+    let inference_port_solutions = solve_port_latencies(&fanouts, &inference_ports)?;
 
     for candidate in &partial_submodule_info.inference_edges {
         let mut infer_me = Some(&mut values_to_infer[candidate.target_to_infer]);
@@ -1120,38 +1070,43 @@ pub fn mk_fan(to_node: usize, delta_latency: i64) -> FanInOut {
         delta_latency: Some(delta_latency),
     }
 }
-
-#[cfg(test)]
-pub fn mk_poisoned(to_node: usize) -> FanInOut {
-    FanInOut {
-        to_node,
-        delta_latency: None,
-    }
-}
-
-// makes inputs for fanins, outputs for fanouts
-#[cfg(test)]
-pub fn infer_ports(fanins: &ListOfLists<FanInOut>) -> Vec<usize> {
-    fanins
-        .iter()
-        .enumerate()
-        .filter_map(|(idx, v)| v.is_empty().then_some(idx))
-        .collect()
-}
-
-#[cfg(test)]
-impl LatencyCountingPorts {
-    pub fn from_inputs_outputs(inputs: &[usize], outputs: &[usize]) -> Self {
-        Self {
-            port_nodes: inputs.iter().chain(outputs.iter()).cloned().collect(),
-            outputs_start_at: inputs.len(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    pub fn pinned_node(abs_lat: i64) -> LatencyNode {
+        let result = LatencyNode {
+            abs_lat,
+            pinned: true,
+        };
+        assert!(!result.is_unset());
+        result
+    }
+
+    pub fn mk_poisoned(to_node: usize) -> FanInOut {
+        FanInOut {
+            to_node,
+            delta_latency: None,
+        }
+    }
+
+    // makes inputs for fanins, outputs for fanouts
+    pub fn infer_ports(fanins: &ListOfLists<FanInOut>) -> Vec<usize> {
+        fanins
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, v)| v.is_empty().then_some(idx))
+            .collect()
+    }
+
+    impl LatencyCountingPorts {
+        pub fn from_inputs_outputs(inputs: &[usize], outputs: &[usize]) -> Self {
+            Self {
+                port_nodes: inputs.iter().chain(outputs.iter()).cloned().collect(),
+                outputs_start_at: inputs.len(),
+            }
+        }
+    }
 
     fn solve_latencies_test_case(
         fanins: ListOfLists<FanInOut>,
@@ -1608,10 +1563,10 @@ mod tests {
         let partial_result = solve_latencies_infer_ports(fanins, &specified_latencies).unwrap();
 
         let correct_latencies = [
-            LatencyNode::new_pinned(0), // [solve_latencies] returns pinned values
-            LatencyNode::new_pinned(0),
-            LatencyNode::new_pinned(3),
-            LatencyNode::new_pinned(3),
+            pinned_node(0), // [solve_latencies] returns pinned values
+            pinned_node(0),
+            pinned_node(3),
+            pinned_node(3),
             LatencyNode::UNSET,
             LatencyNode::UNSET,
             LatencyNode::UNSET,
@@ -1830,7 +1785,7 @@ mod tests {
         let fanouts = fanins.faninout_complement();
 
         let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
-        let mut partial_solutions = solve_port_latencies(&fanins, &fanouts, &ports).unwrap();
+        let mut partial_solutions = solve_port_latencies(&fanouts, &ports).unwrap();
 
         assert_specified_latency_lists_match(
             &mut partial_solutions,
@@ -2241,7 +2196,7 @@ mod tests {
 
         let fanouts = fanins.faninout_complement();
         let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
-        let _partial_solutions = solve_port_latencies(&fanins, &fanouts, &ports).unwrap();
+        let _partial_solutions = solve_port_latencies(&fanouts, &ports).unwrap();
     }
 
     #[test]
@@ -2273,7 +2228,7 @@ mod tests {
 
         let fanouts = fanins.faninout_complement();
         let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
-        let _found_latencies = solve_port_latencies(&fanins, &fanouts, &ports).unwrap();
+        let _found_latencies = solve_port_latencies(&fanouts, &ports).unwrap();
     }
 
     #[test]
