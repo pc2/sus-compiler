@@ -387,8 +387,6 @@ impl InferenceEdgesForDomain {
             );
         }
 
-        let mut port_has_been_visited = port_to_wire_map.map(|_| false);
-
         for (from, to, edge_info) in &self.edges {
             let (Some(from_node), Some(to_node)) = (port_to_node(*from), port_to_node(*to)) else {
                 continue; // Can't infer based on ports that aren't used
@@ -418,17 +416,6 @@ impl InferenceEdgesForDomain {
                             offset,
                             target_to_infer,
                         });
-
-                    if !std::mem::replace(&mut port_has_been_visited[*from], true) {
-                        this_domain_inference_info
-                            .inference_ports
-                            .push(from_node, false);
-                    }
-                    if !std::mem::replace(&mut port_has_been_visited[*to], true) {
-                        this_domain_inference_info
-                            .inference_ports
-                            .push(to_node, true);
-                    }
                 }
             }
         }

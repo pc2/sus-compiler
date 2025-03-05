@@ -327,7 +327,6 @@ impl std::fmt::Debug for LatencyNode {
 pub struct PartialSubmoduleInfo {
     pub inference_edges: Vec<LatencyInferenceCandidate>,
     pub extra_fanin: Vec<(usize, FanInOut)>,
-    pub inference_ports: LatencyCountingPorts,
 }
 
 /// I found that it was far to complex to try to do the whole of latency counting in a single pass of the graph algorithm
@@ -545,6 +544,34 @@ impl LatencyCountingPorts {
     pub fn outputs(&self) -> &[usize] {
         &self.port_nodes[self.outputs_start_at..]
     }
+
+    fn new_from_inference_edges(
+        inference_edges: &[LatencyInferenceCandidate],
+        num_nodes: usize,
+    ) -> Self {
+        let mut was_port_seen = vec![None; num_nodes];
+        let mut result = Self::default();
+
+        for edge in inference_edges {
+            match std::mem::replace(&mut was_port_seen[edge.to_node], Some(true)) {
+                None => result.push(edge.to_node, true),
+                Some(false) => {
+                    unreachable!("Inference port cannot be both input and output")
+                }
+                Some(true) => {}
+            }
+        }
+        for edge in inference_edges {
+            match std::mem::replace(&mut was_port_seen[edge.from_node], Some(false)) {
+                None => result.push(edge.from_node, false),
+                Some(true) => {
+                    unreachable!("Inference port cannot be both input and output")
+                }
+                Some(false) => {}
+            }
+        }
+        result
+    }
 }
 
 /// All ports that still have to be assigned a latency are placed in a list of these
@@ -697,7 +724,6 @@ fn print_inference_test_case<ID>(
     fanins: &ListOfLists<FanInOut>,
     ports: &LatencyCountingPorts,
     specified_latencies: &[SpecifiedLatency],
-    inference_ports: &LatencyCountingPorts,
     inference_edges: &[LatencyInferenceCandidate],
     values_to_infer: &FlatAlloc<ValueToInfer<ID>, LatencyCountInferenceVarIDMarker>,
 ) {
@@ -727,11 +753,6 @@ fn print_inference_test_case<ID>(
         ports.inputs(),
         ports.outputs()
     );
-    println!(
-        "    let inference_ports = LatencyCountingPorts::from_inputs_outputs(&{:?}, &{:?});",
-        inference_ports.inputs(),
-        inference_ports.outputs()
-    );
     println!("    let specified_latencies = {specified_latencies:?};");
 
     println!("    let mut values_to_infer = FlatAlloc::new();");
@@ -739,7 +760,7 @@ fn print_inference_test_case<ID>(
         println!("    let {id:?} = values_to_infer.alloc(ValueToInfer::new(()));");
     }
     println!("    let inference_edges = vec!{inference_edges:?};");
-    println!("    let partial_submodule_info = PartialSubmoduleInfo {{inference_edges, extra_fanin: Vec::new(), inference_ports}};");
+    println!("    let partial_submodule_info = PartialSubmoduleInfo {{inference_edges, extra_fanin: Vec::new()}};");
     println!("    infer_unknown_latency_edges(fanins, &ports, &specified_latencies, partial_submodule_info, &mut values_to_infer).unwrap();");
     println!("}}");
     println!("==== END INFERENCE TEST CASE ====");
@@ -1029,7 +1050,6 @@ pub fn infer_unknown_latency_edges<ID>(
             &fanins,
             ports,
             specified_latencies,
-            &partial_submodule_info.inference_ports,
             &partial_submodule_info.inference_edges,
             values_to_infer,
         );
@@ -1037,18 +1057,6 @@ pub fn infer_unknown_latency_edges<ID>(
 
     if fanins.len() == 0 || partial_submodule_info.inference_edges.is_empty() {
         return Ok(()); // Could not infer anything
-    }
-
-    #[cfg(debug_assertions)]
-    for candidate in &partial_submodule_info.inference_edges {
-        assert!(partial_submodule_info
-            .inference_ports
-            .inputs()
-            .contains(&candidate.to_node));
-        assert!(partial_submodule_info
-            .inference_ports
-            .outputs()
-            .contains(&candidate.from_node));
     }
 
     let fanouts = fanins.faninout_complement();
@@ -1063,13 +1071,17 @@ pub fn infer_unknown_latency_edges<ID>(
     let fanins = fanins.extend_lists_with_new_elements(new_edges);
     let fanouts = fanins.faninout_complement();
 
+    let inference_ports = LatencyCountingPorts::new_from_inference_edges(
+        &partial_submodule_info.inference_edges,
+        fanins.len(),
+    );
+
     #[cfg(not(test))]
     if crate::config::config().debug_print_latency_graph {
-        print_latency_test_case(&fanins, &partial_submodule_info.inference_ports, &[]);
+        print_latency_test_case(&fanins, &inference_ports, &[]);
     }
 
-    let inference_port_solutions =
-        solve_port_latencies(&fanins, &fanouts, &partial_submodule_info.inference_ports)?;
+    let inference_port_solutions = solve_port_latencies(&fanins, &fanouts, &inference_ports)?;
 
     for candidate in &partial_submodule_info.inference_edges {
         let mut infer_me = Some(&mut values_to_infer[candidate.target_to_infer]);
@@ -1871,8 +1883,6 @@ mod tests {
 
         let inputs = [0];
         let outputs = [8];
-        let inputs_inference = [6, 7, 10];
-        let outputs_inference = [2, 3, 4, 5, 9];
         let specified_latencies = [];
 
         let mut values_to_infer = FlatAlloc::new();
@@ -1920,13 +1930,10 @@ mod tests {
         ];
 
         let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
-        let inference_ports =
-            LatencyCountingPorts::from_inputs_outputs(&inputs_inference, &outputs_inference);
 
         let partial_submodule_info = PartialSubmoduleInfo {
             inference_edges,
             extra_fanin: Vec::new(),
-            inference_ports,
         };
 
         infer_unknown_latency_edges(
@@ -1966,8 +1973,6 @@ mod tests {
 
         let inputs = [];
         let outputs = [];
-        let inputs_inference = [1, 4];
-        let outputs_inference = [0, 3];
         let specified_latencies = [];
 
         let mut values_to_infer = FlatAlloc::new();
@@ -1992,13 +1997,10 @@ mod tests {
         ];
 
         let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
-        let inference_ports =
-            LatencyCountingPorts::from_inputs_outputs(&inputs_inference, &outputs_inference);
 
         let partial_submodule_info = PartialSubmoduleInfo {
             inference_edges,
             extra_fanin: Vec::new(),
-            inference_ports,
         };
 
         infer_unknown_latency_edges(
@@ -2039,8 +2041,6 @@ mod tests {
 
         let inputs = [0];
         let outputs = [1];
-        let inputs_inference = [3, 6];
-        let outputs_inference = [2, 5];
         let specified_latencies = [];
 
         let mut values_to_infer = FlatAlloc::new();
@@ -2065,13 +2065,9 @@ mod tests {
         ];
 
         let ports = LatencyCountingPorts::from_inputs_outputs(&inputs, &outputs);
-        let inference_ports =
-            LatencyCountingPorts::from_inputs_outputs(&inputs_inference, &outputs_inference);
-
         let partial_submodule_info = PartialSubmoduleInfo {
             inference_edges,
             extra_fanin: Vec::new(),
-            inference_ports,
         };
 
         let err = infer_unknown_latency_edges(
@@ -2293,7 +2289,6 @@ mod tests {
         ];
         let fanins = ListOfLists::from_slice_slice(&fanins);
         let ports = LatencyCountingPorts::from_inputs_outputs(&[1], &[0]);
-        let inference_ports = LatencyCountingPorts::from_inputs_outputs(&[2], &[5, 6]);
         let specified_latencies = [SpecifiedLatency {
             node: 0,
             latency: 0,
@@ -2320,7 +2315,6 @@ mod tests {
         let partial_submodule_info = PartialSubmoduleInfo {
             inference_edges,
             extra_fanin: Vec::new(),
-            inference_ports,
         };
 
         infer_unknown_latency_edges(
