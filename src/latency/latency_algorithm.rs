@@ -826,6 +826,29 @@ pub fn solve_latencies(
         })
         .collect();
 
+    // Polish solution: if there were no specified latencies, then we make the latency of the first port '0
+    // This is to shift the whole solution to one canonical absolute latency. Prefer:
+    // - Specified latencies
+    // - First port = '0
+    // - Node 0 = '0
+    // By doing the shift early, we make the port or node latency mismatch errors easier to understand as one of the options will be in the frame of the specified latencies.
+    let reference_node = specified_latencies
+        .first()
+        .cloned()
+        .unwrap_or_else(|| SpecifiedLatency {
+            node: *ports.port_nodes.first().unwrap_or(&0),
+            latency: 0,
+        });
+
+    if let Some(reference_solution_idx) = partial_solutions
+        .iter()
+        .position(|psol| !psol.latencies[reference_node.node].is_unset())
+    {
+        // Move the partial solution containing the reference node to the front, such that merge_where_possible always treats it as the reference.
+        partial_solutions.swap(0, reference_solution_idx);
+        partial_solutions[0].offset_to_pin_node_to(reference_node);
+    }
+
     merge_where_possible(&mut partial_solutions, |merge_to, merge_from| {
         // Find a node both share
         let Some(joining_node) = merge_to
@@ -862,33 +885,6 @@ pub fn solve_latencies(
 
         true
     });
-
-    // Polish solution: if there were no specified latencies, then we make the latency of the first port '0
-    // This is to shift the whole solution to one canonical absolute latency. Prefer:
-    // - Specified latencies
-    // - First port = '0
-    // - Node 0 = '0
-    let pinned_node = if let Some(spec) = specified_latencies.first() {
-        *spec
-    } else {
-        SpecifiedLatency {
-            node: *ports.port_nodes.first().unwrap_or(&0),
-            latency: 0,
-        }
-    };
-
-    let mut was_found = false;
-    for psol in &mut partial_solutions {
-        if !psol.latencies[pinned_node.node].is_unset() {
-            assert!(
-                !was_found,
-                "The non-merged partial solutions are of course fully disjoint"
-            );
-            was_found = true;
-            psol.offset_to_pin_node_to(pinned_node);
-        }
-    }
-    assert!(was_found);
 
     let mut solution_iter = partial_solutions.into_iter();
 
