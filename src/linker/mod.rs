@@ -8,7 +8,6 @@ use crate::{
 
 pub mod checkpoint;
 mod resolver;
-use arrayvec::ArrayVec;
 pub use resolver::*;
 
 use std::{
@@ -104,7 +103,7 @@ pub struct LinkInfo {
     /// TODO the system is there, just need to actually do incremental compilation (#49)
     ///
     /// Right now it already functions as a sanity check, to make sure no steps in building modules/types are skipped
-    pub checkpoints: ArrayVec<CheckPoint, 4>,
+    pub checkpoints: Vec<CheckPoint>,
 }
 
 impl LinkInfo {
