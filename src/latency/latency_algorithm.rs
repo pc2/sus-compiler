@@ -1090,15 +1090,6 @@ mod tests {
         }
     }
 
-    // makes inputs for fanins, outputs for fanouts
-    pub fn infer_ports(fanins: &ListOfLists<FanInOut>) -> Vec<usize> {
-        fanins
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, v)| v.is_empty().then_some(idx))
-            .collect()
-    }
-
     impl LatencyCountingPorts {
         pub fn from_inputs_outputs(inputs: &[usize], outputs: &[usize]) -> Self {
             Self {
@@ -1117,20 +1108,6 @@ mod tests {
         let ports = LatencyCountingPorts::from_inputs_outputs(inputs, outputs);
 
         solve_latencies(fanins, Vec::new(), &ports, specified_latencies)
-    }
-
-    /// Any node with no fanin is an input
-    /// Any node with no fanout is an output
-    fn solve_latencies_infer_ports(
-        fanins: ListOfLists<FanInOut>,
-        specified_latencies: &[SpecifiedLatency],
-    ) -> Result<Vec<LatencyNode>, LatencyCountingError> {
-        let fanouts = fanins.faninout_complement();
-
-        let inputs = infer_ports(&fanins);
-        let outputs = infer_ports(&fanouts);
-
-        solve_latencies_test_case(fanins, &inputs, &outputs, specified_latencies)
     }
 
     #[track_caller]
@@ -1366,7 +1343,7 @@ mod tests {
         ];
         let fanins = ListOfLists::from_slice_slice(&fanins);
 
-        let should_be_err = solve_latencies_infer_ports(fanins, &[]);
+        let should_be_err = solve_latencies_test_case(fanins, &[0, 4], &[3, 6], &[]);
 
         assert!(matches!(
             should_be_err,
@@ -1375,6 +1352,43 @@ mod tests {
     }
 
     #[test]
+    fn test_inputs_only() {
+        let fanins: [&[FanInOut]; 7] = [
+            /*0*/ &[],
+            /*1*/ &[mk_fan(0, 0)],
+            /*2*/ &[mk_fan(1, 1), mk_fan(5, 1)],
+            /*3*/ &[mk_fan(2, 0)],
+            /*4*/ &[],
+            /*5*/ &[mk_fan(4, 0), mk_fan(1, 1)],
+            /*6*/ &[mk_fan(5, 0)],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+
+        let found_latencies = solve_latencies_test_case(fanins, &[0, 4], &[], &[]).unwrap();
+
+        assert_latencies_match(&found_latencies, &[0, 0, 2, 2, 1, 1, 1]);
+    }
+
+    #[test]
+    fn test_outputs_only() {
+        let fanins: [&[FanInOut]; 7] = [
+            /*0*/ &[],
+            /*1*/ &[mk_fan(0, 0)],
+            /*2*/ &[mk_fan(1, 1), mk_fan(5, 1)],
+            /*3*/ &[mk_fan(2, 0)],
+            /*4*/ &[],
+            /*5*/ &[mk_fan(4, 0), mk_fan(1, 1)],
+            /*6*/ &[mk_fan(5, 0)],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+
+        let found_latencies = solve_latencies_test_case(fanins, &[], &[3, 6], &[]).unwrap();
+
+        assert_latencies_match(&found_latencies, &[0, 0, 2, 2, 1, 1, 1]);
+    }
+
+    #[test]
+    // Kinda outdated, because specified latencies no longer signify the start of the algorithm
     fn check_conflicting_port_latency_with_any_starting_node_does_error() {
         /*
             i0 - 1 - 2 - 3o
@@ -1394,8 +1408,10 @@ mod tests {
 
         for starting_node in 0..7 {
             println!("starting_node: {starting_node}");
-            solve_latencies_infer_ports(
+            solve_latencies_test_case(
                 fanins.clone(),
+                &[0, 4],
+                &[3, 6],
                 &[SpecifiedLatency {
                     node: starting_node,
                     latency: 0,
@@ -1429,7 +1445,8 @@ mod tests {
             },
         ];
 
-        let found_latencies = solve_latencies_infer_ports(fanins, &specified_latencies).unwrap();
+        let found_latencies =
+            solve_latencies_test_case(fanins, &[0, 4], &[3, 6], &specified_latencies).unwrap();
 
         let correct_latencies = [0, 0, 3, 3, 2, 2, 2];
 
@@ -1459,7 +1476,8 @@ mod tests {
             },
         ];
 
-        let should_be_err = solve_latencies_infer_ports(fanins, &specified_latencies);
+        let should_be_err =
+            solve_latencies_test_case(fanins, &[0, 4], &[3, 6], &specified_latencies);
 
         println!("{should_be_err:?}");
         let Err(LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path }) =
@@ -1495,7 +1513,8 @@ mod tests {
             },
         ];
 
-        let should_be_err = solve_latencies_infer_ports(fanins, &specified_latencies);
+        let should_be_err =
+            solve_latencies_test_case(fanins, &[0, 4], &[3, 6], &specified_latencies);
 
         let Err(LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path }) =
             should_be_err
@@ -1526,7 +1545,7 @@ mod tests {
             },
         ];
 
-        let should_be_err = solve_latencies_infer_ports(fanins, &specified_latencies);
+        let should_be_err = solve_latencies_test_case(fanins, &[0], &[1], &specified_latencies);
         println!("{should_be_err:?}");
 
         let Err(LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path }) =
@@ -1560,7 +1579,8 @@ mod tests {
             latency: 0,
         }];
 
-        let partial_result = solve_latencies_infer_ports(fanins, &specified_latencies).unwrap();
+        let partial_result =
+            solve_latencies_test_case(fanins, &[0, 4], &[3, 6], &specified_latencies).unwrap();
 
         let correct_latencies = [
             pinned_node(0), // [solve_latencies] returns pinned values
@@ -1682,7 +1702,7 @@ mod tests {
         let fanins = ListOfLists::from_slice_slice(&fanins);
         let specified_latencies = [];
 
-        let should_be_err = solve_latencies_infer_ports(fanins, &specified_latencies);
+        let should_be_err = solve_latencies_test_case(fanins, &[0], &[3], &specified_latencies);
 
         let Err(LatencyCountingError::NetPositiveLatencyCycle {
             conflict_path: _,
