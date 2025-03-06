@@ -13,8 +13,8 @@ use crate::prelude::*;
 use crate::alloc::{UUIDAllocator, UUIDMarker, UUIDRange, UUID};
 use crate::value::Value;
 
-use super::abstract_type::AbstractType;
 use super::abstract_type::DomainType;
+use super::abstract_type::{AbstractType, PeanoType};
 use super::concrete_type::ConcreteType;
 
 pub struct TypeVariableIDMarker;
@@ -22,6 +22,12 @@ impl UUIDMarker for TypeVariableIDMarker {
     const DISPLAY_NAME: &'static str = "type_variable_";
 }
 pub type TypeVariableID = UUID<TypeVariableIDMarker>;
+
+pub struct PeanoVariableIDMarker;
+impl UUIDMarker for PeanoVariableIDMarker {
+    const DISPLAY_NAME: &'static str = "peano_variable_";
+}
+pub type PeanoVariableID = UUID<PeanoVariableIDMarker>;
 
 pub struct DomainVariableIDMarker;
 impl UUIDMarker for DomainVariableIDMarker {
@@ -489,6 +495,66 @@ impl HindleyMilner<TypeVariableIDMarker> for AbstractType {
             AbstractType::Template(_) | AbstractType::Named(_) => {}
             AbstractType::Array(array_content) => array_content.for_each_unknown(f),
             AbstractType::Unknown(uuid) => f(*uuid),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PeanoTypeHMInfo {
+    Successor,
+    Zero,
+}
+
+impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
+    type TypeFuncIdent<'slf> = PeanoTypeHMInfo;
+
+    fn get_hm_info(&self) -> HindleyMilnerInfo<PeanoTypeHMInfo, PeanoVariableIDMarker> {
+        match self {
+            PeanoType::Unknown(var_id) => HindleyMilnerInfo::TypeVar(*var_id),
+            PeanoType::Succ(_) => HindleyMilnerInfo::TypeFunc(PeanoTypeHMInfo::Successor),
+            PeanoType::Zero => HindleyMilnerInfo::TypeFunc(PeanoTypeHMInfo::Zero),
+        }
+    }
+
+    fn unify_all_args<F: FnMut(&Self, &Self) -> UnifyResult>(
+        left: &Self,
+        right: &Self,
+        unify: &mut F,
+    ) -> UnifyResult {
+        match (left, right) {
+            (PeanoType::Zero, PeanoType::Zero) => {
+                //assert!(*na == *nb);
+                UnifyResult::Success
+            } // todo: check if this is true: Already covered by get_hm_info
+            (PeanoType::Succ(na), PeanoType::Succ(nb)) => unify(na, nb),
+            (_, _) => unreachable!("All others should have been eliminated by get_hm_info check"),
+        }
+    }
+
+    fn fully_substitute(
+        &mut self,
+        substitutor: &TypeSubstitutor<Self, PeanoVariableIDMarker>,
+    ) -> bool {
+        match self {
+            PeanoType::Succ(typ) => typ.fully_substitute(substitutor),
+            PeanoType::Zero => true,
+            PeanoType::Unknown(var) => {
+                let Some(replacement) = substitutor.substitution_map[var.get_hidden_value()].get()
+                else {
+                    return false;
+                };
+                assert!(!std::ptr::eq(self, replacement));
+                *self = replacement.clone();
+                self.fully_substitute(substitutor)
+            }
+        }
+    }
+
+    fn for_each_unknown(&self, f: &mut impl FnMut(PeanoVariableID)) {
+        match self {
+            PeanoType::Zero => {}
+            PeanoType::Succ(typ) => typ.for_each_unknown(f),
+            PeanoType::Unknown(uuid) => f(*uuid),
         }
     }
 }

@@ -7,8 +7,7 @@ use std::ops::Deref;
 
 use super::template::{GlobalReference, Parameter, TVec};
 use super::type_inference::{
-    DomainVariableID, DomainVariableIDMarker, TypeSubstitutor, TypeVariableID,
-    TypeVariableIDMarker, UnifyErrorReport,
+    DomainVariableID, DomainVariableIDMarker, PeanoVariableID, TypeSubstitutor, TypeVariableID, TypeVariableIDMarker, UnifyErrorReport
 };
 use crate::flattening::{BinaryOperator, StructType, TypingAllocator, UnaryOperator, WrittenType};
 use crate::to_string::map_to_type_names;
@@ -39,6 +38,14 @@ pub enum AbstractType {
     /// It should only occur in creation `AbstractType::Unknown(self.type_substitutor.alloc())`
     Unknown(TypeVariableID),
 }
+
+#[derive(Debug, Clone)]
+pub enum PeanoType {
+    Zero,
+    Succ(Box<PeanoType>),
+    Unknown(PeanoVariableID)
+}
+
 
 pub const BOOL_TYPE: AbstractType = AbstractType::Named(get_builtin_type!("bool"));
 pub const INT_TYPE: AbstractType = AbstractType::Named(get_builtin_type!("int"));
