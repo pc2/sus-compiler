@@ -1,7 +1,7 @@
 [package]
 name = "sus-proc-macro"
 description = "Proc-macros for use in the sus-compiler"
-version = "0.2.0-devel"
+version = "0.2.0"
 authors = ["Lennart Van Hirtum <lennart.vanhirtum@gmail.com>"]
 edition = "2021"
 license = "GPL-3.0-or-later"
@@ -16,7 +16,7 @@ rust-version = "1.78"
 
 # Tree sitter
 tree-sitter = "~0.24.7"
-tree-sitter-sus = {version = "~0.2.0-devel", path = "../tree-sitter-sus"}
+tree-sitter-sus = {version = "~0.2.0", path = "../tree-sitter-sus"}
 regex = "1.11.1"
 
 # proc_macro utils
