@@ -6,7 +6,7 @@ mod parser;
 mod typechecking;
 mod walk;
 
-use crate::alloc::UUIDAllocator;
+use crate::alloc::{UUIDAllocator, UUIDRange};
 use crate::prelude::*;
 use crate::typing::abstract_type::DomainType;
 use crate::typing::type_inference::{DomainVariableIDMarker, TypeVariableIDMarker};
@@ -50,13 +50,18 @@ pub struct Module {
     /// Created in Stage 1: Initialization
     ///
     /// [Port::declaration_instruction] are set in Stage 2: Flattening
+    ///
+    /// Ports can only use domains in [Self::named_domains]
     pub ports: FlatAlloc<Port, PortIDMarker>,
 
     /// Created in Stage 2: Flattening
     pub latency_inference_info: PortLatencyInferenceInfo,
 
     /// Created in Stage 1: Initialization
+    ///
+    /// [Self::domains] is then extended during abstract typechecking to add unnamed domains
     pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,
+    pub named_domains: UUIDRange<DomainIDMarker>,
     pub implicit_clk_domain: bool,
 
     /// Created in Stage 1: Initialization

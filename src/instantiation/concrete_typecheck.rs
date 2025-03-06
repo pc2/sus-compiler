@@ -251,6 +251,8 @@ impl InstantiationContext<'_, '_> {
 
         self.typecheck_all_wires();
 
+        delayed_constraints.push(LatencyInferenceDelayedConstraint {});
+
         delayed_constraints.resolve_delayed_constraints(self);
 
         self.finalize();
@@ -355,18 +357,8 @@ fn concretize_written_type_with_possible_template_args(
     }
 }
 
-impl SubmoduleTypecheckConstraint {
-    /// Directly named type and value parameters are immediately unified, but latency count deltas can only be computed from the latency counting graph
-    fn try_infer_latency_counts(&mut self, _context: &mut InstantiationContext) {
-        // TODO
-    }
-}
-
 impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConstraint {
     fn try_apply(&mut self, context: &mut InstantiationContext) -> DelayedConstraintStatus {
-        // Try to infer template arguments based on the connections to the ports of the module.
-        self.try_infer_latency_counts(context);
-
         let sm = &mut context.submodules[self.sm_id];
 
         let submod_instr =
@@ -499,4 +491,13 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
             .errors
             .error(submod_instr.get_most_relevant_span(), message);
     }
+}
+
+pub struct LatencyInferenceDelayedConstraint {}
+impl DelayedConstraint<InstantiationContext<'_, '_>> for LatencyInferenceDelayedConstraint {
+    fn try_apply(&mut self, context: &mut InstantiationContext<'_, '_>) -> DelayedConstraintStatus {
+        context.infer_parameters_for_latencies()
+    }
+
+    fn report_could_not_resolve_error(&self, _context: &InstantiationContext<'_, '_>) {} // Handled by incomplete submodules themselves
 }

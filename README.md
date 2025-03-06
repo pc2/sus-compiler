@@ -161,7 +161,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Generative Code
 - [x] Generative Parameters
 - [x] Type Templates
-- [ ] Full Template Inference
+- [x] Full Template Inference
 - [ ] Actions, Triggers and Queries
 
 ### Language Features
@@ -180,7 +180,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Get rid of semicolons
 - [x] Access module inputs / outputs through field names
 - [ ] Array Slices
-- [ ] Bound Specifiers
+- [ ] Sized Integers
 - [ ] Structs
 - [ ] Conditional Bindings
 - [x] Generative variables and assignments
@@ -190,7 +190,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Generative Parameters
 - [ ] Generative Parameter Default Arguments
 - [x] Type Parameters
-- [ ] Generative Asserts
+- [x] Generative Asserts
 - [x] Multi-Interface Syntax
 - [x] Native Module integration syntax
 - [x] Intrinsic Modules
@@ -219,7 +219,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Hindley-Milner typing for Concrete Types
 - [x] Template Type Inference
 - [x] Generative Parameter Inference
-- [ ] Latency Count Inference
+- [x] Latency Count Inference
 - [ ] Let-syntax
 
 ### Latency Counting
@@ -233,7 +233,8 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Integrate into Verilog generation
 - [x] Latency cuts
 - [x] Latency Offset
-- [ ] Latency Cuts & Latency Counting for "disjoint Input-Output blocks"
+- [x] Latency Cuts & Latency Counting for "disjoint Input-Output blocks"
+- [x] Latency Count Inference
 - [ ] ~~Split Latencies~~
 
 ### LSP

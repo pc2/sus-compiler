@@ -4,7 +4,7 @@ use std::{
 };
 
 /// Basically `Vec<Vec<T>>`, but reduces pointer chasing by laying the nested vectors all out sequentially. Read-only.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListOfLists<T> {
     buf: Vec<T>,
     // A list of #groups+1 offsets in buf array. The end of each one is the start of the next one. They are laid out sequentially
@@ -37,9 +37,59 @@ impl<T> ListOfLists<T> {
         *last_group_end += 1;
         self.buf.push(item);
     }
+
     pub fn new_group(&mut self) {
         let last_group_end = self.start_ends.last().unwrap();
         self.start_ends.push(*last_group_end);
+    }
+
+    /// Extends multiple lists (groups) with new elements.
+    ///
+    /// The input vector is consumed. Each tuple (group, element) indicates that
+    /// `element` is to be appended to the group at index `group`.
+    ///
+    /// new_values_iter MUST return elements in ascending group order.
+    pub fn extend_lists_with_new_elements(self, mut new_edges: Vec<(usize, T)>) -> Self {
+        assert!(*self.start_ends.first().unwrap() == 0);
+        assert!(*self.start_ends.last().unwrap() == self.buf.len());
+
+        // Sort by the groups
+        new_edges.sort_by_key(|g| g.0);
+
+        let mut new_buffer = Vec::with_capacity(self.buf.capacity() + new_edges.len());
+
+        let mut start_ends = self.start_ends;
+        let mut old_buffer_iterator = self.buf.into_iter();
+
+        let mut new_values_iter_peekable = new_edges.into_iter().peekable();
+
+        let mut cur_start_in_new_buffer = 0;
+        let num_groups = start_ends.len() - 1;
+        for group_id in 0..num_groups {
+            let old_count = start_ends[group_id + 1] - start_ends[group_id];
+            // Copy over old elements
+            for _ in 0..old_count {
+                new_buffer.push(old_buffer_iterator.next().unwrap());
+            }
+            // Add new elements
+            while let Some(v) = new_values_iter_peekable.next_if(|v| v.0 == group_id) {
+                new_buffer.push(v.1);
+            }
+            // Update start_ends
+            start_ends[group_id] = cur_start_in_new_buffer;
+            cur_start_in_new_buffer = new_buffer.len();
+        }
+        start_ends[num_groups] = cur_start_in_new_buffer;
+
+        assert!(
+            new_values_iter_peekable.next().is_none(),
+            "new_values contained groups > num_groups"
+        );
+
+        Self {
+            buf: new_buffer,
+            start_ends,
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -280,5 +330,35 @@ impl<'a, T> IntoIterator for &'a mut ListOfLists<T> {
             start: 0,
             ends_iter: self.start_ends[1..].iter(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ListOfLists;
+
+    #[test]
+    fn test_extend_lists_with_new_elements() {
+        let original = ListOfLists::from_slice_slice(&[
+            &[1, 9, 5, 7],
+            &[5, 6, 3],
+            &[],
+            &[1, 8, 6],
+            &[9, 8, 7],
+        ]);
+
+        let additional_elements = vec![(0, 101), (2, 200), (3, 103), (2, 300)];
+
+        let expected = ListOfLists::from_slice_slice(&[
+            &[1, 9, 5, 7, 101],
+            &[5, 6, 3],
+            &[200, 300],
+            &[1, 8, 6, 103],
+            &[9, 8, 7],
+        ]);
+
+        let new = original.extend_lists_with_new_elements(additional_elements);
+
+        assert!(new == expected);
     }
 }

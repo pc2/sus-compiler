@@ -123,6 +123,14 @@ TREE SITTER module! UseSlice
 TREE SITTER module! UseBuiltinConstants
 TREE SITTER module! FailingAssert
 TREE SITTER module! IfTesting
+TREE SITTER module! latency_counting_disjoint_blocks
+TREE SITTER module! latency_counting_disjoint_blocks_merge_error
+TREE SITTER module! use_infer_me
+TREE SITTER module! infer_me
+TREE SITTER module! infer_from_local_context
+TREE SITTER module! instantiate_fifo
+TREE SITTER module! inference_edge_case
+TREE SITTER module! specified_latencies_not_ports_edge_case
 TREE SITTER module! testArrayWrite
 Typechecking LatencyOffset
 Typechecking CrossDomain
@@ -238,6 +246,14 @@ Typechecking UseSlice
 Typechecking UseBuiltinConstants
 Typechecking FailingAssert
 Typechecking IfTesting
+Typechecking latency_counting_disjoint_blocks
+Typechecking latency_counting_disjoint_blocks_merge_error
+Typechecking use_infer_me
+Typechecking infer_me
+Typechecking infer_from_local_context
+Typechecking instantiate_fifo
+Typechecking inference_edge_case
+Typechecking specified_latencies_not_ports_edge_case
 Typechecking testArrayWrite
 Instantiating IntToBits
 Concrete Typechecking IntToBits
@@ -674,6 +690,47 @@ Concrete Typechecking UseBuiltinConstants
 Latency Counting UseBuiltinConstants
 Checking array accesses UseBuiltinConstants
 Instantiating FailingAssert
+Instantiating latency_counting_disjoint_blocks
+Concrete Typechecking latency_counting_disjoint_blocks
+Latency Counting latency_counting_disjoint_blocks
+Checking array accesses latency_counting_disjoint_blocks
+Instantiating latency_counting_disjoint_blocks_merge_error
+Concrete Typechecking latency_counting_disjoint_blocks_merge_error
+Latency Counting latency_counting_disjoint_blocks_merge_error
+Checking array accesses latency_counting_disjoint_blocks_merge_error
+Not Instantiating use_infer_me due to flattening errors
+Instantiating infer_from_local_context
+Concrete Typechecking infer_from_local_context
+Instantiating infer_me
+Concrete Typechecking infer_me
+Latency Counting infer_me
+Checking array accesses infer_me
+Latency Counting infer_from_local_context
+Checking array accesses infer_from_local_context
+Instantiating instantiate_fifo
+Concrete Typechecking instantiate_fifo
+Instantiating FIFO
+Concrete Typechecking FIFO
+Instantiating CrossDomain
+Concrete Typechecking CrossDomain
+Latency Counting CrossDomain
+Checking array accesses CrossDomain
+Instantiating LatencyOffset
+Concrete Typechecking LatencyOffset
+Latency Counting LatencyOffset
+Checking array accesses LatencyOffset
+Latency Counting FIFO
+Checking array accesses FIFO
+Latency Counting instantiate_fifo
+Checking array accesses instantiate_fifo
+Instantiating inference_edge_case
+Concrete Typechecking inference_edge_case
+Latency Counting inference_edge_case
+Checking array accesses inference_edge_case
+Instantiating specified_latencies_not_ports_edge_case
+Concrete Typechecking specified_latencies_not_ports_edge_case
+Latency Counting specified_latencies_not_ports_edge_case
+Checking array accesses specified_latencies_not_ports_edge_case
 Instantiating testArrayWrite
 Concrete Typechecking testArrayWrite
 Latency Counting testArrayWrite
