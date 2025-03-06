@@ -366,6 +366,1406 @@ state_reg'1
 
 Which conflicts with the starting latency
 ─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 20.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 21.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 22.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 23.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 24.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 25.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 26.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 27.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 28.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
+Error: Index out of bounds. Array is of size 20, but the index is 29.
+     ╭─[test.sus:352:28]
+     │
+ 352 │          row_products[col] = mat[row][col] * vec[col]
+     │                                  ─┬─  
+     │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
+─────╯
 Error: This write is part of a net-positive latency cycle of +5
 
 _1_i'0

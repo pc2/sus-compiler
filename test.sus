@@ -1212,3 +1212,16 @@ module specified_latencies_not_ports_edge_case {
 
 	out_port = out_spec | in_port
 }
+module testArrayWrite {
+	interface testArrayWrite : int[10][6][2] in_arr -> int[10][6] out_arr
+
+	out_arr = in_arr[0]
+
+	out_arr[5][9] = in_arr[0][5][9]
+
+	for int i in 0..10 {
+		for int j in 0..6 {
+			out_arr[j][i] = in_arr[0][j][i]
+		}
+	}
+}

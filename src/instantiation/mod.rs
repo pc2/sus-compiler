@@ -1,5 +1,6 @@
 mod concrete_typecheck;
 mod execute;
+mod final_checks;
 mod unique_names;
 
 use unique_names::UniqueNames;
@@ -339,7 +340,7 @@ fn mangle_name(str: &str) -> String {
         }
         result.push(if c.is_alphanumeric() { c } else { '_' });
     }
-    result
+    result.trim_matches('_').to_owned()
 }
 
 impl InstantiationContext<'_, '_> {
@@ -415,6 +416,9 @@ fn perform_instantiation(
 
     println!("Latency Counting {}", md.link_info.name);
     context.compute_latencies();
+
+    println!("Checking array accesses {}", md.link_info.name);
+    context.check_array_accesses();
 
     context.extract()
 }

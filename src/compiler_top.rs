@@ -53,6 +53,10 @@ impl Linker {
         // Critically, std/core.sus MUST be the first file to be loaded into the linker. Otherwise the IDs don't point to the correct objects
         assert_eq!(self.types[get_builtin_type!("int")].link_info.name, "int");
         assert_eq!(self.types[get_builtin_type!("bool")].link_info.name, "bool");
+        assert_eq!(
+            self.types[get_builtin_type!("float")].link_info.name,
+            "float"
+        );
 
         assert_eq!(
             self.constants[get_builtin_const!("true")].link_info.name,
@@ -132,10 +136,9 @@ impl Linker {
         );
 
         self.with_file_builder(file_id, |builder| {
-            let mut span_debugger =
+            let _panic_guard =
                 SpanDebugger::new("gather_initial_file_data in add_file", builder.file_data);
             gather_initial_file_data(builder);
-            span_debugger.defuse();
         });
 
         info_mngr.on_file_added(file_id, self);
@@ -163,10 +166,9 @@ impl Linker {
             file_data.tree = tree;
 
             self.with_file_builder(file_id, |builder| {
-                let mut span_debugger =
+                let _panic_guard =
                     SpanDebugger::new("gather_initial_file_data in update_file", builder.file_data);
                 gather_initial_file_data(builder);
-                span_debugger.defuse();
             });
 
             info_mngr.on_file_updated(file_id, self);
@@ -232,13 +234,12 @@ impl Linker {
             // Already instantiate any modules without parameters
             // Currently this is all modules
             let span_debug_message = format!("instantiating {}", &md.link_info.name);
-            let mut span_debugger =
+            let _panic_guard =
                 SpanDebugger::new(&span_debug_message, &self.files[md.link_info.file]);
             // Can immediately instantiate modules that have no template args
             if md.link_info.template_parameters.is_empty() {
                 let _inst = md.instantiations.instantiate(md, self, FlatAlloc::new());
             }
-            span_debugger.defuse();
         }
         if config().early_exit == EarlyExitUpTo::Instantiate {}
     }

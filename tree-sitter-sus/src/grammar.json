@@ -1747,6 +1747,10 @@
         "value": "\n"
       }
     },
+    "doc_comment": {
+      "type": "PATTERN",
+      "value": "\\/\\/\\/[^\\n]*"
+    },
     "single_line_comment": {
       "type": "PATTERN",
       "value": "\\/\\/[^\\n]*"
@@ -1760,6 +1764,10 @@
     {
       "type": "PATTERN",
       "value": "[ \\t\\r]+"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "doc_comment"
     },
     {
       "type": "SYMBOL",

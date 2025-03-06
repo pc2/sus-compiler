@@ -26,7 +26,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
 
         let ctx_info_string = format!("Typechecking {}", &working_on.link_info.name);
         println!("{ctx_info_string}");
-        let mut span_debugger =
+        let _panic_guard =
             SpanDebugger::new(&ctx_info_string, &linker.files[working_on.link_info.file]);
 
         let mut context = TypeCheckingContext {
@@ -57,8 +57,6 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
         working_on_mut
             .link_info
             .reabsorb_errors_globals(errs_and_globals, AFTER_TYPECHECK_CP);
-
-        span_debugger.defuse();
     }
 }
 

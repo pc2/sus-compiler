@@ -83,7 +83,6 @@ fn print_most_recent_spans(file_data: &FileData) {
 pub struct SpanDebugger<'text> {
     context: &'text str,
     file_data: &'text FileData,
-    defused: bool,
 }
 
 impl<'text> SpanDebugger<'text> {
@@ -97,26 +96,20 @@ impl<'text> SpanDebugger<'text> {
         Self {
             context,
             file_data: file_text,
-            defused: false,
         }
-    }
-
-    pub fn defuse(&mut self) {
-        SPANS_HISTORY.with_borrow_mut(|history| {
-            assert!(history.in_use);
-            history.in_use = false;
-        });
-
-        self.defused = true;
     }
 }
 
 impl Drop for SpanDebugger<'_> {
     fn drop(&mut self) {
-        if !self.defused {
+        if std::thread::panicking() {
             println!("Panic happened in Span-guarded context: {}", self.context);
             print_most_recent_spans(self.file_data)
         }
+        SPANS_HISTORY.with_borrow_mut(|history| {
+            assert!(history.in_use);
+            history.in_use = false;
+        });
     }
 }
 
