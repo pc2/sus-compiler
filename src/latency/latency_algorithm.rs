@@ -17,7 +17,7 @@
 use std::iter::zip;
 
 use crate::{
-    alloc::{get2_mut, FlatAlloc},
+    alloc::FlatAlloc,
     prelude::{LatencyCountInferenceVarID, LatencyCountInferenceVarIDMarker},
 };
 
@@ -705,61 +705,60 @@ fn solve_port_latencies(
 ) -> Result<Vec<Vec<SpecifiedLatency>>, LatencyCountingError> {
     let mut bad_ports: Vec<(usize, i64, i64)> = Vec::new();
 
-    let mut port_groups: Vec<Vec<SpecifiedLatency>> = ports
-        .inputs()
-        .iter()
-        .map(|input_port| {
-            let mut result: Vec<SpecifiedLatency> = Vec::new();
-            let start_node = SpecifiedLatency {
-                node: *input_port,
-                latency: 0,
-            };
-            result.push(start_node);
-
-            let working_latencies =
-                LatencyNode::make_solution_and_count_latencies(fanouts, &[start_node]);
-
-            for output in ports.outputs() {
-                if let Some(latency) = working_latencies[*output].get_maybe() {
-                    result.push(SpecifiedLatency {
-                        node: *output,
-                        latency,
-                    });
-                }
-            }
-
-            debug_assert!(!SpecifiedLatency::has_duplicates(&result));
-
-            result
-        })
-        .collect();
-
-    merge_where_possible(&mut port_groups, |merge_to, merge_from| {
-        debug_assert!(!SpecifiedLatency::has_duplicates(merge_to));
-        debug_assert!(!SpecifiedLatency::has_duplicates(merge_from));
-
-        let Some(offset) = merge_to.iter().find_map(|to| {
-            SpecifiedLatency::get_latency(merge_from, to.node)
-                .map(|from_latency| to.latency - from_latency)
-        }) else {
-            return false;
+    let port_groups_iter = ports.inputs().iter().map(|input_port| {
+        let mut result: Vec<SpecifiedLatency> = Vec::new();
+        let start_node = SpecifiedLatency {
+            node: *input_port,
+            latency: 0,
         };
+        result.push(start_node);
 
-        for from_node in merge_from {
-            from_node.latency += offset;
+        let working_latencies =
+            LatencyNode::make_solution_and_count_latencies(fanouts, &[start_node]);
 
-            if let Some(to_node_latency) = SpecifiedLatency::get_latency(merge_to, from_node.node) {
-                if to_node_latency != from_node.latency {
-                    bad_ports.push((from_node.node, to_node_latency, from_node.latency));
-                }
-            } else {
-                merge_to.push(*from_node);
+        for output in ports.outputs() {
+            if let Some(latency) = working_latencies[*output].get_maybe() {
+                result.push(SpecifiedLatency {
+                    node: *output,
+                    latency,
+                });
             }
         }
 
-        debug_assert!(!SpecifiedLatency::has_duplicates(merge_to));
-        true
+        debug_assert!(!SpecifiedLatency::has_duplicates(&result));
+
+        result
     });
+
+    let mut port_groups =
+        merge_iter_into_disjoint_groups(port_groups_iter, |merge_to, merge_from| {
+            debug_assert!(!SpecifiedLatency::has_duplicates(merge_to));
+            debug_assert!(!SpecifiedLatency::has_duplicates(merge_from));
+
+            let Some(offset) = merge_to.iter().find_map(|to| {
+                SpecifiedLatency::get_latency(merge_from, to.node)
+                    .map(|from_latency| to.latency - from_latency)
+            }) else {
+                return false;
+            };
+
+            for from_node in merge_from {
+                from_node.latency += offset;
+
+                if let Some(to_node_latency) =
+                    SpecifiedLatency::get_latency(merge_to, from_node.node)
+                {
+                    if to_node_latency != from_node.latency {
+                        bad_ports.push((from_node.node, to_node_latency, from_node.latency));
+                    }
+                } else {
+                    merge_to.push(*from_node);
+                }
+            }
+
+            debug_assert!(!SpecifiedLatency::has_duplicates(merge_to));
+            true
+        });
 
     for output_port in ports.outputs() {
         if !port_groups
@@ -818,13 +817,53 @@ pub fn solve_latencies(
         }]);
     }
 
-    let mut partial_solutions: Vec<PartialLatencyCountingSolution> = partial_solutions
-        .iter()
-        .map(|seeds| PartialLatencyCountingSolution {
-            latencies: LatencyNode::make_solution_forwards_then_backwards(&fanins, &fanouts, seeds),
-            conflicting_nodes: Vec::new(),
-        })
-        .collect();
+    let partial_solutions_iter =
+        partial_solutions
+            .iter()
+            .map(|seeds| PartialLatencyCountingSolution {
+                latencies: LatencyNode::make_solution_forwards_then_backwards(
+                    &fanins, &fanouts, seeds,
+                ),
+                conflicting_nodes: Vec::new(),
+            });
+
+    let mut partial_solutions =
+        merge_iter_into_disjoint_groups(partial_solutions_iter, |merge_to, merge_from| {
+            // Find a node both share
+            let Some(joining_node) = merge_to
+                .latencies
+                .iter()
+                .zip(merge_from.latencies.iter())
+                .position(|(a, b)| a.get_maybe().is_some() && b.get_maybe().is_some())
+            else {
+                return false;
+            };
+
+            // Offset the vector we're merging to bring it in line with the target
+            merge_from.offset_to_pin_node_to(SpecifiedLatency {
+                node: joining_node,
+                latency: merge_to.latencies[joining_node].get_maybe().unwrap(),
+            });
+            merge_to
+                .conflicting_nodes
+                .append(&mut merge_from.conflicting_nodes);
+
+            for (node, (to, from)) in
+                zip(merge_to.latencies.iter_mut(), merge_from.latencies.iter()).enumerate()
+            {
+                match (to.get_maybe(), from.get_maybe()) {
+                    (_, None) => {} // Do nothing
+                    (None, Some(from)) => to.abs_lat = from,
+                    (Some(to), Some(from)) => {
+                        if to != from {
+                            merge_to.conflicting_nodes.push((node, from));
+                        }
+                    }
+                }
+            }
+
+            true
+        });
 
     // Polish solution: if there were no specified latencies, then we make the latency of the first port '0
     // This is to shift the whole solution to one canonical absolute latency. Prefer:
@@ -848,43 +887,6 @@ pub fn solve_latencies(
         partial_solutions.swap(0, reference_solution_idx);
         partial_solutions[0].offset_to_pin_node_to(reference_node);
     }
-
-    merge_where_possible(&mut partial_solutions, |merge_to, merge_from| {
-        // Find a node both share
-        let Some(joining_node) = merge_to
-            .latencies
-            .iter()
-            .zip(merge_from.latencies.iter())
-            .position(|(a, b)| a.get_maybe().is_some() && b.get_maybe().is_some())
-        else {
-            return false;
-        };
-
-        // Offset the vector we're merging to bring it in line with the target
-        merge_from.offset_to_pin_node_to(SpecifiedLatency {
-            node: joining_node,
-            latency: merge_to.latencies[joining_node].get_maybe().unwrap(),
-        });
-        merge_to
-            .conflicting_nodes
-            .append(&mut merge_from.conflicting_nodes);
-
-        for (node, (to, from)) in
-            zip(merge_to.latencies.iter_mut(), merge_from.latencies.iter()).enumerate()
-        {
-            match (to.get_maybe(), from.get_maybe()) {
-                (_, None) => {} // Do nothing
-                (None, Some(from)) => to.abs_lat = from,
-                (Some(to), Some(from)) => {
-                    if to != from {
-                        merge_to.conflicting_nodes.push((node, from));
-                    }
-                }
-            }
-        }
-
-        true
-    });
 
     let mut solution_iter = partial_solutions.into_iter();
 
@@ -914,21 +916,19 @@ pub fn solve_latencies(
     }
 }
 
-/// merge should return true if the second argument was merged into the first argument.
-fn merge_where_possible<T>(parts: &mut Vec<T>, mut merge: impl FnMut(&mut T, &mut T) -> bool) {
-    let mut merge_to_idx = 0;
-    while merge_to_idx < parts.len() {
-        let mut merge_from_idx = merge_to_idx + 1;
-        while merge_from_idx < parts.len() {
-            let (merge_to, merge_from) = get2_mut(parts, merge_to_idx, merge_from_idx).unwrap();
-            if merge(merge_to, merge_from) {
-                parts.swap_remove(merge_from_idx);
-            } else {
-                merge_from_idx += 1;
-            }
-        }
-        merge_to_idx += 1;
+/// [try_merge] should return true if the second argument was merged into the first argument.
+fn merge_iter_into_disjoint_groups<T>(
+    iter: impl Iterator<Item = T>,
+    mut try_merge: impl FnMut(&mut T, &mut T) -> bool,
+) -> Vec<T> {
+    let mut result = Vec::new();
+
+    for mut new_node in iter {
+        result.retain_mut(|existing_elem| !try_merge(&mut new_node, existing_elem));
+        result.push(new_node);
     }
+
+    result
 }
 
 /// A candidate for latency inference. Passed to [try_infer_value_for] as a list of possibilities.

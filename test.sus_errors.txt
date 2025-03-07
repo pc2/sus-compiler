@@ -319,13 +319,13 @@ Error: Latency Counting couldn't reach this node
      │                                              ──┬──  
      │                                                ╰──── Latency Counting couldn't reach this node
 ─────╯
-Error: Cannot determine port latency. Options are 1 and 2
+Error: Cannot determine port latency. Options are 0 and -1
 Try specifying an explicit latency or rework the module to remove this ambiguity
      ╭─[test.sus:284:74]
      │
  284 │     interface undeteriminable_input_latency : int a, int b -> int x, int y
      │                                                                          ┬  
-     │                                                                          ╰── Cannot determine port latency. Options are 1 and 2
+     │                                                                          ╰── Cannot determine port latency. Options are 0 and -1
 Try specifying an explicit latency or rework the module to remove this ambiguity
 ─────╯
 Error: Conflicting specified latency
@@ -2831,22 +2831,22 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │          ─────┬────  
       │               ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: There were conflicting options when merging partial latency counting solutions for this node. Options were 1 and 0
+Error: There were conflicting options when merging partial latency counting solutions for this node. Options were 0 and 1
 Try specifying an explicit latency or rework the module to remove this ambiguity
       ╭─[test.sus:1140:2]
       │
  1140 │     bool out_shared = a_delayed ^ c
       │     ───────┬───────  
-      │            ╰───────── There were conflicting options when merging partial latency counting solutions for this node. Options were 1 and 0
+      │            ╰───────── There were conflicting options when merging partial latency counting solutions for this node. Options were 0 and 1
 Try specifying an explicit latency or rework the module to remove this ambiguity
 ──────╯
-Error: There were conflicting options when merging partial latency counting solutions for this node. Options were 1 and 0
+Error: There were conflicting options when merging partial latency counting solutions for this node. Options were 0 and 1
 Try specifying an explicit latency or rework the module to remove this ambiguity
       ╭─[test.sus:1140:20]
       │
  1140 │     bool out_shared = a_delayed ^ c
       │                       ──────┬──────  
-      │                             ╰──────── There were conflicting options when merging partial latency counting solutions for this node. Options were 1 and 0
+      │                             ╰──────── There were conflicting options when merging partial latency counting solutions for this node. Options were 0 and 1
 Try specifying an explicit latency or rework the module to remove this ambiguity
 ──────╯
 Error: Excess argument. Function takes 1 args, but 2 were passed.
