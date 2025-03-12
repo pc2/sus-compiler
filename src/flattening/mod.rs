@@ -9,7 +9,9 @@ mod walk;
 use crate::alloc::UUIDAllocator;
 use crate::prelude::*;
 use crate::typing::abstract_type::DomainType;
-use crate::typing::type_inference::{DomainVariableIDMarker, TypeVariableIDMarker};
+use crate::typing::type_inference::{
+    DomainVariableIDMarker, PeanoVariableIDMarker, TypeVariableIDMarker,
+};
 
 use std::cell::OnceCell;
 use std::ops::Deref;
@@ -539,7 +541,7 @@ impl ExpressionSource {
 pub enum WrittenType {
     Error(Span),
     TemplateVariable(Span, TemplateID),
-    Named(GlobalReference<TypeUUID>),
+    Named(GlobalReference<RankedTypeUUID>),
     Array(Span, Box<(WrittenType, FlatID, BracketSpan)>),
 }
 
@@ -804,6 +806,7 @@ impl Instruction {
 /// See [crate::typing::type_inference::HindleyMilner]
 #[derive(Debug, Clone)]
 pub struct TypingAllocator {
+    pub peano_variable_alloc: UUIDAllocator<PeanoVariableIDMarker>,
     pub type_variable_alloc: UUIDAllocator<TypeVariableIDMarker>,
     pub domain_variable_alloc: UUIDAllocator<DomainVariableIDMarker>,
 }

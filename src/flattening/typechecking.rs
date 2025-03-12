@@ -1,7 +1,7 @@
 use crate::alloc::{zip_eq3, ArenaAllocator};
 use crate::errors::{ErrorInfo, ErrorInfoObject, FileKnowingErrorInfoObject};
 use crate::prelude::*;
-use crate::typing::abstract_type::AbstractType;
+use crate::typing::abstract_type::{AbstractRankedType, AbstractType, PeanoType};
 use crate::typing::template::ParameterKind;
 use crate::typing::type_inference::{FailedUnification, HindleyMilner};
 
@@ -95,7 +95,10 @@ impl TypeCheckingContext<'_, '_> {
         let decl = submodule_module.get_port_decl(port);
         let port_interface = submodule_module.ports[port].domain;
         let port_local_domain = submodule_inst.local_interface_domains[port_interface];
-        let typ = AbstractType::Unknown(self.type_checker.alloc_typ_variable());
+        let typ = AbstractRankedType {
+            inner: AbstractType::Unknown(self.type_checker.alloc_typ_variable()),
+            rank: PeanoType::Unknown(self.type_checker.alloc_peano_variable()),
+        };
         self.type_checker
             .unify_with_written_type_substitute_templates_must_succeed(
                 &decl.typ_expr,
@@ -157,7 +160,10 @@ impl TypeCheckingContext<'_, '_> {
                 let linker_cst = &self.globals[cst.id];
                 let decl =
                     linker_cst.link_info.instructions[linker_cst.output_decl].unwrap_declaration();
-                let typ = AbstractType::Unknown(self.type_checker.alloc_typ_variable());
+                let typ = AbstractRankedType {
+                    inner: AbstractType::Unknown(self.type_checker.alloc_typ_variable()),
+                    rank: PeanoType::Unknown(self.type_checker.alloc_peano_variable()),
+                };
                 self.type_checker
                     .unify_with_written_type_substitute_templates_must_succeed(
                         &decl.typ_expr,
@@ -186,8 +192,10 @@ impl TypeCheckingContext<'_, '_> {
                 &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
                     let idx_expr = self.working_on.instructions[idx].unwrap_expression();
 
-                    let new_resulting_variable =
-                        AbstractType::Unknown(self.type_checker.alloc_typ_variable());
+                    let new_resulting_variable = AbstractRankedType {
+                        inner: AbstractType::Unknown(self.type_checker.alloc_typ_variable()),
+                        rank: PeanoType::Unknown(self.type_checker.alloc_peano_variable()),
+                    };
                     let arr_span = bracket_span.outer_span();
                     self.type_checker.typecheck_array_access(
                         &current_type_in_progress,
@@ -209,10 +217,17 @@ impl TypeCheckingContext<'_, '_> {
         }
 
         self.type_checker.type_substitutor.unify_report_error(
-            &current_type_in_progress,
-            &output_typ.typ,
+            &current_type_in_progress.inner,
+            &output_typ.typ.inner,
             whole_span,
-            "variable reference",
+            &"variable reference",
+        );
+
+        self.type_checker.peano_substitutor.unify_report_error(
+            &current_type_in_progress.rank,
+            &output_typ.typ.rank,
+            whole_span,
+            &"variable reference rank",
         );
     }
 
@@ -357,7 +372,7 @@ impl TypeCheckingContext<'_, '_> {
                             &argument_expr.typ.typ,
                             argument_type,
                             argument_expr.span,
-                            "generative template argument",
+                            &"generative template argument",
                         );
                     }
                 }
@@ -386,7 +401,7 @@ impl TypeCheckingContext<'_, '_> {
                     &idx_expr.typ.typ,
                     &INT_TYPE,
                     idx_expr.span,
-                    "array size",
+                    &"array size",
                 );
             }
         }
@@ -424,7 +439,7 @@ impl TypeCheckingContext<'_, '_> {
                         &latency_specifier_expr.typ.typ,
                         &INT_TYPE,
                         latency_specifier_expr.span,
-                        "latency specifier",
+                        &"latency specifier",
                     );
                 }
 
@@ -441,7 +456,7 @@ impl TypeCheckingContext<'_, '_> {
                     &condition_expr.typ.typ,
                     &BOOL_TYPE,
                     condition_expr.span,
-                    "if statement condition",
+                    &"if statement condition",
                 );
             }
             Instruction::ForStatement(stm) => {
@@ -453,13 +468,13 @@ impl TypeCheckingContext<'_, '_> {
                     &start.typ.typ,
                     &loop_var.typ.typ,
                     start.span,
-                    "for loop start",
+                    &"for loop start",
                 );
                 self.type_checker.typecheck_write_to_abstract(
                     &end.typ.typ,
                     &loop_var.typ.typ,
                     end.span,
-                    "for loop end",
+                    &"for loop end",
                 );
             }
             Instruction::Expression(expr) => {
@@ -650,6 +665,28 @@ pub fn apply_types(
             .to_string();
         errors
             .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
+            .add_info_list(infos);
+
+        assert!(
+            expected_name != found_name,
+            "{expected_name} != {found_name}"
+        );
+    }
+    for FailedUnification {
+        mut found,
+        mut expected,
+        span,
+        context,
+        infos,
+    } in type_checker.peano_substitutor.extract_errors()
+    {
+        assert!(found.fully_substitute(&type_checker.peano_substitutor));
+        assert!(expected.fully_substitute(&type_checker.peano_substitutor));
+
+        let expected_name = format!("{expected:?}");
+        let found_name = format!("{found:?}");
+        errors
+            .error(span, format!("Rank error: Attempting to combine ranks {found_name} and {expected_name} in {context}"))
             .add_info_list(infos);
 
         assert!(

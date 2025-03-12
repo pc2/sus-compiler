@@ -347,6 +347,7 @@ fn initialize_global_object(
 
     let mut link_info = LinkInfo {
         type_variable_alloc: TypingAllocator {
+            peano_variable_alloc: UUIDAllocator::new(),
             domain_variable_alloc: UUIDAllocator::new(),
             type_variable_alloc: UUIDAllocator::new(),
         },

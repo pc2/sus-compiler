@@ -1,5 +1,5 @@
 use crate::alloc::{ArenaAllocator, UUIDAllocator, UUIDRange, UUID};
-use crate::typing::abstract_type::{AbstractType, DomainType};
+use crate::typing::abstract_type::{AbstractRankedType, AbstractType, DomainType, PeanoType};
 use crate::{alloc::UUIDRangeIter, prelude::*};
 
 use num::BigInt;
@@ -221,7 +221,10 @@ enum ModuleOrWrittenType {
 impl TypingAllocator {
     fn alloc_unset_type(&mut self, domain: DomainAllocOption) -> FullType {
         FullType {
-            typ: AbstractType::Unknown(self.type_variable_alloc.alloc()),
+            typ: AbstractRankedType {
+                inner: AbstractType::Unknown(self.type_variable_alloc.alloc()),
+                rank: PeanoType::Unknown(self.peano_variable_alloc.alloc()),
+            },
             domain: match domain {
                 DomainAllocOption::Generative => DomainType::Generative,
                 DomainAllocOption::NonGenerativeUnknown => {
@@ -439,8 +442,10 @@ impl FlatteningContext<'_, '_> {
                 let template_args =
                     self.flatten_template_args(global_id, template_args_used, cursor);
 
-                let template_arg_types = template_args
-                    .map(|_| AbstractType::Unknown(self.type_alloc.type_variable_alloc.alloc()));
+                let template_arg_types = template_args.map(|_| AbstractRankedType {
+                    inner: AbstractType::Unknown(self.type_alloc.type_variable_alloc.alloc()),
+                    rank: PeanoType::Unknown(self.type_alloc.peano_variable_alloc.alloc()),
+                });
 
                 match global_id {
                     GlobalUUID::Module(id) => LocalOrGlobal::Module(GlobalReference {
@@ -1737,6 +1742,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         working_on_link_info: linker.get_link_info(global_obj),
         instructions: FlatAlloc::new(),
         type_alloc: TypingAllocator {
+            peano_variable_alloc: UUIDAllocator::new(),
             type_variable_alloc: UUIDAllocator::new(),
             domain_variable_alloc: UUIDAllocator::new(),
         },

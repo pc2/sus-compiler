@@ -1,4 +1,4 @@
-use super::abstract_type::AbstractType;
+use super::abstract_type::AbstractRankedType;
 use crate::flattening::WrittenType;
 use crate::{alloc::UUID, prelude::*};
 
@@ -14,7 +14,7 @@ pub struct GlobalReference<ID> {
     pub name_span: Span,
     pub id: ID,
     pub template_args: TVec<Option<TemplateArg>>,
-    pub template_arg_types: TVec<AbstractType>,
+    pub template_arg_types: TVec<AbstractRankedType>,
     pub template_span: Option<BracketSpan>,
 }
 

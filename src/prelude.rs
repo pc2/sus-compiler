@@ -26,6 +26,18 @@ impl UUIDMarker for TypeUUIDMarker {
 }
 pub type TypeUUID = UUID<TypeUUIDMarker>;
 
+pub struct PeanoUUIDMarker;
+impl UUIDMarker for PeanoUUIDMarker {
+    const DISPLAY_NAME: &'static str = "rank_";
+}
+pub type PeanoUUID = UUID<PeanoUUIDMarker>;
+
+pub struct RankedTypeUUIDMarker;
+impl UUIDMarker for RankedTypeUUIDMarker {
+    const DISPLAY_NAME: &'static str = "ranked_type_";
+}
+pub type RankedTypeUUID = UUID<RankedTypeUUIDMarker>;
+
 pub struct ConstantUUIDMarker;
 impl UUIDMarker for ConstantUUIDMarker {
     const DISPLAY_NAME: &'static str = "constant_";

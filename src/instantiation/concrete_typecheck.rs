@@ -72,7 +72,7 @@ impl InstantiationContext<'_, '_> {
                             &destination_typ,
                             source_typ,
                             span,
-                            "write wire access",
+                            &"write wire access",
                         );
                     }
                 }
@@ -93,13 +93,13 @@ impl InstantiationContext<'_, '_> {
                         &self.wires[right].typ,
                         &input_typ,
                         span,
-                        "unary input",
+                        &"unary input",
                     );
                     self.type_substitutor.unify_report_error(
                         &self.wires[this_wire_id].typ,
                         &output_typ,
                         span,
-                        "unary output",
+                        &"unary output",
                     );
                 }
                 &RealWireDataSource::BinaryOp { op, left, right } => {
@@ -152,19 +152,19 @@ impl InstantiationContext<'_, '_> {
                         &self.wires[this_wire_id].typ,
                         &out,
                         span,
-                        "binary output",
+                        &"binary output",
                     );
                     self.type_substitutor.unify_report_error(
                         &self.wires[left].typ,
                         &in_left,
                         span,
-                        "binary left",
+                        &"binary left",
                     );
                     self.type_substitutor.unify_report_error(
                         &self.wires[right].typ,
                         &in_right,
                         span,
-                        "binary right",
+                        &"binary right",
                     );
                 }
                 RealWireDataSource::Select { root, path } => {
@@ -173,7 +173,7 @@ impl InstantiationContext<'_, '_> {
                         &found_typ,
                         &self.wires[this_wire_id].typ,
                         span,
-                        "wire access",
+                        &"wire access",
                     );
                 }
                 RealWireDataSource::Constant { value } => {
