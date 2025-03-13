@@ -56,7 +56,7 @@ impl<T> ListOfLists<T> {
         // Sort by the groups
         new_edges.sort_by_key(|g| g.0);
 
-        let mut new_buffer = Vec::with_capacity(self.buf.capacity() + new_edges.len());
+        let mut new_buffer = Vec::with_capacity(self.buf.len() + new_edges.len());
 
         let mut start_ends = self.start_ends;
         let mut old_buffer_iterator = self.buf.into_iter();
