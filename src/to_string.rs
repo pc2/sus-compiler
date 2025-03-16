@@ -1,7 +1,7 @@
 use crate::alloc::zip_eq;
 use crate::prelude::*;
 
-use crate::typing::abstract_type::{AbstractType, PeanoType};
+use crate::typing::abstract_type::{AbstractInnerType, PeanoType};
 use crate::typing::template::{Parameter, TVec};
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
@@ -45,7 +45,7 @@ impl TemplateNameGetter for TVec<Parameter> {
 #[derive(Debug)]
 pub struct WrittenTypeDisplay<
     'a,
-    TypVec: Index<TypeUUID, Output = StructType>,
+    TypVec: Index<WholeTypeUUID, Output = StructType>,
     TemplateVec: TemplateNameGetter,
 > {
     inner: &'a WrittenType,
@@ -53,7 +53,7 @@ pub struct WrittenTypeDisplay<
     template_names: &'a TemplateVec,
 }
 
-impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
+impl<TypVec: Index<WholeTypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
     for WrittenTypeDisplay<'_, TypVec, TemplateVec>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -81,7 +81,7 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
 impl WrittenType {
     pub fn display<'a>(
         &'a self,
-        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
+        linker_types: &'a impl Index<WholeTypeUUID, Output = StructType>,
         template_names: &'a impl TemplateNameGetter,
     ) -> impl Display + 'a {
         WrittenTypeDisplay {
@@ -93,26 +93,67 @@ impl WrittenType {
 }
 
 #[derive(Debug)]
-pub struct AbstractRankedTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
-    typ: &'a AbstractRankedType,
+pub struct AbstractRankedTypeDisplay<'a, InnerTypVec, PeanoTypVec, TemplateVec: TemplateNameGetter>
+{
+    inner_typ: &'a AbstractInnerType,
+    inner_linker_types: &'a InnerTypVec,
+    rank_typ: &'a PeanoType,
+    rank_linker_types: &'a PeanoTypVec,
+    template_names: &'a TemplateVec,
+}
+
+impl<
+        TypVec: Index<InnerTypeUUID, Output = StructType>,
+        PeanoTypVec: Index<PeanoUUID, Output = StructType>,
+        TemplateVec: TemplateNameGetter,
+    > Display for AbstractRankedTypeDisplay<'_, TypVec, PeanoTypVec, TemplateVec>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // todo: check if this match arm used to return Result or ()
+        match self.inner_typ {
+            AbstractInnerType::Unknown(id) => write!(f, "{id:?}").unwrap(),
+            AbstractInnerType::Template(id) => f
+                .write_str(self.template_names.get_template_name(*id))
+                .unwrap(),
+            AbstractInnerType::Named(id) => {
+                f.write_str(&self.inner_linker_types[*id].link_info.get_full_name())?
+            }
+            AbstractInnerType::Array(sub) => write!(
+                f,
+                "{}[]",
+                sub.deref().display(
+                    self.inner_linker_types,
+                    self.rank_linker_types,
+                    self.template_names
+                )
+            )
+            .unwrap(),
+        }
+        f.write_str(&renderpeano(&self.rank_typ))
+    }
+}
+/*
+#[derive(Debug)]
+pub struct AbstractInnerTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
+    inner: &'a AbstractInnerType,
     linker_types: &'a TypVec,
     template_names: &'a TemplateVec,
 }
 
-impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
-    for AbstractRankedTypeDisplay<'_, TypVec, TemplateVec>
+impl<TypVec: Index<InnerTypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
+    for AbstractInnerTypeDisplay<'_, TypVec, TemplateVec>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // todo: check if this match arm used to return Result or ()
-        match self.typ.inner {
-            AbstractType::Unknown(id) => write!(f, "{id:?}").unwrap(),
-            AbstractType::Template(id) => f
+        match self.inner {
+            AbstractInnerType::Unknown(id) => write!(f, "{id:?}").unwrap(),
+            AbstractInnerType::Template(id) => f
                 .write_str(self.template_names.get_template_name(*id))
                 .unwrap(),
-            AbstractType::Named(id) => {
+            AbstractInnerType::Named(id) => {
                 f.write_str(&self.linker_types[*id].link_info.get_full_name())?
             }
-            AbstractType::Array(sub) => write!(
+            AbstractInnerType::Array(sub) => write!(
                 f,
                 "{}[]",
                 sub.deref().display(self.linker_types, self.template_names)
@@ -124,63 +165,62 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
 }
 
 #[derive(Debug)]
-pub struct AbstractTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
-    inner: &'a AbstractType,
-    linker_types: &'a TypVec,
-    template_names: &'a TemplateVec,
-}
-
-#[derive(Debug)]
 pub struct PeanoTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
     rank: &'a PeanoType,
     linker_types: &'a TypVec,
     template_names: &'a TemplateVec,
 }
+    */
+// todo remove dead code ⬆️⬆️
 
 fn renderpeano(rank: &PeanoType) -> String {
     match rank {
         PeanoType::Zero => "".to_string(),
         PeanoType::Succ(rank) => format!("[]{}", renderpeano(rank)),
-        PeanoType::Unknown(rank) | PeanoType::Named(rank) => format!("[{:?}]", rank),
+        PeanoType::Unknown(rank) => format!("[{:?}]", rank),
+        PeanoType::Named(rank) => format!("[{:?}]", rank),
     }
 }
 
-impl AbstractType {
-    pub fn display<'a>(
+impl AbstractInnerType {
+    /*pub fn display<'a>(
         &'a self,
-        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
+        linker_types: &'a impl Index<InnerTypeUUID, Output = StructType>,
         template_names: &'a impl TemplateNameGetter,
     ) -> impl Display + 'a {
-        AbstractTypeDisplay {
+        AbstractInnerTypeDisplay {
             inner: self,
             linker_types,
             template_names,
         }
-    }
+    }*/
 }
 
 // todo: figure out how this must change to work properly
 impl AbstractRankedType {
     pub fn display<'a>(
         &'a self,
-        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
+        inner_linker_types: &'a impl Index<InnerTypeUUID, Output = StructType>,
+        rank_linker_types: &'a impl Index<PeanoUUID, Output = StructType>,
         template_names: &'a impl TemplateNameGetter,
     ) -> impl Display + 'a {
         AbstractRankedTypeDisplay {
-            typ: self,
-            linker_types,
+            inner_typ: &self.inner,
+            inner_linker_types,
+            rank_typ: &self.rank,
+            rank_linker_types,
             template_names,
         }
     }
 }
 
 #[derive(Debug)]
-pub struct ConcreteTypeDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
+pub struct ConcreteTypeDisplay<'a, T: Index<WholeTypeUUID, Output = StructType>> {
     inner: &'a ConcreteType,
     linker_types: &'a T,
 }
 
-impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_, T> {
+impl<T: Index<WholeTypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner {
             ConcreteType::Named(name) => {
@@ -204,7 +244,7 @@ impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_
 impl ConcreteType {
     pub fn display<'a>(
         &'a self,
-        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
+        linker_types: &'a impl Index<WholeTypeUUID, Output = StructType>,
     ) -> impl Display + 'a {
         ConcreteTypeDisplay {
             inner: self,
@@ -339,7 +379,7 @@ impl Module {
 pub fn pretty_print_concrete_instance(
     target_link_info: &LinkInfo,
     given_template_args: &TVec<ConcreteType>,
-    linker_types: &impl Index<TypeUUID, Output = StructType>,
+    linker_types: &impl Index<WholeTypeUUID, Output = StructType>,
 ) -> String {
     assert!(given_template_args.len() == target_link_info.template_parameters.len());
     let object_full_name = target_link_info.get_full_name();

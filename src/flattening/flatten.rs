@@ -1,5 +1,5 @@
 use crate::alloc::{ArenaAllocator, UUIDAllocator, UUIDRange, UUID};
-use crate::typing::abstract_type::{AbstractRankedType, AbstractType, DomainType, PeanoType};
+use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, DomainType, PeanoType};
 use crate::{alloc::UUIDRangeIter, prelude::*};
 
 use num::BigInt;
@@ -27,7 +27,7 @@ enum NamedLocal {
 enum LocalOrGlobal {
     Local(Span, NamedLocal),
     Module(GlobalReference<ModuleUUID>),
-    Type(GlobalReference<TypeUUID>),
+    Type(GlobalReference<WholeTypeUUID>),
     Constant(GlobalReference<ConstantUUID>),
     // Error is already handled
     NotFound(Span),
@@ -222,7 +222,7 @@ impl TypingAllocator {
     fn alloc_unset_type(&mut self, domain: DomainAllocOption) -> FullType {
         FullType {
             typ: AbstractRankedType {
-                inner: AbstractType::Unknown(self.type_variable_alloc.alloc()),
+                inner: AbstractInnerType::Unknown(self.type_variable_alloc.alloc()),
                 rank: PeanoType::Unknown(self.peano_variable_alloc.alloc()),
             },
             domain: match domain {
@@ -443,7 +443,7 @@ impl FlatteningContext<'_, '_> {
                     self.flatten_template_args(global_id, template_args_used, cursor);
 
                 let template_arg_types = template_args.map(|_| AbstractRankedType {
-                    inner: AbstractType::Unknown(self.type_alloc.type_variable_alloc.alloc()),
+                    inner: AbstractInnerType::Unknown(self.type_alloc.type_variable_alloc.alloc()),
                     rank: PeanoType::Unknown(self.type_alloc.peano_variable_alloc.alloc()),
                 });
 
@@ -1801,7 +1801,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
             &mut md.link_info
         }
         GlobalUUID::Type(type_uuid) => {
-            let typ = &mut linker.types[type_uuid];
+            let typ = &mut linker.whole_types[type_uuid];
 
             // Set all declaration_instruction values
             for (decl_id, instr) in &instructions {

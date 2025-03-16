@@ -1,7 +1,7 @@
 use crate::alloc::{zip_eq3, ArenaAllocator};
 use crate::errors::{ErrorInfo, ErrorInfoObject, FileKnowingErrorInfoObject};
 use crate::prelude::*;
-use crate::typing::abstract_type::{AbstractRankedType, AbstractType, PeanoType};
+use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType};
 use crate::typing::template::ParameterKind;
 use crate::typing::type_inference::{FailedUnification, HindleyMilner};
 
@@ -51,7 +51,8 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
             type_checker,
             working_on_mut,
             &errs_and_globals.0,
-            &linker.types,
+            &linker.inner_types,
+            &linker.rank_types,
         );
 
         working_on_mut
@@ -96,7 +97,7 @@ impl TypeCheckingContext<'_, '_> {
         let port_interface = submodule_module.ports[port].domain;
         let port_local_domain = submodule_inst.local_interface_domains[port_interface];
         let typ = AbstractRankedType {
-            inner: AbstractType::Unknown(self.type_checker.alloc_typ_variable()),
+            inner: AbstractInnerType::Unknown(self.type_checker.alloc_typ_variable()),
             rank: PeanoType::Unknown(self.type_checker.alloc_peano_variable()),
         };
         self.type_checker
@@ -161,7 +162,7 @@ impl TypeCheckingContext<'_, '_> {
                 let decl =
                     linker_cst.link_info.instructions[linker_cst.output_decl].unwrap_declaration();
                 let typ = AbstractRankedType {
-                    inner: AbstractType::Unknown(self.type_checker.alloc_typ_variable()),
+                    inner: AbstractInnerType::Unknown(self.type_checker.alloc_typ_variable()),
                     rank: PeanoType::Unknown(self.type_checker.alloc_peano_variable()),
                 };
                 self.type_checker
@@ -193,7 +194,7 @@ impl TypeCheckingContext<'_, '_> {
                     let idx_expr = self.working_on.instructions[idx].unwrap_expression();
 
                     let new_resulting_variable = AbstractRankedType {
-                        inner: AbstractType::Unknown(self.type_checker.alloc_typ_variable()),
+                        inner: AbstractInnerType::Unknown(self.type_checker.alloc_typ_variable()),
                         rank: PeanoType::Unknown(self.type_checker.alloc_peano_variable()),
                     };
                     let arr_span = bracket_span.outer_span();
@@ -580,7 +581,8 @@ pub fn apply_types(
     mut type_checker: TypeUnifier,
     working_on: &mut Module,
     errors: &ErrorCollector,
-    types: &ArenaAllocator<StructType, TypeUUIDMarker>,
+    inner_types: &ArenaAllocator<StructType, InnerTypeUUIDMarker>,
+    rank_types: &ArenaAllocator<StructType, PeanoUUIDMarker>,
 ) {
     // Set the remaining domain variables that aren't associated with a module port.
     // We just find domain IDs that haven't been
@@ -610,25 +612,35 @@ pub fn apply_types(
     for (_id, inst) in working_on.link_info.instructions.iter_mut() {
         match inst {
             Instruction::Expression(expr) => {
-                type_checker.finalize_type(types, &mut expr.typ, expr.span, errors);
+                type_checker.finalize_type(
+                    inner_types,
+                    rank_types,
+                    &mut expr.typ,
+                    expr.span,
+                    errors,
+                );
                 if let ExpressionSource::WireRef(wr) = &mut expr.source {
                     if let WireReferenceRoot::NamedConstant(cst) = &mut wr.root {
-                        type_checker.finalize_global_ref(types, cst, errors);
+                        type_checker.finalize_global_ref(inner_types, rank_types, cst, errors);
                     }
                 }
             }
-            Instruction::Declaration(decl) => {
-                type_checker.finalize_type(types, &mut decl.typ, decl.name_span, errors)
-            }
+            Instruction::Declaration(decl) => type_checker.finalize_type(
+                inner_types,
+                rank_types,
+                &mut decl.typ,
+                decl.name_span,
+                errors,
+            ),
             Instruction::Write(Write {
                 to_type,
                 to_span,
                 to,
                 ..
             }) => {
-                type_checker.finalize_type(types, to_type, *to_span, errors);
+                type_checker.finalize_type(inner_types, rank_types, to_type, *to_span, errors);
                 if let WireReferenceRoot::NamedConstant(cst) = &mut to.root {
-                    type_checker.finalize_global_ref(types, cst, errors);
+                    type_checker.finalize_global_ref(inner_types, rank_types, cst, errors);
                 }
             }
             // TODO Submodule domains may not be crossed either?
@@ -638,7 +650,12 @@ pub fn apply_types(
                 {
                     type_checker.finalize_domain_type(domain_assigned_to_it_here);
                 }
-                type_checker.finalize_global_ref(types, &mut sm.module_ref, errors);
+                type_checker.finalize_global_ref(
+                    inner_types,
+                    rank_types,
+                    &mut sm.module_ref,
+                    errors,
+                );
             }
             _other => {}
         }
@@ -658,10 +675,10 @@ pub fn apply_types(
         let _ = expected.fully_substitute(&type_checker.type_substitutor);
 
         let expected_name = expected
-            .display(types, &type_checker.template_type_names)
+            .display(inner_types, &type_checker.template_type_names)
             .to_string();
         let found_name = found
-            .display(types, &type_checker.template_type_names)
+            .display(inner_types, &type_checker.template_type_names)
             .to_string();
         errors
             .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))

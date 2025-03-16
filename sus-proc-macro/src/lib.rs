@@ -72,7 +72,7 @@ pub fn field(token_stream: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn get_builtin_type(token_stream: TokenStream) -> TokenStream {
+pub fn get_builtin_type_inner(token_stream: TokenStream) -> TokenStream {
     let string_literal: LitStr = parse_macro_input!(token_stream);
 
     let object_name = string_literal.value();
@@ -85,7 +85,35 @@ pub fn get_builtin_type(token_stream: TokenStream) -> TokenStream {
         let (_full, [found_name]) = c.extract();
         if found_name == object_name {
             return quote! {
-                crate::prelude::TypeUUID::from_hidden_value(#idx)
+                crate::prelude::InnerTypeUUID::from_hidden_value(#idx)
+            }
+            .into();
+        }
+    }
+
+    quote_spanned!(
+        string_literal.span() =>
+        compile_error!("Unknown builtin type was not found in std/core.sus")
+    )
+    .into()
+}
+
+// todo: add the startup type assertions to get_builtin_type_whole too
+#[proc_macro]
+pub fn get_builtin_type_whole(token_stream: TokenStream) -> TokenStream {
+    let string_literal: LitStr = parse_macro_input!(token_stream);
+
+    let object_name = string_literal.value();
+
+    let core_file_text = std::fs::read_to_string("std/core.sus").unwrap();
+
+    let re = Regex::new(r"__builtin__\s+struct\s+([a-zA-Z0-9_]+)\s*(?:#\(.*\))?\s*\{").unwrap();
+
+    for (idx, c) in re.captures_iter(&core_file_text).enumerate() {
+        let (_full, [found_name]) = c.extract();
+        if found_name == object_name {
+            return quote! {
+                crate::prelude::WholeTypeUUID::from_hidden_value(#idx)
             }
             .into();
         }

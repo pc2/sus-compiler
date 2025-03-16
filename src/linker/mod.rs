@@ -153,7 +153,7 @@ pub struct FileData {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GlobalUUID {
     Module(ModuleUUID),
-    Type(TypeUUID),
+    Type(WholeTypeUUID),
     Constant(ConstantUUID),
 }
 
@@ -166,7 +166,7 @@ impl GlobalUUID {
         *id
     }
     #[track_caller]
-    pub fn unwrap_type(&self) -> TypeUUID {
+    pub fn unwrap_type(&self) -> WholeTypeUUID {
         let GlobalUUID::Type(id) = self else {
             unreachable!("Not a TypeUUID!")
         };
@@ -187,8 +187,8 @@ impl From<ModuleUUID> for GlobalUUID {
     }
 }
 
-impl From<TypeUUID> for GlobalUUID {
-    fn from(value: TypeUUID) -> Self {
+impl From<WholeTypeUUID> for GlobalUUID {
+    fn from(value: WholeTypeUUID) -> Self {
         GlobalUUID::Type(value)
     }
 }
@@ -214,7 +214,9 @@ enum NamespaceElement {
 ///
 /// Incremental operations such as adding and removing files can be performed on this
 pub struct Linker {
-    pub types: ArenaAllocator<StructType, TypeUUIDMarker>,
+    pub whole_types: ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+    pub inner_types: ArenaAllocator<StructType, InnerTypeUUIDMarker>,
+    pub rank_types: ArenaAllocator<StructType, PeanoUUIDMarker>,
     pub modules: ArenaAllocator<Module, ModuleUUIDMarker>,
     pub constants: ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
     pub files: ArenaAllocator<FileData, FileUUIDMarker>,
@@ -230,7 +232,9 @@ impl Default for Linker {
 impl Linker {
     pub fn new() -> Linker {
         Linker {
-            types: ArenaAllocator::new(),
+            whole_types: ArenaAllocator::new(),
+            inner_types: ArenaAllocator::new(),
+            rank_types: ArenaAllocator::new(),
             modules: ArenaAllocator::new(),
             constants: ArenaAllocator::new(),
             files: ArenaAllocator::new(),
@@ -241,13 +245,13 @@ impl Linker {
     pub fn get_link_info(&self, global: GlobalUUID) -> &LinkInfo {
         match global {
             GlobalUUID::Module(md_id) => &self.modules[md_id].link_info,
-            GlobalUUID::Type(typ_id) => &self.types[typ_id].link_info,
+            GlobalUUID::Type(typ_id) => &self.whole_types[typ_id].link_info,
             GlobalUUID::Constant(cst_id) => &self.constants[cst_id].link_info,
         }
     }
     pub fn get_link_info_mut<'l>(
         modules: &'l mut ArenaAllocator<Module, ModuleUUIDMarker>,
-        types: &'l mut ArenaAllocator<StructType, TypeUUIDMarker>,
+        types: &'l mut ArenaAllocator<StructType, WholeTypeUUIDMarker>,
         constants: &'l mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
         global: GlobalUUID,
     ) -> &'l mut LinkInfo {
@@ -345,7 +349,7 @@ impl Linker {
                     self.modules.free(id);
                 }
                 GlobalUUID::Type(id) => {
-                    self.types.free(id);
+                    self.whole_types.free(id);
                 }
                 GlobalUUID::Constant(id) => {
                     self.constants.free(id);
@@ -390,7 +394,7 @@ impl Linker {
             other_parsing_errors: &other_parsing_errors,
             associated_values: &mut associated_values,
             global_namespace: &mut self.global_namespace,
-            types: &mut self.types,
+            types: &mut self.whole_types,
             modules: &mut self.modules,
             constants: &mut self.constants,
         });
@@ -412,7 +416,7 @@ pub struct FileBuilder<'linker> {
     associated_values: &'linker mut Vec<GlobalUUID>,
     global_namespace: &'linker mut HashMap<String, NamespaceElement>,
     modules: &'linker mut ArenaAllocator<Module, ModuleUUIDMarker>,
-    types: &'linker mut ArenaAllocator<StructType, TypeUUIDMarker>,
+    types: &'linker mut ArenaAllocator<StructType, WholeTypeUUIDMarker>,
     constants: &'linker mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
 }
 

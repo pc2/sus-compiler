@@ -309,9 +309,9 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                         ),
                     );
                 }
-                WrittenType::Named(named_type, named_rank) => {
+                WrittenType::Named(named_type) => {
                     self.walk_global_reference(parent, link_info, named_type);
-                    // todo: figure out how to walk peano ranks
+                    // todo: figure out how to walk peano ranks!
                     // self.walk_global_reference(parent, link_info, named_rank);
                 }
                 WrittenType::Array(_, arr_box) => {

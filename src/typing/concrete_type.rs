@@ -1,5 +1,5 @@
 use num::BigInt;
-use sus_proc_macro::get_builtin_type;
+use sus_proc_macro::get_builtin_type_whole;
 
 use crate::prelude::*;
 use std::ops::Deref;
@@ -11,12 +11,12 @@ use super::template::TVec;
 use super::type_inference::ConcreteTypeVariableID;
 
 pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
-    id: get_builtin_type!("bool"),
+    id: get_builtin_type_whole!("bool"),
     template_args: FlatAlloc::new(),
 });
 
 pub const INT_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
-    id: get_builtin_type!("int"),
+    id: get_builtin_type_whole!("int"),
     template_args: FlatAlloc::new(),
 });
 
@@ -35,7 +35,7 @@ pub struct ConcreteGlobalReference<ID> {
 /// or [crate::flattening::WrittenType] which represents the textual in-editor data.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteType {
-    Named(ConcreteGlobalReference<TypeUUID>),
+    Named(ConcreteGlobalReference<WholeTypeUUID>),
     Value(Value),
     Array(Box<(ConcreteType, ConcreteType)>),
     /// Referencing [ConcreteType::Unknown] is a strong code smell.
@@ -93,10 +93,10 @@ impl ConcreteType {
     }
 
     /// TODO #50 Ranged Int work should be integrated
-    pub fn sizeof_named(type_ref: &ConcreteGlobalReference<TypeUUID>) -> u64 {
-        if type_ref.id == get_builtin_type!("int") {
+    pub fn sizeof_named(type_ref: &ConcreteGlobalReference<WholeTypeUUID>) -> u64 {
+        if type_ref.id == get_builtin_type_whole!("int") {
             32 // TODO concrete int sizes
-        } else if type_ref.id == get_builtin_type!("bool") {
+        } else if type_ref.id == get_builtin_type_whole!("bool") {
             1
         } else {
             println!("TODO Named Structs Size");

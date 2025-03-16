@@ -64,7 +64,7 @@ impl HoverCollector<'_> {
                         if wire.original_instruction != id {
                             continue;
                         }
-                        let typ_str = wire.typ.display(&self.linker.types);
+                        let typ_str = wire.typ.display(&self.linker.whole_types);
                         let name_str = &wire.name;
                         let latency_str = if wire.absolute_latency != CALCULATE_LATENCY_LATER {
                             format!("{}", wire.absolute_latency)
@@ -87,7 +87,7 @@ impl HoverCollector<'_> {
                 self.sus_code(pretty_print_concrete_instance(
                     &submodule.link_info,
                     &sm.template_args,
-                    &self.linker.types,
+                    &self.linker.whole_types,
                 ));
             }
         });
@@ -142,7 +142,11 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             let typ_str = decl
                 .typ
                 .typ
-                .display(&linker.types, &link_info.template_parameters)
+                .display(
+                    &linker.inner_types,
+                    &linker.rank_types,
+                    &link_info.template_parameters,
+                )
                 .to_string();
             details_vec.push(typ_str);
 
@@ -204,7 +208,11 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             details_vec.push(Cow::Owned(
                 wire.typ
                     .typ
-                    .display(&linker.types, &link_info.template_parameters)
+                    .display(
+                        &linker.inner_types,
+                        &linker.rank_types,
+                        &link_info.template_parameters,
+                    )
                     .to_string(),
             ));
             hover.sus_code(details_vec.join(" "));
@@ -212,7 +220,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
         }
         LocationInfo::Type(typ, link_info) => {
             hover.sus_code(
-                typ.display(&linker.types, &link_info.template_parameters)
+                typ.display(&linker.whole_types, &link_info.template_parameters)
                     .to_string(),
             );
         }
@@ -230,7 +238,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     hover.sus_code(format!(
                         "param {} {}",
                         decl.typ_expr
-                            .display(&linker.types, &link_info.template_parameters),
+                            .display(&linker.whole_types, &link_info.template_parameters),
                         template_arg.name
                     ));
                     hover.gather_hover_infos(obj_id, *declaration_instruction, true);

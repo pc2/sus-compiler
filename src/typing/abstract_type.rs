@@ -1,14 +1,14 @@
-use sus_proc_macro::get_builtin_type;
+use sus_proc_macro::get_builtin_type_inner;
 
-use crate::alloc::{ArenaAllocator, UUIDAllocator, UUID};
+use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
 use crate::value::Value;
 use std::ops::Deref;
 
 use super::template::{GlobalReference, Parameter, TVec};
 use super::type_inference::{
-    DomainVariableID, DomainVariableIDMarker, PeanoVariableID, PeanoVariableIDMarker,
-    TypeSubstitutor, TypeVariableID, TypeVariableIDMarker, UnifyErrorReport,
+    DomainVariableID, DomainVariableIDMarker, InnerTypeVariableID, InnerTypeVariableIDMarker,
+    PeanoVariableID, PeanoVariableIDMarker, TypeSubstitutor, UnifyErrorReport,
 };
 use crate::flattening::{BinaryOperator, StructType, TypingAllocator, UnaryOperator, WrittenType};
 use crate::to_string::map_to_type_names;
@@ -29,25 +29,25 @@ use crate::to_string::map_to_type_names;
 /// [AbstractType]s don't actually get converted to [crate::typing::concrete_type::ConcreteType]s.
 /// Instead [crate::typing::concrete_type::ConcreteType] gets created from [WrittenType] directly.
 #[derive(Debug, Clone)]
-pub enum AbstractType {
+pub enum AbstractInnerType {
     Template(TemplateID),
-    Named(TypeUUID),
+    Named(InnerTypeUUID),
     Array(Box<AbstractRankedType>),
     /// Referencing [AbstractType::Unknown] is a strong code smell.
     /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
     ///
     /// It should only occur in creation `AbstractType::Unknown(self.type_substitutor.alloc())`
-    Unknown(TypeVariableID),
+    Unknown(InnerTypeVariableID),
 }
 
 #[derive(Debug, Clone)]
 pub struct AbstractRankedType {
-    pub inner: AbstractType,
+    pub inner: AbstractInnerType,
     pub rank: PeanoType,
 }
 
 impl AbstractRankedType {
-    pub const fn scalar(inner: AbstractType) -> Self {
+    pub const fn scalar(inner: AbstractInnerType) -> Self {
         Self {
             inner,
             rank: PeanoType::Zero,
@@ -83,9 +83,9 @@ impl PeanoType {
 }*/
 
 pub const BOOL_TYPE: AbstractRankedType =
-    AbstractRankedType::scalar(AbstractType::Named(get_builtin_type!("bool")));
+    AbstractRankedType::scalar(AbstractInnerType::Named(get_builtin_type_inner!("bool")));
 pub const INT_TYPE: AbstractRankedType =
-    AbstractRankedType::scalar(AbstractType::Named(get_builtin_type!("int")));
+    AbstractRankedType::scalar(AbstractInnerType::Named(get_builtin_type_inner!("int")));
 
 /// These represent (clock) domains. While clock domains are included under this umbrella, domains can use the same clock.
 /// The use case for non-clock-domains is to separate Latency Counting domains. So different pipelines where it doesn't
@@ -147,9 +147,10 @@ pub struct FullType {
 /// 'x U 'y -> Substitute 'x = 'y
 pub struct TypeUnifier {
     pub template_type_names: FlatAlloc<String, TemplateIDMarker>,
-    pub type_substitutor: TypeSubstitutor<AbstractType, TypeVariableIDMarker>,
+    pub type_substitutor: TypeSubstitutor<AbstractInnerType, InnerTypeVariableIDMarker>,
     pub peano_substitutor: TypeSubstitutor<PeanoType, PeanoVariableIDMarker>,
     pub domain_substitutor: TypeSubstitutor<DomainType, DomainVariableIDMarker>,
+    //pub type_map: HashMap<Type
 }
 
 impl TypeUnifier {
@@ -164,7 +165,7 @@ impl TypeUnifier {
 
     // todo: not clear why these methods exist
 
-    pub fn alloc_typ_variable(&self) -> TypeVariableID {
+    pub fn alloc_typ_variable(&self) -> InnerTypeVariableID {
         self.type_substitutor.alloc()
     }
 
@@ -189,11 +190,11 @@ impl TypeUnifier {
             WrittenType::Error(_span) => {} // Already an error, don't unify
             WrittenType::TemplateVariable(_span, argument_id) => {
                 self.type_substitutor
-                    .unify_must_succeed(&typ.inner, &AbstractType::Template(*argument_id));
+                    .unify_must_succeed(&typ.inner, &AbstractInnerType::Template(*argument_id));
             }
             WrittenType::Named(global_reference) => {
                 self.type_substitutor
-                    .unify_must_succeed(&typ.inner, &AbstractType::Named(global_reference.id));
+                    .unify_must_succeed(&typ.inner, &AbstractInnerType::Named(global_reference.id));
             }
             WrittenType::Array(_span, array_content_and_size) => {
                 unreachable!("no array written type unifying yet"); // todo this
@@ -240,7 +241,7 @@ impl TypeUnifier {
             }
             WrittenType::Named(global_reference) => {
                 self.type_substitutor
-                    .unify_must_succeed(&typ.inner, &AbstractType::Named(global_reference.id));
+                    .unify_must_succeed(&typ.inner, &AbstractInnerType::Named(global_reference.id));
                 self.peano_substitutor
                     .unify_must_succeed(&typ.rank, &PeanoType::Named(global_reference.id));
             }
@@ -290,7 +291,7 @@ impl TypeUnifier {
             ),
             Value::Array(arr) => {
                 let arr_content_variable = AbstractRankedType {
-                    inner: AbstractType::Unknown(self.type_substitutor.alloc()),
+                    inner: AbstractInnerType::Unknown(self.type_substitutor.alloc()),
                     rank: PeanoType::Unknown(self.peano_substitutor.alloc()),
                 };
 
@@ -549,7 +550,8 @@ impl TypeUnifier {
 
     pub fn finalize_abstract_type(
         &mut self,
-        types: &ArenaAllocator<StructType, TypeUUIDMarker>,
+        inner_types: &ArenaAllocator<StructType, InnerTypeUUIDMarker>,
+        rank_types: &ArenaAllocator<StructType, PeanoUUIDMarker>,
         typ: &mut AbstractRankedType,
         span: Span,
         errors: &ErrorCollector,
@@ -558,7 +560,7 @@ impl TypeUnifier {
         if !(typ.inner.fully_substitute(&self.type_substitutor)
             && typ.rank.fully_substitute(&self.peano_substitutor))
         {
-            let typ_as_string = typ.display(types, &self.template_type_names);
+            let typ_as_string = typ.display(inner_types, rank_types, &self.template_type_names);
             errors.error(
                 span,
                 format!("Could not fully figure out the type of this object. {typ_as_string}"),
@@ -568,24 +570,32 @@ impl TypeUnifier {
 
     pub fn finalize_type(
         &mut self,
-        types: &ArenaAllocator<StructType, TypeUUIDMarker>,
+        inner_types: &ArenaAllocator<StructType, InnerTypeUUIDMarker>,
+        rank_types: &ArenaAllocator<StructType, PeanoUUIDMarker>,
         typ: &mut FullType,
         span: Span,
         errors: &ErrorCollector,
     ) {
         self.finalize_domain_type(&mut typ.domain);
-        self.finalize_abstract_type(types, &mut typ.typ, span, errors);
+        self.finalize_abstract_type(inner_types, rank_types, &mut typ.typ, span, errors);
     }
 
     pub fn finalize_global_ref<ID>(
         &mut self,
-        types: &ArenaAllocator<StructType, TypeUUIDMarker>,
+        inner_types: &ArenaAllocator<StructType, InnerTypeUUIDMarker>,
+        rank_types: &ArenaAllocator<StructType, PeanoUUIDMarker>,
         global_ref: &mut GlobalReference<ID>,
         errors: &ErrorCollector,
     ) {
         let global_ref_span = global_ref.get_total_span();
         for (_template_id, template_type) in &mut global_ref.template_arg_types {
-            self.finalize_abstract_type(types, template_type, global_ref_span, errors);
+            self.finalize_abstract_type(
+                inner_types,
+                rank_types,
+                template_type,
+                global_ref_span,
+                errors,
+            );
         }
     }
 }

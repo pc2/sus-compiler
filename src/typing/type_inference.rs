@@ -13,15 +13,15 @@ use crate::prelude::*;
 use crate::alloc::{UUIDAllocator, UUIDMarker, UUIDRange, UUID};
 use crate::value::Value;
 
-use super::abstract_type::{AbstractRankedType, PeanoType};
-use super::abstract_type::{AbstractType, DomainType};
+use super::abstract_type::PeanoType;
+use super::abstract_type::{AbstractInnerType, DomainType};
 use super::concrete_type::ConcreteType;
 
-pub struct TypeVariableIDMarker;
-impl UUIDMarker for TypeVariableIDMarker {
+pub struct InnerTypeVariableIDMarker;
+impl UUIDMarker for InnerTypeVariableIDMarker {
     const DISPLAY_NAME: &'static str = "type_variable_";
 }
-pub type TypeVariableID = UUID<TypeVariableIDMarker>;
+pub type InnerTypeVariableID = UUID<InnerTypeVariableIDMarker>;
 
 pub struct PeanoVariableIDMarker;
 impl UUIDMarker for PeanoVariableIDMarker {
@@ -430,23 +430,23 @@ pub trait HindleyMilner<VariableIDMarker: UUIDMarker>: Sized {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AbstractTypeHMInfo {
     Template(TemplateID),
-    Named(TypeUUID),
+    Named(InnerTypeUUID),
     Array,
 }
 
-impl HindleyMilner<TypeVariableIDMarker> for AbstractType {
+impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
     type TypeFuncIdent<'slf> = AbstractTypeHMInfo;
 
-    fn get_hm_info(&self) -> HindleyMilnerInfo<AbstractTypeHMInfo, TypeVariableIDMarker> {
+    fn get_hm_info(&self) -> HindleyMilnerInfo<AbstractTypeHMInfo, InnerTypeVariableIDMarker> {
         match self {
-            AbstractType::Unknown(var_id) => HindleyMilnerInfo::TypeVar(*var_id),
-            AbstractType::Template(template_id) => {
+            AbstractInnerType::Unknown(var_id) => HindleyMilnerInfo::TypeVar(*var_id),
+            AbstractInnerType::Template(template_id) => {
                 HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Template(*template_id))
             }
-            AbstractType::Named(named_id) => {
+            AbstractInnerType::Named(named_id) => {
                 HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Named(*named_id))
             }
-            AbstractType::Array(_) => HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Array),
+            AbstractInnerType::Array(_) => HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Array),
         }
     }
 
@@ -456,15 +456,15 @@ impl HindleyMilner<TypeVariableIDMarker> for AbstractType {
         unify: &mut F,
     ) -> UnifyResult {
         match (left, right) {
-            (AbstractType::Template(na), AbstractType::Template(nb)) => {
+            (AbstractInnerType::Template(na), AbstractInnerType::Template(nb)) => {
                 assert!(*na == *nb);
                 UnifyResult::Success
             } // Already covered by get_hm_info
-            (AbstractType::Named(na), AbstractType::Named(nb)) => {
+            (AbstractInnerType::Named(na), AbstractInnerType::Named(nb)) => {
                 assert!(*na == *nb);
                 UnifyResult::Success
             } // Already covered by get_hm_info
-            (AbstractType::Array(arr_typ), AbstractType::Array(arr_typ_2)) => {
+            (AbstractInnerType::Array(arr_typ), AbstractInnerType::Array(arr_typ_2)) => {
                 unify(&arr_typ.inner, &arr_typ_2.inner)
             }
             (_, _) => unreachable!("All others should have been eliminated by get_hm_info check"),
@@ -473,12 +473,12 @@ impl HindleyMilner<TypeVariableIDMarker> for AbstractType {
 
     fn fully_substitute(
         &mut self,
-        substitutor: &TypeSubstitutor<Self, TypeVariableIDMarker>,
+        substitutor: &TypeSubstitutor<Self, InnerTypeVariableIDMarker>,
     ) -> bool {
         match self {
-            AbstractType::Named(_) | AbstractType::Template(_) => true, // Template Name & Name is included in get_hm_info
-            AbstractType::Array(arr_typ) => arr_typ.inner.fully_substitute(substitutor),
-            AbstractType::Unknown(var) => {
+            AbstractInnerType::Named(_) | AbstractInnerType::Template(_) => true, // Template Name & Name is included in get_hm_info
+            AbstractInnerType::Array(arr_typ) => arr_typ.inner.fully_substitute(substitutor),
+            AbstractInnerType::Unknown(var) => {
                 let Some(replacement) = substitutor.substitution_map[var.get_hidden_value()].get()
                 else {
                     return false;
@@ -491,11 +491,11 @@ impl HindleyMilner<TypeVariableIDMarker> for AbstractType {
     }
 
     // todo: this only considers abstract inner types, not ranks, check this is OK
-    fn for_each_unknown(&self, f: &mut impl FnMut(TypeVariableID)) {
+    fn for_each_unknown(&self, f: &mut impl FnMut(InnerTypeVariableID)) {
         match self {
-            AbstractType::Template(_) | AbstractType::Named(_) => {}
-            AbstractType::Array(array_content) => array_content.inner.for_each_unknown(f),
-            AbstractType::Unknown(uuid) => f(*uuid),
+            AbstractInnerType::Template(_) | AbstractInnerType::Named(_) => {}
+            AbstractInnerType::Array(array_content) => array_content.inner.for_each_unknown(f),
+            AbstractInnerType::Unknown(uuid) => f(*uuid),
         }
     }
 }
@@ -607,7 +607,7 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
     ) -> bool {
         match self {
             PeanoType::Succ(typ) => typ.fully_substitute(substitutor),
-            PeanoType::Zero => true,
+            PeanoType::Zero | PeanoType::Named(_) => true,
             PeanoType::Unknown(var) => {
                 let Some(replacement) = substitutor.substitution_map[var.get_hidden_value()].get()
                 else {
@@ -674,7 +674,7 @@ impl HindleyMilner<DomainVariableIDMarker> for DomainType {
 /// [HindleyMilnerInfo] `TypeFuncIdent` for [ConcreteType]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConcreteTypeHMInfo<'slf> {
-    Named(TypeUUID),
+    Named(WholeTypeUUID),
     Value(&'slf Value),
     Array,
 }
