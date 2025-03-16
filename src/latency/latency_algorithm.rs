@@ -15,9 +15,13 @@
 //!     From here it keeps all the found latencies, such that the resulting latencies are all as early as possible.
 
 use std::{
+    collections::VecDeque,
+    io::{stdout, Write},
     iter::zip,
     ops::{Index, IndexMut},
 };
+
+use bitvector::BitVector;
 
 use crate::{
     alloc::FlatAlloc,
@@ -603,6 +607,274 @@ fn find_net_positive_latency_cycles_and_incompatible_specified_latencies(
     Ok(())
 }
 
+/// Check if the graph contains any cycles or incompatible specified latencies.
+fn find_positive_latency_cycle(
+    fanouts: &ListOfLists<FanInOut>,
+    specified_latencies: &[SpecifiedLatency],
+) -> Result<(), LatencyCountingError> {
+    #[derive(Clone, Copy)]
+    struct BellmannFordNode {
+        value: i64,
+        parent: Option<usize>,
+    }
+
+    dbg!(fanouts);
+    let mut nodes = vec![
+        BellmannFordNode {
+            parent: None,
+            value: i64::MIN,
+        };
+        fanouts.len()
+    ];
+
+    /// Returns Some(a_node_in_cycle) if here is a cycle.
+    fn check_parent_cycle(nodes: &[BellmannFordNode], start_from: usize) -> Option<usize> {
+        let mut fast_ptr = start_from;
+        let mut slow_ptr = start_from;
+
+        loop {
+            fast_ptr = nodes[fast_ptr].parent?;
+            fast_ptr = nodes[fast_ptr].parent?;
+            slow_ptr = nodes[slow_ptr].parent.unwrap();
+
+            if fast_ptr == slow_ptr {
+                return Some(fast_ptr);
+            }
+        }
+    }
+
+    fn collect_cycle_or_invalid_specified_latency_error(
+        nodes: &[BellmannFordNode],
+        fanouts: &ListOfLists<FanInOut>,
+        start_from: usize,
+        specified_latencies: &[SpecifiedLatency],
+    ) -> LatencyCountingError {
+        let mut conflict_path = Vec::new();
+
+        let mut cur_idx = start_from;
+        let mut is_bad_cycle = false;
+        conflict_path.push(SpecifiedLatency {
+            node: cur_idx,
+            latency: i64::MIN,
+        });
+        while let Some(parent) = nodes[cur_idx].parent {
+            conflict_path.push(SpecifiedLatency {
+                node: parent,
+                latency: i64::MIN,
+            });
+            if parent == start_from {
+                is_bad_cycle = true;
+                break;
+            }
+            cur_idx = parent;
+        }
+        conflict_path.reverse();
+        let first_node = conflict_path.first_mut().unwrap();
+        first_node.latency = if is_bad_cycle {
+            0
+        } else {
+            SpecifiedLatency::get_from_specify_list(specified_latencies, first_node.node).unwrap()
+        };
+
+        let mut cur_node = *first_node;
+
+        for next_node in &mut conflict_path[1..] {
+            let mut max_delta = i64::MIN;
+            for fout in &fanouts[cur_node.node] {
+                if fout.to_node == next_node.node {
+                    max_delta = i64::max(-fout.delta_latency.unwrap(), max_delta);
+                }
+            }
+            assert!(max_delta != i64::MIN);
+
+            next_node.latency = cur_node.latency + max_delta;
+            cur_node = *next_node;
+        }
+
+        assert!(!conflict_path.is_empty());
+        if is_bad_cycle {
+            let SpecifiedLatency {
+                node,
+                latency: net_roundtrip_latency,
+            } = conflict_path.pop().unwrap();
+            assert_eq!(conflict_path.first().unwrap().node, node);
+
+            assert!(net_roundtrip_latency > 0);
+            LatencyCountingError::NetPositiveLatencyCycle {
+                conflict_path,
+                net_roundtrip_latency,
+            }
+        } else {
+            LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path }
+        }
+    }
+
+    let mut is_specified = BitVector::new(fanouts.len());
+
+    for spec in specified_latencies {
+        is_specified.insert(spec.node);
+        nodes[spec.node].value = spec.latency;
+    }
+    let mut from_list = is_specified.clone();
+    let mut to_list = BitVector::new(fanouts.len());
+    let mut ever_seen = BitVector::new(fanouts.len());
+
+    let mut start_idx_iter = 0..fanouts.len();
+    loop {
+        // Used to bound the Bellmann-Ford algorithm more closely.
+        let mut early_exit_squash_to_constant_time = 0;
+
+        // Early exit
+        while !from_list.is_empty() {
+            for from_idx in from_list.iter() {
+                let from_node_copy = nodes[from_idx];
+                for edge in &fanouts[from_idx] {
+                    let Some(delta) = edge.delta_latency else {
+                        continue; // Ignore poison edges for this. Because their value is unknown, we can only work with the known edges
+                    };
+                    let new_value = from_node_copy.value - delta;
+                    let target_node = &mut nodes[edge.to_node];
+                    if new_value > target_node.value {
+                        target_node.value = new_value;
+                        target_node.parent = Some(from_idx);
+                        to_list.insert(edge.to_node);
+
+                        // Checks when we try to update a node, to see if we detect a positive latency cycle, or a incompatible specified latencies error.
+                        if is_specified.contains(edge.to_node) {
+                            // Can't blame a net-positive latency cycle, so it has to be conflicting specified latencies.
+                            return Err(collect_cycle_or_invalid_specified_latency_error(
+                                &nodes,
+                                fanouts,
+                                edge.to_node,
+                                specified_latencies,
+                            ));
+                        }
+
+                        // Only do the "are we in an infinite cycle" check once every |N| cycles, to amortize the complexity
+                        early_exit_squash_to_constant_time += 1;
+                        if early_exit_squash_to_constant_time >= fanouts.len() {
+                            early_exit_squash_to_constant_time = 0;
+
+                            // O(E*N) termination condition. (See Definition of Bellmann-Ford)
+                            if let Some(cycle_start_node) = check_parent_cycle(&nodes, edge.to_node)
+                            {
+                                return Err(collect_cycle_or_invalid_specified_latency_error(
+                                    &nodes,
+                                    fanouts,
+                                    cycle_start_node,
+                                    specified_latencies,
+                                ));
+                            };
+                        }
+                    }
+                }
+            }
+
+            ever_seen.union_inplace(&to_list);
+
+            // Reset all target nodes
+            std::mem::swap(&mut from_list, &mut to_list);
+            to_list.clear();
+        }
+
+        // Clear all nodes that were reached, and set them to MAX, such that we never try to update them again.
+        for node in &mut nodes {
+            if node.value != i64::MIN {
+                node.value = i64::MAX;
+            }
+        }
+
+        let Some(_) = start_idx_iter.find(|&start_idx| {
+            let start_node = &mut nodes[start_idx];
+            if start_node.value == i64::MIN {
+                start_node.value = 0;
+                from_list.insert(start_idx);
+                ever_seen.insert(start_idx);
+                true
+            } else {
+                false
+            }
+        }) else {
+            break;
+        };
+    }
+
+    Ok(())
+}
+
+/// The graph given to this function must be solveable. (IE pass [check_if_unsolveable]), otherwise this will loop forever
+/// Worst-case Complexity O(V*E), but about O(E) for average case
+fn latency_count_bellman_ford(
+    fanouts: &ListOfLists<FanInOut>,
+    nodes: &mut [i64],
+    nodes_to_process: &mut VecDeque<usize>,
+) {
+    fn dfs_fill_poison(fanouts: &ListOfLists<FanInOut>, nodes: &mut [i64], node: usize) {
+        for edge in &fanouts[node] {
+            let target_node = &mut nodes[edge.to_node];
+            if *target_node != i64::MAX {
+                *target_node = i64::MAX;
+                dfs_fill_poison(fanouts, nodes, edge.to_node);
+            }
+        }
+    }
+
+    while let Some(node) = nodes_to_process.pop_front() {
+        let from_latency = nodes[node];
+        if from_latency == i64::MAX {
+            // If this node is poisoned, then poison everything in its fanout immediately. That simplifies downstream logic
+            dfs_fill_poison(fanouts, nodes, node);
+        } else {
+            for edge in &fanouts[node] {
+                let target_node = &mut nodes[edge.to_node];
+                let new_value = if let Some(delta) = edge.delta_latency {
+                    from_latency - delta
+                } else {
+                    i64::MAX
+                };
+
+                if new_value > *target_node {
+                    *target_node = new_value;
+                    nodes_to_process.push_back(edge.to_node);
+                }
+            }
+        }
+    }
+}
+
+/// `result.len() == from.len()`.
+///
+/// Each result list contains the `to` nodes that were reached from the `from` node corresponding to the result list
+fn find_all_to_all_paths(
+    fanouts: &ListOfLists<FanInOut>,
+    from: &[usize],
+    to: &[usize],
+) -> Vec<Vec<SpecifiedLatency>> {
+    let mut nodes = vec![i64::MIN; fanouts.len()];
+    let mut node_queue = VecDeque::new();
+    from.iter()
+        .map(|from_node| {
+            nodes.fill(i64::MIN);
+
+            nodes[*from_node] = 0;
+            assert!(node_queue.is_empty());
+            node_queue.push_back(*from_node);
+
+            latency_count_bellman_ford(fanouts, &mut nodes, &mut node_queue);
+
+            to.iter()
+                .filter_map(|to_node| {
+                    let latency = nodes[*to_node];
+                    (latency != i64::MIN).then_some(SpecifiedLatency {
+                        node: *to_node,
+                        latency,
+                    })
+                })
+                .collect()
+        })
+        .collect()
+}
+
 #[derive(Default, Clone)]
 pub struct LatencyCountingPorts {
     /// All inputs come first, then all outputs
@@ -897,10 +1169,7 @@ pub fn solve_latencies(
     specified_latencies: &[SpecifiedLatency],
 ) -> Result<Solution, LatencyCountingError> {
     let fanouts = fanins.faninout_complement();
-    find_net_positive_latency_cycles_and_incompatible_specified_latencies(
-        specified_latencies,
-        &fanouts,
-    )?;
+    find_positive_latency_cycle(&fanouts, specified_latencies)?;
 
     let fanins = fanins.add_extra_fanin_and_specified_latencies(extra_fanin, specified_latencies);
 
@@ -1543,6 +1812,57 @@ mod tests {
     }
 
     #[test]
+    fn loose_bad_cycle_gets_detected() {
+        let fanins: [&[FanInOut]; 7] = [
+            /*0*/ &[mk_fan(2, 2)], // Good cycle
+            /*1*/ &[mk_fan(0, -1)],
+            /*2*/ &[mk_fan(1, -2)],
+            /*3*/ &[mk_fan(6, 3)], // Bad cycle
+            /*4*/ &[mk_fan(3, -4)],
+            /*5*/ &[mk_fan(4, 2)],
+            /*6*/ &[mk_fan(5, 1)],
+        ];
+        let fanins = ListOfLists::from_slice_slice(&fanins);
+
+        let should_be_err = solve_latencies_test_case(fanins, &[], &[], &[]);
+
+        println!("{should_be_err:?}");
+        let Err(LatencyCountingError::NetPositiveLatencyCycle {
+            conflict_path,
+            net_roundtrip_latency,
+        }) = should_be_err
+        else {
+            unreachable!()
+        };
+        assert_eq!(net_roundtrip_latency, 2);
+        assert!(conflict_path.len() == 4);
+        let mut conflict_path_nodes: Vec<usize> = conflict_path.iter().map(|e| e.node).collect();
+        conflict_path_nodes.sort();
+        assert_eq!(&conflict_path_nodes, &[3, 4, 5, 6]);
+        /*assert_eq!(
+            conflict_path,
+            &[
+                SpecifiedLatency {
+                    node: 3,
+                    latency: 0
+                },
+                SpecifiedLatency {
+                    node: 4,
+                    latency: -4
+                },
+                SpecifiedLatency {
+                    node: 5,
+                    latency: -2
+                },
+                SpecifiedLatency {
+                    node: 6,
+                    latency: -1
+                }
+            ]
+        );*/
+    }
+
+    #[test]
     fn check_conflicting_port_specifiers() {
         let fanins: [&[FanInOut]; 7] = [
             /*0*/ &[],
@@ -1557,11 +1877,11 @@ mod tests {
         let specified_latencies = [
             SpecifiedLatency {
                 node: 0,
-                latency: 0,
+                latency: 10,
             },
             SpecifiedLatency {
                 node: 3,
-                latency: 1,
+                latency: 11,
             },
         ];
 
@@ -1577,6 +1897,31 @@ mod tests {
         let path_latency =
             conflict_path.last().unwrap().latency - conflict_path.first().unwrap().latency;
         assert_eq!(path_latency, 2);
+        assert_eq!(
+            conflict_path,
+            &[
+                SpecifiedLatency {
+                    node: 0,
+                    latency: 10
+                },
+                SpecifiedLatency {
+                    node: 1,
+                    latency: 10
+                },
+                SpecifiedLatency {
+                    node: 5,
+                    latency: 11
+                },
+                SpecifiedLatency {
+                    node: 2,
+                    latency: 12
+                },
+                SpecifiedLatency {
+                    node: 3,
+                    latency: 12
+                }
+            ]
+        );
     }
 
     #[test]
@@ -1594,11 +1939,11 @@ mod tests {
         let specified_latencies = [
             SpecifiedLatency {
                 node: 1,
-                latency: 0,
+                latency: -10,
             },
             SpecifiedLatency {
                 node: 5,
-                latency: 0,
+                latency: -10,
             },
         ];
 
@@ -1610,6 +1955,19 @@ mod tests {
         else {
             unreachable!()
         };
+        assert_eq!(
+            conflict_path,
+            &[
+                SpecifiedLatency {
+                    node: 1,
+                    latency: -10
+                },
+                SpecifiedLatency {
+                    node: 5,
+                    latency: -9
+                }
+            ]
+        );
         let path_latency =
             conflict_path.last().unwrap().latency - conflict_path.first().unwrap().latency;
         assert_eq!(path_latency, 1);
@@ -1626,11 +1984,11 @@ mod tests {
         let specified_latencies = [
             SpecifiedLatency {
                 node: 0,
-                latency: 0,
+                latency: 3,
             },
             SpecifiedLatency {
                 node: 1,
-                latency: 1,
+                latency: 4,
             },
         ];
 
@@ -1642,13 +2000,27 @@ mod tests {
         else {
             unreachable!()
         };
+
+        assert_eq!(
+            conflict_path,
+            &[
+                SpecifiedLatency {
+                    node: 0,
+                    latency: 3
+                },
+                SpecifiedLatency {
+                    node: 2,
+                    latency: 4
+                },
+                SpecifiedLatency {
+                    node: 1,
+                    latency: 5
+                }
+            ]
+        );
         let path_latency =
             conflict_path.last().unwrap().latency - conflict_path.first().unwrap().latency;
         assert_eq!(path_latency, 2);
-
-        assert_eq!(conflict_path[0].node, 0);
-        assert_eq!(conflict_path[1].node, 2);
-        assert_eq!(conflict_path[2].node, 1);
     }
 
     #[test]

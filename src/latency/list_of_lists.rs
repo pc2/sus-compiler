@@ -4,11 +4,17 @@ use std::{
 };
 
 /// Basically `Vec<Vec<T>>`, but reduces pointer chasing by laying the nested vectors all out sequentially. Read-only.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ListOfLists<T> {
     buf: Vec<T>,
     // A list of #groups+1 offsets in buf array. The end of each one is the start of the next one. They are laid out sequentially
     start_ends: Vec<usize>,
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for ListOfLists<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.iter()).finish()
+    }
 }
 
 impl<T> Default for ListOfLists<T> {
