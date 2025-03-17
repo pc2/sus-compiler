@@ -111,12 +111,12 @@ impl<
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // todo: check if this match arm used to return Result or ()
         match self.inner_typ {
-            AbstractInnerType::Unknown(id) => write!(f, "{id:?}").unwrap(),
-            AbstractInnerType::Template(id) => f
-                .write_str(self.template_names.get_template_name(*id))
-                .unwrap(),
+            AbstractInnerType::Unknown(id) => write!(f, "{id:?}"),
+            AbstractInnerType::Template(id) => {
+                f.write_str(self.template_names.get_template_name(*id))
+            }
             AbstractInnerType::Named(id) => {
-                f.write_str(&self.inner_linker_types[*id].link_info.get_full_name())?
+                f.write_str(&self.inner_linker_types[*id].link_info.get_full_name())
             }
             AbstractInnerType::Array(sub) => write!(
                 f,
@@ -126,10 +126,9 @@ impl<
                     self.rank_linker_types,
                     self.template_names
                 )
-            )
-            .unwrap(),
+            ),
         }
-        f.write_str(&renderpeano(self.rank_typ))
+        .and_then(|_| f.write_str(&renderpeano(self.rank_typ)))
     }
 }
 

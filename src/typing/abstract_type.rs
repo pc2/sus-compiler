@@ -150,8 +150,6 @@ impl TypeUnifier {
         }
     }
 
-    // todo: not clear why these methods exist
-
     pub fn alloc_typ_variable(&self) -> InnerTypeVariableID {
         self.type_substitutor.alloc()
     }
