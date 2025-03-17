@@ -581,8 +581,8 @@ pub fn apply_types(
     mut type_checker: TypeUnifier,
     working_on: &mut Module,
     errors: &ErrorCollector,
-    inner_types: &ArenaAllocator<StructType, InnerTypeUUIDMarker>,
-    rank_types: &ArenaAllocator<StructType, PeanoUUIDMarker>,
+    inner_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+    rank_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
 ) {
     // Set the remaining domain variables that aren't associated with a module port.
     // We just find domain IDs that haven't been
@@ -661,7 +661,7 @@ pub fn apply_types(
         }
     }
 
-    // Print all errors
+    // Print all errors - todo: also show peano problems
     for FailedUnification {
         mut found,
         mut expected,
@@ -674,12 +674,13 @@ pub fn apply_types(
         let _ = found.fully_substitute(&type_checker.type_substitutor);
         let _ = expected.fully_substitute(&type_checker.type_substitutor);
 
-        let expected_name = expected
-            .display(inner_types, &type_checker.template_type_names)
-            .to_string();
-        let found_name = found
-            .display(inner_types, &type_checker.template_type_names)
-            .to_string();
+        // todo: try fetching the AbstractRankedType to display that instead
+        let expected_name = "todo something"; /* = expected
+                                              .display(inner_types, &type_checker.template_type_names)
+                                              .to_string();*/
+        let found_name = "todo something"; /*found
+                                           .display(inner_types, &type_checker.template_type_names)
+                                           .to_string();*/
         errors
             .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
             .add_info_list(infos);

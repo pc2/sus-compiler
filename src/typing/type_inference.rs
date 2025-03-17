@@ -430,7 +430,7 @@ pub trait HindleyMilner<VariableIDMarker: UUIDMarker>: Sized {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AbstractTypeHMInfo {
     Template(TemplateID),
-    Named(InnerTypeUUID),
+    Named(WholeTypeUUID),
     Array,
 }
 
@@ -571,7 +571,7 @@ impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
 pub enum PeanoTypeHMInfo {
     Successor,
     Zero,
-    Named(PeanoUUID),
+    Named(WholeTypeUUID),
 }
 
 impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {

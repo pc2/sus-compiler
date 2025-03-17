@@ -103,8 +103,8 @@ pub struct AbstractRankedTypeDisplay<'a, InnerTypVec, PeanoTypVec, TemplateVec: 
 }
 
 impl<
-        TypVec: Index<InnerTypeUUID, Output = StructType>,
-        PeanoTypVec: Index<PeanoUUID, Output = StructType>,
+        TypVec: Index<WholeTypeUUID, Output = StructType>,
+        PeanoTypVec: Index<WholeTypeUUID, Output = StructType>,
         TemplateVec: TemplateNameGetter,
     > Display for AbstractRankedTypeDisplay<'_, TypVec, PeanoTypVec, TemplateVec>
 {
@@ -129,7 +129,7 @@ impl<
             )
             .unwrap(),
         }
-        f.write_str(&renderpeano(&self.rank_typ))
+        f.write_str(&renderpeano(self.rank_typ))
     }
 }
 /*
@@ -182,26 +182,12 @@ fn renderpeano(rank: &PeanoType) -> String {
     }
 }
 
-impl AbstractInnerType {
-    /*pub fn display<'a>(
-        &'a self,
-        linker_types: &'a impl Index<InnerTypeUUID, Output = StructType>,
-        template_names: &'a impl TemplateNameGetter,
-    ) -> impl Display + 'a {
-        AbstractInnerTypeDisplay {
-            inner: self,
-            linker_types,
-            template_names,
-        }
-    }*/
-}
-
 // todo: figure out how this must change to work properly
 impl AbstractRankedType {
     pub fn display<'a>(
         &'a self,
-        inner_linker_types: &'a impl Index<InnerTypeUUID, Output = StructType>,
-        rank_linker_types: &'a impl Index<PeanoUUID, Output = StructType>,
+        inner_linker_types: &'a impl Index<WholeTypeUUID, Output = StructType>,
+        rank_linker_types: &'a impl Index<WholeTypeUUID, Output = StructType>,
         template_names: &'a impl TemplateNameGetter,
     ) -> impl Display + 'a {
         AbstractRankedTypeDisplay {

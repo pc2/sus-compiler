@@ -1,4 +1,4 @@
-use sus_proc_macro::get_builtin_type_inner;
+use sus_proc_macro::get_builtin_type_whole;
 
 use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
@@ -31,7 +31,7 @@ use crate::to_string::map_to_type_names;
 #[derive(Debug, Clone)]
 pub enum AbstractInnerType {
     Template(TemplateID),
-    Named(InnerTypeUUID),
+    Named(WholeTypeUUID),
     Array(Box<AbstractRankedType>),
     /// Referencing [AbstractType::Unknown] is a strong code smell.
     /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
@@ -64,7 +64,7 @@ impl AbstractRankedType {
 #[derive(Debug, Clone)]
 pub enum PeanoType {
     Zero,
-    Named(PeanoUUID),
+    Named(WholeTypeUUID),
     Succ(Box<PeanoType>),
     Unknown(PeanoVariableID),
 }
@@ -83,9 +83,9 @@ impl PeanoType {
 }*/
 
 pub const BOOL_TYPE: AbstractRankedType =
-    AbstractRankedType::scalar(AbstractInnerType::Named(get_builtin_type_inner!("bool")));
+    AbstractRankedType::scalar(AbstractInnerType::Named(get_builtin_type_whole!("bool")));
 pub const INT_TYPE: AbstractRankedType =
-    AbstractRankedType::scalar(AbstractInnerType::Named(get_builtin_type_inner!("int")));
+    AbstractRankedType::scalar(AbstractInnerType::Named(get_builtin_type_whole!("int")));
 
 /// These represent (clock) domains. While clock domains are included under this umbrella, domains can use the same clock.
 /// The use case for non-clock-domains is to separate Latency Counting domains. So different pipelines where it doesn't
@@ -550,8 +550,8 @@ impl TypeUnifier {
 
     pub fn finalize_abstract_type(
         &mut self,
-        inner_types: &ArenaAllocator<StructType, InnerTypeUUIDMarker>,
-        rank_types: &ArenaAllocator<StructType, PeanoUUIDMarker>,
+        inner_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+        rank_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
         typ: &mut AbstractRankedType,
         span: Span,
         errors: &ErrorCollector,
@@ -570,8 +570,8 @@ impl TypeUnifier {
 
     pub fn finalize_type(
         &mut self,
-        inner_types: &ArenaAllocator<StructType, InnerTypeUUIDMarker>,
-        rank_types: &ArenaAllocator<StructType, PeanoUUIDMarker>,
+        inner_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+        rank_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
         typ: &mut FullType,
         span: Span,
         errors: &ErrorCollector,
@@ -582,8 +582,8 @@ impl TypeUnifier {
 
     pub fn finalize_global_ref<ID>(
         &mut self,
-        inner_types: &ArenaAllocator<StructType, InnerTypeUUIDMarker>,
-        rank_types: &ArenaAllocator<StructType, PeanoUUIDMarker>,
+        inner_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+        rank_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
         global_ref: &mut GlobalReference<ID>,
         errors: &ErrorCollector,
     ) {
