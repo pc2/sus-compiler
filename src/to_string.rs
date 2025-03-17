@@ -109,7 +109,6 @@ impl<
     > Display for AbstractRankedTypeDisplay<'_, TypVec, PeanoTypVec, TemplateVec>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // todo: check if this match arm used to return Result or ()
         match self.inner_typ {
             AbstractInnerType::Unknown(id) => write!(f, "{id:?}"),
             AbstractInnerType::Template(id) => {
