@@ -132,46 +132,6 @@ impl<
         f.write_str(&renderpeano(self.rank_typ))
     }
 }
-/*
-#[derive(Debug)]
-pub struct AbstractInnerTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
-    inner: &'a AbstractInnerType,
-    linker_types: &'a TypVec,
-    template_names: &'a TemplateVec,
-}
-
-impl<TypVec: Index<InnerTypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
-    for AbstractInnerTypeDisplay<'_, TypVec, TemplateVec>
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // todo: check if this match arm used to return Result or ()
-        match self.inner {
-            AbstractInnerType::Unknown(id) => write!(f, "{id:?}").unwrap(),
-            AbstractInnerType::Template(id) => f
-                .write_str(self.template_names.get_template_name(*id))
-                .unwrap(),
-            AbstractInnerType::Named(id) => {
-                f.write_str(&self.linker_types[*id].link_info.get_full_name())?
-            }
-            AbstractInnerType::Array(sub) => write!(
-                f,
-                "{}[]",
-                sub.deref().display(self.linker_types, self.template_names)
-            )
-            .unwrap(),
-        }
-        f.write_str(&renderpeano(&self.typ.rank))
-    }
-}
-
-#[derive(Debug)]
-pub struct PeanoTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
-    rank: &'a PeanoType,
-    linker_types: &'a TypVec,
-    template_names: &'a TemplateVec,
-}
-    */
-// todo remove dead code ⬆️⬆️
 
 fn renderpeano(rank: &PeanoType) -> String {
     match rank {
@@ -182,7 +142,7 @@ fn renderpeano(rank: &PeanoType) -> String {
     }
 }
 
-// todo: figure out how this must change to work properly
+// todo.mergerankedids
 impl AbstractRankedType {
     pub fn display<'a>(
         &'a self,

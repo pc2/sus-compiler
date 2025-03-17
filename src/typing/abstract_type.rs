@@ -69,19 +69,6 @@ pub enum PeanoType {
     Unknown(PeanoVariableID),
 }
 
-// todo remove dead code
-/*
-impl PeanoType {
-    pub fn known_value(&self) -> Result<usize, &UUID<PeanoVariableIDMarker>> {
-        match self {
-            PeanoType::Zero => Ok(0),
-            PeanoType::Succ(inner) => inner.known_value().map(|v| v + 1),
-            PeanoType::Named(v) => Err(v),
-            PeanoType::Unknown(v) => Err(v),
-        }
-    }
-}*/
-
 pub const BOOL_TYPE: AbstractRankedType =
     AbstractRankedType::scalar(AbstractInnerType::Named(get_builtin_type_whole!("bool")));
 pub const INT_TYPE: AbstractRankedType =
