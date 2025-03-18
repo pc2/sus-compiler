@@ -182,22 +182,25 @@ impl TypeUnifier {
                     .unify_must_succeed(&typ.inner, &AbstractInnerType::Named(global_reference.id));
             }
             WrittenType::Array(_span, array_content_and_size) => {
-                unreachable!("no array written type unifying yet"); // todo this
+                let (arr_content_type, _size_flat, _array_bracket_span) =
+                    array_content_and_size.deref();
 
-                /*let (arr_content, _size_flat, _array_bracket_span) = array_content_and_size.deref();
+                let arr_content_variable = AbstractRankedType {
+                    inner: AbstractInnerType::Unknown(self.alloc_typ_variable()),
+                    rank: PeanoType::Unknown(self.alloc_peano_variable()),
+                };
 
-                let arr_content_variable = AbstractType::Unknown(self.alloc_typ_variable());
+                self.type_substitutor
+                    .unify_must_succeed(&typ.inner, &Box::new(arr_content_variable.inner.clone()));
 
-                self.type_substitutor.unify_must_succeed(
-                    &typ.inner,
-                    &AbstractType::Array(Box::new(arr_content_variable.clone())),
-                );
+                self.peano_substitutor
+                    .unify_must_succeed(&typ.rank, &arr_content_variable.rank_up().rank);
 
                 Self::unify_with_written_type_must_succeed(
                     self,
-                    arr_content,
+                    arr_content_type,
                     &arr_content_variable,
-                );*/
+                );
             }
         }
     }
@@ -231,24 +234,26 @@ impl TypeUnifier {
                     .unify_must_succeed(&typ.rank, &PeanoType::Named(global_reference.id));
             }
             WrittenType::Array(_span, array_content_and_size) => {
-                unreachable!("no array written type unifying yet"); // todo this
+                let (arr_content_type, _size_flat, _array_bracket_span) =
+                    array_content_and_size.deref();
 
-                /*
-                let (arr_content, _size_flat, _array_bracket_span) = array_content_and_size.deref();
+                let arr_content_variable = AbstractRankedType {
+                    inner: AbstractInnerType::Unknown(self.alloc_typ_variable()),
+                    rank: PeanoType::Unknown(self.alloc_peano_variable()),
+                };
 
-                let arr_content_variable = AbstractRankedType::Unknown(self.alloc_typ_variable());
+                self.type_substitutor
+                    .unify_must_succeed(&typ.inner, &Box::new(arr_content_variable.inner.clone()));
 
-                self.type_substitutor.unify_must_succeed(
-                    typ,
-                    &AbstractRankedType::Array(Box::new(arr_content_variable.clone())),
-                );
+                self.peano_substitutor
+                    .unify_must_succeed(&typ.rank, &arr_content_variable.rank_up().rank);
 
                 Self::unify_with_written_type_substitute_templates_must_succeed(
                     self,
-                    arr_content,
+                    arr_content_type,
                     &arr_content_variable,
                     template_type_args,
-                );*/
+                );
             }
         }
     }
@@ -324,7 +329,7 @@ impl TypeUnifier {
         span: Span,
         output_typ: &AbstractRankedType,
     ) {
-        // todo: unify ranks
+        // todo: tidy these up (remove duplication of code)
         if op == UnaryOperator::Not {
             self.type_substitutor.unify_report_error(
                 &input_typ.inner,
@@ -332,11 +337,24 @@ impl TypeUnifier {
                 span,
                 &"! input",
             );
+            self.peano_substitutor.unify_report_error(
+                &input_typ.rank,
+                &BOOL_TYPE.rank,
+                span,
+                &"! input rank",
+            );
+
             self.type_substitutor.unify_report_error(
                 &output_typ.inner,
                 &BOOL_TYPE.inner,
                 span,
                 &"! output",
+            );
+            self.peano_substitutor.unify_report_error(
+                &output_typ.rank,
+                &BOOL_TYPE.rank,
+                span,
+                &"! output rank",
             );
         } else if op == UnaryOperator::Negate {
             self.type_substitutor.unify_report_error(
@@ -402,19 +420,37 @@ impl TypeUnifier {
             left_span,
             &"binop left side",
         );
+        self.peano_substitutor.unify_report_error(
+            &left_typ.rank,
+            &exp_left.rank,
+            left_span,
+            &"binop left side rank",
+        );
 
-        // todo: unify ranks!!
         self.type_substitutor.unify_report_error(
             &right_typ.inner,
             &exp_right.inner,
             right_span,
             &"binop right side",
         );
+        self.peano_substitutor.unify_report_error(
+            &right_typ.rank,
+            &exp_right.rank,
+            right_span,
+            &"binop right side rank",
+        );
+
         self.type_substitutor.unify_report_error(
             &output_typ.inner,
             &out_typ.inner,
             Span::new_overarching(left_span, right_span),
             &"binop output",
+        );
+        self.peano_substitutor.unify_report_error(
+            &output_typ.rank,
+            &out_typ.rank,
+            Span::new_overarching(left_span, right_span),
+            &"binop output rank",
         );
     }
 

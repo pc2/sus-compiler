@@ -490,7 +490,6 @@ impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
         }
     }
 
-    // todo: this only considers abstract inner types, not ranks, check this is OK
     fn for_each_unknown(&self, f: &mut impl FnMut(InnerTypeVariableID)) {
         match self {
             AbstractInnerType::Template(_) | AbstractInnerType::Named(_) => {}
