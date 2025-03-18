@@ -122,20 +122,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ┬  
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Latency Counting couldn't reach this node
-     ╭─[test.sus:179:2]
-     │
- 179 │     bool b
-     │     ───┬──  
-     │        ╰──── Latency Counting couldn't reach this node
-─────╯
-Error: Latency Counting couldn't reach this node
-     ╭─[test.sus:180:6]
-     │
- 180 │     reg int a, st[2], reg reg b = assignment_producer()
-     │         ──┬──  
-     │           ╰──── Latency Counting couldn't reach this node
-─────╯
 Error: No Global of the name 'multiply' was found. Did you forget to import it?
      ╭─[test.sus:219:17]
      │
@@ -2121,13 +2107,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │         ──┬─  
      │           ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Latency Counting couldn't reach this node
-     ╭─[test.sus:754:19]
-     │
- 754 │     sdf.start(start, 20)
-     │                      ─┬  
-     │                       ╰── Latency Counting couldn't reach this node
-─────╯
 Error: beep is not a valid template argument of ::int
      ╭─[test.sus:767:30]
      │
@@ -2830,24 +2809,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1140 │     bool out_shared = a_delayed ^ c
       │          ─────┬────  
       │               ╰────── Unused Variable: This variable does not affect the output ports of this module
-──────╯
-Error: There were conflicting options when merging partial latency counting solutions for this node. Options were 0 and 1
-Try specifying an explicit latency or rework the module to remove this ambiguity
-      ╭─[test.sus:1140:2]
-      │
- 1140 │     bool out_shared = a_delayed ^ c
-      │     ───────┬───────  
-      │            ╰───────── There were conflicting options when merging partial latency counting solutions for this node. Options were 0 and 1
-Try specifying an explicit latency or rework the module to remove this ambiguity
-──────╯
-Error: There were conflicting options when merging partial latency counting solutions for this node. Options were 0 and 1
-Try specifying an explicit latency or rework the module to remove this ambiguity
-      ╭─[test.sus:1140:20]
-      │
- 1140 │     bool out_shared = a_delayed ^ c
-      │                       ──────┬──────  
-      │                             ╰──────── There were conflicting options when merging partial latency counting solutions for this node. Options were 0 and 1
-Try specifying an explicit latency or rework the module to remove this ambiguity
 ──────╯
 Error: Excess argument. Function takes 1 args, but 2 were passed.
       ╭─[test.sus:1150:47]

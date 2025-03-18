@@ -16,7 +16,6 @@
 
 use std::{
     collections::VecDeque,
-    io::{stdout, Write},
     iter::zip,
     ops::{Index, IndexMut},
 };
@@ -105,7 +104,7 @@ impl ListOfLists<FanInOut> {
                         to_node,
                         FanInOut {
                             to_node: bucket,
-                            delta_latency: delta_latency.map(|d| -d),
+                            delta_latency,
                         },
                     )
                 },
@@ -145,126 +144,29 @@ pub fn add_cycle_to_extra_fanin(
     }
 }
 
-struct LatencyStackElem<'d> {
-    node: usize,
-    remaining_fanout: std::slice::Iter<'d, FanInOut>,
+const UNSET: i64 = i64::MIN;
+const POISON: i64 = i64::MAX;
+
+pub fn is_valid(latency: i64) -> bool {
+    latency != UNSET && latency != POISON
+}
+#[track_caller]
+fn must_be_valid(latency: i64) -> i64 {
+    assert!(is_valid(latency));
+    latency
 }
 
-/// The node for the latency-counting graph. See [solve_latencies]
-#[derive(Clone, Copy)]
-pub struct LatencyNode {
-    /// We use [i64::MIN] to represent [LatencyNode::UNSET] out of convenience.
-    /// Because the algorithm updates nodes by taking the max of the existing value with the new value,
-    /// this makes it simple to update unset nodes the first time
-    ///
-    /// We use [i64::MAX] to represent [LatencyNode::POISONED] out of convenience too.
-    /// Because the algorithm updates nodes by taking the max of the existing value with the new value,
-    /// a poisoned node will never be updated
-    abs_lat: i64,
-    pinned: bool,
-}
-
-impl LatencyNode {
-    const UNSET: LatencyNode = LatencyNode {
-        abs_lat: i64::MIN,
-        pinned: false,
-    };
-    const POISONED: LatencyNode = LatencyNode {
-        abs_lat: i64::MAX,
-        pinned: false,
-    };
-
-    /// Returns the computed Absolute Latency for this node if it's not [Self::UNSET] and not [Self::POISONED]
-    pub fn get_maybe(&self) -> Option<i64> {
-        if self.abs_lat == i64::MIN || self.abs_lat == i64::MAX {
-            None
-        } else {
-            Some(self.abs_lat)
-        }
-    }
-    fn pin(&mut self) {
-        assert!(!self.is_unset());
-        assert!(!self.pinned);
-        self.pinned = true;
-    }
-    fn unpin(&mut self) {
-        assert!(!self.is_unset());
-        assert!(self.pinned);
-        self.pinned = false;
-    }
-    fn is_unset(&self) -> bool {
-        self.abs_lat == i64::MIN
-    }
-    fn is_poisoned(&self) -> bool {
-        self.abs_lat == i64::MAX
-    }
-    /// To be a valid starting point for latency counting, the node must:
-    /// - Be set
-    /// - Be pinned
-    /// - Not be poisoned
-    fn is_valid_and_pinned(&self) -> bool {
-        !self.is_unset() && !self.is_poisoned() && self.pinned
-    }
-    /// Returns `true` if the node was updated
-    fn update_and_pin(&mut self, from: LatencyNode, delta: Option<i64>, backwards: bool) -> bool {
-        let new_latency = if let (false, Some(delta)) = (from.abs_lat == i64::MAX, delta) {
-            from.abs_lat - delta
-        } else {
-            i64::MAX // Poison
-        };
-
-        let new_latency_may_update = if backwards {
-            new_latency < self.abs_lat
-        } else {
-            new_latency > self.abs_lat
-        };
-
-        if self.pinned && new_latency == i64::MAX {
-            return false; // Only a get-out-of-jail-free card for poison, normal traversal should still hit the assert if it's incorrect
-                          // The early exit is only here, because poison will *always* try to overwrite, and we don't want that.
-        }
-
-        if (self.abs_lat == i64::MIN || new_latency == i64::MAX || new_latency_may_update)
-            && self.abs_lat != i64::MAX
-        {
-            // Any incompatible latency errors should have been caught by [find_net_positive_latency_cycles_and_incompatible_specified_latencies]
-            assert!(!self.pinned);
-            self.abs_lat = new_latency;
-            self.pinned = true;
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl std::fmt::Debug for LatencyNode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.pinned {
-            f.write_str("!")?;
-        }
-        if self.abs_lat == i64::MIN {
-            f.write_str("UNSET")
-        } else if self.abs_lat == i64::MAX {
-            f.write_str("POISONED")
-        } else {
-            write!(f, "{}", self.abs_lat)
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Solution(Vec<LatencyNode>);
+#[derive(Debug, Clone, Default)]
+pub struct Solution(Vec<i64>);
 
 impl Solution {
     fn from_specified(size: usize, specified_latencies: &[SpecifiedLatency]) -> Self {
-        let mut latencies = vec![LatencyNode::UNSET; size];
+        let mut latencies = vec![UNSET; size];
         for spec in specified_latencies {
             let target_node = &mut latencies[spec.node];
-            assert!(target_node.is_unset(), "Duplicate Specified Latency");
-            target_node.abs_lat = spec.latency;
-            target_node.pinned = true;
-            assert!(target_node.is_valid_and_pinned());
+            assert!(*target_node == UNSET, "Duplicate Specified Latency");
+            *target_node = spec.latency;
+            assert!(is_valid(*target_node));
         }
         Self(latencies)
     }
@@ -275,13 +177,17 @@ impl Solution {
         let mut result = Self::from_specified(fanouts.len(), specified_latencies);
 
         // Now that we have all the ports, we can fill in the internal latencies
-        for seed in specified_latencies {
-            assert!(result[seed.node].pinned);
-
-            result.count_latency(fanouts, seed.node, false);
-        }
+        let mut queue: VecDeque<usize> = specified_latencies.iter().map(|s| s.node).collect();
+        result.latency_count_bellman_ford(fanouts, &mut queue);
 
         result
+    }
+
+    // Deletes any Poison values.
+    fn invert(&mut self) {
+        for latency in self.iter_mut() {
+            *latency = if is_valid(*latency) { -*latency } else { UNSET };
+        }
     }
 
     /// Creates a partial solution, where all nodes in the fanin of the ports are set.
@@ -295,141 +201,94 @@ impl Solution {
     ) -> Self {
         let mut result = Self::from_specified_and_fanouts(fanouts, specified_latencies);
 
-        result.pin_all_from(fanins, specified_latencies);
+        let mut fanin_mask = vec![false; fanouts.len()];
+        for node in specified_latencies {
+            fanin_mask[node.node] = true;
+            Self::make_fanout_mask(fanins, &mut fanin_mask, node.node);
+        }
 
-        result.remove_non_pinned_latencies();
+        // Remove any element not in the fanin of the outputs, as
+        for (result_lat, is_in_fanin_of_specified) in result.iter_mut().zip(fanin_mask.iter()) {
+            if !is_in_fanin_of_specified {
+                *result_lat = UNSET;
+            }
+        }
 
-        result.count_latencies_from_all_pinned_latencies(fanins, true);
+        result.invert();
+        result.latency_count_from_all_valid(fanins);
 
         result
     }
 
-    fn pin_all_from(
+    fn make_fanout_mask(fanouts: &ListOfLists<FanInOut>, mask: &mut [bool], node: usize) {
+        for edge in &fanouts[node] {
+            let mask_node = &mut mask[edge.to_node];
+            if !*mask_node {
+                *mask_node = true;
+                Self::make_fanout_mask(fanouts, mask, edge.to_node);
+            }
+        }
+    }
+
+    fn dfs_fill_poison(&mut self, fanouts: &ListOfLists<FanInOut>, node: usize) {
+        for edge in &fanouts[node] {
+            let target_node = &mut self.0[edge.to_node];
+            if *target_node != POISON {
+                *target_node = POISON;
+                self.dfs_fill_poison(fanouts, edge.to_node);
+            }
+        }
+    }
+
+    fn single_step_from_node(
         &mut self,
         fanouts: &ListOfLists<FanInOut>,
-        specified_latencies: &[SpecifiedLatency],
+        nodes_to_process: &mut VecDeque<usize>,
+        from_idx: usize,
     ) {
-        // So, we've got all the foward latencies starting from the given nodes.
-        // Now we also want to add the backwards latencies, but only those in the fanin of the seeds
-        let mut stack: Vec<LatencyStackElem> = specified_latencies
-            .iter()
-            .map(|s| {
-                assert!(self[s.node].pinned);
-                LatencyStackElem {
-                    node: s.node,
-                    remaining_fanout: fanouts[s.node].iter(),
+        let from_latency = self.0[from_idx];
+        if from_latency == POISON {
+            // If this node is poisoned, then poison everything in its fanout immediately. That simplifies downstream logic
+            self.dfs_fill_poison(fanouts, from_idx);
+        } else {
+            for edge in &fanouts[from_idx] {
+                let target_node = &mut self.0[edge.to_node];
+                let new_value = if let Some(delta) = edge.delta_latency {
+                    from_latency + delta
+                } else {
+                    POISON
+                };
+
+                if new_value > *target_node {
+                    *target_node = new_value;
+                    nodes_to_process.push_back(edge.to_node);
                 }
-            })
-            .collect();
-
-        while let Some(top) = stack.last_mut() {
-            let Some(&FanInOut {
-                to_node,
-                delta_latency: _,
-            }) = top.remaining_fanout.next()
-            else {
-                // We don't unpin the node we come from, because we want to pin all nodes in the fanin
-                stack.pop().unwrap();
-                continue;
-            };
-
-            let to_lat = &mut self[to_node];
-            if !to_lat.pinned && !to_lat.is_unset() && !to_lat.is_poisoned() {
-                stack.push(LatencyStackElem {
-                    node: to_node,
-                    remaining_fanout: fanouts[to_node].iter(),
-                });
-                to_lat.pin();
             }
         }
     }
 
-    fn pin_all_valid(&mut self) {
-        for l in self.iter_mut() {
-            l.pinned = !l.is_poisoned() && !l.is_unset();
-        }
-    }
-
-    /// Algorithm:
-    /// Initialize all inputs at latency 0
-    /// Perform full forward pass, making latencies the maximum of all incoming latencies
-    /// Then backward pass, moving nodes forward in latency as much as possible.
-    /// Only moving forward is possible, and only when not confliciting with a later node
-    ///
-    /// Keep reusing the same stack to reduce memory allocations
-    ///
-    /// Requires working_latencies[start_node].pinned == true
-    ///
-    /// Leaves working_latencies[start_node].pinned == true
-    fn count_latency(
+    /// The graph given to this function must be solveable. (IE pass [check_if_unsolveable]), otherwise this will loop forever
+    /// Worst-case Complexity O(V*E), but about O(E) for average case
+    fn latency_count_bellman_ford(
         &mut self,
         fanouts: &ListOfLists<FanInOut>,
-        start_node: usize,
-        backwards: bool,
-    ) -> bool /*Was updated*/ {
-        assert!(self[start_node].is_valid_and_pinned());
-
-        let mut stack = vec![LatencyStackElem {
-            node: start_node,
-            remaining_fanout: fanouts[start_node].iter(),
-        }];
-
-        let mut was_updated = false;
-
-        while let Some(top) = stack.last_mut() {
-            let from = &mut self[top.node];
-            assert!(!from.is_unset());
-            assert!(from.pinned);
-            // Poison edges are allowed now
-            // assert!(!from.is_poisoned());
-
-            let Some(&FanInOut {
-                to_node,
-                delta_latency,
-            }) = top.remaining_fanout.next()
-            else {
-                from.unpin();
-                stack.pop().unwrap();
-                continue;
-            };
-
-            let from = *from; // Break the mutable borrow
-            if self[to_node].update_and_pin(from, delta_latency, backwards) {
-                stack.push(LatencyStackElem {
-                    node: to_node,
-                    remaining_fanout: fanouts[to_node].iter(),
-                });
-                was_updated = true;
-            }
-        }
-
-        // Repin start node, because we unpinned it when unwinding the stack
-        self[start_node].pin();
-        assert!(self[start_node].is_valid_and_pinned());
-
-        was_updated
-    }
-
-    fn remove_non_pinned_latencies(&mut self) {
-        for l in self.iter_mut() {
-            if !l.pinned {
-                *l = LatencyNode::UNSET;
-            }
+        nodes_to_process: &mut VecDeque<usize>,
+    ) {
+        while let Some(from_idx) = nodes_to_process.pop_front() {
+            self.single_step_from_node(fanouts, nodes_to_process, from_idx);
         }
     }
 
-    fn count_latencies_from_all_pinned_latencies(
-        &mut self,
-        fanouts: &ListOfLists<FanInOut>,
-        backwards: bool,
-    ) -> bool /*Was updated*/ {
-        let mut was_updated = false;
-        for idx in 0..self.len() {
-            if self[idx].pinned {
-                was_updated |= self.count_latency(fanouts, idx, backwards);
+    fn latency_count_from_all_valid(&mut self, fanouts: &ListOfLists<FanInOut>) -> bool {
+        let mut nodes_to_process = VecDeque::with_capacity(fanouts.len());
+        for from_idx in 0..self.len() {
+            if is_valid(self[from_idx]) {
+                self.single_step_from_node(fanouts, &mut nodes_to_process, from_idx);
             }
         }
-        was_updated
+        let any_node_was_updated = !nodes_to_process.is_empty();
+        self.latency_count_bellman_ford(fanouts, &mut nodes_to_process);
+        any_node_was_updated
     }
 }
 
@@ -438,24 +297,24 @@ impl Solution {
     fn len(&self) -> usize {
         self.0.len()
     }
-    pub fn iter(&self) -> std::slice::Iter<'_, LatencyNode> {
+    pub fn iter(&self) -> std::slice::Iter<'_, i64> {
         self.0.iter()
     }
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, LatencyNode> {
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, i64> {
         self.0.iter_mut()
     }
 }
 
 impl Index<usize> for Solution {
-    type Output = LatencyNode;
+    type Output = i64;
 
-    fn index(&self, index: usize) -> &LatencyNode {
+    fn index(&self, index: usize) -> &i64 {
         &self.0[index]
     }
 }
 
 impl IndexMut<usize> for Solution {
-    fn index_mut(&mut self, index: usize) -> &mut LatencyNode {
+    fn index_mut(&mut self, index: usize) -> &mut i64 {
         &mut self.0[index]
     }
 }
@@ -470,165 +329,27 @@ pub struct PartialSubmoduleInfo {
     pub extra_fanin: Vec<(usize, FanInOut)>,
 }
 
-/// I found that it was far to complex to try to do the whole of latency counting in a single pass of the graph algorithm
-/// That's why I check the "bad graph" cases first, throw the necessary errors, and then do any processing assuming no net positive latency cycles, and no incompatible latency specifications
-///
-/// In this function, we set [LatencyNode::abs_lat] to [i64::MAX] to indicate that we have already visited a specific node.
-fn find_net_positive_latency_cycles_and_incompatible_specified_latencies(
-    specified_latencies: &[SpecifiedLatency],
-    fanouts: &ListOfLists<FanInOut>,
-) -> Result<(), LatencyCountingError> {
-    impl Solution {
-        fn check_for_errors_from(
-            &mut self,
-            fanouts: &ListOfLists<FanInOut>,
-            start_node: &SpecifiedLatency,
-        ) -> Result<(), LatencyCountingError> {
-            assert!(self[start_node.node].is_valid_and_pinned());
-
-            let mut stack = vec![LatencyStackElem {
-                node: start_node.node,
-                remaining_fanout: fanouts[start_node.node].iter(),
-            }];
-
-            while let Some(top) = stack.last_mut() {
-                let from = &mut self[top.node];
-                assert!(!from.is_unset());
-                assert!(!from.is_poisoned());
-
-                let Some(&FanInOut {
-                    to_node,
-                    delta_latency,
-                }) = top.remaining_fanout.next()
-                else {
-                    from.unpin();
-                    stack.pop().unwrap();
-                    continue;
-                };
-                let Some(delta) = delta_latency else { continue }; // We can safely ignore poison edges here
-
-                // Update node latency
-                let new_latency = from.abs_lat - delta;
-
-                let to = &mut self[to_node];
-                // Always overwrites UNSET, never overwrites POISONED
-                if new_latency > to.abs_lat {
-                    if to.pinned {
-                        // Decide if this is a net positive latency cycle or a conflicting specified latencies error
-                        return Err(
-                            if let Some(conflict_begin) =
-                                stack.iter().position(|elem| elem.node == to_node)
-                            {
-                                LatencyCountingError::NetPositiveLatencyCycle {
-                                    conflict_path: stack[conflict_begin..]
-                                        .iter()
-                                        .map(|elem| SpecifiedLatency {
-                                            node: elem.node,
-                                            latency: self[elem.node].get_maybe().unwrap(),
-                                        })
-                                        .collect(),
-                                    net_roundtrip_latency: new_latency - start_node.latency,
-                                }
-                            } else {
-                                LatencyCountingError::ConflictingSpecifiedLatencies {
-                                    conflict_path: stack
-                                        .iter()
-                                        .map(|elem| SpecifiedLatency {
-                                            node: elem.node,
-                                            latency: self[elem.node].get_maybe().unwrap(),
-                                        })
-                                        .chain(std::iter::once(SpecifiedLatency {
-                                            node: to_node,
-                                            latency: new_latency,
-                                        }))
-                                        .collect(),
-                                }
-                            },
-                        );
-                    } else {
-                        to.abs_lat = new_latency;
-                        to.pinned = true;
-
-                        stack.push(LatencyStackElem {
-                            node: to_node,
-                            remaining_fanout: fanouts[to_node].iter(),
-                        });
-                    }
-                }
-            }
-            Ok(())
-        }
-    }
-
-    let mut working_latencies = Solution::from_specified(fanouts.len(), specified_latencies);
-
-    // First handle all specified latencies
-    for start_node in specified_latencies {
-        working_latencies.check_for_errors_from(fanouts, start_node)?;
-    }
-
-    // Then fill in all remaining nodes
-    let mut cur_start_point = 0;
-    loop {
-        // First replace all nodes that have been explored by POISONED.
-        // POISONED tells our algorithm that this node is not part of a net-positive latency cycle
-        // And thus doesn't need to be checked anymore.
-        // Because POISONED == i64::MAX, that means the algorithm naturally won't visit these nodes anymore.
-        for l in working_latencies.iter_mut() {
-            if l.abs_lat != i64::MIN {
-                *l = LatencyNode::POISONED;
-            }
-        }
-
-        let Some(found) = working_latencies
-            .iter()
-            .skip(cur_start_point)
-            .position(|n| !n.is_poisoned())
-        else {
-            break;
-        };
-        cur_start_point += found;
-
-        let start_node = SpecifiedLatency {
-            node: cur_start_point,
-            latency: 0,
-        };
-
-        working_latencies[cur_start_point] = LatencyNode {
-            abs_lat: 0,
-            pinned: true,
-        };
-
-        working_latencies.check_for_errors_from(fanouts, &start_node)?;
-    }
-
-    // Okay, no net-positive latency cycles, or conflicting specified latencies
-
-    Ok(())
-}
-
 /// Check if the graph contains any cycles or incompatible specified latencies.
 fn find_positive_latency_cycle(
     fanouts: &ListOfLists<FanInOut>,
     specified_latencies: &[SpecifiedLatency],
 ) -> Result<(), LatencyCountingError> {
     #[derive(Clone, Copy)]
-    struct BellmannFordNode {
+    struct BellmanFordNode {
         value: i64,
         parent: Option<usize>,
     }
 
-    dbg!(fanouts);
     let mut nodes = vec![
-        BellmannFordNode {
+        BellmanFordNode {
             parent: None,
-            value: i64::MIN,
+            value: UNSET,
         };
         fanouts.len()
     ];
 
     /// Returns Some(a_node_in_cycle) if here is a cycle.
-    fn check_parent_cycle(nodes: &[BellmannFordNode], start_from: usize) -> Option<usize> {
+    fn check_parent_cycle(nodes: &[BellmanFordNode], start_from: usize) -> Option<usize> {
         let mut fast_ptr = start_from;
         let mut slow_ptr = start_from;
 
@@ -644,7 +365,7 @@ fn find_positive_latency_cycle(
     }
 
     fn collect_cycle_or_invalid_specified_latency_error(
-        nodes: &[BellmannFordNode],
+        nodes: &[BellmanFordNode],
         fanouts: &ListOfLists<FanInOut>,
         start_from: usize,
         specified_latencies: &[SpecifiedLatency],
@@ -655,12 +376,12 @@ fn find_positive_latency_cycle(
         let mut is_bad_cycle = false;
         conflict_path.push(SpecifiedLatency {
             node: cur_idx,
-            latency: i64::MIN,
+            latency: UNSET,
         });
         while let Some(parent) = nodes[cur_idx].parent {
             conflict_path.push(SpecifiedLatency {
                 node: parent,
-                latency: i64::MIN,
+                latency: UNSET,
             });
             if parent == start_from {
                 is_bad_cycle = true;
@@ -682,7 +403,7 @@ fn find_positive_latency_cycle(
             let mut max_delta = i64::MIN;
             for fout in &fanouts[cur_node.node] {
                 if fout.to_node == next_node.node {
-                    max_delta = i64::max(-fout.delta_latency.unwrap(), max_delta);
+                    max_delta = i64::max(fout.delta_latency.unwrap(), max_delta);
                 }
             }
             assert!(max_delta != i64::MIN);
@@ -721,7 +442,7 @@ fn find_positive_latency_cycle(
 
     let mut start_idx_iter = 0..fanouts.len();
     loop {
-        // Used to bound the Bellmann-Ford algorithm more closely.
+        // Used to bound the Bellman-Ford algorithm more closely.
         let mut early_exit_squash_to_constant_time = 0;
 
         // Early exit
@@ -732,7 +453,7 @@ fn find_positive_latency_cycle(
                     let Some(delta) = edge.delta_latency else {
                         continue; // Ignore poison edges for this. Because their value is unknown, we can only work with the known edges
                     };
-                    let new_value = from_node_copy.value - delta;
+                    let new_value = from_node_copy.value + delta;
                     let target_node = &mut nodes[edge.to_node];
                     if new_value > target_node.value {
                         target_node.value = new_value;
@@ -779,14 +500,14 @@ fn find_positive_latency_cycle(
 
         // Clear all nodes that were reached, and set them to MAX, such that we never try to update them again.
         for node in &mut nodes {
-            if node.value != i64::MIN {
-                node.value = i64::MAX;
+            if node.value != UNSET {
+                node.value = POISON;
             }
         }
 
         let Some(_) = start_idx_iter.find(|&start_idx| {
             let start_node = &mut nodes[start_idx];
-            if start_node.value == i64::MIN {
+            if start_node.value == UNSET {
                 start_node.value = 0;
                 from_list.insert(start_idx);
                 ever_seen.insert(start_idx);
@@ -800,79 +521,6 @@ fn find_positive_latency_cycle(
     }
 
     Ok(())
-}
-
-/// The graph given to this function must be solveable. (IE pass [check_if_unsolveable]), otherwise this will loop forever
-/// Worst-case Complexity O(V*E), but about O(E) for average case
-fn latency_count_bellman_ford(
-    fanouts: &ListOfLists<FanInOut>,
-    nodes: &mut [i64],
-    nodes_to_process: &mut VecDeque<usize>,
-) {
-    fn dfs_fill_poison(fanouts: &ListOfLists<FanInOut>, nodes: &mut [i64], node: usize) {
-        for edge in &fanouts[node] {
-            let target_node = &mut nodes[edge.to_node];
-            if *target_node != i64::MAX {
-                *target_node = i64::MAX;
-                dfs_fill_poison(fanouts, nodes, edge.to_node);
-            }
-        }
-    }
-
-    while let Some(node) = nodes_to_process.pop_front() {
-        let from_latency = nodes[node];
-        if from_latency == i64::MAX {
-            // If this node is poisoned, then poison everything in its fanout immediately. That simplifies downstream logic
-            dfs_fill_poison(fanouts, nodes, node);
-        } else {
-            for edge in &fanouts[node] {
-                let target_node = &mut nodes[edge.to_node];
-                let new_value = if let Some(delta) = edge.delta_latency {
-                    from_latency - delta
-                } else {
-                    i64::MAX
-                };
-
-                if new_value > *target_node {
-                    *target_node = new_value;
-                    nodes_to_process.push_back(edge.to_node);
-                }
-            }
-        }
-    }
-}
-
-/// `result.len() == from.len()`.
-///
-/// Each result list contains the `to` nodes that were reached from the `from` node corresponding to the result list
-fn find_all_to_all_paths(
-    fanouts: &ListOfLists<FanInOut>,
-    from: &[usize],
-    to: &[usize],
-) -> Vec<Vec<SpecifiedLatency>> {
-    let mut nodes = vec![i64::MIN; fanouts.len()];
-    let mut node_queue = VecDeque::new();
-    from.iter()
-        .map(|from_node| {
-            nodes.fill(i64::MIN);
-
-            nodes[*from_node] = 0;
-            assert!(node_queue.is_empty());
-            node_queue.push_back(*from_node);
-
-            latency_count_bellman_ford(fanouts, &mut nodes, &mut node_queue);
-
-            to.iter()
-                .filter_map(|to_node| {
-                    let latency = nodes[*to_node];
-                    (latency != i64::MIN).then_some(SpecifiedLatency {
-                        node: *to_node,
-                        latency,
-                    })
-                })
-                .collect()
-        })
-        .collect()
 }
 
 #[derive(Default, Clone)]
@@ -1015,29 +663,35 @@ fn print_inference_test_case<ID>(
     println!("==== END INFERENCE TEST CASE ====");
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct PartialLatencyCountingSolution {
     latencies: Solution,
     conflicting_nodes: Vec<(usize, i64)>, // Node, and the desired latency of the conflict
-    was_updated: bool,
 }
 
 impl PartialLatencyCountingSolution {
     fn offset_to_pin_node_to(&mut self, spec_lat: SpecifiedLatency) {
-        let existing_latency_of_node = self.latencies[spec_lat.node].get_maybe().unwrap();
+        let existing_latency_of_node = must_be_valid(self.latencies[spec_lat.node]);
+
         let offset = spec_lat.latency - existing_latency_of_node;
         if offset == 0 {
             return; // Early exit, no change needed
         }
 
         for lat in self.latencies.iter_mut() {
-            assert!(!lat.is_poisoned());
-            if !lat.is_unset() {
-                lat.abs_lat += offset;
+            assert!(*lat != POISON);
+            if *lat != UNSET {
+                *lat += offset;
             }
         }
         for conflict in &mut self.conflicting_nodes {
             conflict.1 += offset;
+        }
+    }
+    fn invert(&mut self) {
+        self.latencies.invert();
+        for conflict in &mut self.conflicting_nodes {
+            conflict.1 = -conflict.1;
         }
     }
     fn try_merge(&mut self, from: &mut Self) -> bool {
@@ -1046,7 +700,7 @@ impl PartialLatencyCountingSolution {
             .latencies
             .iter()
             .zip(from.latencies.iter())
-            .position(|(a, b)| a.get_maybe().is_some() && b.get_maybe().is_some())
+            .position(|(a, b)| is_valid(*a) && is_valid(*b))
         else {
             return false;
         };
@@ -1054,28 +708,24 @@ impl PartialLatencyCountingSolution {
         // Offset the vector we're merging to bring it in line with the target
         from.offset_to_pin_node_to(SpecifiedLatency {
             node: joining_node,
-            latency: self.latencies[joining_node].get_maybe().unwrap(),
+            latency: must_be_valid(self.latencies[joining_node]),
         });
         self.conflicting_nodes.append(&mut from.conflicting_nodes);
 
         let mut failure_to_merge = false;
-        for (node, (to, from)) in zip(self.latencies.iter_mut(), from.latencies.iter()).enumerate()
-        {
-            if let (Some(to), Some(from)) = (to.get_maybe(), from.get_maybe()) {
-                if to != from {
-                    failure_to_merge = true;
-                    self.conflicting_nodes.push((node, from));
-                }
+        for (node, (to, from)) in zip(self.latencies.iter(), from.latencies.iter()).enumerate() {
+            if is_valid(*to) && is_valid(*from) && to != from {
+                failure_to_merge = true;
+                self.conflicting_nodes.push((node, *from));
             }
         }
 
         if !failure_to_merge {
             for (to, from) in zip(self.latencies.iter_mut(), from.latencies.iter()) {
-                if let (None, Some(from)) = (to.get_maybe(), from.get_maybe()) {
-                    to.abs_lat = from;
+                if !is_valid(*to) {
+                    *to = *from;
                 }
             }
-            self.was_updated |= from.was_updated;
         }
 
         true
@@ -1098,12 +748,11 @@ fn solve_port_latencies(
 
         let result: Vec<SpecifiedLatency> = std::iter::once(start_node)
             .chain(ports.outputs().iter().filter_map(|output| {
-                working_latencies[*output]
-                    .get_maybe()
-                    .map(|latency| SpecifiedLatency {
-                        node: *output,
-                        latency,
-                    })
+                let latency = working_latencies[*output];
+                is_valid(latency).then_some(SpecifiedLatency {
+                    node: *output,
+                    latency,
+                })
             }))
             .collect();
 
@@ -1203,28 +852,36 @@ pub fn solve_latencies(
         .map(|seeds| PartialLatencyCountingSolution {
             latencies: Solution::make_initial_partial_solution(&fanins, &fanouts, seeds),
             conflicting_nodes: Vec::new(),
-            was_updated: true,
         })
         .collect();
 
-    let mut backwards = false;
-    while partial_solutions.iter().any(|s| s.was_updated) {
+    let mut finished_partial_solutions = Vec::new();
+
+    let mut backwards = true;
+    while !partial_solutions.is_empty() {
         partial_solutions = merge_iter_into_disjoint_groups(
             partial_solutions.into_iter(),
             PartialLatencyCountingSolution::try_merge,
         );
 
-        for psol in &mut partial_solutions {
-            if psol.was_updated {
-                // Then we can continue to explore on this solution
-                psol.latencies.pin_all_valid();
-                let fans = if backwards { &fanins } else { &fanouts };
-                psol.was_updated = psol
-                    .latencies
-                    .count_latencies_from_all_pinned_latencies(fans, backwards)
-            }
-        }
         backwards = !backwards;
+        partial_solutions.retain_mut(|psol| {
+            // Then we can continue to explore on this solution
+            psol.invert();
+            let fans = if backwards { &fanins } else { &fanouts };
+            if psol.latencies.latency_count_from_all_valid(fans) {
+                true
+            } else {
+                finished_partial_solutions.push(std::mem::take(psol));
+                false
+            }
+        });
+    }
+
+    if backwards {
+        for psol in &mut finished_partial_solutions {
+            psol.invert();
+        }
     }
 
     // Polish solution: if there were no specified latencies, then we make the latency of the first port '0
@@ -1241,22 +898,22 @@ pub fn solve_latencies(
             latency: 0,
         });
 
-    if let Some(reference_solution_idx) = partial_solutions
+    if let Some(reference_solution_idx) = finished_partial_solutions
         .iter()
-        .position(|psol| !psol.latencies[reference_node.node].is_unset())
+        .position(|psol| psol.latencies[reference_node.node] != UNSET)
     {
         // Move the partial solution containing the reference node to the front, such that merge_where_possible always treats it as the reference.
-        partial_solutions.swap(0, reference_solution_idx);
-        partial_solutions[0].offset_to_pin_node_to(reference_node);
+        finished_partial_solutions.swap(0, reference_solution_idx);
+        finished_partial_solutions[0].offset_to_pin_node_to(reference_node);
     }
 
-    let mut solution_iter = partial_solutions.into_iter();
+    let mut solution_iter = finished_partial_solutions.into_iter();
 
     let first_solution = solution_iter.next().unwrap();
 
     if solution_iter.next().is_some() {
         // More than one unmerged solution remaining. Must assert that there's missing nodes in the first solution
-        assert!(first_solution.latencies.iter().any(|l| l.is_unset()))
+        assert!(first_solution.latencies.iter().any(|l| *l == UNSET))
     }
 
     if first_solution.conflicting_nodes.is_empty() {
@@ -1267,11 +924,7 @@ pub fn solve_latencies(
                 .conflicting_nodes
                 .into_iter()
                 .map(|(node, desired)| {
-                    (
-                        node,
-                        first_solution.latencies[node].get_maybe().unwrap(),
-                        desired,
-                    )
+                    (node, must_be_valid(first_solution.latencies[node]), desired)
                 })
                 .collect(),
         })
@@ -1432,15 +1085,6 @@ pub fn mk_fan(to_node: usize, delta_latency: i64) -> FanInOut {
 mod tests {
     use super::*;
 
-    pub fn pinned_node(abs_lat: i64) -> LatencyNode {
-        let result = LatencyNode {
-            abs_lat,
-            pinned: true,
-        };
-        assert!(!result.is_unset());
-        result
-    }
-
     pub fn mk_poisoned(to_node: usize) -> FanInOut {
         FanInOut {
             to_node,
@@ -1473,18 +1117,17 @@ mod tests {
         assert_eq!(found.len(), correct.len());
 
         assert!(
-            std::iter::zip(found.iter(), correct.iter())
-                .all(|(x, y)| x.get_maybe().is_some_and(|v| v == *y)),
+            std::iter::zip(found.iter(), correct.iter()).all(|(x, y)| *x == *y),
             "Latencies don't match exactly: {found:?} !=lat= {correct:?}"
         );
     }
 
     #[track_caller]
-    fn assert_latency_nodes_match_exactly(found: &Solution, correct: &[LatencyNode]) {
+    fn assert_latency_nodes_match_exactly(found: &Solution, correct: &[i64]) {
         assert_eq!(found.len(), correct.len());
 
         assert!(
-            std::iter::zip(found.iter(), correct.iter()).all(|(x, y)| { x.abs_lat == y.abs_lat }),
+            std::iter::zip(found.iter(), correct.iter()).all(|(x, y)| { *x == *y }),
             "Latencies don't match exactly: {found:?} !=lat= {correct:?}"
         );
     }
@@ -1495,14 +1138,10 @@ mod tests {
     /// This means that all the given latencies are "known", and also that
     fn assert_latencies_match(found: &Solution, correct: &[i64]) {
         assert_eq!(found.len(), correct.len());
+        let diff = found[0] - correct[0];
 
         assert!(
-            found[0].get_maybe().is_some_and(|first_found_lat| {
-                let diff = first_found_lat - correct[0];
-
-                std::iter::zip(found.iter(), correct.iter())
-                    .all(|(x, y)| x.get_maybe().is_some_and(|v| v - y == diff))
-            }),
+            std::iter::zip(found.iter(), correct.iter()).all(|(x, y)| x - y == diff),
             "Latencies don't match even with an offset: {found:?} != {correct:?}"
         );
     }
@@ -2043,15 +1682,7 @@ mod tests {
         let partial_result =
             solve_latencies_test_case(fanins, &[0, 4], &[3, 6], &specified_latencies).unwrap();
 
-        let correct_latencies = [
-            pinned_node(0), // [solve_latencies] returns pinned values
-            pinned_node(0),
-            pinned_node(3),
-            pinned_node(3),
-            LatencyNode::UNSET,
-            LatencyNode::UNSET,
-            LatencyNode::UNSET,
-        ];
+        let correct_latencies = [0, 0, 3, 3, UNSET, UNSET, UNSET];
         assert_latency_nodes_match_exactly(&partial_result, &correct_latencies)
     }
 

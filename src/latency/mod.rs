@@ -13,7 +13,7 @@ use crate::typing::type_inference::{DelayedConstraintStatus, HindleyMilner};
 use crate::value::Value;
 
 use latency_algorithm::{
-    infer_unknown_latency_edges, solve_latencies, FanInOut, LatencyCountingError,
+    infer_unknown_latency_edges, is_valid, solve_latencies, FanInOut, LatencyCountingError,
     LatencyCountingPorts, PartialSubmoduleInfo, SpecifiedLatency,
 };
 
@@ -338,8 +338,8 @@ impl InstantiationContext<'_, '_> {
                         zip(domain_info.latency_node_meanings.iter(), latencies.iter())
                     {
                         let wire = &mut self.wires[*node];
-                        if let Some(lat) = lat.get_maybe() {
-                            wire.absolute_latency = lat;
+                        if is_valid(*lat) {
+                            wire.absolute_latency = *lat;
                         } else {
                             let source_location =
                                 self.md.get_instruction_span(wire.original_instruction);
