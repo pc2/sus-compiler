@@ -12,12 +12,12 @@ __builtin__ module CrossDomain #(T) {
     interface out_domain : -> T out'0
 }
 
-__builtin__ module IntToBits {
-    interface IntToBits : int value'0 -> bool[32] bits'0
+__builtin__ module IntToBits #(int MAX) {
+    interface IntToBits : int #(MAX) value'0 -> bool[clog2 #(V: MAX)] bits'0
 }
 
-__builtin__ module BitsToInt {
-    interface IntToBits : bool[32] bits'0 -> int value'0
+__builtin__ module BitsToInt #(int MAX) {
+    interface IntToBits : bool[clog2 #(V: MAX)] bits'0 -> int #(MAX) value'0
 }
 
 // For now these builtin declarations must be in this order, because they're constants in the code. 
