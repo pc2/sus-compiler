@@ -565,7 +565,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstr
                 BinaryOperator::Subtract => left_size.clone(),
                 BinaryOperator::Multiply => left_size * right_size,
                 BinaryOperator::Divide => left_size.clone(),
-                BinaryOperator::Modulo => right_size.clone(),
+                BinaryOperator::Modulo => right_size.clone() - 1,
                 _ => {
                     unreachable!("The BinaryOpTypecheckConstraint should only check arithmetic operation but got {}", self.op);
                 }
