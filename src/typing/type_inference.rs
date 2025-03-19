@@ -604,7 +604,14 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
         substitutor: &TypeSubstitutor<Self, ConcreteTypeVariableIDMarker>,
     ) -> bool {
         match self {
-            ConcreteType::Named(_) | ConcreteType::Value(_) => true, // Don't need to do anything, this is already final
+            ConcreteType::Value(_) => true, // Don't need to do anything, this is already final
+            ConcreteType::Named(concrete_global_ref) => {
+                let mut result = true;
+                for (_, template_arg) in &mut concrete_global_ref.template_args {
+                    result = result && template_arg.fully_substitute(substitutor);
+                }
+                result
+            }
             ConcreteType::Array(arr_typ) => {
                 let (arr_typ, arr_sz) = arr_typ.deref_mut();
                 arr_typ.fully_substitute(substitutor) && arr_sz.fully_substitute(substitutor)
