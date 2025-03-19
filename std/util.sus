@@ -88,7 +88,7 @@ module Iterator {
 		current_limit = up_to
 		value = 0
 	} else when valid {
-		value = value + 1
+		value = (value + 1) % 50
 	}
 }
 
