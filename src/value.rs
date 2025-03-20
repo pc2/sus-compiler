@@ -1,10 +1,6 @@
 use std::ops::Deref;
 
-use crate::{
-    alloc::FlatAlloc,
-    flattening::{BinaryOperator, UnaryOperator},
-    typing::concrete_type::ConcreteGlobalReference,
-};
+use crate::flattening::{BinaryOperator, UnaryOperator};
 use num::BigInt;
 use sus_proc_macro::get_builtin_type;
 
@@ -39,13 +35,7 @@ impl Value {
         match self {
             Value::Bool(_) => BOOL_CONCRETE_TYPE,
             Value::Integer(value) => {
-                let mut template_args = FlatAlloc::new();
-                template_args.alloc(ConcreteType::Value(Value::Integer(value.clone())));
-
-                ConcreteType::Named(ConcreteGlobalReference {
-                    id: get_builtin_type!("int"),
-                    template_args,
-                })
+                type_substitutor.new_int_type(Some(value.clone()), Some(value + 1))
             }
             Value::Array(arr) => {
                 let mut arr_iter = arr.iter();

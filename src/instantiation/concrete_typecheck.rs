@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use sus_proc_macro::get_builtin_type;
+use num::BigInt;
 
 use crate::alloc::{zip_eq, zip_eq3, UUID};
 use crate::errors::ErrorInfoObject;
@@ -83,15 +83,15 @@ impl InstantiationContext<'_, '_> {
                     let (input_typ, output_typ) = match op {
                         UnaryOperator::Not => (BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE),
                         UnaryOperator::Negate => (
-                            self.type_substitutor.new_int_type(),
-                            self.type_substitutor.new_int_type(),
+                            self.type_substitutor.new_int_type(None, None),
+                            self.type_substitutor.new_int_type(None, None),
                         ),
                         UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => {
                             (self.make_array_of(BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
                         UnaryOperator::Sum | UnaryOperator::Product => (
-                            self.make_array_of(self.type_substitutor.new_int_type()),
-                            self.type_substitutor.new_int_type(),
+                            self.make_array_of(self.type_substitutor.new_int_type(None, None)),
+                            self.type_substitutor.new_int_type(None, None),
                         ),
                     };
 
@@ -135,45 +135,15 @@ impl InstantiationContext<'_, '_> {
                             });
                             continue;
                         }
-                        BinaryOperator::Equals => (
+                        BinaryOperator::Equals
+                        | BinaryOperator::NotEquals
+                        | BinaryOperator::GreaterEq
+                        | BinaryOperator::Greater
+                        | BinaryOperator::LesserEq
+                        | BinaryOperator::Lesser => (
                             (
-                                self.type_substitutor.new_int_type(),
-                                self.type_substitutor.new_int_type(),
-                            ),
-                            BOOL_CONCRETE_TYPE,
-                        ),
-                        BinaryOperator::NotEquals => (
-                            (
-                                self.type_substitutor.new_int_type(),
-                                self.type_substitutor.new_int_type(),
-                            ),
-                            BOOL_CONCRETE_TYPE,
-                        ),
-                        BinaryOperator::GreaterEq => (
-                            (
-                                self.type_substitutor.new_int_type(),
-                                self.type_substitutor.new_int_type(),
-                            ),
-                            BOOL_CONCRETE_TYPE,
-                        ),
-                        BinaryOperator::Greater => (
-                            (
-                                self.type_substitutor.new_int_type(),
-                                self.type_substitutor.new_int_type(),
-                            ),
-                            BOOL_CONCRETE_TYPE,
-                        ),
-                        BinaryOperator::LesserEq => (
-                            (
-                                self.type_substitutor.new_int_type(),
-                                self.type_substitutor.new_int_type(),
-                            ),
-                            BOOL_CONCRETE_TYPE,
-                        ),
-                        BinaryOperator::Lesser => (
-                            (
-                                self.type_substitutor.new_int_type(),
-                                self.type_substitutor.new_int_type(),
+                                self.type_substitutor.new_int_type(None, None),
+                                self.type_substitutor.new_int_type(None, None),
                             ),
                             BOOL_CONCRETE_TYPE,
                         ),
@@ -551,31 +521,85 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstr
                 .try_fully_substitute(&context.type_substitutor),
         ) {
             #[rustfmt::skip]
-            let left_size = left_complete_type.unwrap_named().template_args
+            let left_size_min = left_complete_type.unwrap_named().template_args
                 [UUID::from_hidden_value(0)]
                 .unwrap_value()
                 .unwrap_integer();
             #[rustfmt::skip]
-            let right_size = right_complete_type.unwrap_named().template_args
+            let right_size_min = right_complete_type.unwrap_named().template_args
                 [UUID::from_hidden_value(0)]
                 .unwrap_value()
                 .unwrap_integer();
-            let out_size = match self.op {
-                BinaryOperator::Add => left_size + right_size,
-                BinaryOperator::Subtract => left_size.clone(),
-                BinaryOperator::Multiply => left_size * right_size,
-                BinaryOperator::Divide => left_size.clone(),
-                BinaryOperator::Modulo => right_size.clone() - 1,
+            #[rustfmt::skip]
+            let left_size_max = left_complete_type.unwrap_named().template_args
+                [UUID::from_hidden_value(1)]
+                .unwrap_value()
+                .unwrap_integer() - BigInt::from(1);
+            let left_size_max = &left_size_max;
+            #[rustfmt::skip]
+            let right_size_max = right_complete_type.unwrap_named().template_args
+                [UUID::from_hidden_value(1)]
+                .unwrap_value()
+                .unwrap_integer() - BigInt::from(1);
+            let right_size_max = &right_size_max;
+            let (out_size_min, out_size_max) = match self.op {
+                BinaryOperator::Add => (
+                    right_size_min + left_size_min,
+                    right_size_max + left_size_max + 1,
+                ),
+                BinaryOperator::Subtract => (
+                    left_size_min - right_size_max,
+                    left_size_max - right_size_min + 1,
+                ),
+                BinaryOperator::Multiply => {
+                    let potentials = [
+                        left_size_min * right_size_min,
+                        left_size_min * right_size_max,
+                        left_size_max * right_size_min,
+                        left_size_max * right_size_max,
+                    ];
+                    (
+                        potentials.iter().min().unwrap().clone(),
+                        potentials.iter().max().unwrap() + BigInt::from(1),
+                    )
+                }
+                BinaryOperator::Divide => {
+                    if *right_size_min == BigInt::from(0) {
+                        let potentials: [BigInt; 2] = [
+                            left_size_min / right_size_max,
+                            left_size_max / right_size_max,
+                        ];
+                        (
+                            potentials.iter().min().unwrap().clone(),
+                            potentials.iter().max().unwrap() + BigInt::from(1),
+                        )
+                    } else {
+                        let potentials = [
+                            left_size_min / right_size_max,
+                            left_size_min / right_size_min,
+                            left_size_max / right_size_max,
+                            left_size_max / right_size_min,
+                        ];
+                        (
+                            potentials.iter().min().unwrap().clone(),
+                            potentials.iter().max().unwrap() + BigInt::from(1),
+                        )
+                    }
+                }
+                BinaryOperator::Modulo => {
+                    if !right_size_min > BigInt::from(0) {
+                        context.errors.error(self.span, "Modulos must be > 0");
+                        return DelayedConstraintStatus::NoProgress;
+                    }
+                    (BigInt::from(0), right_size_max.clone())
+                }
                 _ => {
                     unreachable!("The BinaryOpTypecheckConstraint should only check arithmetic operation but got {}", self.op);
                 }
             };
-            let mut template_args: FlatAlloc<ConcreteType, TemplateIDMarker> = FlatAlloc::new();
-            template_args.alloc(ConcreteType::new_int(out_size));
-            let expected_out = ConcreteType::Named(ConcreteGlobalReference {
-                id: get_builtin_type!("int"),
-                template_args,
-            });
+            let expected_out = context
+                .type_substitutor
+                .new_int_type(Some(out_size_min), Some(out_size_max));
             context.type_substitutor.unify_report_error(
                 &context.wires[self.out].typ,
                 &expected_out,

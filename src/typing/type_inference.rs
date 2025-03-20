@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 use std::ops::{BitAnd, Deref, DerefMut, Index};
 use std::thread::panicking;
 
+use num::BigInt;
 use sus_proc_macro::get_builtin_type;
 
 use crate::block_vector::{BlockVec, BlockVecIter};
@@ -60,9 +61,19 @@ pub struct TypeSubstitutor<MyType: HindleyMilner<VariableIDMarker>, VariableIDMa
 }
 
 impl TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker> {
-    pub fn new_int_type(&self) -> ConcreteType {
+    /// Creates a new `int #(int MIN, int MAX)`. The resulting int can have a value from `MIN` to `MAX-1`
+    pub fn new_int_type(&self, min: Option<BigInt>, max: Option<BigInt>) -> ConcreteType {
         let mut template_args = FlatAlloc::new();
-        template_args.alloc(ConcreteType::Unknown(self.alloc()));
+        if let Some(min) = min {
+            template_args.alloc(ConcreteType::Value(Value::Integer(min)));
+        } else {
+            template_args.alloc(ConcreteType::Unknown(self.alloc()));
+        }
+        if let Some(max) = max {
+            template_args.alloc(ConcreteType::Value(Value::Integer(max)));
+        } else {
+            template_args.alloc(ConcreteType::Unknown(self.alloc()));
+        }
 
         ConcreteType::Named(ConcreteGlobalReference {
             id: get_builtin_type!("int"),
