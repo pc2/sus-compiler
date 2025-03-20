@@ -88,7 +88,7 @@ impl UnifyErrorReport for &str {
         (self.to_string(), Vec::new())
     }
 }
-impl<F: Fn() -> (String, Vec<ErrorInfo>)> UnifyErrorReport for F {
+impl<F: FnOnce() -> (String, Vec<ErrorInfo>)> UnifyErrorReport for F {
     fn report(self) -> (String, Vec<ErrorInfo>) {
         self()
     }
