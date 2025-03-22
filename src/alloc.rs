@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    fmt::{Debug, Formatter, Result},
+    fmt::{Debug, Formatter},
     hash::{Hash, Hasher},
     iter::Enumerate,
     marker::PhantomData,
@@ -42,7 +42,7 @@ pub trait UUIDMarker {
 }
 
 impl<IndexMarker: UUIDMarker> Debug for UUID<IndexMarker> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.write_str(IndexMarker::DISPLAY_NAME)?;
         self.0.fmt(f)
     }
@@ -107,7 +107,7 @@ impl<IndexMarker> UUIDAllocator<IndexMarker> {
 }
 
 impl<IndexMarker: UUIDMarker> std::fmt::Debug for UUIDAllocator<IndexMarker> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("UUIDAllocator")
             .field("count: ", &self.cur.0)
             .finish()
@@ -153,6 +153,19 @@ impl<IndexMarker> UUIDRange<IndexMarker> {
             _ph: PhantomData,
         }
     }
+    pub fn try_map<OT, ErrT>(
+        &self,
+        mut f: impl FnMut(UUID<IndexMarker>) -> Result<OT, ErrT>,
+    ) -> Result<FlatAlloc<OT, IndexMarker>, ErrT> {
+        let mut data = Vec::with_capacity(self.len());
+        for id in self.iter() {
+            data.push(f(id)?);
+        }
+        Ok(FlatAlloc {
+            data,
+            _ph: PhantomData,
+        })
+    }
     pub fn len(&self) -> usize {
         self.1 .0 - self.0 .0
     }
@@ -165,7 +178,7 @@ impl<IndexMarker> UUIDRange<IndexMarker> {
 }
 
 impl<IndexMarker: UUIDMarker> Debug for UUIDRange<IndexMarker> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.write_str(IndexMarker::DISPLAY_NAME)?;
         self.0.fmt(f)?;
         f.write_str("..")?;
@@ -616,6 +629,19 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     ) -> [O; N] {
         assert!(self.len() == N);
         std::array::from_fn(|i| f(UUID::from_hidden_value(i), &self.data[i]))
+    }
+    pub fn try_map<OT, ErrT>(
+        &self,
+        mut f: impl FnMut((UUID<IndexMarker>, &T)) -> Result<OT, ErrT>,
+    ) -> Result<FlatAlloc<OT, IndexMarker>, ErrT> {
+        let mut data = Vec::with_capacity(self.len());
+        for id_v in self {
+            data.push(f(id_v)?);
+        }
+        Ok(FlatAlloc {
+            data,
+            _ph: PhantomData,
+        })
     }
     pub fn find(
         &self,
