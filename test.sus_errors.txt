@@ -12,6 +12,32 @@ Warning: Unused Variable: This variable does not affect the output ports of this
     │                              ─┬  
     │                               ╰── Unused Variable: This variable does not affect the output ports of this module
 ────╯
+Error: While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1260:2 ]
+      │
+    1 │ ╭─▶ 
+      ┆ ┆   
+ 1260 │ │       action request_output : -> trigger output_valid : T result
+      │ │       ─────────────────────────────┬────────────────────────────  
+      │ │                                    ╰────────────────────────────── While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1279 │ ├─▶ }
+      │ │       
+      │ ╰─────── Parent node 'source_file'
+──────╯
+Error: While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1261:1 ]
+      │
+    1 │ ╭─▶ 
+      ┆ ┆   
+ 1261 │ │   }
+      │ │   ┬  
+      │ │   ╰── While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1279 │ ├─▶ }
+      │ │       
+      │ ╰─────── Parent node 'source_file'
+──────╯
 Error: 'contains_submodule_submodule' conflicts with other declarations:
      ╭─[ test.sus:441:8 ]
      │
@@ -2894,4 +2920,325 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1209 │     bool in_spec'0 = in_port
       │          ───┬───  
       │             ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not fully instantiate ::infer_me_with_poison_output #(
+    N: /* Could not infer */
+)
+      ╭─[ test.sus:1239:19 ]
+      │
+ 1239 │     bool x, bool y = infer_me_with_poison_output(i)
+      │                      ─────────────┬─────────────  
+      │                                   ╰─────────────── Could not fully instantiate ::infer_me_with_poison_output #(
+    N: /* Could not infer */
+)
+──────╯
+Error: MAX is not a valid template argument of ::int
+      ╭─[ test.sus:1244:27 ]
+      │
+ 1244 │     interface __add__ : int#(MAX: A) a'0, int #(MAX:B) b'0 -> int #(MAX: A+B) o'clog2 #(V: 5)
+      │                              ─┬─  
+      │                               ╰─── MAX is not a valid template argument of ::int
+      │
+      ├─[ core.sus:29:20 ]
+      │
+   29 │ __builtin__ struct int {}
+      │                    ─┬─  
+      │                     ╰─── 'int' defined here
+──────╯
+Error: MAX is not a valid template argument of ::int
+      ╭─[ test.sus:1244:46 ]
+      │
+ 1244 │     interface __add__ : int#(MAX: A) a'0, int #(MAX:B) b'0 -> int #(MAX: A+B) o'clog2 #(V: 5)
+      │                                                 ─┬─  
+      │                                                  ╰─── MAX is not a valid template argument of ::int
+      │
+      ├─[ core.sus:29:20 ]
+      │
+   29 │ __builtin__ struct int {}
+      │                    ─┬─  
+      │                     ╰─── 'int' defined here
+──────╯
+Error: MAX is not a valid template argument of ::int
+      ╭─[ test.sus:1244:66 ]
+      │
+ 1244 │     interface __add__ : int#(MAX: A) a'0, int #(MAX:B) b'0 -> int #(MAX: A+B) o'clog2 #(V: 5)
+      │                                                                     ─┬─  
+      │                                                                      ╰─── MAX is not a valid template argument of ::int
+      │
+      ├─[ core.sus:29:20 ]
+      │
+   29 │ __builtin__ struct int {}
+      │                    ─┬─  
+      │                     ╰─── 'int' defined here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1243:22 ]
+      │
+ 1243 │ module __add__ #(int A, int B) {
+      │                      ┬  
+      │                      ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1243:29 ]
+      │
+ 1243 │ module __add__ #(int A, int B) {
+      │                             ┬  
+      │                             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1244:35 ]
+      │
+ 1244 │     interface __add__ : int#(MAX: A) a'0, int #(MAX:B) b'0 -> int #(MAX: A+B) o'clog2 #(V: 5)
+      │                                      ┬  
+      │                                      ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1244:53 ]
+      │
+ 1244 │     interface __add__ : int#(MAX: A) a'0, int #(MAX:B) b'0 -> int #(MAX: A+B) o'clog2 #(V: 5)
+      │                                                        ┬  
+      │                                                        ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: While parsing 'latency_specifier', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1256:22 ]
+      │
+ 1256 │     trigger may_process'0 : T cur_state {
+      │                        ───┬────┬───────  
+      │                           ╰────────────── While parsing 'latency_specifier', parser found a syntax error in a node of type 'ERROR'
+      │                                │         
+      │                                ╰───────── Parent node 'latency_specifier'
+──────╯
+Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1256:38 ]
+      │
+ 1255 │ ╭─▶ module MultiStateLoop #(T, int II) {
+ 1256 │ │       trigger may_process'0 : T cur_state {
+      │ │                                           ┬  
+      │ │                                           ╰── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1258 │ ├─▶     }
+      │ │           
+      │ ╰─────────── Parent node 'block'
+──────╯
+Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1257:24 ]
+      │
+ 1255 │ ╭─▶ module MultiStateLoop #(T, int II) {
+      ┆ ┆   
+ 1257 │ │          action next_state'II : T next_state_value
+      │ │                               ──────────┬─────────  
+      │ │                                         ╰─────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+ 1258 │ ├─▶     }
+      │ │           
+      │ ╰─────────── Parent node 'block'
+──────╯
+Error: No Global of the name 'trigger' was found. Did you forget to import it?
+      ╭─[ test.sus:1256:2 ]
+      │
+ 1256 │     trigger may_process'0 : T cur_state {
+      │     ───┬───  
+      │        ╰───── No Global of the name 'trigger' was found. Did you forget to import it?
+──────╯
+Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+      ╭─[ test.sus:1256:28 ]
+      │
+ 1256 │     trigger may_process'0 : T cur_state {
+      │                               ────┬────  
+      │                                   ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+──────╯
+Error: Latency Specifier must be a compile-time expression
+      ╭─[ test.sus:1256:28 ]
+      │
+ 1256 │     trigger may_process'0 : T cur_state {
+      │                               ────┬────  
+      │                                   ╰────── Latency Specifier must be a compile-time expression
+──────╯
+Error: No Global of the name 'action' was found. Did you forget to import it?
+      ╭─[ test.sus:1257:3 ]
+      │
+ 1257 │        action next_state'II : T next_state_value
+      │        ───┬──  
+      │           ╰──── No Global of the name 'action' was found. Did you forget to import it?
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_2
+      ╭─[ test.sus:1256:10 ]
+      │
+ 1256 │     trigger may_process'0 : T cur_state {
+      │             ─────┬─────  
+      │                  ╰─────── Could not fully figure out the type of this object. type_variable_2
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_4
+      ╭─[ test.sus:1257:10 ]
+      │
+ 1257 │        action next_state'II : T next_state_value
+      │               ─────┬────  
+      │                    ╰────── Could not fully figure out the type of this object. type_variable_4
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1255:32 ]
+      │
+ 1255 │ module MultiStateLoop #(T, int II) {
+      │                                ─┬  
+      │                                 ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1256:10 ]
+      │
+ 1256 │     trigger may_process'0 : T cur_state {
+      │             ─────┬─────  
+      │                  ╰─────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1257:10 ]
+      │
+ 1257 │        action next_state'II : T next_state_value
+      │               ─────┬────  
+      │                    ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1267:22 ]
+      │
+ 1263 │ ╭─▶ module use_MultiStateLoop {
+      ┆ ┆   
+ 1267 │ │          action input_valid : float new_input
+      │ │                             ────────┬────────  
+      │ │                                     ╰────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1279 │ ├─▶ }
+      │ │       
+      │ ╰─────── Parent node 'block'
+──────╯
+Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1269:2 ]
+      │
+ 1263 │ ╭─▶ module use_MultiStateLoop {
+      ┆ ┆   
+ 1269 │ │       action request_result : -> trigger result_valid : {
+      │ │       ────────────────────────┬────────────────────────  
+      │ │                               ╰────────────────────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1279 │ ├─▶ }
+      │ │       
+      │ ╰─────── Parent node 'block'
+──────╯
+Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1273:20 ]
+      │
+ 1273 │ ╭─▶     when loop.process : float cur_state {
+      │ │                         ────────┬────────  
+      │ │                                 ╰────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1278 │ ├─▶     }
+      │ │           
+      │ ╰─────────── Parent node 'if_statement'
+──────╯
+Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1275:22 ]
+      │
+ 1275 │ ╭─▶        when cur_state >= 2.0 {
+      │ │                             ─┬  
+      │ │                              ╰── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1277 │ ├─▶        }
+      │ │              
+      │ ╰────────────── Parent node 'if_statement'
+──────╯
+Error: No Global of the name 'trigger' was found. Did you forget to import it?
+      ╭─[ test.sus:1266:2 ]
+      │
+ 1266 │     trigger request_input
+      │     ───┬───  
+      │        ╰───── No Global of the name 'trigger' was found. Did you forget to import it?
+──────╯
+Error: No Global of the name 'action' was found. Did you forget to import it?
+      ╭─[ test.sus:1267:3 ]
+      │
+ 1267 │        action input_valid : float new_input
+      │        ───┬──  
+      │           ╰──── No Global of the name 'action' was found. Did you forget to import it?
+──────╯
+Error: There is no port or interface of name 'process' on module MultiStateLoop
+      ╭─[ test.sus:1273:12 ]
+      │
+ 1255 │ module MultiStateLoop #(T, int II) {
+      │        ───────┬──────  
+      │               ╰──────── Module 'MultiStateLoop' defined here. module ::MultiStateLoop #(T, int II):
+domain clk:
+
+      │ 
+ 1273 │     when loop.process : float cur_state {
+      │               ───┬───  
+      │                  ╰───── There is no port or interface of name 'process' on module MultiStateLoop
+──────╯
+Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+      ╭─[ test.sus:1274:22 ]
+      │
+ 1274 │        float next_state = cur_state * cur_state
+      │                           ────┬────  
+      │                               ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+──────╯
+Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+      ╭─[ test.sus:1274:34 ]
+      │
+ 1274 │        float next_state = cur_state * cur_state
+      │                                       ────┬────  
+      │                                           ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+──────╯
+Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+      ╭─[ test.sus:1275:8 ]
+      │
+ 1275 │        when cur_state >= 2.0 {
+      │             ────┬────  
+      │                 ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_0
+      ╭─[ test.sus:1264:2 ]
+      │
+ 1264 │     MultiStateLoop loop
+      │     ───────┬──────  
+      │            ╰──────── Could not fully figure out the type of this object. type_variable_0
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_2
+      ╭─[ test.sus:1266:10 ]
+      │
+ 1266 │     trigger request_input
+      │             ──────┬──────  
+      │                   ╰──────── Could not fully figure out the type of this object. type_variable_2
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_3
+      ╭─[ test.sus:1267:10 ]
+      │
+ 1267 │        action input_valid : float new_input
+      │               ─────┬─────  
+      │                    ╰─────── Could not fully figure out the type of this object. type_variable_3
+──────╯
+Error: Typing Error: connection expects a ::float but was given a ::int
+      ╭─[ test.sus:1274:22 ]
+      │
+ 1274 │        float next_state = cur_state * cur_state
+      │              ─────┬────   ──────────┬──────────  
+      │                   ╰────────────────────────────── 'next_state' declared here
+      │                                     │            
+      │                                     ╰──────────── Typing Error: connection expects a ::float but was given a ::int
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1266:10 ]
+      │
+ 1266 │     trigger request_input
+      │             ──────┬──────  
+      │                   ╰──────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1267:10 ]
+      │
+ 1267 │        action input_valid : float new_input
+      │               ─────┬─────  
+      │                    ╰─────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1274:9 ]
+      │
+ 1274 │        float next_state = cur_state * cur_state
+      │              ─────┬────  
+      │                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯

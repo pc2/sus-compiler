@@ -134,6 +134,12 @@ TREE SITTER module! instantiate_fifo
 TREE SITTER module! inference_edge_case
 TREE SITTER module! specified_latencies_not_ports_edge_case
 TREE SITTER module! testArrayWrite
+TREE SITTER module! infer_me_with_poison_output
+TREE SITTER module! instantiate_infer_me_with_poison_output
+TREE SITTER module! __add__
+TREE SITTER module! ShiftReg
+TREE SITTER module! MultiStateLoop
+TREE SITTER module! use_MultiStateLoop
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -257,6 +263,12 @@ Typechecking instantiate_fifo
 Typechecking inference_edge_case
 Typechecking specified_latencies_not_ports_edge_case
 Typechecking testArrayWrite
+Typechecking infer_me_with_poison_output
+Typechecking instantiate_infer_me_with_poison_output
+Typechecking __add__
+Typechecking ShiftReg
+Typechecking MultiStateLoop
+Typechecking use_MultiStateLoop
 Instantiating IntToBits
 Concrete Typechecking IntToBits
 Latency Counting IntToBits
@@ -737,3 +749,8 @@ Instantiating testArrayWrite
 Concrete Typechecking testArrayWrite
 Latency Counting testArrayWrite
 Checking array accesses testArrayWrite
+Instantiating instantiate_infer_me_with_poison_output
+Concrete Typechecking instantiate_infer_me_with_poison_output
+Latency Counting instantiate_infer_me_with_poison_output
+Checking array accesses instantiate_infer_me_with_poison_output
+Not Instantiating use_MultiStateLoop due to flattening errors

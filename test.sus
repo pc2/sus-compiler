@@ -1225,3 +1225,55 @@ module testArrayWrite {
 		}
 	}
 }
+
+
+module infer_me_with_poison_output #(int N) {
+	interface infer_me_with_poison_output : bool i'0 -> bool o'N, bool p
+	o = i
+	reg reg reg reg p = i
+}
+// The poison output of infer_me_with_poison_output should make it impossible to infer it
+module instantiate_infer_me_with_poison_output {
+	interface instantiate_infer_me_with_poison_output : bool i -> bool o
+	reg reg reg reg reg reg reg o = i
+	bool x, bool y = infer_me_with_poison_output(i)
+	o = x
+	o = y
+}
+module __add__ #(int A, int B) {
+	interface __add__ : int#(MAX: A) a'0, int #(MAX:B) b'0 -> int #(MAX: A+B) o'clog2 #(V: 5)
+}
+module ShiftReg #(int DEPTH) {
+	interface ShiftReg : bool i'0 -> bool o'DEPTH
+	if DEPTH > 3 {
+		// Impl as BRAM
+	} else {
+		o = i
+	}
+}
+
+module MultiStateLoop #(T, int II) {
+	trigger may_process'0 : T cur_state {
+		action next_state'II : T next_state_value
+	}
+
+	action request_output : -> trigger output_valid : T result
+}
+
+module use_MultiStateLoop {
+	MultiStateLoop loop
+
+	trigger request_input
+		action input_valid : float new_input
+
+	action request_result : -> trigger result_valid : {
+
+	}
+
+	when loop.process : float cur_state {
+		float next_state = cur_state * cur_state
+		when cur_state >= 2.0 {
+			
+		}
+	}
+}

@@ -55,6 +55,26 @@ module pairwiseMultiply #(int SIZE) {
 }
 
 
+
+module conditionalBindings {
+
+    FIFO #(DEPTH: 20) fifo
+
+    when fifo.ready { // Trigger
+        fifo.push(3) // Action
+    }
+
+    // Query (Action + Trigger)
+    when fifo.pop() : int data {
+        // Do stuff with data
+    }
+
+
+    fifo.data_in = 3
+}
+
+
+
 module use_splitAt {
     input int[20] arr
     output int x
