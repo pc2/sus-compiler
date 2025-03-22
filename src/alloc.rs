@@ -606,6 +606,17 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
             _ph: PhantomData,
         }
     }
+    pub fn cast_to_array<const N: usize>(&self) -> &[T; N] {
+        assert!(self.len() == N);
+        self.data.as_slice().try_into().unwrap()
+    }
+    pub fn map_to_array<O, const N: usize>(
+        &self,
+        mut f: impl FnMut(UUID<IndexMarker>, &T) -> O,
+    ) -> [O; N] {
+        assert!(self.len() == N);
+        std::array::from_fn(|i| f(UUID::from_hidden_value(i), &self.data[i]))
+    }
     pub fn find(
         &self,
         mut predicate: impl FnMut(UUID<IndexMarker>, &T) -> bool,
@@ -645,6 +656,10 @@ impl<T, IndexMarker> FlatAlloc<Option<T>, IndexMarker> {
             it: self.data.iter_mut().enumerate(),
             _ph: PhantomData,
         }
+    }
+    pub fn unwrap_to_array<const N: usize>(&self) -> [&T; N] {
+        assert!(self.data.len() == N);
+        std::array::from_fn(|i| self.data[i].as_ref().unwrap())
     }
 }
 

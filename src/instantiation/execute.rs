@@ -9,9 +9,10 @@ use std::ops::{Deref, Index, IndexMut};
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::IsExtern;
 use crate::prelude::*;
-use crate::typing::template::GlobalReference;
+use crate::typing::template::{GlobalReference, TemplateArg};
 
 use num::BigInt;
+use sus_proc_macro::get_builtin_const;
 
 use crate::flattening::*;
 use crate::value::{compute_binary_op, compute_unary_op, Value};
@@ -215,70 +216,103 @@ impl InstantiationContext<'_, '_> {
         }
     }
 
-    fn get_first_template_argument_value(
+    fn get_template_args_only_values<const N: usize>(
         &self,
-        cst_ref: &GlobalReference<ConstantUUID>,
-    ) -> (&Value, Span) {
-        let first_arg = cst_ref.unwrap_first_template_argument();
-        let value_instruction = first_arg.kind.unwrap_value();
-        (
-            self.generation_state[value_instruction].unwrap_generation_value(),
-            first_arg.value_span,
-        )
+        args: &TVec<Option<TemplateArg>>,
+    ) -> [(&Value, Span); N] {
+        args.map_to_array(|_, arg| {
+            let arg = arg.as_ref().unwrap();
+            let value_instruction = arg.kind.unwrap_value();
+            (
+                self.generation_state[value_instruction].unwrap_generation_value(),
+                arg.value_span,
+            )
+        })
     }
 
-    /// TODO make builtins that depend on parameters
+    fn evaluate_builtin_constant(
+        &self,
+        cst_ref: &GlobalReference<ConstantUUID>,
+    ) -> ExecutionResult<Value> {
+        match cst_ref.id {
+            get_builtin_const!("true") => Ok(Value::Bool(true)),
+            get_builtin_const!("false") => Ok(Value::Bool(false)),
+            get_builtin_const!("clog2") => {
+                let [(val, span)] = self.get_template_args_only_values(&cst_ref.template_args);
+                let int_val = val.unwrap_integer();
+                if *int_val > BigInt::ZERO {
+                    let int_val_minus_one: BigInt = int_val - 1;
+
+                    Ok(Value::Integer(BigInt::from(int_val_minus_one.bits())))
+                } else {
+                    Err((span, format!("clog argument must be > 0, found {int_val}")))
+                }
+            }
+            get_builtin_const!("pow2") => {
+                let [(exponent, span)] = self.get_template_args_only_values(&cst_ref.template_args);
+                if let Some(exp) = exponent.get_int() {
+                    let mut result = BigInt::ZERO;
+                    result.set_bit(exp, true);
+                    Ok(Value::Integer(result))
+                } else {
+                    Err((
+                        span,
+                        format!("pow2 exponent must be >= 0, found {exponent}"),
+                    ))
+                }
+            }
+            get_builtin_const!("pow") => {
+                let [(base, _base_span), (exponent, span)] =
+                    self.get_template_args_only_values(&cst_ref.template_args);
+                if let Some(exp) = exponent.get_int() {
+                    Ok(Value::Integer(base.unwrap_integer().pow(exp)))
+                } else {
+                    Err((span, format!("pow exponent must be >= 0, found {exponent}")))
+                }
+            }
+            get_builtin_const!("assert") => {
+                let [(condition, span)] =
+                    self.get_template_args_only_values(&cst_ref.template_args);
+
+                if condition.unwrap_bool() {
+                    Ok(Value::Bool(true))
+                } else {
+                    Err((span, "Assertion failed".into()))
+                }
+            }
+            get_builtin_const!("sizeof") => {
+                let [typ_to_size] = cst_ref.template_args.unwrap_to_array();
+                let wr_typ = typ_to_size.kind.unwrap_type();
+
+                let concrete_typ = self.concretize_type(wr_typ)?;
+
+                if let Some(typ_sz) = concrete_typ.sizeof() {
+                    Ok(Value::Integer(typ_sz))
+                } else {
+                    Err((typ_to_size.value_span, "This is an incomplete type".into()))
+                }
+            }
+            get_builtin_const!("__crash_compiler") => {
+                cst_ref.get_total_span().debug();
+                panic!(
+                    "__crash_compiler Intentional ICE. This is for debugging the compiler and LSP."
+                )
+            }
+            other => unreachable!("{other:?} is not a known builtin constant"),
+        }
+    }
+
     fn get_named_constant_value(
         &self,
         cst_ref: &GlobalReference<ConstantUUID>,
     ) -> ExecutionResult<Value> {
         let linker_cst = &self.linker.constants[cst_ref.id];
 
-        Ok(if linker_cst.link_info.is_extern == IsExtern::Builtin {
-            match linker_cst.link_info.name.as_str() {
-                "true" => Value::Bool(true),
-                "false" => Value::Bool(false),
-                "clog2" => {
-                    let (val, span) = self.get_first_template_argument_value(cst_ref);
-                    let int_val = val.unwrap_integer();
-                    if *int_val > BigInt::ZERO {
-                        let int_val_minus_one: BigInt = int_val - 1;
-
-                        Value::Integer(BigInt::from(int_val_minus_one.bits()))
-                    } else {
-                        return Err((span, format!("clog2 argument must be > 0, found {int_val}")));
-                    }
-                }
-                "assert" => {
-                    let (condition, span) = self.get_first_template_argument_value(cst_ref);
-
-                    if condition.unwrap_bool() {
-                        Value::Bool(true)
-                    } else {
-                        return Err((span, "Assertion failed".into()));
-                    }
-                }
-                "sizeof" => {
-                    let first_arg = cst_ref.unwrap_first_template_argument();
-                    let wr_typ = first_arg.kind.unwrap_type();
-
-                    let concrete_typ = self.concretize_type(wr_typ)?;
-
-                    let Some(typ_sz) = concrete_typ.sizeof() else {
-                        return Err((first_arg.value_span, "This is an incomplete type".into()));
-                    };
-
-                    Value::Integer(typ_sz)
-                }
-                "__crash_compiler" => {
-                    cst_ref.get_total_span().debug();
-                    panic!("__crash_compiler Intentional ICE. This is for debugging the compiler and LSP.")
-                }
-                other => unreachable!("{other} is not a known builtin constant"),
-            }
+        if linker_cst.link_info.is_extern == IsExtern::Builtin {
+            self.evaluate_builtin_constant(cst_ref)
         } else {
             todo!("Custom Constants");
-        })
+        }
     }
 
     // Points to the wire in the hardware that corresponds to the root of this.

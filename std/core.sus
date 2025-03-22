@@ -60,3 +60,8 @@ __builtin__ const int sizeof #(T) {}
 // `clog2 #(V: 16) = 4`
 // `clog2 #(V: 17) = 5`
 __builtin__ const int clog2 #(int V) {}
+
+__builtin__ const int pow2 #(int E) {}
+
+__builtin__ const int pow #(int B, int E) {}
+

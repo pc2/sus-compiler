@@ -11,6 +11,8 @@ TREE SITTER module! false
 TREE SITTER module! assert
 TREE SITTER module! sizeof
 TREE SITTER module! clog2
+TREE SITTER module! pow2
+TREE SITTER module! pow
 TREE SITTER module! DualPortMem
 TREE SITTER module! FIFO
 TREE SITTER module! JoinDomains

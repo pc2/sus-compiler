@@ -252,7 +252,7 @@ impl<'g> CodeGenerationContext<'g> {
             idx += 1;
             let (new_typ, sz) = arr_box.deref();
             typ = new_typ;
-            let sz = sz.unwrap_value().unwrap_usize();
+            let sz = sz.unwrap_value().unwrap_integer();
             write!(
                 for_stack,
                 "for({for_should_declare_var}{var_name} = 0; {var_name} < {sz}; {var_name} = {var_name} + 1) "
