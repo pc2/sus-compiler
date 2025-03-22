@@ -13,8 +13,10 @@ use std::{
 ///
 /// TODO add custom niche for more efficient Options, wait until custom niches are stabilized (https://internals.rust-lang.org/t/nonmaxusize-and-niche-value-optimisation/19661)
 /// Maybe use NonZeroUsize (https://doc.rust-lang.org/std/num/struct.NonZeroUsize.html)
+///
+/// Fields are public such that get_builtin_constant!() and get_builtin_type!() can create them such that match can match over
 #[allow(clippy::upper_case_acronyms)]
-pub struct UUID<IndexMarker>(usize, PhantomData<IndexMarker>);
+pub struct UUID<IndexMarker>(pub usize, pub PhantomData<IndexMarker>);
 
 impl<IndexMarker> Clone for UUID<IndexMarker> {
     fn clone(&self) -> Self {

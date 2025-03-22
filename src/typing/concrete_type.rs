@@ -94,15 +94,11 @@ impl ConcreteType {
 
     /// TODO #50 Ranged Int work should be integrated
     pub fn sizeof_named(type_ref: &ConcreteGlobalReference<TypeUUID>) -> u64 {
-        if type_ref.id == get_builtin_type!("int") {
-            32 // TODO concrete int sizes
-        } else if type_ref.id == get_builtin_type!("bool") {
-            1
-        } else if type_ref.id == get_builtin_type!("float") {
-            32
-        } else {
-            println!("TODO Named Structs Size");
-            1 // todo!() // Named structs are not implemented yet
+        match type_ref.id {
+            get_builtin_type!("int") => 32, // TODO concrete int sizes
+            get_builtin_type!("bool") => 1,
+            get_builtin_type!("float") => 32,
+            _other => todo!("Other Named Structs are not implemented yet"),
         }
     }
 }

@@ -85,7 +85,7 @@ pub fn get_builtin_type(token_stream: TokenStream) -> TokenStream {
         let (_full, [found_name]) = c.extract();
         if found_name == object_name {
             return quote! {
-                crate::prelude::TypeUUID::from_hidden_value(#idx)
+                crate::alloc::UUID::<crate::prelude::TypeUUIDMarker>(#idx, std::marker::PhantomData)
             }
             .into();
         }
@@ -112,7 +112,7 @@ pub fn get_builtin_const(token_stream: TokenStream) -> TokenStream {
         let (_full, [found_name]) = c.extract();
         if found_name == object_name {
             return quote! {
-                crate::prelude::ConstantUUID::from_hidden_value(#idx)
+                crate::alloc::UUID::<crate::prelude::ConstantUUIDMarker>(#idx, std::marker::PhantomData)
             }
             .into();
         }
