@@ -216,80 +216,62 @@ impl InstantiationContext<'_, '_> {
         }
     }
 
-    fn get_template_args_only_values<const N: usize>(
-        &self,
-        args: &TVec<Option<TemplateArg>>,
-    ) -> [(&Value, Span); N] {
-        args.map_to_array(|_, arg| {
-            let arg = arg.as_ref().unwrap();
-            let value_instruction = arg.kind.unwrap_value();
-            (
-                self.generation_state[value_instruction].unwrap_generation_value(),
-                arg.value_span,
-            )
-        })
-    }
-
     fn evaluate_builtin_constant(
         &self,
         cst_ref: &GlobalReference<ConstantUUID>,
-    ) -> ExecutionResult<Value> {
+        template_args: &TVec<ConcreteType>,
+    ) -> Result<Value, String> {
         match cst_ref.id {
             get_builtin_const!("true") => Ok(Value::Bool(true)),
             get_builtin_const!("false") => Ok(Value::Bool(false)),
             get_builtin_const!("clog2") => {
-                let [(val, span)] = self.get_template_args_only_values(&cst_ref.template_args);
-                let int_val = val.unwrap_integer();
-                if *int_val > BigInt::ZERO {
-                    let int_val_minus_one: BigInt = int_val - 1;
+                let [val] = template_args.cast_to_array();
+                let val = val.unwrap_value().unwrap_integer();
+                if *val > BigInt::ZERO {
+                    let int_val_minus_one: BigInt = val - 1;
 
                     Ok(Value::Integer(BigInt::from(int_val_minus_one.bits())))
                 } else {
-                    Err((span, format!("clog argument must be > 0, found {int_val}")))
+                    Err(format!("clog argument must be > 0, found {val}"))
                 }
             }
             get_builtin_const!("pow2") => {
-                let [(exponent, span)] = self.get_template_args_only_values(&cst_ref.template_args);
-                if let Some(exp) = exponent.get_int() {
+                let [exponent] = template_args.cast_to_array();
+                let exponent = exponent.unwrap_value().unwrap_integer();
+                if let Ok(exp) = u64::try_from(exponent) {
                     let mut result = BigInt::ZERO;
                     result.set_bit(exp, true);
                     Ok(Value::Integer(result))
                 } else {
-                    Err((
-                        span,
-                        format!("pow2 exponent must be >= 0, found {exponent}"),
-                    ))
+                    Err(format!("pow2 exponent must be >= 0, found {exponent}"))
                 }
             }
             get_builtin_const!("pow") => {
-                let [(base, _base_span), (exponent, span)] =
-                    self.get_template_args_only_values(&cst_ref.template_args);
-                if let Some(exp) = exponent.get_int() {
-                    Ok(Value::Integer(base.unwrap_integer().pow(exp)))
+                let [base, exponent] = template_args.cast_to_array();
+                let base = base.unwrap_value().unwrap_integer();
+                let exponent = exponent.unwrap_value().unwrap_integer();
+                if let Ok(exp) = u32::try_from(exponent) {
+                    Ok(Value::Integer(base.pow(exp)))
                 } else {
-                    Err((span, format!("pow exponent must be >= 0, found {exponent}")))
+                    Err(format!("pow exponent must be >= 0, found {exponent}"))
                 }
             }
             get_builtin_const!("assert") => {
-                let [(condition, span)] =
-                    self.get_template_args_only_values(&cst_ref.template_args);
+                let [condition] = template_args.cast_to_array();
 
-                if condition.unwrap_bool() {
+                if condition.unwrap_value().unwrap_bool() {
                     Ok(Value::Bool(true))
                 } else {
-                    Err((span, "Assertion failed".into()))
+                    Err("Assertion failed".into())
                 }
             }
             get_builtin_const!("sizeof") => {
-                let [typ_to_size] = cst_ref.template_args.unwrap_to_array();
-                let wr_typ = typ_to_size.kind.unwrap_type();
-
-                let concrete_typ = self.concretize_type(wr_typ)?;
+                let [concrete_typ] = template_args.cast_to_array();
 
                 if let Some(typ_sz) = concrete_typ.sizeof() {
                     Ok(Value::Integer(typ_sz))
                 } else {
-                    Err((typ_to_size.value_span, "This is an incomplete type".into()))
+                    Err("This is an incomplete type".into())
                 }
             }
             get_builtin_const!("__crash_compiler") => {
@@ -306,10 +288,35 @@ impl InstantiationContext<'_, '_> {
         &self,
         cst_ref: &GlobalReference<ConstantUUID>,
     ) -> ExecutionResult<Value> {
+        let template_args = self.execute_template_args(&cst_ref.template_args)?;
+
+        let error_values: Vec<_> = template_args
+            .iter()
+            .filter_map(|(id, arg)| arg.contains_unknown().then_some(id))
+            .collect();
+
         let linker_cst = &self.linker.constants[cst_ref.id];
+        if !error_values.is_empty() {
+            let mut resulting_error = String::from("For executing compile-time constants, all arguments must be fully specified. In this case, the arguments ");
+            for ev in error_values {
+                use std::fmt::Write;
+                write!(
+                    resulting_error,
+                    "'{}', ",
+                    &linker_cst.link_info.template_parameters[ev].name
+                )
+                .unwrap();
+            }
+            resulting_error.pop();
+            resulting_error.pop();
+            resulting_error.push_str(" were not specified");
+
+            return Err((cst_ref.get_total_span(), resulting_error));
+        }
 
         if linker_cst.link_info.is_extern == IsExtern::Builtin {
-            self.evaluate_builtin_constant(cst_ref)
+            self.evaluate_builtin_constant(cst_ref, &template_args)
+                .map_err(|e| (cst_ref.get_total_span(), e))
         } else {
             todo!("Custom Constants");
         }
@@ -740,6 +747,23 @@ impl InstantiationContext<'_, '_> {
         })
     }
 
+    fn execute_template_args(
+        &self,
+        args: &TVec<Option<TemplateArg>>,
+    ) -> ExecutionResult<TVec<ConcreteType>> {
+        args.try_map(|(_, v)| -> ExecutionResult<ConcreteType> {
+            Ok(match v {
+                Some(arg) => match &arg.kind {
+                    TemplateArgKind::Type(typ) => self.concretize_type(typ)?,
+                    TemplateArgKind::Value(v) => {
+                        ConcreteType::Value(self.generation_state.get_generation_value(*v)?.clone())
+                    }
+                },
+                None => ConcreteType::Unknown(self.type_substitutor.alloc()),
+            })
+        })
+    }
+
     fn instantiate_code_block(&mut self, block_range: FlatIDRange) -> ExecutionResult<()> {
         let mut instruction_range = block_range.into_iter();
         while let Some(original_instruction) = instruction_range.next() {
@@ -756,20 +780,10 @@ impl InstantiationContext<'_, '_> {
                     };
                     let port_map = sub_module.ports.map(|_| None);
                     let interface_call_sites = sub_module.interfaces.map(|_| Vec::new());
-                    let mut template_args =
-                        FlatAlloc::with_capacity(submodule.module_ref.template_args.len());
 
-                    for (_id, v) in &submodule.module_ref.template_args {
-                        template_args.alloc(match v {
-                            Some(arg) => match &arg.kind {
-                                TemplateArgKind::Type(typ) => self.concretize_type(typ)?,
-                                TemplateArgKind::Value(v) => ConcreteType::Value(
-                                    self.generation_state.get_generation_value(*v)?.clone(),
-                                ),
-                            },
-                            None => ConcreteType::Unknown(self.type_substitutor.alloc()),
-                        });
-                    }
+                    let template_args =
+                        self.execute_template_args(&submodule.module_ref.template_args)?;
+
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule {
                         original_instruction,
                         instance: OnceCell::new(),

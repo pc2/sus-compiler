@@ -61,7 +61,7 @@ impl Value {
             (Self::Bool(_), typ) if *typ == BOOL_CONCRETE_TYPE => true,
             (Self::Array(arr_slice), ConcreteType::Array(arr_typ_box)) => {
                 let (arr_content_typ, arr_size_typ) = arr_typ_box.deref();
-                if arr_slice.len() != arr_size_typ.unwrap_value().get_int::<usize>().unwrap() {
+                if arr_slice.len() != arr_size_typ.unwrap_value().unwrap_int::<usize>() {
                     return false;
                 }
                 for v in arr_slice.iter() {
@@ -86,11 +86,11 @@ impl Value {
     }
 
     #[track_caller]
-    pub fn get_int<IntT: for<'i> TryFrom<&'i BigInt>>(&self) -> Option<IntT> {
+    pub fn unwrap_int<IntT: for<'i> TryFrom<&'i BigInt>>(&self) -> IntT {
         let Self::Integer(i) = self else {
             panic!("{:?} is not an integer!", self)
         };
-        IntT::try_from(i).ok()
+        IntT::try_from(i).ok().unwrap()
     }
 
     #[track_caller]
@@ -167,7 +167,7 @@ impl ConcreteType {
             ConcreteType::Named(_name) => Value::Unset,
             ConcreteType::Array(arr) => {
                 let (arr_typ, arr_size) = arr.deref();
-                let arr_size: usize = arr_size.unwrap_value().get_int().unwrap();
+                let arr_size: usize = arr_size.unwrap_value().unwrap_int();
                 let mut arr = Vec::new();
                 if arr_size > 0 {
                     let content_typ = arr_typ.get_initial_val();

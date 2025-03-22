@@ -1,6 +1,13 @@
 # Changelog
+## 0.3.0 (indev)
+- Add `pow` and `pow2`
+
+### Planned
+- Sized integers
+- float library
+
 ## 0.2.1
-- Update ariadne 0.4.1 => 0.5.1
+- Update ariadne 0.4.1 => 0.5.1 to fix Multiline errors
 - Switch to Bellman-Ford for Latency Counting
 - Latency Counting now covers any fully-connected graph
 

@@ -2788,11 +2788,11 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Assertion failed
-      ╭─[ test.sus:1097:14 ]
+      ╭─[ test.sus:1097:2 ]
       │
  1097 │     assert #(C: 15 + 3 == 19)
-      │                 ──────┬─────  
-      │                       ╰─────── Assertion failed
+      │     ────────────┬────────────  
+      │                 ╰────────────── Assertion failed
 ──────╯
 Error: Used 'when' in a generative context, use 'if' instead
       ╭─[ test.sus:1108:9 ]
