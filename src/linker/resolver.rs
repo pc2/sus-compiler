@@ -1,6 +1,6 @@
 //! This module provides a safe interface to edit both the current module, and access other modules in the linker.
 
-use std::ops::Index;
+use std::{ops::Index, path};
 
 use crate::typing::template::GlobalReference;
 
@@ -112,12 +112,99 @@ impl<'linker> GlobalResolver<'linker> {
         }
     }
 
-    /// SAFETY: Files are never touched, and as long as this object is managed properly linker will also exist long enough.
-    pub fn resolve_global(&self, name_span: Span) -> Option<GlobalUUID> {
-        let name = &self.file_data.file_text[name_span];
+    // generate vec path for namespace ot of vec name span
+    pub fn namespace_path_from_span_vec<'slf>(&'slf self, name_path: Vec<Span>) -> Vec<String> {
+        let mut path_vec: Vec<String> = vec![];
+        for span in name_path {
+            path_vec.push(self.file_data.file_text[span].to_owned());
+        }
+        path_vec.pop();
+        path_vec
+    }
 
+    // attempts to resolve the name in the namespaces that where imported in the file of the module
+    // includes standard imports as well as custom imports specified at the top of a file
+    pub fn resolve_imported_namespace<'slf>(&'slf self, name_span: Span) -> Option<GlobalUUID> {
+        
+        // Program logic
+        let mut global: Vec<GlobalUUID> = Vec::new();
+        // loop through all imported namespaces for file including default imports
+        for possible_namespace in &self.file_data.associated_namespaces{
+            if let Some(name_found) = self.try_resolve_possible_namespace(possible_namespace.clone(), name_span) {
+                global.push(name_found);
+            }
+        }
+
+        // Error handeling and returning
+        // returns GlobalUUID when one possible candidate found, else error and return none
+        let name = self.file_data.file_text[name_span].to_owned();
         let mut resolved_globals = self.resolved_globals.borrow_mut();
-        match self.linker.global_namespace.get(name) {
+        if global.len() == 1 {
+            resolved_globals.referenced_globals.push(global[0]);
+            Some(global[0])
+        } else if global.len() > 1 {
+            resolved_globals.all_resolved = false;
+
+            let err_ref = self.errors.error(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by full name."));
+
+            for collider_global in global.iter() {
+                let err_loc = self.get_linking_error_location(*collider_global);
+                err_ref.info(
+                    err_loc.location,
+                    format!("{} {} declared here", err_loc.named_type, err_loc.full_name),
+                );
+            }
+
+            None
+        } else {
+            resolved_globals.all_resolved = false;
+
+            self.errors.error(
+                name_span,
+                format!(
+                    "'{name}' was not found. Did you forget to import the corresponding module?"
+                ),
+            );
+
+            None
+        }
+    }
+
+    // Attempts to resolve Name for given Namespace path without Errors for None and Subnamespace
+    fn try_resolve_possible_namespace<'slf>(&'slf self, mut path_vec: Vec<String>, name_span: Span) -> Option<GlobalUUID> {
+        let name = self.file_data.file_text[name_span].to_owned(); // convert span to actual name, required for nice error messages
+        let current_namespace = self.linker.get_subnamespace(&mut path_vec);
+        let mut resolved_globals = self.resolved_globals.borrow_mut();
+        match current_namespace.get(&name) {
+            Some(NamespaceElement::Global(found)) => {
+                Some(*found)
+            }
+            Some(NamespaceElement::Colission(coll)) => {
+                resolved_globals.all_resolved = false;
+
+                let err_ref = self.errors.error(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."));
+
+                for collider_global in coll.iter() {
+                    let err_loc = self.get_linking_error_location(*collider_global);
+                    err_ref.info(
+                        err_loc.location,
+                        format!("{} {} declared here", err_loc.named_type, err_loc.full_name),
+                    );
+                }
+                None
+            }
+            Some(_) => None,
+            None => None,
+        }
+    }
+
+    /// SAFETY: Files are never touched, and as long as this object is managed properly linker will also exist long enough.
+    pub fn resolve_full_path<'slf>(&'slf self, mut path_vec: Vec<String>, name_span: Span) -> Option<GlobalUUID> {
+        let name = self.file_data.file_text[name_span].to_owned();
+        let current_namespace = self.linker.get_subnamespace(&mut path_vec);
+        let mut resolved_globals = self.resolved_globals.borrow_mut();
+
+        match current_namespace.get(&name) {
             Some(NamespaceElement::Global(found)) => {
                 resolved_globals.referenced_globals.push(*found);
                 Some(*found)
@@ -137,13 +224,24 @@ impl<'linker> GlobalResolver<'linker> {
 
                 None
             }
+            Some(NamespaceElement::Subnamespace(sub)) => {
+                resolved_globals.all_resolved = false;
+                self.errors.error(
+                    name_span,
+                    format!(
+                        "Subnamespace hit when trying to resolve Name '{name}'"
+                    ),
+                );
+                None
+            }
             None => {
+                
                 resolved_globals.all_resolved = false;
 
                 self.errors.error(
                     name_span,
                     format!(
-                        "No Global of the name '{name}' was found. Did you forget to import it?"
+                        "'{name}' was not found. Did you forget to import the corresponding module?"
                     ),
                 );
 

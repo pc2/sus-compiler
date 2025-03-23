@@ -1,4 +1,4 @@
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -7,7 +7,7 @@ use crate::linker::AFTER_INITIAL_PARSE_CP;
 use crate::prelude::*;
 
 use sus_proc_macro::{get_builtin_const, get_builtin_type};
-use tree_sitter::Parser;
+use tree_sitter::{Parser, Tree};
 
 use crate::{
     config::config, debug::SpanDebugger, errors::ErrorStore, file_position::FileText,
@@ -23,12 +23,14 @@ const STD_LIB_PATH: &str = env!("SUS_COMPILER_STD_LIB_PATH");
 /// Any extra operations that should happen when files are added or removed from the linker. Such as caching line offsets.
 pub trait LinkerExtraFileInfoManager {
     /// This is there to give an acceptable identifier that can be printed
-    fn convert_filename(&self, path: &Path) -> String {
+    // TODO Namespaces: Check if this is still needed
+    /*    fn convert_filename(&self, path: &Path) -> String {
         path.to_string_lossy().into_owned()
-    }
-    fn on_file_added(&mut self, _file_id: FileUUID, _linker: &Linker) {}
-    fn on_file_updated(&mut self, _file_id: FileUUID, _linker: &Linker) {}
-    fn before_file_remove(&mut self, _file_id: FileUUID, _linker: &Linker) {}
+    } */
+    fn convert_filename(&self, path : &PathBuf) {}
+    fn on_file_added(&mut self, _file_id : FileUUID, _linker : &Linker) {}
+    fn on_file_updated(&mut self, _file_id : FileUUID, _linker : &Linker) {}
+    fn before_file_remove(&mut self, _file_id : FileUUID, _linker : &Linker) {}
 }
 
 impl LinkerExtraFileInfoManager for () {}
@@ -46,7 +48,9 @@ impl Linker {
         }
         let std_path = PathBuf::from_str(STD_LIB_PATH)
             .expect("Standard library directory is not a valid path?");
-        self.add_all_files_in_directory(&std_path, info_mngr);
+        // TODO: Only add files from standard directory if they are required by user file
+        // (e.g. always add Core and only add util when imported)
+        self.add_all_files_in_directory(&std_path, &std_path , info_mngr);
 
         // Sanity check for the names the compiler knows internally.
         // They are defined in std/core.sus
@@ -86,12 +90,15 @@ impl Linker {
         );
     }
 
+    //pub fn add_all_files_in_directory<ExtraInfoManager : LinkerExtraFileInfoManager>(&mut self, base : &PathBuf, subdir_path : Vec<OsStr>, info_mngr : &mut ExtraInfoManager) {
+    // Adds all files of directory to new subnamespace below the global name space
     pub fn add_all_files_in_directory<ExtraInfoManager: LinkerExtraFileInfoManager>(
         &mut self,
-        directory: &PathBuf,
+        base: &PathBuf,
+        subdir: &PathBuf,
         info_mngr: &mut ExtraInfoManager,
     ) {
-        let mut files = std::fs::read_dir(directory)
+        let mut files: Vec<PathBuf> = std::fs::read_dir(subdir)
             .unwrap()
             .map(|res| res.map(|e| e.path()))
             .collect::<Result<Vec<_>, std::io::Error>>()
@@ -100,16 +107,64 @@ impl Linker {
         for file in files {
             let file_path = file.canonicalize().unwrap();
             if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
+                 
+                // tokenize path into sub paths that will become namespaces
+                let relative_path = file_path.strip_prefix(base);
+                let mut relative_path = relative_path.unwrap().to_path_buf();
+                relative_path.set_extension("");
+                // stack that will hold all elements of the full namespace path
+                // top of stack is the base dir
+                let mut path_stack = self.make_path_vec(base, &file_path);
+                path_stack.reverse(); // TODO: Make this happen globally once
                 let file_text = std::fs::read_to_string(&file_path).unwrap();
-                let file_identifier: String = info_mngr.convert_filename(&file_path);
-                self.add_file(file_identifier, file_text, info_mngr);
+                // TODO Namespaces: check if this is still needed
+                //let file_identifier: String = info_mngr.convert_filename(&file_path);
+                self.add_file(path_stack, file_text, info_mngr);
+            }
+            if file_path.is_dir() {
+                self.add_all_files_in_directory(&base, &file_path ,info_mngr); // recuse through all subdirs
             }
         }
     }
 
+    // creates path vector for file_identifier and path in global namespace
+    pub fn make_path_vec(&mut self, base: &PathBuf, file: &PathBuf) -> Vec<String> {
+        // tokenize path into sub paths that will become namespaces
+        let canon_file = file.canonicalize().expect("No canon name found for '{:?}', are you sure that the file exists?");
+        let relative_path = canon_file.strip_prefix(base);
+        let mut relative_path = relative_path.unwrap().to_path_buf();
+        relative_path.set_extension("");
+        // stack that will hold all elements of the full namespace path
+        // top of stack is the base dir
+        let mut path_stack : Vec<String> = Vec::new();
+        for subdir in relative_path.iter().rev() {
+            path_stack.push(subdir.to_string_lossy().into_owned());
+        }
+        let mut base_string = base.to_string_lossy().into_owned();
+        if let Some(temp) = self.root_spaces.get(&base_string) {
+            base_string = temp.to_owned();
+        }
+        path_stack.push(base_string);
+        return path_stack;
+    }
+
+
+    // prepare vec with imported namespaces to save as file context later
+    fn gen_namespace_context<ExtraInfoManager : LinkerExtraFileInfoManager>(&mut self, file_identifier: &Vec<String>, info_mngr : &mut ExtraInfoManager) -> Vec<Vec<String>>{
+        let mut associated_namespaces = Vec::new();
+        let core = vec!["std".to_owned(),"core".to_owned()];
+        let util = vec!["std".to_owned(),"util".to_owned()];
+        associated_namespaces.push(core);
+        associated_namespaces.push(util);
+        if !associated_namespaces.contains(file_identifier) {
+            associated_namespaces.push(file_identifier.clone());
+        };
+        associated_namespaces
+    }
+
     pub fn add_file<ExtraInfoManager: LinkerExtraFileInfoManager>(
         &mut self,
-        file_identifier: String,
+        file_identifier: Vec<String>,
         text: String,
         info_mngr: &mut ExtraInfoManager,
     ) -> FileUUID {
@@ -118,10 +173,12 @@ impl Linker {
             .files
             .iter()
             .any(|fd| fd.1.file_identifier == file_identifier));
-
+        
         let mut parser = Parser::new();
         parser.set_language(&tree_sitter_sus::language()).unwrap();
         let tree = parser.parse(&text, None).unwrap();
+    
+        let associated_namespaces = self.gen_namespace_context(&file_identifier, info_mngr);
 
         let file_id = self.files.reserve();
         self.files.alloc_reservation(
@@ -131,6 +188,7 @@ impl Linker {
                 file_text: FileText::new(text),
                 tree,
                 associated_values: Vec::new(),
+                associated_namespaces,
                 parsing_errors: ErrorStore::new(),
             },
         );
@@ -147,6 +205,7 @@ impl Linker {
     }
 
     // When --feature lsp is not used, this gives a warning
+    // TODO, fix for namespaces, file search may be broken 
     #[allow(dead_code)]
     pub fn add_or_update_file<ExtraInfoManager: LinkerExtraFileInfoManager>(
         &mut self,
@@ -173,13 +232,14 @@ impl Linker {
 
             info_mngr.on_file_updated(file_id, self);
         } else {
-            self.add_file(file_identifier.to_owned(), text, info_mngr);
+            //self.add_file(file_identifier.to_owned(), text, info_mngr);
         }
     }
 
+    // TODO Namespaces: Fix for namespaces
     pub fn find_file(&self, file_identifier: &str) -> Option<FileUUID> {
         self.files
-            .find(|_id, f| f.file_identifier == file_identifier)
+            .find(|_id, f| f.file_identifier.join("/") == file_identifier)
     }
 
     pub fn recompile_all(&mut self) {

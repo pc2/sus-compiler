@@ -110,6 +110,8 @@ impl Drop for SpanDebugger<'_> {
             assert!(history.in_use);
             history.in_use = false;
         });
+        // TODO Namespaces: Check if this is still neccessary
+        //self.defused = true;
     }
 }
 

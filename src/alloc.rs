@@ -294,6 +294,10 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
         assert!(self.data[uuid].is_none());
         self.data[uuid] = Some(v);
     }
+    pub fn alloc_reservation_namespace(&mut self, UUID(uuid, _): UUID<IndexMarker>, v: T) {
+        assert!(self.data[uuid].is_none());
+        self.data[uuid] = Some(v);
+    }
     pub fn free(&mut self, UUID(uuid, _): UUID<IndexMarker>) -> T {
         self.free_slots.push(uuid);
         self.data[uuid].take().unwrap()

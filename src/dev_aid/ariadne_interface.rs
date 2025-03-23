@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::{ops::Range, path::PathBuf};
+use std::{ops::Range, path::PathBuf, str::FromStr};
 
 use crate::compiler_top::LinkerExtraFileInfoManager;
 use crate::linker::FileData;
@@ -13,14 +13,18 @@ use crate::{
 
 use ariadne::*;
 
+// TODO Namespaces: find a better way to do this
+const USR_LIB_PATH: &str = "/home/tska/git/sus-compiler";
+
 impl Cache<FileUUID> for (&Linker, &mut ArenaVector<Source<String>, FileUUIDMarker>) {
     type Storage = String;
 
     fn fetch(&mut self, id: &FileUUID) -> Result<&Source<String>, impl std::fmt::Debug> {
         Result::<&Source<String>, ()>::Ok(&self.1[*id])
     }
-    fn display<'a>(&self, id: &'a FileUUID) -> Option<impl std::fmt::Display + 'a> {
-        if config().ci {
+    // TODO Namespaces: Make the old syntax work again
+    fn display<'a>(&self, id: &'a FileUUID) -> Option<Box<dyn std::fmt::Display + 'a>> {
+        /*if config().ci {
             let filename = self.0.files[*id]
                 .file_identifier
                 .rsplit("/")
@@ -29,7 +33,8 @@ impl Cache<FileUUID> for (&Linker, &mut ArenaVector<Source<String>, FileUUIDMark
             Some(filename.to_string())
         } else {
             Some(self.0.files[*id].file_identifier.clone())
-        }
+        }*/
+        Some(Box::new(self.0.files[*id].file_identifier.clone().join("/")))
     }
 }
 
@@ -54,9 +59,11 @@ pub struct FileSourcesManager {
 }
 
 impl LinkerExtraFileInfoManager for FileSourcesManager {
-    fn convert_filename(&self, path: &Path) -> String {
+    // TODO Namespaces: check if this is still needed
+    /*    fn convert_filename(&self, path: &Path) -> String {
         path.to_string_lossy().into_owned()
-    }
+    }*/
+    fn convert_filename(&self, path : &PathBuf) {}
 
     fn on_file_added(&mut self, file_id: FileUUID, linker: &Linker) {
         let source = Source::from(linker.files[file_id].file_text.file_text.clone());
@@ -90,14 +97,17 @@ pub fn compile_all(file_paths: Vec<PathBuf>) -> (Linker, FileSourcesManager) {
                 panic!("Could not open file '{file_path_disp}' for syntax highlighting because {reason}")
             }
         };
-
+        let base = PathBuf::from_str(USR_LIB_PATH).expect("Standard library directory is not a valid path?");
+        let mut path_stack = linker.make_path_vec(&base, &file_path);
+        
+        path_stack.reverse();
         linker.add_file(
-            file_path.to_string_lossy().into_owned(),
-            file_text,
-            &mut file_source_manager,
+            path_stack, 
+            file_text, 
+            &mut file_source_manager
         );
     }
-
+    println!("{:#?}",linker.global_namespace); //TODO Namespaces: add nicer formatting and add to DEBUG 
     linker.recompile_all();
 
     (linker, file_source_manager)
@@ -126,7 +136,8 @@ pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
     let _ = &linker.files[file].file_text[error.position];
 
     let error_span = error.position.as_range();
-
+    // TODO Namespaces: check why this changed:
+    //let error_span = error.position.into_range();
     let config = ariadne_config();
     let mut report: ReportBuilder<'_, (FileUUID, Range<usize>)> =
         Report::build(report_kind, (file, error_span.clone())).with_config(config);
@@ -146,7 +157,6 @@ pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
                 .with_color(info_color),
         )
     }
-
     report.finish().eprint(file_cache).unwrap();
 }
 
@@ -164,11 +174,12 @@ pub fn print_all_errors(
 
 pub fn pretty_print_spans_in_reverse_order(file_data: &FileData, spans: Vec<Range<usize>>) {
     let text_len = file_data.file_text.len();
-    let mut source = NamedSource {
-        source: Source::from(file_data.file_text.file_text.clone()),
-        name: &file_data.file_identifier,
+    // TODO Namespaces: join seems hacky
+    let mut source = NamedSource{
+        source : Source::from(file_data.file_text.file_text.clone()),
+        name : &file_data.file_identifier.join("/")
     };
-
+    // println!("source name: {}", source.name);
     for span in spans.into_iter().rev() {
         // If span not in file, just don't print it. This happens.
         if span.end > text_len {
@@ -195,11 +206,11 @@ pub fn pretty_print_spans_in_reverse_order(file_data: &FileData, spans: Vec<Rang
 
 pub fn pretty_print_many_spans(file_data: &FileData, spans: &[(String, Range<usize>)]) {
     let text_len = file_data.file_text.len();
+    // TODO Namespaces: join seems hacky
     let mut source = NamedSource {
-        source: Source::from(file_data.file_text.file_text.clone()),
-        name: &file_data.file_identifier,
+        source : Source::from(file_data.file_text.file_text.clone()),
+        name : &file_data.file_identifier.join("/")
     };
-
     let config = ariadne_config();
 
     if spans.is_empty() {

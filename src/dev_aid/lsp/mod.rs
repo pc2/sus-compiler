@@ -45,7 +45,7 @@ fn cvt_location_list(location_vec: Vec<SpanFile>, linker: &Linker) -> Vec<Locati
         .into_iter()
         .map(|(span, file_id)| {
             let file = &linker.files[file_id];
-            let uri = Url::parse(&file.file_identifier).unwrap();
+            let uri = Url::parse(&file.file_identifier.join("/")).unwrap();
             let range = span_to_lsp_range(&file.file_text, span);
             Location { uri, range }
         })
@@ -62,7 +62,7 @@ fn cvt_location_list_of_lists(
     let mut result = Vec::with_capacity(result_len);
     for (file_id, vec) in location_vec {
         let file = &linker.files[file_id];
-        let uri = Url::parse(&file.file_identifier).unwrap();
+        let uri = Url::parse(&file.file_identifier.join("/")).unwrap();
         for span in vec {
             let range = span_to_lsp_range(&file.file_text, span);
             result.push(Location {
@@ -88,7 +88,6 @@ impl Linker {
             found
         } else {
             let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
-
             let file_uuid = self.add_file(uri.to_string(), file_text, manager);
             self.recompile_all();
             file_uuid
@@ -134,14 +133,14 @@ fn convert_diagnostic(
         assert!(
             info_file.file_text.is_span_valid(info_span),
             "bad info in {}:\n{}; in err: {}.\nSpan is {info_span}, but file length is {}",
-            info_file.file_identifier,
+            info_file.file_identifier.join("/"),
             info.info,
             err.reason,
             info_file.file_text.len()
         );
         let info_pos = span_to_lsp_range(&info_file.file_text, info_span);
         let location = Location {
-            uri: Url::parse(&info_file.file_identifier).unwrap(),
+            uri: Url::parse(&info_file.file_identifier.join("/")).unwrap(),
             range: info_pos,
         };
         related_info.push(DiagnosticRelatedInformation {
@@ -172,7 +171,7 @@ fn push_all_errors(
         });
 
         let params = &PublishDiagnosticsParams {
-            uri: Url::parse(&file_data.file_identifier).unwrap(),
+            uri: Url::parse(&file_data.file_identifier.join("/")).unwrap(),
             diagnostics: diag_vec,
             version: None,
         };
@@ -208,7 +207,7 @@ fn initialize_all_files(init_params: &InitializeParams) -> (Linker, LSPFileManag
                 continue;
             };
 
-            linker.add_all_files_in_directory(&path, &mut manager);
+            linker.add_all_files_in_directory(&path, &path, &mut manager);
         }
     }
     linker.recompile_all();
@@ -471,7 +470,7 @@ fn handle_request(
                 .map(|(file, spans)| {
                     let file_data = &linker.files[file];
                     (
-                        Url::parse(&file_data.file_identifier).unwrap(),
+                        Url::parse(&file_data.file_identifier.join("/")).unwrap(),
                         spans
                             .into_iter()
                             .map(|span| TextEdit {
@@ -595,7 +594,7 @@ fn main_loop(
 
         println!("All loaded files:");
         for (_id, file) in &linker.files {
-            println!("File: {}", &file.file_identifier);
+            println!("File: {}", &file.file_identifier.join("/"));
         }
     }
     Ok(())

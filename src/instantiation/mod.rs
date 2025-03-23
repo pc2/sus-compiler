@@ -250,6 +250,7 @@ impl InstantiationCache {
                 .is_none());
             result_ref
         };
+        //println!("instance: {:?}", instance);
 
         if !instance.errors.did_error {
             Some(instance.clone())

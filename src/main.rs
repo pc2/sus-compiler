@@ -37,7 +37,6 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     initialize_config_from_cli_args();
 
     let config = config();
-
     let file_paths = config.files.clone();
 
     let codegen_backend = match config.target_language {
@@ -80,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         };
 
         codegen_backend.codegen_with_dependencies(&linker, md.1, &format!("{md_name}_standalone"));
-    }
+    } 
 
     Ok(())
 }
