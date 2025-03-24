@@ -17,7 +17,7 @@ __builtin__ module IntToBits {
 }
 
 __builtin__ module BitsToInt {
-    interface IntToBits : bool[32] bits'0 -> int value'0
+    interface BitsToInt : bool[32] bits'0 -> int value'0
 }
 
 // For now these builtin declarations must be in this order, because they're constants in the code. 

@@ -360,6 +360,15 @@ impl WireReferenceRoot {
         };
         *decl
     }
+    pub fn get_span(&self) -> Option<Span> {
+        match self {
+            WireReferenceRoot::LocalDecl(_uuid, span) => Some(*span),
+            WireReferenceRoot::NamedConstant(global_reference) => {
+                Some(global_reference.get_total_span())
+            }
+            WireReferenceRoot::SubModulePort(port_reference) => port_reference.port_name_span,
+        }
+    }
 }
 
 /// References to wires or generative variables.

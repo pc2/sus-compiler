@@ -77,6 +77,14 @@ impl Value {
         }
     }
 
+    pub fn contains_errors_or_unsets(&self) -> bool {
+        match self {
+            Value::Bool(_) | Value::Integer(_) => false,
+            Value::Array(values) => values.iter().any(|v| v.contains_errors_or_unsets()),
+            Value::Unset | Value::Error => true,
+        }
+    }
+
     #[track_caller]
     pub fn unwrap_integer(&self) -> &BigInt {
         let Self::Integer(i) = self else {

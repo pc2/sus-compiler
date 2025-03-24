@@ -356,11 +356,11 @@ impl InstantiationContext<'_, '_> {
         mut preamble: Vec<RealWirePathElem>,
         path: &[WireReferencePathElement],
         domain: DomainID,
-    ) -> Vec<RealWirePathElem> {
+    ) -> ExecutionResult<Vec<RealWirePathElem>> {
         for v in path {
             match v {
                 &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
-                    let idx_wire = self.get_wire_or_constant_as_wire(idx, domain);
+                    let idx_wire = self.get_wire_or_constant_as_wire(idx, domain)?;
                     assert_eq!(
                         self.wires[idx_wire].typ, INT_CONCRETE_TYPE,
                         "Caught by typecheck"
@@ -373,7 +373,7 @@ impl InstantiationContext<'_, '_> {
             }
         }
 
-        preamble
+        Ok(preamble)
     }
 
     fn instantiate_write_to_wire(
@@ -418,9 +418,9 @@ impl InstantiationContext<'_, '_> {
                     preamble,
                 } => {
                     let domain = self.wires[target_wire].domain;
-                    let from = self.get_wire_or_constant_as_wire(conn_from, domain);
+                    let from = self.get_wire_or_constant_as_wire(conn_from, domain)?;
                     let instantiated_path =
-                        self.instantiate_wire_ref_path(preamble, &target_wire_ref.path, domain);
+                        self.instantiate_wire_ref_path(preamble, &target_wire_ref.path, domain)?;
                     self.instantiate_write_to_wire(
                         target_wire,
                         instantiated_path,
@@ -544,8 +544,12 @@ impl InstantiationContext<'_, '_> {
         value: Value,
         original_instruction: FlatID,
         domain: DomainID,
-    ) -> WireID {
-        self.wires.alloc(RealWire {
+        const_span: Span,
+    ) -> ExecutionResult<WireID> {
+        if value.contains_errors_or_unsets() {
+            return Err((const_span, format!("This compile-time value was not fully resolved by the time it needed to be converted to a wire: {value}")));
+        }
+        Ok(self.wires.alloc(RealWire {
             typ: value.get_type_best_effort(&mut self.type_substitutor),
             source: RealWireDataSource::Constant { value },
             original_instruction,
@@ -553,21 +557,28 @@ impl InstantiationContext<'_, '_> {
             name: self.unique_name_producer.get_unique_name(""),
             specified_latency: CALCULATE_LATENCY_LATER,
             absolute_latency: CALCULATE_LATENCY_LATER,
-        })
+        }))
     }
     fn get_wire_or_constant_as_wire(
         &mut self,
         original_instruction: FlatID,
         domain: DomainID,
-    ) -> WireID {
+    ) -> ExecutionResult<WireID> {
         match &self.generation_state[original_instruction] {
             SubModuleOrWire::SubModule(_) => unreachable!(),
             SubModuleOrWire::Unnasigned => unreachable!(),
-            SubModuleOrWire::Wire(w) => *w,
+            SubModuleOrWire::Wire(w) => Ok(*w),
             SubModuleOrWire::CompileTimeValue(v) => {
                 let value = v.clone();
 
-                self.alloc_wire_for_const(value, original_instruction, domain)
+                self.alloc_wire_for_const(
+                    value,
+                    original_instruction,
+                    domain,
+                    self.md.link_info.instructions[original_instruction]
+                        .unwrap_expression()
+                        .span,
+                )
             }
         }
     }
@@ -642,12 +653,22 @@ impl InstantiationContext<'_, '_> {
                     .unwrap_generation_value()
                     .clone();
                 (
-                    self.alloc_wire_for_const(value, decl_id, domain),
+                    self.alloc_wire_for_const(
+                        value,
+                        decl_id,
+                        domain,
+                        wire_ref_root.get_span().unwrap(),
+                    )?,
                     Vec::new(),
                 )
             }
             RealWireRefRoot::Constant(value) => (
-                self.alloc_wire_for_const(value, original_instruction, domain),
+                self.alloc_wire_for_const(
+                    value,
+                    original_instruction,
+                    domain,
+                    wire_ref_root.get_span().unwrap(),
+                )?,
                 Vec::new(),
             ),
         })
@@ -662,7 +683,7 @@ impl InstantiationContext<'_, '_> {
             ExpressionSource::WireRef(wire_ref) => {
                 let (root_wire, path_preamble) =
                     self.get_wire_ref_root_as_wire(&wire_ref.root, original_instruction, domain)?;
-                let path = self.instantiate_wire_ref_path(path_preamble, &wire_ref.path, domain);
+                let path = self.instantiate_wire_ref_path(path_preamble, &wire_ref.path, domain)?;
 
                 if path.is_empty() {
                     // Little optimization reduces instructions
@@ -675,12 +696,12 @@ impl InstantiationContext<'_, '_> {
                 }
             }
             &ExpressionSource::UnaryOp { op, right } => {
-                let right = self.get_wire_or_constant_as_wire(right, domain);
+                let right = self.get_wire_or_constant_as_wire(right, domain)?;
                 RealWireDataSource::UnaryOp { op, right }
             }
             &ExpressionSource::BinaryOp { op, left, right } => {
-                let left = self.get_wire_or_constant_as_wire(left, domain);
-                let right = self.get_wire_or_constant_as_wire(right, domain);
+                let left = self.get_wire_or_constant_as_wire(left, domain)?;
+                let right = self.get_wire_or_constant_as_wire(right, domain)?;
                 RealWireDataSource::BinaryOp { op, left, right }
             }
             ExpressionSource::Constant(_) => {
@@ -841,7 +862,7 @@ impl InstantiationContext<'_, '_> {
                         std::iter::zip(fc.func_call_inputs.iter(), fc.arguments.iter())
                     {
                         let from =
-                            self.get_wire_or_constant_as_wire(*arg, domain.unwrap_physical());
+                            self.get_wire_or_constant_as_wire(*arg, domain.unwrap_physical())?;
                         let port_wire = self.get_submodule_port(submod_id, port, None);
                         self.instantiate_write_to_wire(
                             port_wire,
