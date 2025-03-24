@@ -357,9 +357,11 @@ impl InstantiationContext<'_, '_> {
             match v {
                 &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
                     let idx_wire = self.get_wire_or_constant_as_wire(idx, domain)?;
-                    assert_eq!(
-                        self.wires[idx_wire].typ, INT_CONCRETE_TYPE,
-                        "Caught by typecheck"
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[idx_wire].typ,
+                        &INT_CONCRETE_TYPE,
+                        bracket_span.inner_span(),
+                        "Caught by typecheck",
                     );
                     preamble.push(RealWirePathElem::ArrayAccess {
                         span: bracket_span,
