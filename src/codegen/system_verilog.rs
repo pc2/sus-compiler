@@ -553,24 +553,30 @@ impl<'g> CodeGenerationContext<'g> {
                 self.program_text.write_str("\tassign out = in;\n").unwrap();
             }
             "IntToBits" => {
+                let [num_bits] = self.instance.global_ref.template_args.cast_to_array();
+                let num_bits: usize = num_bits.unwrap_value().unwrap_int();
+
                 let _value_port = self
                     .md
                     .unwrap_port(PortID::from_hidden_value(0), true, "value");
                 let _bits_port = self
                     .md
                     .unwrap_port(PortID::from_hidden_value(1), false, "bits");
-                for i in 0..32 {
+                for i in 0..num_bits {
                     writeln!(self.program_text, "\tassign bits[{i}] = value[{i}];").unwrap();
                 }
             }
             "BitsToInt" => {
+                let [num_bits] = self.instance.global_ref.template_args.cast_to_array();
+                let num_bits: usize = num_bits.unwrap_value().unwrap_int();
+
                 let _bits_port = self
                     .md
                     .unwrap_port(PortID::from_hidden_value(0), true, "bits");
                 let _value_port = self
                     .md
                     .unwrap_port(PortID::from_hidden_value(1), false, "value");
-                for i in 0..32 {
+                for i in 0..num_bits {
                     writeln!(self.program_text, "\tassign value[{i}] = bits[{i}];").unwrap();
                 }
             }
