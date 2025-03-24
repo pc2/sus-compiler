@@ -1,6 +1,6 @@
 //! This module provides a safe interface to edit both the current module, and access other modules in the linker.
 
-use std::{ops::Index, path};
+use std::ops::Index;
 
 use crate::typing::template::GlobalReference;
 
@@ -125,12 +125,13 @@ impl<'linker> GlobalResolver<'linker> {
     // attempts to resolve the name in the namespaces that where imported in the file of the module
     // includes standard imports as well as custom imports specified at the top of a file
     pub fn resolve_imported_namespace<'slf>(&'slf self, name_span: Span) -> Option<GlobalUUID> {
-        
         // Program logic
         let mut global: Vec<GlobalUUID> = Vec::new();
         // loop through all imported namespaces for file including default imports
-        for possible_namespace in &self.file_data.associated_namespaces{
-            if let Some(name_found) = self.try_resolve_possible_namespace(possible_namespace.clone(), name_span) {
+        for possible_namespace in &self.file_data.associated_namespaces {
+            if let Some(name_found) =
+                self.try_resolve_possible_namespace(possible_namespace.clone(), name_span)
+            {
                 global.push(name_found);
             }
         }
@@ -171,14 +172,16 @@ impl<'linker> GlobalResolver<'linker> {
     }
 
     // Attempts to resolve Name for given Namespace path without Errors for None and Subnamespace
-    fn try_resolve_possible_namespace<'slf>(&'slf self, mut path_vec: Vec<String>, name_span: Span) -> Option<GlobalUUID> {
+    fn try_resolve_possible_namespace<'slf>(
+        &'slf self,
+        mut path_vec: Vec<String>,
+        name_span: Span,
+    ) -> Option<GlobalUUID> {
         let name = self.file_data.file_text[name_span].to_owned(); // convert span to actual name, required for nice error messages
         let current_namespace = self.linker.get_subnamespace(&mut path_vec);
         let mut resolved_globals = self.resolved_globals.borrow_mut();
         match current_namespace.get(&name) {
-            Some(NamespaceElement::Global(found)) => {
-                Some(*found)
-            }
+            Some(NamespaceElement::Global(found)) => Some(*found),
             Some(NamespaceElement::Colission(coll)) => {
                 resolved_globals.all_resolved = false;
 
@@ -199,7 +202,11 @@ impl<'linker> GlobalResolver<'linker> {
     }
 
     /// SAFETY: Files are never touched, and as long as this object is managed properly linker will also exist long enough.
-    pub fn resolve_full_path<'slf>(&'slf self, mut path_vec: Vec<String>, name_span: Span) -> Option<GlobalUUID> {
+    pub fn resolve_full_path<'slf>(
+        &'slf self,
+        mut path_vec: Vec<String>,
+        name_span: Span,
+    ) -> Option<GlobalUUID> {
         let name = self.file_data.file_text[name_span].to_owned();
         let current_namespace = self.linker.get_subnamespace(&mut path_vec);
         let mut resolved_globals = self.resolved_globals.borrow_mut();
@@ -224,18 +231,15 @@ impl<'linker> GlobalResolver<'linker> {
 
                 None
             }
-            Some(NamespaceElement::Subnamespace(sub)) => {
+            Some(NamespaceElement::Subnamespace(_sub)) => {
                 resolved_globals.all_resolved = false;
                 self.errors.error(
                     name_span,
-                    format!(
-                        "Subnamespace hit when trying to resolve Name '{name}'"
-                    ),
+                    format!("Subnamespace hit when trying to resolve Name '{name}'"),
                 );
                 None
             }
             None => {
-                
                 resolved_globals.all_resolved = false;
 
                 self.errors.error(

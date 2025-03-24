@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         };
 
         codegen_backend.codegen_with_dependencies(&linker, md.1, &format!("{md_name}_standalone"));
-    } 
+    }
 
     Ok(())
 }

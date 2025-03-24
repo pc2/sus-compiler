@@ -396,10 +396,10 @@ impl FlatteningContext<'_, '_> {
         template_arg_map
     }
 
-
-    // TODO clean up 3 different possible name resolutions (Local Name, Associated Name, Global Name)
+    // TODO Namespace: clean up 3 different possible name resolutions (Local Name, Associated Name, Global Name)
     fn flatten_local_or_template_global(&mut self, cursor: &mut Cursor) -> LocalOrGlobal {
         cursor.go_down(kind!("template_global"), |cursor| {
+            // TODO Namespace: fix must be global, currently just set based on lenght of path
             let mut must_be_global = cursor.optional_field(field!("is_global_path"));
 
             cursor.field(field!("namespace_list"));
@@ -416,62 +416,70 @@ impl FlatteningContext<'_, '_> {
             }
 
             let template_args_used = cursor.optional_field(field!("template_args"));
-            
+
             if !must_be_global {
                 let [local_name] = name_path.as_slice() else {
                     unreachable!()
                 };
                 let name_text = &self.globals.file_data.file_text[*local_name];
 
-                // name is available in local context aka. module namespace                
+                // name is available in local context aka. module namespace
                 if let Some(decl_id) = self.local_variable_context.get_declaration_for(name_text) {
                     return LocalOrGlobal::Local(*local_name, decl_id);
                 } else {
                     // check if name is available in the context of connected files, either the standard imports
                     // (file the module resides in and stl::core) or other inports specified at the top of a file
-                    
+
                     if let Some(global_id) = self.globals.resolve_imported_namespace(*local_name) {
                         // MUST Still be at field!("template_args")
-                        let template_span = template_args_used.then(|| BracketSpan::from_outer(cursor.span()));
+                        let template_span =
+                            template_args_used.then(|| BracketSpan::from_outer(cursor.span()));
 
-                        let template_args = self.flatten_template_args(global_id, template_args_used, cursor);
+                        let template_args =
+                            self.flatten_template_args(global_id, template_args_used, cursor);
 
-                        let template_arg_types = template_args.map(|_| AbstractType::Unknown(self.type_alloc.type_variable_alloc.alloc()));
+                        let template_arg_types = template_args.map(|_| {
+                            AbstractType::Unknown(self.type_alloc.type_variable_alloc.alloc())
+                        });
 
                         match global_id {
-                            GlobalUUID::Module(id) => return LocalOrGlobal::Module(GlobalReference {
-                                id,
-                                name_span: *local_name,
-                                template_args,
-                                template_arg_types,
-                                template_span,
-                            }),
-                            GlobalUUID::Type(id) => return LocalOrGlobal::Type(GlobalReference {
-                                id, 
-                                name_span: *local_name,
-                                template_args,
-                                template_arg_types,
-                                template_span,
-                            }),
-                            GlobalUUID::Constant(id) => return LocalOrGlobal::Constant(GlobalReference {
-                                id,
-                                name_span: *local_name,
-                                template_args,
-                                template_arg_types,
-                                template_span,
-                            }),
+                            GlobalUUID::Module(id) => {
+                                return LocalOrGlobal::Module(GlobalReference {
+                                    id,
+                                    name_span: *local_name,
+                                    template_args,
+                                    template_arg_types,
+                                    template_span,
+                                })
+                            }
+                            GlobalUUID::Type(id) => {
+                                return LocalOrGlobal::Type(GlobalReference {
+                                    id,
+                                    name_span: *local_name,
+                                    template_args,
+                                    template_arg_types,
+                                    template_span,
+                                })
+                            }
+                            GlobalUUID::Constant(id) => {
+                                return LocalOrGlobal::Constant(GlobalReference {
+                                    id,
+                                    name_span: *local_name,
+                                    template_args,
+                                    template_arg_types,
+                                    template_span,
+                                })
+                            }
                         };
                     } else {
-                        return LocalOrGlobal::NotFound(local_name.to_owned())
+                        return LocalOrGlobal::NotFound(local_name.to_owned());
                     }
                 }
-
             }
-
 
             // the element has a global identifier (e.g. stl::core::int)
             // first we prepare the specified path as Vec<String>
-            let name_span = name_path[name_path.len()-1];
+            let name_span = name_path[name_path.len() - 1];
             let name_path_vec = self.globals.namespace_path_from_span_vec(name_path);
 
             // now we can lookup the full path

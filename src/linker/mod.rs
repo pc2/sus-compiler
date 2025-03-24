@@ -13,7 +13,8 @@ pub use resolver::*;
 use core::panic;
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet}, hash::Hash,
+    collections::{HashMap, HashSet},
+    hash::Hash,
 };
 
 use tree_sitter::Tree;
@@ -91,7 +92,7 @@ pub struct LinkInfo {
     pub span: Span,
     pub name: String,
     pub name_span: Span,
- //   pub subnamespace: NamespaceElement,
+    //   pub subnamespace: NamespaceElement,
     pub documentation: Documentation,
     pub errors: ErrorStore,
     pub resolved_globals: ResolvedGlobals,
@@ -220,15 +221,15 @@ pub enum NamespaceElement {
 /// It also keeps track of the global namespace.
 ///
 /// Incremental operations such as adding and removing files can be performed on this
-/// 
-/// 
+///
+///
 pub struct Linker {
     pub types: ArenaAllocator<StructType, TypeUUIDMarker>,
     pub modules: ArenaAllocator<Module, ModuleUUIDMarker>,
     pub constants: ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
     pub files: ArenaAllocator<FileData, FileUUIDMarker>,
     pub global_namespace: HashMap<String, NamespaceElement>,
-    pub root_spaces: HashMap<String, String>
+    pub root_spaces: HashMap<String, String>,
 }
 
 impl Default for Linker {
@@ -245,10 +246,14 @@ impl Linker {
             constants: ArenaAllocator::new(),
             files: ArenaAllocator::new(),
             global_namespace: HashMap::new(),
-            root_spaces: HashMap::new()
+            root_spaces: HashMap::new(),
         };
-        temp.root_spaces.insert("/home/tska/.sus/0.3.0-devel/std".to_owned() ,"std".to_owned());
-        temp.root_spaces.insert("/home/tska/git/sus-compiler".to_owned(), "usr".to_owned());
+        temp.root_spaces.insert(
+            "/home/tska/.sus/0.3.0-devel/std".to_owned(),
+            "std".to_owned(),
+        );
+        temp.root_spaces
+            .insert("/home/tska/git/sus-compiler".to_owned(), "usr".to_owned());
         temp
     }
 
@@ -258,8 +263,7 @@ impl Linker {
             GlobalUUID::Type(typ_id) => &self.types[typ_id].link_info,
             GlobalUUID::Constant(cst_id) => &self.constants[cst_id].link_info,
         }
-//        self.global_namespace.get(&self.files[])
-
+        //        self.global_namespace.get(&self.files[])
     }
     pub fn get_link_info_mut<'l>(
         modules: &'l mut ArenaAllocator<Module, ModuleUUIDMarker>,
@@ -275,10 +279,13 @@ impl Linker {
     }
 
     // resolves Namespace path
-    pub fn get_subnamespace(&self, filepath_vec: &mut Vec<String>)-> &HashMap<String, NamespaceElement>{
+    pub fn get_subnamespace(
+        &self,
+        filepath_vec: &mut Vec<String>,
+    ) -> &HashMap<String, NamespaceElement> {
         filepath_vec.reverse(); // reverse path so we can use pop to get element. TODO: Store Data in flipped form
         let mut subnamespace = &self.global_namespace;
-        // traverse nested hashmap 
+        // traverse nested hashmap
         while let Some(mut path) = filepath_vec.pop() {
             if let Some(temp) = self.root_spaces.get(&path) {
                 path = temp.to_owned();
@@ -286,7 +293,7 @@ impl Linker {
             if let Some(entry) = subnamespace.get(&path) {
                 if let NamespaceElement::Subnamespace(sub) = entry {
                     if filepath_vec.is_empty() {
-                        return sub
+                        return sub;
                     } else {
                         subnamespace = sub;
                     }
@@ -294,13 +301,14 @@ impl Linker {
                     panic!("Found other NamespaceElement with the name '{}' while searching for subnamespace in path '{:?}'", path, filepath_vec)
                 }
             } else {
-                panic!("Subnamespace {} for Namespace Path {:?} not found", path, filepath_vec)
+                panic!(
+                    "Subnamespace {} for Namespace Path {:?} not found",
+                    path, filepath_vec
+                )
             }
-
         }
         panic!("No Subnamespace found")
     }
-
 
     fn for_all_duplicate_declaration_errors(
         &self,
@@ -313,7 +321,7 @@ impl Linker {
         let subnamespace = self.get_subnamespace(&mut file_path);
         for item in subnamespace {
             let NamespaceElement::Colission(colission) = &item.1 else {
-                    continue;
+                continue;
             };
             let infos: Vec<&LinkInfo> =
                 colission.iter().map(|id| self.get_link_info(*id)).collect();
@@ -427,7 +435,7 @@ impl Linker {
         let mut parsing_errors =
             std::mem::replace(&mut self.files[file_id].parsing_errors, ErrorStore::new());
         let file_data = &self.files[file_id];
-        let other_parsing_errors = 
+        let other_parsing_errors =
             ErrorCollector::from_storage(parsing_errors.take(), file_id, &self.files);
         f(FileBuilder {
             file_id,
@@ -467,30 +475,37 @@ pub struct FileBuilder<'linker> {
 // TODO Namespaces: check why this was changed
 // impl FileBuilder<'_> {
 impl<'linker> FileBuilder<'linker> {
-
     // gets subnamespace for path and creates all subnamespaces along the path that dont exist yet
     // TODO Namespaces, add errors to LSP output instead of panic
-    fn get_and_make_subnamespace(&mut self, filepath_vec: &mut Vec<String>)-> &mut HashMap<String, NamespaceElement>{
+    fn get_and_make_subnamespace(
+        &mut self,
+        filepath_vec: &mut Vec<String>,
+    ) -> &mut HashMap<String, NamespaceElement> {
         let mut subnamespace = &mut *self.global_namespace;
         while let Some(mut path) = filepath_vec.pop() {
             if let Some(temp) = self.root_spaces.get(&path) {
                 path = temp.to_owned();
             }
-            let entry = subnamespace.entry(path).or_insert_with(|| {
-                NamespaceElement::Subnamespace(HashMap::new())
-            });
+            let entry = subnamespace
+                .entry(path)
+                .or_insert_with(|| NamespaceElement::Subnamespace(HashMap::new()));
             if let NamespaceElement::Subnamespace(sub) = entry {
                 if filepath_vec.is_empty() {
-                    return sub
+                    return sub;
                 } else {
                     subnamespace = sub;
                 }
             } else {
-                panic!("While searching for subnamespace {:?}, found other NamespaceElement for", filepath_vec)
+                panic!(
+                    "While searching for subnamespace {:?}, found other NamespaceElement for",
+                    filepath_vec
+                )
             }
-
         }
-        panic!("Error in while, when trying to create subnamespaces for file {:?}", filepath_vec)
+        panic!(
+            "Error in while, when trying to create subnamespaces for file {:?}",
+            filepath_vec
+        )
     }
 
     // adds name to namespace and creates possible subnamespaces
@@ -498,7 +513,7 @@ impl<'linker> FileBuilder<'linker> {
     fn add_name(&mut self, name: String, new_obj_id: GlobalUUID) {
         let mut filepath_vec = self.file_data.file_identifier.clone();
         filepath_vec.reverse(); // TODO: globally flip this data, so it can easily be popped
-        let correct_subnamespace= self.get_and_make_subnamespace(&mut filepath_vec); // resolve namespace root location
+        let correct_subnamespace = self.get_and_make_subnamespace(&mut filepath_vec); // resolve namespace root location
         match correct_subnamespace.entry(name) {
             std::collections::hash_map::Entry::Occupied(mut occ) => {
                 let new_val = match occ.get_mut() {
@@ -508,7 +523,9 @@ impl<'linker> FileBuilder<'linker> {
                         vec.push(new_obj_id);
                         vec.into_boxed_slice()
                     }
-                    NamespaceElement::Subnamespace(sub) => panic!("Subnamespace hit by name resolution (shouldnt be possible)")
+                    NamespaceElement::Subnamespace(_sub) => {
+                        panic!("Subnamespace hit by name resolution (shouldnt be possible)")
+                    }
                 };
                 occ.insert(NamespaceElement::Colission(new_val));
             }
@@ -517,8 +534,6 @@ impl<'linker> FileBuilder<'linker> {
             }
         }
     }
-
-
 
     pub fn add_module(&mut self, md: Module) {
         let module_name = md.link_info.name.clone();

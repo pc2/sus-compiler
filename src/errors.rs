@@ -132,7 +132,6 @@ impl<'linker> ErrorCollector<'linker> {
             file_len: files[file].file_text.len(),
             files,
         }
-        
     }
     /// To re-attach this [ErrorCollector] to a new [Linker]. Mostly to get around the borrow checker
     pub fn re_attach(self, files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorCollector<'_> {
