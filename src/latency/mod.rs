@@ -206,7 +206,7 @@ impl InstantiationContext<'_, '_> {
                 continue;
             };
 
-            for domain_id in self.linker.modules[sm.module_uuid].domains.id_range() {
+            for domain_id in self.linker.modules[sm.refers_to.id].domains.id_range() {
                 struct Prev {
                     first: (WireID, i64),
                     prev: (WireID, i64),
@@ -376,12 +376,12 @@ impl InstantiationContext<'_, '_> {
             if sm.instance.get().is_some() {
                 continue; // Submodule already instantiated
             }
-            let sm_md = &self.linker.modules[sm.module_uuid];
+            let sm_md = &self.linker.modules[sm.refers_to.id];
 
             let sm_instruction =
                 self.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
 
-            let known_template_args = sm.template_args.map(|(_, t)| {
+            let known_template_args = sm.refers_to.template_args.map(|(_, t)| {
                 let mut t_copy = t.clone();
                 t_copy.fully_substitute(&self.type_substitutor);
                 if let ConcreteType::Value(Value::Integer(num)) = &t_copy {
@@ -438,7 +438,7 @@ impl InstantiationContext<'_, '_> {
                 let (submod_id, arg_id) = var.back_reference;
 
                 self.type_substitutor.unify_must_succeed(
-                    &self.submodules[submod_id].template_args[arg_id],
+                    &self.submodules[submod_id].refers_to.template_args[arg_id],
                     &ConcreteType::Value(Value::Integer(inferred_value.into())),
                 );
 

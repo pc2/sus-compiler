@@ -226,7 +226,7 @@ impl InstantiationContext<'_, '_> {
     pub fn typecheck(&mut self) {
         let mut delayed_constraints: DelayedConstraintsList<Self> = DelayedConstraintsList::new();
         for (sm_id, sm) in &self.submodules {
-            let sub_module = &self.linker.modules[sm.module_uuid];
+            let sub_module = &self.linker.modules[sm.refers_to.id];
 
             for (port_id, p) in sm.port_map.iter_valids() {
                 let wire = &self.wires[p.maps_to_wire];
@@ -237,7 +237,7 @@ impl InstantiationContext<'_, '_> {
 
                 let typ_for_inference = concretize_written_type_with_possible_template_args(
                     &port_decl.typ_expr,
-                    &sm.template_args,
+                    &sm.refers_to.template_args,
                     &sub_module.link_info,
                     &self.type_substitutor,
                 );
@@ -363,21 +363,21 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
 
         let submod_instr =
             context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
-        let sub_module = &context.linker.modules[sm.module_uuid];
+
+        let sub_module = &context.linker.modules[sm.refers_to.id];
 
         // Check if there's any argument that isn't known
-        for (_id, arg) in &mut sm.template_args {
+        for (_id, arg) in &mut Rc::get_mut(&mut sm.refers_to).unwrap().template_args {
             if !arg.fully_substitute(&context.type_substitutor) {
                 // We don't actually *need* to already fully_substitute here, but it's convenient and saves some work
                 return DelayedConstraintStatus::NoProgress;
             }
         }
 
-        if let Some(instance) = sub_module.instantiations.instantiate(
-            sub_module,
-            context.linker,
-            sm.template_args.clone(),
-        ) {
+        if let Some(instance) = sub_module
+            .instantiations
+            .instantiate(context.linker, sm.refers_to.clone())
+        {
             for (_port_id, concrete_port, source_code_port, connecting_wire) in
                 zip_eq3(&instance.interface_ports, &sub_module.ports, &sm.port_map)
             {
@@ -462,7 +462,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
 
             sm.instance
                 .set(instance)
-                .expect("Can only set the instance of a submodule once");
+                .expect("Can only set an InstantiatedModule once");
             DelayedConstraintStatus::Resolved
         } else {
             context.errors.error(
@@ -478,13 +478,11 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
 
         let submod_instr =
             context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
-        let sub_module = &context.linker.modules[sm.module_uuid];
+        let sub_module = &context.linker.modules[sm.refers_to.id];
 
-        let submodule_template_args_string = pretty_print_concrete_instance(
-            &sub_module.link_info,
-            &sm.template_args,
-            &context.linker.types,
-        );
+        let submodule_template_args_string = sm
+            .refers_to
+            .pretty_print_concrete_instance(&sub_module.link_info, &context.linker.types);
         let message = format!("Could not fully instantiate {submodule_template_args_string}");
 
         context

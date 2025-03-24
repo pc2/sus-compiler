@@ -1,6 +1,8 @@
 # Changelog
 ## 0.3.0 (indev)
 - Add `pow` and `pow2`
+- Fix ICEs when improperly using constants
+- 
 
 ### Planned
 - Sized integers

@@ -9,7 +9,7 @@ use std::ops::{Deref, Index, IndexMut};
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::IsExtern;
 use crate::prelude::*;
-use crate::typing::template::{GlobalReference, TemplateArg};
+use crate::typing::template::GlobalReference;
 
 use num::BigInt;
 use sus_proc_macro::get_builtin_const;
@@ -180,7 +180,7 @@ impl InstantiationContext<'_, '_> {
         Ok(match typ {
             WrittenType::Error(_) => caught_by_typecheck!("Error Type"),
             WrittenType::TemplateVariable(_, template_id) => {
-                self.template_args[*template_id].clone()
+                self.working_on_global_ref.template_args[*template_id].clone()
             }
             WrittenType::Named(named_type) => {
                 ConcreteType::Named(crate::typing::concrete_type::ConcreteGlobalReference {
@@ -218,14 +218,13 @@ impl InstantiationContext<'_, '_> {
 
     fn evaluate_builtin_constant(
         &self,
-        cst_ref: &GlobalReference<ConstantUUID>,
-        template_args: &TVec<ConcreteType>,
+        cst_ref: &ConcreteGlobalReference<ConstantUUID>,
     ) -> Result<Value, String> {
         match cst_ref.id {
             get_builtin_const!("true") => Ok(Value::Bool(true)),
             get_builtin_const!("false") => Ok(Value::Bool(false)),
             get_builtin_const!("clog2") => {
-                let [val] = template_args.cast_to_array();
+                let [val] = cst_ref.template_args.cast_to_array();
                 let val = val.unwrap_value().unwrap_integer();
                 if *val > BigInt::ZERO {
                     let int_val_minus_one: BigInt = val - 1;
@@ -236,7 +235,7 @@ impl InstantiationContext<'_, '_> {
                 }
             }
             get_builtin_const!("pow2") => {
-                let [exponent] = template_args.cast_to_array();
+                let [exponent] = cst_ref.template_args.cast_to_array();
                 let exponent = exponent.unwrap_value().unwrap_integer();
                 if let Ok(exp) = u64::try_from(exponent) {
                     let mut result = BigInt::ZERO;
@@ -247,7 +246,7 @@ impl InstantiationContext<'_, '_> {
                 }
             }
             get_builtin_const!("pow") => {
-                let [base, exponent] = template_args.cast_to_array();
+                let [base, exponent] = cst_ref.template_args.cast_to_array();
                 let base = base.unwrap_value().unwrap_integer();
                 let exponent = exponent.unwrap_value().unwrap_integer();
                 if let Ok(exp) = u32::try_from(exponent) {
@@ -257,7 +256,7 @@ impl InstantiationContext<'_, '_> {
                 }
             }
             get_builtin_const!("assert") => {
-                let [condition] = template_args.cast_to_array();
+                let [condition] = cst_ref.template_args.cast_to_array();
 
                 if condition.unwrap_value().unwrap_bool() {
                     Ok(Value::Bool(true))
@@ -266,7 +265,7 @@ impl InstantiationContext<'_, '_> {
                 }
             }
             get_builtin_const!("sizeof") => {
-                let [concrete_typ] = template_args.cast_to_array();
+                let [concrete_typ] = cst_ref.template_args.cast_to_array();
 
                 if let Some(typ_sz) = concrete_typ.sizeof() {
                     Ok(Value::Integer(typ_sz))
@@ -275,7 +274,6 @@ impl InstantiationContext<'_, '_> {
                 }
             }
             get_builtin_const!("__crash_compiler") => {
-                cst_ref.get_total_span().debug();
                 panic!(
                     "__crash_compiler Intentional ICE. This is for debugging the compiler and LSP."
                 )
@@ -288,24 +286,21 @@ impl InstantiationContext<'_, '_> {
         &self,
         cst_ref: &GlobalReference<ConstantUUID>,
     ) -> ExecutionResult<Value> {
-        let template_args = self.execute_template_args(&cst_ref.template_args)?;
-
-        let error_values: Vec<_> = template_args
-            .iter()
-            .filter_map(|(id, arg)| arg.contains_unknown().then_some(id))
-            .collect();
+        let concrete_ref = self.execute_global_ref(cst_ref)?;
 
         let linker_cst = &self.linker.constants[cst_ref.id];
-        if !error_values.is_empty() {
+        if !concrete_ref.is_final() {
             let mut resulting_error = String::from("For executing compile-time constants, all arguments must be fully specified. In this case, the arguments ");
-            for ev in error_values {
-                use std::fmt::Write;
-                write!(
-                    resulting_error,
-                    "'{}', ",
-                    &linker_cst.link_info.template_parameters[ev].name
-                )
-                .unwrap();
+            for (id, arg) in &concrete_ref.template_args {
+                if arg.contains_unknown() {
+                    use std::fmt::Write;
+                    write!(
+                        resulting_error,
+                        "'{}', ",
+                        &linker_cst.link_info.template_parameters[id].name
+                    )
+                    .unwrap();
+                }
             }
             resulting_error.pop();
             resulting_error.pop();
@@ -315,7 +310,8 @@ impl InstantiationContext<'_, '_> {
         }
 
         if linker_cst.link_info.is_extern == IsExtern::Builtin {
-            self.evaluate_builtin_constant(cst_ref, &template_args)
+            cst_ref.get_total_span().debug();
+            self.evaluate_builtin_constant(&concrete_ref)
                 .map_err(|e| (cst_ref.get_total_span(), e))
         } else {
             todo!("Custom Constants");
@@ -600,7 +596,7 @@ impl InstantiationContext<'_, '_> {
             }
             wire_found.maps_to_wire
         } else {
-            let port_data = &self.linker.modules[submod_instance.module_uuid].ports[port_id];
+            let port_data = &self.linker.modules[submod_instance.refers_to.id].ports[port_id];
             let submodule_instruction = self.md.link_info.instructions
                 [submod_instance.original_instruction]
                 .unwrap_submodule();
@@ -729,7 +725,9 @@ impl InstantiationContext<'_, '_> {
         Ok(if wire_decl.identifier_type == IdentifierType::Generative {
             let value = if let DeclarationKind::GenerativeInput(template_id) = wire_decl.decl_kind {
                 // Only for template arguments, we must initialize their value to the value they've been assigned in the template instantiation
-                self.template_args[template_id].unwrap_value().clone()
+                self.working_on_global_ref.template_args[template_id]
+                    .unwrap_value()
+                    .clone()
             } else {
                 // Empty initial value
                 typ.get_initial_val()
@@ -768,20 +766,27 @@ impl InstantiationContext<'_, '_> {
         })
     }
 
-    fn execute_template_args(
+    fn execute_global_ref<ID: Copy>(
         &self,
-        args: &TVec<Option<TemplateArg>>,
-    ) -> ExecutionResult<TVec<ConcreteType>> {
-        args.try_map(|(_, v)| -> ExecutionResult<ConcreteType> {
-            Ok(match v {
-                Some(arg) => match &arg.kind {
-                    TemplateArgKind::Type(typ) => self.concretize_type(typ)?,
-                    TemplateArgKind::Value(v) => {
-                        ConcreteType::Value(self.generation_state.get_generation_value(*v)?.clone())
-                    }
-                },
-                None => ConcreteType::Unknown(self.type_substitutor.alloc()),
-            })
+        global_ref: &GlobalReference<ID>,
+    ) -> ExecutionResult<ConcreteGlobalReference<ID>> {
+        let template_args =
+            global_ref
+                .template_args
+                .try_map(|(_, v)| -> ExecutionResult<ConcreteType> {
+                    Ok(match v {
+                        Some(arg) => match &arg.kind {
+                            TemplateArgKind::Type(typ) => self.concretize_type(typ)?,
+                            TemplateArgKind::Value(v) => ConcreteType::Value(
+                                self.generation_state.get_generation_value(*v)?.clone(),
+                            ),
+                        },
+                        None => ConcreteType::Unknown(self.type_substitutor.alloc()),
+                    })
+                })?;
+        Ok(ConcreteGlobalReference {
+            id: global_ref.id,
+            template_args,
         })
     }
 
@@ -802,17 +807,15 @@ impl InstantiationContext<'_, '_> {
                     let port_map = sub_module.ports.map(|_| None);
                     let interface_call_sites = sub_module.interfaces.map(|_| Vec::new());
 
-                    let template_args =
-                        self.execute_template_args(&submodule.module_ref.template_args)?;
+                    let concrete_ref = self.execute_global_ref(&submodule.module_ref)?;
 
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule {
                         original_instruction,
                         instance: OnceCell::new(),
+                        refers_to: Rc::new(concrete_ref),
                         port_map,
                         interface_call_sites,
                         name: self.unique_name_producer.get_unique_name(name_origin),
-                        module_uuid: submodule.module_ref.id,
-                        template_args,
                     }))
                 }
                 Instruction::Declaration(wire_decl) => {

@@ -1,10 +1,12 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
 use crate::linker::AFTER_INITIAL_PARSE_CP;
 use crate::prelude::*;
+use crate::typing::concrete_type::ConcreteGlobalReference;
 
 use sus_proc_macro::{get_builtin_const, get_builtin_type};
 use tree_sitter::Parser;
@@ -229,7 +231,7 @@ impl Linker {
 
         // Make an initial instantiation of all modules
         // Won't be possible once we have template modules
-        for (_id, md) in &self.modules {
+        for (id, md) in &self.modules {
             //md.print_flattened_module();
             // Already instantiate any modules without parameters
             // Currently this is all modules
@@ -238,7 +240,13 @@ impl Linker {
                 SpanDebugger::new(&span_debug_message, &self.files[md.link_info.file]);
             // Can immediately instantiate modules that have no template args
             if md.link_info.template_parameters.is_empty() {
-                let _inst = md.instantiations.instantiate(md, self, FlatAlloc::new());
+                let _inst = md.instantiations.instantiate(
+                    self,
+                    Rc::new(ConcreteGlobalReference {
+                        id,
+                        template_args: FlatAlloc::new(),
+                    }),
+                );
             }
         }
         if config().early_exit == EarlyExitUpTo::Instantiate {}

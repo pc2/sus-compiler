@@ -1,8 +1,11 @@
 use num::BigInt;
 use sus_proc_macro::get_builtin_type;
 
+use crate::alloc::zip_eq;
+use crate::flattening::StructType;
+use crate::linker::LinkInfo;
 use crate::prelude::*;
-use std::ops::Deref;
+use std::ops::{Deref, Index};
 
 use crate::value::Value;
 
@@ -24,6 +27,46 @@ pub const INT_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalRe
 pub struct ConcreteGlobalReference<ID> {
     pub id: ID,
     pub template_args: TVec<ConcreteType>,
+}
+
+impl<ID> ConcreteGlobalReference<ID> {
+    /// Means that the ConcreteGlobalReference contains no Unknowns
+    ///
+    /// If true, then this is a unique ID for a specific instantiated object
+    pub fn is_final(&self) -> bool {
+        !self.template_args.iter().any(|(_, v)| v.contains_unknown())
+    }
+    pub fn pretty_print_concrete_instance(
+        &self,
+        target_link_info: &LinkInfo,
+        linker_types: &impl Index<TypeUUID, Output = StructType>,
+    ) -> String {
+        assert!(self.template_args.len() == target_link_info.template_parameters.len());
+        let object_full_name = target_link_info.get_full_name();
+        if self.template_args.is_empty() {
+            return format!("{object_full_name} #()");
+        }
+        use std::fmt::Write;
+        let mut result = format!("{object_full_name} #(\n");
+        for (_id, arg, arg_in_target) in
+            zip_eq(&self.template_args, &target_link_info.template_parameters)
+        {
+            write!(result, "    {}: ", arg_in_target.name).unwrap();
+            match arg {
+                ConcreteType::Named(_) | ConcreteType::Array(_) => {
+                    writeln!(result, "type {},", arg.display(linker_types)).unwrap();
+                }
+                ConcreteType::Value(value) => {
+                    writeln!(result, "{value},").unwrap();
+                }
+                ConcreteType::Unknown(_) => {
+                    writeln!(result, "/* Could not infer */").unwrap();
+                }
+            }
+        }
+        result.push(')');
+        result
+    }
 }
 
 /// A post-instantiation type. These fully define what wires should be generated for a given object.

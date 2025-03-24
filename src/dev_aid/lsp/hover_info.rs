@@ -3,7 +3,6 @@ use std::borrow::Cow;
 use crate::alloc::ArenaAllocator;
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::prelude::*;
-use crate::to_string::pretty_print_concrete_instance;
 
 use lsp_types::{LanguageString, MarkedString};
 
@@ -79,17 +78,13 @@ impl HoverCollector<'_> {
         }
     }
 
-    fn gather_submodule_hover_infos(&mut self, md: &Module, submodule: &Module, id: FlatID) {
+    fn gather_submodule_hover_infos(&mut self, md: &Module, id: FlatID) {
         md.instantiations.for_each_instance(|_template_args, inst| {
             for (_id, sm) in &inst.submodules {
                 if sm.original_instruction != id {
                     continue;
                 }
-                self.sus_code(pretty_print_concrete_instance(
-                    &submodule.link_info,
-                    &sm.template_args,
-                    &self.linker.types,
-                ));
+                self.sus_code(inst.name.clone());
             }
         });
     }
@@ -184,7 +179,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
 
             // Module documentation
             hover.documentation_link_info(&submodule.link_info);
-            hover.gather_submodule_hover_infos(md, submodule, id);
+            hover.gather_submodule_hover_infos(md, id);
         }
         LocationInfo::InGlobal(obj_id, link_info, id, InGlobal::Temporary(wire)) => {
             let mut details_vec: Vec<Cow<str>> = Vec::with_capacity(2);

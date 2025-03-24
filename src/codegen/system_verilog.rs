@@ -391,13 +391,13 @@ impl<'g> CodeGenerationContext<'g> {
     fn write_submodules(&mut self) {
         let parent_clk_name = self.md.get_clock_name();
         for (_id, sm) in &self.instance.submodules {
-            let sm_md = &self.linker.modules[sm.module_uuid];
+            let sm_md = &self.linker.modules[sm.refers_to.id];
             let sm_inst: &InstantiatedModule = sm
                 .instance
                 .get()
                 .expect("Invalid submodules are impossible to remain by the time codegen happens");
             if sm_md.link_info.is_extern == IsExtern::Extern {
-                self.write_template_args(&sm_md.link_info, &sm.template_args);
+                self.write_template_args(&sm_md.link_info, &sm_inst.global_ref.template_args);
             } else {
                 self.program_text.write_str(&sm_inst.mangled_name).unwrap();
             };
