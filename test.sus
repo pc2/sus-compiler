@@ -1272,5 +1272,5 @@ module CombineArray {
 	int a = 3
 	int b = 4
 
-	int[4] result = [2, a, b, b]
+	int[4] result = []
 }

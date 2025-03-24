@@ -64,7 +64,13 @@ impl InstantiationContext<'_, '_> {
                 RealWireDataSource::ReadOnly => {}
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     if let Some(is_state) = is_state {
-                        assert!(is_state.is_of_type(&this_wire.typ));
+                        let value_typ = is_state.get_type(&self.type_substitutor);
+                        self.type_substitutor.unify_report_error(
+                            &value_typ,
+                            &this_wire.typ,
+                            span,
+                            "initial value of state",
+                        );
                     }
                     for s in sources {
                         let source_typ = &self.wires[s.from].typ;
@@ -199,12 +205,8 @@ impl InstantiationContext<'_, '_> {
                         "array construction",
                     );
                 }
-                RealWireDataSource::Constant { value } => {
-                    assert!(
-                        value.is_of_type(&this_wire.typ),
-                        "Assigned type to a constant should already be of the type"
-                    );
-                }
+                // type is already set when the wire was created
+                RealWireDataSource::Constant { value: _ } => {}
             };
         }
     }

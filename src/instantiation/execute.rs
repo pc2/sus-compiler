@@ -477,72 +477,6 @@ impl InstantiationContext<'_, '_> {
         }
         Ok(())
     }
-    fn compute_compile_time_wireref(&self, wire_ref: &WireReference) -> ExecutionResult<Value> {
-        let mut work_on_value: Value = match &wire_ref.root {
-            &WireReferenceRoot::LocalDecl(decl_id, _span) => {
-                self.generation_state.get_generation_value(decl_id)?.clone()
-            }
-            WireReferenceRoot::NamedConstant(cst) => self.get_named_constant_value(cst)?,
-            &WireReferenceRoot::SubModulePort(_) => {
-                todo!("Don't yet support compile time functions")
-            }
-        };
-
-        for path_elem in &wire_ref.path {
-            work_on_value = match path_elem {
-                &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
-                    let idx = self.generation_state.get_generation_integer(idx)?;
-
-                    array_access(&work_on_value, idx, bracket_span)?.clone()
-                }
-            }
-        }
-
-        Ok(work_on_value)
-    }
-    fn compute_compile_time(&mut self, expression: &Expression) -> ExecutionResult<Value> {
-        Ok(match &expression.source {
-            ExpressionSource::WireRef(wire_ref) => {
-                self.compute_compile_time_wireref(wire_ref)?.clone()
-            }
-            &ExpressionSource::UnaryOp { op, right } => {
-                let right_val = self.generation_state.get_generation_value(right)?;
-                compute_unary_op(op, right_val)
-            }
-            &ExpressionSource::BinaryOp { op, left, right } => {
-                let left_val = self.generation_state.get_generation_value(left)?;
-                let right_val = self.generation_state.get_generation_value(right)?;
-
-                match op {
-                    BinaryOperator::Divide | BinaryOperator::Modulo => {
-                        use num::Zero;
-                        if right_val.unwrap_integer().is_zero() {
-                            return Err((
-                                expression.span,
-                                format!(
-                                    "Divide or Modulo by zero: {} / 0",
-                                    left_val.unwrap_integer()
-                                ),
-                            ));
-                        }
-                    }
-                    _ => {}
-                }
-
-                compute_binary_op(left_val, op, right_val)
-            }
-            ExpressionSource::ArrayConstruct(arr) => {
-                let mut result = Vec::with_capacity(arr.len());
-                for v_id in arr {
-                    let val = self.generation_state.get_generation_value(*v_id)?;
-                    result.push(val.clone());
-                }
-                Value::Array(result)
-            }
-            ExpressionSource::Constant(value) => value.clone(),
-        })
-    }
-
     fn alloc_wire_for_const(
         &mut self,
         value: Value,
@@ -554,7 +488,7 @@ impl InstantiationContext<'_, '_> {
             return Err((const_span, format!("This compile-time value was not fully resolved by the time it needed to be converted to a wire: {value}")));
         }
         Ok(self.wires.alloc(RealWire {
-            typ: value.get_type_best_effort(&mut self.type_substitutor),
+            typ: value.get_type(&self.type_substitutor),
             source: RealWireDataSource::Constant { value },
             original_instruction,
             domain,
@@ -803,6 +737,72 @@ impl InstantiationContext<'_, '_> {
         Ok(ConcreteGlobalReference {
             id: global_ref.id,
             template_args,
+        })
+    }
+
+    fn compute_compile_time_wireref(&self, wire_ref: &WireReference) -> ExecutionResult<Value> {
+        let mut work_on_value: Value = match &wire_ref.root {
+            &WireReferenceRoot::LocalDecl(decl_id, _span) => {
+                self.generation_state.get_generation_value(decl_id)?.clone()
+            }
+            WireReferenceRoot::NamedConstant(cst) => self.get_named_constant_value(cst)?,
+            &WireReferenceRoot::SubModulePort(_) => {
+                todo!("Don't yet support compile time functions")
+            }
+        };
+
+        for path_elem in &wire_ref.path {
+            work_on_value = match path_elem {
+                &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
+                    let idx = self.generation_state.get_generation_integer(idx)?;
+
+                    array_access(&work_on_value, idx, bracket_span)?.clone()
+                }
+            }
+        }
+
+        Ok(work_on_value)
+    }
+    fn compute_compile_time(&mut self, expression: &Expression) -> ExecutionResult<Value> {
+        Ok(match &expression.source {
+            ExpressionSource::WireRef(wire_ref) => {
+                self.compute_compile_time_wireref(wire_ref)?.clone()
+            }
+            &ExpressionSource::UnaryOp { op, right } => {
+                let right_val = self.generation_state.get_generation_value(right)?;
+                compute_unary_op(op, right_val)
+            }
+            &ExpressionSource::BinaryOp { op, left, right } => {
+                let left_val = self.generation_state.get_generation_value(left)?;
+                let right_val = self.generation_state.get_generation_value(right)?;
+
+                match op {
+                    BinaryOperator::Divide | BinaryOperator::Modulo => {
+                        use num::Zero;
+                        if right_val.unwrap_integer().is_zero() {
+                            return Err((
+                                expression.span,
+                                format!(
+                                    "Divide or Modulo by zero: {} / 0",
+                                    left_val.unwrap_integer()
+                                ),
+                            ));
+                        }
+                    }
+                    _ => {}
+                }
+
+                compute_binary_op(left_val, op, right_val)
+            }
+            ExpressionSource::ArrayConstruct(arr) => {
+                let mut result = Vec::with_capacity(arr.len());
+                for v_id in arr {
+                    let val = self.generation_state.get_generation_value(*v_id)?;
+                    result.push(val.clone());
+                }
+                Value::Array(result)
+            }
+            ExpressionSource::Constant(value) => value.clone(),
         })
     }
 

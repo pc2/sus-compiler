@@ -25,55 +25,35 @@ pub enum Value {
 impl Value {
     /// Traverses the Value, to create a best-effort [ConcreteType] for it.
     /// So '1' becomes [INT_CONCRETE_TYPE],
-    /// but `Value::Array([])` becomes `ConcreteType::Array(ConcreteType::Unknown)`
+    /// but `Value::Array([])` becomes `ConcreteType::Array((ConcreteType::Unknown, 0))`
     ///
     /// Panics when arrays contain mutually incompatible types
-    pub fn get_type_best_effort(
+    pub fn get_type(
         &self,
-        type_substitutor: &mut TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
+        type_substitutor: &TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
     ) -> ConcreteType {
         match self {
             Value::Bool(_) => BOOL_CONCRETE_TYPE,
             Value::Integer(_) => INT_CONCRETE_TYPE,
             Value::Array(arr) => {
                 let mut arr_iter = arr.iter();
-                let Some(fst) = arr_iter.next() else {
-                    return ConcreteType::Unknown(type_substitutor.alloc());
-                };
-                let typ = fst.get_type_best_effort(type_substitutor);
+                let typ = arr_iter
+                    .next()
+                    .map(|fst| fst.get_type(type_substitutor))
+                    .unwrap_or(ConcreteType::Unknown(type_substitutor.alloc()));
 
-                for other in arr_iter {
+                /*for other in arr_iter {
                     // Assert the types are correct
                     assert!(other.is_of_type(&typ));
-                }
+                }*/
 
                 ConcreteType::Array(Box::new((
                     typ,
                     ConcreteType::Value(Value::Integer(arr.len().into())),
                 )))
             }
-            Value::Unset | Value::Error => unreachable!(),
-        }
-    }
-    pub fn is_of_type(&self, typ: &ConcreteType) -> bool {
-        match (self, typ) {
-            (Self::Integer(_), typ) if *typ == INT_CONCRETE_TYPE => true,
-            (Self::Bool(_), typ) if *typ == BOOL_CONCRETE_TYPE => true,
-            (Self::Array(arr_slice), ConcreteType::Array(arr_typ_box)) => {
-                let (arr_content_typ, arr_size_typ) = arr_typ_box.deref();
-                if arr_slice.len() != arr_size_typ.unwrap_value().unwrap_int::<usize>() {
-                    return false;
-                }
-                for v in arr_slice.iter() {
-                    if !v.is_of_type(arr_content_typ) {
-                        return false;
-                    }
-                }
-                true
-            }
-            (Self::Unset, _) => true,
-            (Self::Error, _) => true,
-            _other => false,
+            Value::Unset => ConcreteType::Unknown(type_substitutor.alloc()),
+            Value::Error => unreachable!("{self:?}"),
         }
     }
 
