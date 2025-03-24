@@ -3259,7 +3259,14 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1275:9 ]
       │
- 1275 │     int[4] result = [2, a, b, b]
+ 1275 │     int[4] result = []
       │            ───┬──  
       │               ╰──── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Typing Error: write wire access expects a ::int[0] but was given a ::int[4]
+      ╭─[ test.sus:1275:2 ]
+      │
+ 1275 │     int[4] result = []
+      │     ──────┬──────  
+      │           ╰──────── Typing Error: write wire access expects a ::int[0] but was given a ::int[4]
 ──────╯

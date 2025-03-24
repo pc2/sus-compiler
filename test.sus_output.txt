@@ -271,14 +271,6 @@ Typechecking ShiftReg
 Typechecking MultiStateLoop
 Typechecking use_MultiStateLoop
 Typechecking CombineArray
-Instantiating IntToBits
-Concrete Typechecking IntToBits
-Latency Counting IntToBits
-Checking array accesses IntToBits
-Instantiating BitsToInt
-Concrete Typechecking BitsToInt
-Latency Counting BitsToInt
-Checking array accesses BitsToInt
 Instantiating Iterator
 Concrete Typechecking Iterator
 Latency Counting Iterator
