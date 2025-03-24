@@ -76,6 +76,9 @@ pub enum RealWireDataSource {
         root: WireID,
         path: Vec<RealWirePathElem>,
     },
+    ConstructArray {
+        array_wires: Vec<WireID>,
+    },
     Constant {
         value: Value,
     },

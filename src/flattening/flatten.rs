@@ -507,61 +507,63 @@ impl FlatteningContext<'_, '_> {
         };
         let (kind, span) = cursor.kind_span();
         // Only difference is that
-        if kind == kind!("template_global") {
-            match self.flatten_local_or_template_global(cursor) {
-                LocalOrGlobal::Local(span, NamedLocal::Declaration(instr))
-                | LocalOrGlobal::Local(span, NamedLocal::SubModule(instr)) => {
-                    self.errors
-                        .error(
-                            span,
-                            format!(
+        match kind {
+            kind!("template_global") => {
+                match self.flatten_local_or_template_global(cursor) {
+                    LocalOrGlobal::Local(span, NamedLocal::Declaration(instr))
+                    | LocalOrGlobal::Local(span, NamedLocal::SubModule(instr)) => {
+                        self.errors
+                            .error(
+                                span,
+                                format!(
                                 "This is not a {accepted_text}, it is a local variable instead!"
                             ),
-                        )
-                        .info_obj_same_file(&self.instructions[instr]);
+                            )
+                            .info_obj_same_file(&self.instructions[instr]);
 
-                    ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
-                }
-                LocalOrGlobal::Local(span, NamedLocal::DomainDecl(domain_id)) => {
-                    self.errors
-                        .error(
+                        ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
+                    }
+                    LocalOrGlobal::Local(span, NamedLocal::DomainDecl(domain_id)) => {
+                        self.errors
+                            .error(
+                                span,
+                                format!("This is not a {accepted_text}, it is a domain instead!"),
+                            )
+                            .info_obj_same_file(&self.domains[domain_id]);
+
+                        ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
+                    }
+                    LocalOrGlobal::Local(span, NamedLocal::TemplateType(template_id)) => {
+                        ModuleOrWrittenType::WrittenType(WrittenType::TemplateVariable(
                             span,
-                            format!("This is not a {accepted_text}, it is a domain instead!"),
-                        )
-                        .info_obj_same_file(&self.domains[domain_id]);
-
-                    ModuleOrWrittenType::WrittenType(WrittenType::Error(span))
+                            template_id,
+                        ))
+                    }
+                    LocalOrGlobal::Type(type_ref) => {
+                        ModuleOrWrittenType::WrittenType(WrittenType::Named(type_ref))
+                    }
+                    LocalOrGlobal::Module(module_ref) if ALLOW_MODULES => {
+                        ModuleOrWrittenType::Module(module_ref)
+                    }
+                    LocalOrGlobal::Module(module_ref) => {
+                        self.globals
+                            .not_expected_global_error(&module_ref, accepted_text);
+                        ModuleOrWrittenType::WrittenType(WrittenType::Error(module_ref.name_span))
+                    }
+                    LocalOrGlobal::Constant(constant_ref) => {
+                        self.globals
+                            .not_expected_global_error(&constant_ref, accepted_text);
+                        ModuleOrWrittenType::WrittenType(WrittenType::Error(constant_ref.name_span))
+                    }
+                    LocalOrGlobal::NotFound(name_span) => {
+                        ModuleOrWrittenType::WrittenType(WrittenType::Error(name_span))
+                    } // Already covered
                 }
-                LocalOrGlobal::Local(span, NamedLocal::TemplateType(template_id)) => {
-                    ModuleOrWrittenType::WrittenType(WrittenType::TemplateVariable(
-                        span,
-                        template_id,
-                    ))
-                }
-                LocalOrGlobal::Type(type_ref) => {
-                    ModuleOrWrittenType::WrittenType(WrittenType::Named(type_ref))
-                }
-                LocalOrGlobal::Module(module_ref) if ALLOW_MODULES => {
-                    ModuleOrWrittenType::Module(module_ref)
-                }
-                LocalOrGlobal::Module(module_ref) => {
-                    self.globals
-                        .not_expected_global_error(&module_ref, accepted_text);
-                    ModuleOrWrittenType::WrittenType(WrittenType::Error(module_ref.name_span))
-                }
-                LocalOrGlobal::Constant(constant_ref) => {
-                    self.globals
-                        .not_expected_global_error(&constant_ref, accepted_text);
-                    ModuleOrWrittenType::WrittenType(WrittenType::Error(constant_ref.name_span))
-                }
-                LocalOrGlobal::NotFound(name_span) => {
-                    ModuleOrWrittenType::WrittenType(WrittenType::Error(name_span))
-                } // Already covered
             }
-        } else if kind == kind!("array_type") {
-            ModuleOrWrittenType::WrittenType(self.flatten_array_type(span, cursor))
-        } else {
-            cursor.could_not_match()
+            kind!("array_type") => {
+                ModuleOrWrittenType::WrittenType(self.flatten_array_type(span, cursor))
+            }
+            _other => cursor.could_not_match(),
         }
     }
 
@@ -939,15 +941,16 @@ impl FlatteningContext<'_, '_> {
     fn flatten_expr(&mut self, cursor: &mut Cursor) -> (FlatID, bool) {
         let (kind, expr_span) = cursor.kind_span();
 
-        let (source, is_generative) = if kind == kind!("number") {
-            let text = &self.globals.file_data.file_text[expr_span];
-            use std::str::FromStr;
-            (
-                ExpressionSource::Constant(Value::Integer(BigInt::from_str(text).unwrap())),
-                true,
-            )
-        } else if kind == kind!("unary_op") {
-            cursor.go_down_no_check(|cursor| {
+        let (source, is_generative) = match kind {
+            kind!("number") => {
+                let text = &self.globals.file_data.file_text[expr_span];
+                use std::str::FromStr;
+                (
+                    ExpressionSource::Constant(Value::Integer(BigInt::from_str(text).unwrap())),
+                    true,
+                )
+            }
+            kind!("unary_op") => cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("operator"));
                 let op = UnaryOperator::from_kind_id(cursor.kind());
 
@@ -955,9 +958,8 @@ impl FlatteningContext<'_, '_> {
                 let (right, right_gen) = self.flatten_expr(cursor);
 
                 (ExpressionSource::UnaryOp { op, right }, right_gen)
-            })
-        } else if kind == kind!("binary_op") {
-            cursor.go_down_no_check(|cursor| {
+            }),
+            kind!("binary_op") => cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("left"));
                 let (left, left_gen) = self.flatten_expr(cursor);
 
@@ -971,68 +973,82 @@ impl FlatteningContext<'_, '_> {
                     ExpressionSource::BinaryOp { op, left, right },
                     left_gen & right_gen,
                 )
-            })
-        } else if kind == kind!("func_call") {
-            (
-                if let Some(fc_id) = self.flatten_func_call(cursor) {
-                    let fc = self.instructions[fc_id].unwrap_func_call();
-                    let (md, interface) = self.get_interface_reference(&fc.interface_reference);
-                    if interface.func_call_outputs.len() != 1 {
-                        self.errors
+            }),
+            kind!("func_call") => {
+                (
+                    if let Some(fc_id) = self.flatten_func_call(cursor) {
+                        let fc = self.instructions[fc_id].unwrap_func_call();
+                        let (md, interface) = self.get_interface_reference(&fc.interface_reference);
+                        if interface.func_call_outputs.len() != 1 {
+                            self.errors
                         .error(expr_span, "A function called in this context may only return one result. Split this function call into a separate line instead.")
                         .info_obj(&(md, interface));
-                    }
+                        }
 
-                    if !interface.func_call_outputs.is_empty() {
-                        ExpressionSource::WireRef(WireReference::simple_port(PortReference {
-                            submodule_name_span: fc.interface_reference.name_span,
-                            submodule_decl: fc.interface_reference.submodule_decl,
-                            port: interface.func_call_outputs.0,
-                            port_name_span: None,
-                            is_input: false,
-                        }))
+                        if !interface.func_call_outputs.is_empty() {
+                            ExpressionSource::WireRef(WireReference::simple_port(PortReference {
+                                submodule_name_span: fc.interface_reference.name_span,
+                                submodule_decl: fc.interface_reference.submodule_decl,
+                                port: interface.func_call_outputs.0,
+                                port_name_span: None,
+                                is_input: false,
+                            }))
+                        } else {
+                            // Function desugaring or using threw an error
+                            ExpressionSource::new_error()
+                        }
                     } else {
                         // Function desugaring or using threw an error
                         ExpressionSource::new_error()
-                    }
-                } else {
-                    // Function desugaring or using threw an error
-                    ExpressionSource::new_error()
-                },
-                false,
-            ) // TODO add compile-time functions https://github.com/pc2/sus-compiler/issues/10
-        } else if kind == kind!("parenthesis_expression") {
-            // Explicitly return so we don't alloc another WireInstance Instruction
-            return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| {
-                self.flatten_expr(cursor)
-            });
-        } else if let Some(wr) = self.flatten_wire_reference(cursor).expect_wireref(self) {
-            let mut is_comptime = match wr.root {
-                WireReferenceRoot::LocalDecl(uuid, _span) => self.instructions[uuid]
-                    .unwrap_declaration()
-                    .identifier_type
-                    .is_generative(),
-                WireReferenceRoot::NamedConstant(_) => true,
-                WireReferenceRoot::SubModulePort(_) => false,
-            };
+                    },
+                    false,
+                ) // TODO add compile-time functions https://github.com/pc2/sus-compiler/issues/10
+            }
+            kind!("parenthesis_expression") => {
+                // Explicitly return so we don't alloc another WireInstance Instruction
+                return cursor.go_down_content(kind!("parenthesis_expression"), |cursor| {
+                    self.flatten_expr(cursor)
+                });
+            }
+            kind!("array_list_expression") => {
+                let mut is_generative = true;
+                let list = cursor.collect_list(kind!("array_list_expression"), |cursor| {
+                    let (expr_id, is_gen) = self.flatten_expr(cursor);
+                    is_generative &= is_gen;
+                    expr_id
+                });
+                (ExpressionSource::ArrayConstruct(list), is_generative)
+            }
+            _other => {
+                if let Some(wr) = self.flatten_wire_reference(cursor).expect_wireref(self) {
+                    let mut is_comptime = match wr.root {
+                        WireReferenceRoot::LocalDecl(uuid, _span) => self.instructions[uuid]
+                            .unwrap_declaration()
+                            .identifier_type
+                            .is_generative(),
+                        WireReferenceRoot::NamedConstant(_) => true,
+                        WireReferenceRoot::SubModulePort(_) => false,
+                    };
 
-            for elem in &wr.path {
-                match elem {
-                    WireReferencePathElement::ArrayAccess {
-                        idx,
-                        bracket_span: _,
-                    } => {
-                        is_comptime &= self.instructions[*idx]
-                            .unwrap_expression()
-                            .typ
-                            .domain
-                            .is_generative()
+                    for elem in &wr.path {
+                        match elem {
+                            WireReferencePathElement::ArrayAccess {
+                                idx,
+                                bracket_span: _,
+                            } => {
+                                is_comptime &= self.instructions[*idx]
+                                    .unwrap_expression()
+                                    .typ
+                                    .domain
+                                    .is_generative()
+                            }
+                        }
                     }
+                    (ExpressionSource::WireRef(wr), is_comptime)
+                } else {
+                    (ExpressionSource::new_error(), false)
                 }
             }
-            (ExpressionSource::WireRef(wr), is_comptime)
-        } else {
-            (ExpressionSource::new_error(), false)
         };
 
         let wire_instance = Expression {
@@ -1053,7 +1069,8 @@ impl FlatteningContext<'_, '_> {
 
     fn flatten_wire_reference(&mut self, cursor: &mut Cursor) -> PartialWireReference {
         let (kind, expr_span) = cursor.kind_span();
-        if kind == kind!("template_global") {
+        match kind {
+        kind!("template_global") => {
             match self.flatten_local_or_template_global(cursor) {
                 LocalOrGlobal::Local(span, named_obj) => match named_obj {
                     NamedLocal::Declaration(decl_id) => {
@@ -1114,7 +1131,7 @@ impl FlatteningContext<'_, '_> {
                 }
                 LocalOrGlobal::NotFound(_) => PartialWireReference::Error,
             }
-        } else if kind == kind!("array_op") {
+        } kind!("array_op") => {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("arr"));
                 let mut flattened_arr_expr = self.flatten_wire_reference(cursor);
@@ -1144,7 +1161,7 @@ impl FlatteningContext<'_, '_> {
 
                 flattened_arr_expr
             })
-        } else if kind == kind!("field_access") {
+        } kind!("field_access") => {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("left"));
                 let flattened_arr_expr = self.flatten_wire_reference(cursor);
@@ -1195,27 +1212,27 @@ impl FlatteningContext<'_, '_> {
                     }
                 }
             })
-        } else if kind == kind!("number") {
+        } kind!("number") => {
             self.errors
                 .error(expr_span, "A constant is not a wire reference");
             PartialWireReference::Error
-        } else if kind == kind!("unary_op") || kind == kind!("binary_op") {
+        } kind!("unary_op") | kind!("binary_op") => {
             self.errors.error(
                 expr_span,
                 "The result of an operator is not a wire reference",
             );
             PartialWireReference::Error
-        } else if kind == kind!("func_call") {
+        } kind!("func_call") => {
             self.errors
                 .error(expr_span, "A submodule call is not a wire reference");
             PartialWireReference::Error
-        } else if kind == kind!("parenthesis_expression") {
+        } kind!("parenthesis_expression") => {
             self.errors.error(
                 expr_span,
                 "Parentheses are not allowed within a wire reference",
             );
             PartialWireReference::Error
-        } else {
+        } _other =>
             cursor.could_not_match()
         }
     }
@@ -1382,9 +1399,10 @@ impl FlatteningContext<'_, '_> {
         cursor.clear_gathered_comments(); // Clear comments at the start of a block
         cursor.list(kind!("block"), |cursor| {
             let kind = cursor.kind();
-            if kind == kind!("assign_left_side") {
+            match kind {
+                kind!("assign_left_side") => {
                 self.flatten_standalone_decls(cursor);
-            } else if kind == kind!("decl_assign_statement") {
+            } kind!("decl_assign_statement") => {
                 cursor.go_down_no_check(|cursor| {
                     cursor.field(field!("assign_left"));
                     let to = self.flatten_assignment_left_side(cursor);
@@ -1411,11 +1429,11 @@ impl FlatteningContext<'_, '_> {
                         }
                     }
                 });
-            } else if kind == kind!("block") {
+            } kind!("block") => {
                 self.flatten_code(cursor);
-            } else if kind == kind!("if_statement") {
+            } kind!("if_statement") => {
                 self.flatten_if_statement(cursor);
-            } else if kind == kind!("for_statement") {
+            } kind!("for_statement") => {
                 cursor.go_down_no_check(|cursor| {
                     let loop_var_decl_frame = self.local_variable_context.new_frame();
                     cursor.field(field!("for_decl"));
@@ -1445,7 +1463,7 @@ impl FlatteningContext<'_, '_> {
 
                     self.local_variable_context.pop_frame(loop_var_decl_frame);
                 })
-            } else if kind == kind!("interface_statement") {
+            } kind!("interface_statement") => {
                 cursor.go_down_no_check(|cursor| {
                     // Skip name
                     cursor.field(field!("name"));
@@ -1454,12 +1472,12 @@ impl FlatteningContext<'_, '_> {
                         self.flatten_interface_ports(cursor);
                     }
                 });
-            } else if kind == kind!("domain_statement") {
+            } kind!("domain_statement") => {
                 // Skip, because we already covered domains in initialization. 
                 // TODO synchronous & async clocks
-            } else {
+            } _other => {
                 cursor.could_not_match()
-            }
+            }}
             cursor.clear_gathered_comments(); // Clear comments after every statement, so comments don't bleed over
         });
     }

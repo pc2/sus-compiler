@@ -531,6 +531,14 @@ impl InstantiationContext<'_, '_> {
 
                 compute_binary_op(left_val, op, right_val)
             }
+            ExpressionSource::ArrayConstruct(arr) => {
+                let mut result = Vec::with_capacity(arr.len());
+                for v_id in arr {
+                    let val = self.generation_state.get_generation_value(*v_id)?;
+                    result.push(val.clone());
+                }
+                Value::Array(result)
+            }
             ExpressionSource::Constant(value) => value.clone(),
         })
     }
@@ -699,6 +707,14 @@ impl InstantiationContext<'_, '_> {
                 let left = self.get_wire_or_constant_as_wire(left, domain)?;
                 let right = self.get_wire_or_constant_as_wire(right, domain)?;
                 RealWireDataSource::BinaryOp { op, left, right }
+            }
+            ExpressionSource::ArrayConstruct(arr) => {
+                let mut array_wires = Vec::with_capacity(arr.len());
+                for v_id in arr {
+                    let wire_id = self.get_wire_or_constant_as_wire(*v_id, domain)?;
+                    array_wires.push(wire_id);
+                }
+                RealWireDataSource::ConstructArray { array_wires }
             }
             ExpressionSource::Constant(_) => {
                 unreachable!("Constant cannot be non-compile-time");

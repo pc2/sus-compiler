@@ -16,7 +16,7 @@ rust-version = "1.78"
 
 # Tree sitter
 tree-sitter = "~0.24.7"
-tree-sitter-sus = {version = "~0.2.0", path = "../tree-sitter-sus"}
+tree-sitter-sus = {version = "~0.3.0-devel", path = "../tree-sitter-sus"}
 regex = "1.11.1"
 
 # proc_macro utils

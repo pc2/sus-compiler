@@ -866,17 +866,7 @@ module permute_t #(T, int SIZE, int[SIZE] SOURCES) {
 }
 
 module use_permute {
-	gen int[8] SOURCES
-
-	SOURCES[0] = 3
-	SOURCES[1] = 2
-	SOURCES[2] = 4
-	SOURCES[3] = 5
-	SOURCES[4] = 1
-	SOURCES[5] = 2
-	SOURCES[6] = 7
-	SOURCES[7] = 6
-
+	gen int[8] SOURCES = [3, 2, 4, 5, 1, 2, 7, 6]
 
 	int[2] inArr
 
@@ -1276,4 +1266,11 @@ module use_MultiStateLoop {
 			
 		}
 	}
+}
+
+module CombineArray {
+	int a = 3
+	int b = 4
+
+	int[4] result = [2, a, b, b]
 }

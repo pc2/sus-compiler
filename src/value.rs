@@ -16,7 +16,7 @@ use crate::typing::{
 pub enum Value {
     Bool(bool),
     Integer(BigInt),
-    Array(Box<[Value]>),
+    Array(Vec<Value>),
     /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
     Error,
@@ -181,7 +181,7 @@ impl ConcreteType {
                     let content_typ = arr_typ.get_initial_val();
                     arr.resize(arr_size, content_typ);
                 }
-                Value::Array(arr.into_boxed_slice())
+                Value::Array(arr)
             }
             ConcreteType::Value(_) | ConcreteType::Unknown(_) => unreachable!(),
         }

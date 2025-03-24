@@ -1,5 +1,7 @@
 use std::ops::Deref;
 
+use num::BigInt;
+
 use crate::alloc::{zip_eq, zip_eq3};
 use crate::errors::ErrorInfoObject;
 use crate::flattening::{DeclarationKind, ExpressionSource, WireReferenceRoot, WrittenType};
@@ -174,6 +176,27 @@ impl InstantiationContext<'_, '_> {
                         &self.wires[this_wire_id].typ,
                         span,
                         "wire access",
+                    );
+                }
+                RealWireDataSource::ConstructArray { array_wires } => {
+                    let mut array_wires_iter = array_wires.iter();
+                    let first_elem = array_wires_iter.next().unwrap();
+                    let element_type = self.wires[*first_elem].typ.clone();
+                    for w in array_wires_iter {
+                        self.type_substitutor.unify_report_error(
+                            &self.wires[*w].typ,
+                            &element_type,
+                            span,
+                            "array construction",
+                        );
+                    }
+                    let array_size_value =
+                        ConcreteType::Value(Value::Integer(BigInt::from(array_wires.len())));
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[this_wire_id].typ,
+                        &ConcreteType::Array(Box::new((element_type, array_size_value))),
+                        span,
+                        "array construction",
                     );
                 }
                 RealWireDataSource::Constant { value } => {

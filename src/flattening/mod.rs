@@ -536,6 +536,7 @@ pub enum ExpressionSource {
         left: FlatID,
         right: FlatID,
     },
+    ArrayConstruct(Vec<FlatID>),
     Constant(Value),
 }
 

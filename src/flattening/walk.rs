@@ -34,6 +34,11 @@ impl ExpressionSource {
                 func(right)
             }
             ExpressionSource::Constant(_) => {}
+            ExpressionSource::ArrayConstruct(arr) => {
+                for v in arr {
+                    func(*v);
+                }
+            }
         }
     }
 }

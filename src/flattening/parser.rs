@@ -272,7 +272,8 @@ impl<'t> Cursor<'t> {
         result
     }
 
-    /// Goes down the current node, checks it's kind, and then selects the 'content' field. Useful for constructs like seq('[', field('content', $.expr), ']')
+    /// Goes down the current node, checks it's kind, and then selects the 'content' field.
+    /// Useful for constructs like `seq('[', field('content', $.expr), ']')`
     #[track_caller]
     pub fn go_down_content<OT>(
         &mut self,
