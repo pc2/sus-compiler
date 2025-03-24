@@ -460,9 +460,14 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                 }
             }
 
+            // Overwrite the refers_to with the identical instance.global_ref
+            assert!(sm.refers_to == instance.global_ref);
+            sm.refers_to = instance.global_ref.clone();
+
             sm.instance
                 .set(instance)
                 .expect("Can only set an InstantiatedModule once");
+
             DelayedConstraintStatus::Resolved
         } else {
             context.errors.error(
