@@ -140,6 +140,7 @@ TREE SITTER module! __add__
 TREE SITTER module! ShiftReg
 TREE SITTER module! MultiStateLoop
 TREE SITTER module! use_MultiStateLoop
+TREE SITTER module! CombineArray
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -269,6 +270,7 @@ Typechecking __add__
 Typechecking ShiftReg
 Typechecking MultiStateLoop
 Typechecking use_MultiStateLoop
+Typechecking CombineArray
 Instantiating IntToBits
 Concrete Typechecking IntToBits
 Latency Counting IntToBits
@@ -754,3 +756,7 @@ Concrete Typechecking instantiate_infer_me_with_poison_output
 Latency Counting instantiate_infer_me_with_poison_output
 Checking array accesses instantiate_infer_me_with_poison_output
 Not Instantiating use_MultiStateLoop due to flattening errors
+Instantiating CombineArray
+Concrete Typechecking CombineArray
+Latency Counting CombineArray
+Checking array accesses CombineArray
