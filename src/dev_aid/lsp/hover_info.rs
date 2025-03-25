@@ -142,11 +142,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             let typ_str = decl
                 .typ
                 .typ
-                .display(
-                    &linker.inner_types,
-                    &linker.rank_types,
-                    &link_info.template_parameters,
-                )
+                .display(&linker.whole_types, &link_info.template_parameters)
                 .to_string();
             details_vec.push(typ_str);
 
@@ -208,11 +204,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             details_vec.push(Cow::Owned(
                 wire.typ
                     .typ
-                    .display(
-                        &linker.inner_types,
-                        &linker.rank_types,
-                        &link_info.template_parameters,
-                    )
+                    .display(&linker.whole_types, &link_info.template_parameters)
                     .to_string(),
             ));
             hover.sus_code(details_vec.join(" "));

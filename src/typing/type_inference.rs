@@ -243,9 +243,8 @@ impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: 
         };
 
         // Very expensive, only enable if there are issues
-        //#[cfg(debug_assertions)]
+        #[cfg(debug_assertions)]
         //self.check_no_unknown_loop();
-
         result
     }
     pub fn unify_must_succeed(&self, a: &MyType, b: &MyType) {
@@ -513,7 +512,7 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
         match self {
             PeanoType::Unknown(var_id) => HindleyMilnerInfo::TypeVar(*var_id),
             PeanoType::Succ(_) => HindleyMilnerInfo::TypeFunc(PeanoTypeHMInfo::Successor),
-            PeanoType::Zero => HindleyMilnerInfo::TypeFunc(PeanoTypeHMInfo::Zero),
+            PeanoType::Zero => HindleyMilnerInfo::TypeFunc(PeanoTypeHMInfo::Zero), // todo mega hack
             PeanoType::Named(n) => HindleyMilnerInfo::TypeFunc(PeanoTypeHMInfo::Named(*n)),
         }
     }
@@ -524,12 +523,16 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
         unify: &mut F,
     ) -> UnifyResult {
         match (left, right) {
-            (PeanoType::Zero, PeanoType::Zero) => {
-                //assert!(*na == *nb);
+            (PeanoType::Zero, PeanoType::Zero) => UnifyResult::Success, // todo: check if this is true: Already covered by get_hm_info
+            (PeanoType::Named(na), PeanoType::Named(nb)) => {
+                assert!(*na == *nb);
                 UnifyResult::Success
-            } // todo: check if this is true: Already covered by get_hm_info
+            } // Already covered by get_hm_info
             (PeanoType::Succ(na), PeanoType::Succ(nb)) => unify(na, nb),
-            (_, _) => unreachable!("All others should have been eliminated by get_hm_info check"),
+            (_, _) => unreachable!(
+                "All others ({:?}, {:?}) should have been eliminated by get_hm_info check",
+                left, right
+            ),
         }
     }
 

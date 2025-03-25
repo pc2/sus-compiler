@@ -215,8 +215,6 @@ enum NamespaceElement {
 /// Incremental operations such as adding and removing files can be performed on this
 pub struct Linker {
     pub whole_types: ArenaAllocator<StructType, WholeTypeUUIDMarker>,
-    pub inner_types: ArenaAllocator<StructType, WholeTypeUUIDMarker>,
-    pub rank_types: ArenaAllocator<StructType, WholeTypeUUIDMarker>,
     pub modules: ArenaAllocator<Module, ModuleUUIDMarker>,
     pub constants: ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
     pub files: ArenaAllocator<FileData, FileUUIDMarker>,
@@ -233,8 +231,6 @@ impl Linker {
     pub fn new() -> Linker {
         Linker {
             whole_types: ArenaAllocator::new(),
-            inner_types: ArenaAllocator::new(),
-            rank_types: ArenaAllocator::new(),
             modules: ArenaAllocator::new(),
             constants: ArenaAllocator::new(),
             files: ArenaAllocator::new(),

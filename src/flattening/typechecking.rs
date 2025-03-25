@@ -51,8 +51,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
             type_checker,
             working_on_mut,
             &errs_and_globals.0,
-            &linker.inner_types,
-            &linker.rank_types,
+            &linker.whole_types,
         );
 
         working_on_mut
@@ -581,8 +580,7 @@ pub fn apply_types(
     mut type_checker: TypeUnifier,
     working_on: &mut Module,
     errors: &ErrorCollector,
-    inner_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
-    rank_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+    linker_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
 ) {
     // Set the remaining domain variables that aren't associated with a module port.
     // We just find domain IDs that haven't been
@@ -612,35 +610,25 @@ pub fn apply_types(
     for (_id, inst) in working_on.link_info.instructions.iter_mut() {
         match inst {
             Instruction::Expression(expr) => {
-                type_checker.finalize_type(
-                    inner_types,
-                    rank_types,
-                    &mut expr.typ,
-                    expr.span,
-                    errors,
-                );
+                type_checker.finalize_type(linker_types, &mut expr.typ, expr.span, errors);
                 if let ExpressionSource::WireRef(wr) = &mut expr.source {
                     if let WireReferenceRoot::NamedConstant(cst) = &mut wr.root {
-                        type_checker.finalize_global_ref(inner_types, rank_types, cst, errors);
+                        type_checker.finalize_global_ref(linker_types, cst, errors);
                     }
                 }
             }
-            Instruction::Declaration(decl) => type_checker.finalize_type(
-                inner_types,
-                rank_types,
-                &mut decl.typ,
-                decl.name_span,
-                errors,
-            ),
+            Instruction::Declaration(decl) => {
+                type_checker.finalize_type(linker_types, &mut decl.typ, decl.name_span, errors)
+            }
             Instruction::Write(Write {
                 to_type,
                 to_span,
                 to,
                 ..
             }) => {
-                type_checker.finalize_type(inner_types, rank_types, to_type, *to_span, errors);
+                type_checker.finalize_type(linker_types, to_type, *to_span, errors);
                 if let WireReferenceRoot::NamedConstant(cst) = &mut to.root {
-                    type_checker.finalize_global_ref(inner_types, rank_types, cst, errors);
+                    type_checker.finalize_global_ref(linker_types, cst, errors);
                 }
             }
             // TODO Submodule domains may not be crossed either?
@@ -650,12 +638,7 @@ pub fn apply_types(
                 {
                     type_checker.finalize_domain_type(domain_assigned_to_it_here);
                 }
-                type_checker.finalize_global_ref(
-                    inner_types,
-                    rank_types,
-                    &mut sm.module_ref,
-                    errors,
-                );
+                type_checker.finalize_global_ref(linker_types, &mut sm.module_ref, errors);
             }
             _other => {}
         }

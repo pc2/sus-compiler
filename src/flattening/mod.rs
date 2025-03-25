@@ -10,7 +10,7 @@ use crate::alloc::UUIDAllocator;
 use crate::prelude::*;
 use crate::typing::abstract_type::DomainType;
 use crate::typing::type_inference::{
-    DomainVariableIDMarker, PeanoVariableIDMarker, InnerTypeVariableIDMarker,
+    DomainVariableIDMarker, InnerTypeVariableIDMarker, PeanoVariableIDMarker,
 };
 
 use std::cell::OnceCell;
@@ -763,8 +763,8 @@ pub enum Instruction {
     SubModule(SubModuleInstance),
     FuncCall(FuncCallInstruction),
     Declaration(Declaration),
-    Expression(Expression),
     Write(Write),
+    Expression(Expression),
     IfStatement(IfStatement),
     ForStatement(ForStatement),
 }

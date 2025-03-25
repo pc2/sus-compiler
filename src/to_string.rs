@@ -93,20 +93,15 @@ impl WrittenType {
 }
 
 #[derive(Debug)]
-pub struct AbstractRankedTypeDisplay<'a, InnerTypVec, PeanoTypVec, TemplateVec: TemplateNameGetter>
-{
+pub struct AbstractRankedTypeDisplay<'a, WholeTypVec, TemplateVec: TemplateNameGetter> {
     inner_typ: &'a AbstractInnerType,
-    inner_linker_types: &'a InnerTypVec,
     rank_typ: &'a PeanoType,
-    rank_linker_types: &'a PeanoTypVec,
+    linker_types: &'a WholeTypVec,
     template_names: &'a TemplateVec,
 }
 
-impl<
-        TypVec: Index<WholeTypeUUID, Output = StructType>,
-        PeanoTypVec: Index<WholeTypeUUID, Output = StructType>,
-        TemplateVec: TemplateNameGetter,
-    > Display for AbstractRankedTypeDisplay<'_, TypVec, PeanoTypVec, TemplateVec>
+impl<TypVec: Index<WholeTypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
+    for AbstractRankedTypeDisplay<'_, TypVec, TemplateVec>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner_typ {
@@ -115,16 +110,12 @@ impl<
                 f.write_str(self.template_names.get_template_name(*id))
             }
             AbstractInnerType::Named(id) => {
-                f.write_str(&self.inner_linker_types[*id].link_info.get_full_name())
+                f.write_str(&self.linker_types[*id].link_info.get_full_name())
             }
             AbstractInnerType::Array(sub) => write!(
                 f,
                 "{}[]",
-                sub.deref().display(
-                    self.inner_linker_types,
-                    self.rank_linker_types,
-                    self.template_names
-                )
+                sub.deref().display(self.linker_types, self.template_names)
             ),
         }
         .and_then(|_| f.write_str(&renderpeano(self.rank_typ)))
@@ -144,15 +135,13 @@ fn renderpeano(rank: &PeanoType) -> String {
 impl AbstractRankedType {
     pub fn display<'a>(
         &'a self,
-        inner_linker_types: &'a impl Index<WholeTypeUUID, Output = StructType>,
-        rank_linker_types: &'a impl Index<WholeTypeUUID, Output = StructType>,
+        linker_types: &'a impl Index<WholeTypeUUID, Output = StructType>,
         template_names: &'a impl TemplateNameGetter,
     ) -> impl Display + 'a {
         AbstractRankedTypeDisplay {
             inner_typ: &self.inner,
-            inner_linker_types,
             rank_typ: &self.rank,
-            rank_linker_types,
+            linker_types,
             template_names,
         }
     }

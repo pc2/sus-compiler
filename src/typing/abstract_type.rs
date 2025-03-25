@@ -142,10 +142,12 @@ pub struct TypeUnifier {
 
 impl TypeUnifier {
     pub fn new(parameters: &TVec<Parameter>, typing_alloc: TypingAllocator) -> Self {
+        let p = TypeSubstitutor::init(&typing_alloc.peano_variable_alloc);
+
         Self {
             template_type_names: map_to_type_names(parameters),
             type_substitutor: TypeSubstitutor::init(&typing_alloc.type_variable_alloc),
-            peano_substitutor: TypeSubstitutor::init(&typing_alloc.peano_variable_alloc),
+            peano_substitutor: p,
             domain_substitutor: TypeSubstitutor::init(&typing_alloc.domain_variable_alloc),
         }
     }
@@ -571,8 +573,7 @@ impl TypeUnifier {
 
     pub fn finalize_abstract_type(
         &mut self,
-        inner_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
-        rank_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+        linker_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
         typ: &mut AbstractRankedType,
         span: Span,
         errors: &ErrorCollector,
@@ -581,7 +582,7 @@ impl TypeUnifier {
         if !(typ.inner.fully_substitute(&self.type_substitutor)
             && typ.rank.fully_substitute(&self.peano_substitutor))
         {
-            let typ_as_string = typ.display(inner_types, rank_types, &self.template_type_names);
+            let typ_as_string = typ.display(linker_types, &self.template_type_names);
             errors.error(
                 span,
                 format!("Could not fully figure out the type of this object. {typ_as_string}"),
@@ -591,32 +592,24 @@ impl TypeUnifier {
 
     pub fn finalize_type(
         &mut self,
-        inner_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
-        rank_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+        linker_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
         typ: &mut FullType,
         span: Span,
         errors: &ErrorCollector,
     ) {
         self.finalize_domain_type(&mut typ.domain);
-        self.finalize_abstract_type(inner_types, rank_types, &mut typ.typ, span, errors);
+        self.finalize_abstract_type(linker_types, &mut typ.typ, span, errors);
     }
 
     pub fn finalize_global_ref<ID>(
         &mut self,
-        inner_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
-        rank_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+        linker_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
         global_ref: &mut GlobalReference<ID>,
         errors: &ErrorCollector,
     ) {
         let global_ref_span = global_ref.get_total_span();
         for (_template_id, template_type) in &mut global_ref.template_arg_types {
-            self.finalize_abstract_type(
-                inner_types,
-                rank_types,
-                template_type,
-                global_ref_span,
-                errors,
-            );
+            self.finalize_abstract_type(linker_types, template_type, global_ref_span, errors);
         }
     }
 }
