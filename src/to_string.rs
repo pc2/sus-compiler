@@ -124,6 +124,7 @@ impl<TypVec: Index<WholeTypeUUID, Output = StructType>, TemplateVec: TemplateNam
 
 fn renderpeano(rank: &PeanoType) -> String {
     match rank {
+        PeanoType::Template(id) => format!("[{:?}]", id), // todo: template names for peano
         PeanoType::Zero => "".to_string(),
         PeanoType::Succ(rank) => format!("[]{}", renderpeano(rank)),
         PeanoType::Unknown(rank) => format!("[{:?}]", rank),

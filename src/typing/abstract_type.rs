@@ -50,7 +50,7 @@ impl AbstractRankedType {
     pub const fn scalar(inner: AbstractInnerType) -> Self {
         Self {
             inner,
-            rank: PeanoType::Zero,
+            rank: PeanoType::Named(get_builtin_type_whole!("int")), //PeanoType::Zero, todo a bit hacky!!
         }
     }
     pub fn rank_up(&self) -> Self {
@@ -64,6 +64,7 @@ impl AbstractRankedType {
 #[derive(Debug, Clone)]
 pub enum PeanoType {
     Zero,
+    Template(TemplateID),
     Named(WholeTypeUUID),
     Succ(Box<PeanoType>),
     Unknown(PeanoVariableID),
@@ -134,7 +135,7 @@ pub struct FullType {
 /// 'x U 'y -> Substitute 'x = 'y
 pub struct TypeUnifier {
     pub template_type_names: FlatAlloc<String, TemplateIDMarker>,
-    pub type_substitutor: TypeSubstitutor<AbstractInnerType, InnerTypeVariableIDMarker>,
+    pub abstract_type_substitutor: TypeSubstitutor<AbstractInnerType, InnerTypeVariableIDMarker>,
     pub peano_substitutor: TypeSubstitutor<PeanoType, PeanoVariableIDMarker>,
     pub domain_substitutor: TypeSubstitutor<DomainType, DomainVariableIDMarker>,
     //pub type_map: HashMap<Type
@@ -143,17 +144,17 @@ pub struct TypeUnifier {
 impl TypeUnifier {
     pub fn new(parameters: &TVec<Parameter>, typing_alloc: TypingAllocator) -> Self {
         let p = TypeSubstitutor::init(&typing_alloc.peano_variable_alloc);
-
+        p.alloc(); // 0, fixme this is pretty ugly
         Self {
             template_type_names: map_to_type_names(parameters),
-            type_substitutor: TypeSubstitutor::init(&typing_alloc.type_variable_alloc),
+            abstract_type_substitutor: TypeSubstitutor::init(&typing_alloc.type_variable_alloc),
             peano_substitutor: p,
             domain_substitutor: TypeSubstitutor::init(&typing_alloc.domain_variable_alloc),
         }
     }
 
     pub fn alloc_typ_variable(&self) -> InnerTypeVariableID {
-        self.type_substitutor.alloc()
+        self.abstract_type_substitutor.alloc()
     }
 
     pub fn alloc_peano_variable(&self) -> PeanoVariableID {
@@ -176,12 +177,19 @@ impl TypeUnifier {
         match wr_typ {
             WrittenType::Error(_span) => {} // Already an error, don't unify
             WrittenType::TemplateVariable(_span, argument_id) => {
-                self.type_substitutor
+                self.abstract_type_substitutor
                     .unify_must_succeed(&typ.inner, &AbstractInnerType::Template(*argument_id));
+                self.peano_substitutor
+                    .unify_must_succeed(&typ.rank, &PeanoType::Template(*argument_id));
             }
             WrittenType::Named(global_reference) => {
-                self.type_substitutor
+                self.abstract_type_substitutor
                     .unify_must_succeed(&typ.inner, &AbstractInnerType::Named(global_reference.id));
+                self.peano_substitutor.unify_must_succeed(
+                    &typ.rank,
+                    &PeanoType::Named(get_builtin_type_whole!("int")),
+                );
+                // todo: super super mega hacky hack, assume all named types are scalars
             }
             WrittenType::Array(_span, array_content_and_size) => {
                 let (arr_content_type, _size_flat, _array_bracket_span) =
@@ -192,7 +200,7 @@ impl TypeUnifier {
                     rank: PeanoType::Unknown(self.alloc_peano_variable()),
                 };
 
-                self.type_substitutor
+                self.abstract_type_substitutor
                     .unify_must_succeed(&typ.inner, &Box::new(arr_content_variable.inner.clone()));
 
                 self.peano_substitutor
@@ -223,17 +231,20 @@ impl TypeUnifier {
         match wr_typ {
             WrittenType::Error(_span) => {} // Already an error, don't unify
             WrittenType::TemplateVariable(_span, argument_id) => {
-                self.type_substitutor
+                self.abstract_type_substitutor
                     .unify_must_succeed(&typ.inner, &template_type_args[*argument_id].inner);
 
                 self.peano_substitutor
                     .unify_must_succeed(&typ.rank, &template_type_args[*argument_id].rank);
             }
             WrittenType::Named(global_reference) => {
-                self.type_substitutor
+                self.abstract_type_substitutor
                     .unify_must_succeed(&typ.inner, &AbstractInnerType::Named(global_reference.id));
-                self.peano_substitutor
-                    .unify_must_succeed(&typ.rank, &PeanoType::Named(global_reference.id));
+                self.peano_substitutor.unify_must_succeed(
+                    &typ.rank,
+                    &PeanoType::Named(get_builtin_type_whole!("int")),
+                ); //global_reference.id));
+                   // todo: super super mega hacky hack, assume all named types are scalars
             }
             WrittenType::Array(_span, array_content_and_size) => {
                 let (arr_content_type, _size_flat, _array_bracket_span) =
@@ -244,7 +255,7 @@ impl TypeUnifier {
                     rank: PeanoType::Unknown(self.alloc_peano_variable()),
                 };
 
-                self.type_substitutor
+                self.abstract_type_substitutor
                     .unify_must_succeed(&typ.inner, &Box::new(arr_content_variable.inner.clone()));
 
                 self.peano_substitutor
@@ -269,27 +280,44 @@ impl TypeUnifier {
     ) {
         match value {
             // todo: also unify with rank
-            Value::Bool(_) => self.type_substitutor.unify_report_error(
-                &typ.inner,
-                &BOOL_TYPE.inner,
-                value_span,
-                &"bool constant",
-            ),
-            Value::Integer(_big_int) => self.type_substitutor.unify_report_error(
-                &typ.inner,
-                &INT_TYPE.inner,
-                value_span,
-                &"int constant",
-            ),
+            Value::Bool(_) => {
+                self.abstract_type_substitutor.unify_report_error(
+                    &typ.inner,
+                    &BOOL_TYPE.inner,
+                    value_span,
+                    &"bool constant",
+                );
+                self.peano_substitutor.unify_report_error(
+                    &typ.rank,
+                    &BOOL_TYPE.rank,
+                    value_span,
+                    &"bool constant rank",
+                );
+            }
+            Value::Integer(_big_int) => {
+                self.abstract_type_substitutor.unify_report_error(
+                    &typ.inner,
+                    &INT_TYPE.inner,
+                    value_span,
+                    &"int constant",
+                );
+                self.peano_substitutor.unify_report_error(
+                    &typ.rank,
+                    &INT_TYPE.rank,
+                    value_span,
+                    &"int constant rank",
+                );
+            }
             Value::Array(arr) => {
                 let arr_content_variable = AbstractRankedType {
-                    inner: AbstractInnerType::Unknown(self.type_substitutor.alloc()),
+                    inner: AbstractInnerType::Unknown(self.abstract_type_substitutor.alloc()),
                     rank: PeanoType::Unknown(self.peano_substitutor.alloc()),
                 };
 
                 for v in arr.deref() {
                     self.unify_with_constant(&arr_content_variable.rank_up(), v, value_span);
                 }
+                // todo
                 /*
                 self.type_substitutor.unify_report_error(
                     typ,
@@ -309,7 +337,7 @@ impl TypeUnifier {
         output_typ: AbstractRankedType,
         arr_span: Span,
     ) {
-        self.type_substitutor.unify_report_error(
+        self.abstract_type_substitutor.unify_report_error(
             &arr_type.inner,
             &Box::new(output_typ.inner),
             arr_span,
@@ -333,7 +361,7 @@ impl TypeUnifier {
     ) {
         // todo: tidy these up (remove duplication of code)
         if op == UnaryOperator::Not {
-            self.type_substitutor.unify_report_error(
+            self.abstract_type_substitutor.unify_report_error(
                 &input_typ.inner,
                 &BOOL_TYPE.inner,
                 span,
@@ -346,7 +374,7 @@ impl TypeUnifier {
                 &"! input rank",
             );
 
-            self.type_substitutor.unify_report_error(
+            self.abstract_type_substitutor.unify_report_error(
                 &output_typ.inner,
                 &BOOL_TYPE.inner,
                 span,
@@ -359,17 +387,29 @@ impl TypeUnifier {
                 &"! output rank",
             );
         } else if op == UnaryOperator::Negate {
-            self.type_substitutor.unify_report_error(
+            self.abstract_type_substitutor.unify_report_error(
                 &input_typ.inner,
                 &INT_TYPE.inner,
                 span,
                 &"unary - input",
             );
-            self.type_substitutor.unify_report_error(
+            self.peano_substitutor.unify_report_error(
+                &input_typ.rank,
+                &INT_TYPE.rank,
+                span,
+                &"unary - input rank",
+            );
+            self.abstract_type_substitutor.unify_report_error(
                 &output_typ.inner,
                 &INT_TYPE.inner,
                 span,
                 &"unary - output",
+            );
+            self.peano_substitutor.unify_report_error(
+                &output_typ.rank,
+                &INT_TYPE.rank,
+                span,
+                &"unary - output rank",
             );
         } else {
             let reduction_type = match op {
@@ -380,11 +420,17 @@ impl TypeUnifier {
                 UnaryOperator::Product => INT_TYPE,
                 _ => unreachable!(),
             };
-            self.type_substitutor.unify_report_error(
+            self.abstract_type_substitutor.unify_report_error(
                 &output_typ.inner,
                 &reduction_type.inner,
                 span,
                 &"array reduction",
+            );
+            self.peano_substitutor.unify_report_error(
+                &output_typ.rank,
+                &reduction_type.rank,
+                span,
+                &"array reduction rank",
             );
             self.unify_with_array_of(input_typ, output_typ.clone(), span);
         }
@@ -416,7 +462,7 @@ impl TypeUnifier {
             BinaryOperator::Lesser => (INT_TYPE, INT_TYPE, BOOL_TYPE),
         };
 
-        self.type_substitutor.unify_report_error(
+        self.abstract_type_substitutor.unify_report_error(
             &left_typ.inner,
             &exp_left.inner,
             left_span,
@@ -429,7 +475,7 @@ impl TypeUnifier {
             &"binop left side rank",
         );
 
-        self.type_substitutor.unify_report_error(
+        self.abstract_type_substitutor.unify_report_error(
             &right_typ.inner,
             &exp_right.inner,
             right_span,
@@ -442,7 +488,7 @@ impl TypeUnifier {
             &"binop right side rank",
         );
 
-        self.type_substitutor.unify_report_error(
+        self.abstract_type_substitutor.unify_report_error(
             &output_typ.inner,
             &out_typ.inner,
             Span::new_overarching(left_span, right_span),
@@ -525,7 +571,7 @@ impl TypeUnifier {
         // Must unify arr_type's inner type with output_typ's inner type,
         // arr_type's rank type with succ(output_typ's ranked type) (and idx_type with int)
 
-        self.type_substitutor.unify_report_error(
+        self.abstract_type_substitutor.unify_report_error(
             &idx_type.inner,
             &INT_TYPE.inner,
             idx_span,
@@ -548,8 +594,12 @@ impl TypeUnifier {
         span: Span,
         context: &Context,
     ) {
-        self.type_substitutor
-            .unify_report_error(&found.inner, &expected.inner, span, context);
+        self.abstract_type_substitutor.unify_report_error(
+            &found.inner,
+            &expected.inner,
+            span,
+            context,
+        );
 
         self.peano_substitutor
             .unify_report_error(&found.rank, &expected.rank, span, context);
@@ -579,7 +629,7 @@ impl TypeUnifier {
         errors: &ErrorCollector,
     ) {
         use super::type_inference::HindleyMilner;
-        if !(typ.inner.fully_substitute(&self.type_substitutor)
+        if !(typ.inner.fully_substitute(&self.abstract_type_substitutor)
             && typ.rank.fully_substitute(&self.peano_substitutor))
         {
             let typ_as_string = typ.display(linker_types, &self.template_type_names);

@@ -216,12 +216,14 @@ impl TypeCheckingContext<'_, '_> {
             }
         }
 
-        self.type_checker.type_substitutor.unify_report_error(
-            &current_type_in_progress.inner,
-            &output_typ.typ.inner,
-            whole_span,
-            &"variable reference",
-        );
+        self.type_checker
+            .abstract_type_substitutor
+            .unify_report_error(
+                &current_type_in_progress.inner,
+                &output_typ.typ.inner,
+                whole_span,
+                &"variable reference",
+            );
 
         self.type_checker.peano_substitutor.unify_report_error(
             &current_type_in_progress.rank,
@@ -651,11 +653,11 @@ pub fn apply_types(
         span,
         context,
         infos,
-    } in type_checker.type_substitutor.extract_errors()
+    } in type_checker.abstract_type_substitutor.extract_errors()
     {
         // Not being able to fully substitute is not an issue. We just display partial types
-        let _ = found.fully_substitute(&type_checker.type_substitutor);
-        let _ = expected.fully_substitute(&type_checker.type_substitutor);
+        let _ = found.fully_substitute(&type_checker.abstract_type_substitutor);
+        let _ = expected.fully_substitute(&type_checker.abstract_type_substitutor);
 
         // todo: try fetching the AbstractRankedType to display that instead
         let expected_name = "todo something"; /* = expected
