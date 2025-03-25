@@ -385,6 +385,7 @@ fn concretize_written_type_with_possible_template_args(
 impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConstraint {
     fn try_apply(&mut self, context: &mut InstantiationContext) -> DelayedConstraintStatus {
         let sm = &mut context.submodules[self.sm_id];
+        assert!(sm.instance.get().is_none());
 
         let submod_instr =
             context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
@@ -499,7 +500,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                 submod_instr.module_ref.get_total_span(),
                 "Error instantiating submodule",
             );
-            DelayedConstraintStatus::NoProgress
+            DelayedConstraintStatus::Resolved
         }
     }
 
