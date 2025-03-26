@@ -209,7 +209,6 @@ impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: 
     /// but immediately apply substitutions to [Self::substitution_map]
     #[must_use]
     fn unify(&self, a: &MyType, b: &MyType) -> UnifyResult {
-        print!("Unify called on {:?} and {:?}\n", a, b);
         let result = match (a.get_hm_info(), b.get_hm_info(), a, b) {
             (HindleyMilnerInfo::TypeVar(a_var), HindleyMilnerInfo::TypeVar(b_var), _, _) => {
                 if a_var == b_var {
@@ -228,7 +227,6 @@ impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: 
             }
             (HindleyMilnerInfo::TypeFunc(tf_a), HindleyMilnerInfo::TypeFunc(tf_b), _, _) => {
                 if tf_a != tf_b {
-                    print!("!!! Non matching type funcs! {:?} != {:?}\n", a, b);
                     UnifyResult::NoMatchingTypeFunc
                 } else {
                     MyType::unify_all_args(a, b, &mut |arg_a, arg_b| self.unify(arg_a, arg_b))
@@ -262,13 +260,8 @@ impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: 
         span: Span,
         reporter: &Report,
     ) {
-        print!("Calling unify:\n");
         let unify_result = self.unify(found, expected);
         if unify_result != UnifyResult::Success {
-            print!(
-                "!!! Failed to unify: {:?} with {:?} at {:?}\n\n",
-                found, expected, span
-            );
             let (mut context, infos) = reporter.report();
             if unify_result == UnifyResult::NoInfiniteTypes {
                 context.push_str(": Creating Infinite Types is Forbidden!");
@@ -437,7 +430,6 @@ pub trait HindleyMilner<VariableIDMarker: UUIDMarker>: Sized {
 pub enum AbstractTypeHMInfo {
     Template(TemplateID),
     Named(WholeTypeUUID),
-    Array,
 }
 
 impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
@@ -452,14 +444,13 @@ impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
             AbstractInnerType::Named(named_id) => {
                 HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Named(*named_id))
             }
-            AbstractInnerType::Array(_) => HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Array),
         }
     }
 
     fn unify_all_args<F: FnMut(&Self, &Self) -> UnifyResult>(
         left: &Self,
         right: &Self,
-        unify: &mut F,
+        _: &mut F,
     ) -> UnifyResult {
         match (left, right) {
             (AbstractInnerType::Template(na), AbstractInnerType::Template(nb)) => {
@@ -470,9 +461,6 @@ impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
                 assert!(*na == *nb);
                 UnifyResult::Success
             } // Already covered by get_hm_info
-            (AbstractInnerType::Array(arr_typ), AbstractInnerType::Array(arr_typ_2)) => {
-                unify(&arr_typ.inner, &arr_typ_2.inner)
-            }
             (_, _) => unreachable!("All others should have been eliminated by get_hm_info check"),
         }
     }
@@ -483,7 +471,6 @@ impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
     ) -> bool {
         match self {
             AbstractInnerType::Named(_) | AbstractInnerType::Template(_) => true, // Template Name & Name is included in get_hm_info
-            AbstractInnerType::Array(arr_typ) => arr_typ.inner.fully_substitute(substitutor),
             AbstractInnerType::Unknown(var) => {
                 let Some(replacement) = substitutor.substitution_map[var.get_hidden_value()].get()
                 else {
@@ -499,7 +486,6 @@ impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
     fn for_each_unknown(&self, f: &mut impl FnMut(InnerTypeVariableID)) {
         match self {
             AbstractInnerType::Template(_) | AbstractInnerType::Named(_) => {}
-            AbstractInnerType::Array(array_content) => array_content.inner.for_each_unknown(f),
             AbstractInnerType::Unknown(uuid) => f(*uuid),
         }
     }
@@ -559,7 +545,9 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
             PeanoType::Succ(typ) => typ.fully_substitute(substitutor),
             PeanoType::Zero | PeanoType::Named(_) | PeanoType::Template(_) => true,
             PeanoType::Unknown(var) => {
-                if (var.get_hidden_value() == 0) {
+                // PeanoType::Unknown 0 is really a magic "zero" identifier
+                // todo: horrid hack
+                if var.get_hidden_value() == 0 {
                     return true;
                 }
                 assert!(var.get_hidden_value() != 0);

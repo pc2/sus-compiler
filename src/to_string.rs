@@ -112,11 +112,6 @@ impl<TypVec: Index<WholeTypeUUID, Output = StructType>, TemplateVec: TemplateNam
             AbstractInnerType::Named(id) => {
                 f.write_str(&self.linker_types[*id].link_info.get_full_name())
             }
-            AbstractInnerType::Array(sub) => write!(
-                f,
-                "{}[]",
-                sub.deref().display(self.linker_types, self.template_names)
-            ),
         }
         .and_then(|_| f.write_str(&renderpeano(self.rank_typ)))
     }

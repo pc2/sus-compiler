@@ -32,7 +32,6 @@ use crate::to_string::map_to_type_names;
 pub enum AbstractInnerType {
     Template(TemplateID),
     Named(WholeTypeUUID),
-    Array(Box<AbstractRankedType>),
     /// Referencing [AbstractType::Unknown] is a strong code smell.
     /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
     ///
@@ -612,7 +611,7 @@ impl TypeUnifier {
         span: Span,
         context: Context,
     ) {
-        self.typecheck_write_to_abstract(&found.typ, &expected.typ, span, &mut context.clone());
+        self.typecheck_write_to_abstract(&found.typ, &expected.typ, span, &context);
         self.unify_domains(&found.domain, &expected.domain, span, context);
     }
 
