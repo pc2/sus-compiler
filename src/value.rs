@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use num::BigInt;
+use ibig::IBig;
 
 use crate::flattening::{BinaryOperator, UnaryOperator};
 
@@ -15,7 +15,7 @@ use crate::typing::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
     Bool(bool),
-    Integer(BigInt),
+    Integer(IBig),
     Array(Vec<Value>),
     /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
@@ -66,7 +66,7 @@ impl Value {
     }
 
     #[track_caller]
-    pub fn unwrap_integer(&self) -> &BigInt {
+    pub fn unwrap_integer(&self) -> &IBig {
         let Self::Integer(i) = self else {
             panic!("{:?} is not an integer!", self)
         };
@@ -74,7 +74,7 @@ impl Value {
     }
 
     #[track_caller]
-    pub fn unwrap_int<IntT: for<'i> TryFrom<&'i BigInt>>(&self) -> IntT {
+    pub fn unwrap_int<IntT: for<'i> TryFrom<&'i IBig>>(&self) -> IntT {
         let Self::Integer(i) = self else {
             panic!("{:?} is not an integer!", self)
         };

@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use num::BigInt;
+use ibig::IBig;
 
 use crate::alloc::{zip_eq, zip_eq3};
 use crate::errors::ErrorInfoObject;
@@ -197,7 +197,7 @@ impl InstantiationContext<'_, '_> {
                         );
                     }
                     let array_size_value =
-                        ConcreteType::Value(Value::Integer(BigInt::from(array_wires.len())));
+                        ConcreteType::Value(Value::Integer(IBig::from(array_wires.len())));
                     self.type_substitutor.unify_report_error(
                         &self.wires[this_wire_id].typ,
                         &ConcreteType::Array(Box::new((element_type, array_size_value))),

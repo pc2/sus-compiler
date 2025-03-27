@@ -11,7 +11,7 @@ use crate::linker::IsExtern;
 use crate::prelude::*;
 use crate::typing::template::GlobalReference;
 
-use num::BigInt;
+use ibig::{ubig, IBig, UBig};
 use sus_proc_macro::get_builtin_const;
 
 use crate::flattening::*;
@@ -94,11 +94,11 @@ impl GenerationState<'_> {
             ))
         }
     }
-    fn get_generation_integer(&self, idx: FlatID) -> ExecutionResult<&BigInt> {
+    fn get_generation_integer(&self, idx: FlatID) -> ExecutionResult<&IBig> {
         let val = self.get_generation_value(idx)?;
         Ok(val.unwrap_integer())
     }
-    fn get_generation_small_int<INT: for<'v> TryFrom<&'v BigInt>>(
+    fn get_generation_small_int<INT: for<'v> TryFrom<&'v IBig>>(
         &self,
         idx: FlatID,
     ) -> ExecutionResult<INT> {
@@ -132,7 +132,7 @@ impl IndexMut<FlatID> for GenerationState<'_> {
 
 fn array_access<'v>(
     arr_val: &'v Value,
-    idx: &BigInt,
+    idx: &IBig,
     span: BracketSpan,
 ) -> ExecutionResult<&'v Value> {
     let Value::Array(arr) = arr_val else {
@@ -226,21 +226,22 @@ impl InstantiationContext<'_, '_> {
             get_builtin_const!("clog2") => {
                 let [val] = cst_ref.template_args.cast_to_array();
                 let val = val.unwrap_value().unwrap_integer();
-                if *val > BigInt::ZERO {
-                    let int_val_minus_one: BigInt = val - 1;
-
-                    Ok(Value::Integer(BigInt::from(int_val_minus_one.bits())))
+                if val > &ibig::ibig!(0) {
+                    let val = UBig::try_from(val - 1).unwrap();
+                    Ok(Value::Integer(IBig::from(val.bit_len())))
                 } else {
-                    Err(format!("clog argument must be > 0, found {val}"))
+                    Err(format!(
+                        "clog2 argument must be strictly positive! Found {val}"
+                    ))
                 }
             }
             get_builtin_const!("pow2") => {
                 let [exponent] = cst_ref.template_args.cast_to_array();
                 let exponent = exponent.unwrap_value().unwrap_integer();
-                if let Ok(exp) = u64::try_from(exponent) {
-                    let mut result = BigInt::ZERO;
-                    result.set_bit(exp, true);
-                    Ok(Value::Integer(result))
+                if let Ok(exp) = usize::try_from(exponent) {
+                    let mut result = ubig!(0);
+                    result.set_bit(exp);
+                    Ok(Value::Integer(result.into()))
                 } else {
                     Err(format!("pow2 exponent must be >= 0, found {exponent}"))
                 }
@@ -249,7 +250,7 @@ impl InstantiationContext<'_, '_> {
                 let [base, exponent] = cst_ref.template_args.cast_to_array();
                 let base = base.unwrap_value().unwrap_integer();
                 let exponent = exponent.unwrap_value().unwrap_integer();
-                if let Ok(exp) = u32::try_from(exponent) {
+                if let Ok(exp) = usize::try_from(exponent) {
                     Ok(Value::Integer(base.pow(exp)))
                 } else {
                     Err(format!("pow exponent must be >= 0, found {exponent}"))
@@ -780,8 +781,7 @@ impl InstantiationContext<'_, '_> {
 
                 match op {
                     BinaryOperator::Divide | BinaryOperator::Modulo => {
-                        use num::Zero;
-                        if right_val.unwrap_integer().is_zero() {
+                        if right_val.unwrap_integer() == &ibig::ibig!(0) {
                             return Err((
                                 expression.span,
                                 format!(

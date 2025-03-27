@@ -2,7 +2,7 @@ use crate::alloc::{ArenaAllocator, UUIDAllocator, UUIDRange, UUID};
 use crate::typing::abstract_type::{AbstractType, DomainType};
 use crate::{alloc::UUIDRangeIter, prelude::*};
 
-use num::BigInt;
+use ibig::IBig;
 use sus_proc_macro::{field, kind, kw};
 
 use crate::linker::{FileData, GlobalResolver, GlobalUUID, AFTER_FLATTEN_CP};
@@ -946,7 +946,7 @@ impl FlatteningContext<'_, '_> {
                 let text = &self.globals.file_data.file_text[expr_span];
                 use std::str::FromStr;
                 (
-                    ExpressionSource::Constant(Value::Integer(BigInt::from_str(text).unwrap())),
+                    ExpressionSource::Constant(Value::Integer(IBig::from_str(text).unwrap())),
                     true,
                 )
             }

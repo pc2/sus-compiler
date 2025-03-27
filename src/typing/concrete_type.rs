@@ -1,4 +1,4 @@
-use num::BigInt;
+use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::zip_eq;
@@ -114,7 +114,7 @@ impl ConcreteType {
     /// Returns the size of this type in *wires*. So int #(MAX: 255) would return '8'
     ///
     /// If it contains any Unknowns, then returns None
-    pub fn sizeof(&self) -> Option<BigInt> {
+    pub fn sizeof(&self) -> Option<IBig> {
         match self {
             ConcreteType::Named(reference) => Some(Self::sizeof_named(reference).into()),
             ConcreteType::Value(_value) => unreachable!("Root of ConcreteType cannot be a value"),
