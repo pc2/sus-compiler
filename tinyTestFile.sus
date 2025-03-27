@@ -1,7 +1,27 @@
 
-module CombineArray {
-	int a = 3
-	int b = 4
 
-	int[4] result = []
+module MuxBlock #(int SELECTED_MUX_CONFIG) {
+    gen int MUX_NUM_SELECTOR_BITS = 2
+    gen int MAX_ITERATION = 2048
+
+    interface MuxBlock : int iteration, bool[pow2 #(E: MUX_NUM_SELECTOR_BITS)] select_from -> bool selected
+
+    bool[clog2 #(V: MAX_ITERATION)] as_bits = IntToBits(iteration)
+
+    bool[MUX_NUM_SELECTOR_BITS] selected_bits
+
+    gen int[MUX_NUM_SELECTOR_BITS] BIT_INDICES
+    for int I in 0..MUX_NUM_SELECTOR_BITS {
+        BIT_INDICES[I] = I
+    }
+
+    gen int CUR_SELECTED_MUX_CONFIG = SELECTED_MUX_CONFIG
+
+    for int SELECTED_I in 0..MUX_NUM_SELECTOR_BITS {
+
+    }
+}
+
+module use_MuxBlock {
+    MuxBlock #(SELECTED_MUX_CONFIG: 23) mb
 }

@@ -13,6 +13,9 @@ TREE SITTER module! sizeof
 TREE SITTER module! clog2
 TREE SITTER module! pow2
 TREE SITTER module! pow
+TREE SITTER module! factorial
+TREE SITTER module! falling_factorial
+TREE SITTER module! comb
 TREE SITTER module! DualPortMem
 TREE SITTER module! FIFO
 TREE SITTER module! JoinDomains

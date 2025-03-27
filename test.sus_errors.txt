@@ -1952,9 +1952,9 @@ Error: MIN is not a valid template argument of ::int
      │           ─┬─  
      │            ╰─── MIN is not a valid template argument of ::int
      │
-     ├─[ core.sus:29:20 ]
+     ├─[ core.sus:33:20 ]
      │
-  29 │ __builtin__ struct int {}
+  33 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -1965,9 +1965,9 @@ Error: MAX is not a valid template argument of ::int
      │                   ─┬─  
      │                    ╰─── MAX is not a valid template argument of ::int
      │
-     ├─[ core.sus:29:20 ]
+     ├─[ core.sus:33:20 ]
      │
-  29 │ __builtin__ struct int {}
+  33 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -2140,9 +2140,9 @@ Error: beep is not a valid template argument of ::int
      │                              ──┬─  
      │                                ╰─── beep is not a valid template argument of ::int
      │
-     ├─[ core.sus:29:20 ]
+     ├─[ core.sus:33:20 ]
      │
-  29 │ __builtin__ struct int {}
+  33 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -2153,9 +2153,9 @@ Error: BEEP is not a valid template argument of ::int
      │                                            ──┬─  
      │                                              ╰─── BEEP is not a valid template argument of ::int
      │
-     ├─[ core.sus:29:20 ]
+     ├─[ core.sus:33:20 ]
      │
-  29 │ __builtin__ struct int {}
+  33 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -2166,9 +2166,9 @@ Error: ::int is not a named wire: local or constant, it is a Struct instead!
      │                                                  ─┬─  
      │                                                   ╰─── ::int is not a named wire: local or constant, it is a Struct instead!
      │
-     ├─[ core.sus:29:20 ]
+     ├─[ core.sus:33:20 ]
      │
-  29 │ __builtin__ struct int {}
+  33 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── Defined here
 ─────╯
@@ -2536,9 +2536,9 @@ Error: ABC is not a valid template argument of ::int
      │           ─┬─  
      │            ╰─── ABC is not a valid template argument of ::int
      │
-     ├─[ core.sus:29:20 ]
+     ├─[ core.sus:33:20 ]
      │
-  29 │ __builtin__ struct int {}
+  33 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -2939,9 +2939,9 @@ Error: MAX is not a valid template argument of ::int
       │                              ─┬─  
       │                               ╰─── MAX is not a valid template argument of ::int
       │
-      ├─[ core.sus:29:20 ]
+      ├─[ core.sus:33:20 ]
       │
-   29 │ __builtin__ struct int {}
+   33 │ __builtin__ struct int {}
       │                    ─┬─  
       │                     ╰─── 'int' defined here
 ──────╯
@@ -2952,9 +2952,9 @@ Error: MAX is not a valid template argument of ::int
       │                                                 ─┬─  
       │                                                  ╰─── MAX is not a valid template argument of ::int
       │
-      ├─[ core.sus:29:20 ]
+      ├─[ core.sus:33:20 ]
       │
-   29 │ __builtin__ struct int {}
+   33 │ __builtin__ struct int {}
       │                    ─┬─  
       │                     ╰─── 'int' defined here
 ──────╯
@@ -2965,9 +2965,9 @@ Error: MAX is not a valid template argument of ::int
       │                                                                     ─┬─  
       │                                                                      ╰─── MAX is not a valid template argument of ::int
       │
-      ├─[ core.sus:29:20 ]
+      ├─[ core.sus:33:20 ]
       │
-   29 │ __builtin__ struct int {}
+   33 │ __builtin__ struct int {}
       │                    ─┬─  
       │                     ╰─── 'int' defined here
 ──────╯

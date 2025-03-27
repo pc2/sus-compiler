@@ -11,7 +11,8 @@ use crate::linker::IsExtern;
 use crate::prelude::*;
 use crate::typing::template::GlobalReference;
 
-use ibig::{ubig, IBig, UBig};
+use ibig::{IBig, UBig};
+
 use sus_proc_macro::get_builtin_const;
 
 use crate::flattening::*;
@@ -158,6 +159,27 @@ fn add_to_small_set<T: Eq>(set_vec: &mut Vec<T>, elem: T) {
     }
 }
 
+fn must_be_positive(v: &IBig, subject: &str) -> Result<UBig, String> {
+    UBig::try_from(v).map_err(|_| format!("{subject} must be positive! Found {v}"))
+}
+/// n! / (n - k)!
+fn falling_factorial(mut n: UBig, k: &UBig) -> UBig {
+    let num_terms = u64::try_from(k).unwrap();
+    let mut result = ibig::ubig!(1);
+    for _ in 0..num_terms {
+        result *= &n;
+        n -= 1usize;
+    }
+    result
+}
+fn factorial(mut n: UBig) -> UBig {
+    let as_usize = usize::try_from(&n).unwrap();
+    for v in 2..as_usize {
+        n *= v;
+    }
+    n
+}
+
 /// Temporary intermediary struct
 ///
 /// See [WireReferenceRoot]
@@ -239,7 +261,7 @@ impl InstantiationContext<'_, '_> {
                 let [exponent] = cst_ref.template_args.cast_to_array();
                 let exponent = exponent.unwrap_value().unwrap_integer();
                 if let Ok(exp) = usize::try_from(exponent) {
-                    let mut result = ubig!(0);
+                    let mut result = ibig::ubig!(0);
                     result.set_bit(exp);
                     Ok(Value::Integer(result.into()))
                 } else {
@@ -255,6 +277,41 @@ impl InstantiationContext<'_, '_> {
                 } else {
                     Err(format!("pow exponent must be >= 0, found {exponent}"))
                 }
+            }
+            get_builtin_const!("factorial") => {
+                let [n] = cst_ref.template_args.cast_to_array();
+                let n = n.unwrap_value().unwrap_integer();
+                let n = must_be_positive(n, "factorial parameter")?;
+
+                Ok(Value::Integer(factorial(n).into()))
+            }
+            get_builtin_const!("falling_factorial") => {
+                let [n, k] = cst_ref.template_args.cast_to_array();
+                let n = n.unwrap_value().unwrap_integer();
+                let n = must_be_positive(n, "comb n parameter")?;
+                let k = k.unwrap_value().unwrap_integer();
+                let k = must_be_positive(k, "comb k parameter")?;
+
+                if k > n {
+                    return Err(format!("comb assertion failed: k <= n. Found n={n}, k={k}"));
+                }
+
+                Ok(Value::Integer(falling_factorial(n, &k).into()))
+            }
+            get_builtin_const!("comb") => {
+                let [n, k] = cst_ref.template_args.cast_to_array();
+                let n = n.unwrap_value().unwrap_integer();
+                let n = must_be_positive(n, "comb n parameter")?;
+                let k = k.unwrap_value().unwrap_integer();
+                let k = must_be_positive(k, "comb k parameter")?;
+
+                if k > n {
+                    return Err(format!("comb assertion failed: k <= n. Found n={n}, k={k}"));
+                }
+
+                Ok(Value::Integer(
+                    (falling_factorial(n, &k) / factorial(k)).into(),
+                ))
             }
             get_builtin_const!("assert") => {
                 let [condition] = cst_ref.template_args.cast_to_array();
@@ -999,5 +1056,33 @@ impl InstantiationContext<'_, '_> {
         let result = self.instantiate_code_block(self.md.link_info.instructions.id_range());
         self.make_interface();
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::instantiation::execute::factorial;
+
+    #[test]
+    fn test_factorial() {
+        let a = ibig::ubig!(7);
+
+        assert_eq!(factorial(a), ibig::ubig!(5040))
+    }
+    #[test]
+    fn test_falling_factorial() {
+        let a = ibig::ubig!(20);
+        let b = ibig::ubig!(15);
+
+        let a_factorial = factorial(a.clone());
+        let a_b_factorial = factorial(&a - &b);
+        dbg!(&a_factorial, &a_b_factorial);
+
+        assert_eq!(
+            falling_factorial(a.clone(), &b),
+            a_factorial / a_b_factorial
+        )
     }
 }

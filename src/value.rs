@@ -22,6 +22,26 @@ pub enum Value {
     Error,
 }
 
+impl ConcreteType {
+    /// On the road to implementing subtyping. Takes in a list of types,
+    /// and computes the smallest supertype that all list elements can coerce to.
+    /// TODO integrate into Hindley-Milner more closely
+    fn get_smallest_common_supertype(
+        list: &[Self],
+        type_substitutor: &TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
+    ) -> Option<Self> {
+        let mut iter = list.iter();
+
+        let first = iter.next()?.clone();
+
+        for elem in iter {
+            type_substitutor.unify_must_succeed(&first, elem);
+        }
+
+        Some(first)
+    }
+}
+
 impl Value {
     /// Traverses the Value, to create a best-effort [ConcreteType] for it.
     /// So '1' becomes [INT_CONCRETE_TYPE],
@@ -36,19 +56,17 @@ impl Value {
             Value::Bool(_) => BOOL_CONCRETE_TYPE,
             Value::Integer(_) => INT_CONCRETE_TYPE,
             Value::Array(arr) => {
-                let mut arr_iter = arr.iter();
-                let typ = arr_iter
-                    .next()
-                    .map(|fst| fst.get_type(type_substitutor))
-                    .unwrap_or(ConcreteType::Unknown(type_substitutor.alloc()));
+                let typs_arr: Vec<ConcreteType> = arr
+                    .iter()
+                    .map(|elem| elem.get_type(type_substitutor))
+                    .collect();
 
-                /*for other in arr_iter {
-                    // Assert the types are correct
-                    assert!(other.is_of_type(&typ));
-                }*/
+                let shared_supertype =
+                    ConcreteType::get_smallest_common_supertype(&typs_arr, type_substitutor)
+                        .unwrap_or_else(|| ConcreteType::Unknown(type_substitutor.alloc()));
 
                 ConcreteType::Array(Box::new((
-                    typ,
+                    shared_supertype,
                     ConcreteType::Value(Value::Integer(arr.len().into())),
                 )))
             }
