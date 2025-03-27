@@ -39,7 +39,6 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
             runtime_condition_stack: Vec::new(),
             working_on: &working_on.link_info,
         };
-        //println!("type_check context: {:?}", context.typecheck());
         context.typecheck();
 
         let type_checker = context.type_checker;

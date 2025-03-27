@@ -151,7 +151,7 @@ pub struct FileData {
     pub parsing_errors: ErrorStore,
     /// In source file order
     pub associated_values: Vec<GlobalUUID>,
-    pub associated_namespaces: Vec<Vec<String>>,
+    pub associated_namespaces: RefCell<Vec<Vec<String>>>,
     pub tree: tree_sitter::Tree,
 }
 
@@ -444,6 +444,7 @@ impl Linker {
             files: &self.files,
             other_parsing_errors: &other_parsing_errors,
             associated_values: &mut associated_values,
+            associated_namespaces: &self.files[file_id].associated_namespaces,
             global_namespace: &mut self.global_namespace,
             root_spaces: &mut self.root_spaces,
             types: &mut self.types,
@@ -465,6 +466,7 @@ pub struct FileBuilder<'linker> {
     pub files: &'linker ArenaAllocator<FileData, FileUUIDMarker>,
     pub other_parsing_errors: &'linker ErrorCollector<'linker>,
     associated_values: &'linker mut Vec<GlobalUUID>,
+    pub associated_namespaces: &'linker RefCell<Vec<Vec<String>>>,
     global_namespace: &'linker mut HashMap<String, NamespaceElement>,
     root_spaces: &'linker mut HashMap<String, String>,
     modules: &'linker mut ArenaAllocator<Module, ModuleUUIDMarker>,
@@ -511,7 +513,7 @@ impl<'linker> FileBuilder<'linker> {
     // adds name to namespace and creates possible subnamespaces
     // TODO Namespaces, change panic to LSP Msg
     fn add_name(&mut self, name: String, new_obj_id: GlobalUUID) {
-        let mut filepath_vec = self.file_data.file_identifier.clone();
+        let mut filepath_vec = self.files[self.file_id].file_identifier.clone();
         filepath_vec.reverse(); // TODO: globally flip this data, so it can easily be popped
         let correct_subnamespace = self.get_and_make_subnamespace(&mut filepath_vec); // resolve namespace root location
         match correct_subnamespace.entry(name) {

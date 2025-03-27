@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -154,7 +155,7 @@ impl Linker {
         &mut self,
         file_identifier: &Vec<String>,
         _info_mngr: &mut ExtraInfoManager,
-    ) -> Vec<Vec<String>> {
+    ) -> RefCell<Vec<Vec<String>>> {
         let mut associated_namespaces = Vec::new();
         let core = vec!["std".to_owned(), "core".to_owned()];
         let util = vec!["std".to_owned(), "util".to_owned()];
@@ -163,7 +164,7 @@ impl Linker {
         if !associated_namespaces.contains(file_identifier) {
             associated_namespaces.push(file_identifier.clone());
         };
-        associated_namespaces
+        associated_namespaces.into()
     }
 
     pub fn add_file<ExtraInfoManager: LinkerExtraFileInfoManager>(

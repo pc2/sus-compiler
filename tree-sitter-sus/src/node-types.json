@@ -920,6 +920,22 @@
     }
   },
   {
+    "type": "import",
+    "named": true,
+    "fields": {
+      "namespace_list": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "namespace_list",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "interface_ports",
     "named": true,
     "fields": {
@@ -1130,6 +1146,10 @@
         "types": [
           {
             "type": "global_object",
+            "named": true
+          },
+          {
+            "type": "import",
             "named": true
           }
         ]
@@ -1540,6 +1560,10 @@
   },
   {
     "type": "if",
+    "named": false
+  },
+  {
+    "type": "import",
     "named": false
   },
   {

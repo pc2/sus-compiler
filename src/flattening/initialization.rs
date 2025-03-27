@@ -1,3 +1,4 @@
+use clap::Subcommand;
 use sus_proc_macro::{field, kind, kw};
 
 use crate::errors::ErrorStore;
@@ -286,17 +287,42 @@ pub fn gather_initial_file_data(mut builder: FileBuilder) {
         }
     };
 
-    cursor.list_and_report_errors(
-        kind!("source_file"),
-        builder.other_parsing_errors,
-        |cursor| {
+    cursor.list_and_report_errors(kind!("source_file"), builder.other_parsing_errors, |cursor| {
             let parsing_errors = ErrorCollector::new_empty(builder.file_id, builder.files);
             cursor.report_all_decendant_errors(&parsing_errors);
 
             let span = cursor.span();
-            cursor.go_down(kind!("global_object"), |cursor| {
-                initialize_global_object(&mut builder, parsing_errors, span, cursor);
-            });
+            match cursor.kind() {
+                kind!("global_object") => {
+                    cursor.go_down(kind!("global_object"), |cursor| {
+                        initialize_global_object(&mut builder, parsing_errors, span, cursor);
+                    });
+                }
+                kind!("import") => {
+                    let name_path = cursor.go_down(kind!("import"), |cursor| {
+                        cursor.field(field!("namespace_list"));
+                        let name_path_span = cursor.collect_list(kind!("namespace_list"), |cursor|{
+
+                            let (kind, span) = cursor.kind_span();
+
+                            assert!(kind == kind!("identifier"));
+                            span
+                        });
+                        let mut name_path_literal: Vec<String> = vec![];
+                        for span in name_path_span {
+                            name_path_literal.push(builder.file_data.file_text[span].to_owned());
+                        }
+                        name_path_literal
+                    });
+                    if !builder.associated_namespaces.borrow().contains(&name_path){
+                        builder.associated_namespaces.borrow_mut().push(name_path);
+                    };
+                }
+                _ => {
+                    panic!("Found different kind for field below 'source_file', expected 'global_object' or 'import', found '{}'", cursor.kind());
+                }
+            }
+
         },
     );
 }

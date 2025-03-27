@@ -116,7 +116,6 @@ impl<'t> Cursor<'t> {
                     return true;
                 } else {
                     self.current_field_was_already_consumed = false;
-                    //println!("Optional field '{}' not found. Found '{}' instead", tree_sitter_sus::language().field_name_for_id(field_id.get()).unwrap(), tree_sitter_sus::language().field_name_for_id(found.get()).unwrap());
                     return false; // Field found, but it's not this one. Stop here, because we've passed the possibly optional field
                 }
             } else {
@@ -180,6 +179,16 @@ impl<'t> Cursor<'t> {
     }
 
     #[track_caller]
+    fn check_if_kind(&mut self, expected_kind: u16) -> bool {
+        let node = self.cursor.node();
+        let kind = node.kind_id();
+        if kind != expected_kind {
+            return false;
+        }
+        return true;
+    }
+
+    #[track_caller]
     pub fn optional_field_span(
         &mut self,
         field_id: NonZeroU16,
@@ -202,7 +211,6 @@ impl<'t> Cursor<'t> {
     #[track_caller]
     pub fn go_down<OT>(&mut self, kind: u16, func: impl FnOnce(&mut Self) -> OT) -> OT {
         self.assert_is_kind(kind);
-
         self.go_down_no_check(func)
     }
 
@@ -227,7 +235,6 @@ impl<'t> Cursor<'t> {
     #[track_caller]
     pub fn list(&mut self, parent_kind: u16, mut func: impl FnMut(&mut Self)) {
         self.assert_is_kind(parent_kind);
-
         if self.cursor.goto_first_child() {
             loop {
                 if let Some(found) = self.cursor.field_id() {

@@ -128,7 +128,8 @@ impl<'linker> GlobalResolver<'linker> {
         // Program logic
         let mut global: Vec<GlobalUUID> = Vec::new();
         // loop through all imported namespaces for file including default imports
-        for possible_namespace in &self.file_data.associated_namespaces {
+        let associated_namespaces = &self.file_data.associated_namespaces.borrow();
+        for possible_namespace in associated_namespaces.iter() {
             if let Some(name_found) =
                 self.try_resolve_possible_namespace(possible_namespace.clone(), name_span)
             {
@@ -145,7 +146,6 @@ impl<'linker> GlobalResolver<'linker> {
             Some(global[0])
         } else if global.len() > 1 {
             resolved_globals.all_resolved = false;
-
             let err_ref = self.errors.error(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by full name."));
 
             for collider_global in global.iter() {

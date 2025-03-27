@@ -56,8 +56,17 @@ module.exports = grammar({
 
     rules: {
         // Top level structure
+        source_file: $ => newlineSepSeq($, $._definition),
 
-        source_file: $ => newlineSepSeq($, $.global_object),
+        _definition: $ => choice(
+            $.global_object,
+            $.import
+        ),
+
+        import: $ => seq(
+            'import',
+            field('namespace_list', $.namespace_list)
+        ),
 
         global_object: $ => seq(
             optional(field('extern_marker', choice('__builtin__', 'extern'))),
@@ -71,6 +80,7 @@ module.exports = grammar({
             optional(field('template_declaration_arguments', $.template_declaration_arguments)),
             field('block', $.block)
         ),
+
 
         const_and_type: $ => seq(
             'const',
@@ -331,7 +341,7 @@ module.exports = grammar({
         _linebreak: $ => repeat1('\n'), // For things that must be separated by at least one newline (whitespace after is to optimize gobbling up any extra newlines)
 
         // Extras
-        
+
         // These must be kept in this order for precedence, so that
         // '///' is not interpreted as a single_line_comment of '/'
         doc_comment: $ => /\/\/\/[^\n]*/,

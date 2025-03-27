@@ -29,7 +29,7 @@
                   "name": "item",
                   "content": {
                     "type": "SYMBOL",
-                    "name": "global_object"
+                    "name": "_definition"
                   }
                 },
                 {
@@ -46,7 +46,7 @@
                         "name": "item",
                         "content": {
                           "type": "SYMBOL",
-                          "name": "global_object"
+                          "name": "_definition"
                         }
                       }
                     ]
@@ -70,6 +70,36 @@
               "type": "BLANK"
             }
           ]
+        }
+      ]
+    },
+    "_definition": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "global_object"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "import"
+        }
+      ]
+    },
+    "import": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "import"
+        },
+        {
+          "type": "FIELD",
+          "name": "namespace_list",
+          "content": {
+            "type": "SYMBOL",
+            "name": "namespace_list"
+          }
         }
       ]
     },

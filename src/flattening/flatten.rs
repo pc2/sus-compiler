@@ -1720,13 +1720,22 @@ pub fn flatten_all_globals(linker: &mut Linker) {
         let mut associated_value_iter = file.associated_values.iter();
 
         cursor.list(kind!("source_file"), |cursor| {
-            cursor.go_down(kind!("global_object"), |cursor| {
-                let global_obj = *associated_value_iter
-                    .next()
-                    .expect("Iterator cannot be exhausted");
-
-                flatten_global(linker, global_obj, cursor);
-            });
+            match cursor.kind() {
+                kind!("global_object") => {
+                    cursor.go_down(kind!("global_object"), |cursor| {
+                        let global_obj = *associated_value_iter
+                            .next()
+                            .expect("Iterator cannot be exhausted");
+                        flatten_global(linker, global_obj, cursor);
+                    });
+                }
+                kind!("import") => {
+                    println!("skipping imports during flattening");
+                }
+                _ => {
+                    panic!("got object other than 'global_object' and 'import' while flattening 'source_file'");
+                }
+            }
         });
     }
 }
