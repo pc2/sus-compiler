@@ -1,8 +1,7 @@
 use clap::{Arg, Command, ValueEnum};
-use std::fs;
 use std::sync::OnceLock;
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     env,
     ffi::{OsStr, OsString},
     path::PathBuf,
@@ -44,7 +43,7 @@ pub struct ConfigStruct {
     pub ci: bool,
     pub target_language: TargetLanguage,
     pub files: Vec<PathBuf>,
-    pub namespaces: Vec<PathBuf>,
+    pub namespaces: HashMap<PathBuf, String>,
 }
 
 fn command_builder() -> Command {
@@ -124,24 +123,29 @@ fn command_builder() -> Command {
                     Err("Is a directory")
                 } else if file_path.extension() != Some(OsStr::new("sus")) {
                     Err("Source files must end in .sus")
-                } else if let Ok(file_path) = fs::canonicalize(file_path){
+                } else if let Ok(file_path) = std::fs::canonicalize(file_path){
                     Ok(file_path)
                 } else {
                     Err("Couldn't resolve File to an absolute path")
                 }
             }))
         .arg(Arg::new("namespace")
-            .long("namespaces")
+            .long("namespace")
             .action(clap::ArgAction::Append)
-            .help("dir path to additional namespaces")
-            .value_parser(|namespace_path_str : &str| {
+            .help("dir path to additional namespace")
+            .value_parser(|namespace_definition : &str| {
+                let Some((namespace_name, namespace_path_str)) = namespace_definition.split_once(":") else {
+                    return Err("Not a valid combination of 'namespace_name:namespace_path'")
+                };
                 let namespace_path = PathBuf::from(namespace_path_str);
                 if !namespace_path.exists() {
                     Err("Dir does not exist")
                 } else if !namespace_path.is_dir(){
                     Err("Is a file")
-                } else if let Ok(namespace_path) = fs::canonicalize(namespace_path){
-                    Ok(namespace_path)
+                } else if namespace_name == "std" || namespace_name == "usr" {
+                    Err("Can't define different namespace for default namespaces 'std' or 'usr'")
+                } else if let Ok(namespace_path) = std::fs::canonicalize(namespace_path){
+                    Ok((namespace_path, namespace_name.to_owned()))
                 } else {
                     Err("Couldn't resolve File to an absolute path")
                 }
@@ -171,17 +175,28 @@ where
     let target_language = *matches.get_one("target").unwrap();
     let file_paths: Vec<PathBuf> = match matches.get_many("files") {
         Some(files) => files.cloned().collect(),
-        None => std::fs::read_dir(".")
-            .unwrap()
-            .map(|file| file.unwrap().path())
-            .filter(|file_path| {
-                file_path.is_file() && file_path.extension() == Some("sus".as_ref())
-            })
-            .collect(),
+        None => {
+            let mut canon_files: Vec<PathBuf> = vec![];
+            for non_canon_file in std::fs::read_dir(".")
+                .unwrap()
+                .map(|file| file.unwrap().path())
+                .filter(|file_path| {
+                    file_path.is_file() && file_path.extension() == Some("sus".as_ref())
+                })
+                .collect::<Vec<PathBuf>>()
+            {
+                let canonicalize_result = std::fs::canonicalize(non_canon_file);
+                let Ok(canon_name) = canonicalize_result else {
+                    panic!("{}", canonicalize_result.err().unwrap())
+                };
+                canon_files.push(canon_name);
+            }
+            canon_files
+        }
     };
-    let namespace_paths: Vec<PathBuf> = match matches.get_many("namespace") {
+    let namespace_paths: HashMap<PathBuf, String> = match matches.get_many("namespace") {
         Some(namespaces) => namespaces.cloned().collect(),
-        None => Vec::new(),
+        None => HashMap::new(),
     };
     Ok(ConfigStruct {
         use_lsp,
