@@ -1,0 +1,22 @@
+{
+  "sus_lsp.executable_path": "/home/lennart/Desktop/sus-compiler/target/release/sus_compiler",
+  // Doesn't work, I guess I need to parse ${workspaceFolder} in the extension? 
+  // "sus_lsp.executable_path": "${workspaceFolder}/target/release/sus_compiler",
+  "sus_lsp.tcp_port": 25000,
+  "sus_lsp.args": [
+    "--lsp"
+    //, "--upto", "typecheck"
+  ],
+  "editor.lineHeight": 0,
+  "editor.inlayHints.enabled": "offUnlessPressed",
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.formatOnSave": true
+  },
+  "rust-analyzer.check.command": "clippy",
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "rust-analyzer.runnables.extraTestBinaryArgs": [
+    "--nocapture",
+    "--show-output"
+  ],
+}

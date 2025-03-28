@@ -1,6 +1,5 @@
 **/target
 **/*.lock
-.vscode
 **/*.data
 **/*.old
 **/*.out

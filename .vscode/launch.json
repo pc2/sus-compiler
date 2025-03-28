@@ -1,0 +1,129 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug tinyTestFile.sus in 'sus_compiler'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=sus_compiler",
+                    "--package=sus_compiler"
+                ],
+                "filter": {
+                    "name": "sus_compiler",
+                    "kind": "bin"
+                }
+            },
+            "sourceLanguages": ["rust"],
+            "args": [
+                "--debug",
+                "--debug-latency",
+                "tinyTestFile.sus",
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug BitSerialMatrixMultiply in 'sus_compiler'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=sus_compiler",
+                    "--package=sus_compiler"
+                ],
+                "filter": {
+                    "name": "sus_compiler",
+                    "kind": "bin"
+                }
+            },
+            "sourceLanguages": ["rust"],
+            "args": [
+                "--debug",
+                "--debug-latency",
+                "--module-and-dependencies",
+                "BitSerialMatrixMultiply",
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug 'sus_compiler'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=sus_compiler",
+                    "--package=sus_compiler"
+                ],
+                "filter": {
+                    "name": "sus_compiler",
+                    "kind": "bin"
+                }
+            },
+            "sourceLanguages": ["rust"],
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug 'sus_compiler' with arguments",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=sus_compiler",
+                    "--package=sus_compiler"
+                ],
+                "filter": {
+                    "name": "sus_compiler",
+                    "kind": "bin",
+                }
+            },
+            "sourceLanguages": ["rust"],
+            "args": ["bad_syntax.sus", "test.sus", "slidesExampleCode.sus", "tinyTestFile.sus", "stl/core.sus"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'sus_compiler'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=sus_compiler",
+                    "--package=sus_compiler"
+                ],
+                "filter": {
+                    "name": "sus_compiler",
+                    "kind": "bin"
+                }
+            },
+            "sourceLanguages": ["rust"],
+            "args": [
+                "--exact",
+                "--nocapture",
+                "--show-output",
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+			"type": "extensionHost",
+			"request": "launch",
+			"name": "Launch SUS LSP",
+			"runtimeExecutable": "${execPath}",
+			"args": ["--extensionDevelopmentPath=${workspaceRoot}"],
+			"outFiles": ["${workspaceRoot}/client/out/**/*.js"],
+			"preLaunchTask": {
+				"type": "npm",
+				"script": "watch"
+			}
+		}
+    ]
+}
