@@ -6,3 +6,4 @@
 **/*.vcd
 **/*.fst
 sus-lsp/
+tinyTestFile.sus
