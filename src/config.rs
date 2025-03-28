@@ -1,4 +1,5 @@
 use clap::{Arg, Command, ValueEnum};
+use std::fs;
 use std::sync::OnceLock;
 use std::{
     collections::HashSet,
@@ -43,6 +44,7 @@ pub struct ConfigStruct {
     pub ci: bool,
     pub target_language: TargetLanguage,
     pub files: Vec<PathBuf>,
+    pub namespaces: Vec<PathBuf>,
 }
 
 fn command_builder() -> Command {
@@ -122,8 +124,26 @@ fn command_builder() -> Command {
                     Err("Is a directory")
                 } else if file_path.extension() != Some(OsStr::new("sus")) {
                     Err("Source files must end in .sus")
-                } else {
+                } else if let Ok(file_path) = fs::canonicalize(file_path){
                     Ok(file_path)
+                } else {
+                    Err("Couldn't resolve File to an absolute path")
+                }
+            }))
+        .arg(Arg::new("namespace")
+            .long("namespaces")
+            .action(clap::ArgAction::Append)
+            .help("dir path to additional namespaces")
+            .value_parser(|namespace_path_str : &str| {
+                let namespace_path = PathBuf::from(namespace_path_str);
+                if !namespace_path.exists() {
+                    Err("Dir does not exist")
+                } else if !namespace_path.is_dir(){
+                    Err("Is a file")
+                } else if let Ok(namespace_path) = fs::canonicalize(namespace_path){
+                    Ok(namespace_path)
+                } else {
+                    Err("Couldn't resolve File to an absolute path")
                 }
             }))
 }
@@ -159,6 +179,10 @@ where
             })
             .collect(),
     };
+    let namespace_paths: Vec<PathBuf> = match matches.get_many("namespace") {
+        Some(namespaces) => namespaces.cloned().collect(),
+        None => Vec::new(),
+    };
     Ok(ConfigStruct {
         use_lsp,
         lsp_debug_mode,
@@ -173,6 +197,7 @@ where
         ci,
         target_language,
         files: file_paths,
+        namespaces: namespace_paths,
     })
 }
 
