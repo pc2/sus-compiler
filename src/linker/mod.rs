@@ -201,9 +201,20 @@ impl From<ConstantUUID> for GlobalUUID {
     }
 }
 
-enum NamespaceElement {
+pub enum NamespaceElement {
     Global(GlobalUUID),
-    Colission(Box<[GlobalUUID]>),
+    Colission(Box<[CollisionElement]>),
+    Subnamespace(HashMap<String, NamespaceElement>),
+}
+
+pub enum CollisionElement {
+    Global(GlobalUUID),
+    Namespace(FileUUID),
+}
+
+pub enum ResolvedCollision<'linker> {
+    Name(&'linker LinkInfo),
+    Space(&'linker FileData),
 }
 
 /// The global singleton object that collects all [Module]s, [StructType]s, and [NamedConstant]s that are in the current SUS codebase.
@@ -261,6 +272,7 @@ impl Linker {
             GlobalUUID::Constant(cst_id) => &mut constants[cst_id].link_info,
         }
     }
+
     fn for_all_duplicate_declaration_errors(
         &self,
         file_uuid: FileUUID,
@@ -271,38 +283,61 @@ impl Linker {
             let NamespaceElement::Colission(colission) = &item.1 else {
                 continue;
             };
-            let infos: Vec<&LinkInfo> =
-                colission.iter().map(|id| self.get_link_info(*id)).collect();
+            let infos: Vec<ResolvedCollision> = colission
+                .iter()
+                .map(|id| match id {
+                    CollisionElement::Global(glob_id) => {
+                        ResolvedCollision::Name(self.get_link_info(*glob_id))
+                    }
+                    CollisionElement::Namespace(file_id) => {
+                        ResolvedCollision::Space(&self.files[file_id.to_owned()])
+                    }
+                })
+                .collect();
 
             for (idx, info) in infos.iter().enumerate() {
-                if info.file != file_uuid {
-                    continue;
-                }
-                let mut conflict_infos = Vec::new();
-                for (idx_2, conflicts_with) in infos.iter().enumerate() {
-                    if idx_2 == idx {
-                        continue;
+                match info {
+                    ResolvedCollision::Name(global_info) => {
+                        if global_info.file != file_uuid {
+                            continue;
+                        }
+                        let mut conflict_infos = Vec::new();
+                        for (idx_2, conflicts_with) in infos.iter().enumerate() {
+                            if idx_2 == idx {
+                                continue;
+                            }
+                            match conflicts_with {
+                                ResolvedCollision::Name(conflict_infos_name) => {
+                                    conflict_infos.push(conflict_infos_name)
+                                }
+
+                                ResolvedCollision::Space(_) => {
+                                    todo!("Handle File Collision in error Output")
+                                }
+                            }
+                        }
+                        let this_object_name = &global_info.name;
+                        let infos = conflict_infos
+                            .iter()
+                            .map(|conf_info| ErrorInfo {
+                                position: conf_info.name_span,
+                                file: conf_info.file,
+                                info: "Conflicts with".to_owned(),
+                            })
+                            .collect();
+
+                        let reason =
+                            format!("'{this_object_name}' conflicts with other declarations:");
+
+                        f(&CompileError {
+                            position: global_info.name_span,
+                            reason,
+                            infos,
+                            level: ErrorLevel::Error,
+                        });
                     }
-                    conflict_infos.push(conflicts_with);
+                    ResolvedCollision::Space(_) => continue,
                 }
-                let this_object_name = &info.name;
-                let infos = conflict_infos
-                    .iter()
-                    .map(|conf_info| ErrorInfo {
-                        position: conf_info.name_span,
-                        file: conf_info.file,
-                        info: "Conflicts with".to_owned(),
-                    })
-                    .collect();
-
-                let reason = format!("'{this_object_name}' conflicts with other declarations:");
-
-                f(&CompileError {
-                    position: info.name_span,
-                    reason,
-                    infos,
-                    level: ErrorLevel::Error,
-                });
             }
         }
     }
@@ -362,10 +397,17 @@ impl Linker {
             NamespaceElement::Global(g) => !to_remove_set.contains(g),
             NamespaceElement::Colission(colission) => {
                 let mut retain_vec =
-                    std::mem::replace::<Box<[GlobalUUID]>>(colission, Box::new([])).into_vec();
-                retain_vec.retain(|g| !to_remove_set.contains(g));
+                    std::mem::replace::<Box<[CollisionElement]>>(colission, Box::new([]))
+                        .into_vec();
+                retain_vec.retain(|g| match g {
+                    CollisionElement::Global(g) => !to_remove_set.contains(g),
+                    CollisionElement::Namespace(_) => true,
+                });
                 *colission = retain_vec.into_boxed_slice();
                 colission.len() > 0
+            }
+            NamespaceElement::Subnamespace(_) => {
+                todo!("Implement removing elements from subnamespaces")
             }
         });
 
@@ -414,7 +456,7 @@ pub struct FileBuilder<'linker> {
     pub files: &'linker ArenaAllocator<FileData, FileUUIDMarker>,
     pub other_parsing_errors: &'linker ErrorCollector<'linker>,
     associated_values: &'linker mut Vec<GlobalUUID>,
-    global_namespace: &'linker mut HashMap<String, NamespaceElement>,
+    pub global_namespace: &'linker mut HashMap<String, NamespaceElement>,
     modules: &'linker mut ArenaAllocator<Module, ModuleUUIDMarker>,
     types: &'linker mut ArenaAllocator<StructType, TypeUUIDMarker>,
     constants: &'linker mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
@@ -425,11 +467,17 @@ impl FileBuilder<'_> {
         match self.global_namespace.entry(name) {
             std::collections::hash_map::Entry::Occupied(mut occ) => {
                 let new_val = match occ.get_mut() {
-                    NamespaceElement::Global(g) => Box::new([*g, new_obj_id]),
+                    NamespaceElement::Global(g) => Box::new([
+                        CollisionElement::Global(*g),
+                        CollisionElement::Global(new_obj_id),
+                    ]),
                     NamespaceElement::Colission(coll) => {
                         let mut vec = std::mem::replace(coll, Box::new([])).into_vec();
-                        vec.push(new_obj_id);
+                        vec.push(CollisionElement::Global(new_obj_id));
                         vec.into_boxed_slice()
+                    }
+                    NamespaceElement::Subnamespace(_) => {
+                        todo!("Resolve FileUUID that requires the subnamespace that was hit during name resolution")
                     }
                 };
                 occ.insert(NamespaceElement::Colission(new_val));

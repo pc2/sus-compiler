@@ -128,14 +128,27 @@ impl<'linker> GlobalResolver<'linker> {
                 let err_ref = self.errors.error(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."));
 
                 for collider_global in coll.iter() {
-                    let err_loc = self.get_linking_error_location(*collider_global);
-                    err_ref.info(
-                        err_loc.location,
-                        format!("{} {} declared here", err_loc.named_type, err_loc.full_name),
-                    );
+                    match collider_global {
+                        CollisionElement::Global(global) => {
+                            let err_loc = self.get_linking_error_location(*global);
+                            err_ref.info(
+                                err_loc.location,
+                                format!(
+                                    "{} {} declared here",
+                                    err_loc.named_type, err_loc.full_name
+                                ),
+                            );
+                        }
+                        CollisionElement::Namespace(_) => {
+                            todo!("handle collisions with other namespaces when resolving globals")
+                        }
+                    }
                 }
 
                 None
+            }
+            Some(NamespaceElement::Subnamespace(_)) => {
+                todo!("implement resolving subnamespaces")
             }
             None => {
                 resolved_globals.all_resolved = false;
