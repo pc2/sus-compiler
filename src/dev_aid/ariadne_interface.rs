@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::Path;
 use std::{ops::Range, path::PathBuf};
 
@@ -75,8 +76,12 @@ impl LinkerExtraFileInfoManager for FileSourcesManager {
     }
 }
 
-pub fn compile_all(file_paths: Vec<PathBuf>) -> (Linker, FileSourcesManager) {
+pub fn compile_all(
+    file_paths: Vec<PathBuf>,
+    namespaces: HashMap<PathBuf, String>,
+) -> (Linker, FileSourcesManager) {
     let mut linker = Linker::new();
+    linker.root_namespaces = namespaces;
     let mut file_source_manager = FileSourcesManager {
         file_sources: ArenaVector::new(),
     };

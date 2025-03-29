@@ -109,6 +109,45 @@ impl Linker {
         }
     }
 
+    fn resolve_file_namespace(&self, file_identifier: &str) -> Vec<String> {
+        // make PathBuf for more robust stip_prefix
+        let mut file_identifier = PathBuf::from(file_identifier);
+        // remove .sus extension
+        file_identifier.set_extension("");
+
+        let mut possible_paths: Vec<String> = vec![];
+        // Try and strip root for every possible root_namespace
+        for namespace in &self.root_namespaces {
+            let changed_string =
+                match file_identifier.strip_prefix(namespace.0.to_string_lossy().into_owned()) {
+                    Ok(changed_string) => changed_string,
+                    Err(_not_base) => continue,
+                };
+            // add new short form root to the possible path
+            // e.g. /path/to/std/core.sus -> std/core.sus
+            possible_paths.push(
+                Path::new(&namespace.1)
+                    .join(changed_string)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+        // make sure we only have one possible solution for file namespace
+        if possible_paths.len() > 1 {
+            panic!("Found multiple possible ways to resolve file path {:?} to namespace location. Possible resolutions: {:#?}", file_identifier,possible_paths)
+        }
+        match possible_paths.pop() {
+            Some(path) => path
+                .split("/")
+                .map(|string| string.to_string().clone())
+                .collect::<Vec<String>>(),
+            None => panic!(
+                "Couldn't resolve namespace root for file with path {:?}",
+                file_identifier
+            ),
+        }
+    }
+
     pub fn add_file<ExtraInfoManager: LinkerExtraFileInfoManager>(
         &mut self,
         file_identifier: String,
@@ -124,12 +163,13 @@ impl Linker {
         let mut parser = Parser::new();
         parser.set_language(&tree_sitter_sus::language()).unwrap();
         let tree = parser.parse(&text, None).unwrap();
-
         let file_id = self.files.reserve();
+        let file_namespace = self.resolve_file_namespace(&file_identifier);
         self.files.alloc_reservation(
             file_id,
             FileData {
                 file_identifier,
+                file_namespace,
                 file_text: FileText::new(text),
                 tree,
                 associated_values: Vec::new(),

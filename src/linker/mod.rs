@@ -17,6 +17,8 @@ use std::{
 
 use tree_sitter::Tree;
 
+use crate::PathBuf;
+
 use crate::{alloc::ArenaAllocator, file_position::FileText, flattening::Module};
 
 use crate::errors::{CompileError, ErrorInfo, ErrorLevel, ErrorStore};
@@ -141,6 +143,7 @@ impl LinkInfo {
 /// All FileDatas are stored in [Linker::files], and indexed by [FileUUID]
 pub struct FileData {
     pub file_identifier: String,
+    pub file_namespace: Vec<String>,
     pub file_text: FileText,
     pub parsing_errors: ErrorStore,
     /// In source file order
@@ -217,6 +220,7 @@ pub struct Linker {
     pub modules: ArenaAllocator<Module, ModuleUUIDMarker>,
     pub constants: ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
     pub files: ArenaAllocator<FileData, FileUUIDMarker>,
+    pub root_namespaces: HashMap<PathBuf, String>,
     global_namespace: HashMap<String, NamespaceElement>,
 }
 
@@ -233,6 +237,7 @@ impl Linker {
             modules: ArenaAllocator::new(),
             constants: ArenaAllocator::new(),
             files: ArenaAllocator::new(),
+            root_namespaces: HashMap::new(),
             global_namespace: HashMap::new(),
         }
     }

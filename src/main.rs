@@ -22,8 +22,8 @@ mod linker;
 
 mod compiler_top;
 
-use std::error::Error;
 use std::io::Write;
+use std::{error::Error, path::PathBuf};
 
 use prelude::*;
 
@@ -33,12 +33,21 @@ use dev_aid::ariadne_interface::*;
 use flattening::Module;
 use instantiation::InstantiatedModule;
 
+const STD_LIB_PATH: &str = env!("SUS_COMPILER_STD_LIB_PATH");
+
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     initialize_config_from_cli_args();
 
     let config = config();
 
     let file_paths = config.files.clone();
+
+    // add deafault namespaces to namespace list
+    let mut namespaces = config.namespaces.clone();
+    let std_path = PathBuf::from(STD_LIB_PATH);
+    let usr_path = std::env::current_dir().expect("Couldn't resolve working directory");
+    namespaces.insert(std_path, "std".to_string());
+    namespaces.insert(usr_path, "usr".to_string());
 
     let codegen_backend = match config.target_language {
         config::TargetLanguage::SystemVerilog => {
@@ -55,7 +64,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         panic!("LSP not enabled!")
     }
 
-    let (linker, mut paths_arena) = compile_all(file_paths);
+    let (linker, mut paths_arena) = compile_all(file_paths, namespaces);
     print_all_errors(&linker, &mut paths_arena.file_sources);
 
     if config.early_exit != EarlyExitUpTo::CodeGen {
