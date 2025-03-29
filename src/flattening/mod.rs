@@ -382,21 +382,18 @@ impl WireReferenceRoot {
 pub struct WireReference {
     pub root: WireReferenceRoot,
     pub path: Vec<WireReferencePathElement>,
-    pub is_generative: bool,
 }
 
 impl WireReference {
     fn simple_port(port: PortReference) -> WireReference {
         WireReference {
             root: WireReferenceRoot::SubModulePort(port),
-            is_generative: false,
             path: Vec::new(),
         }
     }
-    fn simple_var_read(id: FlatID, is_generative: bool, name_span: Span) -> WireReference {
+    fn simple_var_read(id: FlatID, name_span: Span) -> WireReference {
         WireReference {
             root: WireReferenceRoot::LocalDecl(id, name_span),
-            is_generative,
             path: Vec::new(),
         }
     }

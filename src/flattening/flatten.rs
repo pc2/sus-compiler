@@ -49,11 +49,14 @@ enum PartialWireReference {
         interface_name_span: Span,
     },
     /// It's ready for use higher up
-    WireReference(WireReference),
+    WireReference {
+        wire_ref: WireReference,
+        is_generative: bool,
+    },
 }
 
 impl PartialWireReference {
-    fn expect_wireref(self, ctx: &FlatteningContext) -> Option<WireReference> {
+    fn expect_wireref(self, ctx: &FlatteningContext) -> Option<(WireReference, bool)> {
         match self {
             PartialWireReference::Error => None, // Error already reported
             PartialWireReference::ModuleButNoPort(submod_decl, span) => {
@@ -105,7 +108,10 @@ impl PartialWireReference {
                     .info((interf.name_span, md.link_info.file), "Declared here");
                 None
             }
-            PartialWireReference::WireReference(wr) => Some(wr),
+            PartialWireReference::WireReference {
+                wire_ref,
+                is_generative,
+            } => Some((wire_ref, is_generative)),
         }
     }
 }
@@ -233,6 +239,12 @@ impl TypingAllocator {
     }
 }
 
+struct AssignLeftSideObject {
+    wire_ref: WireReference,
+    write_modifiers: WriteModifiers,
+    is_generative: bool,
+}
+
 struct FlatteningContext<'l, 'errs> {
     globals: &'l GlobalResolver<'l>,
     errors: &'errs ErrorCollector<'l>,
@@ -342,7 +354,7 @@ impl FlatteningContext<'_, '_> {
                             let wire_read_id = self.instructions.alloc(Instruction::Expression(Expression {
                                 typ: self.type_alloc.alloc_unset_type(DomainAllocOption::Generative),
                                 span: name_span,
-                                source: ExpressionSource::WireRef(WireReference::simple_var_read(decl_id, true, name_span))
+                                source: ExpressionSource::WireRef(WireReference::simple_var_read(decl_id, name_span))
                             }));
                             TemplateArgKind::Value(wire_read_id)
                         }
@@ -917,7 +929,7 @@ impl FlatteningContext<'_, '_> {
                 name_span: Some(submodule_name_span),
                 interface_span: interface_name_span,
             }),
-            PartialWireReference::WireReference(_wire_ref) => {
+            PartialWireReference::WireReference { .. } => {
                 self.errors.error(
                     outer_span,
                     "Function call syntax is only possible on modules or interfaces of modules",
@@ -1020,7 +1032,9 @@ impl FlatteningContext<'_, '_> {
                 (ExpressionSource::ArrayConstruct(list), is_generative)
             }
             _other => {
-                if let Some(wr) = self.flatten_wire_reference(cursor).expect_wireref(self) {
+                if let Some((wr, _is_generative)) =
+                    self.flatten_wire_reference(cursor).expect_wireref(self)
+                {
                     let mut is_comptime = match wr.root {
                         WireReferenceRoot::LocalDecl(uuid, _span) => self.instructions[uuid]
                             .unwrap_declaration()
@@ -1075,14 +1089,16 @@ impl FlatteningContext<'_, '_> {
                 LocalOrGlobal::Local(span, named_obj) => match named_obj {
                     NamedLocal::Declaration(decl_id) => {
                         let root = WireReferenceRoot::LocalDecl(decl_id, expr_span);
-                        PartialWireReference::WireReference(WireReference {
+                        PartialWireReference::WireReference{
+                            wire_ref: WireReference {
                             root,
-                            is_generative: self.instructions[decl_id]
+                            path: Vec::new(),
+                        },
+                        is_generative: self.instructions[decl_id]
                                 .unwrap_declaration()
                                 .identifier_type
-                                .is_generative(),
-                            path: Vec::new(),
-                        })
+                                .is_generative()
+                        }
                     }
                     NamedLocal::SubModule(submod_id) => {
                         PartialWireReference::ModuleButNoPort(submod_id, expr_span)
@@ -1117,11 +1133,12 @@ impl FlatteningContext<'_, '_> {
                 },
                 LocalOrGlobal::Constant(cst_ref) => {
                     let root = WireReferenceRoot::NamedConstant(cst_ref);
-                    PartialWireReference::WireReference(WireReference {
+                    PartialWireReference::WireReference{
+                        wire_ref: WireReference {
                         root,
-                        is_generative: true,
                         path: Vec::new(),
-                    })
+                    },
+                    is_generative: true}
                 }
                 LocalOrGlobal::Module(md_ref) => PartialWireReference::GlobalModuleName(md_ref),
                 LocalOrGlobal::Type(type_ref) => {
@@ -1153,8 +1170,8 @@ impl FlatteningContext<'_, '_> {
                         self.errors.todo(arr_idx_span, "Module Arrays");
                     }
                     PartialWireReference::Error => {}
-                    PartialWireReference::WireReference(wr) => {
-                        wr.path
+                    PartialWireReference::WireReference{wire_ref, is_generative: _} => {
+                        wire_ref.path
                             .push(WireReferencePathElement::ArrayAccess { idx, bracket_span });
                     }
                 }
@@ -1194,11 +1211,12 @@ impl FlatteningContext<'_, '_> {
                                     port_name_span : Some(port_name_span),
                                     is_input: submod.ports[port].is_input
                                 };
-                                PartialWireReference::WireReference(WireReference{
+                                PartialWireReference::WireReference{
+                                    wire_ref: WireReference{
                                     root : WireReferenceRoot::SubModulePort(port_info),
-                                    is_generative: false,
                                     path : Vec::new()
-                                })
+                                },
+                            is_generative: false}
                             }
                             Some(PortOrInterface::Interface(interface)) => {
                                 PartialWireReference::ModuleWithInterface { submodule_decl, submodule_name_span, interface, interface_name_span: port_name_span }
@@ -1206,7 +1224,7 @@ impl FlatteningContext<'_, '_> {
                             None => PartialWireReference::Error
                         }
                     }
-                    PartialWireReference::WireReference(_) => {
+                    PartialWireReference::WireReference{..} => {
                         println!("TODO: Struct fields");
                         PartialWireReference::Error
                     }
@@ -1295,15 +1313,14 @@ impl FlatteningContext<'_, '_> {
 
     fn flatten_assign_function_call(
         &mut self,
-        to: Vec<(Option<(WireReference, WriteModifiers)>, Span)>,
+        to: Vec<(Option<AssignLeftSideObject>, Span)>,
         cursor: &mut Cursor,
     ) {
         // Error on all to items that require writing a generative value
-        for (to_item, to_span) in &to {
-            if let Some((to, _write_modifiers)) = to_item {
-                if to.is_generative {
-                    self.errors.error(*to_span, "A generative value must be written to this, but function calls cannot return generative values");
-                }
+        for (left_item, to_span) in &to {
+            let Some(left_item) = left_item else { continue };
+            if left_item.is_generative {
+                self.errors.error(*to_span, "A generative value must be written to this, but function calls cannot return generative values");
             }
         }
 
@@ -1335,56 +1352,56 @@ impl FlatteningContext<'_, '_> {
 
             let mut to_iter = to.into_iter();
             for port in outputs {
-                if let Some((Some((to, write_modifiers)), to_span)) = to_iter.next() {
-                    let from = self.instructions.alloc(Instruction::Expression(Expression {
-                        typ: self
-                            .type_alloc
-                            .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown), // TODO Generative Function Calls https://github.com/pc2/sus-compiler/issues/10
-                        span: func_call_span,
-                        source: ExpressionSource::WireRef(WireReference::simple_port(
-                            PortReference {
-                                port,
-                                port_name_span: None,
-                                is_input: false,
-                                submodule_name_span,
-                                submodule_decl,
-                            },
-                        )),
-                    }));
-                    self.instructions.alloc(Instruction::Write(Write {
-                        from,
-                        to,
-                        to_span,
-                        to_type: self
-                            .type_alloc
-                            .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown), // Module ports are always non-generative
-                        write_modifiers,
-                    }));
-                }
+                let Some((Some(to), to_span)) = to_iter.next() else {
+                    continue;
+                };
+                let from = self.instructions.alloc(Instruction::Expression(Expression {
+                    typ: self
+                        .type_alloc
+                        .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown), // TODO Generative Function Calls https://github.com/pc2/sus-compiler/issues/10
+                    span: func_call_span,
+                    source: ExpressionSource::WireRef(WireReference::simple_port(PortReference {
+                        port,
+                        port_name_span: None,
+                        is_input: false,
+                        submodule_name_span,
+                        submodule_decl,
+                    })),
+                }));
+                self.instructions.alloc(Instruction::Write(Write {
+                    from,
+                    to: to.wire_ref,
+                    to_span,
+                    to_type: self
+                        .type_alloc
+                        .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown), // Module ports are always non-generative
+                    write_modifiers: to.write_modifiers,
+                }));
             }
             to_iter
         } else {
             to.into_iter()
         };
         for leftover_to in to_iter {
-            if let (Some((to, write_modifiers)), to_span) = leftover_to {
-                let err_id = self.instructions.alloc(Instruction::Expression(Expression {
-                    typ: self
-                        .type_alloc
-                        .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown),
-                    span: func_call_span,
-                    source: ExpressionSource::new_error(),
-                }));
-                self.instructions.alloc(Instruction::Write(Write {
-                    from: err_id,
-                    to,
-                    to_span,
-                    to_type: self
-                        .type_alloc
-                        .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown), // Even non-existing Module ports are non-generative
-                    write_modifiers,
-                }));
-            }
+            let (Some(to), to_span) = leftover_to else {
+                continue;
+            };
+            let err_id = self.instructions.alloc(Instruction::Expression(Expression {
+                typ: self
+                    .type_alloc
+                    .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown),
+                span: func_call_span,
+                source: ExpressionSource::new_error(),
+            }));
+            self.instructions.alloc(Instruction::Write(Write {
+                from: err_id,
+                to: to.wire_ref,
+                to_span,
+                to_type: self
+                    .type_alloc
+                    .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown), // Even non-existing Module ports are non-generative
+                write_modifiers: to.write_modifiers,
+            }));
         }
     }
 
@@ -1419,13 +1436,13 @@ impl FlatteningContext<'_, '_> {
                         if to.len() != 1 {
                             self.errors.error(value_span, format!("Non-function assignments must output exactly 1 output instead of {}", to.len()));
                         }
-                        if let Some((Some((to, write_modifiers)), to_span)) = to.into_iter().next() {
+                        if let Some((Some(to), to_span)) = to.into_iter().next() {
                             if to.is_generative && !read_side_is_generative {
                                 self.errors.error(value_span, "This value is non-generative, yet it is being assigned to a generative value")
                                 .info_same_file(to_span, "This object is generative");
                             }
                             let to_type = self.type_alloc.alloc_unset_type(if to.is_generative {DomainAllocOption::Generative} else {DomainAllocOption::NonGenerativeUnknown});
-                            self.instructions.alloc(Instruction::Write(Write{from: read_side, to, to_span, write_modifiers, to_type}));
+                            self.instructions.alloc(Instruction::Write(Write{from: read_side, to: to.wire_ref, to_span, write_modifiers: to.write_modifiers, to_type}));
                         }
                     }
                 });
@@ -1522,14 +1539,13 @@ impl FlatteningContext<'_, '_> {
     fn flatten_assignment_left_side(
         &mut self,
         cursor: &mut Cursor,
-    ) -> Vec<(Option<(WireReference, WriteModifiers)>, Span)> {
+    ) -> Vec<(Option<AssignLeftSideObject>, Span)> {
         cursor.collect_list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
                 let write_modifiers = self.flatten_write_modifiers(cursor);
 
                 cursor.field(field!("expr_or_decl"));
                 let (kind, span) = cursor.kind_span();
-
                 (
                     if kind == kind!("declaration") {
                         let root = self.flatten_declaration::<false>(
@@ -1540,19 +1556,23 @@ impl FlatteningContext<'_, '_> {
                         );
                         let flat_root_decl = self.instructions[root].unwrap_declaration();
                         let is_generative = flat_root_decl.identifier_type.is_generative();
-                        Some((
-                            WireReference {
+                        Some(AssignLeftSideObject {
+                            wire_ref: WireReference {
                                 root: WireReferenceRoot::LocalDecl(root, flat_root_decl.name_span),
-                                is_generative,
                                 path: Vec::new(),
                             },
                             write_modifiers,
-                        ))
+                            is_generative,
+                        })
                     } else {
                         // It's _expression
                         self.flatten_wire_reference(cursor)
                             .expect_wireref(self)
-                            .map(|wire_ref| (wire_ref, write_modifiers))
+                            .map(|(wire_ref, is_generative)| AssignLeftSideObject {
+                                wire_ref,
+                                write_modifiers,
+                                is_generative,
+                            })
                     },
                     span,
                 )

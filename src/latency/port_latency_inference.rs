@@ -108,7 +108,9 @@ fn recurse_down_expression(
     cur_instr: FlatID,
     num_template_args: usize,
 ) -> Option<PortLatencyLinearity> {
-    match &instructions[cur_instr].unwrap_expression().source {
+    let expr = instructions[cur_instr].unwrap_expression();
+    assert!(expr.typ.domain.is_generative());
+    match &expr.source {
         ExpressionSource::UnaryOp {
             op: UnaryOperator::Negate,
             right,
@@ -178,9 +180,7 @@ fn recurse_down_expression(
         ExpressionSource::WireRef(WireReference {
             root: WireReferenceRoot::LocalDecl(decl_id, _span),
             path,
-            is_generative,
         }) => {
-            assert!(is_generative);
             if !path.is_empty() {
                 return None;
             }
