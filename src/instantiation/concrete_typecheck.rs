@@ -148,7 +148,7 @@ impl InstantiationContext<'_, '_> {
                             ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
                     };
-                    self.type_substitutor.unify_report_error(
+                    /*self.type_substitutor.unify_report_error(
                         &self.wires[this_wire_id].typ,
                         &out,
                         span,
@@ -163,6 +163,18 @@ impl InstantiationContext<'_, '_> {
                     self.type_substitutor.unify_report_error(
                         &self.wires[right].typ,
                         &in_right,
+                        span,
+                        &"binary right",
+                    );*/
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[left].typ,
+                        &self.wires[this_wire_id].typ,
+                        span,
+                        &"binary left",
+                    );
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[right].typ,
+                        &self.wires[this_wire_id].typ,
                         span,
                         &"binary right",
                     );

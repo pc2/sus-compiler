@@ -467,12 +467,12 @@ impl TypeUnifier {
             left_span,
             &"binop left side",
         );
-        self.peano_substitutor.unify_report_error(
+        /*self.peano_substitutor.unify_report_error(
             &left_typ.rank,
             &exp_left.rank,
             left_span,
             &"binop left side rank",
-        );
+        );*/
 
         self.abstract_type_substitutor.unify_report_error(
             &right_typ.inner,
@@ -480,12 +480,12 @@ impl TypeUnifier {
             right_span,
             &"binop right side",
         );
-        self.peano_substitutor.unify_report_error(
+        /*self.peano_substitutor.unify_report_error(
             &right_typ.rank,
             &exp_right.rank,
             right_span,
             &"binop right side rank",
-        );
+        );*/
 
         self.abstract_type_substitutor.unify_report_error(
             &output_typ.inner,
@@ -495,9 +495,15 @@ impl TypeUnifier {
         );
         self.peano_substitutor.unify_report_error(
             &output_typ.rank,
-            &out_typ.rank,
-            Span::new_overarching(left_span, right_span),
-            &"binop output rank",
+            &left_typ.rank,
+            left_span,
+            &"binop left rank",
+        );
+        self.peano_substitutor.unify_report_error(
+            &output_typ.rank,
+            &right_typ.rank,
+            right_span,
+            &"binop right rank",
         );
     }
 
