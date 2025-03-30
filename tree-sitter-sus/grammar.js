@@ -218,7 +218,7 @@ module.exports = grammar({
 
         array_type: $ => seq(
             field('arr', $._type),
-            field('arr_idx', $.array_bracket_expression)
+            field('arr_idx', $.array_bracket_type)
         ),
 
         // Expressions
@@ -284,10 +284,25 @@ module.exports = grammar({
             ')'
         ),
 
-        array_bracket_expression: $ => seq(
+        array_bracket_type: $ => seq(
             '[',
             field('content', $._expression),
+            ']',
+        ),
+
+        array_bracket_expression: $ => seq(
+            '[',
+            choice(
+                field('slice', $.slice),
+                field('index', $._expression)
+            ),
             ']'
+        ),
+
+        slice: $ => seq(
+            field('index_a', $._expression),
+            ':',
+            field('index_b', $._expression)
         ),
 
         // Utilities

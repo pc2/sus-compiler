@@ -317,6 +317,11 @@ pub enum WireReferencePathElement {
         idx: FlatID,
         bracket_span: BracketSpan,
     },
+    ArraySlice {
+        idx_a: FlatID,
+        idx_b: FlatID,
+        bracket_span: BracketSpan,
+    },
 }
 
 /// The root of a [WireReference]. Basically where the wire reference starts.
