@@ -1,6 +1,8 @@
+use std::collections::HashMap;
 use sus_proc_macro::{field, kind, kw};
 
 use crate::errors::ErrorStore;
+use crate::linker::{CollisionElement, NamespaceElement};
 use crate::linker::{IsExtern, AFTER_INITIAL_PARSE_CP};
 use crate::prelude::*;
 
@@ -274,31 +276,71 @@ impl InitializationContext<'_> {
 
 pub fn gather_initial_file_data(mut builder: FileBuilder) {
     assert!(builder.file_data.associated_values.is_empty());
+    // for now a collision when trying to generate the namespace of a file means that the file is skipped
+    if let Some(_subnamespace) = create_subnamespace_for_file(&mut builder) {
+        let mut cursor = match Cursor::new_at_root(builder.tree, &builder.file_data.file_text) {
+            Ok(cursor) => cursor,
+            Err(file_span) => {
+                builder
+                    .other_parsing_errors
+                    .error(file_span, "An ERROR node at the root of the syntax tree!");
 
-    let mut cursor = match Cursor::new_at_root(builder.tree, &builder.file_data.file_text) {
-        Ok(cursor) => cursor,
-        Err(file_span) => {
-            builder
-                .other_parsing_errors
-                .error(file_span, "An ERROR node at the root of the syntax tree!");
+                return;
+            }
+        };
 
-            return;
+        cursor.list_and_report_errors(
+            kind!("source_file"),
+            builder.other_parsing_errors,
+            |cursor| {
+                let parsing_errors = ErrorCollector::new_empty(builder.file_id, builder.files);
+                cursor.report_all_decendant_errors(&parsing_errors);
+
+                let span = cursor.span();
+                cursor.go_down(kind!("global_object"), |cursor| {
+                    initialize_global_object(&mut builder, parsing_errors, span, cursor);
+                });
+            },
+        );
+    } else {
+        builder.other_parsing_errors.did_error();
+        todo!(
+            "Implement error handeling when namespace for file can't be resolved due to collision"
+        )
+    }
+}
+
+fn create_subnamespace_for_file<'builder>(
+    builder: &'builder mut FileBuilder,
+) -> Option<&'builder mut HashMap<String, NamespaceElement>> {
+    let new_namespace_path = &builder.file_data.file_namespace;
+    let file_uuid = builder.file_id;
+    let mut current_namespace = &mut *builder.global_namespace;
+    for step in new_namespace_path {
+        let namespace_element = current_namespace
+            .entry(step.to_string())
+            .or_insert_with(|| NamespaceElement::Subnamespace(HashMap::new()));
+        match namespace_element {
+            NamespaceElement::Subnamespace(space) => current_namespace = space,
+
+            // generate CollisionElements for the other cases and exit
+            NamespaceElement::Global(g) => {
+                let new_element = NamespaceElement::Colission(Box::new([
+                    CollisionElement::Global(*g),
+                    CollisionElement::Namespace(file_uuid),
+                ]));
+                *namespace_element = new_element;
+                return None;
+            }
+            NamespaceElement::Colission(coll) => {
+                let mut vec = std::mem::replace(&mut *coll, Box::new([])).into_vec();
+                vec.push(CollisionElement::Namespace(file_uuid));
+                *namespace_element = NamespaceElement::Colission(vec.into_boxed_slice());
+                return None;
+            }
         }
-    };
-
-    cursor.list_and_report_errors(
-        kind!("source_file"),
-        builder.other_parsing_errors,
-        |cursor| {
-            let parsing_errors = ErrorCollector::new_empty(builder.file_id, builder.files);
-            cursor.report_all_decendant_errors(&parsing_errors);
-
-            let span = cursor.span();
-            cursor.go_down(kind!("global_object"), |cursor| {
-                initialize_global_object(&mut builder, parsing_errors, span, cursor);
-            });
-        },
-    );
+    }
+    Some(current_namespace)
 }
 
 enum GlobalObjectKind {
