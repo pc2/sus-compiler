@@ -13,11 +13,11 @@ __builtin__ module CrossDomain #(T) {
 }
 
 __builtin__ module IntToBits #(int BITS) {
-    interface IntToBits : int #(MIN: -pow2(E: BITS - 1) MAX: pow2(E: BITS - 1) - 1) value'0 -> bool[BITS] bits'0
+    interface IntToBits : int #(MIN: -pow2(E: BITS - 1), MAX: pow2(E: BITS - 1) - 1) value'0 -> bool[BITS] bits'0
 }
 
 __builtin__ module BitsToInt #(int BITS) {
-    interface IntToBits : bool[BITS] bits'0 -> #(MIN: -pow2(E: BITS - 1) MAX: pow2(E: BITS - 1) - 1) value'0
+    interface IntToBits : bool[BITS] bits'0 -> int #(MIN: -pow2(E: BITS - 1), MAX: pow2(E: BITS - 1) - 1) value'0
 }
 
 // For now these builtin declarations must be in this order, because they're constants in the code. 
