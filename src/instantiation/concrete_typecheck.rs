@@ -82,17 +82,18 @@ impl InstantiationContext<'_, '_> {
                     // TODO overloading
                     let (input_typ, output_typ) = match op {
                         UnaryOperator::Not => (BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE),
-                        UnaryOperator::Negate => (
-                            self.type_substitutor.new_int_type(None, None),
-                            self.type_substitutor.new_int_type(None, None),
-                        ),
                         UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => {
                             (self.make_array_of(BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
-                        UnaryOperator::Sum | UnaryOperator::Product => (
-                            self.make_array_of(self.type_substitutor.new_int_type(None, None)),
-                            self.type_substitutor.new_int_type(None, None),
-                        ),
+                        UnaryOperator::Negate | UnaryOperator::Sum | UnaryOperator::Product => {
+                            delayed_constraints.push(UnaryOpTypecheckConstraint {
+                                op,
+                                out: this_wire_id,
+                                input: right,
+                                span,
+                            });
+                            continue;
+                        }
                     };
 
                     self.type_substitutor.unify_report_error(
@@ -502,6 +503,100 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
 }
 
 #[derive(Debug)]
+struct UnaryOpTypecheckConstraint {
+    op: UnaryOperator,
+    input: UUID<WireIDMarker>,
+    out: UUID<WireIDMarker>,
+    span: Span,
+}
+
+/// Returns the inclusive bounds of an int. An int #(MIN: 0, MAX: 15) will return (0, 14)
+fn get_bounds(input_type: &ConcreteType) -> (BigInt, BigInt) {
+    let min = input_type.unwrap_named().template_args[UUID::from_hidden_value(0)]
+        .unwrap_value()
+        .unwrap_integer();
+    let max = input_type.unwrap_named().template_args[UUID::from_hidden_value(1)]
+        .unwrap_value()
+        .unwrap_integer();
+    (min.clone(), max - 1)
+}
+
+impl DelayedConstraint<InstantiationContext<'_, '_>> for UnaryOpTypecheckConstraint {
+    fn try_apply(&mut self, context: &mut InstantiationContext<'_, '_>) -> DelayedConstraintStatus {
+        if let Some(input_complete_type) = context.wires[self.input]
+            .typ
+            .try_fully_substitute(&context.type_substitutor)
+        {
+            if let UnaryOperator::Negate = self.op {
+                let (min, max) = get_bounds(&input_complete_type);
+                let (out_size_min, out_size_max) = (min * -1, (max * -1) + 1);
+                let expected_out = context
+                    .type_substitutor
+                    .new_int_type(Some(out_size_min), Some(out_size_max));
+                context.type_substitutor.unify_report_error(
+                    &context.wires[self.out].typ,
+                    &expected_out,
+                    self.span,
+                    "unary output",
+                );
+                return DelayedConstraintStatus::Resolved;
+            }
+            if let UnaryOperator::Product | UnaryOperator::Sum = self.op {
+                let (array_type, array_size) = input_complete_type.unwrap_array();
+                let array_size = array_size.unwrap_value().unwrap_integer();
+                let (min, max) = get_bounds(array_type);
+                let (out_size_min, out_size_max) = match self.op {
+                    UnaryOperator::Sum => (min * array_size, max * array_size + 1),
+                    UnaryOperator::Product => {
+                        let potentials: [BigInt; 4] = [
+                            &min ^ array_size,
+                            &max ^ array_size,
+                            -(min ^ array_size),
+                            -(max ^ array_size),
+                        ];
+
+                        (
+                            potentials.iter().min().unwrap().clone(),
+                            potentials.iter().max().unwrap() + 1,
+                        )
+                    }
+                    _ => unreachable!(),
+                };
+                let expected_out = context
+                    .type_substitutor
+                    .new_int_type(Some(out_size_min), Some(out_size_max));
+                context.type_substitutor.unify_report_error(
+                    &context.wires[self.out].typ,
+                    &expected_out,
+                    self.span,
+                    "unary output",
+                );
+                return DelayedConstraintStatus::Resolved;
+            }
+            unreachable!(
+                "The BinaryOpTypecheckConstraint should only check Negate, Product and Sum operations but got {}",
+                self.op
+            );
+        } else {
+            DelayedConstraintStatus::NoProgress
+        }
+    }
+
+    fn report_could_not_resolve_error(&self, context: &InstantiationContext<'_, '_>) {
+        let mut input_fully_substituted = context.wires[self.input].typ.clone();
+        input_fully_substituted.fully_substitute(&context.type_substitutor);
+        let mut out_fully_substituted = context.wires[self.out].typ.clone();
+        out_fully_substituted.fully_substitute(&context.type_substitutor);
+        let message = format!(
+            "Failed to Typecheck {:?} = {}{:?}",
+            out_fully_substituted, self.op, input_fully_substituted
+        );
+
+        context.errors.error(self.span, message);
+    }
+}
+
+#[derive(Debug)]
 struct BinaryOpTypecheckConstraint {
     op: BinaryOperator,
     left: UUID<WireIDMarker>,
@@ -520,28 +615,8 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstr
                 .typ
                 .try_fully_substitute(&context.type_substitutor),
         ) {
-            #[rustfmt::skip]
-            let left_size_min = left_complete_type.unwrap_named().template_args
-                [UUID::from_hidden_value(0)]
-                .unwrap_value()
-                .unwrap_integer();
-            #[rustfmt::skip]
-            let right_size_min = right_complete_type.unwrap_named().template_args
-                [UUID::from_hidden_value(0)]
-                .unwrap_value()
-                .unwrap_integer();
-            #[rustfmt::skip]
-            let left_size_max = left_complete_type.unwrap_named().template_args
-                [UUID::from_hidden_value(1)]
-                .unwrap_value()
-                .unwrap_integer() - BigInt::from(1);
-            let left_size_max = &left_size_max;
-            #[rustfmt::skip]
-            let right_size_max = right_complete_type.unwrap_named().template_args
-                [UUID::from_hidden_value(1)]
-                .unwrap_value()
-                .unwrap_integer() - BigInt::from(1);
-            let right_size_max = &right_size_max;
+            let (left_size_min, left_size_max) = get_bounds(&left_complete_type);
+            let (right_size_min, right_size_max) = get_bounds(&right_complete_type);
             let (out_size_min, out_size_max) = match self.op {
                 BinaryOperator::Add => (
                     right_size_min + left_size_min,
@@ -553,9 +628,9 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstr
                 ),
                 BinaryOperator::Multiply => {
                     let potentials = [
-                        left_size_min * right_size_min,
-                        left_size_min * right_size_max,
-                        left_size_max * right_size_min,
+                        &left_size_min * &right_size_min,
+                        left_size_min * &right_size_max,
+                        &left_size_max * right_size_min,
                         left_size_max * right_size_max,
                     ];
                     (
@@ -564,9 +639,9 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstr
                     )
                 }
                 BinaryOperator::Divide => {
-                    if *right_size_min == BigInt::from(0) {
+                    if right_size_min == BigInt::from(0) {
                         let potentials: [BigInt; 2] = [
-                            left_size_min / right_size_max,
+                            left_size_min / &right_size_max,
                             left_size_max / right_size_max,
                         ];
                         (
@@ -575,9 +650,9 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstr
                         )
                     } else {
                         let potentials = [
-                            left_size_min / right_size_max,
-                            left_size_min / right_size_min,
-                            left_size_max / right_size_max,
+                            &left_size_min / &right_size_max,
+                            left_size_min / &right_size_min,
+                            &left_size_max / right_size_max,
                             left_size_max / right_size_min,
                         ];
                         (
@@ -594,7 +669,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstr
                     (BigInt::from(0), right_size_max.clone())
                 }
                 _ => {
-                    unreachable!("The BinaryOpTypecheckConstraint should only check arithmetic operation but got {}", self.op);
+                    unreachable!("The BinaryOpTypecheckConstraint should only check arithmetic operations but got {}", self.op);
                 }
             };
             let expected_out = context

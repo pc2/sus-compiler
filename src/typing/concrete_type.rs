@@ -62,6 +62,13 @@ impl ConcreteType {
         };
         v
     }
+    #[track_caller]
+    pub fn unwrap_array(&self) -> &(ConcreteType, ConcreteType) {
+        let ConcreteType::Array(arr_box) = self else {
+            unreachable!("unwrap_array")
+        };
+        arr_box
+    }
     pub fn down_array(&self) -> &ConcreteType {
         let ConcreteType::Array(arr_box) = self else {
             unreachable!("Must be an array!")
