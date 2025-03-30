@@ -12,12 +12,12 @@ __builtin__ module CrossDomain #(T) {
     interface out_domain : -> T out'0
 }
 
-__builtin__ module IntToBits #(int MAX) {
-    interface IntToBits : int #(MAX) value'0 -> bool[clog2 #(V: MAX)] bits'0
+__builtin__ module IntToBits #(int BITS) {
+    interface IntToBits : int #(MIN: -pow2(E: BITS - 1) MAX: pow2(E: BITS - 1) - 1) value'0 -> bool[BITS] bits'0
 }
 
-__builtin__ module BitsToInt #(int MAX) {
-    interface IntToBits : bool[clog2 #(V: MAX)] bits'0 -> int #(MAX) value'0
+__builtin__ module BitsToInt #(int BITS) {
+    interface IntToBits : bool[BITS] bits'0 -> #(MIN: -pow2(E: BITS - 1) MAX: pow2(E: BITS - 1) - 1) value'0
 }
 
 // For now these builtin declarations must be in this order, because they're constants in the code. 
@@ -25,8 +25,8 @@ __builtin__ module BitsToInt #(int MAX) {
 
 // The decider of truth and falsity
 __builtin__ struct bool {}
-// An integer of variable size. Right now it's not implemented yet, so this is just a 32-bit int. 
-__builtin__ struct int #(int MAX) {}
+// An integer of variable size.
+__builtin__ struct int #(int MIN, int MAX) {}
 
 // For intentionally triggering an ICE for debugging. It is a constant that crashes the compiler when it is evaluated
 __builtin__ const bool __crash_compiler {}
