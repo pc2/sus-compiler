@@ -27,13 +27,8 @@ __builtin__ module BitsToInt #(int NUM_BITS) {
 
 /// The decider of truth and falsity
 __builtin__ struct bool {}
-<<<<<<< HEAD
 // An integer of variable size.
 __builtin__ struct int #(int MIN, int MAX) {}
-=======
-/// An integer of variable size. Right now it's not implemented yet, so this is just a 32-bit int. 
-__builtin__ struct int {}
->>>>>>> master
 
 /// Single precision IEEE 32-bit float. Operators are definted externally, but it's defined here for convenience. 
 __builtin__ struct float {}
