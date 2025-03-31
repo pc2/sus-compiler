@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use std::ops::{BitAnd, Deref, DerefMut, Index};
 use std::thread::panicking;
 
-use num::BigInt;
+use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::block_vector::{BlockVec, BlockVecIter};
@@ -62,7 +62,7 @@ pub struct TypeSubstitutor<MyType: HindleyMilner<VariableIDMarker>, VariableIDMa
 
 impl TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker> {
     /// Creates a new `int #(int MIN, int MAX)`. The resulting int can have a value from `MIN` to `MAX-1`
-    pub fn new_int_type(&self, min: Option<BigInt>, max: Option<BigInt>) -> ConcreteType {
+    pub fn new_int_type(&self, min: Option<IBig>, max: Option<IBig>) -> ConcreteType {
         let mut template_args = FlatAlloc::new();
         if let Some(min) = min {
             template_args.alloc(ConcreteType::Value(Value::Integer(min)));
@@ -113,7 +113,7 @@ impl UnifyErrorReport for &str {
         (self.to_string(), Vec::new())
     }
 }
-impl<F: Fn() -> (String, Vec<ErrorInfo>)> UnifyErrorReport for F {
+impl<F: FnOnce() -> (String, Vec<ErrorInfo>)> UnifyErrorReport for F {
     fn report(self) -> (String, Vec<ErrorInfo>) {
         self()
     }

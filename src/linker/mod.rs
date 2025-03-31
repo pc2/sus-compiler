@@ -8,7 +8,6 @@ use crate::{
 
 pub mod checkpoint;
 mod resolver;
-use arrayvec::ArrayVec;
 pub use resolver::*;
 
 use std::{
@@ -40,8 +39,15 @@ impl Documentation {
         }
         let mut result = String::with_capacity(total_length);
         for s in self.gathered.iter() {
-            result.push_str(&file_text[*s]);
-            result.push('\n');
+            let text = &file_text[*s];
+
+            if text.trim().is_empty() {
+                // Force a newline by adding a blank comment (like Rust does it?)
+                // need two spaces beforehand to force a newline in markdown, according to https://github.com/microsoft/vscode/issues/86291#issuecomment-561841915
+                result.push_str("  \n");
+            } else {
+                result.push_str(text);
+            }
         }
         result
     }
@@ -104,7 +110,7 @@ pub struct LinkInfo {
     /// TODO the system is there, just need to actually do incremental compilation (#49)
     ///
     /// Right now it already functions as a sanity check, to make sure no steps in building modules/types are skipped
-    pub checkpoints: ArrayVec<CheckPoint, 4>,
+    pub checkpoints: Vec<CheckPoint>,
 }
 
 impl LinkInfo {

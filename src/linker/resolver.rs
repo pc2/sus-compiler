@@ -226,7 +226,7 @@ impl LinkInfo {
         assert!(self.resolved_globals.is_untouched());
         assert!(self.errors.is_untouched());
         let expected_checkpoint = self.checkpoints.len();
-        assert_eq!(expected_checkpoint, checkpoint_id, "The new checkpoint is not what was expected. The new checkpoint was {checkpoint_id}, whereas the expected next checkpoint is {expected_checkpoint}");
+        assert!(expected_checkpoint == checkpoint_id, "In {}: The new checkpoint is not what was expected. The new checkpoint was {checkpoint_id}, whereas the expected next checkpoint is {expected_checkpoint}", self.get_full_name());
 
         self.resolved_globals = resolved_globals;
         self.errors = errors.into_storage();

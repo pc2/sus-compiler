@@ -1,10 +1,10 @@
 use clap::{Arg, Command, ValueEnum};
+use std::sync::OnceLock;
 use std::{
     collections::HashSet,
     env,
     ffi::{OsStr, OsString},
     path::PathBuf,
-    sync::LazyLock,
 };
 
 /// Describes at what point in the compilation process we should exit early.
@@ -176,14 +176,18 @@ where
     })
 }
 
+static CONFIG: OnceLock<ConfigStruct> = OnceLock::new();
+
+pub fn initialize_config_from_cli_args() {
+    match parse_args(std::env::args_os()) {
+        Ok(parsed_args) => CONFIG.set(parsed_args).unwrap(),
+        Err(err) => err.exit(),
+    }
+}
+
 /// Access the singleton [ConfigStruct] representing the CLI arguments passed to `sus_compiler`
 pub fn config() -> &'static ConfigStruct {
-    static CONFIG: LazyLock<ConfigStruct> = LazyLock::new(|| {
-        parse_args(std::env::args_os())
-            .map_err(|err| err.exit())
-            .unwrap()
-    });
-    &CONFIG
+    CONFIG.get().unwrap()
 }
 
 #[cfg(test)]

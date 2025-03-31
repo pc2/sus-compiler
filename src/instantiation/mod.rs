@@ -1,8 +1,6 @@
 mod concrete_typecheck;
 mod execute;
-mod latency_algorithm;
-mod latency_count;
-mod list_of_lists;
+mod final_checks;
 mod unique_names;
 
 use unique_names::UniqueNames;
@@ -18,16 +16,10 @@ use crate::flattening::{BinaryOperator, Module, UnaryOperator};
 use crate::{
     config,
     errors::{CompileError, ErrorStore},
-    to_string::pretty_print_concrete_instance,
     value::Value,
 };
 
-use crate::typing::concrete_type::ConcreteType;
-
-use self::latency_algorithm::SpecifiedLatency;
-
-// Temporary value before proper latency is given
-pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
+use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
 
 /// See [MultiplexerSource]
 ///
@@ -38,7 +30,7 @@ pub enum RealWirePathElem {
 }
 
 impl RealWirePathElem {
-    fn for_each_wire_in_path(path: &[RealWirePathElem], mut f: impl FnMut(WireID)) {
+    pub fn for_each_wire_in_path(path: &[RealWirePathElem], mut f: impl FnMut(WireID)) {
         for v in path {
             match v {
                 RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
@@ -84,6 +76,9 @@ pub enum RealWireDataSource {
         root: WireID,
         path: Vec<RealWirePathElem>,
     },
+    ConstructArray {
+        array_wires: Vec<WireID>,
+    },
     Constant {
         value: Value,
     },
@@ -128,11 +123,10 @@ pub struct SubModulePort {
 pub struct SubModule {
     pub original_instruction: FlatID,
     pub instance: OnceCell<Rc<InstantiatedModule>>,
+    pub refers_to: Rc<ConcreteGlobalReference<ModuleUUID>>,
     pub port_map: FlatAlloc<Option<SubModulePort>, PortIDMarker>,
     pub interface_call_sites: FlatAlloc<Vec<Span>, InterfaceIDMarker>,
     pub name: String,
-    pub module_uuid: ModuleUUID,
-    pub template_args: TVec<ConcreteType>,
 }
 
 /// Generated from [Module::ports]
@@ -153,6 +147,7 @@ pub struct InstantiatedPort {
 /// Generated when instantiating a [Module]
 #[derive(Debug)]
 pub struct InstantiatedModule {
+    pub global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
     /// Unique name involving all template arguments
     pub name: String,
     /// Used in code generation. Only contains characters allowed in SV and VHDL
@@ -207,7 +202,7 @@ impl SubModuleOrWire {
 /// Also, with incremental builds (#49) this will be a prime area for investigation
 #[derive(Debug)]
 pub struct InstantiationCache {
-    cache: RefCell<HashMap<TVec<ConcreteType>, Rc<InstantiatedModule>>>,
+    pub cache: RefCell<HashMap<Rc<ConcreteGlobalReference<ModuleUUID>>, Rc<InstantiatedModule>>>,
 }
 
 impl Default for InstantiationCache {
@@ -225,19 +220,18 @@ impl InstantiationCache {
 
     pub fn instantiate(
         &self,
-        md: &Module,
         linker: &Linker,
-        template_args: TVec<ConcreteType>,
+        object_id: Rc<ConcreteGlobalReference<ModuleUUID>>,
     ) -> Option<Rc<InstantiatedModule>> {
         let cache_borrow = self.cache.borrow();
 
         // Temporary, no template arguments yet
-        let instance = if let Some(found) = cache_borrow.get(&template_args) {
+        let instance = if let Some(found) = cache_borrow.get(&object_id) {
             found.clone()
         } else {
             std::mem::drop(cache_borrow);
 
-            let result = perform_instantiation(md, linker, &template_args);
+            let result = perform_instantiation(linker, object_id.clone());
 
             if config().should_print_for_debug(config().debug_print_module_contents, &result.name) {
                 println!("[[Instantiated {}]]", result.name);
@@ -253,7 +247,7 @@ impl InstantiationCache {
             assert!(self
                 .cache
                 .borrow_mut()
-                .insert(template_args, result_ref.clone())
+                .insert(object_id, result_ref.clone())
                 .is_none());
             result_ref
         };
@@ -282,7 +276,7 @@ impl InstantiationCache {
     // Only used for things like syntax highlighting
     pub fn for_each_instance(
         &self,
-        mut f: impl FnMut(&TVec<ConcreteType>, &Rc<InstantiatedModule>),
+        mut f: impl FnMut(&ConcreteGlobalReference<ModuleUUID>, &Rc<InstantiatedModule>),
     ) {
         let borrow = self.cache.borrow();
         for (k, v) in borrow.iter() {
@@ -318,24 +312,24 @@ pub struct ConditionStackElem {
 }
 
 /// As with other contexts, this is the shared state we're lugging around while executing & typechecking a module.
-struct InstantiationContext<'fl, 'l> {
-    name: String,
+pub struct InstantiationContext<'fl, 'l> {
+    pub name: String,
+    pub wires: FlatAlloc<RealWire, WireIDMarker>,
+    pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+
+    pub type_substitutor: TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
+
+    /// Used for Execution
     generation_state: GenerationState<'fl>,
-    wires: FlatAlloc<RealWire, WireIDMarker>,
-    submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
-
-    type_substitutor: TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
-
-    // Used for Execution
     unique_name_producer: UniqueNames,
     condition_stack: Vec<ConditionStackElem>,
 
-    interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
-    errors: ErrorCollector<'l>,
+    pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
+    pub errors: ErrorCollector<'l>,
 
-    template_args: &'fl TVec<ConcreteType>,
-    md: &'fl Module,
-    linker: &'l Linker,
+    pub working_on_global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
+    pub md: &'fl Module,
+    pub linker: &'l Linker,
 }
 
 /// Mangle the module name for use in code generation
@@ -347,12 +341,13 @@ fn mangle_name(str: &str) -> String {
         }
         result.push(if c.is_alphanumeric() { c } else { '_' });
     }
-    result
+    result.trim_matches('_').to_owned()
 }
 
 impl InstantiationContext<'_, '_> {
     fn extract(self) -> InstantiatedModule {
         InstantiatedModule {
+            global_ref: self.working_on_global_ref,
             mangled_name: mangle_name(&self.name),
             name: self.name,
             wires: self.wires,
@@ -365,12 +360,12 @@ impl InstantiationContext<'_, '_> {
 }
 
 fn perform_instantiation(
-    md: &Module,
     linker: &Linker,
-    template_args: &TVec<ConcreteType>,
+    working_on_global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
 ) -> InstantiatedModule {
+    let md = &linker.modules[working_on_global_ref.id];
     let mut context = InstantiationContext {
-        name: pretty_print_concrete_instance(&md.link_info, template_args, &linker.types),
+        name: working_on_global_ref.pretty_print_concrete_instance(&md.link_info, &linker.types),
         generation_state: GenerationState {
             md,
             generation_state: md
@@ -385,7 +380,7 @@ fn perform_instantiation(
         interface_ports: md.ports.map(|_| None),
         errors: ErrorCollector::new_empty(md.link_info.file, &linker.files),
         unique_name_producer: UniqueNames::new(),
-        template_args,
+        working_on_global_ref,
         md,
         linker,
     };
@@ -423,6 +418,9 @@ fn perform_instantiation(
 
     println!("Latency Counting {}", md.link_info.name);
     context.compute_latencies();
+
+    println!("Checking array accesses {}", md.link_info.name);
+    context.check_array_accesses();
 
     context.extract()
 }

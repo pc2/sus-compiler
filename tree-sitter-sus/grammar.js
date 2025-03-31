@@ -231,7 +231,8 @@ module.exports = grammar({
             $.unary_op,
             $.binary_op,
             $.func_call,
-            $.field_access
+            $.field_access,
+            $.array_list_expression
         ),
 
         unary_op: $ => prec(PREC.unary, seq(
@@ -290,6 +291,12 @@ module.exports = grammar({
             ']'
         ),
 
+        array_list_expression: $ => seq(
+            '[',
+            commaSepSeq($, $._expression),
+            ']'
+        ),
+
         // Utilities
 
         namespace_list: $ => sepSeq1($.identifier, '::'),
@@ -331,8 +338,12 @@ module.exports = grammar({
         _linebreak: $ => repeat1('\n'), // For things that must be separated by at least one newline (whitespace after is to optimize gobbling up any extra newlines)
 
         // Extras
-
+        
+        // These must be kept in this order for precedence, so that
+        // '///' is not interpreted as a single_line_comment of '/'
+        doc_comment: $ => /\/\/\/[^\n]*/,
         single_line_comment: $ => /\/\/[^\n]*/,
+
         multi_line_comment: $ => /\/\*[^\*]*\*+([^\/\*][^\*]*\*+)*\//,
     },
 
@@ -344,6 +355,7 @@ module.exports = grammar({
 
     extras: $ => [
         /[ \t\r]+/, // Non newline whitespace
+        $.doc_comment,
         $.single_line_comment,
         $.multi_line_comment
     ]

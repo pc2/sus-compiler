@@ -1,4 +1,3 @@
-use arrayvec::ArrayVec;
 use sus_proc_macro::{field, kind, kw};
 
 use crate::errors::ErrorStore;
@@ -274,7 +273,19 @@ impl InitializationContext<'_> {
 }
 
 pub fn gather_initial_file_data(mut builder: FileBuilder) {
-    let mut cursor = Cursor::new_at_root(builder.tree, &builder.file_data.file_text);
+    assert!(builder.file_data.associated_values.is_empty());
+
+    let mut cursor = match Cursor::new_at_root(builder.tree, &builder.file_data.file_text) {
+        Ok(cursor) => cursor,
+        Err(file_span) => {
+            builder
+                .other_parsing_errors
+                .error(file_span, "An ERROR node at the root of the syntax tree!");
+
+            return;
+        }
+    };
+
     cursor.list_and_report_errors(
         kind!("source_file"),
         builder.other_parsing_errors,
@@ -348,7 +359,7 @@ fn initialize_global_object(
         errors: ErrorStore::new(),
         is_extern,
         resolved_globals: ResolvedGlobals::empty(),
-        checkpoints: ArrayVec::new(),
+        checkpoints: Vec::new(),
     };
 
     link_info.reabsorb_errors_globals(
@@ -362,6 +373,7 @@ fn initialize_global_object(
                 link_info,
                 ports: ctx.ports,
                 latency_inference_info: PortLatencyInferenceInfo::default(),
+                named_domains: ctx.domains.id_range(),
                 domains: ctx.domains,
                 implicit_clk_domain: ctx.implicit_clk_domain,
                 interfaces: ctx.interfaces,

@@ -9,6 +9,7 @@ mod errors;
 mod file_position;
 mod flattening;
 mod instantiation;
+mod latency;
 mod prelude;
 mod to_string;
 mod typing;
@@ -27,12 +28,14 @@ use std::io::Write;
 use prelude::*;
 
 use codegen::{CodeGenBackend, VHDLCodegenBackend, VerilogCodegenBackend};
-use config::{config, EarlyExitUpTo};
+use config::{config, initialize_config_from_cli_args, EarlyExitUpTo};
 use dev_aid::ariadne_interface::*;
 use flattening::Module;
 use instantiation::InstantiatedModule;
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
+    initialize_config_from_cli_args();
+
     let config = config();
 
     let file_paths = config.files.clone();

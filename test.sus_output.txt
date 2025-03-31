@@ -4,12 +4,19 @@ TREE SITTER module! IntToBits
 TREE SITTER module! BitsToInt
 TREE SITTER module! bool
 TREE SITTER module! int
+TREE SITTER module! int
+TREE SITTER module! float
 TREE SITTER module! __crash_compiler
 TREE SITTER module! true
 TREE SITTER module! false
 TREE SITTER module! assert
 TREE SITTER module! sizeof
 TREE SITTER module! clog2
+TREE SITTER module! pow2
+TREE SITTER module! pow
+TREE SITTER module! factorial
+TREE SITTER module! falling_factorial
+TREE SITTER module! comb
 TREE SITTER module! DualPortMem
 TREE SITTER module! FIFO
 TREE SITTER module! JoinDomains
@@ -122,6 +129,22 @@ TREE SITTER module! UseSlice
 TREE SITTER module! UseBuiltinConstants
 TREE SITTER module! FailingAssert
 TREE SITTER module! IfTesting
+TREE SITTER module! latency_counting_disjoint_blocks
+TREE SITTER module! latency_counting_disjoint_blocks_merge_error
+TREE SITTER module! use_infer_me
+TREE SITTER module! infer_me
+TREE SITTER module! infer_from_local_context
+TREE SITTER module! instantiate_fifo
+TREE SITTER module! inference_edge_case
+TREE SITTER module! specified_latencies_not_ports_edge_case
+TREE SITTER module! testArrayWrite
+TREE SITTER module! infer_me_with_poison_output
+TREE SITTER module! instantiate_infer_me_with_poison_output
+TREE SITTER module! __add__
+TREE SITTER module! ShiftReg
+TREE SITTER module! MultiStateLoop
+TREE SITTER module! use_MultiStateLoop
+TREE SITTER module! CombineArray
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -236,337 +259,164 @@ Typechecking UseSlice
 Typechecking UseBuiltinConstants
 Typechecking FailingAssert
 Typechecking IfTesting
-Instantiating IntToBits
-Concrete Typechecking IntToBits
-Latency Counting IntToBits
-Instantiating BitsToInt
-Concrete Typechecking BitsToInt
-Latency Counting BitsToInt
-Instantiating Iterator
-Concrete Typechecking Iterator
-Latency Counting Iterator
-Instantiating Abs
-Concrete Typechecking Abs
-Latency Counting Abs
-Instantiating example_md
-Concrete Typechecking example_md
-Latency Counting example_md
-Instantiating multiply_add
-Concrete Typechecking multiply_add
-Latency Counting multiply_add
-Instantiating test_pow17
-Concrete Typechecking test_pow17
-Instantiating pow17
-Concrete Typechecking pow17
-Latency Counting pow17
-Latency Counting test_pow17
-Instantiating fibonnaci
-Concrete Typechecking fibonnaci
-Latency Counting fibonnaci
-Instantiating blur2
-Concrete Typechecking blur2
-Latency Counting blur2
-Instantiating Tree_Multiply
-Concrete Typechecking Tree_Multiply
-Latency Counting Tree_Multiply
-Instantiating Accumulator
-Concrete Typechecking Accumulator
-Latency Counting Accumulator
-Instantiating blur
-Concrete Typechecking blur
-Latency Counting blur
-Instantiating Unpack4
-Concrete Typechecking Unpack4
-Latency Counting Unpack4
+Typechecking latency_counting_disjoint_blocks
+Typechecking latency_counting_disjoint_blocks_merge_error
+Typechecking use_infer_me
+Typechecking infer_me
+Typechecking infer_from_local_context
+Typechecking instantiate_fifo
+Typechecking inference_edge_case
+Typechecking specified_latencies_not_ports_edge_case
+Typechecking testArrayWrite
+Typechecking infer_me_with_poison_output
+Typechecking instantiate_infer_me_with_poison_output
+Typechecking __add__
+Typechecking ShiftReg
+Typechecking MultiStateLoop
+Typechecking use_MultiStateLoop
+Typechecking CombineArray
+Not Instantiating example_md due to flattening errors
+Not Instantiating multiply_add due to flattening errors
+Not Instantiating test_pow17 due to flattening errors
+Not Instantiating pow17 due to flattening errors
+Not Instantiating fibonnaci due to flattening errors
+Not Instantiating blur2 due to flattening errors
+Not Instantiating Tree_Multiply due to flattening errors
+Not Instantiating Accumulator due to flattening errors
+Not Instantiating blur due to flattening errors
+Not Instantiating Unpack4 due to flattening errors
 Not Instantiating generative due to flattening errors
-Instantiating add_indices_to_array
-Concrete Typechecking add_indices_to_array
-Latency Counting add_indices_to_array
-Instantiating assignment_producer
-Concrete Typechecking assignment_producer
-Latency Counting assignment_producer
-Instantiating test_various_assignments
-Concrete Typechecking test_various_assignments
-Latency Counting test_various_assignments
-Instantiating first_bit_idx_6
-Concrete Typechecking first_bit_idx_6
-Latency Counting first_bit_idx_6
+Not Instantiating add_indices_to_array due to flattening errors
+Not Instantiating assignment_producer due to flattening errors
+Not Instantiating test_various_assignments due to flattening errors
+Not Instantiating first_bit_idx_6 due to flattening errors
 Not Instantiating multiply_add_with_latencies due to flattening errors
-Instantiating first_bit_idx_24
-Concrete Typechecking first_bit_idx_24
-Latency Counting first_bit_idx_24
-Instantiating permute
-Concrete Typechecking permute
-Latency Counting permute
+Not Instantiating first_bit_idx_24 due to flattening errors
+Not Instantiating permute due to flattening errors
 Not Instantiating permute24 due to flattening errors
-Instantiating test_single_wire
-Concrete Typechecking test_single_wire
-Latency Counting test_single_wire
-Instantiating disjoint_ports
-Concrete Typechecking disjoint_ports
-Latency Counting disjoint_ports
-Instantiating undeteriminable_input_latency
-Concrete Typechecking undeteriminable_input_latency
-Latency Counting undeteriminable_input_latency
-Instantiating specified_input_latency
-Concrete Typechecking specified_input_latency
-Latency Counting specified_input_latency
-Instantiating determinable_input_latency
-Concrete Typechecking determinable_input_latency
-Latency Counting determinable_input_latency
-Instantiating determinable_because_no_input_output_ports
-Concrete Typechecking determinable_because_no_input_output_ports
-Latency Counting determinable_because_no_input_output_ports
-Instantiating conflicting_latency_declarations
-Concrete Typechecking conflicting_latency_declarations
-Latency Counting conflicting_latency_declarations
-Instantiating bad_cycle
-Concrete Typechecking bad_cycle
-Latency Counting bad_cycle
-Instantiating module_taking_time
-Concrete Typechecking module_taking_time
-Latency Counting module_taking_time
-Instantiating matrix_vector_mul
-Concrete Typechecking matrix_vector_mul
-Latency Counting matrix_vector_mul
-Instantiating bad_cycle2
-Concrete Typechecking bad_cycle2
-Latency Counting bad_cycle2
-Instantiating module_taking_a_lot_of_time
-Concrete Typechecking module_taking_a_lot_of_time
-Latency Counting module_taking_a_lot_of_time
-Instantiating offset_latency
-Concrete Typechecking offset_latency
-Latency Counting offset_latency
-Instantiating good_cycle
-Concrete Typechecking good_cycle
-Latency Counting good_cycle
-Instantiating input_only
-Concrete Typechecking input_only
-Latency Counting input_only
-Instantiating multiple_inputs_only
-Concrete Typechecking multiple_inputs_only
-Latency Counting multiple_inputs_only
-Instantiating output_only
-Concrete Typechecking output_only
-Latency Counting output_only
-Instantiating multiple_outputs_only
-Concrete Typechecking multiple_outputs_only
-Latency Counting multiple_outputs_only
-Instantiating submodule
-Concrete Typechecking submodule
-Latency Counting submodule
+Not Instantiating test_single_wire due to flattening errors
+Not Instantiating disjoint_ports due to flattening errors
+Not Instantiating undeteriminable_input_latency due to flattening errors
+Not Instantiating specified_input_latency due to flattening errors
+Not Instantiating determinable_input_latency due to flattening errors
+Not Instantiating determinable_because_no_input_output_ports due to flattening errors
+Not Instantiating conflicting_latency_declarations due to flattening errors
+Not Instantiating bad_cycle due to flattening errors
+Not Instantiating module_taking_time due to flattening errors
+Not Instantiating matrix_vector_mul due to flattening errors
+Not Instantiating bad_cycle2 due to flattening errors
+Not Instantiating module_taking_a_lot_of_time due to flattening errors
+Not Instantiating offset_latency due to flattening errors
+Not Instantiating good_cycle due to flattening errors
+Not Instantiating input_only due to flattening errors
+Not Instantiating multiple_inputs_only due to flattening errors
+Not Instantiating output_only due to flattening errors
+Not Instantiating multiple_outputs_only due to flattening errors
+Not Instantiating submodule due to flattening errors
 Instantiating doNothing
 Concrete Typechecking doNothing
 Latency Counting doNothing
+Checking array accesses doNothing
 Not Instantiating contains_submodule_submodule due to flattening errors
 Instantiating xor
 Concrete Typechecking xor
 Latency Counting xor
+Checking array accesses xor
 Instantiating use_xor
 Concrete Typechecking use_xor
 Latency Counting use_xor
-Instantiating fizz_buzz
-Concrete Typechecking fizz_buzz
-Latency Counting fizz_buzz
-Instantiating fizz_buzz_gen
-Concrete Typechecking fizz_buzz_gen
-Latency Counting fizz_buzz_gen
-Instantiating mbf_dual
-Concrete Typechecking mbf_dual
-Latency Counting mbf_dual
-Instantiating monotonize_down
-Concrete Typechecking monotonize_down
-Latency Counting monotonize_down
-Instantiating my_mod
-Concrete Typechecking my_mod
-Latency Counting my_mod
+Checking array accesses use_xor
+Not Instantiating fizz_buzz due to flattening errors
+Not Instantiating fizz_buzz_gen due to flattening errors
+Not Instantiating mbf_dual due to flattening errors
+Not Instantiating monotonize_down due to flattening errors
+Not Instantiating my_mod due to flattening errors
 Instantiating use_my_mod
 Concrete Typechecking use_my_mod
 Latency Counting use_my_mod
-Instantiating submodule_named_ports
-Concrete Typechecking submodule_named_ports
-Latency Counting submodule_named_ports
-Instantiating use_submodule_named_ports
-Concrete Typechecking use_submodule_named_ports
-Latency Counting use_submodule_named_ports
+Checking array accesses use_my_mod
+Not Instantiating submodule_named_ports due to flattening errors
+Not Instantiating use_submodule_named_ports due to flattening errors
 Not Instantiating contains_submodule_submodule due to flattening errors
 Instantiating cross_bool
 Concrete Typechecking cross_bool
 Latency Counting cross_bool
-Instantiating cross_int
-Concrete Typechecking cross_int
-Latency Counting cross_int
+Checking array accesses cross_bool
+Not Instantiating cross_int due to flattening errors
 Instantiating cross_memory
 Concrete Typechecking cross_memory
 Latency Counting cross_memory
+Checking array accesses cross_memory
 Instantiating offset_backwards
 Concrete Typechecking offset_backwards
 Latency Counting offset_backwards
-Instantiating dual_port_mem
-Concrete Typechecking dual_port_mem
-Latency Counting dual_port_mem
-Instantiating use_fifo
-Concrete Typechecking use_fifo
-Latency Counting use_fifo
+Checking array accesses offset_backwards
+Not Instantiating dual_port_mem due to flattening errors
+Not Instantiating use_fifo due to flattening errors
 Not Instantiating test_separated_domain due to flattening errors
 Instantiating no_port_module
 Concrete Typechecking no_port_module
 Latency Counting no_port_module
+Checking array accesses no_port_module
 Not Instantiating use_no_input_module due to flattening errors
-Instantiating mod_with_unused_interface
-Concrete Typechecking mod_with_unused_interface
-Latency Counting mod_with_unused_interface
+Not Instantiating mod_with_unused_interface due to flattening errors
 Not Instantiating test_write_to_gen_var due to flattening errors
-Instantiating use_bad_interface
-Concrete Typechecking use_bad_interface
-Latency Counting use_bad_interface
-Instantiating sequenceDownFrom
-Concrete Typechecking sequenceDownFrom
-Latency Counting sequenceDownFrom
-Instantiating sumUpTo
-Concrete Typechecking sumUpTo
-Latency Counting sumUpTo
+Not Instantiating use_bad_interface due to flattening errors
+Not Instantiating sequenceDownFrom due to flattening errors
+Not Instantiating sumUpTo due to flattening errors
 Not Instantiating use_test due to flattening errors
 Instantiating testTinyTestMod
 Concrete Typechecking testTinyTestMod
-Instantiating tinyTestMod
-Concrete Typechecking tinyTestMod
-Latency Counting tinyTestMod
-Instantiating tinyTestMod
-Concrete Typechecking tinyTestMod
-Latency Counting tinyTestMod
+Not Instantiating tinyTestMod due to flattening errors
+Not Instantiating tinyTestMod due to flattening errors
 Latency Counting testTinyTestMod
-Instantiating make_tree_add
-Concrete Typechecking make_tree_add
-Instantiating tree_add
-Concrete Typechecking tree_add
-Instantiating tree_add
-Concrete Typechecking tree_add
-Instantiating tree_add
-Concrete Typechecking tree_add
-Instantiating tree_add
-Concrete Typechecking tree_add
-Instantiating tree_add
-Concrete Typechecking tree_add
-Instantiating tree_add
-Concrete Typechecking tree_add
-Instantiating tree_add
-Concrete Typechecking tree_add
-Instantiating tree_add
-Concrete Typechecking tree_add
-Latency Counting tree_add
-Latency Counting tree_add
-Latency Counting tree_add
-Latency Counting tree_add
-Latency Counting tree_add
-Latency Counting tree_add
-Latency Counting tree_add
-Latency Counting tree_add
-Latency Counting make_tree_add
-Instantiating use_replicate
-Concrete Typechecking use_replicate
-Instantiating replicate
-Concrete Typechecking replicate
-Latency Counting replicate
-Instantiating replicate
-Concrete Typechecking replicate
-Latency Counting replicate
-Latency Counting use_replicate
-Instantiating use_permute
-Concrete Typechecking use_permute
-Instantiating permute_t
-Concrete Typechecking permute_t
-Latency Counting permute_t
-Latency Counting use_permute
+Checking array accesses testTinyTestMod
+Not Instantiating make_tree_add due to flattening errors
+Not Instantiating use_replicate due to flattening errors
+Not Instantiating use_permute due to flattening errors
 Instantiating instruction_decoder
 Concrete Typechecking instruction_decoder
 Latency Counting instruction_decoder
+Checking array accesses instruction_decoder
 Not Instantiating run_instruction due to flattening errors
 Instantiating no_main_interface
 Concrete Typechecking no_main_interface
 Latency Counting no_main_interface
+Checking array accesses no_main_interface
 Not Instantiating use_no_main_interface due to flattening errors
 Not Instantiating moduleWithBadDeclaration due to flattening errors
 Not Instantiating moduleWithBadInterface due to flattening errors
 Not Instantiating useModuleWithBadInterface due to flattening errors
 Not Instantiating m due to flattening errors
-Instantiating xyz
-Concrete Typechecking xyz
-Instantiating CrossDomain
-Concrete Typechecking CrossDomain
-Latency Counting CrossDomain
-Latency Counting xyz
-Instantiating numbersToAddUp
-Concrete Typechecking numbersToAddUp
-Instantiating TreeAdd
-Concrete Typechecking TreeAdd
-Instantiating SplitAt
-Concrete Typechecking SplitAt
-Latency Counting SplitAt
-Instantiating TreeAdd
-Concrete Typechecking TreeAdd
-Instantiating SplitAt
-Concrete Typechecking SplitAt
-Latency Counting SplitAt
-Instantiating TreeAdd
-Concrete Typechecking TreeAdd
-Latency Counting TreeAdd
-Latency Counting TreeAdd
-Instantiating TreeAdd
-Concrete Typechecking TreeAdd
-Instantiating SplitAt
-Concrete Typechecking SplitAt
-Latency Counting SplitAt
-Latency Counting TreeAdd
-Latency Counting TreeAdd
-Latency Counting numbersToAddUp
-Instantiating use_sized_int_add
-Concrete Typechecking use_sized_int_add
-Instantiating sized_int_add
-Concrete Typechecking sized_int_add
-Latency Counting sized_int_add
-Latency Counting use_sized_int_add
+Not Instantiating xyz due to flattening errors
+Not Instantiating numbersToAddUp due to flattening errors
+Not Instantiating use_sized_int_add due to flattening errors
 Not Instantiating implicit_domain_forbidden due to flattening errors
 Not Instantiating conflicting_domain_with_port_name due to flattening errors
 Not Instantiating make_infinite_type due to flattening errors
-Instantiating UseDualPortMem
-Concrete Typechecking UseDualPortMem
-Instantiating DualPortMem
-Concrete Typechecking DualPortMem
-Instantiating CrossDomain
-Concrete Typechecking CrossDomain
-Latency Counting CrossDomain
-Latency Counting DualPortMem
-Latency Counting UseDualPortMem
-Instantiating example_FIFO
-Concrete Typechecking example_FIFO
-Instantiating FIFO
-Concrete Typechecking FIFO
-Instantiating CrossDomain
-Concrete Typechecking CrossDomain
-Latency Counting CrossDomain
-Instantiating CrossDomain
-Concrete Typechecking CrossDomain
-Latency Counting CrossDomain
-Instantiating CrossDomain
-Concrete Typechecking CrossDomain
-Latency Counting CrossDomain
-Instantiating LatencyOffset
-Concrete Typechecking LatencyOffset
-Latency Counting LatencyOffset
-Latency Counting FIFO
-Latency Counting example_FIFO
-Instantiating use_Iterator
-Concrete Typechecking use_Iterator
-Latency Counting use_Iterator
-Instantiating UseSlice
-Concrete Typechecking UseSlice
-Instantiating Slice
-Concrete Typechecking Slice
-Latency Counting Slice
-Latency Counting UseSlice
-Instantiating UseBuiltinConstants
-Concrete Typechecking UseBuiltinConstants
-Latency Counting UseBuiltinConstants
+Not Instantiating UseDualPortMem due to flattening errors
+Not Instantiating example_FIFO due to flattening errors
+Not Instantiating use_Iterator due to flattening errors
+Not Instantiating UseSlice due to flattening errors
+Not Instantiating UseBuiltinConstants due to flattening errors
 Instantiating FailingAssert
+Instantiating latency_counting_disjoint_blocks
+Concrete Typechecking latency_counting_disjoint_blocks
+Latency Counting latency_counting_disjoint_blocks
+Checking array accesses latency_counting_disjoint_blocks
+Instantiating latency_counting_disjoint_blocks_merge_error
+Concrete Typechecking latency_counting_disjoint_blocks_merge_error
+Latency Counting latency_counting_disjoint_blocks_merge_error
+Checking array accesses latency_counting_disjoint_blocks_merge_error
+Not Instantiating use_infer_me due to flattening errors
+Not Instantiating infer_from_local_context due to flattening errors
+Not Instantiating instantiate_fifo due to flattening errors
+Not Instantiating inference_edge_case due to flattening errors
+Instantiating specified_latencies_not_ports_edge_case
+Concrete Typechecking specified_latencies_not_ports_edge_case
+Latency Counting specified_latencies_not_ports_edge_case
+Checking array accesses specified_latencies_not_ports_edge_case
+Not Instantiating testArrayWrite due to flattening errors
+Not Instantiating instantiate_infer_me_with_poison_output due to flattening errors
+Not Instantiating use_MultiStateLoop due to flattening errors
+Not Instantiating CombineArray due to flattening errors

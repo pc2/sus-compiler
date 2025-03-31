@@ -45,12 +45,20 @@ pub struct Cursor<'t> {
 }
 
 impl<'t> Cursor<'t> {
-    pub fn new_at_root(tree: &'t Tree, file_text: &'t FileText) -> Self {
-        Self {
+    pub fn new_at_root(tree: &'t Tree, file_text: &'t FileText) -> Result<Self, Span> {
+        let result = Self {
             cursor: tree.walk(),
             file_text,
             gathered_comments: Vec::new(),
             current_field_was_already_consumed: false,
+        };
+
+        let root_node = result.cursor.node();
+        if root_node.is_error() || root_node.is_missing() {
+            Err(Span::from(root_node.byte_range()))
+        } else {
+            assert!(root_node.kind_id() == kind!("source_file"));
+            Ok(result)
         }
     }
 
@@ -264,7 +272,8 @@ impl<'t> Cursor<'t> {
         result
     }
 
-    /// Goes down the current node, checks it's kind, and then selects the 'content' field. Useful for constructs like seq('[', field('content', $.expr), ']')
+    /// Goes down the current node, checks it's kind, and then selects the 'content' field.
+    /// Useful for constructs like `seq('[', field('content', $.expr), ']')`
     #[track_caller]
     pub fn go_down_content<OT>(
         &mut self,
@@ -283,13 +292,12 @@ impl<'t> Cursor<'t> {
         let node = self.cursor.node();
         let kind = node.kind_id();
 
-        if kind == kind!("single_line_comment") || kind == kind!("multi_line_comment") {
+        if kind == kind!("doc_comment") {
             let mut range = node.byte_range();
-            range.start += 2; // skip '/*' or '//'
-            if kind == kind!("multi_line_comment") {
-                range.end -= 2; // skip '*/'
-            }
+            range.start += 3; // skip '///'
             self.gathered_comments.push(Span::from(range));
+        } else if kind == kind!("single_line_comment") || kind == kind!("multi_line_comment") {
+            self.clear_gathered_comments();
         }
     }
 

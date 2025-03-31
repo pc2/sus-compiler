@@ -235,12 +235,12 @@ impl TypeUnifier {
     pub fn unify_with_array_of(
         &self,
         arr_type: &AbstractType,
-        output_typ: AbstractType,
+        output_typ: &AbstractType,
         arr_span: Span,
     ) {
         self.type_substitutor.unify_report_error(
             arr_type,
-            &AbstractType::Array(Box::new(output_typ)),
+            &AbstractType::Array(Box::new(output_typ.clone())),
             arr_span,
             "array access",
         );
@@ -278,7 +278,7 @@ impl TypeUnifier {
                 span,
                 "array reduction",
             );
-            self.unify_with_array_of(input_typ, output_typ.clone(), span);
+            self.unify_with_array_of(input_typ, output_typ, span);
         }
     }
 
@@ -338,61 +338,6 @@ impl TypeUnifier {
             self.domain_substitutor
                 .unify_report_error(from_domain, to_domain, span, context);
         }
-    }
-
-    pub fn typecheck_unary_operator(
-        &self,
-        op: UnaryOperator,
-        input_typ: &FullType,
-        output_typ: &FullType,
-        span: Span,
-    ) {
-        self.typecheck_unary_operator_abstr(op, &input_typ.typ, span, &output_typ.typ);
-        self.unify_domains(&input_typ.domain, &output_typ.domain, span, "unary op");
-    }
-
-    pub fn typecheck_binary_operator(
-        &self,
-        op: BinaryOperator,
-        left_typ: &FullType,
-        right_typ: &FullType,
-        left_span: Span,
-        right_span: Span,
-        output_typ: &FullType,
-    ) {
-        self.typecheck_binary_operator_abstr(
-            op,
-            &left_typ.typ,
-            &right_typ.typ,
-            left_span,
-            right_span,
-            &output_typ.typ,
-        );
-        self.unify_domains(
-            &left_typ.domain,
-            &output_typ.domain,
-            left_span,
-            "binop left",
-        );
-        self.unify_domains(
-            &right_typ.domain,
-            &output_typ.domain,
-            right_span,
-            "binop right",
-        );
-    }
-
-    pub fn typecheck_array_access(
-        &self,
-        arr_type: &AbstractType,
-        idx_type: &AbstractType,
-        arr_span: Span,
-        idx_span: Span,
-        output_typ: &AbstractType,
-    ) {
-        self.type_substitutor
-            .unify_report_error(idx_type, &INT_TYPE, idx_span, "array index");
-        self.unify_with_array_of(arr_type, output_typ.clone(), arr_span);
     }
 
     pub fn typecheck_write_to_abstract<Context: UnifyErrorReport>(
