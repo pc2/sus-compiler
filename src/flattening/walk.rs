@@ -46,14 +46,6 @@ impl WireReferencePathElement {
                     idx,
                     bracket_span: _,
                 } => f(*idx),
-                WireReferencePathElement::ArraySlice {
-                    idx_a,
-                    idx_b,
-                    bracket_span,
-                } => {
-                    f(*idx_a);
-                    f(*idx_b);
-                }
             }
         }
     }

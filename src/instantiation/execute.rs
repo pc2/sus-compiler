@@ -70,43 +70,6 @@ impl GenerationState<'_> {
                     };
                     target = tt
                 }
-                &WireReferencePathElement::ArraySlice {
-                    idx_a,
-                    idx_b,
-                    bracket_span,
-                } => {
-                    let idx_a = self.get_generation_integer(idx_a)?; // Caught by typecheck
-                    let idx_b = self.get_generation_integer(idx_b)?; // Caught by typecheck
-                    let Value::Array(a_box) = target else {
-                        caught_by_typecheck!("Non-array")
-                    };
-                    let array_len = a_box.len();
-                    let Some(tt) = usize::try_from(idx_a)
-                        .ok()
-                        .and_then(|pos| a_box.get_mut(pos))
-                    else {
-                        return Err((
-                            bracket_span.inner_span(),
-                            format!(
-                                "Start index {idx_a} is out of bounds for this array of size {}",
-                                array_len
-                            ),
-                        ));
-                    };
-                    let Some(tt) = usize::try_from(idx_b)
-                        .ok()
-                        .and_then(|pos| a_box.get_mut(pos))
-                    else {
-                        return Err((
-                            bracket_span.inner_span(),
-                            format!(
-                                "End index {idx_b} is out of bounds for this array of size {}",
-                                array_len
-                            ),
-                        ));
-                    };
-                    target = tt
-                }
             }
         }
         *target = to_write;
@@ -181,57 +144,6 @@ fn array_access<'v>(
             span.outer_span(),
             format!(
                 "Compile-Time Array index is out of range: idx: {idx}, array size: {}",
-                arr.len()
-            ),
-        ))
-    }
-}
-
-fn array_slice<'v>(
-    arr_val: &'v Value,
-    idx_a: &BigInt,
-    idx_b: &BigInt,
-    span: BracketSpan,
-) -> ExecutionResult<Vec<Value>> {
-    panic!("bbbb");
-    let Value::Array(arr) = arr_val else {
-        caught_by_typecheck!("Value must be an array")
-    };
-
-    // todo: the outer "else"s here catch the case where the int is bigger than a usize which is a bit
-    // ridiculous
-    if let Some(idx_a) = usize::try_from(idx_a).ok() {
-        if let Some(idx_b) = usize::try_from(idx_b).ok() {
-            let mut result = Vec::with_capacity((idx_b - idx_a) as usize); // todo must be abs of size, could be a backwards slice
-
-            for idx in idx_a..idx_b {
-                if let Some(value) = arr.get(idx) {
-                    result.push(value.clone());
-                } else {
-                    return Err((
-                        span.outer_span(),
-                        format!(
-                            "Compile-Time Array slice index is out of range: idx: {idx}, array size: {}",
-                            arr.len()
-                        ),
-                    ));
-                }
-            }
-            Ok(result)
-        } else {
-            Err((
-                span.outer_span(),
-                format!(
-                    "Compile-Time Array slice end index is out of range: idx: {idx_b}, array size: {}",
-                    arr.len()
-                ),
-            ))
-        }
-    } else {
-        Err((
-            span.outer_span(),
-            format!(
-                "Compile-Time Array slice start index is out of range: idx: {idx_a}, array size: {}",
                 arr.len()
             ),
         ))
@@ -416,28 +328,6 @@ impl InstantiationContext<'_, '_> {
                         idx_wire,
                     });
                 }
-                &WireReferencePathElement::ArraySlice {
-                    idx_a,
-                    idx_b,
-                    bracket_span,
-                } => {
-                    let idx_wire_a = self.get_wire_or_constant_as_wire(idx_a, domain);
-                    assert_eq!(
-                        self.wires[idx_wire_a].typ, INT_CONCRETE_TYPE,
-                        "Caught by typecheck"
-                    );
-
-                    let idx_wire_b = self.get_wire_or_constant_as_wire(idx_b, domain);
-                    assert_eq!(
-                        self.wires[idx_wire_b].typ, INT_CONCRETE_TYPE,
-                        "Caught by typecheck"
-                    );
-                    preamble.push(RealWirePathElem::ArraySlice {
-                        span: bracket_span,
-                        idx_a_wire: idx_wire_a,
-                        idx_b_wire: idx_wire_b,
-                    });
-                }
             }
         }
 
@@ -566,20 +456,6 @@ impl InstantiationContext<'_, '_> {
                     let idx = self.generation_state.get_generation_integer(idx)?;
 
                     array_access(&work_on_value, idx, bracket_span)?.clone()
-                }
-                &WireReferencePathElement::ArraySlice {
-                    idx_a,
-                    idx_b,
-                    bracket_span,
-                } => {
-                    let idx_a = self.generation_state.get_generation_integer(idx_a)?;
-                    let idx_b = self.generation_state.get_generation_integer(idx_b)?;
-
-                    Value::Array(
-                        array_slice(&work_on_value, idx_a, idx_b, bracket_span)?
-                            .clone()
-                            .into_boxed_slice(),
-                    )
                 }
             }
         }

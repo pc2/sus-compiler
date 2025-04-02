@@ -1033,22 +1033,6 @@ impl FlatteningContext<'_, '_> {
                             .domain
                             .is_generative()
                     }
-                    WireReferencePathElement::ArraySlice {
-                        idx_a,
-                        idx_b,
-                        bracket_span: _,
-                    } => {
-                        is_comptime &= self.instructions[*idx_a]
-                            .unwrap_expression()
-                            .typ
-                            .domain
-                            .is_generative();
-                        is_comptime &= self.instructions[*idx_b]
-                            .unwrap_expression()
-                            .typ
-                            .domain
-                            .is_generative()
-                    }
                 }
             }
             (ExpressionSource::WireRef(wr), is_comptime)

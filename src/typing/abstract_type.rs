@@ -565,7 +565,7 @@ impl TypeUnifier {
         );
     }
 
-    pub fn typecheck_array_index(
+    pub fn typecheck_array_access(
         &self,
         arr_type: &AbstractRankedType,
         idx_type: &AbstractRankedType,
@@ -590,57 +590,6 @@ impl TypeUnifier {
         );
 
         self.unify_with_array_of(arr_type, output_typ.clone(), arr_span);
-    }
-
-    pub fn typecheck_array_slice(
-        &self,
-        arr_type: &AbstractRankedType,
-        idx_a_type: &AbstractRankedType,
-        idx_b_type: &AbstractRankedType,
-        arr_span: Span,
-        idx_a_span: Span,
-        idx_b_span: Span,
-        output_typ: &AbstractRankedType,
-    ) {
-        self.abstract_type_substitutor.unify_report_error(
-            &idx_a_type.inner,
-            &INT_TYPE.inner,
-            idx_a_span,
-            &"array start index",
-        );
-        self.peano_substitutor.unify_report_error(
-            &idx_a_type.rank,
-            &INT_TYPE.rank,
-            idx_a_span,
-            &"array start index",
-        );
-
-        self.abstract_type_substitutor.unify_report_error(
-            &idx_b_type.inner,
-            &INT_TYPE.inner,
-            idx_b_span,
-            &"array end index",
-        );
-        self.peano_substitutor.unify_report_error(
-            &idx_b_type.rank,
-            &INT_TYPE.rank,
-            idx_b_span,
-            &"array end index rank",
-        );
-
-        self.abstract_type_substitutor.unify_report_error(
-            &output_typ.inner,
-            &arr_type.inner,
-            arr_span,
-            &"array slice",
-        );
-
-        self.peano_substitutor.unify_report_error(
-            &output_typ.rank,
-            &arr_type.rank,
-            arr_span,
-            &"array slice rank",
-        );
     }
 
     pub fn typecheck_write_to_abstract<Context: UnifyErrorReport>(

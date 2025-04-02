@@ -39,27 +39,6 @@ impl InstantiationContext<'_, '_> {
                     );
                     current_type_in_progress = typ_after_applying_array;
                 }
-                RealWirePathElem::ArraySlice {
-                    span: _,
-                    idx_a_wire: _,
-                    idx_b_wire: _,
-                } => {
-                    /*let arr_size = ConcreteType::Unknown(self.type_substitutor.alloc());
-
-                    self.type_substitutor.unify_must_succeed(
-                        &current_type_in_progress,
-                        &typ_after_applying_array,
-                    );
-                    current_type_in_progress = typ_after_applying_array;*/
-                    // TODO #28 integer size <-> array bound check
-                    let arr_size = ConcreteType::Unknown(self.type_substitutor.alloc());
-                    let arr_box = Box::new((typ_after_applying_array.clone(), arr_size));
-                    self.type_substitutor.unify_must_succeed(
-                        &current_type_in_progress,
-                        &ConcreteType::Array(arr_box),
-                    );
-                    current_type_in_progress = typ_after_applying_array;
-                }
             }
         }
 
