@@ -1,7 +1,11 @@
+use ibig::ibig;
+use ibig::ops::Abs;
 use ibig::IBig;
+use ibig::UBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::zip_eq;
+use crate::alloc::UUID;
 use crate::flattening::StructType;
 use crate::linker::LinkInfo;
 use crate::prelude::*;
@@ -12,14 +16,12 @@ use crate::value::Value;
 use super::template::TVec;
 
 use super::type_inference::ConcreteTypeVariableID;
+use super::type_inference::ConcreteTypeVariableIDMarker;
+use super::type_inference::HindleyMilner;
+use super::type_inference::TypeSubstitutor;
 
 pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
     id: get_builtin_type!("bool"),
-    template_args: FlatAlloc::new(),
-});
-
-pub const INT_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
-    id: get_builtin_type!("int"),
     template_args: FlatAlloc::new(),
 });
 
@@ -90,12 +92,36 @@ pub enum ConcreteType {
 }
 
 impl ConcreteType {
+    pub fn new_int(int: IBig) -> Self {
+        Self::Value(Value::Integer(int))
+    }
     #[track_caller]
     pub fn unwrap_value(&self) -> &Value {
         let ConcreteType::Value(v) = self else {
             unreachable!("unwrap_value on {self:?}")
         };
         v
+    }
+    #[track_caller]
+    pub fn unwrap_named(&self) -> &ConcreteGlobalReference<TypeUUID> {
+        let ConcreteType::Named(v) = self else {
+            unreachable!("unwrap_named")
+        };
+        v
+    }
+    #[track_caller]
+    pub fn unwrap_array(&self) -> &(ConcreteType, ConcreteType) {
+        let ConcreteType::Array(arr_box) = self else {
+            unreachable!("unwrap_array")
+        };
+        arr_box
+    }
+    pub fn down_array(&self) -> &ConcreteType {
+        let ConcreteType::Array(arr_box) = self else {
+            unreachable!("Must be an array!")
+        };
+        let (sub, _sz) = arr_box.deref();
+        sub
     }
     pub fn contains_unknown(&self) -> bool {
         match self {
@@ -135,13 +161,98 @@ impl ConcreteType {
         }
     }
 
-    /// TODO #50 Ranged Int work should be integrated
     pub fn sizeof_named(type_ref: &ConcreteGlobalReference<TypeUUID>) -> u64 {
         match type_ref.id {
-            get_builtin_type!("int") => 32, // TODO concrete int sizes
+            get_builtin_type!("int") => {
+                let min = type_ref.template_args[UUID::from_hidden_value(0)]
+                    .unwrap_value()
+                    .unwrap_integer();
+                let max = type_ref.template_args[UUID::from_hidden_value(1)]
+                    .unwrap_value()
+                    .unwrap_integer()
+                    - ibig!(1);
+                bound_to_bits(min, &max)
+            }
             get_builtin_type!("bool") => 1,
             get_builtin_type!("float") => 32,
             _other => todo!("Other Named Structs are not implemented yet"),
         }
+    }
+    pub fn try_fully_substitute(
+        &self,
+        substitutor: &TypeSubstitutor<Self, ConcreteTypeVariableIDMarker>,
+    ) -> Option<Self> {
+        let mut self_clone = self.clone();
+        if self_clone.fully_substitute(substitutor) {
+            Some(self_clone)
+        } else {
+            None
+        }
+    }
+}
+
+fn bits_negative(value: &IBig) -> u64 {
+    (UBig::try_from(value.abs() - 1).unwrap().bit_len() + 1)
+        .try_into()
+        .unwrap()
+}
+
+fn bits_positive(value: &IBig) -> u64 {
+    (UBig::try_from(value).unwrap().bit_len() + 1)
+        .try_into()
+        .unwrap()
+}
+
+fn bound_to_bits(min: &IBig, max: &IBig) -> u64 {
+    [min, max]
+        .iter()
+        .map(|&num| {
+            if num >= &ibig!(0) {
+                bits_positive(num)
+            } else {
+                bits_negative(num)
+            }
+        })
+        .max()
+        .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_bits_negative() {
+        assert_eq!(bits_negative(&ibig!(-1)), 1);
+        assert_eq!(bits_negative(&ibig!(-2)), 2);
+        assert_eq!(bits_negative(&ibig!(-3)), 3);
+        assert_eq!(bits_negative(&ibig!(-4)), 3);
+        assert_eq!(bits_negative(&ibig!(-5)), 4);
+        assert_eq!(bits_negative(&ibig!(-8)), 4);
+        assert_eq!(bits_negative(&ibig!(-9)), 5);
+        assert_eq!(bits_negative(&ibig!(-16)), 5);
+    }
+    #[test]
+    fn test_bits_positive() {
+        assert_eq!(bits_positive(&ibig!(0)), 1);
+        assert_eq!(bits_positive(&ibig!(1)), 2);
+        assert_eq!(bits_positive(&ibig!(2)), 3);
+        assert_eq!(bits_positive(&ibig!(3)), 3);
+        assert_eq!(bits_positive(&ibig!(4)), 4);
+        assert_eq!(bits_positive(&ibig!(7)), 4);
+        assert_eq!(bits_positive(&ibig!(8)), 5);
+        assert_eq!(bits_positive(&ibig!(15)), 5);
+        assert_eq!(bits_positive(&ibig!(16)), 6);
+        assert_eq!(bits_positive(&ibig!(31)), 6);
+    }
+    #[test]
+    fn test_bound_to_bits() {
+        assert_eq!(bound_to_bits(&ibig!(-1), &ibig!(0)), 1);
+        assert_eq!(bound_to_bits(&ibig!(-2), &ibig!(0)), 2);
+        assert_eq!(bound_to_bits(&ibig!(-1), &ibig!(1)), 2);
+        assert_eq!(bound_to_bits(&ibig!(-2), &ibig!(2)), 3);
+        assert_eq!(bound_to_bits(&ibig!(2), &ibig!(8)), 5);
+        assert_eq!(bound_to_bits(&ibig!(-1000), &ibig!(0)), 11);
+        assert_eq!(bound_to_bits(&ibig!(-2000), &ibig!(-1000)), 12);
+        assert_eq!(bound_to_bits(&ibig!(-256), &ibig!(255)), 9);
     }
 }

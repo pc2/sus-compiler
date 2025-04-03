@@ -3,9 +3,10 @@ use std::ops::Deref;
 use ibig::IBig;
 
 use crate::flattening::{BinaryOperator, UnaryOperator};
+use sus_proc_macro::get_builtin_type;
 
 use crate::typing::{
-    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
+    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE},
     type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor},
 };
 
@@ -44,7 +45,7 @@ impl ConcreteType {
 
 impl Value {
     /// Traverses the Value, to create a best-effort [ConcreteType] for it.
-    /// So '1' becomes [INT_CONCRETE_TYPE],
+    /// So '1' becomes `ConcreteType::Named(ConcreteGlobalReference{id: get_builtin_type!("int"), ...}})`,
     /// but `Value::Array([])` becomes `ConcreteType::Array((ConcreteType::Unknown, 0))`
     ///
     /// Panics when arrays contain mutually incompatible types
@@ -54,7 +55,9 @@ impl Value {
     ) -> ConcreteType {
         match self {
             Value::Bool(_) => BOOL_CONCRETE_TYPE,
-            Value::Integer(_) => INT_CONCRETE_TYPE,
+            Value::Integer(value) => {
+                type_substitutor.new_int_type(Some(value.clone()), Some(value + 1))
+            }
             Value::Array(arr) => {
                 let typs_arr: Vec<ConcreteType> = arr
                     .iter()
@@ -72,6 +75,29 @@ impl Value {
             }
             Value::Unset => ConcreteType::Unknown(type_substitutor.alloc()),
             Value::Error => unreachable!("{self:?}"),
+        }
+    }
+    pub fn is_of_type(&self, typ: &ConcreteType) -> bool {
+        match (self, typ) {
+            (Self::Integer(_), ConcreteType::Named(global_ref)) => {
+                global_ref.id == get_builtin_type!("int")
+            }
+            (Self::Bool(_), typ) if *typ == BOOL_CONCRETE_TYPE => true,
+            (Self::Array(arr_slice), ConcreteType::Array(arr_typ_box)) => {
+                let (arr_content_typ, arr_size_typ) = arr_typ_box.deref();
+                if IBig::from(arr_slice.len()) != *arr_size_typ.unwrap_value().unwrap_integer() {
+                    return false;
+                }
+                for v in arr_slice.iter() {
+                    if !v.is_of_type(arr_content_typ) {
+                        return false;
+                    }
+                }
+                true
+            }
+            (Self::Unset, _) => true,
+            (Self::Error, _) => true,
+            _other => false,
         }
     }
 
