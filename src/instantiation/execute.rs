@@ -19,9 +19,7 @@ use crate::flattening::*;
 use crate::value::{compute_binary_op, compute_unary_op, Value};
 
 use crate::typing::{
-    abstract_type::DomainType,
-    concrete_type::{ConcreteType, INT_CONCRETE_TYPE},
-    template::TemplateArgKind,
+    abstract_type::DomainType, concrete_type::ConcreteType, template::TemplateArgKind,
 };
 
 use super::*;
@@ -205,9 +203,27 @@ impl InstantiationContext<'_, '_> {
                 self.working_on_global_ref.template_args[*template_id].clone()
             }
             WrittenType::Named(named_type) => {
+                let template_args = named_type.template_args.try_map(|template_arg| {
+                    if let (_, Some(template_arg)) = template_arg {
+                        match &template_arg.kind {
+                            TemplateArgKind::Type(written_type) => {
+                                self.concretize_type(written_type)
+                            }
+                            TemplateArgKind::Value(uuid) => Ok(ConcreteType::Value(
+                                self.generation_state
+                                    .get_generation_value(*uuid)
+                                    .unwrap()
+                                    .clone(),
+                            )),
+                        }
+                    } else {
+                        Ok(ConcreteType::Unknown(self.type_substitutor.alloc()))
+                    }
+                })?;
+
                 ConcreteType::Named(crate::typing::concrete_type::ConcreteGlobalReference {
                     id: named_type.id,
-                    template_args: FlatAlloc::new(),
+                    template_args,
                 })
             }
             WrittenType::Array(_, arr_box) => {
@@ -417,7 +433,7 @@ impl InstantiationContext<'_, '_> {
                     let idx_wire = self.get_wire_or_constant_as_wire(idx, domain)?;
                     self.type_substitutor.unify_report_error(
                         &self.wires[idx_wire].typ,
-                        &INT_CONCRETE_TYPE,
+                        &self.type_substitutor.new_int_type(None, None),
                         bracket_span.inner_span(),
                         "Caught by typecheck",
                     );

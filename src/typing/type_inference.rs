@@ -6,16 +6,19 @@ use std::marker::PhantomData;
 use std::ops::{BitAnd, Deref, DerefMut, Index};
 use std::thread::panicking;
 
+use ibig::IBig;
+use sus_proc_macro::get_builtin_type;
+
 use crate::block_vector::{BlockVec, BlockVecIter};
 use crate::errors::ErrorInfo;
 use crate::prelude::*;
 
-use crate::alloc::{UUIDAllocator, UUIDMarker, UUIDRange, UUID};
+use crate::alloc::{zip_eq, UUIDAllocator, UUIDMarker, UUIDRange, UUID};
 use crate::value::Value;
 
 use super::abstract_type::AbstractType;
 use super::abstract_type::DomainType;
-use super::concrete_type::ConcreteType;
+use super::concrete_type::{ConcreteGlobalReference, ConcreteType};
 
 pub struct TypeVariableIDMarker;
 impl UUIDMarker for TypeVariableIDMarker {
@@ -55,6 +58,28 @@ pub struct TypeSubstitutor<MyType: HindleyMilner<VariableIDMarker>, VariableIDMa
     substitution_map: BlockVec<OnceCell<MyType>, BLOCK_SIZE>,
     failed_unifications: RefCell<Vec<FailedUnification<MyType>>>,
     _ph: PhantomData<VariableIDMarker>,
+}
+
+impl TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker> {
+    /// Creates a new `int #(int MIN, int MAX)`. The resulting int can have a value from `MIN` to `MAX-1`
+    pub fn new_int_type(&self, min: Option<IBig>, max: Option<IBig>) -> ConcreteType {
+        let mut template_args = FlatAlloc::new();
+        if let Some(min) = min {
+            template_args.alloc(ConcreteType::Value(Value::Integer(min)));
+        } else {
+            template_args.alloc(ConcreteType::Unknown(self.alloc()));
+        }
+        if let Some(max) = max {
+            template_args.alloc(ConcreteType::Value(Value::Integer(max)));
+        } else {
+            template_args.alloc(ConcreteType::Unknown(self.alloc()));
+        }
+
+        ConcreteType::Named(ConcreteGlobalReference {
+            id: get_builtin_type!("int"),
+            template_args,
+        })
+    }
 }
 
 impl<'v, MyType: HindleyMilner<VariableIDMarker> + 'v, VariableIDMarker: UUIDMarker> IntoIterator
@@ -564,8 +589,13 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
     ) -> UnifyResult {
         match (left, right) {
             (ConcreteType::Named(na), ConcreteType::Named(nb)) => {
-                assert!(*na == *nb);
-                UnifyResult::Success
+                zip_eq(na.template_args.iter(), nb.template_args.iter())
+                    .map(|(_, template_arg_a, template_arg_b)| {
+                        unify(template_arg_a, template_arg_b)
+                    })
+                    .fold(UnifyResult::Success, |result_acc, result| {
+                        result_acc & result
+                    })
             } // Already covered by get_hm_info
             (ConcreteType::Value(v_1), ConcreteType::Value(v_2)) => {
                 assert!(*v_1 == *v_2);
@@ -585,7 +615,14 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
         substitutor: &TypeSubstitutor<Self, ConcreteTypeVariableIDMarker>,
     ) -> bool {
         match self {
-            ConcreteType::Named(_) | ConcreteType::Value(_) => true, // Don't need to do anything, this is already final
+            ConcreteType::Value(_) => true, // Don't need to do anything, this is already final
+            ConcreteType::Named(concrete_global_ref) => {
+                let mut result = true;
+                for (_, template_arg) in &mut concrete_global_ref.template_args {
+                    result = result && template_arg.fully_substitute(substitutor);
+                }
+                result
+            }
             ConcreteType::Array(arr_typ) => {
                 let (arr_typ, arr_sz) = arr_typ.deref_mut();
                 arr_typ.fully_substitute(substitutor) && arr_sz.fully_substitute(substitutor)

@@ -1,3 +1,4 @@
+use crate::alloc::zip_eq;
 use crate::prelude::*;
 
 use crate::typing::template::{Parameter, TVec};
@@ -6,7 +7,7 @@ use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 use crate::flattening::{
     DomainInfo, Interface, InterfaceToDomainMap, Module, StructType, WrittenType,
 };
-use crate::linker::FileData;
+use crate::linker::{FileData, LinkInfo};
 use crate::typing::{
     abstract_type::{AbstractType, DomainType},
     concrete_type::ConcreteType,
@@ -139,8 +140,13 @@ pub struct ConcreteTypeDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
 impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner {
-            ConcreteType::Named(name) => {
-                f.write_str(&self.linker_types[name.id].link_info.get_full_name())
+            ConcreteType::Named(global_ref) => {
+                f.write_str(&pretty_print_concrete_instance(
+                    &self.linker_types[global_ref.id].link_info,
+                    &global_ref.template_args,
+                    self.linker_types,
+                ))?;
+                Ok(())
             }
             ConcreteType::Array(arr_box) => {
                 let (elem_typ, arr_size) = arr_box.deref();
@@ -290,4 +296,37 @@ impl Module {
         }
         pretty_print_many_spans(file_data, &spans_print);
     }
+}
+
+pub fn pretty_print_concrete_instance(
+    target_link_info: &LinkInfo,
+    given_template_args: &TVec<ConcreteType>,
+    linker_types: &impl Index<TypeUUID, Output = StructType>,
+) -> String {
+    assert!(given_template_args.len() == target_link_info.template_parameters.len());
+    let object_full_name = target_link_info.get_full_name();
+    if given_template_args.is_empty() {
+        return format!("{object_full_name} #()");
+    }
+
+    let mut result = format!("{object_full_name} #(\n");
+    for (_id, arg, arg_in_target) in
+        zip_eq(given_template_args, &target_link_info.template_parameters)
+    {
+        write!(result, "    {}: ", arg_in_target.name).unwrap();
+        match arg {
+            ConcreteType::Named(_) | ConcreteType::Array(_) => {
+                writeln!(result, "type {},", arg.display(linker_types)).unwrap();
+            }
+            ConcreteType::Value(value) => {
+                writeln!(result, "{value},").unwrap();
+            }
+            ConcreteType::Unknown(_) => {
+                writeln!(result, "/* Could not infer */").unwrap();
+            }
+        }
+    }
+
+    result.push(')');
+    result
 }
