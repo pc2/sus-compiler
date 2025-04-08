@@ -529,17 +529,6 @@ struct UnaryOpTypecheckConstraint {
     span: Span,
 }
 
-/// Returns the inclusive bounds of an int. An int #(MIN: 0, MAX: 15) will return (0, 14)
-fn get_bounds(input_type: &ConcreteType) -> (IBig, IBig) {
-    let min = input_type.unwrap_named().template_args[UUID::from_hidden_value(0)]
-        .unwrap_value()
-        .unwrap_integer();
-    let max = input_type.unwrap_named().template_args[UUID::from_hidden_value(1)]
-        .unwrap_value()
-        .unwrap_integer();
-    (min.clone(), max - 1)
-}
-
 impl DelayedConstraint<InstantiationContext<'_, '_>> for UnaryOpTypecheckConstraint {
     fn try_apply(&mut self, context: &mut InstantiationContext<'_, '_>) -> DelayedConstraintStatus {
         if let Some(input_complete_type) = context.wires[self.input]
@@ -547,7 +536,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for UnaryOpTypecheckConstra
             .try_fully_substitute(&context.type_substitutor)
         {
             if let UnaryOperator::Negate = self.op {
-                let (min, max) = get_bounds(&input_complete_type);
+                let (min, max) = input_complete_type.get_bounds();
                 let (out_size_min, out_size_max) = (min * -1, (max * -1) + 1);
                 let expected_out = context
                     .type_substitutor
@@ -563,7 +552,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for UnaryOpTypecheckConstra
             if let UnaryOperator::Product | UnaryOperator::Sum = self.op {
                 let (array_type, array_size) = input_complete_type.unwrap_array();
                 let array_size = array_size.unwrap_value().unwrap_integer();
-                let (min, max) = get_bounds(array_type);
+                let (min, max) = array_type.get_bounds();
                 let (out_size_min, out_size_max) = match self.op {
                     UnaryOperator::Sum => (min * array_size, max * array_size + 1),
                     UnaryOperator::Product => {
@@ -634,8 +623,8 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstr
                 .typ
                 .try_fully_substitute(&context.type_substitutor),
         ) {
-            let (left_size_min, left_size_max) = get_bounds(&left_complete_type);
-            let (right_size_min, right_size_max) = get_bounds(&right_complete_type);
+            let (left_size_min, left_size_max) = left_complete_type.get_bounds();
+            let (right_size_min, right_size_max) = right_complete_type.get_bounds();
             let (out_size_min, out_size_max) = match self.op {
                 BinaryOperator::Add => (
                     right_size_min + left_size_min,

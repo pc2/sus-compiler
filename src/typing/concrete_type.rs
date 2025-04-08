@@ -189,6 +189,16 @@ impl ConcreteType {
             None
         }
     }
+    /// Returns the inclusive bounds of an int. An int #(MIN: 0, MAX: 15) will return (0, 14)
+    pub fn get_bounds(&self) -> (IBig, IBig) {
+        let min = self.unwrap_named().template_args[UUID::from_hidden_value(0)]
+            .unwrap_value()
+            .unwrap_integer();
+        let max = self.unwrap_named().template_args[UUID::from_hidden_value(1)]
+            .unwrap_value()
+            .unwrap_integer();
+        (min.clone(), max - 1)
+    }
 }
 
 fn bits_negative(value: &IBig) -> u64 {
