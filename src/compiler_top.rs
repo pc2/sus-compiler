@@ -185,6 +185,8 @@ impl Linker {
     }
 
     pub fn recompile_all(&mut self) {
+        let config = config();
+
         // First reset all modules back to post-gather_initial_file_data
         for (_, md) in &mut self.modules {
             let Module {
@@ -202,30 +204,34 @@ impl Linker {
         for (_, cst) in &mut self.constants {
             cst.link_info.reset_to(AFTER_INITIAL_PARSE_CP);
         }
-        if config().early_exit == EarlyExitUpTo::Initialize {
+        if config.early_exit == EarlyExitUpTo::Initialize {
             return;
         }
 
         flatten_all_globals(self);
-        config().for_each_debug_module(config().debug_print_module_contents, &self.modules, |md| {
-            md.print_flattened_module(&self.files[md.link_info.file]);
-        });
-        if config().early_exit == EarlyExitUpTo::Flatten {
+        if config.debug_print_module_contents {
+            config.for_each_debug_module(&self.modules, |md| {
+                md.print_flattened_module(&self.files[md.link_info.file]);
+            });
+        }
+        if config.early_exit == EarlyExitUpTo::Flatten {
             return;
         }
 
         typecheck_all_modules(self);
 
-        config().for_each_debug_module(config().debug_print_module_contents, &self.modules, |md| {
-            md.print_flattened_module(&self.files[md.link_info.file]);
-        });
-        if config().early_exit == EarlyExitUpTo::AbstractTypecheck {
+        if config.debug_print_module_contents {
+            config.for_each_debug_module(&self.modules, |md| {
+                md.print_flattened_module(&self.files[md.link_info.file]);
+            });
+        }
+        if config.early_exit == EarlyExitUpTo::AbstractTypecheck {
             return;
         }
 
         perform_lints(self);
 
-        if config().early_exit == EarlyExitUpTo::Lint {
+        if config.early_exit == EarlyExitUpTo::Lint {
             return;
         }
 
@@ -249,6 +255,6 @@ impl Linker {
                 );
             }
         }
-        if config().early_exit == EarlyExitUpTo::Instantiate {}
+        if config.early_exit == EarlyExitUpTo::Instantiate {}
     }
 }

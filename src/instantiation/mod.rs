@@ -29,18 +29,6 @@ pub enum RealWirePathElem {
     ArrayAccess { span: BracketSpan, idx_wire: WireID },
 }
 
-impl RealWirePathElem {
-    pub fn for_each_wire_in_path(path: &[RealWirePathElem], mut f: impl FnMut(WireID)) {
-        for v in path {
-            match v {
-                RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
-                    f(*idx_wire);
-                }
-            }
-        }
-    }
-}
-
 /// One arm of a multiplexer. Each arm has an attached condition that is also stored here.
 ///
 /// See [RealWireDataSource::Multiplexer]
@@ -233,7 +221,9 @@ impl InstantiationCache {
 
             let result = perform_instantiation(linker, object_id.clone());
 
-            if config().should_print_for_debug(config().debug_print_module_contents, &result.name) {
+            let config = config();
+
+            if config.debug_print_module_contents && config.should_print_for_debug(&result.name) {
                 println!("[[Instantiated {}]]", result.name);
                 for (id, w) in &result.wires {
                     println!("{id:?} -> {w:?}");
@@ -241,6 +231,10 @@ impl InstantiationCache {
                 for (id, sm) in &result.submodules {
                     println!("SubModule {id:?}: {sm:?}");
                 }
+            }
+
+            if config.dot_print_instance && config.should_print_for_debug(&result.name) {
+                crate::dev_aid::dot_graphs::display_generated_hardware_structure(&result, linker);
             }
 
             let result_ref = Rc::new(result);
@@ -309,6 +303,76 @@ pub struct ConditionStackElem {
     pub condition_wire: WireID,
     /// When this is an else-branch
     pub inverse: bool,
+}
+
+/// Iteration of contained [WireID]s
+pub trait ForEachContainedWire {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID));
+}
+
+impl<E: ForEachContainedWire> ForEachContainedWire for [E] {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
+        for e in self {
+            e.for_each_wire(f);
+        }
+    }
+}
+
+impl ForEachContainedWire for WireID {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
+        f(*self)
+    }
+}
+
+impl ForEachContainedWire for RealWirePathElem {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
+        match self {
+            RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
+                f(*idx_wire);
+            }
+        }
+    }
+}
+
+impl ForEachContainedWire for ConditionStackElem {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
+        f(self.condition_wire);
+    }
+}
+
+impl ForEachContainedWire for MultiplexerSource {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
+        self.to_path.for_each_wire(f);
+        self.condition.for_each_wire(f);
+        f(self.from);
+    }
+}
+
+impl ForEachContainedWire for RealWireDataSource {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
+        match self {
+            RealWireDataSource::ReadOnly => {}
+            RealWireDataSource::Multiplexer {
+                is_state: _,
+                sources,
+            } => {
+                sources.for_each_wire(f);
+            }
+            RealWireDataSource::UnaryOp { op: _, right } => f(*right),
+            RealWireDataSource::BinaryOp { op: _, left, right } => {
+                f(*left);
+                f(*right)
+            }
+            RealWireDataSource::Select { root, path } => {
+                f(*root);
+                path.for_each_wire(f);
+            }
+            RealWireDataSource::ConstructArray { array_wires } => {
+                array_wires.for_each_wire(f);
+            }
+            RealWireDataSource::Constant { value: _ } => {}
+        }
+    }
 }
 
 /// As with other contexts, this is the shared state we're lugging around while executing & typechecking a module.
@@ -403,7 +467,8 @@ fn perform_instantiation(
         return context.extract();
     }
 
-    if config().should_print_for_debug(config().debug_print_module_contents, &context.name) {
+    let config = config();
+    if config.debug_print_module_contents && config.should_print_for_debug(&context.name) {
         println!("[[Executed {}]]", &context.name);
         for (id, w) in &context.wires {
             println!("{id:?} -> {w:?}");

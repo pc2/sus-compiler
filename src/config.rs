@@ -1,4 +1,4 @@
-use clap::{Arg, Command, ValueEnum};
+use clap::{value_parser, Arg, Command, ValueEnum};
 use std::sync::OnceLock;
 use std::{
     collections::HashSet,
@@ -43,6 +43,10 @@ pub struct ConfigStruct {
     pub ci: bool,
     pub target_language: TargetLanguage,
     pub files: Vec<PathBuf>,
+
+    pub dot_print_instance: bool,
+    pub dot_print_latency: bool,
+    pub dot_output_path: PathBuf,
 }
 
 fn command_builder() -> Command {
@@ -85,6 +89,31 @@ fn command_builder() -> Command {
             .hide(true)
             .help("Print latency graph for debugging")
             .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("dot-module")
+            .long("dot-module")
+            .hide(false)
+            .help("Select a module to write to the dot-output-path")
+            .action(clap::ArgAction::Set))
+        .arg(Arg::new("print-dot")
+            .long("print-dot")
+            .hide(false)
+            .help("Enable Dot printing of Module Instances")
+            .requires("dot-module")
+            .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("print-dot-latency")
+            .long("print-dot-latency")
+            .hide(false)
+            .help("Enable Dot printing of Latency Counting Instances")
+            .requires("dot-module")
+            .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("dot-output-path")
+            .long("dot-output-path")
+            .hide(false)
+            .help("Path of output dot file for print-dot or print-dot-latency")
+            .default_value("output.dot")
+            .requires("dot-module")
+            .value_parser(value_parser!(PathBuf))
+            .action(clap::ArgAction::Set))
         .arg(Arg::new("debug-whitelist")
             .long("debug-whitelist")
             .hide(true)
@@ -103,9 +132,9 @@ fn command_builder() -> Command {
             .help("Disables color printing in the errors of the sus_compiler output")
             .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("ci")
-                .long("ci")
-                .help("Makes the compiler output as environment agnostic as possible")
-                .action(clap::ArgAction::SetTrue))
+            .long("ci")
+            .help("Makes the compiler output as environment agnostic as possible")
+            .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("target")
             .long("target")
             .help("Sets the target HDL")
@@ -134,22 +163,12 @@ where
     T: Into<OsString> + Clone,
 {
     let matches = command_builder().try_get_matches_from(itr)?;
-    let lsp_port = *matches.get_one("socket").unwrap();
-    let use_lsp = matches.get_flag("lsp");
-    let lsp_debug_mode = matches.get_flag("lsp-debug");
-
     let codegen = matches.get_flag("codegen") || matches.get_many::<PathBuf>("files").is_none();
-    let debug_print_module_contents = matches.get_flag("debug");
-    let debug_print_latency_graph = matches.get_flag("debug-latency");
     let debug_whitelist = matches
         .get_many("debug-whitelist")
         .map(|s| s.cloned().collect());
-    let use_color = !matches.get_flag("nocolor") && !use_lsp;
-    let early_exit = *matches.get_one("upto").unwrap();
-    let codegen_module_and_dependencies_one_file = matches.get_one("standalone").cloned();
-    let ci = matches.get_flag("ci");
-    let target_language = *matches.get_one("target").unwrap();
-    let file_paths: Vec<PathBuf> = match matches.get_many("files") {
+    let use_color = !matches.get_flag("nocolor") && !matches.get_flag("lsp");
+    let files: Vec<PathBuf> = match matches.get_many("files") {
         Some(files) => files.cloned().collect(),
         None => std::fs::read_dir(".")
             .unwrap()
@@ -159,20 +178,27 @@ where
             })
             .collect(),
     };
+
     Ok(ConfigStruct {
-        use_lsp,
-        lsp_debug_mode,
-        lsp_port,
+        use_lsp: matches.get_flag("lsp"),
+        lsp_debug_mode: matches.get_flag("lsp-debug"),
+        lsp_port: *matches.get_one("socket").unwrap(),
         codegen,
-        debug_print_module_contents,
-        debug_print_latency_graph,
+        debug_print_module_contents: matches.get_flag("debug"),
+        debug_print_latency_graph: matches.get_flag("debug-latency"),
         debug_whitelist,
-        codegen_module_and_dependencies_one_file,
-        early_exit,
+        codegen_module_and_dependencies_one_file: matches.get_one("standalone").cloned(),
+        early_exit: *matches.get_one("upto").unwrap(),
         use_color,
-        ci,
-        target_language,
-        files: file_paths,
+        ci: matches.get_flag("ci"),
+        target_language: *matches.get_one("target").unwrap(),
+        files,
+        dot_print_instance: matches.get_flag("print-dot"),
+        dot_print_latency: matches.get_flag("print-dot-latency"),
+        dot_output_path: matches
+            .get_one::<PathBuf>("dot-output-path")
+            .unwrap()
+            .clone(),
     })
 }
 

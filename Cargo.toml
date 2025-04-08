@@ -27,6 +27,7 @@ ariadne = "0.5.1" # for nice errors
 ibig = { version = "0.3.6", default-features = false, features = ["std"] }
 clap = { version = "4.5.21", features = ["derive", "wrap_help"] }
 bitvector = "0.1.5"
+dot = {version = "0.1.4", optional = true}
 
 # Tree sitter
 tree-sitter = "~0.24.7"
@@ -53,7 +54,7 @@ serde = {version = "1.0.156", optional = true}
 dirs-next = "2.0.0"
 
 [features]
-default = ["lsp"]
+default = ["lsp", "dot"]
 
 lsp = ["lsp-server", "lsp-types", "serde_json", "serde"]
 # codegen = ["calyx-ir", "calyx-opt", "calyx-backend"]

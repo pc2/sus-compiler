@@ -117,33 +117,26 @@ impl ConfigStruct {
     /// The reason we pass an explicit bool here is because it merges the "if config().debug_xyz" with the for loop.
     pub fn for_each_debug_module<F: FnMut(&Module)>(
         &self,
-        should_debug: bool,
         modules: &ArenaAllocator<Module, ModuleUUIDMarker>,
         mut f: F,
     ) {
-        if should_debug {
-            for (_, md) in modules {
-                let passes_whitelist = if let Some(wl) = &self.debug_whitelist {
-                    wl.contains(&md.link_info.name)
-                } else {
-                    true
-                };
-                if passes_whitelist {
-                    f(md)
-                }
+        for (_, md) in modules {
+            let passes_whitelist = if let Some(wl) = &self.debug_whitelist {
+                wl.contains(&md.link_info.name)
+            } else {
+                true
+            };
+            if passes_whitelist {
+                f(md)
             }
         }
     }
 
-    pub fn should_print_for_debug(&self, should_debug: bool, md_name: &str) -> bool {
-        if should_debug {
-            if let Some(wl) = &self.debug_whitelist {
-                wl.contains(md_name)
-            } else {
-                true
-            }
+    pub fn should_print_for_debug(&self, md_name: &str) -> bool {
+        if let Some(wl) = &self.debug_whitelist {
+            wl.contains(md_name)
         } else {
-            false
+            true
         }
     }
 }
