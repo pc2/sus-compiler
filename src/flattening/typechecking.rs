@@ -24,10 +24,12 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
         let working_on: &Module = &linker.modules[module_uuid];
         let globals = GlobalResolver::new(linker, &working_on.link_info, errs_globals);
 
-        let ctx_info_string = format!("Typechecking {}", &working_on.link_info.name);
-        println!("{ctx_info_string}");
-        let _panic_guard =
-            SpanDebugger::new(&ctx_info_string, &linker.files[working_on.link_info.file]);
+        println!("Typechecking {}", &working_on.link_info.name);
+        let _panic_guard = SpanDebugger::new(
+            "Typechecking",
+            &working_on.link_info.name,
+            &linker.files[working_on.link_info.file],
+        );
 
         let mut context = TypeCheckingContext {
             globals: &globals,
@@ -57,6 +59,10 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
         working_on_mut
             .link_info
             .reabsorb_errors_globals(errs_and_globals, AFTER_TYPECHECK_CP);
+
+        if crate::debug::is_enabled("print-flattened") {
+            working_on_mut.print_flattened_module(&linker.files[working_on_mut.link_info.file]);
+        }
     }
 }
 

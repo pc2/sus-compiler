@@ -21,8 +21,9 @@
             },
             "sourceLanguages": ["rust"],
             "args": [
-                "--debug",
-                "--debug-latency",
+                "--debug", "dot-latency-problem",
+                "--debug", "dot-latency-infer",
+                "--debug-whitelist", "instantiate_fifo_debug",
                 "tinyTestFile.sus",
             ],
             "cwd": "${workspaceFolder}"
@@ -44,8 +45,6 @@
             },
             "sourceLanguages": ["rust"],
             "args": [
-                "--debug",
-                "--debug-latency",
                 "--module-and-dependencies",
                 "BitSerialMatrixMultiply",
             ],

@@ -5,6 +5,7 @@ mod unique_names;
 
 use unique_names::UniqueNames;
 
+use crate::debug::SpanDebugger;
 use crate::prelude::*;
 use crate::typing::template::TVec;
 use crate::typing::type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor};
@@ -14,7 +15,6 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::flattening::{BinaryOperator, Module, UnaryOperator};
 use crate::{
-    config,
     errors::{CompileError, ErrorStore},
     value::Value,
 };
@@ -221,19 +221,7 @@ impl InstantiationCache {
 
             let result = perform_instantiation(linker, object_id.clone());
 
-            let config = config();
-
-            if config.debug_print_module_contents && config.should_print_for_debug(&result.name) {
-                println!("[[Instantiated {}]]", result.name);
-                for (id, w) in &result.wires {
-                    println!("{id:?} -> {w:?}");
-                }
-                for (id, sm) in &result.submodules {
-                    println!("SubModule {id:?}: {sm:?}");
-                }
-            }
-
-            if config.dot_print_instance && config.should_print_for_debug(&result.name) {
+            if crate::debug::is_enabled("dot-concrete-module") {
                 crate::dev_aid::dot_graphs::display_generated_hardware_structure(&result, linker);
             }
 
@@ -428,8 +416,15 @@ fn perform_instantiation(
     working_on_global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
 ) -> InstantiatedModule {
     let md = &linker.modules[working_on_global_ref.id];
+
+    let _panic_guard = SpanDebugger::new(
+        "instantiating",
+        &md.link_info.name,
+        &linker.files[md.link_info.file],
+    );
+
     let mut context = InstantiationContext {
-        name: working_on_global_ref.pretty_print_concrete_instance(&md.link_info, &linker.types),
+        name: working_on_global_ref.pretty_print_concrete_instance(linker),
         generation_state: GenerationState {
             md,
             generation_state: md
@@ -467,8 +462,7 @@ fn perform_instantiation(
         return context.extract();
     }
 
-    let config = config();
-    if config.debug_print_module_contents && config.should_print_for_debug(&context.name) {
+    if crate::debug::is_enabled("print-instantiated-modules-pre-concrete-typecheck") {
         println!("[[Executed {}]]", &context.name);
         for (id, w) in &context.wires {
             println!("{id:?} -> {w:?}");
@@ -486,6 +480,16 @@ fn perform_instantiation(
 
     println!("Checking array accesses {}", md.link_info.name);
     context.check_array_accesses();
+
+    if crate::debug::is_enabled("print-instantiated-modules") {
+        println!("[[Instantiated {}]]", context.name);
+        for (id, w) in &context.wires {
+            println!("{id:?} -> {w:?}");
+        }
+        for (id, sm) in &context.submodules {
+            println!("SubModule {id:?}: {sm:?}");
+        }
+    }
 
     context.extract()
 }

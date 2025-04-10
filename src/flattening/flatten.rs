@@ -1697,12 +1697,11 @@ pub fn flatten_all_globals(linker: &mut Linker) {
     let linker_files: *const ArenaAllocator<FileData, FileUUIDMarker> = &linker.files;
     // SAFETY we won't be touching the files anywere. This is just to get the compiler to stop complaining about linker going into the closure.
     for (_file_id, file) in unsafe { &*linker_files } {
-        let Ok(mut cursor) = Cursor::new_at_root(&file.tree, &file.file_text) else {
+        let Ok(mut cursor) = Cursor::new_at_root(&file.tree, file) else {
             assert!(file.associated_values.is_empty());
             continue; // Error already handled in initialization
         };
 
-        let _panic_guard = SpanDebugger::new("flatten_all_globals", file);
         let mut associated_value_iter = file.associated_values.iter();
 
         cursor.list(kind!("source_file"), |cursor| {
@@ -1721,6 +1720,8 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
     let errors_globals = GlobalResolver::take_errors_globals(linker, global_obj);
     let obj_link_info = linker.get_link_info(global_obj);
     let globals = GlobalResolver::new(linker, obj_link_info, errors_globals);
+
+    let _panic_guard = SpanDebugger::new("flatten_global", &obj_link_info.name, cursor.file_data);
 
     let mut local_variable_context = LocalVariableContext::new_initial();
 
@@ -1829,6 +1830,10 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
                 &instructions,
                 md.link_info.template_parameters.len(),
             );
+
+            if crate::debug::is_enabled("print-flattened-pre-typecheck") {
+                md.print_flattened_module(&linker.files[md.link_info.file]);
+            }
 
             &mut md.link_info
         }

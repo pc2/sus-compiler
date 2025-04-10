@@ -2,10 +2,9 @@ use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::zip_eq;
-use crate::flattening::StructType;
-use crate::linker::LinkInfo;
+use crate::linker::GlobalUUID;
 use crate::prelude::*;
-use std::ops::{Deref, Index};
+use std::ops::Deref;
 
 use crate::value::Value;
 
@@ -36,11 +35,11 @@ impl<ID> ConcreteGlobalReference<ID> {
     pub fn is_final(&self) -> bool {
         !self.template_args.iter().any(|(_, v)| v.contains_unknown())
     }
-    pub fn pretty_print_concrete_instance(
-        &self,
-        target_link_info: &LinkInfo,
-        linker_types: &impl Index<TypeUUID, Output = StructType>,
-    ) -> String {
+    pub fn pretty_print_concrete_instance(&self, linker: &Linker) -> String
+    where
+        ID: Into<GlobalUUID> + Copy,
+    {
+        let target_link_info = linker.get_link_info(self.id.into());
         assert!(self.template_args.len() == target_link_info.template_parameters.len());
         let object_full_name = target_link_info.get_full_name();
         if self.template_args.is_empty() {
@@ -54,7 +53,7 @@ impl<ID> ConcreteGlobalReference<ID> {
             write!(result, "    {}: ", arg_in_target.name).unwrap();
             match arg {
                 ConcreteType::Named(_) | ConcreteType::Array(_) => {
-                    writeln!(result, "type {},", arg.display(linker_types)).unwrap();
+                    writeln!(result, "type {},", arg.display(&linker.types)).unwrap();
                 }
                 ConcreteType::Value(value) => {
                     writeln!(result, "{value},").unwrap();

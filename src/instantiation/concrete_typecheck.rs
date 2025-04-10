@@ -509,11 +509,9 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
 
         let submod_instr =
             context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
-        let sub_module = &context.linker.modules[sm.refers_to.id];
 
-        let submodule_template_args_string = sm
-            .refers_to
-            .pretty_print_concrete_instance(&sub_module.link_info, &context.linker.types);
+        let submodule_template_args_string =
+            sm.refers_to.pretty_print_concrete_instance(context.linker);
         let message = format!("Could not fully instantiate {submodule_template_args_string}");
 
         context

@@ -27,6 +27,7 @@ ariadne = "0.5.1" # for nice errors
 ibig = { version = "0.3.6", default-features = false, features = ["std"] }
 clap = { version = "4.5.21", features = ["derive", "wrap_help"] }
 bitvector = "0.1.5"
+circular-buffer = "0.1.9"
 dot = {version = "0.1.4", optional = true}
 
 # Tree sitter

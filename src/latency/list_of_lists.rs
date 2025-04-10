@@ -101,6 +101,10 @@ impl<T> ListOfLists<T> {
     pub fn len(&self) -> usize {
         self.start_ends.len() - 1
     }
+    /// Returns the sum of lens of all sublists
+    pub fn len_nested(&self) -> usize {
+        self.buf.len()
+    }
     pub fn iter_flattened(&self) -> std::slice::Iter<'_, T> {
         self.buf.iter()
     }

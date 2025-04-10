@@ -48,11 +48,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     };
 
     if config.use_lsp {
-        #[cfg(feature = "lsp")]
         return dev_aid::lsp::lsp_main();
-
-        #[cfg(not(feature = "lsp"))]
-        panic!("LSP not enabled!")
     }
 
     let (linker, mut paths_arena) = compile_all(file_paths);

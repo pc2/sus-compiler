@@ -78,13 +78,12 @@ impl HoverCollector<'_> {
         }
     }
 
-    fn gather_submodule_hover_infos(&mut self, md: &Module, id: FlatID) {
+    fn gather_submodule_hover_infos(&mut self, md: &Module, submodule_instr: FlatID) {
         md.instantiations.for_each_instance(|_template_args, inst| {
             for (_id, sm) in &inst.submodules {
-                if sm.original_instruction != id {
-                    continue;
+                if sm.original_instruction == submodule_instr {
+                    self.sus_code(sm.refers_to.pretty_print_concrete_instance(self.linker));
                 }
-                self.sus_code(inst.name.clone());
             }
         });
     }

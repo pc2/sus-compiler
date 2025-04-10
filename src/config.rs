@@ -1,7 +1,6 @@
-use clap::{value_parser, Arg, Command, ValueEnum};
+use clap::{Arg, Command, ValueEnum};
 use std::sync::OnceLock;
 use std::{
-    collections::HashSet,
     env,
     ffi::{OsStr, OsString},
     path::PathBuf,
@@ -28,25 +27,26 @@ pub enum TargetLanguage {
 }
 
 /// All command-line flags are converted to this struct, of which the singleton instance can be acquired using [crate::config::config]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct ConfigStruct {
     pub use_lsp: bool,
     pub lsp_debug_mode: bool,
     pub lsp_port: u16,
     pub codegen: bool,
-    pub debug_print_module_contents: bool,
-    pub debug_print_latency_graph: bool,
-    pub debug_whitelist: Option<HashSet<String>>,
+    /// Enable debugging printouts and figures
+    ///
+    /// If an element in this list is a substring of a [crate::debug::SpanDebugger] message, then debugging is enabled.
+    ///
+    /// If the list is empty, debug everything
+    ///
+    /// See also [crate::debug::ENABLED_DEBUG_PATHS]
+    pub debug_whitelist: Vec<String>,
     pub codegen_module_and_dependencies_one_file: Option<String>,
     pub early_exit: EarlyExitUpTo,
     pub use_color: bool,
     pub ci: bool,
     pub target_language: TargetLanguage,
     pub files: Vec<PathBuf>,
-
-    pub dot_print_instance: bool,
-    pub dot_print_latency: bool,
-    pub dot_output_path: PathBuf,
 }
 
 fn command_builder() -> Command {
@@ -75,50 +75,20 @@ fn command_builder() -> Command {
             .help("Enable LSP debug mode")
             .requires("lsp")
             .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("debug")
+            .long("debug")
+            .hide(true)
+            .help("Enable specific debug paths for specific modules. Path names are found by searching for crate::debug::is_enabled in the source code. ")
+            .action(clap::ArgAction::Append))
+        .arg(Arg::new("debug-whitelist")
+            .long("debug-whitelist")
+            .hide(true)
+            .help("Enable debug prints and figures for specific modules.\nDebugging checks if the current debug stage print has one of the debug-whitelist arguments as a substring. So passing 'FIFO' debugs all FIFO stuff, but passing 'Typechecking FIFO' only shows debug prints during typechecking. To show everything, pass --debug-whitelist-is-blacklist")
+            .action(clap::ArgAction::Append))
         .arg(Arg::new("codegen")
             .long("codegen")
             .help("Enable code generation for all modules. This creates a file named [ModuleName].sv per module.")
             .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("debug")
-            .long("debug")
-            .hide(true)
-            .help("Print debug information about the module contents")
-            .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("debug-latency")
-            .long("debug-latency")
-            .hide(true)
-            .help("Print latency graph for debugging")
-            .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("dot-module")
-            .long("dot-module")
-            .hide(false)
-            .help("Select a module to write to the dot-output-path")
-            .action(clap::ArgAction::Set))
-        .arg(Arg::new("print-dot")
-            .long("print-dot")
-            .hide(false)
-            .help("Enable Dot printing of Module Instances")
-            .requires("dot-module")
-            .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("print-dot-latency")
-            .long("print-dot-latency")
-            .hide(false)
-            .help("Enable Dot printing of Latency Counting Instances")
-            .requires("dot-module")
-            .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("dot-output-path")
-            .long("dot-output-path")
-            .hide(false)
-            .help("Path of output dot file for print-dot or print-dot-latency")
-            .default_value("output.dot")
-            .requires("dot-module")
-            .value_parser(value_parser!(PathBuf))
-            .action(clap::ArgAction::Set))
-        .arg(Arg::new("debug-whitelist")
-            .long("debug-whitelist")
-            .hide(true)
-            .help("Sets the modules that should be shown by --debug. When not provided all modules are whitelisted")
-            .action(clap::ArgAction::Append))
         .arg(Arg::new("standalone")
             .long("standalone")
             .help("Generate standalone code with all dependencies in one file of the module specified."))
@@ -166,7 +136,19 @@ where
     let codegen = matches.get_flag("codegen") || matches.get_many::<PathBuf>("files").is_none();
     let debug_whitelist = matches
         .get_many("debug-whitelist")
-        .map(|s| s.cloned().collect());
+        .unwrap_or_default()
+        .cloned()
+        .collect();
+
+    let enabled_debug_paths = matches
+        .get_many("debug")
+        .unwrap_or_default()
+        .cloned()
+        .collect();
+    crate::debug::ENABLED_DEBUG_PATHS
+        .set(enabled_debug_paths)
+        .unwrap();
+
     let use_color = !matches.get_flag("nocolor") && !matches.get_flag("lsp");
     let files: Vec<PathBuf> = match matches.get_many("files") {
         Some(files) => files.cloned().collect(),
@@ -184,8 +166,6 @@ where
         lsp_debug_mode: matches.get_flag("lsp-debug"),
         lsp_port: *matches.get_one("socket").unwrap(),
         codegen,
-        debug_print_module_contents: matches.get_flag("debug"),
-        debug_print_latency_graph: matches.get_flag("debug-latency"),
         debug_whitelist,
         codegen_module_and_dependencies_one_file: matches.get_one("standalone").cloned(),
         early_exit: *matches.get_one("upto").unwrap(),
@@ -193,12 +173,6 @@ where
         ci: matches.get_flag("ci"),
         target_language: *matches.get_one("target").unwrap(),
         files,
-        dot_print_instance: matches.get_flag("print-dot"),
-        dot_print_latency: matches.get_flag("print-dot-latency"),
-        dot_output_path: matches
-            .get_one::<PathBuf>("dot-output-path")
-            .unwrap()
-            .clone(),
     })
 }
 

@@ -1,16 +1,15 @@
 use std::borrow::Cow;
 
-use dot::{render, Edges, GraphWalk, Id, LabelText, Labeller, Nodes};
+use dot::{render, Edges, GraphWalk, Id, LabelText, Labeller, Nodes, Style};
 
 use crate::{
-    config::config,
     instantiation::{ForEachContainedWire, InstantiatedModule, RealWireDataSource},
     linker::Linker,
     prelude::{SubModuleID, WireID},
 };
 
 pub fn display_generated_hardware_structure(md_instance: &InstantiatedModule, linker: &Linker) {
-    let mut file = std::fs::File::create(&config().dot_output_path).unwrap();
+    let mut file = std::fs::File::create("hardware_structure.dot").unwrap();
     render(&(md_instance, linker), &mut file).unwrap();
 }
 
@@ -66,6 +65,13 @@ impl<'inst> Labeller<'inst, NodeType, EdgeType> for (&'inst InstantiatedModule, 
                 format!("{id:?}: {}", &sm.name)
             }
         }))
+    }
+
+    fn node_style(&'inst self, n: &NodeType) -> Style {
+        match n {
+            NodeType::Wire(_) => Style::None,
+            NodeType::SubModule(_) => Style::Filled,
+        }
     }
 }
 

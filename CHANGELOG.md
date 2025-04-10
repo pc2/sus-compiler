@@ -4,6 +4,9 @@
 - Fix ICEs when improperly using constants
 - 
 
+### Technical changes
+- Revamped SpanDebugger system. Now use inline string IDs for debug code paths (use --debug and --debug-whitelist only)
+
 ### Planned
 - Sized integers
 - float library
