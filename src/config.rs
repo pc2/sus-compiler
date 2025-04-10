@@ -1,4 +1,5 @@
 use clap::{Arg, Command, ValueEnum};
+use std::collections::HashSet;
 use std::sync::OnceLock;
 use std::{
     env,
@@ -39,8 +40,9 @@ pub struct ConfigStruct {
     ///
     /// If the list is empty, debug everything
     ///
-    /// See also [crate::debug::ENABLED_DEBUG_PATHS]
+    /// See also [Self::enabled_debug_paths]
     pub debug_whitelist: Vec<String>,
+    pub enabled_debug_paths: HashSet<String>,
     pub codegen_module_and_dependencies_one_file: Option<String>,
     pub early_exit: EarlyExitUpTo,
     pub use_color: bool,
@@ -145,9 +147,6 @@ where
         .unwrap_or_default()
         .cloned()
         .collect();
-    crate::debug::ENABLED_DEBUG_PATHS
-        .set(enabled_debug_paths)
-        .unwrap();
 
     let use_color = !matches.get_flag("nocolor") && !matches.get_flag("lsp");
     let files: Vec<PathBuf> = match matches.get_many("files") {
@@ -167,6 +166,7 @@ where
         lsp_port: *matches.get_one("socket").unwrap(),
         codegen,
         debug_whitelist,
+        enabled_debug_paths,
         codegen_module_and_dependencies_one_file: matches.get_one("standalone").cloned(),
         early_exit: *matches.get_one("upto").unwrap(),
         use_color,

@@ -1078,7 +1078,6 @@ mod tests {
 
         let a_factorial = factorial(a.clone());
         let a_b_factorial = factorial(&a - &b);
-        dbg!(&a_factorial, &a_b_factorial);
 
         assert_eq!(
             falling_factorial(a.clone(), &b),

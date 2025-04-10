@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashSet, ops::Range, sync::OnceLock};
+use std::{cell::RefCell, ops::Range};
 
 use circular_buffer::CircularBuffer;
 
@@ -92,7 +92,7 @@ impl<'text> SpanDebugger<'text> {
             let config = config();
 
             let debugging_enabled = config.debug_whitelist.is_empty()
-                && !ENABLED_DEBUG_PATHS.get().unwrap().is_empty()
+                && !config.enabled_debug_paths.is_empty()
                 || config
                     .debug_whitelist
                     .iter()
@@ -123,8 +123,6 @@ impl Drop for SpanDebugger<'_> {
     }
 }
 
-pub static ENABLED_DEBUG_PATHS: OnceLock<HashSet<String>> = OnceLock::new();
-
 /// Check if the debug path is enabled
 pub fn is_enabled(path_id: &'static str) -> bool {
     DEBUG_STACK.with_borrow(|stack| {
@@ -134,10 +132,7 @@ pub fn is_enabled(path_id: &'static str) -> bool {
         if !last.debugging_enabled {
             return false;
         }
-        let Some(debug_paths) = ENABLED_DEBUG_PATHS.get() else {
-            return false;
-        };
 
-        debug_paths.contains(path_id)
+        config().enabled_debug_paths.contains(path_id)
     })
 }
