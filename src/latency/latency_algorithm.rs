@@ -817,6 +817,17 @@ pub fn solve_latencies(
     ports: &LatencyCountingPorts,
     specified_latencies: &[SpecifiedLatency],
 ) -> Result<Solution, LatencyCountingError> {
+    if crate::debug::is_enabled("dot-latency-problem") {
+        super::dot_graph::display_latency_count_graph(
+            &fanins,
+            ports,
+            &vec![i64::MIN; fanins.len()],
+            specified_latencies,
+            &[],
+            "solve_latencies_problem.dot",
+        );
+    }
+
     let fanouts = fanins.faninout_complement();
     find_positive_latency_cycle(&fanouts, specified_latencies)?;
 
@@ -914,6 +925,17 @@ pub fn solve_latencies(
         assert!(first_solution.latencies.iter().any(|l| *l == UNSET))
     }
 
+    if crate::debug::is_enabled("dot-latency-solution") {
+        super::dot_graph::display_latency_count_graph(
+            &fanins,
+            ports,
+            &first_solution.latencies.0,
+            specified_latencies,
+            &[],
+            "solve_latencies.dot",
+        );
+    }
+
     if first_solution.conflicting_nodes.is_empty() {
         Ok(first_solution.latencies)
     } else {
@@ -1001,6 +1023,17 @@ pub fn infer_unknown_latency_edges<ID>(
         partial_submodule_info.extra_fanin,
         specified_latencies,
     );
+
+    if crate::debug::is_enabled("dot-latency-infer") {
+        super::dot_graph::display_latency_count_graph(
+            &fanins,
+            ports,
+            &vec![i64::MIN; fanins.len()],
+            specified_latencies,
+            &partial_submodule_info.inference_edges,
+            "latency_inference.dot",
+        )
+    }
 
     if crate::debug::is_enabled("print-infer_unknown_latency_edges-test-case") {
         print_inference_test_case(
