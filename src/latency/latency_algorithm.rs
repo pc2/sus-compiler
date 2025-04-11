@@ -323,7 +323,7 @@ impl IndexMut<usize> for Solution {
 ///
 /// So for each module, the parts of its subdomains must be added
 /// to the collector associated with the global domain this domain is connected to
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct PartialSubmoduleInfo {
     pub inference_edges: Vec<LatencyInferenceCandidate>,
     pub extra_fanin: Vec<(usize, FanInOut)>,
@@ -523,7 +523,7 @@ fn find_positive_latency_cycle(
     Ok(())
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct LatencyCountingPorts {
     /// All inputs come first, then all outputs
     port_nodes: Vec<usize>,
@@ -822,9 +822,7 @@ pub fn solve_latencies(
 
     let fanins = fanins.add_extra_fanin_and_specified_latencies(extra_fanin, specified_latencies);
 
-    // Cannot call config from a test case. See https://users.rust-lang.org/t/cargo-test-name-errors-with-error-invalid-value-name-for-files-file-does-not-exist/125855
-    #[cfg(not(test))]
-    if crate::config::config().debug_print_latency_graph {
+    if crate::debug::is_enabled("print-solve_latencies-test-case") {
         print_latency_test_case(&fanins, ports, specified_latencies);
     }
 
@@ -1004,9 +1002,7 @@ pub fn infer_unknown_latency_edges<ID>(
         specified_latencies,
     );
 
-    // Cannot call config from a test case. See https://users.rust-lang.org/t/cargo-test-name-errors-with-error-invalid-value-name-for-files-file-does-not-exist/125855
-    #[cfg(not(test))]
-    if crate::config::config().debug_print_latency_graph {
+    if crate::debug::is_enabled("print-infer_unknown_latency_edges-test-case") {
         print_inference_test_case(
             &fanins,
             ports,
@@ -1037,8 +1033,7 @@ pub fn infer_unknown_latency_edges<ID>(
         fanins.len(),
     );
 
-    #[cfg(not(test))]
-    if crate::config::config().debug_print_latency_graph {
+    if crate::debug::is_enabled("print-inference-as-latency-test-case") {
         print_latency_test_case(&fanins, &inference_ports, &[]);
     }
 

@@ -1,5 +1,22 @@
+#[cfg(feature = "dot")]
+mod dot_graph;
+
+#[cfg(not(feature = "dot"))]
+mod dot_graph {
+    pub fn display_latency_count_graph(
+        _fanins: &ListOfLists<FanInOut>,
+        _ports: &LatencyCountingPorts,
+        _solution: &[i64],
+        _specified_latencies: &[SpecifiedLatency],
+        _inference_edges: &[LatencyInferenceCandidate],
+    ) {
+        unimplemented!("sus_compiler was not compiled with 'dot' feature enabled!")
+    }
+}
+
 mod latency_algorithm;
 mod list_of_lists;
+
 pub mod port_latency_inference;
 
 use std::{cmp::max, iter::zip};
@@ -100,6 +117,7 @@ struct WireToLatencyMap {
     next_port_chain: FlatAlloc<Option<(WireID, i64)>, WireIDMarker>,
 }
 
+#[derive(Debug)]
 struct LatencyDomainInfo {
     latency_node_meanings: Vec<WireID>,
     initial_values: Vec<SpecifiedLatency>,
@@ -115,11 +133,7 @@ impl RealWireDataSource {
                 sources,
             } => {
                 for s in sources {
-                    f(s.from, s.num_regs);
-                    RealWirePathElem::for_each_wire_in_path(&s.to_path, |w| f(w, s.num_regs));
-                    for elem in s.condition.iter() {
-                        f(elem.condition_wire, s.num_regs);
-                    }
+                    s.for_each_wire(&mut |from| f(from, s.num_regs));
                 }
             }
             RealWireDataSource::UnaryOp { op: _, right } => {
@@ -131,7 +145,7 @@ impl RealWireDataSource {
             }
             RealWireDataSource::Select { root, path } => {
                 f(*root, 0);
-                RealWirePathElem::for_each_wire_in_path(path, |w| f(w, 0));
+                path.for_each_wire(&mut |w| f(w, 0));
             }
             RealWireDataSource::ConstructArray { array_wires } => {
                 for w in array_wires {
@@ -482,13 +496,11 @@ impl InstantiationContext<'_, '_> {
 
             for s in sources {
                 let mut predecessor_found = false;
-                let mut predecessor_adder = |source| {
+                s.for_each_wire(&mut |source| {
                     if source == from_wire_id {
                         predecessor_found = true;
                     }
-                };
-                predecessor_adder(s.from);
-                RealWirePathElem::for_each_wire_in_path(&s.to_path, predecessor_adder);
+                });
                 if predecessor_found {
                     connection_list.push(PathMuxSource {
                         to_wire,
