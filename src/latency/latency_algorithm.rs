@@ -20,8 +20,6 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use bitvector::BitVector;
-
 use crate::{
     alloc::FlatAlloc,
     prelude::{LatencyCountInferenceVarID, LatencyCountInferenceVarIDMarker},
@@ -329,198 +327,201 @@ pub struct PartialSubmoduleInfo {
     pub extra_fanin: Vec<(usize, FanInOut)>,
 }
 
+#[derive(Clone, Copy, Debug)]
+enum NodeProperty {
+    Unreached,
+    /// Specified nodes NEVER have parent set
+    Specified,
+    /// Parent node
+    HasParent(usize),
+}
+
+#[derive(Clone, Copy, Debug)]
+struct BellmanFordNode {
+    value: i64,
+    parent: NodeProperty,
+}
+
+#[derive(Debug)]
+struct BellmanFordError {
+    nodes: Vec<BellmanFordNode>,
+    start_from: usize,
+    end_at: usize,
+}
+
+impl BellmanFordError {
+    fn to_lc_error(&self, fanouts: &ListOfLists<FanInOut>) -> LatencyCountingError {
+        let mut conflict_path = Vec::new();
+        let mut net_latency = -self.nodes[self.end_at].value;
+        let mut cur_node = self.end_at;
+
+        loop {
+            conflict_path.push(SpecifiedLatency {
+                node: cur_node,
+                latency: net_latency,
+            });
+            let NodeProperty::HasParent(parent) = self.nodes[cur_node].parent else {
+                unreachable!()
+            };
+
+            let mut cur_delta = i64::MIN;
+            for fout in &fanouts[parent] {
+                if let (true, Some(delta)) = (fout.to_node == cur_node, fout.delta_latency) {
+                    cur_delta = i64::max(cur_delta, delta)
+                }
+            }
+            net_latency += cur_delta;
+
+            cur_node = parent;
+            if cur_node == self.start_from {
+                break;
+            }
+        }
+
+        if self.start_from == self.end_at {
+            LatencyCountingError::NetPositiveLatencyCycle {
+                conflict_path,
+                net_roundtrip_latency: net_latency,
+            }
+        } else {
+            conflict_path.push(SpecifiedLatency {
+                node: cur_node,
+                latency: net_latency,
+            });
+            LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path }
+        }
+    }
+}
+
 /// Check if the graph contains any cycles or incompatible specified latencies.
+///
+/// This ignores poison edges, since we don't know their value yet
 fn find_positive_latency_cycle(
     fanouts: &ListOfLists<FanInOut>,
     specified_latencies: &[SpecifiedLatency],
-) -> Result<(), LatencyCountingError> {
-    #[derive(Clone, Copy)]
-    struct BellmanFordNode {
-        value: i64,
-        parent: Option<usize>,
-    }
+) -> Result<(), BellmanFordError> {
+    use NodeProperty::*;
 
     let mut nodes = vec![
         BellmanFordNode {
-            parent: None,
             value: UNSET,
+            parent: Unreached
         };
         fanouts.len()
     ];
 
-    /// Returns Some(a_node_in_cycle) if here is a cycle.
-    fn check_parent_cycle(nodes: &[BellmanFordNode], start_from: usize) -> Option<usize> {
-        let mut fast_ptr = start_from;
-        let mut slow_ptr = start_from;
-
-        loop {
-            fast_ptr = nodes[fast_ptr].parent?;
-            fast_ptr = nodes[fast_ptr].parent?;
-            slow_ptr = nodes[slow_ptr].parent.unwrap();
-
-            if fast_ptr == slow_ptr {
-                return Some(fast_ptr);
-            }
-        }
-    }
-
-    fn collect_cycle_or_invalid_specified_latency_error(
-        nodes: &[BellmanFordNode],
-        fanouts: &ListOfLists<FanInOut>,
-        start_from: usize,
-        specified_latencies: &[SpecifiedLatency],
-    ) -> LatencyCountingError {
-        let mut conflict_path = Vec::new();
-
-        let mut cur_idx = start_from;
-        let mut is_bad_cycle = false;
-        conflict_path.push(SpecifiedLatency {
-            node: cur_idx,
-            latency: UNSET,
-        });
-        while let Some(parent) = nodes[cur_idx].parent {
-            conflict_path.push(SpecifiedLatency {
-                node: parent,
-                latency: UNSET,
-            });
-            if parent == start_from {
-                is_bad_cycle = true;
-                break;
-            }
-            cur_idx = parent;
-        }
-        conflict_path.reverse();
-        let first_node = conflict_path.first_mut().unwrap();
-        first_node.latency = if is_bad_cycle {
-            0
-        } else {
-            SpecifiedLatency::get_from_specify_list(specified_latencies, first_node.node).unwrap()
-        };
-
-        let mut cur_node = *first_node;
-
-        for next_node in &mut conflict_path[1..] {
-            let mut max_delta = i64::MIN;
-            for fout in &fanouts[cur_node.node] {
-                if fout.to_node == next_node.node {
-                    max_delta = i64::max(fout.delta_latency.unwrap(), max_delta);
-                }
-            }
-            assert!(max_delta != i64::MIN);
-
-            next_node.latency = cur_node.latency + max_delta;
-            cur_node = *next_node;
-        }
-
-        assert!(!conflict_path.is_empty());
-        if is_bad_cycle {
-            let SpecifiedLatency {
-                node,
-                latency: net_roundtrip_latency,
-            } = conflict_path.pop().unwrap();
-            assert_eq!(conflict_path.first().unwrap().node, node);
-
-            assert!(net_roundtrip_latency > 0);
-            LatencyCountingError::NetPositiveLatencyCycle {
-                conflict_path,
-                net_roundtrip_latency,
-            }
-        } else {
-            LatencyCountingError::ConflictingSpecifiedLatencies { conflict_path }
-        }
-    }
-
-    let mut is_specified = BitVector::new(fanouts.len());
+    let mut queue: VecDeque<usize> = VecDeque::new();
+    let mut nodes_ever_seen = Vec::new();
+    let mut cur_step = 0;
 
     for spec in specified_latencies {
-        is_specified.insert(spec.node);
-        nodes[spec.node].value = spec.latency;
+        let spec_node = &mut nodes[spec.node];
+        spec_node.parent = Specified;
+        spec_node.value = -spec.latency; // Negate because we work with fanins not fanouts
+        queue.push_back(spec.node);
+        nodes_ever_seen.push(spec.node);
+        //println!("Init node {} to: {spec_node:?}", spec.node);
     }
-    let mut from_list = is_specified.clone();
-    let mut to_list = BitVector::new(fanouts.len());
-    let mut ever_seen = BitVector::new(fanouts.len());
 
-    let mut start_idx_iter = 0..fanouts.len();
+    /// Returns either a node with no parent, or a node in an infinite cycle
+    fn find_root(nodes: &[BellmanFordNode], mut parent_idx: usize, max_steps: usize) -> usize {
+        for _ in 0..max_steps {
+            if let HasParent(parent) = nodes[parent_idx].parent {
+                parent_idx = parent;
+            } else {
+                break;
+            }
+        }
+        parent_idx
+    }
+
+    let mut next_start = 0;
     loop {
-        // Used to bound the Bellman-Ford algorithm more closely.
-        let mut early_exit_squash_to_constant_time = 0;
+        while let Some(start_from_idx) = queue.pop_front() {
+            let start_from = nodes[start_from_idx];
+            for f in &fanouts[start_from_idx] {
+                // Skip poison edges, since we don't know their value
+                let Some(delta_lat) = f.delta_latency else {
+                    continue;
+                };
+                let target_latency = start_from.value + delta_lat;
 
-        // Early exit
-        while !from_list.is_empty() {
-            for from_idx in from_list.iter() {
-                let from_node_copy = nodes[from_idx];
-                for edge in &fanouts[from_idx] {
-                    let Some(delta) = edge.delta_latency else {
-                        continue; // Ignore poison edges for this. Because their value is unknown, we can only work with the known edges
-                    };
-                    let new_value = from_node_copy.value + delta;
-                    let target_node = &mut nodes[edge.to_node];
-                    if new_value > target_node.value {
-                        target_node.value = new_value;
-                        target_node.parent = Some(from_idx);
-                        to_list.insert(edge.to_node);
-
-                        // Checks when we try to update a node, to see if we detect a positive latency cycle, or a incompatible specified latencies error.
-                        if is_specified.contains(edge.to_node) {
-                            // Can't blame a net-positive latency cycle, so it has to be conflicting specified latencies.
-                            return Err(collect_cycle_or_invalid_specified_latency_error(
-                                &nodes,
-                                fanouts,
-                                edge.to_node,
-                                specified_latencies,
-                            ));
+                let to_node = &mut nodes[f.to_node];
+                if target_latency > to_node.value {
+                    // We have to already replace the parent, because this way we complete the loop if there is one
+                    let old_parent = to_node.parent;
+                    to_node.parent = HasParent(start_from_idx);
+                    match old_parent {
+                        Unreached => {
+                            nodes_ever_seen.push(f.to_node);
                         }
+                        Specified => {
+                            let root = find_root(&nodes, start_from_idx, nodes_ever_seen.len());
+                            if let HasParent(_) = nodes[root].parent {
+                                // Bad cycle error!
+                                nodes[root].value = 0;
+                                return Err(BellmanFordError {
+                                    nodes,
+                                    start_from: root,
+                                    end_at: root,
+                                });
+                            } else {
+                                // Incompatible Specified Latencies!
+                                return Err(BellmanFordError {
+                                    nodes,
+                                    start_from: root,
+                                    end_at: f.to_node,
+                                });
+                            }
+                        }
+                        HasParent(_) => {}
+                    }
 
-                        // Only do the "are we in an infinite cycle" check once every |N| cycles, to amortize the complexity
-                        early_exit_squash_to_constant_time += 1;
-                        if early_exit_squash_to_constant_time >= fanouts.len() {
-                            early_exit_squash_to_constant_time = 0;
+                    // Update the target node
+                    // We only do that now, because otherwise we might've overwritten a Specified Latency
+                    to_node.value = target_latency;
+                    queue.push_back(f.to_node);
 
-                            // O(E*N) termination condition. (See Definition of Bellmann-Ford)
-                            if let Some(cycle_start_node) = check_parent_cycle(&nodes, edge.to_node)
-                            {
-                                return Err(collect_cycle_or_invalid_specified_latency_error(
-                                    &nodes,
-                                    fanouts,
-                                    cycle_start_node,
-                                    specified_latencies,
-                                ));
-                            };
+                    //println!("Set node {} to: {to_node:?}", f.to_node);
+
+                    // Occasionally try to walk backwards, to see if we find an infinite cycle.
+                    //
+                    // Amortize the cost of O(N) backwards walking by only doing it every 1/N times
+                    cur_step += 1;
+                    if cur_step > nodes_ever_seen.len() {
+                        cur_step = 0;
+                        let root = find_root(&nodes, start_from_idx, nodes_ever_seen.len());
+                        if let HasParent(_) = nodes[root].parent {
+                            // Bad cycle error!
+                            nodes[root].value = 0;
+                            return Err(BellmanFordError {
+                                nodes,
+                                start_from: root,
+                                end_at: root,
+                            });
                         }
                     }
                 }
             }
-
-            ever_seen.union_inplace(&to_list);
-
-            // Reset all target nodes
-            std::mem::swap(&mut from_list, &mut to_list);
-            to_list.clear();
         }
 
-        // Clear all nodes that were reached, and set them to MAX, such that we never try to update them again.
-        for node in &mut nodes {
-            if node.value != UNSET {
-                node.value = POISON;
+        for node in nodes_ever_seen.drain(..) {
+            nodes[node].value = i64::MAX; // Set to max because we don't want to visit these anymore.
+        }
+        cur_step = 0;
+
+        while nodes[next_start].value == i64::MAX {
+            next_start += 1;
+            if next_start >= nodes.len() {
+                return Ok(()); // We're done! ^-^
             }
         }
 
-        let Some(_) = start_idx_iter.find(|&start_idx| {
-            let start_node = &mut nodes[start_idx];
-            if start_node.value == UNSET {
-                start_node.value = 0;
-                from_list.insert(start_idx);
-                ever_seen.insert(start_idx);
-                true
-            } else {
-                false
-            }
-        }) else {
-            break;
-        };
+        nodes_ever_seen.push(next_start);
+        nodes[next_start].value = 0;
+        queue.push_back(next_start);
+        //println!("Init node {next_start} to: {:?}", nodes[next_start]);
     }
-
-    Ok(())
 }
 
 #[derive(Default, Clone, Debug)]
@@ -828,8 +829,8 @@ pub fn solve_latencies(
         );
     }
 
-    let fanouts = fanins.faninout_complement();
-    find_positive_latency_cycle(&fanouts, specified_latencies)?;
+    find_positive_latency_cycle(&fanins, specified_latencies)
+        .map_err(|e| e.to_lc_error(&fanins))?;
 
     let fanins = fanins.add_extra_fanin_and_specified_latencies(extra_fanin, specified_latencies);
 
