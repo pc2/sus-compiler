@@ -68,6 +68,9 @@ pub struct SpanDebugger<'text> {
 
 fn print_stack_top(enter_exit: &str) {
     DEBUG_STACK.with_borrow(|stack| {
+        if !config().enabled_debug_paths.contains("spandebugger") {
+            return;
+        }
         if let Some(top) = stack.last() {
             let debug_enabled = if top.debugging_enabled {
                 " DEBUGGING ENABLED"
