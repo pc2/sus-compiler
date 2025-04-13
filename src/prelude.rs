@@ -95,8 +95,8 @@ impl UUIDMarker for SubModuleIDMarker {
 }
 pub type SubModuleID = UUID<SubModuleIDMarker>;
 
-pub struct LatencyCountInferenceVarIDMarker;
-impl UUIDMarker for LatencyCountInferenceVarIDMarker {
+pub struct InferenceVarIDMarker;
+impl UUIDMarker for InferenceVarIDMarker {
     const DISPLAY_NAME: &'static str = "latency_";
 }
-pub type LatencyCountInferenceVarID = UUID<LatencyCountInferenceVarIDMarker>;
+pub type LatencyCountInferenceVarID = UUID<InferenceVarIDMarker>;

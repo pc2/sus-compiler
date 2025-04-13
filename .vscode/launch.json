@@ -21,9 +21,10 @@
             },
             "sourceLanguages": ["rust"],
             "args": [
-                "--debug", "dot-latency-problem",
-                "--debug", "dot-latency-infer",
-                "--debug-whitelist", "instantiate_fifo_debug",
+                //"--debug", "dot-latency-problem",
+                //"--debug", "dot-latency-infer",
+                "--debug-whitelist", "TEST",
+                "--debug", "TEST", // Temporary to add in code when debugging
                 "tinyTestFile.sus",
             ],
             "cwd": "${workspaceFolder}"

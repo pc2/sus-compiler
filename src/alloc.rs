@@ -566,6 +566,9 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
             _ph: PhantomData,
         }
     }
+    pub fn into_vec(self) -> Vec<T> {
+        self.data
+    }
     pub fn get_next_alloc_id(&self) -> UUID<IndexMarker> {
         let uuid = self.data.len();
         UUID(uuid, PhantomData)

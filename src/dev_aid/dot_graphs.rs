@@ -1,11 +1,13 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, path::PathBuf};
 
 use dot::{render, Edges, GraphWalk, Id, LabelText, Labeller, Nodes, Style};
 
 use crate::{
-    instantiation::{ForEachContainedWire, InstantiatedModule, RealWireDataSource},
+    alloc::FlatAlloc,
+    instantiation::{ForEachContainedWire, InstantiatedModule, RealWire, RealWireDataSource},
+    latency::LatencyCountingProblem,
     linker::Linker,
-    prelude::{SubModuleID, WireID},
+    prelude::{SubModuleID, WireID, WireIDMarker},
 };
 
 pub fn display_generated_hardware_structure(md_instance: &InstantiatedModule, linker: &Linker) {
@@ -120,6 +122,142 @@ impl<'inst> GraphWalk<'inst, NodeType, EdgeType> for (&'inst InstantiatedModule,
     }
 
     fn target(&'inst self, edge: &EdgeType) -> NodeType {
+        edge.1
+    }
+}
+
+pub fn display_latency_count_graph(
+    lc_problem: &LatencyCountingProblem,
+    wires: &FlatAlloc<RealWire, WireIDMarker>,
+    solution: Option<&[i64]>,
+    filename: &str,
+) {
+    // true for input
+    let mut extra_node_info = vec![(None, None); lc_problem.map_latency_node_to_wire.len()];
+    for port in lc_problem.ports.inputs() {
+        extra_node_info[*port].0 = Some(true);
+    }
+    for port in lc_problem.ports.outputs() {
+        extra_node_info[*port].0 = Some(false);
+    }
+
+    for spec in &lc_problem.specified_latencies {
+        extra_node_info[spec.node].1 = Some(spec.latency);
+    }
+
+    use std::str::FromStr;
+
+    let mut file = std::fs::File::create(PathBuf::from_str(filename).unwrap()).unwrap();
+    render(
+        &Problem {
+            lc_problem,
+            wires,
+            solution,
+            extra_node_info,
+        },
+        &mut file,
+    )
+    .unwrap();
+}
+
+#[derive(Clone, Copy)]
+enum LCEdgeType {
+    Normal(i64),
+    Infer(usize),
+    Poison,
+}
+
+type LatencyEdge = (usize, usize, LCEdgeType);
+
+struct Problem<'a> {
+    lc_problem: &'a LatencyCountingProblem,
+    wires: &'a FlatAlloc<RealWire, WireIDMarker>,
+    solution: Option<&'a [i64]>,
+    extra_node_info: Vec<(Option<bool>, Option<i64>)>,
+}
+
+impl<'a> Labeller<'a, usize, LatencyEdge> for Problem<'a> {
+    fn graph_id(&'a self) -> Id<'a> {
+        Id::new("lcGraph").unwrap()
+    }
+
+    fn node_id(&'a self, n: &usize) -> Id<'a> {
+        Id::new(format!("n{n}")).unwrap()
+    }
+
+    fn node_label(&'a self, n: &usize) -> LabelText<'a> {
+        let name = &self.wires[self.lc_problem.map_latency_node_to_wire[*n]].name;
+        let mut result = format!("[{name}] ");
+
+        if let Some(sol) = self.solution {
+            result.push_str(&sol[*n].to_string())
+        }
+        if let Some(specified) = self.extra_node_info[*n].1 {
+            use std::fmt::Write;
+            write!(result, " specified {specified}").unwrap();
+        }
+        LabelText::LabelStr(result.into())
+    }
+
+    fn edge_label(&'a self, e: &LatencyEdge) -> LabelText<'a> {
+        LabelText::LabelStr(match e.2 {
+            LCEdgeType::Normal(delta) => delta.to_string().into(),
+            LCEdgeType::Infer(var) => format!("Infer {var}").into(),
+            LCEdgeType::Poison => "poison".into(),
+        })
+    }
+
+    fn edge_color(&'a self, e: &LatencyEdge) -> Option<LabelText<'a>> {
+        match e.2 {
+            LCEdgeType::Normal(_) => None,
+            LCEdgeType::Infer(_) => Some(LabelText::LabelStr("green".into())),
+            LCEdgeType::Poison => Some(LabelText::LabelStr("red".into())),
+        }
+    }
+
+    fn node_color(&'a self, node: &usize) -> Option<LabelText<'a>> {
+        self.extra_node_info[*node]
+            .0
+            .map(|is_input| LabelText::LabelStr(if is_input { "red" } else { "blue" }.into()))
+    }
+}
+
+impl<'a> GraphWalk<'a, usize, LatencyEdge> for Problem<'a> {
+    fn nodes(&'a self) -> Nodes<'a, usize> {
+        (0..self.lc_problem.map_latency_node_to_wire.len()).collect()
+    }
+
+    fn edges(&'a self) -> Edges<'a, LatencyEdge> {
+        let mut result = Vec::with_capacity(self.lc_problem.edges.len());
+
+        for (to, fan_from) in &self.lc_problem.edges {
+            result.push((
+                fan_from.to_node,
+                *to,
+                if let Some(delta) = fan_from.delta_latency {
+                    LCEdgeType::Normal(delta)
+                } else {
+                    LCEdgeType::Poison
+                },
+            ));
+        }
+
+        for infer_edge in &self.lc_problem.inference_edges {
+            result.push((
+                infer_edge.from_node,
+                infer_edge.to_node,
+                LCEdgeType::Infer(infer_edge.target_to_infer.get_hidden_value()),
+            ));
+        }
+
+        result.into()
+    }
+
+    fn source(&'a self, edge: &LatencyEdge) -> usize {
+        edge.0
+    }
+
+    fn target(&'a self, edge: &LatencyEdge) -> usize {
         edge.1
     }
 }
