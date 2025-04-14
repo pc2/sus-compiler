@@ -112,7 +112,9 @@ fn recurse_down_expression(
     num_template_args: usize,
 ) -> Option<PortLatencyLinearity> {
     let expr = instructions[cur_instr].unwrap_expression();
-    assert!(expr.typ.domain.is_generative());
+    if !expr.typ.domain.is_generative() {
+        return None; // Early exit, the user can create an invalid interface, we just don't handle it
+    }
     match &expr.source {
         ExpressionSource::UnaryOp {
             op: UnaryOperator::Negate,

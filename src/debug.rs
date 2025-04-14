@@ -36,7 +36,7 @@ pub fn add_debug_span(sp: Span) {
 
 fn print_most_recent_spans(file_data: &FileData) {
     DEBUG_STACK.with_borrow_mut(|history| {
-        let history = history.last_mut().unwrap();
+        let Some(history) = history.last_mut() else {return;}; // Exit because we can't know what context. TODO FIX AND SPAN + FileUUID
 
         let mut spans_to_print: Vec<Range<usize>> = Vec::with_capacity(NUM_SPANS_TO_PRINT);
 
