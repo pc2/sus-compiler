@@ -6,7 +6,7 @@ use crate::config::EarlyExitUpTo;
 use crate::linker::AFTER_INITIAL_PARSE_CP;
 use crate::prelude::*;
 
-use sus_proc_macro::{get_builtin_const, get_builtin_type_whole};
+use sus_proc_macro::{get_builtin_const, get_builtin_type};
 use tree_sitter::Parser;
 
 use crate::{
@@ -39,7 +39,7 @@ impl Linker {
         info_mngr: &mut ExtraInfoManager,
     ) {
         assert!(self.modules.is_empty());
-        assert!(self.whole_types.is_empty());
+        assert!(self.types.is_empty());
         assert!(self.constants.is_empty());
         if !config().ci {
             println!("Standard Library Directory: {STD_LIB_PATH}");
@@ -51,18 +51,8 @@ impl Linker {
         // Sanity check for the names the compiler knows internally.
         // They are defined in std/core.sus
         // Critically, std/core.sus MUST be the first file to be loaded into the linker. Otherwise the IDs don't point to the correct objects
-        assert_eq!(
-            self.whole_types[get_builtin_type_whole!("int")]
-                .link_info
-                .name,
-            "int"
-        );
-        assert_eq!(
-            self.whole_types[get_builtin_type_whole!("bool")]
-                .link_info
-                .name,
-            "bool"
-        );
+        assert_eq!(self.types[get_builtin_type!("int")].link_info.name, "int");
+        assert_eq!(self.types[get_builtin_type!("bool")].link_info.name, "bool");
 
         assert_eq!(
             self.constants[get_builtin_const!("true")].link_info.name,
@@ -200,7 +190,7 @@ impl Linker {
             link_info.instructions.clear();
             instantiations.clear_instances()
         }
-        for (_, typ) in &mut self.whole_types {
+        for (_, typ) in &mut self.types {
             typ.link_info.reset_to(AFTER_INITIAL_PARSE_CP);
         }
         for (_, cst) in &mut self.constants {

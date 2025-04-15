@@ -22,7 +22,7 @@ pub type ModuleUUID = UUID<ModuleUUIDMarker>;
 
 pub struct TypeUUIDMarker;
 impl UUIDMarker for TypeUUIDMarker {
-    const DISPLAY_NAME: &'static str = "whole_type_";
+    const DISPLAY_NAME: &'static str = "type_";
 }
 pub type TypeUUID = UUID<TypeUUIDMarker>;
 

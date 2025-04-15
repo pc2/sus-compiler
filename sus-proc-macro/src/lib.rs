@@ -72,7 +72,7 @@ pub fn field(token_stream: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn get_builtin_type_whole(token_stream: TokenStream) -> TokenStream {
+pub fn get_builtin_type(token_stream: TokenStream) -> TokenStream {
     let string_literal: LitStr = parse_macro_input!(token_stream);
 
     let object_name = string_literal.value();

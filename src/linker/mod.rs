@@ -214,7 +214,7 @@ enum NamespaceElement {
 ///
 /// Incremental operations such as adding and removing files can be performed on this
 pub struct Linker {
-    pub whole_types: ArenaAllocator<StructType, TypeUUIDMarker>,
+    pub types: ArenaAllocator<StructType, TypeUUIDMarker>,
     pub modules: ArenaAllocator<Module, ModuleUUIDMarker>,
     pub constants: ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
     pub files: ArenaAllocator<FileData, FileUUIDMarker>,
@@ -230,7 +230,7 @@ impl Default for Linker {
 impl Linker {
     pub fn new() -> Linker {
         Linker {
-            whole_types: ArenaAllocator::new(),
+            types: ArenaAllocator::new(),
             modules: ArenaAllocator::new(),
             constants: ArenaAllocator::new(),
             files: ArenaAllocator::new(),
@@ -241,7 +241,7 @@ impl Linker {
     pub fn get_link_info(&self, global: GlobalUUID) -> &LinkInfo {
         match global {
             GlobalUUID::Module(md_id) => &self.modules[md_id].link_info,
-            GlobalUUID::Type(typ_id) => &self.whole_types[typ_id].link_info,
+            GlobalUUID::Type(typ_id) => &self.types[typ_id].link_info,
             GlobalUUID::Constant(cst_id) => &self.constants[cst_id].link_info,
         }
     }
@@ -345,7 +345,7 @@ impl Linker {
                     self.modules.free(id);
                 }
                 GlobalUUID::Type(id) => {
-                    self.whole_types.free(id);
+                    self.types.free(id);
                 }
                 GlobalUUID::Constant(id) => {
                     self.constants.free(id);
@@ -390,7 +390,7 @@ impl Linker {
             other_parsing_errors: &other_parsing_errors,
             associated_values: &mut associated_values,
             global_namespace: &mut self.global_namespace,
-            types: &mut self.whole_types,
+            types: &mut self.types,
             modules: &mut self.modules,
             constants: &mut self.constants,
         });

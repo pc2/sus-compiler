@@ -51,7 +51,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
             type_checker,
             working_on_mut,
             &errs_and_globals.0,
-            &linker.whole_types,
+            &linker.types,
         );
 
         working_on_mut

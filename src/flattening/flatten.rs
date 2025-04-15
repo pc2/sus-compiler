@@ -1803,7 +1803,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
             &mut md.link_info
         }
         GlobalUUID::Type(type_uuid) => {
-            let typ = &mut linker.whole_types[type_uuid];
+            let typ = &mut linker.types[type_uuid];
 
             // Set all declaration_instruction values
             for (decl_id, instr) in &instructions {

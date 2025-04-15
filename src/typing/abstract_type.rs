@@ -1,4 +1,4 @@
-use sus_proc_macro::get_builtin_type_whole;
+use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
@@ -49,7 +49,7 @@ impl AbstractRankedType {
     pub const fn scalar(inner: AbstractInnerType) -> Self {
         Self {
             inner,
-            rank: PeanoType::Named(get_builtin_type_whole!("int")), //PeanoType::Zero, todo a bit hacky!!
+            rank: PeanoType::Named(get_builtin_type!("int")), //PeanoType::Zero, todo a bit hacky!!
         }
     }
     pub fn rank_up(&self) -> Self {
@@ -70,9 +70,9 @@ pub enum PeanoType {
 }
 
 pub const BOOL_TYPE: AbstractRankedType =
-    AbstractRankedType::scalar(AbstractInnerType::Named(get_builtin_type_whole!("bool")));
+    AbstractRankedType::scalar(AbstractInnerType::Named(get_builtin_type!("bool")));
 pub const INT_TYPE: AbstractRankedType =
-    AbstractRankedType::scalar(AbstractInnerType::Named(get_builtin_type_whole!("int")));
+    AbstractRankedType::scalar(AbstractInnerType::Named(get_builtin_type!("int")));
 
 /// These represent (clock) domains. While clock domains are included under this umbrella, domains can use the same clock.
 /// The use case for non-clock-domains is to separate Latency Counting domains. So different pipelines where it doesn't
@@ -186,10 +186,8 @@ impl TypeUnifier {
             WrittenType::Named(global_reference) => {
                 self.abstract_type_substitutor
                     .unify_must_succeed(&typ.inner, &AbstractInnerType::Named(global_reference.id));
-                self.peano_substitutor.unify_must_succeed(
-                    &typ.rank,
-                    &PeanoType::Named(get_builtin_type_whole!("int")),
-                );
+                self.peano_substitutor
+                    .unify_must_succeed(&typ.rank, &PeanoType::Named(get_builtin_type!("int")));
                 // todo: super super mega hacky hack, assume all named types are scalars
             }
             WrittenType::Array(_span, array_content_and_size) => {
@@ -241,11 +239,10 @@ impl TypeUnifier {
             WrittenType::Named(global_reference) => {
                 self.abstract_type_substitutor
                     .unify_must_succeed(&typ.inner, &AbstractInnerType::Named(global_reference.id));
-                self.peano_substitutor.unify_must_succeed(
-                    &typ.rank,
-                    &PeanoType::Named(get_builtin_type_whole!("int")),
-                ); //global_reference.id));
-                   // todo: super super mega hacky hack, assume all named types are scalars
+                self.peano_substitutor
+                    .unify_must_succeed(&typ.rank, &PeanoType::Named(get_builtin_type!("int")));
+                //global_reference.id));
+                // todo: super super mega hacky hack, assume all named types are scalars
             }
             WrittenType::Array(_span, array_content_and_size) => {
                 let (arr_content_type, _size_flat, _array_bracket_span) =

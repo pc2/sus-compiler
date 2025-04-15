@@ -244,7 +244,7 @@ fn gather_completions(linker: &Linker, file_id: FileUUID, position: usize) -> Ve
             ..Default::default()
         });
     }
-    for (_, t) in &linker.whole_types {
+    for (_, t) in &linker.types {
         result.push(CompletionItem {
             label: t.link_info.name.to_string(),
             kind: Some(CompletionItemKind::STRUCT),

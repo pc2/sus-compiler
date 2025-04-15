@@ -366,7 +366,7 @@ fn perform_instantiation(
     template_args: &TVec<ConcreteType>,
 ) -> InstantiatedModule {
     let mut context = InstantiationContext {
-        name: pretty_print_concrete_instance(&md.link_info, template_args, &linker.whole_types),
+        name: pretty_print_concrete_instance(&md.link_info, template_args, &linker.types),
         generation_state: GenerationState {
             md,
             generation_state: md

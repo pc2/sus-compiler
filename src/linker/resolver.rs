@@ -60,7 +60,7 @@ impl<'linker> GlobalResolver<'linker> {
     ) -> (ErrorStore, ResolvedGlobals) {
         let obj_link_info = Linker::get_link_info_mut(
             &mut linker.modules,
-            &mut linker.whole_types,
+            &mut linker.types,
             &mut linker.constants,
             global_obj,
         );
@@ -200,7 +200,7 @@ impl Index<TypeUUID> for GlobalResolver<'_> {
             .referenced_globals
             .push(GlobalUUID::Type(index));
 
-        &self.linker.whole_types[index]
+        &self.linker.types[index]
     }
 }
 impl Index<ConstantUUID> for GlobalResolver<'_> {

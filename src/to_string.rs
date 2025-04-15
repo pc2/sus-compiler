@@ -93,10 +93,10 @@ impl WrittenType {
 }
 
 #[derive(Debug)]
-pub struct AbstractRankedTypeDisplay<'a, WholeTypVec, TemplateVec: TemplateNameGetter> {
+pub struct AbstractRankedTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
     inner_typ: &'a AbstractInnerType,
     rank_typ: &'a PeanoType,
-    linker_types: &'a WholeTypVec,
+    linker_types: &'a TypVec,
     template_names: &'a TemplateVec,
 }
 
