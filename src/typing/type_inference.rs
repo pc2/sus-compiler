@@ -429,7 +429,7 @@ pub trait HindleyMilner<VariableIDMarker: UUIDMarker>: Sized {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AbstractTypeHMInfo {
     Template(TemplateID),
-    Named(WholeTypeUUID),
+    Named(TypeUUID),
 }
 
 impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
@@ -496,7 +496,7 @@ pub enum PeanoTypeHMInfo {
     Successor,
     //Zero,
     Template(TemplateID),
-    Named(WholeTypeUUID),
+    Named(TypeUUID),
 }
 
 impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
@@ -616,7 +616,7 @@ impl HindleyMilner<DomainVariableIDMarker> for DomainType {
 /// [HindleyMilnerInfo] `TypeFuncIdent` for [ConcreteType]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConcreteTypeHMInfo<'slf> {
-    Named(WholeTypeUUID),
+    Named(TypeUUID),
     Value(&'slf Value),
     Array,
 }

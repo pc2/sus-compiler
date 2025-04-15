@@ -349,7 +349,7 @@ fn initialize_global_object(
         type_variable_alloc: TypingAllocator {
             peano_variable_alloc: UUIDAllocator::new(),
             domain_variable_alloc: UUIDAllocator::new(),
-            type_variable_alloc: UUIDAllocator::new(),
+            inner_type_variable_alloc: UUIDAllocator::new(),
         },
         template_parameters: ctx.parameters,
         instructions: FlatAlloc::new(),

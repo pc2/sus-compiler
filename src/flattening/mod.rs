@@ -541,7 +541,7 @@ impl ExpressionSource {
 pub enum WrittenType {
     Error(Span),
     TemplateVariable(Span, TemplateID),
-    Named(GlobalReference<WholeTypeUUID>),
+    Named(GlobalReference<TypeUUID>),
     Array(Span, Box<(WrittenType, FlatID, BracketSpan)>),
 }
 
@@ -807,6 +807,6 @@ impl Instruction {
 #[derive(Debug, Clone)]
 pub struct TypingAllocator {
     pub peano_variable_alloc: UUIDAllocator<PeanoVariableIDMarker>,
-    pub type_variable_alloc: UUIDAllocator<InnerTypeVariableIDMarker>,
+    pub inner_type_variable_alloc: UUIDAllocator<InnerTypeVariableIDMarker>,
     pub domain_variable_alloc: UUIDAllocator<DomainVariableIDMarker>,
 }

@@ -35,7 +35,7 @@ pub struct ConcreteGlobalReference<ID> {
 /// or [crate::flattening::WrittenType] which represents the textual in-editor data.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteType {
-    Named(ConcreteGlobalReference<WholeTypeUUID>),
+    Named(ConcreteGlobalReference<TypeUUID>),
     Value(Value),
     Array(Box<(ConcreteType, ConcreteType)>),
     /// Referencing [ConcreteType::Unknown] is a strong code smell.
@@ -93,7 +93,7 @@ impl ConcreteType {
     }
 
     /// TODO #50 Ranged Int work should be integrated
-    pub fn sizeof_named(type_ref: &ConcreteGlobalReference<WholeTypeUUID>) -> u64 {
+    pub fn sizeof_named(type_ref: &ConcreteGlobalReference<TypeUUID>) -> u64 {
         if type_ref.id == get_builtin_type_whole!("int") {
             32 // TODO concrete int sizes
         } else if type_ref.id == get_builtin_type_whole!("bool") {

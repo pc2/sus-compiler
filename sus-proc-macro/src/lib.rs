@@ -85,7 +85,7 @@ pub fn get_builtin_type_whole(token_stream: TokenStream) -> TokenStream {
         let (_full, [found_name]) = c.extract();
         if found_name == object_name {
             return quote! {
-                crate::prelude::WholeTypeUUID::from_hidden_value(#idx)
+                crate::prelude::TypeUUID::from_hidden_value(#idx)
             }
             .into();
         }

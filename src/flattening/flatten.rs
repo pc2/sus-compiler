@@ -27,7 +27,7 @@ enum NamedLocal {
 enum LocalOrGlobal {
     Local(Span, NamedLocal),
     Module(GlobalReference<ModuleUUID>),
-    Type(GlobalReference<WholeTypeUUID>),
+    Type(GlobalReference<TypeUUID>),
     Constant(GlobalReference<ConstantUUID>),
     // Error is already handled
     NotFound(Span),
@@ -222,7 +222,7 @@ impl TypingAllocator {
     fn alloc_unset_type(&mut self, domain: DomainAllocOption) -> FullType {
         FullType {
             typ: AbstractRankedType {
-                inner: AbstractInnerType::Unknown(self.type_variable_alloc.alloc()),
+                inner: AbstractInnerType::Unknown(self.inner_type_variable_alloc.alloc()),
                 rank: PeanoType::Unknown(self.peano_variable_alloc.alloc()),
             },
             domain: match domain {
@@ -443,7 +443,9 @@ impl FlatteningContext<'_, '_> {
                     self.flatten_template_args(global_id, template_args_used, cursor);
 
                 let template_arg_types = template_args.map(|_| AbstractRankedType {
-                    inner: AbstractInnerType::Unknown(self.type_alloc.type_variable_alloc.alloc()),
+                    inner: AbstractInnerType::Unknown(
+                        self.type_alloc.inner_type_variable_alloc.alloc(),
+                    ),
                     rank: PeanoType::Unknown(self.type_alloc.peano_variable_alloc.alloc()),
                 });
 
@@ -1743,7 +1745,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         instructions: FlatAlloc::new(),
         type_alloc: TypingAllocator {
             peano_variable_alloc: UUIDAllocator::new(),
-            type_variable_alloc: UUIDAllocator::new(),
+            inner_type_variable_alloc: UUIDAllocator::new(),
             domain_variable_alloc: UUIDAllocator::new(),
         },
         named_domain_alloc: UUIDAllocator::new(),

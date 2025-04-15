@@ -191,10 +191,10 @@ impl Index<ModuleUUID> for GlobalResolver<'_> {
         &self.linker.modules[index]
     }
 }
-impl Index<WholeTypeUUID> for GlobalResolver<'_> {
+impl Index<TypeUUID> for GlobalResolver<'_> {
     type Output = StructType;
 
-    fn index(&self, index: WholeTypeUUID) -> &Self::Output {
+    fn index(&self, index: TypeUUID) -> &Self::Output {
         self.resolved_globals
             .borrow_mut()
             .referenced_globals

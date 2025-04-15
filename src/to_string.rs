@@ -45,7 +45,7 @@ impl TemplateNameGetter for TVec<Parameter> {
 #[derive(Debug)]
 pub struct WrittenTypeDisplay<
     'a,
-    TypVec: Index<WholeTypeUUID, Output = StructType>,
+    TypVec: Index<TypeUUID, Output = StructType>,
     TemplateVec: TemplateNameGetter,
 > {
     inner: &'a WrittenType,
@@ -53,7 +53,7 @@ pub struct WrittenTypeDisplay<
     template_names: &'a TemplateVec,
 }
 
-impl<TypVec: Index<WholeTypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
+impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
     for WrittenTypeDisplay<'_, TypVec, TemplateVec>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -81,7 +81,7 @@ impl<TypVec: Index<WholeTypeUUID, Output = StructType>, TemplateVec: TemplateNam
 impl WrittenType {
     pub fn display<'a>(
         &'a self,
-        linker_types: &'a impl Index<WholeTypeUUID, Output = StructType>,
+        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
         template_names: &'a impl TemplateNameGetter,
     ) -> impl Display + 'a {
         WrittenTypeDisplay {
@@ -100,7 +100,7 @@ pub struct AbstractRankedTypeDisplay<'a, WholeTypVec, TemplateVec: TemplateNameG
     template_names: &'a TemplateVec,
 }
 
-impl<TypVec: Index<WholeTypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
+impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
     for AbstractRankedTypeDisplay<'_, TypVec, TemplateVec>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -127,11 +127,10 @@ fn renderpeano(rank: &PeanoType) -> String {
     }
 }
 
-// todo.mergerankedids
 impl AbstractRankedType {
     pub fn display<'a>(
         &'a self,
-        linker_types: &'a impl Index<WholeTypeUUID, Output = StructType>,
+        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
         template_names: &'a impl TemplateNameGetter,
     ) -> impl Display + 'a {
         AbstractRankedTypeDisplay {
@@ -144,12 +143,12 @@ impl AbstractRankedType {
 }
 
 #[derive(Debug)]
-pub struct ConcreteTypeDisplay<'a, T: Index<WholeTypeUUID, Output = StructType>> {
+pub struct ConcreteTypeDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
     inner: &'a ConcreteType,
     linker_types: &'a T,
 }
 
-impl<T: Index<WholeTypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_, T> {
+impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner {
             ConcreteType::Named(name) => {
@@ -173,7 +172,7 @@ impl<T: Index<WholeTypeUUID, Output = StructType>> Display for ConcreteTypeDispl
 impl ConcreteType {
     pub fn display<'a>(
         &'a self,
-        linker_types: &'a impl Index<WholeTypeUUID, Output = StructType>,
+        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
     ) -> impl Display + 'a {
         ConcreteTypeDisplay {
             inner: self,
@@ -308,7 +307,7 @@ impl Module {
 pub fn pretty_print_concrete_instance(
     target_link_info: &LinkInfo,
     given_template_args: &TVec<ConcreteType>,
-    linker_types: &impl Index<WholeTypeUUID, Output = StructType>,
+    linker_types: &impl Index<TypeUUID, Output = StructType>,
 ) -> String {
     assert!(given_template_args.len() == target_link_info.template_parameters.len());
     let object_full_name = target_link_info.get_full_name();

@@ -31,7 +31,7 @@ use crate::to_string::map_to_type_names;
 #[derive(Debug, Clone)]
 pub enum AbstractInnerType {
     Template(TemplateID),
-    Named(WholeTypeUUID),
+    Named(TypeUUID),
     /// Referencing [AbstractType::Unknown] is a strong code smell.
     /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
     ///
@@ -64,7 +64,7 @@ impl AbstractRankedType {
 pub enum PeanoType {
     Zero,
     Template(TemplateID),
-    Named(WholeTypeUUID),
+    Named(TypeUUID),
     Succ(Box<PeanoType>),
     Unknown(PeanoVariableID),
 }
@@ -146,7 +146,9 @@ impl TypeUnifier {
         p.alloc(); // 0, fixme this is pretty ugly
         Self {
             template_type_names: map_to_type_names(parameters),
-            abstract_type_substitutor: TypeSubstitutor::init(&typing_alloc.type_variable_alloc),
+            abstract_type_substitutor: TypeSubstitutor::init(
+                &typing_alloc.inner_type_variable_alloc,
+            ),
             peano_substitutor: p,
             domain_substitutor: TypeSubstitutor::init(&typing_alloc.domain_variable_alloc),
         }
@@ -628,7 +630,7 @@ impl TypeUnifier {
 
     pub fn finalize_abstract_type(
         &mut self,
-        linker_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+        linker_types: &ArenaAllocator<StructType, TypeUUIDMarker>,
         typ: &mut AbstractRankedType,
         span: Span,
         errors: &ErrorCollector,
@@ -647,7 +649,7 @@ impl TypeUnifier {
 
     pub fn finalize_type(
         &mut self,
-        linker_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+        linker_types: &ArenaAllocator<StructType, TypeUUIDMarker>,
         typ: &mut FullType,
         span: Span,
         errors: &ErrorCollector,
@@ -658,7 +660,7 @@ impl TypeUnifier {
 
     pub fn finalize_global_ref<ID>(
         &mut self,
-        linker_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+        linker_types: &ArenaAllocator<StructType, TypeUUIDMarker>,
         global_ref: &mut GlobalReference<ID>,
         errors: &ErrorCollector,
     ) {

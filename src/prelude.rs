@@ -19,24 +19,12 @@ impl UUIDMarker for ModuleUUIDMarker {
     const DISPLAY_NAME: &'static str = "module_";
 }
 pub type ModuleUUID = UUID<ModuleUUIDMarker>;
-/*
-pub struct WholeTypeUUIDMarker;
-impl UUIDMarker for WholeTypeUUIDMarker {
-    const DISPLAY_NAME: &'static str = "inner_type_";
-}
-pub type WholeTypeUUID = UUID<WholeTypeUUIDMarker>;
 
-pub struct WholeTypeUUIDMarker;
-impl UUIDMarker for WholeTypeUUIDMarker {
-    const DISPLAY_NAME: &'static str = "rank_";
-}
-pub type WholeTypeUUID = UUID<WholeTypeUUIDMarker>;*/
-
-pub struct WholeTypeUUIDMarker;
-impl UUIDMarker for WholeTypeUUIDMarker {
+pub struct TypeUUIDMarker;
+impl UUIDMarker for TypeUUIDMarker {
     const DISPLAY_NAME: &'static str = "whole_type_";
 }
-pub type WholeTypeUUID = UUID<WholeTypeUUIDMarker>;
+pub type TypeUUID = UUID<TypeUUIDMarker>;
 
 pub struct ConstantUUIDMarker;
 impl UUIDMarker for ConstantUUIDMarker {

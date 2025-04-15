@@ -582,7 +582,7 @@ pub fn apply_types(
     mut type_checker: TypeUnifier,
     working_on: &mut Module,
     errors: &ErrorCollector,
-    linker_types: &ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+    linker_types: &ArenaAllocator<StructType, TypeUUIDMarker>,
 ) {
     // Set the remaining domain variables that aren't associated with a module port.
     // We just find domain IDs that haven't been

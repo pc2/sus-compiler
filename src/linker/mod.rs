@@ -153,7 +153,7 @@ pub struct FileData {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GlobalUUID {
     Module(ModuleUUID),
-    Type(WholeTypeUUID),
+    Type(TypeUUID),
     Constant(ConstantUUID),
 }
 
@@ -166,7 +166,7 @@ impl GlobalUUID {
         *id
     }
     #[track_caller]
-    pub fn unwrap_type(&self) -> WholeTypeUUID {
+    pub fn unwrap_type(&self) -> TypeUUID {
         let GlobalUUID::Type(id) = self else {
             unreachable!("Not a TypeUUID!")
         };
@@ -187,8 +187,8 @@ impl From<ModuleUUID> for GlobalUUID {
     }
 }
 
-impl From<WholeTypeUUID> for GlobalUUID {
-    fn from(value: WholeTypeUUID) -> Self {
+impl From<TypeUUID> for GlobalUUID {
+    fn from(value: TypeUUID) -> Self {
         GlobalUUID::Type(value)
     }
 }
@@ -214,7 +214,7 @@ enum NamespaceElement {
 ///
 /// Incremental operations such as adding and removing files can be performed on this
 pub struct Linker {
-    pub whole_types: ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+    pub whole_types: ArenaAllocator<StructType, TypeUUIDMarker>,
     pub modules: ArenaAllocator<Module, ModuleUUIDMarker>,
     pub constants: ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
     pub files: ArenaAllocator<FileData, FileUUIDMarker>,
@@ -247,7 +247,7 @@ impl Linker {
     }
     pub fn get_link_info_mut<'l>(
         modules: &'l mut ArenaAllocator<Module, ModuleUUIDMarker>,
-        types: &'l mut ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+        types: &'l mut ArenaAllocator<StructType, TypeUUIDMarker>,
         constants: &'l mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
         global: GlobalUUID,
     ) -> &'l mut LinkInfo {
@@ -412,7 +412,7 @@ pub struct FileBuilder<'linker> {
     associated_values: &'linker mut Vec<GlobalUUID>,
     global_namespace: &'linker mut HashMap<String, NamespaceElement>,
     modules: &'linker mut ArenaAllocator<Module, ModuleUUIDMarker>,
-    types: &'linker mut ArenaAllocator<StructType, WholeTypeUUIDMarker>,
+    types: &'linker mut ArenaAllocator<StructType, TypeUUIDMarker>,
     constants: &'linker mut ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
 }
 
