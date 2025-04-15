@@ -1,9 +1,10 @@
-use std::ops::Deref;
+use std::ops::{Deref, Index};
 
 use crate::alloc::{zip_eq, zip_eq3};
 use crate::errors::ErrorInfoObject;
 use crate::flattening::{DeclarationKind, ExpressionSource, WireReferenceRoot, WrittenType};
 use crate::linker::LinkInfo;
+use crate::typing::abstract_type::PeanoType;
 use crate::typing::concrete_type::ConcreteGlobalReference;
 use crate::typing::template::TemplateArgKind;
 use crate::typing::{
@@ -18,6 +19,24 @@ use super::*;
 use crate::typing::type_inference::HindleyMilner;
 
 impl InstantiationContext<'_, '_> {
+    fn peano_to_nested_array_of(
+        &self,
+        p: &PeanoType,
+        c: ConcreteType,
+        dims: &mut Vec<ConcreteType>,
+    ) -> ConcreteType {
+        match p {
+            (PeanoType::Zero | PeanoType::Named(_)) => c,
+            PeanoType::Succ(p) => {
+                let this_dim_var = ConcreteType::Unknown(self.type_substitutor.alloc());
+                let arr = ConcreteType::Array(Box::new((c, this_dim_var.clone())));
+                let typ = self.peano_to_nested_array_of(p, arr, dims);
+                dims.push(this_dim_var.clone());
+                return typ;
+            }
+            _ => unreachable!("Peano abstract ranks being used at concrete type-checking time should never be anything other than Zero, Succ or Named ({p:?})"),
+        }
+    }
     fn walk_type_along_path(
         &self,
         mut current_type_in_progress: ConcreteType,
@@ -104,7 +123,7 @@ impl InstantiationContext<'_, '_> {
                 }
                 &RealWireDataSource::BinaryOp { op, left, right } => {
                     // TODO overloading
-                    let ((in_left, in_right), out) = match op {
+                    let ((in_left_inner, in_right_inner), out_inner) = match op {
                         BinaryOperator::And => {
                             ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
@@ -148,33 +167,61 @@ impl InstantiationContext<'_, '_> {
                             ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
                     };
-                    /*self.type_substitutor.unify_report_error(
+                    // gets the corresponding abstract type to figure out how many layers of array to unify with:
+                    let peano_type = &self.md.link_info.instructions
+                        [this_wire.original_instruction]
+                        .unwrap_expression()
+                        .typ
+                        .typ
+                        .rank;
+                    let mut out_dims = vec![];
+                    let out_type =
+                        self.peano_to_nested_array_of(peano_type, out_inner, &mut out_dims);
+
+                    let mut in_left_dims = vec![];
+                    let in_left_type =
+                        self.peano_to_nested_array_of(peano_type, in_left_inner, &mut in_left_dims);
+
+                    for (in_left, out) in out_dims.iter().zip(in_left_dims.iter()) {
+                        self.type_substitutor.unify_report_error(
+                            in_left,
+                            out,
+                            span,
+                            &"binary output dimension",
+                        );
+                    }
+
+                    let mut in_right_dims = vec![];
+                    let in_right_type = self.peano_to_nested_array_of(
+                        peano_type,
+                        in_right_inner,
+                        &mut in_right_dims,
+                    );
+
+                    for (in_right, out) in out_dims.iter().zip(in_right_dims.iter()) {
+                        self.type_substitutor.unify_report_error(
+                            in_right,
+                            out,
+                            span,
+                            &"binary output dimension",
+                        );
+                    }
+
+                    self.type_substitutor.unify_report_error(
                         &self.wires[this_wire_id].typ,
-                        &out,
+                        &out_type,
                         span,
                         &"binary output",
                     );
                     self.type_substitutor.unify_report_error(
                         &self.wires[left].typ,
-                        &in_left,
+                        &in_left_type,
                         span,
                         &"binary left",
                     );
                     self.type_substitutor.unify_report_error(
                         &self.wires[right].typ,
-                        &in_right,
-                        span,
-                        &"binary right",
-                    );*/
-                    self.type_substitutor.unify_report_error(
-                        &self.wires[left].typ,
-                        &self.wires[this_wire_id].typ,
-                        span,
-                        &"binary left",
-                    );
-                    self.type_substitutor.unify_report_error(
-                        &self.wires[right].typ,
-                        &self.wires[this_wire_id].typ,
+                        &in_right_type,
                         span,
                         &"binary right",
                     );
