@@ -494,7 +494,6 @@ impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PeanoTypeHMInfo {
     Successor,
-    //Zero,
     Template(TemplateID),
     Named(TypeUUID),
 }
@@ -509,7 +508,7 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
             }
             PeanoType::Unknown(var_id) => HindleyMilnerInfo::TypeVar(*var_id),
             PeanoType::Succ(_) => HindleyMilnerInfo::TypeFunc(PeanoTypeHMInfo::Successor),
-            PeanoType::Zero => HindleyMilnerInfo::TypeVar(PeanoVariableID::from_hidden_value(0)), // todo mega hack
+            PeanoType::Zero => HindleyMilnerInfo::TypeVar(PeanoVariableID::from_hidden_value(0)),
             PeanoType::Named(n) => HindleyMilnerInfo::TypeFunc(PeanoTypeHMInfo::Named(*n)),
         }
     }
@@ -520,7 +519,7 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
         unify: &mut F,
     ) -> UnifyResult {
         match (left, right) {
-            (PeanoType::Zero, PeanoType::Zero) => UnifyResult::Success, // todo: check if this is true: Already covered by get_hm_info
+            (PeanoType::Zero, PeanoType::Zero) => UnifyResult::Success,
             (PeanoType::Named(na), PeanoType::Named(nb)) => {
                 assert!(*na == *nb);
                 UnifyResult::Success
@@ -545,12 +544,11 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
             PeanoType::Succ(typ) => typ.fully_substitute(substitutor),
             PeanoType::Zero | PeanoType::Named(_) | PeanoType::Template(_) => true,
             PeanoType::Unknown(var) => {
-                // PeanoType::Unknown 0 is really a magic "zero" identifier
-                // todo: horrid hack
+                // PeanoType::Unknown 0 is really "zero" - need a special zero var because couldn't unify a
+                // zero type function with other type functions like template
                 if var.get_hidden_value() == 0 {
                     return true;
                 }
-                assert!(var.get_hidden_value() != 0);
                 let Some(replacement) = substitutor.substitution_map[var.get_hidden_value()].get()
                 else {
                     return false;
