@@ -686,10 +686,10 @@ pub fn apply_types(
         assert!(found.fully_substitute(&type_checker.peano_substitutor));
         assert!(expected.fully_substitute(&type_checker.peano_substitutor));
 
-        let expected_name = format!("{expected:?}");
-        let found_name = format!("{found:?}");
+        let expected_name = expected.to_string();
+        let found_name = found.to_string();
         errors
-            .error(span, format!("Rank error: Attempting to combine ranks {found_name} and {expected_name} in {context}"))
+            .error(span, format!("Rank error: Attempting to combine incompatible {found_name} and {expected_name} in {context}"))
             .add_info_list(infos);
 
         assert!(
