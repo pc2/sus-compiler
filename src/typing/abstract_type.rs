@@ -50,7 +50,7 @@ impl AbstractRankedType {
     pub const fn scalar(inner: AbstractInnerType) -> Self {
         Self {
             inner,
-            rank: PeanoType::Named(get_builtin_type!("int")), //PeanoType::Zero, todo a bit hacky!!
+            rank: PeanoType::Zero,
         }
     }
     pub fn rank_up(&self) -> Self {
@@ -65,9 +65,18 @@ impl AbstractRankedType {
 pub enum PeanoType {
     Zero,
     Template(TemplateID),
-    Named(TypeUUID),
     Succ(Box<PeanoType>),
     Unknown(PeanoVariableID),
+}
+
+impl PeanoType {
+    pub fn as_integer_must_succeed(&self) -> usize {
+        match self {
+            PeanoType::Zero => 0,
+            PeanoType::Succ(inner) => inner.as_integer_must_succeed() + 1,
+            _ => panic!("Could not convert {self:?} Peano type to integer"),
+        }
+    }
 }
 
 pub const BOOL_TYPE: AbstractRankedType =
@@ -121,7 +130,7 @@ impl DomainType {
 impl Display for PeanoType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            (PeanoType::Zero | PeanoType::Named(_)) => write!(f, "<inner type>"),
+            PeanoType::Zero => write!(f, ""),
             PeanoType::Template(id) => write!(f, "<[T]>"),
             PeanoType::Succ(inner) => write!(f, "{}[]", inner.to_string()),
             PeanoType::Unknown(id) => write!(f, "<[...]>"),

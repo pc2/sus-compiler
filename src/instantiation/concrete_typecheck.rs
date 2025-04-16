@@ -26,7 +26,7 @@ impl InstantiationContext<'_, '_> {
         dims: &mut Vec<ConcreteType>,
     ) -> ConcreteType {
         match p {
-            (PeanoType::Zero | PeanoType::Named(_)) => c,
+            PeanoType::Zero => c,
             PeanoType::Succ(p) => {
                 let this_dim_var = ConcreteType::Unknown(self.type_substitutor.alloc());
                 let arr = ConcreteType::Array(Box::new((c, this_dim_var.clone())));

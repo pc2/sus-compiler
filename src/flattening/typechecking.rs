@@ -646,7 +646,7 @@ pub fn apply_types(
         }
     }
 
-    // Print all errors - todo: also show peano problems
+    // Print all errors
     for FailedUnification {
         mut found,
         mut expected,
@@ -660,12 +660,12 @@ pub fn apply_types(
         let _ = expected.fully_substitute(&type_checker.abstract_type_substitutor);
 
         // todo: try fetching the AbstractRankedType to display that instead
-        let expected_name = "todo something"; /* = expected
-                                              .display(inner_types, &type_checker.template_type_names)
-                                              .to_string();*/
-        let found_name = "todo something"; /*found
-                                           .display(inner_types, &type_checker.template_type_names)
-                                           .to_string();*/
+        let expected_name = "todo"; /*expected
+                                    .display(inner_types, &type_checker.template_type_names)
+                                    .to_string();*/
+        let found_name = "todo"; /*found
+                                 .display(inner_types, &type_checker.template_type_names)
+                                 .to_string();*/
         errors
             .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
             .add_info_list(infos);
@@ -689,7 +689,7 @@ pub fn apply_types(
         let expected_name = expected.to_string();
         let found_name = found.to_string();
         errors
-            .error(span, format!("Rank error: Attempting to combine incompatible {found_name} and {expected_name} in {context}"))
+            .error(span, format!("Rank error: Attempting to combine incompatible <inner type>{found_name} and <inner type>{expected_name} in {context}"))
             .add_info_list(infos);
 
         assert!(

@@ -113,17 +113,7 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
                 f.write_str(&self.linker_types[*id].link_info.get_full_name())
             }
         }
-        .and_then(|_| f.write_str(&renderpeano(self.rank_typ)))
-    }
-}
-
-fn renderpeano(rank: &PeanoType) -> String {
-    match rank {
-        PeanoType::Template(id) => format!("[{:?}]", id), // todo: template names for peano
-        PeanoType::Zero => "".to_string(),
-        PeanoType::Succ(rank) => format!("[]{}", renderpeano(rank)),
-        PeanoType::Unknown(rank) => format!("[{:?}]", rank),
-        PeanoType::Named(rank) => format!("[{:?}]", rank),
+        .and_then(|_| f.write_str(&self.rank_typ.to_string()))
     }
 }
 

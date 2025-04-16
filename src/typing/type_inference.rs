@@ -495,7 +495,6 @@ impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
 pub enum PeanoTypeHMInfo {
     Successor,
     Template(TemplateID),
-    Named(TypeUUID),
 }
 
 impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
@@ -509,7 +508,6 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
             PeanoType::Unknown(var_id) => HindleyMilnerInfo::TypeVar(*var_id),
             PeanoType::Succ(_) => HindleyMilnerInfo::TypeFunc(PeanoTypeHMInfo::Successor),
             PeanoType::Zero => HindleyMilnerInfo::TypeVar(PeanoVariableID::from_hidden_value(0)),
-            PeanoType::Named(n) => HindleyMilnerInfo::TypeFunc(PeanoTypeHMInfo::Named(*n)),
         }
     }
 
@@ -520,10 +518,6 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
     ) -> UnifyResult {
         match (left, right) {
             (PeanoType::Zero, PeanoType::Zero) => UnifyResult::Success,
-            (PeanoType::Named(na), PeanoType::Named(nb)) => {
-                assert!(*na == *nb);
-                UnifyResult::Success
-            } // Already covered by get_hm_info
             (PeanoType::Succ(na), PeanoType::Succ(nb)) => unify(na, nb),
             (PeanoType::Template(na), PeanoType::Template(nb)) => {
                 assert!(*na == *nb);
@@ -542,7 +536,7 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
     ) -> bool {
         match self {
             PeanoType::Succ(typ) => typ.fully_substitute(substitutor),
-            PeanoType::Zero | PeanoType::Named(_) | PeanoType::Template(_) => true,
+            PeanoType::Zero | PeanoType::Template(_) => true,
             PeanoType::Unknown(var) => {
                 // PeanoType::Unknown 0 is really "zero" - need a special zero var because couldn't unify a
                 // zero type function with other type functions like template
@@ -562,7 +556,7 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
 
     fn for_each_unknown(&self, f: &mut impl FnMut(PeanoVariableID)) {
         match self {
-            PeanoType::Zero | PeanoType::Named(_) | PeanoType::Template(_) => {}
+            PeanoType::Zero | PeanoType::Template(_) => {}
             PeanoType::Succ(typ) => typ.for_each_unknown(f),
             PeanoType::Unknown(uuid) => f(*uuid),
         }
