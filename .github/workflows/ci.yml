@@ -21,6 +21,8 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: 1.82
+    - name: Set cargo version
+      run: rustup default 1.82
     - name: Build
       run: cargo build --verbose --all-features
     - name: Run tests
@@ -39,6 +41,8 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: 1.82
+    - name: Set cargo version
+      run: rustup default 1.82
     - name: format
       run: cargo fmt --check
     - name: clippy
