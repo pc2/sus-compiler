@@ -280,6 +280,7 @@ impl PortLatencyInferenceInfo {
         let mut port_groups: Vec<Vec<(PortID, i64)>> = Vec::new();
         let mut edges: Vec<(PortID, PortID, EdgeInfo<LatencyCountInferenceVarID>)> = Vec::new();
         for d in domains {
+            let mut groups_in_this_domain: Vec<Vec<(PortID, i64)>> = Vec::new();
             // Constant offset edges
             for (id, port) in &updated_port_linearities {
                 if port.domain != d {
@@ -290,7 +291,7 @@ impl PortLatencyInferenceInfo {
                 };
 
                 let mut group_found = false;
-                for group in &mut port_groups {
+                for group in &mut groups_in_this_domain {
                     let compare_against = &updated_port_linearities[group[0].0];
 
                     if let Some(delta) = PortLatencyLinearity::is_pair_at_constant_offset(
@@ -304,9 +305,11 @@ impl PortLatencyInferenceInfo {
                 }
                 if !group_found {
                     // new group
-                    port_groups.push(vec![(id, 0)]);
+                    groups_in_this_domain.push(vec![(id, 0)]);
                 }
             }
+
+            port_groups.append(&mut groups_in_this_domain);
 
             // Inference Edges
             for (from_id, from) in &updated_port_linearities {
@@ -556,6 +559,30 @@ mod tests {
         dbg!(&result);
     }
 
+    /// ```sus
+    /// module infer_mex #(int A, int B, int C) {
+    ///     domain x
+    ///     interface x : bool v2'-A, bool v3'-B -> bool v6'0
+    ///     domain y
+    ///     interface y : bool v4'-C+3, bool v5'-B -> bool v7'0
+    /// }
+    /// module use_infer_mex {
+    ///     interface use_infer_mex : bool v0'0 -> bool v8'10
+    ///     bool v1 = v0
+    ///     
+    ///     reg bool v2 = v1
+    ///     reg reg reg reg reg reg bool v3 = v1
+    ///     reg reg bool v4 = v0
+    ///     reg reg reg reg reg bool v5 = v0
+    ///     
+    ///     infer_mex inf
+    ///     bool v6 = inf.x(v2, v3)
+    ///     bool v7 = inf.y(v4, v5)
+    ///     
+    ///     reg reg reg v8 = v6
+    ///     reg reg v8 = v7
+    /// }
+    /// ```
     #[test]
     fn test_infernce_end_to_end() {
         // Outer scope
@@ -635,7 +662,7 @@ mod tests {
                 name_refs: Vec::new(),
             })
         });
-        let wire_to_node_map = FlatAlloc::from_vec(vec![0, 1, 2, 3, 4, 5, 6, 7, 7, 8]);
+        let wire_to_node_map = FlatAlloc::from_vec(vec![0, 1, 2, 3, 4, 5, 6, 7, 8]);
 
         let mut extra_fanin = Vec::new();
         let mut inference_edges = Vec::new();
@@ -661,8 +688,8 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            values_to_infer.map(|(_, v)| v.get()),
-            FlatAlloc::from_vec(vec![Some(6), Some(1), Some(3)]) // C 3 smaller due to offset on port 4
+            values_to_infer.map_to_array(|_, v| v.get()),
+            [Some(6), Some(1), Some(9)] // C 3 smaller due to offset on port 4
         );
     }
 }

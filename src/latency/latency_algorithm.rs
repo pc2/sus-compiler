@@ -959,10 +959,6 @@ pub fn infer_unknown_latency_edges<ID>(
                     candidate.to_node,
                 ),
             ) {
-                if crate::debug::is_enabled("TEST") {
-                    println!("DEBG");
-                }
-
                 let candidate_value = (to - from - candidate.offset) / candidate.multiply_var_by;
                 let target_to_infer = infer_me.take().expect(
                     "At most one partial solution can have a possible value for the candidate",

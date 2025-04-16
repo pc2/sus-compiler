@@ -4,10 +4,12 @@ use dot::{render, Edges, GraphWalk, Id, LabelText, Labeller, Nodes, Style};
 
 use crate::{
     alloc::FlatAlloc,
-    instantiation::{ForEachContainedWire, InstantiatedModule, RealWire, RealWireDataSource},
+    instantiation::{
+        ForEachContainedWire, InstantiatedModule, RealWire, RealWireDataSource, SubModule,
+    },
     latency::LatencyCountingProblem,
     linker::Linker,
-    prelude::{SubModuleID, WireID, WireIDMarker},
+    prelude::{SubModuleID, SubModuleIDMarker, WireID, WireIDMarker},
 };
 
 pub fn display_generated_hardware_structure(md_instance: &InstantiatedModule, linker: &Linker) {
@@ -129,6 +131,8 @@ impl<'inst> GraphWalk<'inst, NodeType, EdgeType> for (&'inst InstantiatedModule,
 pub fn display_latency_count_graph(
     lc_problem: &LatencyCountingProblem,
     wires: &FlatAlloc<RealWire, WireIDMarker>,
+    submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
+    linker: &Linker,
     solution: Option<&[i64]>,
     filename: &str,
 ) {
@@ -152,6 +156,8 @@ pub fn display_latency_count_graph(
         &Problem {
             lc_problem,
             wires,
+            submodules,
+            linker,
             solution,
             extra_node_info,
         },
@@ -161,22 +167,29 @@ pub fn display_latency_count_graph(
 }
 
 #[derive(Clone, Copy)]
-enum LCEdgeType {
+enum LCEdgeType<'a> {
     Normal(i64),
-    Infer(usize),
+    Infer {
+        in_submod: &'a str,
+        var: &'a str,
+        offset: i64,
+        multiplier: i64,
+    },
     Poison,
 }
 
-type LatencyEdge = (usize, usize, LCEdgeType);
+type LatencyEdge<'a> = (usize, usize, LCEdgeType<'a>);
 
 struct Problem<'a> {
     lc_problem: &'a LatencyCountingProblem,
     wires: &'a FlatAlloc<RealWire, WireIDMarker>,
+    submodules: &'a FlatAlloc<SubModule, SubModuleIDMarker>,
+    linker: &'a Linker,
     solution: Option<&'a [i64]>,
     extra_node_info: Vec<(Option<bool>, Option<i64>)>,
 }
 
-impl<'a> Labeller<'a, usize, LatencyEdge> for Problem<'a> {
+impl<'a> Labeller<'a, usize, LatencyEdge<'a>> for Problem<'a> {
     fn graph_id(&'a self) -> Id<'a> {
         Id::new("lcGraph").unwrap()
     }
@@ -202,7 +215,12 @@ impl<'a> Labeller<'a, usize, LatencyEdge> for Problem<'a> {
     fn edge_label(&'a self, e: &LatencyEdge) -> LabelText<'a> {
         LabelText::LabelStr(match e.2 {
             LCEdgeType::Normal(delta) => delta.to_string().into(),
-            LCEdgeType::Infer(var) => format!("Infer {var}").into(),
+            LCEdgeType::Infer {
+                var,
+                in_submod,
+                offset,
+                multiplier,
+            } => format!("Infer <= {multiplier} * {in_submod}.{var} + {offset}").into(),
             LCEdgeType::Poison => "poison".into(),
         })
     }
@@ -210,7 +228,7 @@ impl<'a> Labeller<'a, usize, LatencyEdge> for Problem<'a> {
     fn edge_color(&'a self, e: &LatencyEdge) -> Option<LabelText<'a>> {
         match e.2 {
             LCEdgeType::Normal(_) => None,
-            LCEdgeType::Infer(_) => Some(LabelText::LabelStr("green".into())),
+            LCEdgeType::Infer { .. } => Some(LabelText::LabelStr("green".into())),
             LCEdgeType::Poison => Some(LabelText::LabelStr("red".into())),
         }
     }
@@ -222,7 +240,7 @@ impl<'a> Labeller<'a, usize, LatencyEdge> for Problem<'a> {
     }
 }
 
-impl<'a> GraphWalk<'a, usize, LatencyEdge> for Problem<'a> {
+impl<'a> GraphWalk<'a, usize, LatencyEdge<'a>> for Problem<'a> {
     fn nodes(&'a self) -> Nodes<'a, usize> {
         (0..self.lc_problem.map_latency_node_to_wire.len()).collect()
     }
@@ -243,10 +261,24 @@ impl<'a> GraphWalk<'a, usize, LatencyEdge> for Problem<'a> {
         }
 
         for infer_edge in &self.lc_problem.inference_edges {
+            let var = &self.lc_problem.inference_variables[infer_edge.target_to_infer];
+            let submod = &self.submodules[var.back_reference.0];
+            let submod_md = &self.linker.modules[submod.refers_to.id];
+            let var_param = submod_md.link_info.template_parameters[var.back_reference.1]
+                .kind
+                .unwrap_value();
+            let var_decl = submod_md.link_info.instructions[var_param.declaration_instruction]
+                .unwrap_declaration();
+
             result.push((
                 infer_edge.from_node,
                 infer_edge.to_node,
-                LCEdgeType::Infer(infer_edge.target_to_infer.get_hidden_value()),
+                LCEdgeType::Infer {
+                    in_submod: &submod.name,
+                    var: &var_decl.name,
+                    offset: infer_edge.offset,
+                    multiplier: infer_edge.multiply_var_by,
+                },
             ));
         }
 

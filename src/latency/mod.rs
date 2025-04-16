@@ -220,7 +220,14 @@ impl LatencyCountingProblem {
         file_name: &str,
     ) {
         if crate::debug::is_enabled(debug_flag) {
-            display_latency_count_graph(self, &ctx.wires, solution, file_name);
+            display_latency_count_graph(
+                self,
+                &ctx.wires,
+                &ctx.submodules,
+                ctx.linker,
+                solution,
+                file_name,
+            );
         }
     }
 }
