@@ -51,7 +51,7 @@ Error: While parsing 'source_file', parser found a syntax error in a node of typ
       │ │       ─────────────────────────────┬────────────────────────────  
       │ │                                    ╰────────────────────────────── While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
       ┆ ┆   
- 1276 │ ├─▶ }
+ 1349 │ ├─▶ }
       │ │       
       │ ╰─────── Parent node 'source_file'
 ──────╯
@@ -64,7 +64,7 @@ Error: While parsing 'source_file', parser found a syntax error in a node of typ
       │ │   ┬  
       │ │   ╰── While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
       ┆ ┆   
- 1276 │ ├─▶ }
+ 1349 │ ├─▶ }
       │ │       
       │ ╰─────── Parent node 'source_file'
 ──────╯
@@ -3495,4 +3495,121 @@ Error: Typing Error: write wire access expects a ::int[0] but was given a ::int[
  1275 │     int[4] result = []
       │     ──────┬──────  
       │           ╰──────── Typing Error: write wire access expects a ::int[0] but was given a ::int[4]
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1278:29 ]
+      │
+ 1278 │ module unknownLatency #(int V) {
+      │                             ┬  
+      │                             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not fully instantiate ::unknownLatency #(
+    V: /* Could not infer */
+)
+      ╭─[ test.sus:1288:17 ]
+      │
+ 1288 │     unknownLatency ulat
+      │                    ──┬─  
+      │                      ╰─── Could not fully instantiate ::unknownLatency #(
+    V: /* Could not infer */
+)
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1294:20 ]
+      │
+ 1294 │     interface a: bool x'0 -> bool y'V
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1296:20 ]
+      │
+ 1296 │     interface b: bool p'0 -> bool q'-V
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not fully instantiate ::infer_me_conflicting_directions #(
+    V: /* Could not infer */
+)
+      ╭─[ test.sus:1302:34 ]
+      │
+ 1302 │     infer_me_conflicting_directions inf
+      │                                     ─┬─  
+      │                                      ╰─── Could not fully instantiate ::infer_me_conflicting_directions #(
+    V: /* Could not infer */
+)
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1309:20 ]
+      │
+ 1309 │     interface a: bool x'0 -> bool y'V
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1311:20 ]
+      │
+ 1311 │     interface b: bool p'0 -> bool q'V+30
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1324:20 ]
+      │
+ 1324 │     interface a: bool x'0 -> bool y'-V
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1326:20 ]
+      │
+ 1326 │     interface b: bool p'0 -> bool q'-V+30
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1338:35 ]
+      │
+ 1338 │ module infer_me_inputs_only #(int V) {
+      │                                   ┬  
+      │                                   ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1339:40 ]
+      │
+ 1339 │     interface infer_me_inputs_only : bool a'0, bool b'V
+      │                                           ┬  
+      │                                           ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1339:50 ]
+      │
+ 1339 │     interface infer_me_inputs_only : bool a'0, bool b'V
+      │                                                     ┬  
+      │                                                     ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1343:44 ]
+      │
+ 1343 │     interface use_infer_me_inputs_only : bool x'0
+      │                                               ┬  
+      │                                               ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1346:19 ]
+      │
+ 1346 │     reg reg reg bool y = x
+      │                      ┬  
+      │                      ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not fully instantiate ::infer_me_inputs_only #(
+    V: /* Could not infer */
+)
+      ╭─[ test.sus:1348:2 ]
+      │
+ 1348 │     infer_me_inputs_only(x, y)
+      │     ──────────┬─────────  
+      │               ╰─────────── Could not fully instantiate ::infer_me_inputs_only #(
+    V: /* Could not infer */
+)
 ──────╯

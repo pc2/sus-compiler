@@ -294,8 +294,8 @@ impl PortLatencyInferenceInfo {
                     let compare_against = &updated_port_linearities[group[0].0];
 
                     if let Some(delta) = PortLatencyLinearity::is_pair_at_constant_offset(
-                        port_lat_lin,
                         compare_against.latency_linearity.as_ref().unwrap(),
+                        port_lat_lin,
                     ) {
                         group.push((id, delta));
                         group_found = true;

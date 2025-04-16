@@ -144,6 +144,16 @@ TREE SITTER module! ShiftReg
 TREE SITTER module! MultiStateLoop
 TREE SITTER module! use_MultiStateLoop
 TREE SITTER module! CombineArray
+TREE SITTER module! unknownLatency
+TREE SITTER module! useUnknownLatency
+TREE SITTER module! infer_me_conflicting_directions
+TREE SITTER module! use_infer_me_conflicting_directions
+TREE SITTER module! infer_me_with_delta
+TREE SITTER module! use_infer_me_with_delta
+TREE SITTER module! infer_me_with_negative_delta
+TREE SITTER module! use_infer_me_with_negative_delta
+TREE SITTER module! infer_me_inputs_only
+TREE SITTER module! use_infer_me_inputs_only
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -274,6 +284,16 @@ Typechecking ShiftReg
 Typechecking MultiStateLoop
 Typechecking use_MultiStateLoop
 Typechecking CombineArray
+Typechecking unknownLatency
+Typechecking useUnknownLatency
+Typechecking infer_me_conflicting_directions
+Typechecking use_infer_me_conflicting_directions
+Typechecking infer_me_with_delta
+Typechecking use_infer_me_with_delta
+Typechecking infer_me_with_negative_delta
+Typechecking use_infer_me_with_negative_delta
+Typechecking infer_me_inputs_only
+Typechecking use_infer_me_inputs_only
 Instantiating Iterator
 Concrete Typechecking Iterator
 Latency Counting Iterator
@@ -755,3 +775,31 @@ Instantiating CombineArray
 Concrete Typechecking CombineArray
 Latency Counting CombineArray
 Checking array accesses CombineArray
+Instantiating useUnknownLatency
+Concrete Typechecking useUnknownLatency
+Latency Counting useUnknownLatency
+Checking array accesses useUnknownLatency
+Instantiating use_infer_me_conflicting_directions
+Concrete Typechecking use_infer_me_conflicting_directions
+Latency Counting use_infer_me_conflicting_directions
+Checking array accesses use_infer_me_conflicting_directions
+Instantiating use_infer_me_with_delta
+Concrete Typechecking use_infer_me_with_delta
+Instantiating infer_me_with_delta
+Concrete Typechecking infer_me_with_delta
+Latency Counting infer_me_with_delta
+Checking array accesses infer_me_with_delta
+Latency Counting use_infer_me_with_delta
+Checking array accesses use_infer_me_with_delta
+Instantiating use_infer_me_with_negative_delta
+Concrete Typechecking use_infer_me_with_negative_delta
+Instantiating infer_me_with_negative_delta
+Concrete Typechecking infer_me_with_negative_delta
+Latency Counting infer_me_with_negative_delta
+Checking array accesses infer_me_with_negative_delta
+Latency Counting use_infer_me_with_negative_delta
+Checking array accesses use_infer_me_with_negative_delta
+Instantiating use_infer_me_inputs_only
+Concrete Typechecking use_infer_me_inputs_only
+Latency Counting use_infer_me_inputs_only
+Checking array accesses use_infer_me_inputs_only
