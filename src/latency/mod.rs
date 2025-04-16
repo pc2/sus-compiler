@@ -160,10 +160,6 @@ impl LatencyCountingProblem {
         let mut inference_variables = FlatAlloc::new();
         let mut inference_edges = Vec::new();
 
-        if crate::debug::is_enabled("TEST") {
-            print!("DEBG")
-        }
-
         // Submodules
         for (sm_id, sm) in &ctx.submodules {
             let local_inference_edges = sm.get_interface_relative_latencies(

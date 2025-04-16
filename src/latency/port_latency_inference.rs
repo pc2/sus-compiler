@@ -332,17 +332,27 @@ impl PortLatencyInferenceInfo {
                                     target_to_infer,
                                     multiply_var_by: multiplier,
                                     offset,
-                                } => EdgeInfo::Inferrable {
-                                    target_to_infer: *local_variables[target_to_infer]
+                                } => {
+                                    assert!(multiplier != 0);
+                                    let linearity_is_positive = multiplier >= 0;
+                                    let target_to_infer = *local_variables[target_to_infer]
                                         .get_or_insert_with(|| {
-                                            latency_inference_variables.alloc(ValueToInfer::new((
-                                                submodule_id,
-                                                target_to_infer,
-                                            )))
-                                        }),
-                                    multiply_var_by: multiplier,
-                                    offset,
-                                },
+                                            latency_inference_variables.alloc(ValueToInfer::new(
+                                                (submodule_id, target_to_infer),
+                                                linearity_is_positive,
+                                            ))
+                                        });
+                                    let var = &mut latency_inference_variables[target_to_infer];
+                                    if var.linear_factor_is_positive != linearity_is_positive {
+                                        // Cannot infer a variable with both positive and negative corrlations, as these would conflict
+                                        var.spoil();
+                                    }
+                                    EdgeInfo::Inferrable {
+                                        target_to_infer,
+                                        multiply_var_by: multiplier,
+                                        offset,
+                                    }
+                                }
                                 EdgeInfo::Poison => EdgeInfo::Poison,
                             }
                         } else {

@@ -837,13 +837,38 @@ pub struct LatencyInferenceCandidate {
 pub struct ValueToInfer<ID> {
     /// Initially Some([i64::MAX]), decreasing. Set to None when a [LatencyInferenceCandidate] targets it, but cannot be resolved
     inferred_value: Option<i64>,
+    /// Represents if the variable is being used in an edge with a positive coefficient ('0 -> 'V), or a negative coefficient ('V -> '0)
+    /// Used to see in what direction multiple inferences should be combined.
+    /// This is because the resulting value should be as lax as possible.
+    /// Example:
+    /// ```sus
+    /// module infer_me #(int V) {
+    ///     interface a : bool iA'0 -> bool oA'V
+    ///     interface b : bool iB'0 -> bool oB'V+3
+    /// }
+    /// module use_infer_me {
+    ///     interface i : bool i'0 -> bool o'5
+    ///
+    ///     infer_me iii
+    ///     o = iii.a(i) // Requires V <= 5
+    ///     o = iii.b(i) // Requires V <= 2 // V becomes 2
+    /// }
+    /// ```
+    /// If positive, then we take the max of the possible candidates, otherwise the min.
+    /// If the user specifies both a negative, and a positive offset, then we can't infer without possibly breaking things, and so we .spoil() immediately
+    pub linear_factor_is_positive: bool,
     pub back_reference: ID,
 }
 
 impl<ID> ValueToInfer<ID> {
-    pub fn new(back_reference: ID) -> Self {
+    pub fn new(back_reference: ID, linear_factor_is_positive: bool) -> Self {
         Self {
-            inferred_value: Some(i64::MAX),
+            inferred_value: Some(if linear_factor_is_positive {
+                i64::MAX
+            } else {
+                i64::MIN
+            }),
+            linear_factor_is_positive,
             back_reference,
         }
     }
@@ -853,10 +878,14 @@ impl<ID> ValueToInfer<ID> {
     }
     fn apply_candidate(&mut self, candidate_value: i64) {
         if let Some(v) = &mut self.inferred_value {
-            *v = i64::min(*v, candidate_value);
+            *v = if self.linear_factor_is_positive {
+                i64::min(*v, candidate_value)
+            } else {
+                i64::max(*v, candidate_value)
+            };
         }
     }
-    fn spoil(&mut self) {
+    pub fn spoil(&mut self) {
         self.inferred_value = None;
     }
 }
@@ -930,7 +959,11 @@ pub fn infer_unknown_latency_edges<ID>(
                     candidate.to_node,
                 ),
             ) {
-                let candidate_value = (to - from + candidate.offset) / candidate.multiply_var_by;
+                if crate::debug::is_enabled("TEST") {
+                    println!("DEBG");
+                }
+
+                let candidate_value = (to - from - candidate.offset) / candidate.multiply_var_by;
                 let target_to_infer = infer_me.take().expect(
                     "At most one partial solution can have a possible value for the candidate",
                 );
@@ -1862,10 +1895,10 @@ mod tests {
         let specified_latencies = [];
 
         let mut values_to_infer = FlatAlloc::new();
-        let a = values_to_infer.alloc(ValueToInfer::new(()));
-        let b = values_to_infer.alloc(ValueToInfer::new(())); // Shared by two inference candidates
-        let c = values_to_infer.alloc(ValueToInfer::new(()));
-        let d = values_to_infer.alloc(ValueToInfer::new(())); // Cannot be inferred
+        let a = values_to_infer.alloc(ValueToInfer::new((), true));
+        let b = values_to_infer.alloc(ValueToInfer::new((), true)); // Shared by two inference candidates
+        let c = values_to_infer.alloc(ValueToInfer::new((), true));
+        let d = values_to_infer.alloc(ValueToInfer::new((), true)); // Cannot be inferred
 
         let inference_edges = vec![
             LatencyInferenceCandidate {
@@ -1946,8 +1979,8 @@ mod tests {
         let specified_latencies = [];
 
         let mut values_to_infer = FlatAlloc::new();
-        let a = values_to_infer.alloc(ValueToInfer::new(()));
-        let b = values_to_infer.alloc(ValueToInfer::new(()));
+        let a = values_to_infer.alloc(ValueToInfer::new((), true));
+        let b = values_to_infer.alloc(ValueToInfer::new((), true));
 
         let inference_edges = vec![
             LatencyInferenceCandidate {
@@ -2008,8 +2041,8 @@ mod tests {
         let specified_latencies = [];
 
         let mut values_to_infer = FlatAlloc::new();
-        let a = values_to_infer.alloc(ValueToInfer::new(()));
-        let b = values_to_infer.alloc(ValueToInfer::new(()));
+        let a = values_to_infer.alloc(ValueToInfer::new((), true));
+        let b = values_to_infer.alloc(ValueToInfer::new((), true));
 
         let inference_edges = vec![
             LatencyInferenceCandidate {
@@ -2256,7 +2289,7 @@ mod tests {
             latency: 0,
         }];
         let mut values_to_infer = FlatAlloc::new();
-        let latency_0 = values_to_infer.alloc(ValueToInfer::new(()));
+        let latency_0 = values_to_infer.alloc(ValueToInfer::new((), true));
         let inference_edges = vec![
             LatencyInferenceCandidate {
                 multiply_var_by: -1,
