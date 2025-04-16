@@ -36,6 +36,9 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.82
     - name: format
       run: cargo fmt --check
     - name: clippy
