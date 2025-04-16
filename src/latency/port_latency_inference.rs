@@ -1,5 +1,5 @@
 use crate::{
-    alloc::{zip_eq, UUIDRange},
+    alloc::zip_eq,
     flattening::{DeclarationKind, ExpressionSource},
     instantiation::{SubModule, SubModulePort},
     prelude::*,
@@ -15,9 +15,7 @@ use crate::flattening::{
     BinaryOperator, Instruction, Port, UnaryOperator, WireReference, WireReferenceRoot,
 };
 
-use super::latency_algorithm::{
-    add_cycle_to_extra_fanin, FanInOut, LatencyInferenceCandidate, SpecifiedLatency, ValueToInfer,
-};
+use super::latency_algorithm::{FanInOut, LatencyInferenceCandidate, ValueToInfer};
 
 /*/// ports whose latency annotations require them to be at fixed predefined offsets
 ///
@@ -35,6 +33,7 @@ struct PortGroup {
 }*/
 #[derive(Debug, Clone, Copy)]
 pub enum EdgeInfo<ID> {
+    ConstantOffset(i64),
     /// |from| + value_of(id) * multiplier + offset = |to|
     Inferrable {
         target_to_infer: ID,
@@ -65,25 +64,21 @@ impl PortLatencyLinearity {
         self.arg_linear_factor.iter().all(|(_, v)| *v == 0)
     }
 
-    fn is_pair_at_constant_offset(from: &Self, to: &Self) -> Option<i64> {
-        (from.arg_linear_factor == to.arg_linear_factor)
-            .then_some(to.const_factor - from.const_factor)
-    }
     /// Checks if the two latency annotations are offset by a constant and exactly 1x a template variable
     fn is_pair_latency_candidate(from: &Self, to: &Self) -> EdgeInfo<TemplateID> {
-        let mut result = EdgeInfo::Poison;
+        let mut result = EdgeInfo::ConstantOffset(to.const_factor - from.const_factor);
 
         for (target_to_infer, a, b) in zip_eq(&from.arg_linear_factor, &to.arg_linear_factor) {
             let multiplier = *b - *a;
             if multiplier != 0 {
-                let EdgeInfo::Poison = result else {
+                let EdgeInfo::ConstantOffset(offset) = result else {
                     result = EdgeInfo::Poison; // Offset was already by multiple template vars
                     break;
                 };
                 result = EdgeInfo::Inferrable {
                     target_to_infer,
                     multiply_var_by: multiplier,
-                    offset: to.const_factor - from.const_factor,
+                    offset,
                 }
             }
         }
@@ -261,7 +256,6 @@ impl PortLatencyInferenceInfo {
     pub fn get_inference_edges<ID: Copy>(
         &self,
         known_template_args: &TVec<Option<i64>>,
-        domains: UUIDRange<DomainIDMarker>,
         submodule_id: ID,
         latency_inference_variables: &mut FlatAlloc<
             ValueToInfer<(ID, TemplateID)>,
@@ -277,102 +271,88 @@ impl PortLatencyInferenceInfo {
 
         let mut local_variables = known_template_args.map(|_| None);
 
-        let mut port_groups: Vec<Vec<(PortID, i64)>> = Vec::new();
         let mut edges: Vec<(PortID, PortID, EdgeInfo<LatencyCountInferenceVarID>)> = Vec::new();
-        for d in domains {
-            let mut groups_in_this_domain: Vec<Vec<(PortID, i64)>> = Vec::new();
-            // Constant offset edges
-            for (id, port) in &updated_port_linearities {
-                if port.domain != d {
-                    continue; // ports on different domains cannot be related in latency counting
-                }
-                let Some(port_lat_lin) = &port.latency_linearity else {
-                    continue; // Could not determine latency, so this port can't be part of a group
-                };
 
-                let mut group_found = false;
-                for group in &mut groups_in_this_domain {
-                    let compare_against = &updated_port_linearities[group[0].0];
-
-                    if let Some(delta) = PortLatencyLinearity::is_pair_at_constant_offset(
-                        compare_against.latency_linearity.as_ref().unwrap(),
-                        port_lat_lin,
-                    ) {
-                        group.push((id, delta));
-                        group_found = true;
-                        break;
-                    }
-                }
-                if !group_found {
-                    // new group
-                    groups_in_this_domain.push(vec![(id, 0)]);
-                }
+        // Inference Edges
+        for (from_id, from) in &updated_port_linearities {
+            if !from.is_input {
+                continue;
             }
-
-            port_groups.append(&mut groups_in_this_domain);
-
-            // Inference Edges
-            for (from_id, from) in &updated_port_linearities {
-                if from.domain != d || !from.is_input {
+            for (to_id, to) in &updated_port_linearities {
+                if to.domain != from.domain || to.is_input {
                     continue; // ports on different domains cannot be related in latency counting
                 }
-                for (to_id, to) in &updated_port_linearities {
-                    if to.domain != d || to.is_input {
-                        continue; // ports on different domains cannot be related in latency counting
-                    }
 
-                    edges.push((
-                        from_id,
-                        to_id,
-                        if let (Some(from_linearity), Some(to_linearity)) =
-                            (&from.latency_linearity, &to.latency_linearity)
-                        {
-                            match PortLatencyLinearity::is_pair_latency_candidate(
-                                from_linearity,
-                                to_linearity,
-                            ) {
+                edges.push((
+                    from_id,
+                    to_id,
+                    if let (Some(from_linearity), Some(to_linearity)) =
+                        (&from.latency_linearity, &to.latency_linearity)
+                    {
+                        match PortLatencyLinearity::is_pair_latency_candidate(
+                            from_linearity,
+                            to_linearity,
+                        ) {
+                            EdgeInfo::Inferrable {
+                                target_to_infer,
+                                multiply_var_by: multiplier,
+                                offset,
+                            } => {
+                                assert!(multiplier != 0);
+                                let linearity_is_positive = multiplier >= 0;
+                                let target_to_infer = *local_variables[target_to_infer]
+                                    .get_or_insert_with(|| {
+                                        latency_inference_variables.alloc(ValueToInfer::new(
+                                            (submodule_id, target_to_infer),
+                                            linearity_is_positive,
+                                        ))
+                                    });
+                                let var = &mut latency_inference_variables[target_to_infer];
+                                if var.linear_factor_is_positive != linearity_is_positive {
+                                    // Cannot infer a variable with both positive and negative corrlations, as these would conflict
+                                    var.spoil();
+                                }
                                 EdgeInfo::Inferrable {
                                     target_to_infer,
                                     multiply_var_by: multiplier,
                                     offset,
-                                } => {
-                                    assert!(multiplier != 0);
-                                    let linearity_is_positive = multiplier >= 0;
-                                    let target_to_infer = *local_variables[target_to_infer]
-                                        .get_or_insert_with(|| {
-                                            latency_inference_variables.alloc(ValueToInfer::new(
-                                                (submodule_id, target_to_infer),
-                                                linearity_is_positive,
-                                            ))
-                                        });
-                                    let var = &mut latency_inference_variables[target_to_infer];
-                                    if var.linear_factor_is_positive != linearity_is_positive {
-                                        // Cannot infer a variable with both positive and negative corrlations, as these would conflict
-                                        var.spoil();
-                                    }
-                                    EdgeInfo::Inferrable {
-                                        target_to_infer,
-                                        multiply_var_by: multiplier,
-                                        offset,
-                                    }
                                 }
-                                EdgeInfo::Poison => EdgeInfo::Poison,
                             }
-                        } else {
-                            EdgeInfo::Poison
-                        },
-                    ));
-                }
+                            EdgeInfo::ConstantOffset(cst) => EdgeInfo::ConstantOffset(cst),
+                            EdgeInfo::Poison => EdgeInfo::Poison,
+                        }
+                    } else {
+                        EdgeInfo::Poison
+                    },
+                ));
             }
         }
-        InferenceEdgesForDomain { edges, port_groups }
+        InferenceEdgesForDomain { edges }
     }
 }
 
 #[derive(Debug)]
 pub struct InferenceEdgesForDomain {
-    port_groups: Vec<Vec<(PortID, i64)>>,
     edges: Vec<(PortID, PortID, EdgeInfo<LatencyCountInferenceVarID>)>,
+}
+
+fn add_cycle_to_extra_fanin(
+    cycle: &[(PortID, i64)],
+    edges: &mut Vec<(PortID, PortID, EdgeInfo<LatencyCountInferenceVarID>)>,
+) {
+    if cycle.len() <= 1 {
+        return;
+    }
+    let mut previous_node = *cycle.last().unwrap();
+
+    for node in cycle {
+        edges.push((
+            node.0,
+            previous_node.0,
+            EdgeInfo::ConstantOffset(previous_node.1 - node.1),
+        ));
+        previous_node = *node;
+    }
 }
 
 impl SubModule {
@@ -391,25 +371,28 @@ impl SubModule {
         if let Some(instance) = self.instance.get() {
             // The module has already been instantiated, so we know all local absolute latencies
             // No inference edges
-            let port_groups = sm_md
-                .domains
-                .id_range()
-                .into_iter()
-                .map(|domain_id| {
-                    instance
-                        .interface_ports
-                        .iter_valids()
-                        .filter_map(|(port_id, instance_port)| {
-                            (instance_port.domain == domain_id)
-                                .then_some((port_id, instance_port.absolute_latency))
-                        })
-                        .collect()
-                })
-                .collect();
-            InferenceEdgesForDomain {
-                port_groups,
-                edges: Vec::new(),
+            let mut specified_per_domain: FlatAlloc<Vec<(PortID, i64)>, DomainIDMarker> =
+                sm_md.domains.map(|_| Vec::new());
+
+            for (p_id, port) in instance.interface_ports.iter_valids() {
+                specified_per_domain[port.domain].push((p_id, port.absolute_latency));
             }
+
+            let mut total_size = 0;
+            for (_, v) in &mut specified_per_domain {
+                if v.len() <= 1 {
+                    v.clear();
+                }
+                total_size += v.len();
+            }
+
+            let mut edges = Vec::with_capacity(total_size);
+
+            for (_, v) in &specified_per_domain {
+                add_cycle_to_extra_fanin(v, &mut edges)
+            }
+
+            InferenceEdgesForDomain { edges }
         } else {
             let known_template_args = self.refers_to.template_args.map(|(_, t)| {
                 let mut t_copy = t.clone();
@@ -424,7 +407,6 @@ impl SubModule {
 
             sm_md.latency_inference_info.get_inference_edges(
                 &known_template_args,
-                sm_md.named_domains,
                 sm_id,
                 latency_inference_variables,
             )
@@ -446,19 +428,6 @@ impl InferenceEdgesForDomain {
                 .map(|port_wire| wire_to_node_map[port_wire.maps_to_wire])
         };
 
-        for group in &self.port_groups {
-            let valid_port_nodes: Vec<SpecifiedLatency> = group
-                .iter()
-                .filter_map(|(port, relative_latency)| {
-                    port_to_node(*port).map(|node| SpecifiedLatency {
-                        node,
-                        latency: *relative_latency,
-                    })
-                })
-                .collect();
-            add_cycle_to_extra_fanin(&valid_port_nodes, extra_fanin);
-        }
-
         for (from, to, edge_info) in &self.edges {
             let (Some(from_node), Some(to_node)) = (port_to_node(*from), port_to_node(*to)) else {
                 continue; // Can't infer based on ports that aren't used
@@ -471,6 +440,15 @@ impl InferenceEdgesForDomain {
                         FanInOut {
                             to_node: from_node,
                             delta_latency: None,
+                        },
+                    ));
+                }
+                EdgeInfo::ConstantOffset(cst) => {
+                    extra_fanin.push((
+                        to_node,
+                        FanInOut {
+                            to_node: from_node,
+                            delta_latency: Some(cst),
                         },
                     ));
                 }
@@ -553,8 +531,7 @@ mod tests {
 
         let mut variables = FlatAlloc::new();
 
-        let result =
-            latency_info.get_inference_edges(&known_template_args, domains, (), &mut variables);
+        let result = latency_info.get_inference_edges(&known_template_args, (), &mut variables);
 
         dbg!(&result);
     }
@@ -647,12 +624,8 @@ mod tests {
 
         let mut values_to_infer = FlatAlloc::new();
 
-        let local_inference_edges = latency_info.get_inference_edges(
-            &known_template_args,
-            domains,
-            (),
-            &mut values_to_infer,
-        );
+        let local_inference_edges =
+            latency_info.get_inference_edges(&known_template_args, (), &mut values_to_infer);
 
         // Because both domains of the submodule are part of the outer domain, we just merge both
 
