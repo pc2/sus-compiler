@@ -663,9 +663,9 @@ pub fn apply_types(
         let expected_name = "todo"; /*expected
                                     .display(inner_types, &type_checker.template_type_names)
                                     .to_string();*/
-        let found_name = "todo"; /*found
-                                 .display(inner_types, &type_checker.template_type_names)
-                                 .to_string();*/
+        let found_name = "todo 2"; /*found
+                                   .display(inner_types, &type_checker.template_type_names)
+                                   .to_string();*/
         errors
             .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
             .add_info_list(infos);

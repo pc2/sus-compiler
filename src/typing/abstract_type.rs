@@ -64,7 +64,6 @@ impl AbstractRankedType {
 #[derive(Debug, Clone)]
 pub enum PeanoType {
     Zero,
-    Template(TemplateID),
     Succ(Box<PeanoType>),
     Unknown(PeanoVariableID),
 }
@@ -131,9 +130,8 @@ impl Display for PeanoType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             PeanoType::Zero => write!(f, ""),
-            PeanoType::Template(id) => write!(f, "<[T]>"),
-            PeanoType::Succ(inner) => write!(f, "{}[]", inner.to_string()),
-            PeanoType::Unknown(id) => write!(f, "<[...]>"),
+            PeanoType::Succ(inner) => write!(f, "{}[]", inner),
+            PeanoType::Unknown(_) => write!(f, "<[...]>"),
         }
     }
 }
@@ -163,9 +161,7 @@ pub struct TypeUnifier {
 impl TypeUnifier {
     pub fn new(parameters: &TVec<Parameter>, typing_alloc: TypingAllocator) -> Self {
         let p = TypeSubstitutor::init(&typing_alloc.peano_variable_alloc);
-        p.alloc();
-        // Allocate the identifier for the Peano variable with identity 0, the 0 variable. Needed so that Zero
-        // can be a HM type var rather than a type func.
+
         Self {
             template_type_names: map_to_type_names(parameters),
             abstract_type_substitutor: TypeSubstitutor::init(
@@ -203,7 +199,7 @@ impl TypeUnifier {
                 self.abstract_type_substitutor
                     .unify_must_succeed(&typ.inner, &AbstractInnerType::Template(*argument_id));
                 self.peano_substitutor
-                    .unify_must_succeed(&typ.rank, &PeanoType::Template(*argument_id));
+                    .unify_must_succeed(&typ.rank, &PeanoType::Zero);
             }
             WrittenType::Named(global_reference) => {
                 self.abstract_type_substitutor

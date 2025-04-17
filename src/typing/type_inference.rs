@@ -494,7 +494,7 @@ impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PeanoTypeHMInfo {
     Successor,
-    Template(TemplateID),
+    Zero,
 }
 
 impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
@@ -502,12 +502,9 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
 
     fn get_hm_info(&self) -> HindleyMilnerInfo<PeanoTypeHMInfo, PeanoVariableIDMarker> {
         match self {
-            PeanoType::Template(template_id) => {
-                HindleyMilnerInfo::TypeFunc(PeanoTypeHMInfo::Template(*template_id))
-            }
             PeanoType::Unknown(var_id) => HindleyMilnerInfo::TypeVar(*var_id),
             PeanoType::Succ(_) => HindleyMilnerInfo::TypeFunc(PeanoTypeHMInfo::Successor),
-            PeanoType::Zero => HindleyMilnerInfo::TypeVar(PeanoVariableID::from_hidden_value(0)),
+            PeanoType::Zero => HindleyMilnerInfo::TypeFunc(PeanoTypeHMInfo::Zero),
         }
     }
 
@@ -519,10 +516,6 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
         match (left, right) {
             (PeanoType::Zero, PeanoType::Zero) => UnifyResult::Success,
             (PeanoType::Succ(na), PeanoType::Succ(nb)) => unify(na, nb),
-            (PeanoType::Template(na), PeanoType::Template(nb)) => {
-                assert!(*na == *nb);
-                UnifyResult::Success
-            } // Already covered by get_hm_info
             (_, _) => unreachable!(
                 "All others ({:?}, {:?}) should have been eliminated by get_hm_info check",
                 left, right
@@ -536,13 +529,8 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
     ) -> bool {
         match self {
             PeanoType::Succ(typ) => typ.fully_substitute(substitutor),
-            PeanoType::Zero | PeanoType::Template(_) => true,
+            PeanoType::Zero => true,
             PeanoType::Unknown(var) => {
-                // PeanoType::Unknown 0 is really "zero" - need a special zero var because couldn't unify a
-                // zero type function with other type functions like template
-                if var.get_hidden_value() == 0 {
-                    return true;
-                }
                 let Some(replacement) = substitutor.substitution_map[var.get_hidden_value()].get()
                 else {
                     return false;
@@ -556,7 +544,7 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
 
     fn for_each_unknown(&self, f: &mut impl FnMut(PeanoVariableID)) {
         match self {
-            PeanoType::Zero | PeanoType::Template(_) => {}
+            PeanoType::Zero => {}
             PeanoType::Succ(typ) => typ.for_each_unknown(f),
             PeanoType::Unknown(uuid) => f(*uuid),
         }
