@@ -659,13 +659,12 @@ pub fn apply_types(
         let _ = found.fully_substitute(&type_checker.abstract_type_substitutor);
         let _ = expected.fully_substitute(&type_checker.abstract_type_substitutor);
 
-        // todo: try fetching the AbstractRankedType to display that instead
-        let expected_name = "todo"; /*expected
-                                    .display(inner_types, &type_checker.template_type_names)
-                                    .to_string();*/
-        let found_name = "todo 2"; /*found
-                                   .display(inner_types, &type_checker.template_type_names)
-                                   .to_string();*/
+        let expected_name = expected
+            .display(linker_types, &type_checker.template_type_names)
+            .to_string();
+        let found_name = found
+            .display(linker_types, &type_checker.template_type_names)
+            .to_string();
         errors
             .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
             .add_info_list(infos);

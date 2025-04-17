@@ -133,6 +133,43 @@ impl AbstractRankedType {
 }
 
 #[derive(Debug)]
+pub struct AbstractInnerTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
+    inner_typ: &'a AbstractInnerType,
+    linker_types: &'a TypVec,
+    template_names: &'a TemplateVec,
+}
+
+impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
+    for AbstractInnerTypeDisplay<'_, TypVec, TemplateVec>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.inner_typ {
+            AbstractInnerType::Unknown(id) => write!(f, "{id:?}"),
+            AbstractInnerType::Template(id) => {
+                f.write_str(self.template_names.get_template_name(*id))
+            }
+            AbstractInnerType::Named(id) => {
+                f.write_str(&self.linker_types[*id].link_info.get_full_name())
+            }
+        }
+    }
+}
+
+impl AbstractInnerType {
+    pub fn display<'a>(
+        &'a self,
+        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
+        template_names: &'a impl TemplateNameGetter,
+    ) -> impl Display + 'a {
+        AbstractInnerTypeDisplay {
+            inner_typ: self,
+            linker_types,
+            template_names,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct ConcreteTypeDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
     inner: &'a ConcreteType,
     linker_types: &'a T,

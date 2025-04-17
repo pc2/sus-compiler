@@ -1,4 +1,4 @@
-use std::ops::{Deref, Index};
+use std::ops::Deref;
 
 use crate::alloc::{zip_eq, zip_eq3};
 use crate::errors::ErrorInfoObject;
@@ -32,7 +32,7 @@ impl InstantiationContext<'_, '_> {
                 let arr = ConcreteType::Array(Box::new((c, this_dim_var.clone())));
                 let typ = self.peano_to_nested_array_of(p, arr, dims);
                 dims.push(this_dim_var.clone());
-                return typ;
+                typ
             }
             _ => unreachable!("Peano abstract ranks being used at concrete type-checking time should never be anything other than Zero, Succ or Named ({p:?})"),
         }

@@ -3,7 +3,7 @@ use sus_proc_macro::get_builtin_type;
 use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
 use crate::value::Value;
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{self, Display};
 use std::ops::Deref;
 
 use super::template::{GlobalReference, Parameter, TVec};
