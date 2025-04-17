@@ -5,7 +5,7 @@ use crate::linker::{IsExtern, AFTER_INITIAL_PARSE_CP};
 use crate::prelude::*;
 
 use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
-use crate::{file_position::FileText, flattening::Module, instantiation::InstantiationCache};
+use crate::{file_position::FileText, flattening::Module};
 
 use crate::typing::template::{
     GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind,
@@ -377,7 +377,6 @@ fn initialize_global_object(
                 domains: ctx.domains,
                 implicit_clk_domain: ctx.implicit_clk_domain,
                 interfaces: ctx.interfaces,
-                instantiations: InstantiationCache::new(),
             });
         }
         GlobalObjectKind::Struct => {

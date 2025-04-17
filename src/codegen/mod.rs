@@ -5,6 +5,8 @@ pub mod vhdl;
 pub use system_verilog::VerilogCodegenBackend;
 pub use vhdl::VHDLCodegenBackend;
 
+use crate::prelude::*;
+
 use crate::{InstantiatedModule, Linker, Module};
 
 use std::{
@@ -63,19 +65,20 @@ pub trait CodeGenBackend {
         write!(out_file, "{code}").unwrap();
     }
 
-    fn codegen_to_file(&self, md: &Module, linker: &Linker) {
+    fn codegen_to_file(&self, id: ModuleUUID, md: &Module, linker: &Linker) {
         let mut out_file = self.make_output_file(&md.link_info.name);
-        md.instantiations.for_each_instance(|_template_args, inst| {
+        for (_global_ref, inst) in linker.instantiator.borrow().iter_for_module(id) {
             self.codegen_instance(inst.as_ref(), md, linker, &mut out_file)
-        });
+        }
     }
 
-    fn codegen_with_dependencies(&self, linker: &Linker, md: &Module, file_name: &str) {
+    fn codegen_with_dependencies(&self, linker: &Linker, md_id: ModuleUUID, file_name: &str) {
         let mut out_file = self.make_output_file(file_name);
         let mut to_process_queue: Vec<Rc<InstantiatedModule>> = Vec::new();
-        md.instantiations.for_each_instance(|_template_args, inst| {
+        for (_template_args, inst) in linker.instantiator.borrow().iter_for_module(md_id) {
             to_process_queue.push(inst.clone());
-        });
+        }
+
         let mut to_process_queue: Vec<&InstantiatedModule> =
             to_process_queue.iter().map(|inst| inst.deref()).collect();
 

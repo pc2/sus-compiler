@@ -324,6 +324,23 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
     pub fn iter_mut(&mut self) -> FlatOptionIteratorMut<'_, T, IndexMarker> {
         self.into_iter()
     }
+    pub fn map<O>(
+        &self,
+        mut f: impl FnMut(UUID<IndexMarker>, &T) -> O,
+    ) -> ArenaAllocator<O, IndexMarker> {
+        let data = self
+            .data
+            .iter()
+            .enumerate()
+            .map(|(idx, v)| v.as_ref().map(|v| f(UUID::from_hidden_value(idx), v)))
+            .collect();
+
+        ArenaAllocator {
+            data,
+            free_slots: self.free_slots.clone(),
+            _ph: PhantomData,
+        }
+    }
     pub fn find(
         &self,
         mut predicate: impl FnMut(UUID<IndexMarker>, &T) -> bool,
@@ -418,6 +435,41 @@ impl<'a, T, IndexMarker> IntoIterator for &'a mut ArenaAllocator<T, IndexMarker>
         FlatOptionIteratorMut {
             it: self.data.iter_mut().enumerate(),
             _ph: PhantomData,
+        }
+    }
+}
+
+impl<T, IndexMarker> IntoIterator for ArenaAllocator<T, IndexMarker> {
+    type Item = (UUID<IndexMarker>, T);
+
+    type IntoIter = FlatOptionConsumingIterator<T, IndexMarker>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        FlatOptionConsumingIterator {
+            it: self.data.into_iter().enumerate(),
+            _ph: PhantomData,
+        }
+    }
+}
+
+pub struct FlatOptionConsumingIterator<T, IndexMarker> {
+    it: Enumerate<std::vec::IntoIter<Option<T>>>,
+    _ph: PhantomData<IndexMarker>,
+}
+impl<T, IndexMarker> Iterator for FlatOptionConsumingIterator<T, IndexMarker> {
+    type Item = (UUID<IndexMarker>, T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.it.next() {
+                None => {
+                    return None;
+                }
+                Some((_pos, None)) => {}
+                Some((pos, Some(val))) => {
+                    return Some((UUID(pos, PhantomData), val));
+                }
+            }
         }
     }
 }

@@ -3,7 +3,6 @@ use std::ops::Deref;
 use ibig::IBig;
 
 use crate::alloc::{zip_eq, zip_eq3};
-use crate::errors::ErrorInfoObject;
 use crate::flattening::{DeclarationKind, ExpressionSource, WireReferenceRoot, WrittenType};
 use crate::linker::LinkInfo;
 use crate::typing::concrete_type::ConcreteGlobalReference;
@@ -400,8 +399,9 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
             }
         }
 
-        if let Some(instance) = sub_module
-            .instantiations
+        if let Some(instance) = context
+            .linker
+            .instantiator
             .instantiate(context.linker, sm.refers_to.clone())
         {
             for (_port_id, concrete_port, source_code_port, connecting_wire) in
@@ -438,6 +438,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                             &concrete_port.typ,
                             submod_instr.module_ref.get_total_span(),
                             || {
+                                use crate::errors::ErrorInfoObject;
                                 let port_declared_here = source_code_port
                                     .make_info(sub_module.link_info.file)
                                     .unwrap();

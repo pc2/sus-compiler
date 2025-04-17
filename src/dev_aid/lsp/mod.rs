@@ -2,7 +2,9 @@ mod hover_info;
 mod semantic_tokens;
 mod tree_walk;
 
-use crate::{compiler_top::LinkerExtraFileInfoManager, linker::GlobalUUID, prelude::*};
+use crate::{
+    alloc::zip_eq, compiler_top::LinkerExtraFileInfoManager, linker::GlobalUUID, prelude::*,
+};
 
 use hover_info::hover;
 use lsp_types::{notification::*, request::Request, *};
@@ -111,11 +113,7 @@ impl Linker {
 }
 
 /// Requires that token_positions.len() == tokens.len() + 1 to include EOF token
-fn convert_diagnostic(
-    err: &CompileError,
-    main_file_text: &FileText,
-    linker: &Linker,
-) -> Diagnostic {
+fn convert_diagnostic(err: CompileError, main_file_text: &FileText, linker: &Linker) -> Diagnostic {
     assert!(
         main_file_text.is_span_valid(err.position),
         "bad error: {}",
@@ -128,7 +126,7 @@ fn convert_diagnostic(
         ErrorLevel::Warning => DiagnosticSeverity::WARNING,
     };
     let mut related_info = Vec::new();
-    for info in &err.infos {
+    for info in err.infos {
         let info_file = &linker.files[info.file];
         let info_span = info.position;
         assert!(
@@ -146,7 +144,7 @@ fn convert_diagnostic(
         };
         related_info.push(DiagnosticRelatedInformation {
             location,
-            message: info.info.clone(),
+            message: info.info,
         });
     }
     Diagnostic::new(
@@ -154,7 +152,7 @@ fn convert_diagnostic(
         Some(severity),
         None,
         None,
-        err.reason.clone(),
+        err.reason,
         Some(related_info),
         None,
     )
@@ -164,12 +162,13 @@ fn push_all_errors(
     connection: &lsp_server::Connection,
     linker: &Linker,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
-    for (file_id, file_data) in &linker.files {
-        let mut diag_vec: Vec<Diagnostic> = Vec::new();
+    let errs = linker.collect_all_errors();
 
-        linker.for_all_errors_in_file(file_id, |err| {
-            diag_vec.push(convert_diagnostic(err, &file_data.file_text, linker));
-        });
+    for (_file_id, file_data, errs_for_file) in zip_eq(linker.files.iter(), errs.into_iter()) {
+        let diag_vec: Vec<Diagnostic> = errs_for_file
+            .into_iter()
+            .map(|e| convert_diagnostic(e, &file_data.file_text, linker))
+            .collect();
 
         let params = &PublishDiagnosticsParams {
             uri: Url::parse(&file_data.file_identifier).unwrap(),

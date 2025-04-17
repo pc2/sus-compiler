@@ -59,8 +59,8 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     }
 
     if config.codegen {
-        for (_id, md) in &linker.modules {
-            codegen_backend.codegen_to_file(md, &linker);
+        for (id, md) in &linker.modules {
+            codegen_backend.codegen_to_file(id, md, &linker);
         }
     }
 
@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
             std::process::exit(1);
         };
 
-        codegen_backend.codegen_with_dependencies(&linker, md.1, &format!("{md_name}_standalone"));
+        codegen_backend.codegen_with_dependencies(&linker, md.0, &format!("{md_name}_standalone"));
     }
 
     Ok(())

@@ -193,16 +193,13 @@ impl Linker {
     pub fn recompile_all(&mut self) {
         let config = config();
 
+        self.instantiator.borrow_mut().clear_instances();
+
         // First reset all modules back to post-gather_initial_file_data
         for (_, md) in &mut self.modules {
-            let Module {
-                link_info,
-                instantiations,
-                ..
-            } = md;
+            let Module { link_info, .. } = md;
             link_info.reset_to(AFTER_INITIAL_PARSE_CP);
             link_info.instructions.clear();
-            instantiations.clear_instances()
         }
         for (_, typ) in &mut self.types {
             typ.link_info.reset_to(AFTER_INITIAL_PARSE_CP);
@@ -237,7 +234,7 @@ impl Linker {
             // Already instantiate any modules without parameters
             // Can immediately instantiate modules that have no template args
             if md.link_info.template_parameters.is_empty() {
-                let _inst = md.instantiations.instantiate(
+                let _inst = self.instantiator.instantiate(
                     self,
                     Rc::new(ConcreteGlobalReference {
                         id,

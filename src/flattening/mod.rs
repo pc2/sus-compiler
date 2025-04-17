@@ -21,7 +21,7 @@ pub use lints::perform_lints;
 pub use typechecking::typecheck_all_modules;
 
 use crate::linker::{Documentation, LinkInfo};
-use crate::{file_position::FileText, instantiation::InstantiationCache, value::Value};
+use crate::{file_position::FileText, value::Value};
 
 use crate::typing::{abstract_type::FullType, template::GlobalReference};
 
@@ -66,9 +66,6 @@ pub struct Module {
 
     /// Created in Stage 1: Initialization
     pub interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
-
-    /// Created in Stage 3: Instantiation
-    pub instantiations: InstantiationCache,
 }
 
 impl Module {

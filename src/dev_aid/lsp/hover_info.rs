@@ -49,12 +49,12 @@ impl HoverCollector<'_> {
 
     fn gather_hover_infos(&mut self, obj_id: GlobalUUID, id: FlatID, is_generative: bool) {
         if let GlobalUUID::Module(md_id) = obj_id {
-            let md = &self.linker.modules[md_id];
-
-            md.instantiations.for_each_instance(|_template_args, inst| {
+            for (_template_args, inst) in self.linker.instantiator.borrow().iter_for_module(md_id) {
                 if is_generative {
                     let value_str = match &inst.generation_state[id] {
-                        SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => unreachable!(),
+                        SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => {
+                            unreachable!()
+                        }
                         SubModuleOrWire::CompileTimeValue(v) => format!(" = {}", v),
                         SubModuleOrWire::Unnasigned => "never assigned to".to_string(),
                     };
@@ -74,18 +74,18 @@ impl HoverCollector<'_> {
                         self.sus_code(format!("{typ_str} {name_str}'{latency_str}"));
                     }
                 }
-            });
+            }
         }
     }
 
-    fn gather_submodule_hover_infos(&mut self, md: &Module, submodule_instr: FlatID) {
-        md.instantiations.for_each_instance(|_template_args, inst| {
+    fn gather_submodule_hover_infos(&mut self, md_id: ModuleUUID, submodule_instr: FlatID) {
+        for (_template_args, inst) in self.linker.instantiator.borrow().iter_for_module(md_id) {
             for (_id, sm) in &inst.submodules {
                 if sm.original_instruction == submodule_instr {
                     self.sus_code(sm.refers_to.pretty_print_concrete_instance(self.linker));
                 }
             }
-        });
+        }
     }
 }
 
@@ -149,7 +149,8 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.gather_hover_infos(obj_id, decl_id, decl.identifier_type.is_generative());
         }
         LocationInfo::InGlobal(obj_id, _link_info, id, InGlobal::NamedSubmodule(submod)) => {
-            let md = &linker.modules[obj_id.unwrap_module()]; // Submodules can only exist within Modules
+            let md_id = obj_id.unwrap_module();
+            let md = &linker.modules[md_id]; // Submodules can only exist within Modules
             let submodule = &linker.modules[submod.module_ref.id];
 
             // Declaration's documentation
@@ -178,7 +179,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
 
             // Module documentation
             hover.documentation_link_info(&submodule.link_info);
-            hover.gather_submodule_hover_infos(md, id);
+            hover.gather_submodule_hover_infos(md_id, id);
         }
         LocationInfo::InGlobal(obj_id, link_info, id, InGlobal::Temporary(wire)) => {
             let mut details_vec: Vec<Cow<str>> = Vec::with_capacity(2);
