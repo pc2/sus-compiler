@@ -243,7 +243,7 @@ impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: 
         };
 
         // Very expensive, only enable if there are issues
-        #[cfg(debug_assertions)]
+        //#[cfg(debug_assertions)]
         //self.check_no_unknown_loop();
         result
     }

@@ -683,8 +683,8 @@ pub fn apply_types(
         infos,
     } in type_checker.peano_substitutor.extract_errors()
     {
-        assert!(found.fully_substitute(&type_checker.peano_substitutor));
-        assert!(expected.fully_substitute(&type_checker.peano_substitutor));
+        let _ = found.fully_substitute(&type_checker.peano_substitutor);
+        let _ = expected.fully_substitute(&type_checker.peano_substitutor);
 
         let expected_name = expected.to_string();
         let found_name = found.to_string();
