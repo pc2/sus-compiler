@@ -31,6 +31,7 @@ pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
 #[derive(Debug, Clone)]
 pub enum RealWirePathElem {
     ArrayAccess { span: BracketSpan, idx_wire: WireID },
+    ArraySlice { span: BracketSpan, idx_a_wire: WireID, idx_b_wire: WireID },
 }
 
 impl RealWirePathElem {
@@ -39,6 +40,14 @@ impl RealWirePathElem {
             match v {
                 RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
                     f(*idx_wire);
+                },
+                RealWirePathElem::ArraySlice {
+                    span: _,
+                    idx_a_wire,
+                    idx_b_wire 
+                } => {
+                    f(*idx_a_wire);
+                    f(*idx_b_wire);
                 }
             }
         }

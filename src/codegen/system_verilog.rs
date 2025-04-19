@@ -110,6 +110,17 @@ impl<'g> CodeGenerationContext<'g> {
                     let idx_wire_name = self.wire_name(wire, absolute_latency);
                     write!(result, "[{idx_wire_name}]").unwrap();
                 }
+                RealWirePathElem::ArraySlice {
+                    span,
+                    idx_a_wire,
+                    idx_b_wire,
+                } => {
+                    let wire_a = &self.instance.wires[*idx_a_wire];
+                    let idx_wire_name_a = self.wire_name(wire_a, absolute_latency);
+                    let wire_b = &self.instance.wires[*idx_b_wire];
+                    let idx_wire_name_b = self.wire_name(wire_b, absolute_latency);
+                    write!(result, "[{idx_wire_name_a}:{idx_wire_name_b}]").unwrap();
+                }
             }
         }
         result

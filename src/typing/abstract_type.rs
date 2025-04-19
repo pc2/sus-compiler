@@ -570,7 +570,7 @@ impl TypeUnifier {
         );
     }
 
-    pub fn typecheck_array_access(
+    pub fn typecheck_array_index(
         &self,
         arr_type: &AbstractRankedType,
         idx_type: &AbstractRankedType,
@@ -595,6 +595,28 @@ impl TypeUnifier {
         );
 
         self.unify_with_array_of(arr_type, output_typ.clone(), arr_span);
+    }
+
+    pub fn typecheck_array_slice(
+        &self,
+        arr_type: &AbstractType,
+        idx_a_type: &AbstractType,
+        idx_b_type: &AbstractType,
+        arr_span: Span,
+        idx_a_span: Span,
+        idx_b_span: Span,
+        output_typ: &AbstractType,
+    ) {
+        panic!("aaaa");
+        self.type_substitutor
+            .unify_report_error(idx_a_type, &INT_TYPE, idx_a_span, "array start index");
+        self.type_substitutor
+            .unify_report_error(idx_b_type, &INT_TYPE, idx_b_span, "array end index");
+
+        self.type_substitutor
+            .unify_report_error(output_typ, arr_type, arr_span, "array slice");
+
+        //self.unify_with_array_of(arr_type, output_typ.clone(), arr_span);
     }
 
     pub fn typecheck_write_to_abstract<Context: UnifyErrorReport>(
