@@ -28,12 +28,14 @@ use std::io::Write;
 use prelude::*;
 
 use codegen::{CodeGenBackend, VHDLCodegenBackend, VerilogCodegenBackend};
-use config::{config, EarlyExitUpTo};
+use config::{config, initialize_config_from_cli_args, EarlyExitUpTo};
 use dev_aid::ariadne_interface::*;
 use flattening::Module;
 use instantiation::InstantiatedModule;
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
+    initialize_config_from_cli_args();
+
     let config = config();
 
     let file_paths = config.files.clone();
@@ -46,11 +48,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     };
 
     if config.use_lsp {
-        #[cfg(feature = "lsp")]
         return dev_aid::lsp::lsp_main();
-
-        #[cfg(not(feature = "lsp"))]
-        panic!("LSP not enabled!")
     }
 
     let (linker, mut paths_arena) = compile_all(file_paths);
@@ -61,8 +59,8 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     }
 
     if config.codegen {
-        for (_id, md) in &linker.modules {
-            codegen_backend.codegen_to_file(md, &linker);
+        for (id, md) in &linker.modules {
+            codegen_backend.codegen_to_file(id, md, &linker);
         }
     }
 
@@ -77,7 +75,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
             std::process::exit(1);
         };
 
-        codegen_backend.codegen_with_dependencies(&linker, md.1, &format!("{md_name}_standalone"));
+        codegen_backend.codegen_with_dependencies(&linker, md.0, &format!("{md_name}_standalone"));
     }
 
     Ok(())

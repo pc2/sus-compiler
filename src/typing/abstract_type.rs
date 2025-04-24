@@ -297,13 +297,13 @@ impl TypeUnifier {
                     &typ.inner,
                     &BOOL_TYPE.inner,
                     value_span,
-                    &"bool constant",
+                    "bool constant",
                 );
                 self.peano_substitutor.unify_report_error(
                     &typ.rank,
                     &BOOL_TYPE.rank,
                     value_span,
-                    &"bool constant rank",
+                    "bool constant rank",
                 );
             }
             Value::Integer(_big_int) => {
@@ -311,13 +311,13 @@ impl TypeUnifier {
                     &typ.inner,
                     &INT_TYPE.inner,
                     value_span,
-                    &"int constant",
+                    "int constant",
                 );
                 self.peano_substitutor.unify_report_error(
                     &typ.rank,
                     &INT_TYPE.rank,
                     value_span,
-                    &"int constant rank",
+                    "int constant rank",
                 );
             }
             Value::Array(arr) => {
@@ -334,14 +334,14 @@ impl TypeUnifier {
                     &typ.inner,
                     &arr_content_variable.inner,
                     value_span,
-                    &"array literal",
+                    "array literal",
                 );
 
                 self.peano_substitutor.unify_report_error(
                     &typ.rank_up().rank,
                     &arr_content_variable.rank,
                     value_span,
-                    &"array literal rank",
+                    "array literal rank",
                 );
             }
             Value::Error | Value::Unset => {} // Already an error, don't unify
@@ -359,14 +359,14 @@ impl TypeUnifier {
             &arr_type.inner,
             &Box::new(output_typ.inner),
             arr_span,
-            &"array access",
+            "array access",
         );
 
         self.peano_substitutor.unify_report_error(
             &arr_type.rank,
             &PeanoType::Succ(Box::new(output_typ.rank)),
             arr_span,
-            &"array access",
+            "array access",
         );
     }
 
@@ -382,51 +382,51 @@ impl TypeUnifier {
                 &input_typ.inner,
                 &BOOL_TYPE.inner,
                 span,
-                &"! input",
+                "! input",
             );
             self.peano_substitutor.unify_report_error(
                 &input_typ.rank,
                 &BOOL_TYPE.rank,
                 span,
-                &"! input rank",
+                "! input rank",
             );
 
             self.abstract_type_substitutor.unify_report_error(
                 &output_typ.inner,
                 &BOOL_TYPE.inner,
                 span,
-                &"! output",
+                "! output",
             );
             self.peano_substitutor.unify_report_error(
                 &output_typ.rank,
                 &BOOL_TYPE.rank,
                 span,
-                &"! output rank",
+                "! output rank",
             );
         } else if op == UnaryOperator::Negate {
             self.abstract_type_substitutor.unify_report_error(
                 &input_typ.inner,
                 &INT_TYPE.inner,
                 span,
-                &"unary - input",
+                "unary - input",
             );
             self.peano_substitutor.unify_report_error(
                 &input_typ.rank,
                 &INT_TYPE.rank,
                 span,
-                &"unary - input rank",
+                "unary - input rank",
             );
             self.abstract_type_substitutor.unify_report_error(
                 &output_typ.inner,
                 &INT_TYPE.inner,
                 span,
-                &"unary - output",
+                "unary - output",
             );
             self.peano_substitutor.unify_report_error(
                 &output_typ.rank,
                 &INT_TYPE.rank,
                 span,
-                &"unary - output rank",
+                "unary - output rank",
             );
         } else {
             let reduction_type = match op {
@@ -441,13 +441,13 @@ impl TypeUnifier {
                 &output_typ.inner,
                 &reduction_type.inner,
                 span,
-                &"array reduction",
+                "array reduction",
             );
             self.peano_substitutor.unify_report_error(
                 &output_typ.rank,
                 &reduction_type.rank,
                 span,
-                &"array reduction rank",
+                "array reduction rank",
             );
             self.unify_with_array_of(input_typ, output_typ.clone(), span);
         }
@@ -483,32 +483,32 @@ impl TypeUnifier {
             &left_typ.inner,
             &exp_left.inner,
             left_span,
-            &"binop left side",
+            "binop left side",
         );
         self.abstract_type_substitutor.unify_report_error(
             &right_typ.inner,
             &exp_right.inner,
             right_span,
-            &"binop right side",
+            "binop right side",
         );
 
         self.abstract_type_substitutor.unify_report_error(
             &output_typ.inner,
             &out_typ.inner,
             Span::new_overarching(left_span, right_span),
-            &"binop output",
+            "binop output",
         );
         self.peano_substitutor.unify_report_error(
             &output_typ.rank,
             &left_typ.rank,
             left_span,
-            &"binop left rank",
+            "binop left rank",
         );
         self.peano_substitutor.unify_report_error(
             &output_typ.rank,
             &right_typ.rank,
             right_span,
-            &"binop right rank",
+            "binop right rank",
         );
     }
 
@@ -524,91 +524,22 @@ impl TypeUnifier {
         // The case of writes to generatives from non-generatives should be fully covered by flattening
         if !from_domain.is_generative() && !to_domain.is_generative() {
             self.domain_substitutor
-                .unify_report_error(from_domain, to_domain, span, &context);
+                .unify_report_error(from_domain, to_domain, span, context);
         }
     }
 
-    pub fn typecheck_unary_operator(
-        &self,
-        op: UnaryOperator,
-        input_typ: &FullType,
-        output_typ: &FullType,
-        span: Span,
-    ) {
-        self.typecheck_unary_operator_abstr(op, &input_typ.typ, span, &output_typ.typ);
-        self.unify_domains(&input_typ.domain, &output_typ.domain, span, "unary op");
-    }
-
-    pub fn typecheck_binary_operator(
-        &self,
-        op: BinaryOperator,
-        left_typ: &FullType,
-        right_typ: &FullType,
-        left_span: Span,
-        right_span: Span,
-        output_typ: &FullType,
-    ) {
-        self.typecheck_binary_operator_abstr(
-            op,
-            &left_typ.typ,
-            &right_typ.typ,
-            left_span,
-            right_span,
-            &output_typ.typ,
-        );
-        self.unify_domains(
-            &left_typ.domain,
-            &output_typ.domain,
-            left_span,
-            "binop left",
-        );
-        self.unify_domains(
-            &right_typ.domain,
-            &output_typ.domain,
-            right_span,
-            "binop right",
-        );
-    }
-
-    pub fn typecheck_array_access(
-        &self,
-        arr_type: &AbstractRankedType,
-        idx_type: &AbstractRankedType,
-        arr_span: Span,
-        idx_span: Span,
-        output_typ: &AbstractRankedType,
-    ) {
-        // Must unify arr_type's inner type with output_typ's inner type,
-        // arr_type's rank type with succ(output_typ's ranked type) (and idx_type with int)
-
-        self.abstract_type_substitutor.unify_report_error(
-            &idx_type.inner,
-            &INT_TYPE.inner,
-            idx_span,
-            &"array index",
-        );
-        self.peano_substitutor.unify_report_error(
-            &idx_type.rank,
-            &INT_TYPE.rank,
-            idx_span,
-            &"array index",
-        );
-
-        self.unify_with_array_of(arr_type, output_typ.clone(), arr_span);
-    }
-
-    pub fn typecheck_write_to_abstract<Context: UnifyErrorReport>(
+    pub fn typecheck_write_to_abstract<Context: UnifyErrorReport + Clone>(
         &self,
         found: &AbstractRankedType,
         expected: &AbstractRankedType,
         span: Span,
-        context: &Context,
+        context: Context,
     ) {
         self.abstract_type_substitutor.unify_report_error(
             &found.inner,
             &expected.inner,
             span,
-            context,
+            context.clone(),
         );
 
         self.peano_substitutor
@@ -622,7 +553,7 @@ impl TypeUnifier {
         span: Span,
         context: Context,
     ) {
-        self.typecheck_write_to_abstract(&found.typ, &expected.typ, span, &context);
+        self.typecheck_write_to_abstract(&found.typ, &expected.typ, span, context.clone());
         self.unify_domains(&found.domain, &expected.domain, span, context);
     }
 

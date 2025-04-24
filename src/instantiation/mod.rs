@@ -1,6 +1,7 @@
 mod concrete_typecheck;
 mod execute;
 mod final_checks;
+pub mod instantiation_cache;
 mod unique_names;
 
 use unique_names::UniqueNames;
@@ -10,20 +11,12 @@ use crate::typing::template::TVec;
 use crate::typing::type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor};
 
 use std::cell::OnceCell;
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::rc::Rc;
 
 use crate::flattening::{BinaryOperator, Module, UnaryOperator};
-use crate::{
-    config,
-    errors::{CompileError, ErrorStore},
-    to_string::pretty_print_concrete_instance,
-    value::Value,
-};
+use crate::{errors::ErrorStore, value::Value};
 
-use crate::typing::concrete_type::ConcreteType;
-
-// Temporary value before proper latency is given
-pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
+use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
 
 /// See [MultiplexerSource]
 ///
@@ -31,18 +24,6 @@ pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
 #[derive(Debug, Clone)]
 pub enum RealWirePathElem {
     ArrayAccess { span: BracketSpan, idx_wire: WireID },
-}
-
-impl RealWirePathElem {
-    pub fn for_each_wire_in_path(path: &[RealWirePathElem], mut f: impl FnMut(WireID)) {
-        for v in path {
-            match v {
-                RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
-                    f(*idx_wire);
-                }
-            }
-        }
-    }
 }
 
 /// One arm of a multiplexer. Each arm has an attached condition that is also stored here.
@@ -79,6 +60,9 @@ pub enum RealWireDataSource {
     Select {
         root: WireID,
         path: Vec<RealWirePathElem>,
+    },
+    ConstructArray {
+        array_wires: Vec<WireID>,
     },
     Constant {
         value: Value,
@@ -124,11 +108,10 @@ pub struct SubModulePort {
 pub struct SubModule {
     pub original_instruction: FlatID,
     pub instance: OnceCell<Rc<InstantiatedModule>>,
+    pub refers_to: Rc<ConcreteGlobalReference<ModuleUUID>>,
     pub port_map: FlatAlloc<Option<SubModulePort>, PortIDMarker>,
     pub interface_call_sites: FlatAlloc<Vec<Span>, InterfaceIDMarker>,
     pub name: String,
-    pub module_uuid: ModuleUUID,
-    pub template_args: TVec<ConcreteType>,
 }
 
 /// Generated from [Module::ports]
@@ -149,6 +132,7 @@ pub struct InstantiatedPort {
 /// Generated when instantiating a [Module]
 #[derive(Debug)]
 pub struct InstantiatedModule {
+    pub global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
     /// Unique name involving all template arguments
     pub name: String,
     /// Used in code generation. Only contains characters allowed in SV and VHDL
@@ -196,97 +180,6 @@ impl SubModuleOrWire {
     }
 }
 
-/// Stored per module [Module].
-/// With this you can instantiate a module for different sets of template arguments.
-/// It caches the instantiations that have been made, such that they need not be repeated.
-///
-/// Also, with incremental builds (#49) this will be a prime area for investigation
-#[derive(Debug)]
-pub struct InstantiationCache {
-    cache: RefCell<HashMap<TVec<ConcreteType>, Rc<InstantiatedModule>>>,
-}
-
-impl Default for InstantiationCache {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl InstantiationCache {
-    pub fn new() -> Self {
-        Self {
-            cache: RefCell::new(HashMap::new()),
-        }
-    }
-
-    pub fn instantiate(
-        &self,
-        md: &Module,
-        linker: &Linker,
-        template_args: TVec<ConcreteType>,
-    ) -> Option<Rc<InstantiatedModule>> {
-        let cache_borrow = self.cache.borrow();
-
-        // Temporary, no template arguments yet
-        let instance = if let Some(found) = cache_borrow.get(&template_args) {
-            found.clone()
-        } else {
-            std::mem::drop(cache_borrow);
-
-            let result = perform_instantiation(md, linker, &template_args);
-
-            if config().should_print_for_debug(config().debug_print_module_contents, &result.name) {
-                println!("[[Instantiated {}]]", result.name);
-                for (id, w) in &result.wires {
-                    println!("{id:?} -> {w:?}");
-                }
-                for (id, sm) in &result.submodules {
-                    println!("SubModule {id:?}: {sm:?}");
-                }
-            }
-
-            let result_ref = Rc::new(result);
-            assert!(self
-                .cache
-                .borrow_mut()
-                .insert(template_args, result_ref.clone())
-                .is_none());
-            result_ref
-        };
-
-        if !instance.errors.did_error {
-            Some(instance.clone())
-        } else {
-            None
-        }
-    }
-
-    pub fn for_each_error(&self, func: &mut impl FnMut(&CompileError)) {
-        let cache_borrow = self.cache.borrow();
-        for inst in cache_borrow.values() {
-            for err in &inst.errors {
-                func(err)
-            }
-        }
-    }
-
-    pub fn clear_instances(&mut self) {
-        self.cache.borrow_mut().clear()
-    }
-
-    // Also passes over invalid instances. Instance validity should not be assumed!
-    // Only used for things like syntax highlighting
-    pub fn for_each_instance(
-        &self,
-        mut f: impl FnMut(&TVec<ConcreteType>, &Rc<InstantiatedModule>),
-    ) {
-        let borrow = self.cache.borrow();
-        for (k, v) in borrow.iter() {
-            f(k, v)
-        }
-    }
-}
-
 /// Every [crate::flattening::Instruction] has an associated value (See [SubModuleOrWire]).
 /// They are either what this local name is currently referencing (either a wire instance or a submodule instance).
 /// Or in the case of Generative values, the current value in the generative variable.
@@ -313,6 +206,76 @@ pub struct ConditionStackElem {
     pub inverse: bool,
 }
 
+/// Iteration of contained [WireID]s
+pub trait ForEachContainedWire {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID));
+}
+
+impl<E: ForEachContainedWire> ForEachContainedWire for [E] {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
+        for e in self {
+            e.for_each_wire(f);
+        }
+    }
+}
+
+impl ForEachContainedWire for WireID {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
+        f(*self)
+    }
+}
+
+impl ForEachContainedWire for RealWirePathElem {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
+        match self {
+            RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
+                f(*idx_wire);
+            }
+        }
+    }
+}
+
+impl ForEachContainedWire for ConditionStackElem {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
+        f(self.condition_wire);
+    }
+}
+
+impl ForEachContainedWire for MultiplexerSource {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
+        self.to_path.for_each_wire(f);
+        self.condition.for_each_wire(f);
+        f(self.from);
+    }
+}
+
+impl ForEachContainedWire for RealWireDataSource {
+    fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
+        match self {
+            RealWireDataSource::ReadOnly => {}
+            RealWireDataSource::Multiplexer {
+                is_state: _,
+                sources,
+            } => {
+                sources.for_each_wire(f);
+            }
+            RealWireDataSource::UnaryOp { op: _, right } => f(*right),
+            RealWireDataSource::BinaryOp { op: _, left, right } => {
+                f(*left);
+                f(*right)
+            }
+            RealWireDataSource::Select { root, path } => {
+                f(*root);
+                path.for_each_wire(f);
+            }
+            RealWireDataSource::ConstructArray { array_wires } => {
+                array_wires.for_each_wire(f);
+            }
+            RealWireDataSource::Constant { value: _ } => {}
+        }
+    }
+}
+
 /// As with other contexts, this is the shared state we're lugging around while executing & typechecking a module.
 pub struct InstantiationContext<'fl, 'l> {
     pub name: String,
@@ -329,7 +292,7 @@ pub struct InstantiationContext<'fl, 'l> {
     pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     pub errors: ErrorCollector<'l>,
 
-    pub template_args: &'fl TVec<ConcreteType>,
+    pub working_on_global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
     pub md: &'fl Module,
     pub linker: &'l Linker,
 }
@@ -349,6 +312,7 @@ fn mangle_name(str: &str) -> String {
 impl InstantiationContext<'_, '_> {
     fn extract(self) -> InstantiatedModule {
         InstantiatedModule {
+            global_ref: self.working_on_global_ref,
             mangled_name: mangle_name(&self.name),
             name: self.name,
             wires: self.wires,
@@ -358,70 +322,4 @@ impl InstantiationContext<'_, '_> {
             errors: self.errors.into_storage(),
         }
     }
-}
-
-fn perform_instantiation(
-    md: &Module,
-    linker: &Linker,
-    template_args: &TVec<ConcreteType>,
-) -> InstantiatedModule {
-    let mut context = InstantiationContext {
-        name: pretty_print_concrete_instance(&md.link_info, template_args, &linker.types),
-        generation_state: GenerationState {
-            md,
-            generation_state: md
-                .link_info
-                .instructions
-                .map(|(_, _)| SubModuleOrWire::Unnasigned),
-        },
-        type_substitutor: TypeSubstitutor::new(),
-        condition_stack: Vec::new(),
-        wires: FlatAlloc::new(),
-        submodules: FlatAlloc::new(),
-        interface_ports: md.ports.map(|_| None),
-        errors: ErrorCollector::new_empty(md.link_info.file, &linker.files),
-        unique_name_producer: UniqueNames::new(),
-        template_args,
-        md,
-        linker,
-    };
-
-    // Don't instantiate modules that already errored. Otherwise instantiator may crash
-    if md.link_info.errors.did_error {
-        println!(
-            "Not Instantiating {} due to flattening errors",
-            md.link_info.name
-        );
-        context.errors.set_did_error();
-        return context.extract();
-    }
-
-    println!("Instantiating {}", md.link_info.name);
-
-    if let Err(e) = context.execute_module() {
-        context.errors.error(e.0, e.1);
-
-        return context.extract();
-    }
-
-    if config().should_print_for_debug(config().debug_print_module_contents, &context.name) {
-        println!("[[Executed {}]]", &context.name);
-        for (id, w) in &context.wires {
-            println!("{id:?} -> {w:?}");
-        }
-        for (id, sm) in &context.submodules {
-            println!("SubModule {id:?}: {sm:?}");
-        }
-    }
-
-    println!("Concrete Typechecking {}", md.link_info.name);
-    context.typecheck();
-
-    println!("Latency Counting {}", md.link_info.name);
-    context.compute_latencies();
-
-    println!("Checking array accesses {}", md.link_info.name);
-    context.check_array_accesses();
-
-    context.extract()
 }

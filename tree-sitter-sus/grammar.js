@@ -231,7 +231,8 @@ module.exports = grammar({
             $.unary_op,
             $.binary_op,
             $.func_call,
-            $.field_access
+            $.field_access,
+            $.array_list_expression
         ),
 
         unary_op: $ => prec(PREC.unary, seq(
@@ -287,6 +288,12 @@ module.exports = grammar({
         array_bracket_expression: $ => seq(
             '[',
             field('content', $._expression),
+            ']'
+        ),
+
+        array_list_expression: $ => seq(
+            '[',
+            commaSepSeq($, $._expression),
             ']'
         ),
 

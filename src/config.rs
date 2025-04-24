@@ -1,10 +1,10 @@
 use clap::{Arg, Command, ValueEnum};
+use std::collections::HashSet;
+use std::sync::OnceLock;
 use std::{
-    collections::HashSet,
     env,
     ffi::{OsStr, OsString},
     path::PathBuf,
-    sync::LazyLock,
 };
 
 /// Describes at what point in the compilation process we should exit early.
@@ -28,15 +28,21 @@ pub enum TargetLanguage {
 }
 
 /// All command-line flags are converted to this struct, of which the singleton instance can be acquired using [crate::config::config]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct ConfigStruct {
     pub use_lsp: bool,
     pub lsp_debug_mode: bool,
     pub lsp_port: u16,
     pub codegen: bool,
-    pub debug_print_module_contents: bool,
-    pub debug_print_latency_graph: bool,
-    pub debug_whitelist: Option<HashSet<String>>,
+    /// Enable debugging printouts and figures
+    ///
+    /// If an element in this list is a substring of a [crate::debug::SpanDebugger] message, then debugging is enabled.
+    ///
+    /// If the list is empty, debug everything
+    ///
+    /// See also [Self::enabled_debug_paths]
+    pub debug_whitelist: Vec<String>,
+    pub enabled_debug_paths: HashSet<String>,
     pub codegen_module_and_dependencies_one_file: Option<String>,
     pub early_exit: EarlyExitUpTo,
     pub use_color: bool,
@@ -71,25 +77,20 @@ fn command_builder() -> Command {
             .help("Enable LSP debug mode")
             .requires("lsp")
             .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("debug")
+            .long("debug")
+            .hide(true)
+            .help("Enable specific debug paths for specific modules. Path names are found by searching for crate::debug::is_enabled in the source code. ")
+            .action(clap::ArgAction::Append))
+        .arg(Arg::new("debug-whitelist")
+            .long("debug-whitelist")
+            .hide(true)
+            .help("Enable debug prints and figures for specific modules.\nDebugging checks if the current debug stage print has one of the debug-whitelist arguments as a substring. So passing 'FIFO' debugs all FIFO stuff, but passing 'Typechecking FIFO' only shows debug prints during typechecking. To show everything, pass --debug-whitelist-is-blacklist")
+            .action(clap::ArgAction::Append))
         .arg(Arg::new("codegen")
             .long("codegen")
             .help("Enable code generation for all modules. This creates a file named [ModuleName].sv per module.")
             .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("debug")
-            .long("debug")
-            .hide(true)
-            .help("Print debug information about the module contents")
-            .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("debug-latency")
-            .long("debug-latency")
-            .hide(true)
-            .help("Print latency graph for debugging")
-            .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("debug-whitelist")
-            .long("debug-whitelist")
-            .hide(true)
-            .help("Sets the modules that should be shown by --debug. When not provided all modules are whitelisted")
-            .action(clap::ArgAction::Append))
         .arg(Arg::new("standalone")
             .long("standalone")
             .help("Generate standalone code with all dependencies in one file of the module specified."))
@@ -103,9 +104,9 @@ fn command_builder() -> Command {
             .help("Disables color printing in the errors of the sus_compiler output")
             .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("ci")
-                .long("ci")
-                .help("Makes the compiler output as environment agnostic as possible")
-                .action(clap::ArgAction::SetTrue))
+            .long("ci")
+            .help("Makes the compiler output as environment agnostic as possible")
+            .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("target")
             .long("target")
             .help("Sets the target HDL")
@@ -134,22 +135,21 @@ where
     T: Into<OsString> + Clone,
 {
     let matches = command_builder().try_get_matches_from(itr)?;
-    let lsp_port = *matches.get_one("socket").unwrap();
-    let use_lsp = matches.get_flag("lsp");
-    let lsp_debug_mode = matches.get_flag("lsp-debug");
-
     let codegen = matches.get_flag("codegen") || matches.get_many::<PathBuf>("files").is_none();
-    let debug_print_module_contents = matches.get_flag("debug");
-    let debug_print_latency_graph = matches.get_flag("debug-latency");
     let debug_whitelist = matches
         .get_many("debug-whitelist")
-        .map(|s| s.cloned().collect());
-    let use_color = !matches.get_flag("nocolor") && !use_lsp;
-    let early_exit = *matches.get_one("upto").unwrap();
-    let codegen_module_and_dependencies_one_file = matches.get_one("standalone").cloned();
-    let ci = matches.get_flag("ci");
-    let target_language = *matches.get_one("target").unwrap();
-    let file_paths: Vec<PathBuf> = match matches.get_many("files") {
+        .unwrap_or_default()
+        .cloned()
+        .collect();
+
+    let enabled_debug_paths = matches
+        .get_many("debug")
+        .unwrap_or_default()
+        .cloned()
+        .collect();
+
+    let use_color = !matches.get_flag("nocolor") && !matches.get_flag("lsp");
+    let files: Vec<PathBuf> = match matches.get_many("files") {
         Some(files) => files.cloned().collect(),
         None => std::fs::read_dir(".")
             .unwrap()
@@ -159,31 +159,35 @@ where
             })
             .collect(),
     };
+
     Ok(ConfigStruct {
-        use_lsp,
-        lsp_debug_mode,
-        lsp_port,
+        use_lsp: matches.get_flag("lsp"),
+        lsp_debug_mode: matches.get_flag("lsp-debug"),
+        lsp_port: *matches.get_one("socket").unwrap(),
         codegen,
-        debug_print_module_contents,
-        debug_print_latency_graph,
         debug_whitelist,
-        codegen_module_and_dependencies_one_file,
-        early_exit,
+        enabled_debug_paths,
+        codegen_module_and_dependencies_one_file: matches.get_one("standalone").cloned(),
+        early_exit: *matches.get_one("upto").unwrap(),
         use_color,
-        ci,
-        target_language,
-        files: file_paths,
+        ci: matches.get_flag("ci"),
+        target_language: *matches.get_one("target").unwrap(),
+        files,
     })
+}
+
+static CONFIG: OnceLock<ConfigStruct> = OnceLock::new();
+
+pub fn initialize_config_from_cli_args() {
+    match parse_args(std::env::args_os()) {
+        Ok(parsed_args) => CONFIG.set(parsed_args).unwrap(),
+        Err(err) => err.exit(),
+    }
 }
 
 /// Access the singleton [ConfigStruct] representing the CLI arguments passed to `sus_compiler`
 pub fn config() -> &'static ConfigStruct {
-    static CONFIG: LazyLock<ConfigStruct> = LazyLock::new(|| {
-        parse_args(std::env::args_os())
-            .map_err(|err| err.exit())
-            .unwrap()
-    });
-    &CONFIG
+    CONFIG.get().unwrap()
 }
 
 #[cfg(test)]

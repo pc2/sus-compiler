@@ -1,10 +1,12 @@
 
-// Compiler Intrinsic
+/// Unsafe builtin to circumvent the Latency Counting System. Connects `out` to `in` without adding the requisite latency
+/// Or: used for negative latencies, for instance to implement Almost-Full FIFOs, stateful for loops, etc. 
 __builtin__ module LatencyOffset #(T, int OFFSET) {
     interface LatencyOffset : T in'0 -> T out'OFFSET
 }
 
-// Compiler Intrinsic
+/// Unsafe builtin to connect wires from different domains. 
+/// Important: Does not perform any kind of Clock Domain Crossing!
 __builtin__ module CrossDomain #(T) {
     domain in_clk
     interface in_domain : T in'0
@@ -12,48 +14,68 @@ __builtin__ module CrossDomain #(T) {
     interface out_domain : -> T out'0
 }
 
-__builtin__ module IntToBits {
-    interface IntToBits : int value'0 -> bool[32] bits'0
+/// Convert an `int` to a 2s complement bit vector
+__builtin__ module IntToBits #(int NUM_BITS) {
+    interface IntToBits : int value'0 -> bool[NUM_BITS] bits'0
 }
 
-__builtin__ module BitsToInt {
-    interface IntToBits : bool[32] bits'0 -> int value'0
+/// Convert a 2s complement bit vector to an `int`
+__builtin__ module BitsToInt #(int NUM_BITS) {
+    interface BitsToInt : bool[NUM_BITS] bits'0 -> int value'0
 }
 
 // For now these builtin declarations must be in this order, because they're constants in the code. 
 // We'll get a better system for this at some point
 
-// The decider of truth and falsity
+/// The decider of truth and falsity
 __builtin__ struct bool {}
-// An integer of variable size. Right now it's not implemented yet, so this is just a 32-bit int. 
+/// An integer of variable size. Right now it's not implemented yet, so this is just a 32-bit int. 
 __builtin__ struct int {}
 
-// For intentionally triggering an ICE for debugging. It is a constant that crashes the compiler when it is evaluated
+/// Single precision IEEE 32-bit float. Operators are definted externally, but it's defined here for convenience. 
+__builtin__ struct float {}
+
+/// For intentionally triggering an ICE for debugging. It is a constant that crashes the compiler when it is evaluated
 __builtin__ const bool __crash_compiler {}
 
-// True, as in '1'
+/// True, as in '1'
 __builtin__ const bool true {}
-// False, as in '0'
+/// False, as in '0'
 __builtin__ const bool false {}
 
-// Fails to execute if C == false
+/// Fails to execute iff `C == false`
 __builtin__ const bool assert #(bool C) {}
 
-// Returns the size of the given type, in bits. 
-//
-// `sizeof #(T: type bool) = 1`
-// `sizeof #(T: type bool[50]) = 50`
-// `sizeof #(T: type int[10][10]) = 3200`
+/// Returns the size of the given type, in bits. 
+///
+/// `sizeof #(T: type bool) = 1`
+/// `sizeof #(T: type bool[50]) = 50`
+/// `sizeof #(T: type int[10][10]) = 3200`
 __builtin__ const int sizeof #(T) {}
 
 
-// Computes the Log2 of a value, rounded up. 
-// 
-// Typically used to find the size in bits that the address would need to be to address into a memory of size V. 
-//
-// Requires V > 0
-//
-// `clog2 #(V: 15) = 4`
-// `clog2 #(V: 16) = 4`
-// `clog2 #(V: 17) = 5`
+/// Computes the Log2 of a value, rounded up. 
+/// 
+/// Typically used to find the size in bits that the address would need to be to address into a memory of size V. 
+///
+/// Requires V > 0
+///
+/// `clog2 #(V: 15) = 4`
+/// `clog2 #(V: 16) = 4`
+/// `clog2 #(V: 17) = 5`
 __builtin__ const int clog2 #(int V) {}
+
+/// Computes `2^E` at compile-time
+__builtin__ const int pow2 #(int E) {}
+
+/// Computes `B^E` at compile-time
+__builtin__ const int pow #(int B, int E) {}
+
+/// Computes `N!`
+__builtin__ const int factorial #(int N) {}
+
+/// Computes `N! / (N - K)!`. for `0 <= K <= N`
+__builtin__ const int falling_factorial #(int N, int K) {}
+
+/// Computes `N! / (K! * (N - K)!)`. for `0 <= K <= N`
+__builtin__ const int comb #(int N, int K) {}

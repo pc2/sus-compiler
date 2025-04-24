@@ -87,15 +87,15 @@ impl<MyType: HindleyMilner<VariableIDMarker>, VariableIDMarker: UUIDMarker>
 
 /// To be passed to [TypeSubstitutor::unify_report_error]
 pub trait UnifyErrorReport {
-    fn report(&self) -> (String, Vec<ErrorInfo>);
+    fn report(self) -> (String, Vec<ErrorInfo>);
 }
 impl UnifyErrorReport for &str {
-    fn report(&self) -> (String, Vec<ErrorInfo>) {
+    fn report(self) -> (String, Vec<ErrorInfo>) {
         (self.to_string(), Vec::new())
     }
 }
-impl<F: Fn() -> (String, Vec<ErrorInfo>)> UnifyErrorReport for F {
-    fn report(&self) -> (String, Vec<ErrorInfo>) {
+impl<F: FnOnce() -> (String, Vec<ErrorInfo>)> UnifyErrorReport for F {
+    fn report(self) -> (String, Vec<ErrorInfo>) {
         self()
     }
 }
@@ -258,7 +258,7 @@ impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: 
         found: &MyType,
         expected: &MyType,
         span: Span,
-        reporter: &Report,
+        reporter: Report,
     ) {
         let unify_result = self.unify(found, expected);
         if unify_result != UnifyResult::Success {

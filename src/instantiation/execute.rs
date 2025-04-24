@@ -6,11 +6,14 @@
 
 use std::ops::{Deref, Index, IndexMut};
 
+use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::IsExtern;
 use crate::prelude::*;
 use crate::typing::template::GlobalReference;
 
-use num::BigInt;
+use ibig::{IBig, UBig};
+
+use sus_proc_macro::get_builtin_const;
 
 use crate::flattening::*;
 use crate::value::{compute_binary_op, compute_unary_op, Value};
@@ -92,11 +95,11 @@ impl GenerationState<'_> {
             ))
         }
     }
-    fn get_generation_integer(&self, idx: FlatID) -> ExecutionResult<&BigInt> {
+    fn get_generation_integer(&self, idx: FlatID) -> ExecutionResult<&IBig> {
         let val = self.get_generation_value(idx)?;
         Ok(val.unwrap_integer())
     }
-    fn get_generation_small_int<INT: for<'v> TryFrom<&'v BigInt>>(
+    fn get_generation_small_int<INT: for<'v> TryFrom<&'v IBig>>(
         &self,
         idx: FlatID,
     ) -> ExecutionResult<INT> {
@@ -130,7 +133,7 @@ impl IndexMut<FlatID> for GenerationState<'_> {
 
 fn array_access<'v>(
     arr_val: &'v Value,
-    idx: &BigInt,
+    idx: &IBig,
     span: BracketSpan,
 ) -> ExecutionResult<&'v Value> {
     let Value::Array(arr) = arr_val else {
@@ -156,6 +159,27 @@ fn add_to_small_set<T: Eq>(set_vec: &mut Vec<T>, elem: T) {
     }
 }
 
+fn must_be_positive(v: &IBig, subject: &str) -> Result<UBig, String> {
+    UBig::try_from(v).map_err(|_| format!("{subject} must be positive! Found {v}"))
+}
+/// n! / (n - k)!
+fn falling_factorial(mut n: UBig, k: &UBig) -> UBig {
+    let num_terms = u64::try_from(k).unwrap();
+    let mut result = ibig::ubig!(1);
+    for _ in 0..num_terms {
+        result *= &n;
+        n -= 1usize;
+    }
+    result
+}
+fn factorial(mut n: UBig) -> UBig {
+    let as_usize = usize::try_from(&n).unwrap();
+    for v in 2..as_usize {
+        n *= v;
+    }
+    n
+}
+
 /// Temporary intermediary struct
 ///
 /// See [WireReferenceRoot]
@@ -178,7 +202,7 @@ impl InstantiationContext<'_, '_> {
         Ok(match typ {
             WrittenType::Error(_) => caught_by_typecheck!("Error Type"),
             WrittenType::TemplateVariable(_, template_id) => {
-                self.template_args[*template_id].clone()
+                self.working_on_global_ref.template_args[*template_id].clone()
             }
             WrittenType::Named(named_type) => {
                 ConcreteType::Named(crate::typing::concrete_type::ConcreteGlobalReference {
@@ -214,70 +238,142 @@ impl InstantiationContext<'_, '_> {
         }
     }
 
-    fn get_first_template_argument_value(
+    fn evaluate_builtin_constant(
         &self,
-        cst_ref: &GlobalReference<ConstantUUID>,
-    ) -> (&Value, Span) {
-        let first_arg = cst_ref.unwrap_first_template_argument();
-        let value_instruction = first_arg.kind.unwrap_value();
-        (
-            self.generation_state[value_instruction].unwrap_generation_value(),
-            first_arg.value_span,
-        )
+        cst_ref: &ConcreteGlobalReference<ConstantUUID>,
+    ) -> Result<Value, String> {
+        match cst_ref.id {
+            get_builtin_const!("true") => Ok(Value::Bool(true)),
+            get_builtin_const!("false") => Ok(Value::Bool(false)),
+            get_builtin_const!("clog2") => {
+                let [val] = cst_ref.template_args.cast_to_array();
+                let val = val.unwrap_value().unwrap_integer();
+                if val > &ibig::ibig!(0) {
+                    let val = UBig::try_from(val - 1).unwrap();
+                    Ok(Value::Integer(IBig::from(val.bit_len())))
+                } else {
+                    Err(format!(
+                        "clog2 argument must be strictly positive! Found {val}"
+                    ))
+                }
+            }
+            get_builtin_const!("pow2") => {
+                let [exponent] = cst_ref.template_args.cast_to_array();
+                let exponent = exponent.unwrap_value().unwrap_integer();
+                if let Ok(exp) = usize::try_from(exponent) {
+                    let mut result = ibig::ubig!(0);
+                    result.set_bit(exp);
+                    Ok(Value::Integer(result.into()))
+                } else {
+                    Err(format!("pow2 exponent must be >= 0, found {exponent}"))
+                }
+            }
+            get_builtin_const!("pow") => {
+                let [base, exponent] = cst_ref.template_args.cast_to_array();
+                let base = base.unwrap_value().unwrap_integer();
+                let exponent = exponent.unwrap_value().unwrap_integer();
+                if let Ok(exp) = usize::try_from(exponent) {
+                    Ok(Value::Integer(base.pow(exp)))
+                } else {
+                    Err(format!("pow exponent must be >= 0, found {exponent}"))
+                }
+            }
+            get_builtin_const!("factorial") => {
+                let [n] = cst_ref.template_args.cast_to_array();
+                let n = n.unwrap_value().unwrap_integer();
+                let n = must_be_positive(n, "factorial parameter")?;
+
+                Ok(Value::Integer(factorial(n).into()))
+            }
+            get_builtin_const!("falling_factorial") => {
+                let [n, k] = cst_ref.template_args.cast_to_array();
+                let n = n.unwrap_value().unwrap_integer();
+                let n = must_be_positive(n, "comb n parameter")?;
+                let k = k.unwrap_value().unwrap_integer();
+                let k = must_be_positive(k, "comb k parameter")?;
+
+                if k > n {
+                    return Err(format!("comb assertion failed: k <= n. Found n={n}, k={k}"));
+                }
+
+                Ok(Value::Integer(falling_factorial(n, &k).into()))
+            }
+            get_builtin_const!("comb") => {
+                let [n, k] = cst_ref.template_args.cast_to_array();
+                let n = n.unwrap_value().unwrap_integer();
+                let n = must_be_positive(n, "comb n parameter")?;
+                let k = k.unwrap_value().unwrap_integer();
+                let k = must_be_positive(k, "comb k parameter")?;
+
+                if k > n {
+                    return Err(format!("comb assertion failed: k <= n. Found n={n}, k={k}"));
+                }
+
+                Ok(Value::Integer(
+                    (falling_factorial(n, &k) / factorial(k)).into(),
+                ))
+            }
+            get_builtin_const!("assert") => {
+                let [condition] = cst_ref.template_args.cast_to_array();
+
+                if condition.unwrap_value().unwrap_bool() {
+                    Ok(Value::Bool(true))
+                } else {
+                    Err("Assertion failed".into())
+                }
+            }
+            get_builtin_const!("sizeof") => {
+                let [concrete_typ] = cst_ref.template_args.cast_to_array();
+
+                if let Some(typ_sz) = concrete_typ.sizeof() {
+                    Ok(Value::Integer(typ_sz))
+                } else {
+                    Err("This is an incomplete type".into())
+                }
+            }
+            get_builtin_const!("__crash_compiler") => {
+                panic!(
+                    "__crash_compiler Intentional ICE. This is for debugging the compiler and LSP."
+                )
+            }
+            other => unreachable!("{other:?} is not a known builtin constant"),
+        }
     }
 
-    /// TODO make builtins that depend on parameters
     fn get_named_constant_value(
         &self,
         cst_ref: &GlobalReference<ConstantUUID>,
     ) -> ExecutionResult<Value> {
+        let concrete_ref = self.execute_global_ref(cst_ref)?;
+
         let linker_cst = &self.linker.constants[cst_ref.id];
-
-        Ok(if linker_cst.link_info.is_extern == IsExtern::Builtin {
-            match linker_cst.link_info.name.as_str() {
-                "true" => Value::Bool(true),
-                "false" => Value::Bool(false),
-                "clog2" => {
-                    let (val, span) = self.get_first_template_argument_value(cst_ref);
-                    let int_val = val.unwrap_integer();
-                    if *int_val > BigInt::ZERO {
-                        let int_val_minus_one: BigInt = int_val - 1;
-
-                        Value::Integer(BigInt::from(int_val_minus_one.bits()))
-                    } else {
-                        return Err((span, format!("clog2 argument must be > 0, found {int_val}")));
-                    }
+        if !concrete_ref.is_final() {
+            let mut resulting_error = String::from("For executing compile-time constants, all arguments must be fully specified. In this case, the arguments ");
+            for (id, arg) in &concrete_ref.template_args {
+                if arg.contains_unknown() {
+                    use std::fmt::Write;
+                    write!(
+                        resulting_error,
+                        "'{}', ",
+                        &linker_cst.link_info.template_parameters[id].name
+                    )
+                    .unwrap();
                 }
-                "assert" => {
-                    let (condition, span) = self.get_first_template_argument_value(cst_ref);
-
-                    if condition.unwrap_bool() {
-                        Value::Bool(true)
-                    } else {
-                        return Err((span, "Assertion failed".into()));
-                    }
-                }
-                "sizeof" => {
-                    let first_arg = cst_ref.unwrap_first_template_argument();
-                    let wr_typ = first_arg.kind.unwrap_type();
-
-                    let concrete_typ = self.concretize_type(wr_typ)?;
-
-                    let Some(typ_sz) = concrete_typ.sizeof() else {
-                        return Err((first_arg.value_span, "This is an incomplete type".into()));
-                    };
-
-                    Value::Integer(typ_sz)
-                }
-                "__crash_compiler" => {
-                    cst_ref.get_total_span().debug();
-                    panic!("__crash_compiler Intentional ICE. This is for debugging the compiler and LSP.")
-                }
-                other => unreachable!("{other} is not a known builtin constant"),
             }
+            resulting_error.pop();
+            resulting_error.pop();
+            resulting_error.push_str(" were not specified");
+
+            return Err((cst_ref.get_total_span(), resulting_error));
+        }
+
+        if linker_cst.link_info.is_extern == IsExtern::Builtin {
+            cst_ref.get_total_span().debug();
+            self.evaluate_builtin_constant(&concrete_ref)
+                .map_err(|e| (cst_ref.get_total_span(), e))
         } else {
             todo!("Custom Constants");
-        })
+        }
     }
 
     // Points to the wire in the hardware that corresponds to the root of this.
@@ -314,14 +410,16 @@ impl InstantiationContext<'_, '_> {
         mut preamble: Vec<RealWirePathElem>,
         path: &[WireReferencePathElement],
         domain: DomainID,
-    ) -> Vec<RealWirePathElem> {
+    ) -> ExecutionResult<Vec<RealWirePathElem>> {
         for v in path {
             match v {
                 &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
-                    let idx_wire = self.get_wire_or_constant_as_wire(idx, domain);
-                    assert_eq!(
-                        self.wires[idx_wire].typ, INT_CONCRETE_TYPE,
-                        "Caught by typecheck"
+                    let idx_wire = self.get_wire_or_constant_as_wire(idx, domain)?;
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[idx_wire].typ,
+                        &INT_CONCRETE_TYPE,
+                        bracket_span.inner_span(),
+                        "Caught by typecheck",
                     );
                     preamble.push(RealWirePathElem::ArrayAccess {
                         span: bracket_span,
@@ -331,7 +429,7 @@ impl InstantiationContext<'_, '_> {
             }
         }
 
-        preamble
+        Ok(preamble)
     }
 
     fn instantiate_write_to_wire(
@@ -376,9 +474,9 @@ impl InstantiationContext<'_, '_> {
                     preamble,
                 } => {
                     let domain = self.wires[target_wire].domain;
-                    let from = self.get_wire_or_constant_as_wire(conn_from, domain);
+                    let from = self.get_wire_or_constant_as_wire(conn_from, domain)?;
                     let instantiated_path =
-                        self.instantiate_wire_ref_path(preamble, &target_wire_ref.path, domain);
+                        self.instantiate_wire_ref_path(preamble, &target_wire_ref.path, domain)?;
                     self.instantiate_write_to_wire(
                         target_wire,
                         instantiated_path,
@@ -439,93 +537,46 @@ impl InstantiationContext<'_, '_> {
         }
         Ok(())
     }
-    fn compute_compile_time_wireref(&self, wire_ref: &WireReference) -> ExecutionResult<Value> {
-        let mut work_on_value: Value = match &wire_ref.root {
-            &WireReferenceRoot::LocalDecl(decl_id, _span) => {
-                self.generation_state.get_generation_value(decl_id)?.clone()
-            }
-            WireReferenceRoot::NamedConstant(cst) => self.get_named_constant_value(cst)?,
-            &WireReferenceRoot::SubModulePort(_) => {
-                todo!("Don't yet support compile time functions")
-            }
-        };
-
-        for path_elem in &wire_ref.path {
-            work_on_value = match path_elem {
-                &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
-                    let idx = self.generation_state.get_generation_integer(idx)?;
-
-                    array_access(&work_on_value, idx, bracket_span)?.clone()
-                }
-            }
-        }
-
-        Ok(work_on_value)
-    }
-    fn compute_compile_time(&mut self, expression: &Expression) -> ExecutionResult<Value> {
-        Ok(match &expression.source {
-            ExpressionSource::WireRef(wire_ref) => {
-                self.compute_compile_time_wireref(wire_ref)?.clone()
-            }
-            &ExpressionSource::UnaryOp { op, right } => {
-                let right_val = self.generation_state.get_generation_value(right)?;
-                compute_unary_op(op, right_val)
-            }
-            &ExpressionSource::BinaryOp { op, left, right } => {
-                let left_val = self.generation_state.get_generation_value(left)?;
-                let right_val = self.generation_state.get_generation_value(right)?;
-
-                match op {
-                    BinaryOperator::Divide | BinaryOperator::Modulo => {
-                        use num::Zero;
-                        if right_val.unwrap_integer().is_zero() {
-                            return Err((
-                                expression.span,
-                                format!(
-                                    "Divide or Modulo by zero: {} / 0",
-                                    left_val.unwrap_integer()
-                                ),
-                            ));
-                        }
-                    }
-                    _ => {}
-                }
-
-                compute_binary_op(left_val, op, right_val)
-            }
-            ExpressionSource::Constant(value) => value.clone(),
-        })
-    }
-
     fn alloc_wire_for_const(
         &mut self,
         value: Value,
         original_instruction: FlatID,
         domain: DomainID,
-    ) -> WireID {
-        self.wires.alloc(RealWire {
-            typ: value.get_type_best_effort(&mut self.type_substitutor),
+        const_span: Span,
+    ) -> ExecutionResult<WireID> {
+        if value.contains_errors_or_unsets() {
+            return Err((const_span, format!("This compile-time value was not fully resolved by the time it needed to be converted to a wire: {value}")));
+        }
+        Ok(self.wires.alloc(RealWire {
+            typ: value.get_type(&self.type_substitutor),
             source: RealWireDataSource::Constant { value },
             original_instruction,
             domain,
             name: self.unique_name_producer.get_unique_name(""),
             specified_latency: CALCULATE_LATENCY_LATER,
             absolute_latency: CALCULATE_LATENCY_LATER,
-        })
+        }))
     }
     fn get_wire_or_constant_as_wire(
         &mut self,
         original_instruction: FlatID,
         domain: DomainID,
-    ) -> WireID {
+    ) -> ExecutionResult<WireID> {
         match &self.generation_state[original_instruction] {
             SubModuleOrWire::SubModule(_) => unreachable!(),
             SubModuleOrWire::Unnasigned => unreachable!(),
-            SubModuleOrWire::Wire(w) => *w,
+            SubModuleOrWire::Wire(w) => Ok(*w),
             SubModuleOrWire::CompileTimeValue(v) => {
                 let value = v.clone();
 
-                self.alloc_wire_for_const(value, original_instruction, domain)
+                self.alloc_wire_for_const(
+                    value,
+                    original_instruction,
+                    domain,
+                    self.md.link_info.instructions[original_instruction]
+                        .unwrap_expression()
+                        .span,
+                )
             }
         }
     }
@@ -547,7 +598,7 @@ impl InstantiationContext<'_, '_> {
             }
             wire_found.maps_to_wire
         } else {
-            let port_data = &self.linker.modules[submod_instance.module_uuid].ports[port_id];
+            let port_data = &self.linker.modules[submod_instance.refers_to.id].ports[port_id];
             let submodule_instruction = self.md.link_info.instructions
                 [submod_instance.original_instruction]
                 .unwrap_submodule();
@@ -600,12 +651,22 @@ impl InstantiationContext<'_, '_> {
                     .unwrap_generation_value()
                     .clone();
                 (
-                    self.alloc_wire_for_const(value, decl_id, domain),
+                    self.alloc_wire_for_const(
+                        value,
+                        decl_id,
+                        domain,
+                        wire_ref_root.get_span().unwrap(),
+                    )?,
                     Vec::new(),
                 )
             }
             RealWireRefRoot::Constant(value) => (
-                self.alloc_wire_for_const(value, original_instruction, domain),
+                self.alloc_wire_for_const(
+                    value,
+                    original_instruction,
+                    domain,
+                    wire_ref_root.get_span().unwrap(),
+                )?,
                 Vec::new(),
             ),
         })
@@ -620,7 +681,7 @@ impl InstantiationContext<'_, '_> {
             ExpressionSource::WireRef(wire_ref) => {
                 let (root_wire, path_preamble) =
                     self.get_wire_ref_root_as_wire(&wire_ref.root, original_instruction, domain)?;
-                let path = self.instantiate_wire_ref_path(path_preamble, &wire_ref.path, domain);
+                let path = self.instantiate_wire_ref_path(path_preamble, &wire_ref.path, domain)?;
 
                 if path.is_empty() {
                     // Little optimization reduces instructions
@@ -633,13 +694,21 @@ impl InstantiationContext<'_, '_> {
                 }
             }
             &ExpressionSource::UnaryOp { op, right } => {
-                let right = self.get_wire_or_constant_as_wire(right, domain);
+                let right = self.get_wire_or_constant_as_wire(right, domain)?;
                 RealWireDataSource::UnaryOp { op, right }
             }
             &ExpressionSource::BinaryOp { op, left, right } => {
-                let left = self.get_wire_or_constant_as_wire(left, domain);
-                let right = self.get_wire_or_constant_as_wire(right, domain);
+                let left = self.get_wire_or_constant_as_wire(left, domain)?;
+                let right = self.get_wire_or_constant_as_wire(right, domain)?;
                 RealWireDataSource::BinaryOp { op, left, right }
+            }
+            ExpressionSource::ArrayConstruct(arr) => {
+                let mut array_wires = Vec::with_capacity(arr.len());
+                for v_id in arr {
+                    let wire_id = self.get_wire_or_constant_as_wire(*v_id, domain)?;
+                    array_wires.push(wire_id);
+                }
+                RealWireDataSource::ConstructArray { array_wires }
             }
             ExpressionSource::Constant(_) => {
                 unreachable!("Constant cannot be non-compile-time");
@@ -666,7 +735,9 @@ impl InstantiationContext<'_, '_> {
         Ok(if wire_decl.identifier_type == IdentifierType::Generative {
             let value = if let DeclarationKind::GenerativeInput(template_id) = wire_decl.decl_kind {
                 // Only for template arguments, we must initialize their value to the value they've been assigned in the template instantiation
-                self.template_args[template_id].unwrap_value().clone()
+                self.working_on_global_ref.template_args[template_id]
+                    .unwrap_value()
+                    .clone()
             } else {
                 // Empty initial value
                 typ.get_initial_val()
@@ -705,6 +776,95 @@ impl InstantiationContext<'_, '_> {
         })
     }
 
+    fn execute_global_ref<ID: Copy>(
+        &self,
+        global_ref: &GlobalReference<ID>,
+    ) -> ExecutionResult<ConcreteGlobalReference<ID>> {
+        let template_args =
+            global_ref
+                .template_args
+                .try_map(|(_, v)| -> ExecutionResult<ConcreteType> {
+                    Ok(match v {
+                        Some(arg) => match &arg.kind {
+                            TemplateArgKind::Type(typ) => self.concretize_type(typ)?,
+                            TemplateArgKind::Value(v) => ConcreteType::Value(
+                                self.generation_state.get_generation_value(*v)?.clone(),
+                            ),
+                        },
+                        None => ConcreteType::Unknown(self.type_substitutor.alloc()),
+                    })
+                })?;
+        Ok(ConcreteGlobalReference {
+            id: global_ref.id,
+            template_args,
+        })
+    }
+
+    fn compute_compile_time_wireref(&self, wire_ref: &WireReference) -> ExecutionResult<Value> {
+        let mut work_on_value: Value = match &wire_ref.root {
+            &WireReferenceRoot::LocalDecl(decl_id, _span) => {
+                self.generation_state.get_generation_value(decl_id)?.clone()
+            }
+            WireReferenceRoot::NamedConstant(cst) => self.get_named_constant_value(cst)?,
+            &WireReferenceRoot::SubModulePort(_) => {
+                todo!("Don't yet support compile time functions")
+            }
+        };
+
+        for path_elem in &wire_ref.path {
+            work_on_value = match path_elem {
+                &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
+                    let idx = self.generation_state.get_generation_integer(idx)?;
+
+                    array_access(&work_on_value, idx, bracket_span)?.clone()
+                }
+            }
+        }
+
+        Ok(work_on_value)
+    }
+    fn compute_compile_time(&mut self, expression: &Expression) -> ExecutionResult<Value> {
+        Ok(match &expression.source {
+            ExpressionSource::WireRef(wire_ref) => {
+                self.compute_compile_time_wireref(wire_ref)?.clone()
+            }
+            &ExpressionSource::UnaryOp { op, right } => {
+                let right_val = self.generation_state.get_generation_value(right)?;
+                compute_unary_op(op, right_val)
+            }
+            &ExpressionSource::BinaryOp { op, left, right } => {
+                let left_val = self.generation_state.get_generation_value(left)?;
+                let right_val = self.generation_state.get_generation_value(right)?;
+
+                match op {
+                    BinaryOperator::Divide | BinaryOperator::Modulo => {
+                        if right_val.unwrap_integer() == &ibig::ibig!(0) {
+                            return Err((
+                                expression.span,
+                                format!(
+                                    "Divide or Modulo by zero: {} / 0",
+                                    left_val.unwrap_integer()
+                                ),
+                            ));
+                        }
+                    }
+                    _ => {}
+                }
+
+                compute_binary_op(left_val, op, right_val)
+            }
+            ExpressionSource::ArrayConstruct(arr) => {
+                let mut result = Vec::with_capacity(arr.len());
+                for v_id in arr {
+                    let val = self.generation_state.get_generation_value(*v_id)?;
+                    result.push(val.clone());
+                }
+                Value::Array(result)
+            }
+            ExpressionSource::Constant(value) => value.clone(),
+        })
+    }
+
     fn instantiate_code_block(&mut self, block_range: FlatIDRange) -> ExecutionResult<()> {
         let mut instruction_range = block_range.into_iter();
         while let Some(original_instruction) = instruction_range.next() {
@@ -721,28 +881,16 @@ impl InstantiationContext<'_, '_> {
                     };
                     let port_map = sub_module.ports.map(|_| None);
                     let interface_call_sites = sub_module.interfaces.map(|_| Vec::new());
-                    let mut template_args =
-                        FlatAlloc::with_capacity(submodule.module_ref.template_args.len());
 
-                    for (_id, v) in &submodule.module_ref.template_args {
-                        template_args.alloc(match v {
-                            Some(arg) => match &arg.kind {
-                                TemplateArgKind::Type(typ) => self.concretize_type(typ)?,
-                                TemplateArgKind::Value(v) => ConcreteType::Value(
-                                    self.generation_state.get_generation_value(*v)?.clone(),
-                                ),
-                            },
-                            None => ConcreteType::Unknown(self.type_substitutor.alloc()),
-                        });
-                    }
+                    let concrete_ref = self.execute_global_ref(&submodule.module_ref)?;
+
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule {
                         original_instruction,
                         instance: OnceCell::new(),
+                        refers_to: Rc::new(concrete_ref),
                         port_map,
                         interface_call_sites,
                         name: self.unique_name_producer.get_unique_name(name_origin),
-                        module_uuid: submodule.module_ref.id,
-                        template_args,
                     }))
                 }
                 Instruction::Declaration(wire_decl) => {
@@ -792,7 +940,7 @@ impl InstantiationContext<'_, '_> {
                         std::iter::zip(fc.func_call_inputs.iter(), fc.arguments.iter())
                     {
                         let from =
-                            self.get_wire_or_constant_as_wire(*arg, domain.unwrap_physical());
+                            self.get_wire_or_constant_as_wire(*arg, domain.unwrap_physical())?;
                         let port_wire = self.get_submodule_port(submod_id, port, None);
                         self.instantiate_write_to_wire(
                             port_wire,
@@ -908,5 +1056,32 @@ impl InstantiationContext<'_, '_> {
         let result = self.instantiate_code_block(self.md.link_info.instructions.id_range());
         self.make_interface();
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::instantiation::execute::factorial;
+
+    #[test]
+    fn test_factorial() {
+        let a = ibig::ubig!(7);
+
+        assert_eq!(factorial(a), ibig::ubig!(5040))
+    }
+    #[test]
+    fn test_falling_factorial() {
+        let a = ibig::ubig!(20);
+        let b = ibig::ubig!(15);
+
+        let a_factorial = factorial(a.clone());
+        let a_b_factorial = factorial(&a - &b);
+
+        assert_eq!(
+            falling_factorial(a.clone(), &b),
+            a_factorial / a_b_factorial
+        )
     }
 }

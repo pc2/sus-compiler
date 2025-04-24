@@ -1,7 +1,8 @@
 use std::ops::Deref;
 
+use ibig::IBig;
+
 use crate::alloc::{zip_eq, zip_eq3};
-use crate::errors::ErrorInfoObject;
 use crate::flattening::{DeclarationKind, ExpressionSource, WireReferenceRoot, WrittenType};
 use crate::linker::LinkInfo;
 use crate::typing::abstract_type::PeanoType;
@@ -81,7 +82,13 @@ impl InstantiationContext<'_, '_> {
                 RealWireDataSource::ReadOnly => {}
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     if let Some(is_state) = is_state {
-                        assert!(is_state.is_of_type(&this_wire.typ));
+                        let value_typ = is_state.get_type(&self.type_substitutor);
+                        self.type_substitutor.unify_report_error(
+                            &value_typ,
+                            &this_wire.typ,
+                            span,
+                            "initial value of state",
+                        );
                     }
                     for s in sources {
                         let source_typ = &self.wires[s.from].typ;
@@ -91,7 +98,7 @@ impl InstantiationContext<'_, '_> {
                             &destination_typ,
                             source_typ,
                             span,
-                            &"write wire access",
+                            "write wire access",
                         );
                     }
                 }
@@ -112,13 +119,13 @@ impl InstantiationContext<'_, '_> {
                         &self.wires[right].typ,
                         &input_typ,
                         span,
-                        &"unary input",
+                        "unary input",
                     );
                     self.type_substitutor.unify_report_error(
                         &self.wires[this_wire_id].typ,
                         &output_typ,
                         span,
-                        &"unary output",
+                        "unary output",
                     );
                 }
                 &RealWireDataSource::BinaryOp { op, left, right } => {
@@ -187,7 +194,7 @@ impl InstantiationContext<'_, '_> {
                             in_left,
                             out,
                             span,
-                            &"binary output dimension",
+                            "binary output dimension",
                         );
                     }
 
@@ -203,7 +210,7 @@ impl InstantiationContext<'_, '_> {
                             in_right,
                             out,
                             span,
-                            &"binary output dimension",
+                            "binary output dimension",
                         );
                     }
 
@@ -211,19 +218,19 @@ impl InstantiationContext<'_, '_> {
                         &self.wires[this_wire_id].typ,
                         &out_type,
                         span,
-                        &"binary output",
+                        "binary output",
                     );
                     self.type_substitutor.unify_report_error(
                         &self.wires[left].typ,
                         &in_left_type,
                         span,
-                        &"binary left",
+                        "binary left",
                     );
                     self.type_substitutor.unify_report_error(
                         &self.wires[right].typ,
                         &in_right_type,
                         span,
-                        &"binary right",
+                        "binary right",
                     );
                 }
                 RealWireDataSource::Select { root, path } => {
@@ -232,15 +239,32 @@ impl InstantiationContext<'_, '_> {
                         &found_typ,
                         &self.wires[this_wire_id].typ,
                         span,
-                        &"wire access",
+                        "wire access",
                     );
                 }
-                RealWireDataSource::Constant { value } => {
-                    assert!(
-                        value.is_of_type(&this_wire.typ),
-                        "Assigned type to a constant should already be of the type"
+                RealWireDataSource::ConstructArray { array_wires } => {
+                    let mut array_wires_iter = array_wires.iter();
+                    let first_elem = array_wires_iter.next().unwrap();
+                    let element_type = self.wires[*first_elem].typ.clone();
+                    for w in array_wires_iter {
+                        self.type_substitutor.unify_report_error(
+                            &self.wires[*w].typ,
+                            &element_type,
+                            span,
+                            "array construction",
+                        );
+                    }
+                    let array_size_value =
+                        ConcreteType::Value(Value::Integer(IBig::from(array_wires.len())));
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[this_wire_id].typ,
+                        &ConcreteType::Array(Box::new((element_type, array_size_value))),
+                        span,
+                        "array construction",
                     );
                 }
+                // type is already set when the wire was created
+                RealWireDataSource::Constant { value: _ } => {}
             };
         }
     }
@@ -285,7 +309,7 @@ impl InstantiationContext<'_, '_> {
     pub fn typecheck(&mut self) {
         let mut delayed_constraints: DelayedConstraintsList<Self> = DelayedConstraintsList::new();
         for (sm_id, sm) in &self.submodules {
-            let sub_module = &self.linker.modules[sm.module_uuid];
+            let sub_module = &self.linker.modules[sm.refers_to.id];
 
             for (port_id, p) in sm.port_map.iter_valids() {
                 let wire = &self.wires[p.maps_to_wire];
@@ -296,7 +320,7 @@ impl InstantiationContext<'_, '_> {
 
                 let typ_for_inference = concretize_written_type_with_possible_template_args(
                     &port_decl.typ_expr,
-                    &sm.template_args,
+                    &sm.refers_to.template_args,
                     &sub_module.link_info,
                     &self.type_substitutor,
                 );
@@ -309,6 +333,8 @@ impl InstantiationContext<'_, '_> {
         }
 
         self.typecheck_all_wires();
+
+        delayed_constraints.push(LatencyInferenceDelayedConstraint {});
 
         delayed_constraints.resolve_delayed_constraints(self);
 
@@ -414,37 +440,29 @@ fn concretize_written_type_with_possible_template_args(
     }
 }
 
-impl SubmoduleTypecheckConstraint {
-    /// Directly named type and value parameters are immediately unified, but latency count deltas can only be computed from the latency counting graph
-    fn try_infer_latency_counts(&mut self, _context: &mut InstantiationContext) {
-        // TODO
-    }
-}
-
 impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConstraint {
     fn try_apply(&mut self, context: &mut InstantiationContext) -> DelayedConstraintStatus {
-        // Try to infer template arguments based on the connections to the ports of the module.
-        self.try_infer_latency_counts(context);
-
         let sm = &mut context.submodules[self.sm_id];
+        assert!(sm.instance.get().is_none());
 
         let submod_instr =
             context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
-        let sub_module = &context.linker.modules[sm.module_uuid];
+
+        let sub_module = &context.linker.modules[sm.refers_to.id];
 
         // Check if there's any argument that isn't known
-        for (_id, arg) in &mut sm.template_args {
+        for (_id, arg) in &mut Rc::get_mut(&mut sm.refers_to).unwrap().template_args {
             if !arg.fully_substitute(&context.type_substitutor) {
                 // We don't actually *need* to already fully_substitute here, but it's convenient and saves some work
                 return DelayedConstraintStatus::NoProgress;
             }
         }
 
-        if let Some(instance) = sub_module.instantiations.instantiate(
-            sub_module,
-            context.linker,
-            sm.template_args.clone(),
-        ) {
+        if let Some(instance) = context
+            .linker
+            .instantiator
+            .instantiate(context.linker, sm.refers_to.clone())
+        {
             for (_port_id, concrete_port, source_code_port, connecting_wire) in
                 zip_eq3(&instance.interface_ports, &sub_module.ports, &sm.port_map)
             {
@@ -478,7 +496,8 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                             &wire.typ,
                             &concrete_port.typ,
                             submod_instr.module_ref.get_total_span(),
-                            &|| {
+                            || {
+                                use crate::errors::ErrorInfoObject;
                                 let port_declared_here = source_code_port
                                     .make_info(sub_module.link_info.file)
                                     .unwrap();
@@ -527,16 +546,21 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                 }
             }
 
+            // Overwrite the refers_to with the identical instance.global_ref
+            assert!(sm.refers_to == instance.global_ref);
+            sm.refers_to = instance.global_ref.clone();
+
             sm.instance
                 .set(instance)
-                .expect("Can only set the instance of a submodule once");
+                .expect("Can only set an InstantiatedModule once");
+
             DelayedConstraintStatus::Resolved
         } else {
             context.errors.error(
                 submod_instr.module_ref.get_total_span(),
                 "Error instantiating submodule",
             );
-            DelayedConstraintStatus::NoProgress
+            DelayedConstraintStatus::Resolved
         }
     }
 
@@ -545,17 +569,22 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
 
         let submod_instr =
             context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
-        let sub_module = &context.linker.modules[sm.module_uuid];
 
-        let submodule_template_args_string = pretty_print_concrete_instance(
-            &sub_module.link_info,
-            &sm.template_args,
-            &context.linker.types,
-        );
+        let submodule_template_args_string =
+            sm.refers_to.pretty_print_concrete_instance(context.linker);
         let message = format!("Could not fully instantiate {submodule_template_args_string}");
 
         context
             .errors
             .error(submod_instr.get_most_relevant_span(), message);
     }
+}
+
+pub struct LatencyInferenceDelayedConstraint {}
+impl DelayedConstraint<InstantiationContext<'_, '_>> for LatencyInferenceDelayedConstraint {
+    fn try_apply(&mut self, context: &mut InstantiationContext<'_, '_>) -> DelayedConstraintStatus {
+        context.infer_parameters_for_latencies()
+    }
+
+    fn report_could_not_resolve_error(&self, _context: &InstantiationContext<'_, '_>) {} // Handled by incomplete submodules themselves
 }

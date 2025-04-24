@@ -1,76 +1,75 @@
 Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[util.sus:73:27]
+    ╭─[ util.sus:73:27 ]
     │
  73 │     interface identity1 : T1 i1'0 -> T1 o1'0
     │                              ─┬  
     │                               ╰── Unused Variable: This variable does not affect the output ports of this module
 ────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[util.sus:74:27]
+    ╭─[ util.sus:74:27 ]
     │
  74 │     interface identity2 : T2 i2'OFFSET -> T2 o2'OFFSET
     │                              ─┬  
     │                               ╰── Unused Variable: This variable does not affect the output ports of this module
 ────╯
-Error: 'contains_submodule_submodule' conflicts with other declarations:
-     ╭─[test.sus:441:8]
-     │
- 441 │ module contains_submodule_submodule {
-     │        ──────────────┬─────────────  
-     │                      ╰─────────────── 'contains_submodule_submodule' conflicts with other declarations:
-     │ 
- 597 │ module contains_submodule_submodule {
-     │        ──────────────┬─────────────  
-     │                      ╰─────────────── Conflicts with
-─────╯
-Error: 'contains_submodule_submodule' conflicts with other declarations:
-     ╭─[test.sus:597:8]
-     │
- 441 │ module contains_submodule_submodule {
-     │        ──────────────┬─────────────  
-     │                      ╰─────────────── Conflicts with
-     │ 
- 597 │ module contains_submodule_submodule {
-     │        ──────────────┬─────────────  
-     │                      ╰─────────────── 'contains_submodule_submodule' conflicts with other declarations:
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[test.sus:26:6]
+    ╭─[ test.sus:26:6 ]
     │
  26 │     int a = pow17(2)
     │         ┬  
     │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[test.sus:60:10]
+    ╭─[ test.sus:60:10 ]
     │
  60 │     gen int a
     │             ┬  
     │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[test.sus:62:11]
+    ╭─[ test.sus:62:11 ]
     │
  62 │     gen bool b = true
     │              ┬  
     │              ╰── Unused Variable: This variable does not affect the output ports of this module
 ────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-    ╭─[test.sus:63:11]
+    ╭─[ test.sus:63:11 ]
     │
  63 │     gen bool bb = false
     │              ─┬  
     │               ╰── Unused Variable: This variable does not affect the output ports of this module
 ────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:115:10]
+     ╭─[ test.sus:115:10 ]
      │
  115 │     gen int A = 1
      │             ┬  
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:144:13 ]
+     │
+ 144 │     gen int[x] ys
+     │                ─┬  
+     │                 ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:148:13 ]
+     │
+ 148 │     gen int[3] ps
+     │                ─┬  
+     │                 ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:155:13 ]
+     │
+ 155 │     gen int[3] xx = a
+     │                ─┬  
+     │                 ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
 Error: 'i' is read-only
-     ╭─[test.sus:159:11]
+     ╭─[ test.sus:159:11 ]
      │
  142 │     interface generative : int i -> int o, int o2
      │                                ┬  
@@ -80,142 +79,95 @@ Error: 'i' is read-only
      │              ┬  
      │              ╰── 'i' is read-only
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:144:13]
+Error: This port is not strongly connected to the strongly connected port cluster 'v'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+     ╭─[ test.sus:175:53 ]
      │
- 144 │     gen int[x] ys
-     │                ─┬  
-     │                 ╰── Unused Variable: This variable does not affect the output ports of this module
+ 175 │     interface assignment_producer : -> int v'0, int o'0, bool j'0 }
+     │                                            ┬        ┬  
+     │                                            ╰─────────── 'v' declared here
+     │                                                     │  
+     │                                                     ╰── This port is not strongly connected to the strongly connected port cluster 'v'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+─────╯
+Error: This port is not strongly connected to the strongly connected port cluster 'v'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+     ╭─[ test.sus:175:63 ]
+     │
+ 175 │     interface assignment_producer : -> int v'0, int o'0, bool j'0 }
+     │                                            ┬                  ┬  
+     │                                            ╰───────────────────── 'v' declared here
+     │                                                               │  
+     │                                                               ╰── This port is not strongly connected to the strongly connected port cluster 'v'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:148:13]
-     │
- 148 │     gen int[3] ps
-     │                ─┬  
-     │                 ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:155:13]
-     │
- 155 │     gen int[3] xx = a
-     │                ─┬  
-     │                 ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:178:15]
+     ╭─[ test.sus:178:15 ]
      │
  178 │     state int[3] st
      │                  ─┬  
      │                   ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:179:7]
+     ╭─[ test.sus:179:7 ]
      │
  179 │     bool b
      │          ┬  
      │          ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:180:10]
+     ╭─[ test.sus:180:10 ]
      │
  180 │     reg int a, st[2], reg reg b = assignment_producer()
      │             ┬  
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Latency Counting couldn't reach this node
-     ╭─[test.sus:179:2]
-     │
- 179 │     bool b
-     │     ───┬──  
-     │        ╰──── Latency Counting couldn't reach this node
-─────╯
-Error: Latency Counting couldn't reach this node
-     ╭─[test.sus:180:6]
+Error: Error instantiating submodule
+     ╭─[ test.sus:180:32 ]
      │
  180 │     reg int a, st[2], reg reg b = assignment_producer()
-     │         ──┬──  
-     │           ╰──── Latency Counting couldn't reach this node
-─────╯
-Error: No Global of the name 'multiply' was found. Did you forget to import it?
-     ╭─[test.sus:219:17]
-     │
- 219 │     int tmp'1 = multiply(a, b)
-     │                 ────┬───  
-     │                     ╰───── No Global of the name 'multiply' was found. Did you forget to import it?
+     │                                   ─────────┬─────────  
+     │                                            ╰─────────── Error instantiating submodule
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:218:49]
+     ╭─[ test.sus:218:49 ]
      │
  218 │     interface multiply_add_with_latencies : int a'0, int b'0, int c'0 -> int r'0
      │                                                 ┬  
      │                                                 ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:218:58]
+     ╭─[ test.sus:218:58 ]
      │
  218 │     interface multiply_add_with_latencies : int a'0, int b'0, int c'0 -> int r'0
      │                                                          ┬  
      │                                                          ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: No Global of the name 'multiply' was found. Did you forget to import it?
+     ╭─[ test.sus:219:17 ]
+     │
+ 219 │     int tmp'1 = multiply(a, b)
+     │                 ────┬───  
+     │                     ╰───── No Global of the name 'multiply' was found. Did you forget to import it?
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:224:43]
+     ╭─[ test.sus:224:43 ]
      │
  224 │     interface first_bit_idx_24 : bool[24] bits -> int first
      │                                           ──┬─  
      │                                             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:225:9]
-     │
- 225 │     int[4] offsets
-     │            ───┬───  
-     │               ╰───── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:226:10]
-     │
- 226 │     bool[4] was_nonzeros
-     │             ──────┬─────  
-     │                   ╰─────── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:228:10]
-     │
- 228 │     for int i in 0..4 {
-     │             ┬  
-     │             ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:229:11]
-     │
- 229 │        bool[6] these_bits
-     │                ─────┬────  
-     │                     ╰────── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:230:11]
-     │
- 230 │        for int j in 0..6 {
-     │                ┬  
-     │                ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:234:7]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │            ───┬──  
-     │               ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:234:20]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │                         ─────┬─────  
-     │                              ╰─────── Unused Variable: This variable does not affect the output ports of this module
-─────╯
 Error: Pre-emptive error because latency-unspecified 'first' is never written to. 
 (This is because work-in-progress code would get a lot of latency counting errors while unfinished)
-     ╭─[test.sus:224:55]
+     ╭─[ test.sus:224:55 ]
      │
  224 │     interface first_bit_idx_24 : bool[24] bits -> int first
      │                                                       ──┬──  
@@ -223,28 +175,114 @@ Error: Pre-emptive error because latency-unspecified 'first' is never written to
 (This is because work-in-progress code would get a lot of latency counting errors while unfinished)
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:241:44]
+     ╭─[ test.sus:225:9 ]
+     │
+ 225 │     int[4] offsets
+     │            ───┬───  
+     │               ╰───── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:226:10 ]
+     │
+ 226 │     bool[4] was_nonzeros
+     │             ──────┬─────  
+     │                   ╰─────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:228:10 ]
+     │
+ 228 │     for int i in 0..4 {
+     │             ┬  
+     │             ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:229:11 ]
+     │
+ 229 │        bool[6] these_bits
+     │                ─────┬────  
+     │                     ╰────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:230:11 ]
+     │
+ 230 │        for int j in 0..6 {
+     │                ┬  
+     │                ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:234:7 ]
+     │
+ 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
+     │            ───┬──  
+     │               ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:234:20 ]
+     │
+ 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
+     │                         ─────┬─────  
+     │                              ╰─────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:241:44 ]
      │
  241 │     interface permute : bool[128] mbf, int selected_permutation -> bool[128] permuted_mbf
      │                                            ──────────┬─────────  
      │                                                      ╰─────────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Latency Counting couldn't reach this node
-     ╭─[test.sus:241:40]
+Error: This port is not strongly connected to the strongly connected port cluster 'mbf'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+     ╭─[ test.sus:241:44 ]
      │
  241 │     interface permute : bool[128] mbf, int selected_permutation -> bool[128] permuted_mbf
-     │                                        ────────────┬───────────  
-     │                                                    ╰───────────── Latency Counting couldn't reach this node
+     │                                   ─┬─      ──────────┬─────────  
+     │                                    ╰───────────────────────────── 'mbf' declared here
+     │                                                      │           
+     │                                                      ╰─────────── This port is not strongly connected to the strongly connected port cluster 'mbf'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
 ─────╯
-Error: Function call syntax is only possible on modules or interfaces of modules
-     ╭─[test.sus:267:2]
+Error: This port is not strongly connected to the strongly connected port cluster 'mbf'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+     ╭─[ test.sus:241:78 ]
      │
- 267 │     aaaaa()
-     │     ──┬──  
-     │       ╰──── Function call syntax is only possible on modules or interfaces of modules
+ 241 │     interface permute : bool[128] mbf, int selected_permutation -> bool[128] permuted_mbf
+     │                                   ─┬─                                        ──────┬─────  
+     │                                    ╰─────────────────────────────────────────────────────── 'mbf' declared here
+     │                                                                                    │       
+     │                                                                                    ╰─────── This port is not strongly connected to the strongly connected port cluster 'mbf'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:248:37 ]
+     │
+ 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
+     │                                     ─┬─  
+     │                                      ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:248:51 ]
+     │
+ 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
+     │                                                   ───────┬──────  
+     │                                                          ╰──────── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:248:72 ]
+     │
+ 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
+     │                                                                        ──┬──  
+     │                                                                          ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Typing Error: connection expects a ::bool[] but was given a ::int
-     ╭─[test.sus:250:41]
+     ╭─[ test.sus:250:41 ]
      │
  250 │     state bool[24] stored_valid_permutes = 000000000000000000000000
      │                    ──────────┬──────────   ────────────┬───────────  
@@ -252,22 +290,22 @@ Error: Typing Error: connection expects a ::bool[] but was given a ::int
      │                                                        │             
      │                                                        ╰───────────── Typing Error: connection expects a ::bool[] but was given a ::int
 ─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:252:10 ]
+     │
+ 252 │     gen int aaaaa = 5
+     │             ──┬──  
+     │               ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
 Error: Typing Error: binop left side expects a ::bool but was given a ::bool[]
-     ╭─[test.sus:263:26]
+     ╭─[ test.sus:263:26 ]
      │
  263 │     stored_valid_permutes = stored_valid_permutes & permutes_to_keep
      │                             ──────────┬──────────  
      │                                       ╰──────────── Typing Error: binop left side expects a ::bool but was given a ::bool[]
 ─────╯
-Error: Typing Error: binop right side expects a ::bool but was given a ::bool[]
-     ╭─[test.sus:263:50]
-     │
- 263 │     stored_valid_permutes = stored_valid_permutes & permutes_to_keep
-     │                                                     ────────┬───────  
-     │                                                             ╰───────── Typing Error: binop right side expects a ::bool but was given a ::bool[]
-─────╯
 Error: Typing Error: connection expects a ::bool[] but was given a ::bool
-     ╭─[test.sus:263:26]
+     ╭─[ test.sus:263:26 ]
      │
  250 │     state bool[24] stored_valid_permutes = 000000000000000000000000
      │                    ──────────┬──────────  
@@ -277,55 +315,68 @@ Error: Typing Error: connection expects a ::bool[] but was given a ::bool
      │                             ────────────────────┬───────────────────  
      │                                                 ╰───────────────────── Typing Error: connection expects a ::bool[] but was given a ::bool
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:248:37]
+Error: Typing Error: binop right side expects a ::bool but was given a ::bool[]
+     ╭─[ test.sus:263:50 ]
      │
- 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
-     │                                     ─┬─  
-     │                                      ╰─── Unused Variable: This variable does not affect the output ports of this module
+ 263 │     stored_valid_permutes = stored_valid_permutes & permutes_to_keep
+     │                                                     ────────┬───────  
+     │                                                             ╰───────── Typing Error: binop right side expects a ::bool but was given a ::bool[]
+─────╯
+Error: Function call syntax is only possible on modules or interfaces of modules
+     ╭─[ test.sus:267:2 ]
+     │
+ 267 │     aaaaa()
+     │     ──┬──  
+     │       ╰──── Function call syntax is only possible on modules or interfaces of modules
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:248:51]
-     │
- 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
-     │                                                   ───────┬──────  
-     │                                                          ╰──────── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:248:72]
-     │
- 248 │     interface permute24 : bool[128] mbf, bool[24] valid_permutes, bool start -> bool[128] permuted_out, bool permuted_out_valid
-     │                                                                        ──┬──  
-     │                                                                          ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:252:10]
-     │
- 252 │     gen int aaaaa = 5
-     │             ──┬──  
-     │               ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:278:50]
+     ╭─[ test.sus:278:50 ]
      │
  278 │     interface disjoint_ports : int a, int b, int c -> int result
      │                                                  ┬  
      │                                                  ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Latency Counting couldn't reach this node
-     ╭─[test.sus:278:46]
+Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+     ╭─[ test.sus:278:50 ]
      │
  278 │     interface disjoint_ports : int a, int b, int c -> int result
-     │                                              ──┬──  
-     │                                                ╰──── Latency Counting couldn't reach this node
+     │                                    ┬      ┬      ┬  
+     │                                    ╰──────────────── 'a' declared here
+     │                                           │      │  
+     │                                           ╰───────── 'b' declared here
+     │                                                  │  
+     │                                                  ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
 ─────╯
-Error: Cannot determine port latency. Options are 1 and 2
+Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+     ╭─[ test.sus:278:59 ]
+     │
+ 278 │     interface disjoint_ports : int a, int b, int c -> int result
+     │                                    ┬      ┬               ───┬──  
+     │                                    ╰────────────────────────────── 'a' declared here
+     │                                           │                  │    
+     │                                           ╰─────────────────────── 'b' declared here
+     │                                                              │    
+     │                                                              ╰──── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+─────╯
+Error: Cannot determine port latency. Options are 0 and -1
 Try specifying an explicit latency or rework the module to remove this ambiguity
-     ╭─[test.sus:284:74]
+     ╭─[ test.sus:284:74 ]
      │
  284 │     interface undeteriminable_input_latency : int a, int b -> int x, int y
      │                                                                          ┬  
-     │                                                                          ╰── Cannot determine port latency. Options are 1 and 2
+     │                                                                          ╰── Cannot determine port latency. Options are 0 and -1
 Try specifying an explicit latency or rework the module to remove this ambiguity
 ─────╯
 Error: Conflicting specified latency
@@ -335,7 +386,7 @@ a'0
 -> x'2 (+1)
 
 But this was specified as x'1
-     ╭─[test.sus:325:67]
+     ╭─[ test.sus:325:67 ]
      │
  325 │     interface conflicting_latency_declarations : int a'0 -> int x'1
      │                                                      ┬            ┬  
@@ -355,7 +406,7 @@ state_reg'1
 -> state_reg'2 (+1)
 
 Which conflicts with the starting latency
-     ╭─[test.sus:337:2]
+     ╭─[ test.sus:337:2 ]
      │
  337 │     reg state_reg = state_reg + a
      │     ─┬─  
@@ -367,1400 +418,1400 @@ state_reg'1
 Which conflicts with the starting latency
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 20.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 21.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 21.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 22.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 22.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 23.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 23.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 24.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 24.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 25.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 25.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 26.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 26.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 27.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 27.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 28.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 28.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 29.
-     ╭─[test.sus:352:28]
+     ╭─[ test.sus:352:28 ]
      │
  352 │          row_products[col] = mat[row][col] * vec[col]
      │                                  ─┬─  
@@ -1773,7 +1824,7 @@ _1_i'0
 -> _1_i'5 (+0)
 
 Which conflicts with the starting latency
-     ╭─[test.sus:363:2]
+     ╭─[ test.sus:363:2 ]
      │
  363 │     test = module_taking_time(test+a)
      │     ──┬─  
@@ -1786,56 +1837,90 @@ _1_i'0
 Which conflicts with the starting latency
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:375:36]
+     ╭─[ test.sus:375:36 ]
      │
  375 │     interface offset_latency : int i'0 -> int o'-5
      │                                    ┬  
      │                                    ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:393:32]
+     ╭─[ test.sus:393:32 ]
      │
  393 │     interface input_only : int i
      │                                ┬  
      │                                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:394:12]
+     ╭─[ test.sus:394:12 ]
      │
  394 │     state int loop
      │               ──┬─  
      │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:400:42]
+     ╭─[ test.sus:400:42 ]
      │
  400 │     interface multiple_inputs_only : int i, int i2
      │                                          ┬  
      │                                          ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:400:49]
+     ╭─[ test.sus:400:49 ]
      │
  400 │     interface multiple_inputs_only : int i, int i2
      │                                                 ─┬  
      │                                                  ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: This port is not strongly connected to the strongly connected port cluster 'i'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+     ╭─[ test.sus:400:49 ]
+     │
+ 400 │     interface multiple_inputs_only : int i, int i2
+     │                                          ┬      ─┬  
+     │                                          ╰────────── 'i' declared here
+     │                                                  │  
+     │                                                  ╰── This port is not strongly connected to the strongly connected port cluster 'i'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:401:12]
+     ╭─[ test.sus:401:12 ]
      │
  401 │     state int loop
      │               ──┬─  
      │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Latency Counting couldn't reach this node
-     ╭─[test.sus:415:49]
+Error: This port is not strongly connected to the strongly connected port cluster 'o'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+     ╭─[ test.sus:415:53 ]
      │
  415 │     interface multiple_outputs_only : -> int o, int o2
-     │                                                 ───┬──  
-     │                                                    ╰──── Latency Counting couldn't reach this node
+     │                                              ┬      ─┬  
+     │                                              ╰────────── 'o' declared here
+     │                                                      │  
+     │                                                      ╰── This port is not strongly connected to the strongly connected port cluster 'o'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+─────╯
+Error: 'contains_submodule_submodule' conflicts with other declarations:
+     ╭─[ test.sus:441:8 ]
+     │
+ 441 │ module contains_submodule_submodule {
+     │        ──────────────┬─────────────  
+     │                      ╰─────────────── 'contains_submodule_submodule' conflicts with other declarations:
+     │ 
+ 597 │ module contains_submodule_submodule {
+     │        ──────────────┬─────────────  
+     │                      ╰─────────────── Conflicts with
 ─────╯
 Error: ::doNothing does not have a main interface. You should explicitly specify an interface to access
-     ╭─[test.sus:445:2]
+     ╭─[ test.sus:445:2 ]
      │
  431 │ module doNothing {}
      │        ────┬────  
@@ -1848,14 +1933,25 @@ domain clk:
      │         ╰────── ::doNothing does not have a main interface. You should explicitly specify an interface to access
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:462:7]
+     ╭─[ test.sus:462:7 ]
      │
  462 │     bool b = xor(true, false)
      │          ┬  
      │          ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: 'contains_submodule_submodule' conflicts with other declarations:
+     ╭─[ test.sus:597:8 ]
+     │
+ 441 │ module contains_submodule_submodule {
+     │        ──────────────┬─────────────  
+     │                      ╰─────────────── Conflicts with
+     │ 
+ 597 │ module contains_submodule_submodule {
+     │        ──────────────┬─────────────  
+     │                      ╰─────────────── 'contains_submodule_submodule' conflicts with other declarations:
+─────╯
 Error: ::doNothing does not have a main interface. You should explicitly specify an interface to access
-     ╭─[test.sus:601:2]
+     ╭─[ test.sus:601:2 ]
      │
  431 │ module doNothing {}
      │        ────┬────  
@@ -1868,60 +1964,48 @@ domain clk:
      │         ╰────── ::doNothing does not have a main interface. You should explicitly specify an interface to access
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:608:22]
+     ╭─[ test.sus:608:22 ]
      │
  608 │     interface in : bool i'0
      │                         ┬  
      │                         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:613:21]
+     ╭─[ test.sus:613:21 ]
      │
  613 │     interface in : int i'0
      │                        ┬  
      │                        ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:619:31]
+     ╭─[ test.sus:619:31 ]
      │
  619 │     interface in : bool[20][512] i'0
      │                                  ┬  
      │                                  ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:625:39]
+     ╭─[ test.sus:625:39 ]
      │
  625 │     interface offset_backwards : bool i'0 -> bool o'-5
      │                                       ┬  
      │                                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:651:11]
+Error: Pre-emptive error because latency-unspecified 'o' is never written to. 
+(This is because work-in-progress code would get a lot of latency counting errors while unfinished)
+     ╭─[ test.sus:648:33 ]
      │
- 651 │     bool[20] data
-     │              ──┬─  
-     │                ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:653:7]
-     │
- 653 │     bool valid, bool[20] data2 = fiii.pop(true)
-     │          ──┬──  
-     │            ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:653:23]
-     │
- 653 │     bool valid, bool[20] data2 = fiii.pop(true)
-     │                          ──┬──  
-     │                            ╰──── Unused Variable: This variable does not affect the output ports of this module
+ 648 │     interface use_fifo : -> int o
+     │                                 ┬  
+     │                                 ╰── Pre-emptive error because latency-unspecified 'o' is never written to. 
+(This is because work-in-progress code would get a lot of latency counting errors while unfinished)
 ─────╯
 Error: Could not fully instantiate ::FIFO #(
     T: type ::bool[20],
     DEPTH: /* Could not infer */
     READY_SLACK: /* Could not infer */
 )
-     ╭─[test.sus:649:7]
+     ╭─[ test.sus:649:7 ]
      │
  649 │     FIFO fiii
      │          ──┬─  
@@ -1931,85 +2015,97 @@ Error: Could not fully instantiate ::FIFO #(
     READY_SLACK: /* Could not infer */
 )
 ─────╯
-Error: Pre-emptive error because latency-unspecified 'o' is never written to. 
-(This is because work-in-progress code would get a lot of latency counting errors while unfinished)
-     ╭─[test.sus:648:33]
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:651:11 ]
      │
- 648 │     interface use_fifo : -> int o
-     │                                 ┬  
-     │                                 ╰── Pre-emptive error because latency-unspecified 'o' is never written to. 
-(This is because work-in-progress code would get a lot of latency counting errors while unfinished)
-─────╯
-Error: MIN is not a valid template argument of ::int
-     ╭─[test.sus:672:8]
-     │
- 672 │     int #(MIN: 0, MAX: 199) my_int
-     │           ─┬─  
-     │            ╰─── MIN is not a valid template argument of ::int
-     │
-     ├─[core.sus:29:20]
-     │
-  29 │ __builtin__ struct int {}
-     │                    ─┬─  
-     │                     ╰─── 'int' defined here
-─────╯
-Error: MAX is not a valid template argument of ::int
-     ╭─[test.sus:672:16]
-     │
- 672 │     int #(MIN: 0, MAX: 199) my_int
-     │                   ─┬─  
-     │                    ╰─── MAX is not a valid template argument of ::int
-     │
-     ├─[core.sus:29:20]
-     │
-  29 │ __builtin__ struct int {}
-     │                    ─┬─  
-     │                     ╰─── 'int' defined here
+ 651 │     bool[20] data
+     │              ──┬─  
+     │                ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:659:43]
+     ╭─[ test.sus:653:7 ]
+     │
+ 653 │     bool valid, bool[20] data2 = fiii.pop(true)
+     │          ──┬──  
+     │            ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:653:23 ]
+     │
+ 653 │     bool valid, bool[20] data2 = fiii.pop(true)
+     │                          ──┬──  
+     │                            ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:659:43 ]
      │
  659 │     interface test_separated_domain : int main
      │                                           ──┬─  
      │                                             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:660:6]
+     ╭─[ test.sus:660:6 ]
      │
  660 │     int domain2
      │         ───┬───  
      │            ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:662:6]
+     ╭─[ test.sus:662:6 ]
      │
  662 │     int domain3
      │         ───┬───  
      │            ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:664:6]
+     ╭─[ test.sus:664:6 ]
      │
  664 │     int domain4
      │         ───┬───  
      │            ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:670:6]
+     ╭─[ test.sus:670:6 ]
      │
  670 │     int domain5
      │         ───┬───  
      │            ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: MIN is not a valid template argument of ::int
+     ╭─[ test.sus:672:8 ]
+     │
+ 672 │     int #(MIN: 0, MAX: 199) my_int
+     │           ─┬─  
+     │            ╰─── MIN is not a valid template argument of ::int
+     │
+     ├─[ core.sus:33:20 ]
+     │
+  33 │ __builtin__ struct int {}
+     │                    ─┬─  
+     │                     ╰─── 'int' defined here
+─────╯
+Error: MAX is not a valid template argument of ::int
+     ╭─[ test.sus:672:16 ]
+     │
+ 672 │     int #(MIN: 0, MAX: 199) my_int
+     │                   ─┬─  
+     │                    ╰─── MAX is not a valid template argument of ::int
+     │
+     ├─[ core.sus:33:20 ]
+     │
+  33 │ __builtin__ struct int {}
+     │                    ─┬─  
+     │                     ╰─── 'int' defined here
+─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:672:26]
+     ╭─[ test.sus:672:26 ]
      │
  672 │     int #(MIN: 0, MAX: 199) my_int
      │                             ───┬──  
      │                                ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: ::no_port_module does not have a main interface. You should explicitly specify an interface to access
-     ╭─[test.sus:678:2]
+     ╭─[ test.sus:678:2 ]
      │
  675 │ module no_port_module {}
      │        ───────┬──────  
@@ -2021,8 +2117,15 @@ domain clk:
      │     ───────┬──────  
      │            ╰──────── ::no_port_module does not have a main interface. You should explicitly specify an interface to access
 ─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:681:6 ]
+     │
+ 681 │     int x = no_port()
+     │         ┬  
+     │         ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
 Error: ::no_port_module does not have a main interface. You should explicitly specify an interface to access
-     ╭─[test.sus:681:10]
+     ╭─[ test.sus:681:10 ]
      │
  675 │ module no_port_module {}
      │        ───────┬──────  
@@ -2035,21 +2138,28 @@ domain clk:
      │                ╰───── ::no_port_module does not have a main interface. You should explicitly specify an interface to access
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:681:6]
-     │
- 681 │     int x = no_port()
-     │         ┬  
-     │         ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:686:21]
+     ╭─[ test.sus:686:21 ]
      │
  686 │        interface v : int a -> int b
      │                          ┬  
      │                          ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:691:6 ]
+     │
+ 691 │     int a
+     │         ┬  
+     │         ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:693:10 ]
+     │
+ 693 │     gen int b
+     │             ┬  
+     │             ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
 Error: This value is non-generative, yet it is being assigned to a generative value
-     ╭─[test.sus:701:6]
+     ╭─[ test.sus:701:6 ]
      │
  701 │     b = a
      │     ┬   ┬  
@@ -2057,22 +2167,8 @@ Error: This value is non-generative, yet it is being assigned to a generative va
      │         │  
      │         ╰── This value is non-generative, yet it is being assigned to a generative value
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:691:6]
-     │
- 691 │     int a
-     │         ┬  
-     │         ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:693:10]
-     │
- 693 │     gen int b
-     │             ┬  
-     │             ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
 Error: Port 'a' is used, but the instantiated module has this port disabled
-     ╭─[test.sus:707:5]
+     ╭─[ test.sus:707:5 ]
      │
  686 │        interface v : int a -> int b
      │                          ┬  
@@ -2087,108 +2183,116 @@ Error: Port 'a' is used, but the instantiated module has this port disabled
      │        ╰── Port 'a' is used, but the instantiated module has this port disabled
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:750:30]
+     ╭─[ test.sus:750:30 ]
      │
  750 │     interface sumUpTo : bool start
      │                              ──┬──  
      │                                ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:756:7]
+     ╭─[ test.sus:756:7 ]
      │
  756 │     bool re = sdf.ready
      │          ─┬  
      │           ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:758:7]
+     ╭─[ test.sus:758:7 ]
      │
  758 │     bool iter_valid, int iter_index = sdf.iter()
      │          ─────┬────  
      │               ╰────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:758:23]
+     ╭─[ test.sus:758:23 ]
      │
  758 │     bool iter_valid, int iter_index = sdf.iter()
      │                          ─────┬────  
      │                               ╰────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:760:7]
+     ╭─[ test.sus:760:7 ]
      │
  760 │        int idx = iter_index
      │            ─┬─  
      │             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:763:6]
+     ╭─[ test.sus:763:6 ]
      │
  763 │     int beep
      │         ──┬─  
      │           ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:766:22 ]
+     │
+ 766 │ module test #(T, int MY_INPUT) {
+     │                      ────┬───  
+     │                          ╰───── Unused Variable: This variable does not affect the output ports of this module
+─────╯
 Error: beep is not a valid template argument of ::int
-     ╭─[test.sus:767:30]
+     ╭─[ test.sus:767:30 ]
      │
  767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
      │                              ──┬─  
      │                                ╰─── beep is not a valid template argument of ::int
      │
-     ├─[core.sus:29:20]
+     ├─[ core.sus:33:20 ]
      │
-  29 │ __builtin__ struct int {}
+  33 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
 Error: BEEP is not a valid template argument of ::int
-     ╭─[test.sus:767:44]
+     ╭─[ test.sus:767:44 ]
      │
  767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
      │                                            ──┬─  
      │                                              ╰─── BEEP is not a valid template argument of ::int
      │
-     ├─[core.sus:29:20]
+     ├─[ core.sus:33:20 ]
      │
-  29 │ __builtin__ struct int {}
+  33 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
 Error: ::int is not a named wire: local or constant, it is a Struct instead!
-     ╭─[test.sus:767:50]
+     ╭─[ test.sus:767:50 ]
      │
  767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
      │                                                  ─┬─  
      │                                                   ╰─── ::int is not a named wire: local or constant, it is a Struct instead!
      │
-     ├─[core.sus:29:20]
+     ├─[ core.sus:33:20 ]
      │
-  29 │ __builtin__ struct int {}
+  33 │ __builtin__ struct int {}
      │                    ─┬─  
      │                     ╰─── Defined here
 ─────╯
 Error: Template arguments must be known at compile-time!
-     ╭─[test.sus:767:50]
+     ╭─[ test.sus:767:50 ]
      │
  767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
      │                                                  ─┬─  
      │                                                   ╰─── Template arguments must be known at compile-time!
 ─────╯
-Error: BITWIDTH is not a valid template argument of ::FIFO
-     ╭─[test.sus:775:9]
+Error: Could not fully figure out the type of this object. type_variable_4
+     ╭─[ test.sus:767:50 ]
      │
- 775 │     FIFO #(BITWIDTH: 4) badoop
-     │            ────┬───  
-     │                ╰───── BITWIDTH is not a valid template argument of ::FIFO
+ 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
+     │                                                  ─┬─  
+     │                                                   ╰─── Could not fully figure out the type of this object. type_variable_4
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:767:55 ]
      │
-     ├─[util.sus:22:8]
-     │
-  22 │ module FIFO #(
-     │        ──┬─  
-     │          ╰─── 'FIFO' defined here
+ 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
+     │                                                       ─┬  
+     │                                                        ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: 'MY_INPUT' is read-only
-     ╭─[test.sus:769:2]
+     ╭─[ test.sus:769:2 ]
      │
  766 │ module test #(T, int MY_INPUT) {
      │                      ────┬───  
@@ -2198,8 +2302,15 @@ Error: 'MY_INPUT' is read-only
      │     ────┬───  
      │         ╰───── 'MY_INPUT' is read-only
 ─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:771:12 ]
+     │
+ 771 │     input int beep
+     │               ──┬─  
+     │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
 Error: 'beep' is read-only
-     ╭─[test.sus:773:2]
+     ╭─[ test.sus:773:2 ]
      │
  771 │     input int beep
      │               ──┬─  
@@ -2209,50 +2320,35 @@ Error: 'beep' is read-only
      │     ──┬─  
      │       ╰─── 'beep' is read-only
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_4
-     ╭─[test.sus:767:50]
-     │
- 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
-     │                                                  ─┬─  
-     │                                                   ╰─── Could not fully figure out the type of this object. type_variable_4
-─────╯
 Error: Could not fully figure out the type of this object. type_variable_12
-     ╭─[test.sus:775:2]
+     ╭─[ test.sus:775:2 ]
      │
  775 │     FIFO #(BITWIDTH: 4) badoop
      │     ─────────┬─────────  
      │              ╰─────────── Could not fully figure out the type of this object. type_variable_12
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:766:22]
+Error: BITWIDTH is not a valid template argument of ::FIFO
+     ╭─[ test.sus:775:9 ]
      │
- 766 │ module test #(T, int MY_INPUT) {
-     │                      ────┬───  
-     │                          ╰───── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:767:55]
+ 775 │     FIFO #(BITWIDTH: 4) badoop
+     │            ────┬───  
+     │                ╰───── BITWIDTH is not a valid template argument of ::FIFO
      │
- 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
-     │                                                       ─┬  
-     │                                                        ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:771:12]
+     ├─[ util.sus:22:8 ]
      │
- 771 │     input int beep
-     │               ──┬─  
-     │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
+  22 │ module FIFO #(
+     │        ──┬─  
+     │          ╰─── 'FIFO' defined here
 ─────╯
 Error: Could not fully figure out the type of this object. type_variable_1
-     ╭─[test.sus:779:2]
+     ╭─[ test.sus:779:2 ]
      │
  779 │     test #(MY_INPUT: 3) test_mod
      │     ─────────┬─────────  
      │              ╰─────────── Could not fully figure out the type of this object. type_variable_1
 ─────╯
 Warning: Unused port 'o'
-     ╭─[test.sus:791:2]
+     ╭─[ test.sus:791:2 ]
      │
  786 │     output int o = beep
      │                ┬  
@@ -2265,7 +2361,7 @@ Warning: Unused port 'o'
      │                            ╰── a declared here
 ─────╯
 Warning: Unused port 'o'
-     ╭─[test.sus:792:2]
+     ╭─[ test.sus:792:2 ]
      │
  786 │     output int o = beep
      │                ┬  
@@ -2278,7 +2374,7 @@ Warning: Unused port 'o'
      │                            ╰── b declared here
 ─────╯
 Warning: Unused port 'o'
-     ╭─[test.sus:793:2]
+     ╭─[ test.sus:793:2 ]
      │
  786 │     output int o = beep
      │                ┬  
@@ -2290,22 +2386,8 @@ Warning: Unused port 'o'
      │                            │  
      │                            ╰── c declared here
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:854:6]
-     │
- 854 │     int val = 3
-     │         ─┬─  
-     │          ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:857:10]
-     │
- 857 │     int[30] out = c.result
-     │             ─┬─  
-     │              ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
 Warning: Unused port 'data'
-     ╭─[test.sus:851:2]
+     ╭─[ test.sus:851:2 ]
      │
  840 │     input T data
      │             ──┬─  
@@ -2318,7 +2400,7 @@ Warning: Unused port 'data'
      │                                                 ╰── b declared here
 ─────╯
 Warning: Unused port 'result'
-     ╭─[test.sus:851:2]
+     ╭─[ test.sus:851:2 ]
      │
  842 │     output T[NUM_REPLS] result
      │                         ───┬──  
@@ -2331,489 +2413,1195 @@ Warning: Unused port 'result'
      │                                                 ╰── b declared here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:869:13]
+     ╭─[ test.sus:854:6 ]
      │
- 869 │     gen int[8] SOURCES
+ 854 │     int val = 3
+     │         ─┬─  
+     │          ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:857:10 ]
+     │
+ 857 │     int[30] out = c.result
+     │             ─┬─  
+     │              ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:869:13 ]
+     │
+ 869 │     gen int[8] SOURCES = [3, 2, 4, 5, 1, 2, 7, 6]
      │                ───┬───  
      │                   ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:881:9]
+     ╭─[ test.sus:871:9 ]
      │
- 881 │     int[2] inArr
+ 871 │     int[2] inArr
      │            ──┬──  
      │              ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:888:9]
+     ╭─[ test.sus:878:9 ]
      │
- 888 │     int[8] beep = permut.permute(SOURCES)
+ 878 │     int[8] beep = permut.permute(SOURCES)
      │            ──┬─  
      │              ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:892:28]
+     ╭─[ test.sus:882:28 ]
      │
- 892 │     interface from : bool[32] instr
+ 882 │     interface from : bool[32] instr
      │                               ──┬──  
      │                                 ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[test.sus:904:25]
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:890:42 ]
      │
- 904 │ ╭─▶     when decoder.is_jump() : int target_addr {
-     │ │                              ────────┬────────  
-     │ │                                      ╰────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ┆ ┆   
- 906 │ ├─▶     }
-     │ │           
-     │ ╰─────────── Parent node 'if_statement'
-─────╯
-Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[test.sus:907:25]
-     │
- 907 │ ╭─▶     when decoder.is_load() : int reg_to, int addr {
-     │ │                              ───────────┬──────────  
-     │ │                                         ╰──────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ┆ ┆   
- 909 │ ├─▶     }
-     │ │           
-     │ ╰─────────── Parent node 'if_statement'
-─────╯
-Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[test.sus:910:7]
-     │
- 910 │ ╭─▶     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │ │            ─────────────────────────┬─────────────────────────  
-     │ │                                     ╰─────────────────────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ┆ ┆   
- 912 │ ├─▶     }
-     │ │           
-     │ ╰─────────── Parent node 'if_statement'
+ 890 │     interface run_instruction : bool[32] instr
+     │                                          ──┬──  
+     │                                            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: A function called in this context may only return one result. Split this function call into a separate line instead.
-     ╭─[test.sus:904:7]
+     ╭─[ test.sus:894:7 ]
      │
- 893 │     interface is_jump
+ 883 │     interface is_jump
      │               ───┬───  
      │                  ╰───── Interface 'is_jump' defined here
      │ 
- 904 │     when decoder.is_jump() : int target_addr {
+ 894 │     when decoder.is_jump() : int target_addr {
      │          ────────┬────────  
      │                  ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
 ─────╯
-Error: A function called in this context may only return one result. Split this function call into a separate line instead.
-     ╭─[test.sus:907:7]
+Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ╭─[ test.sus:894:25 ]
      │
- 894 │     interface is_load
+ 894 │ ╭─▶     when decoder.is_jump() : int target_addr {
+     │ │                              ────────┬────────  
+     │ │                                      ╰────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ┆ ┆   
+ 896 │ ├─▶     }
+     │ │           
+     │ ╰─────────── Parent node 'if_statement'
+─────╯
+Error: A function called in this context may only return one result. Split this function call into a separate line instead.
+     ╭─[ test.sus:897:7 ]
+     │
+ 884 │     interface is_load
      │               ───┬───  
      │                  ╰───── Interface 'is_load' defined here
      │ 
- 907 │     when decoder.is_load() : int reg_to, int addr {
+ 897 │     when decoder.is_load() : int reg_to, int addr {
      │          ────────┬────────  
      │                  ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
 ─────╯
-Error: No Global of the name 'op' was found. Did you forget to import it?
-     ╭─[test.sus:910:59]
+Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ╭─[ test.sus:897:25 ]
      │
- 910 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+ 897 │ ╭─▶     when decoder.is_load() : int reg_to, int addr {
+     │ │                              ───────────┬──────────  
+     │ │                                         ╰──────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ┆ ┆   
+ 899 │ ├─▶     }
+     │ │           
+     │ ╰─────────── Parent node 'if_statement'
+─────╯
+Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ╭─[ test.sus:900:7 ]
+     │
+ 900 │ ╭─▶     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │ │            ─────────────────────────┬─────────────────────────  
+     │ │                                     ╰─────────────────────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+     ┆ ┆   
+ 902 │ ├─▶     }
+     │ │           
+     │ ╰─────────── Parent node 'if_statement'
+─────╯
+Error: No Global of the name 'op' was found. Did you forget to import it?
+     ╭─[ test.sus:900:59 ]
+     │
+ 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
      │                                                              ─┬  
      │                                                               ╰── No Global of the name 'op' was found. Did you forget to import it?
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:900:42]
+     ╭─[ test.sus:913:6 ]
      │
- 900 │     interface run_instruction : bool[32] instr
-     │                                          ──┬──  
-     │                                            ╰──── Unused Variable: This variable does not affect the output ports of this module
+ 913 │     int x = no_interface_named()
+     │         ┬  
+     │         ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: ::no_main_interface does not have a main interface. You should explicitly specify an interface to access
-     ╭─[test.sus:923:10]
+     ╭─[ test.sus:913:10 ]
      │
- 916 │ module no_main_interface {
+ 906 │ module no_main_interface {
      │        ────────┬────────  
      │                ╰────────── Module 'no_main_interface' defined here. module ::no_main_interface #():
 domain clk:
 
      │ 
- 923 │     int x = no_interface_named()
+ 913 │     int x = no_interface_named()
      │             ─────────┬────────  
      │                      ╰────────── ::no_main_interface does not have a main interface. You should explicitly specify an interface to access
 ─────╯
-Error: ::no_main_interface does not have a main interface. You should explicitly specify an interface to access
-     ╭─[test.sus:924:10]
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:914:6 ]
      │
- 916 │ module no_main_interface {
+ 914 │     int y = no_main_interface()
+     │         ┬  
+     │         ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: ::no_main_interface does not have a main interface. You should explicitly specify an interface to access
+     ╭─[ test.sus:914:10 ]
+     │
+ 906 │ module no_main_interface {
      │        ────────┬────────  
      │                ╰────────── Module 'no_main_interface' defined here. module ::no_main_interface #():
 domain clk:
 
      │ 
- 924 │     int y = no_main_interface()
+ 914 │     int y = no_main_interface()
      │             ────────┬────────  
      │                     ╰────────── ::no_main_interface does not have a main interface. You should explicitly specify an interface to access
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:923:6]
-     │
- 923 │     int x = no_interface_named()
-     │         ┬  
-     │         ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:924:6]
-     │
- 924 │     int y = no_main_interface()
-     │         ┬  
-     │         ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
 Error: Typing Error: array size expects a ::int but was given a ::bool
-     ╭─[test.sus:928:6]
+     ╭─[ test.sus:918:6 ]
      │
- 928 │     int[true] a
+ 918 │     int[true] a
      │         ──┬─  
      │           ╰─── Typing Error: array size expects a ::int but was given a ::bool
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:928:12]
+     ╭─[ test.sus:918:12 ]
      │
- 928 │     int[true] a
+ 918 │     int[true] a
      │               ┬  
      │               ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Typing Error: array size expects a ::int but was given a ::bool
-     ╭─[test.sus:932:41]
+     ╭─[ test.sus:922:41 ]
      │
- 932 │     interface moduleWithBadInterface : int[true] a
+ 922 │     interface moduleWithBadInterface : int[true] a
      │                                            ──┬─  
      │                                              ╰─── Typing Error: array size expects a ::int but was given a ::bool
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:932:47]
+     ╭─[ test.sus:922:47 ]
      │
- 932 │     interface moduleWithBadInterface : int[true] a
+ 922 │     interface moduleWithBadInterface : int[true] a
      │                                                  ┬  
      │                                                  ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Typing Error: connection expects a ::int but was given a ::bool
-     ╭─[test.sus:939:11]
-     │
- 936 │     int[3] xyz
-     │            ─┬─  
-     │             ╰─── 'xyz' declared here
-     │ 
- 939 │     xyz[3] = true
-     │              ──┬─  
-     │                ╰─── Typing Error: connection expects a ::int but was given a ::bool
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:936:9]
+     ╭─[ test.sus:926:9 ]
      │
- 936 │     int[3] xyz
+ 926 │     int[3] xyz
      │            ─┬─  
      │             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: BEEEP is not a valid template argument of ::SUM_UP
-     ╭─[test.sus:960:38]
+Error: Typing Error: connection expects a ::int but was given a ::bool
+     ╭─[ test.sus:929:11 ]
      │
- 943 │ const int SUM_UP #(int SIZE, int[SIZE] DATA) {
-     │           ───┬──  
-     │              ╰──── 'SUM_UP' defined here
+ 926 │     int[3] xyz
+     │            ─┬─  
+     │             ╰─── 'xyz' declared here
      │ 
- 960 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
-     │                                         ──┬──  
-     │                                           ╰──── BEEEP is not a valid template argument of ::SUM_UP
+ 929 │     xyz[3] = true
+     │              ──┬─  
+     │                ╰─── Typing Error: connection expects a ::int but was given a ::bool
 ─────╯
-Error: ABC is not a valid template argument of ::int
-     ╭─[test.sus:962:8]
+Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+     ╭─[ test.sus:935:2 ]
      │
- 962 │     int #(ABC) x
-     │           ─┬─  
-     │            ╰─── ABC is not a valid template argument of ::int
-     │
-     ├─[core.sus:29:20]
-     │
-  29 │ __builtin__ struct int {}
-     │                    ─┬─  
-     │                     ╰─── 'int' defined here
+ 933 │ ╭─▶ const int SUM_UP #(int SIZE, int[SIZE] DATA) {
+     ┆ ┆   
+ 935 │ │       for I in 0..SIZE {
+     │ │       ────────┬───────  
+     │ │               ╰───────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+     ┆ ┆   
+ 938 │ ├─▶ }
+     │ │       
+     │ ╰─────── Parent node 'block'
 ─────╯
-Error: ABC does not name a Type or a Value.
-     ╭─[test.sus:962:8]
+Error: This value is non-generative, yet it is being assigned to a generative value
+     ╭─[ test.sus:936:15 ]
      │
- 962 │     int #(ABC) x
-     │           ─┬─  
-     │            ╰─── ABC does not name a Type or a Value.
+ 936 │         SUM_UP = SUM_UP + DATA[I]
+     │         ───┬──   ────────┬───────  
+     │            ╰─────────────────────── This object is generative
+     │                          │         
+     │                          ╰───────── This value is non-generative, yet it is being assigned to a generative value
+─────╯
+Error: No Global of the name 'I' was found. Did you forget to import it?
+     ╭─[ test.sus:936:29 ]
+     │
+ 936 │         SUM_UP = SUM_UP + DATA[I]
+     │                                ┬  
+     │                                ╰── No Global of the name 'I' was found. Did you forget to import it?
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:953:13]
+     ╭─[ test.sus:943:13 ]
      │
- 953 │     gen int[5] DATA
+ 943 │     gen int[5] DATA
      │                ──┬─  
      │                  ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:960:10]
+     ╭─[ test.sus:950:10 ]
      │
- 960 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
+ 950 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
      │             ┬  
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:962:13]
+Error: BEEEP is not a valid template argument of ::SUM_UP
+     ╭─[ test.sus:950:38 ]
      │
- 962 │     int #(ABC) x
+ 933 │ const int SUM_UP #(int SIZE, int[SIZE] DATA) {
+     │           ───┬──  
+     │              ╰──── 'SUM_UP' defined here
+     │ 
+ 950 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
+     │                                         ──┬──  
+     │                                           ╰──── BEEEP is not a valid template argument of ::SUM_UP
+─────╯
+Error: ABC is not a valid template argument of ::int
+     ╭─[ test.sus:952:8 ]
+     │
+ 952 │     int #(ABC) x
+     │           ─┬─  
+     │            ╰─── ABC is not a valid template argument of ::int
+     │
+     ├─[ core.sus:33:20 ]
+     │
+  33 │ __builtin__ struct int {}
+     │                    ─┬─  
+     │                     ╰─── 'int' defined here
+─────╯
+Error: ABC does not name a Type or a Value.
+     ╭─[ test.sus:952:8 ]
+     │
+ 952 │     int #(ABC) x
+     │           ─┬─  
+     │            ╰─── ABC does not name a Type or a Value.
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:952:13 ]
+     │
+ 952 │     int #(ABC) x
      │                ┬  
      │                ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:966:9]
+     ╭─[ test.sus:956:9 ]
      │
- 966 │     int[5] a
+ 956 │     int[5] a
      │            ┬  
      │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:971:9]
+     ╭─[ test.sus:961:9 ]
      │
- 971 │     int[5] b = cr.out
+ 961 │     int[5] b = cr.out
      │            ┬  
      │            ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:975:9]
+     ╭─[ test.sus:965:9 ]
      │
- 975 │     int[5] arr
+ 965 │     int[5] arr
      │            ─┬─  
      │             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[test.sus:984:6]
+     ╭─[ test.sus:974:6 ]
      │
- 984 │     int total = adder(arr)
+ 974 │     int total = adder(arr)
      │         ──┬──  
      │           ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
-      ╭─[test.sus:1018:2]
-      │
- 1016 │     input int bad_port
-      │           ──────┬─────  
-      │                 ╰─────── A domain should be explicitly defined before this port
-      │ 
- 1018 │     domain bad_domain
-      │     ────────┬────────  
-      │             ╰────────── When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
-──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[test.sus:1016:12]
+      ╭─[ test.sus:1006:12 ]
       │
- 1016 │     input int bad_port
+ 1006 │     input int bad_port
       │               ────┬───  
       │                   ╰───── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Conflicting domain declaration. Domain 'my_domain' was already declared earlier
-      ╭─[test.sus:1027:9]
+Error: When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
+      ╭─[ test.sus:1008:2 ]
       │
- 1024 │     domain my_domain
-      │            ────┬────  
-      │                ╰────── Domain 'my_domain' declared here
+ 1006 │     input int bad_port
+      │           ──────┬─────  
+      │                 ╰─────── A domain should be explicitly defined before this port
       │ 
- 1027 │     domain my_domain
-      │            ────┬────  
-      │                ╰────── Conflicting domain declaration. Domain 'my_domain' was already declared earlier
+ 1008 │     domain bad_domain
+      │     ────────┬────────  
+      │             ╰────────── When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
 ──────╯
 Error: This declaration conflicts with a previous declaration in the same scope
-      ╭─[test.sus:1025:12]
+      ╭─[ test.sus:1015:12 ]
       │
- 1024 │     domain my_domain
+ 1014 │     domain my_domain
       │            ────┬────  
       │                ╰────── Domain 'my_domain' declared here
- 1025 │     input int my_domain
+ 1015 │     input int my_domain
       │               ────┬────  
       │                   ╰────── This declaration conflicts with a previous declaration in the same scope
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[test.sus:1025:12]
+      ╭─[ test.sus:1015:12 ]
       │
- 1025 │     input int my_domain
+ 1015 │     input int my_domain
       │               ────┬────  
       │                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_0
-      ╭─[test.sus:1037:2]
+Error: Conflicting domain declaration. Domain 'my_domain' was already declared earlier
+      ╭─[ test.sus:1017:9 ]
       │
- 1037 │     make_infinite_type_help mtinf
+ 1014 │     domain my_domain
+      │            ────┬────  
+      │                ╰────── Domain 'my_domain' declared here
+      │ 
+ 1017 │     domain my_domain
+      │            ────┬────  
+      │                ╰────── Conflicting domain declaration. Domain 'my_domain' was already declared earlier
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_0
+      ╭─[ test.sus:1027:2 ]
+      │
+ 1027 │     make_infinite_type_help mtinf
       │     ───────────┬───────────  
       │                ╰───────────── Could not fully figure out the type of this object. type_variable_0
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_0
-      ╭─[test.sus:1039:12]
-      │
- 1039 │     mtinf.a = mtinf.b
-      │               ───┬───  
-      │                  ╰───── Could not fully figure out the type of this object. type_variable_0
-──────╯
 Error: Could not fully figure out the type of this object. type_variable_0[]
-      ╭─[test.sus:1039:2]
+      ╭─[ test.sus:1029:2 ]
       │
- 1039 │     mtinf.a = mtinf.b
+ 1029 │     mtinf.a = mtinf.b
       │     ───┬───  
       │        ╰───── Could not fully figure out the type of this object. type_variable_0[]
 ──────╯
-Error: Typing Error: connection: Creating Infinite Types is Forbidden! expects a type_variable_0[] but was given a type_variable_0
-      ╭─[test.sus:1039:12]
+Error: Could not fully figure out the type of this object. type_variable_0
+      ╭─[ test.sus:1029:12 ]
       │
- 1031 │     interface make_infinite_type_help: T[3] a -> T b
+ 1029 │     mtinf.a = mtinf.b
+      │               ───┬───  
+      │                  ╰───── Could not fully figure out the type of this object. type_variable_0
+──────╯
+Error: Typing Error: connection: Creating Infinite Types is Forbidden! expects a type_variable_0[] but was given a type_variable_0
+      ╭─[ test.sus:1029:12 ]
+      │
+ 1021 │     interface make_infinite_type_help: T[3] a -> T b
       │                                             ┬  
       │                                             ╰── 'a' declared here
       │ 
- 1039 │     mtinf.a = mtinf.b
+ 1029 │     mtinf.a = mtinf.b
       │               ───┬───  
       │                  ╰───── Typing Error: connection: Creating Infinite Types is Forbidden! expects a type_variable_0[] but was given a type_variable_0
 ──────╯
 Warning: Unused port 'ready'
-      ╭─[test.sus:1059:2]
+      ╭─[ test.sus:1049:2 ]
       │
- 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 1049 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │     ──────────────────────┬────────────────────── ┬  
       │                           ╰────────────────────────── Unused port 'ready'
       │                                                   │  
       │                                                   ╰── f declared here
       │
-      ├─[util.sus:36:14]
+      ├─[ util.sus:36:14 ]
       │
    36 │     output bool ready'0
       │                 ──┬──  
       │                   ╰──── Port 'ready' declared here
 ──────╯
 Warning: Unused port 'push'
-      ╭─[test.sus:1059:2]
+      ╭─[ test.sus:1049:2 ]
       │
- 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 1049 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │     ──────────────────────┬────────────────────── ┬  
       │                           ╰────────────────────────── Unused port 'push'
       │                                                   │  
       │                                                   ╰── f declared here
       │
-      ├─[util.sus:37:24]
+      ├─[ util.sus:37:24 ]
       │
    37 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
       │                           ──┬─  
       │                             ╰─── Port 'push' declared here
 ──────╯
 Warning: Unused port 'data_in'
-      ╭─[test.sus:1059:2]
+      ╭─[ test.sus:1049:2 ]
       │
- 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 1049 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │     ──────────────────────┬────────────────────── ┬  
       │                           ╰────────────────────────── Unused port 'data_in'
       │                                                   │  
       │                                                   ╰── f declared here
       │
-      ├─[util.sus:37:44]
+      ├─[ util.sus:37:44 ]
       │
    37 │     interface push : bool push'READY_SLACK, T data_in'READY_SLACK
       │                                               ───┬───  
       │                                                  ╰───── Port 'data_in' declared here
 ──────╯
 Warning: Unused port 'pop'
-      ╭─[test.sus:1059:2]
+      ╭─[ test.sus:1049:2 ]
       │
- 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 1049 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │     ──────────────────────┬────────────────────── ┬  
       │                           ╰────────────────────────── Unused port 'pop'
       │                                                   │  
       │                                                   ╰── f declared here
       │
-      ├─[util.sus:40:23]
+      ├─[ util.sus:40:23 ]
       │
    40 │     interface pop : bool pop -> bool data_valid, T data_out
       │                          ─┬─  
       │                           ╰─── Port 'pop' declared here
 ──────╯
 Warning: Unused port 'data_valid'
-      ╭─[test.sus:1059:2]
+      ╭─[ test.sus:1049:2 ]
       │
- 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 1049 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │     ──────────────────────┬────────────────────── ┬  
       │                           ╰────────────────────────── Unused port 'data_valid'
       │                                                   │  
       │                                                   ╰── f declared here
       │
-      ├─[util.sus:40:35]
+      ├─[ util.sus:40:35 ]
       │
    40 │     interface pop : bool pop -> bool data_valid, T data_out
       │                                      ─────┬────  
       │                                           ╰────── Port 'data_valid' declared here
 ──────╯
 Warning: Unused port 'data_out'
-      ╭─[test.sus:1059:2]
+      ╭─[ test.sus:1049:2 ]
       │
- 1059 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
+ 1049 │     FIFO #(DEPTH: 3, READY_SLACK: 5, T: type int) f
       │     ──────────────────────┬────────────────────── ┬  
       │                           ╰────────────────────────── Unused port 'data_out'
       │                                                   │  
       │                                                   ╰── f declared here
       │
-      ├─[util.sus:40:49]
+      ├─[ util.sus:40:49 ]
       │
    40 │     interface pop : bool pop -> bool data_valid, T data_out
       │                                                    ────┬───  
       │                                                        ╰───── Port 'data_out' declared here
 ──────╯
 Warning: Used 'if' in a non generative context, use 'when' instead
-      ╭─[test.sus:1074:2]
+      ╭─[ test.sus:1064:2 ]
       │
- 1074 │     if iter_valid {
+ 1064 │     if iter_valid {
       │     ─┬  
       │      ╰── Used 'if' in a non generative context, use 'when' instead
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[test.sus:1080:10]
+      ╭─[ test.sus:1070:10 ]
       │
- 1080 │     int[20] arr
+ 1070 │     int[20] arr
       │             ─┬─  
       │              ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[test.sus:1082:9]
+      ╭─[ test.sus:1072:9 ]
       │
- 1082 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
+ 1072 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
       │            ───┬──  
       │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Assertion failed
-      ╭─[test.sus:1097:14]
+      ╭─[ test.sus:1087:2 ]
       │
- 1097 │     assert #(C: 15 + 3 == 19)
-      │                 ──────┬─────  
-      │                       ╰─────── Assertion failed
+ 1087 │     assert #(C: 15 + 3 == 19)
+      │     ────────────┬────────────  
+      │                 ╰────────────── Assertion failed
 ──────╯
 Error: Used 'when' in a generative context, use 'if' instead
-      ╭─[test.sus:1108:9]
+      ╭─[ test.sus:1098:9 ]
       │
- 1108 │         when WIDTH <= BASE_CASE_SIZE {
+ 1098 │         when WIDTH <= BASE_CASE_SIZE {
       │         ──┬─  
       │           ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
 Warning: Used 'if' in a non generative context, use 'when' instead
-      ╭─[test.sus:1111:25]
+      ╭─[ test.sus:1101:25 ]
       │
- 1111 │                         if bits[I] {
+ 1101 │                         if bits[I] {
       │                         ─┬  
       │                          ╰── Used 'if' in a non generative context, use 'when' instead
 ──────╯
 Warning: Used 'if' in a non generative context, use 'when' instead
-      ╭─[test.sus:1113:32]
+      ╭─[ test.sus:1103:32 ]
       │
- 1113 │                         } else if !bits[I] {
+ 1103 │                         } else if !bits[I] {
       │                                ─┬  
       │                                 ╰── Used 'if' in a non generative context, use 'when' instead
 ──────╯
 Error: Used 'when' in a generative context, use 'if' instead
-      ╭─[test.sus:1118:16]
+      ╭─[ test.sus:1108:16 ]
       │
- 1118 │         } else when WIDTH > BASE_CASE_SIZE {
+ 1108 │         } else when WIDTH > BASE_CASE_SIZE {
       │                ──┬─  
       │                  ╰─── Used 'when' in a generative context, use 'if' instead
+──────╯
+Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      ╭─[ test.sus:1114:21 ]
+      │
+ 1113 │     interface x : bool a -> bool b
+      │                        ┬         ┬  
+      │                        ╰──────────── 'a' declared here
+      │                                  │  
+      │                                  ╰── 'b' declared here
+ 1114 │     interface y : bool c -> bool d
+      │                        ┬  
+      │                        ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+──────╯
+Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      ╭─[ test.sus:1114:31 ]
+      │
+ 1113 │     interface x : bool a -> bool b
+      │                        ┬         ┬  
+      │                        ╰──────────── 'a' declared here
+      │                                  │  
+      │                                  ╰── 'b' declared here
+ 1114 │     interface y : bool c -> bool d
+      │                                  ┬  
+      │                                  ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+──────╯
+Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      ╭─[ test.sus:1124:21 ]
+      │
+ 1123 │     interface x : bool a -> bool b
+      │                        ┬         ┬  
+      │                        ╰──────────── 'a' declared here
+      │                                  │  
+      │                                  ╰── 'b' declared here
+ 1124 │     interface y : bool c -> bool d
+      │                        ┬  
+      │                        ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+──────╯
+Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+      ╭─[ test.sus:1124:31 ]
+      │
+ 1123 │     interface x : bool a -> bool b
+      │                        ┬         ┬  
+      │                        ╰──────────── 'a' declared here
+      │                                  │  
+      │                                  ╰── 'b' declared here
+ 1124 │     interface y : bool c -> bool d
+      │                                  ┬  
+      │                                  ╰── This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
+An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
+Strongly connected ports are also transitive.
+If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1128:11 ]
+      │
+ 1128 │     reg bool a_delayed = a
+      │              ────┬────  
+      │                  ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1130:7 ]
+      │
+ 1130 │     bool out_shared = a_delayed ^ c
+      │          ─────┬────  
+      │               ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Excess argument. Function takes 1 args, but 2 were passed.
+      ╭─[ test.sus:1140:47 ]
+      │
+ 1140 │     out_val = infer_me(in_val | (in_val_2 == 0), in_val_2)
+      │                                                  ────┬───  
+      │                                                      ╰───── Excess argument. Function takes 1 args, but 2 were passed.
+      │ 
+ 1145 │     interface infer_me : bool x'0 -> bool y'A
+      │               ────┬───  
+      │                   ╰───── Interface 'infer_me' defined here
+──────╯
+Warning: Unused port 'pop'
+      ╭─[ test.sus:1162:2 ]
+      │
+ 1162 │     FIFO #(DEPTH: 30) fifo
+      │     ────────┬──────── ──┬─  
+      │             ╰─────────────── Unused port 'pop'
+      │                         │   
+      │                         ╰─── fifo declared here
+      │
+      ├─[ util.sus:40:23 ]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                          ─┬─  
+      │                           ╰─── Port 'pop' declared here
+──────╯
+Warning: Unused port 'data_valid'
+      ╭─[ test.sus:1162:2 ]
+      │
+ 1162 │     FIFO #(DEPTH: 30) fifo
+      │     ────────┬──────── ──┬─  
+      │             ╰─────────────── Unused port 'data_valid'
+      │                         │   
+      │                         ╰─── fifo declared here
+      │
+      ├─[ util.sus:40:35 ]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                                      ─────┬────  
+      │                                           ╰────── Port 'data_valid' declared here
+──────╯
+Warning: Unused port 'data_out'
+      ╭─[ test.sus:1162:2 ]
+      │
+ 1162 │     FIFO #(DEPTH: 30) fifo
+      │     ────────┬──────── ──┬─  
+      │             ╰─────────────── Unused port 'data_out'
+      │                         │   
+      │                         ╰─── fifo declared here
+      │
+      ├─[ util.sus:40:49 ]
+      │
+   40 │     interface pop : bool pop -> bool data_valid, T data_out
+      │                                                    ────┬───  
+      │                                                        ╰───── Port 'data_out' declared here
+──────╯
+Error: Could not fully instantiate ::infer_me #(
+    A: /* Could not infer */
+)
+      ╭─[ test.sus:1187:11 ]
+      │
+ 1187 │     infer_me x
+      │              ┬  
+      │              ╰── Could not fully instantiate ::infer_me #(
+    A: /* Could not infer */
+)
+──────╯
+Error: Could not fully instantiate ::infer_me #(
+    A: /* Could not infer */
+)
+      ╭─[ test.sus:1188:11 ]
+      │
+ 1188 │     infer_me y
+      │              ┬  
+      │              ╰── Could not fully instantiate ::infer_me #(
+    A: /* Could not infer */
+)
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1199:7 ]
+      │
+ 1199 │     bool in_spec'0 = in_port
+      │          ───┬───  
+      │             ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not fully instantiate ::infer_me_with_poison_output #(
+    N: /* Could not infer */
+)
+      ╭─[ test.sus:1229:19 ]
+      │
+ 1229 │     bool x, bool y = infer_me_with_poison_output(i)
+      │                      ─────────────┬─────────────  
+      │                                   ╰─────────────── Could not fully instantiate ::infer_me_with_poison_output #(
+    N: /* Could not infer */
+)
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1233:22 ]
+      │
+ 1233 │ module __add__ #(int A, int B) {
+      │                      ┬  
+      │                      ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1233:29 ]
+      │
+ 1233 │ module __add__ #(int A, int B) {
+      │                             ┬  
+      │                             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: MAX is not a valid template argument of ::int
+      ╭─[ test.sus:1234:27 ]
+      │
+ 1234 │     interface __add__ : int#(MAX: A) a'0, int #(MAX:B) b'0 -> int #(MAX: A+B) o'clog2 #(V: 5)
+      │                              ─┬─  
+      │                               ╰─── MAX is not a valid template argument of ::int
+      │
+      ├─[ core.sus:33:20 ]
+      │
+   33 │ __builtin__ struct int {}
+      │                    ─┬─  
+      │                     ╰─── 'int' defined here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1234:35 ]
+      │
+ 1234 │     interface __add__ : int#(MAX: A) a'0, int #(MAX:B) b'0 -> int #(MAX: A+B) o'clog2 #(V: 5)
+      │                                      ┬  
+      │                                      ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: MAX is not a valid template argument of ::int
+      ╭─[ test.sus:1234:46 ]
+      │
+ 1234 │     interface __add__ : int#(MAX: A) a'0, int #(MAX:B) b'0 -> int #(MAX: A+B) o'clog2 #(V: 5)
+      │                                                 ─┬─  
+      │                                                  ╰─── MAX is not a valid template argument of ::int
+      │
+      ├─[ core.sus:33:20 ]
+      │
+   33 │ __builtin__ struct int {}
+      │                    ─┬─  
+      │                     ╰─── 'int' defined here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1234:53 ]
+      │
+ 1234 │     interface __add__ : int#(MAX: A) a'0, int #(MAX:B) b'0 -> int #(MAX: A+B) o'clog2 #(V: 5)
+      │                                                        ┬  
+      │                                                        ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: MAX is not a valid template argument of ::int
+      ╭─[ test.sus:1234:66 ]
+      │
+ 1234 │     interface __add__ : int#(MAX: A) a'0, int #(MAX:B) b'0 -> int #(MAX: A+B) o'clog2 #(V: 5)
+      │                                                                     ─┬─  
+      │                                                                      ╰─── MAX is not a valid template argument of ::int
+      │
+      ├─[ core.sus:33:20 ]
+      │
+   33 │ __builtin__ struct int {}
+      │                    ─┬─  
+      │                     ╰─── 'int' defined here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1245:32 ]
+      │
+ 1245 │ module MultiStateLoop #(T, int II) {
+      │                                ─┬  
+      │                                 ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: No Global of the name 'trigger' was found. Did you forget to import it?
+      ╭─[ test.sus:1246:2 ]
+      │
+ 1246 │     trigger may_process'0 : T cur_state {
+      │     ───┬───  
+      │        ╰───── No Global of the name 'trigger' was found. Did you forget to import it?
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_2
+      ╭─[ test.sus:1246:10 ]
+      │
+ 1246 │     trigger may_process'0 : T cur_state {
+      │             ─────┬─────  
+      │                  ╰─────── Could not fully figure out the type of this object. type_variable_2
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1246:10 ]
+      │
+ 1246 │     trigger may_process'0 : T cur_state {
+      │             ─────┬─────  
+      │                  ╰─────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: While parsing 'latency_specifier', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1246:22 ]
+      │
+ 1246 │     trigger may_process'0 : T cur_state {
+      │                        ───┬────┬───────  
+      │                           ╰────────────── While parsing 'latency_specifier', parser found a syntax error in a node of type 'ERROR'
+      │                                │         
+      │                                ╰───────── Parent node 'latency_specifier'
+──────╯
+Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+      ╭─[ test.sus:1246:28 ]
+      │
+ 1246 │     trigger may_process'0 : T cur_state {
+      │                               ────┬────  
+      │                                   ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+──────╯
+Error: Latency Specifier must be a compile-time expression
+      ╭─[ test.sus:1246:28 ]
+      │
+ 1246 │     trigger may_process'0 : T cur_state {
+      │                               ────┬────  
+      │                                   ╰────── Latency Specifier must be a compile-time expression
+──────╯
+Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1246:38 ]
+      │
+ 1245 │ ╭─▶ module MultiStateLoop #(T, int II) {
+ 1246 │ │       trigger may_process'0 : T cur_state {
+      │ │                                           ┬  
+      │ │                                           ╰── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1248 │ ├─▶     }
+      │ │           
+      │ ╰─────────── Parent node 'block'
+──────╯
+Error: No Global of the name 'action' was found. Did you forget to import it?
+      ╭─[ test.sus:1247:3 ]
+      │
+ 1247 │        action next_state'II : T next_state_value
+      │        ───┬──  
+      │           ╰──── No Global of the name 'action' was found. Did you forget to import it?
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_4
+      ╭─[ test.sus:1247:10 ]
+      │
+ 1247 │        action next_state'II : T next_state_value
+      │               ─────┬────  
+      │                    ╰────── Could not fully figure out the type of this object. type_variable_4
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1247:10 ]
+      │
+ 1247 │        action next_state'II : T next_state_value
+      │               ─────┬────  
+      │                    ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1247:24 ]
+      │
+ 1245 │ ╭─▶ module MultiStateLoop #(T, int II) {
+      ┆ ┆   
+ 1247 │ │          action next_state'II : T next_state_value
+      │ │                               ──────────┬─────────  
+      │ │                                         ╰─────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+ 1248 │ ├─▶     }
+      │ │           
+      │ ╰─────────── Parent node 'block'
+──────╯
+Error: While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1250:2 ]
+      │
+    1 │ ╭─▶ 
+      ┆ ┆   
+ 1250 │ │       action request_output : -> trigger output_valid : T result
+      │ │       ─────────────────────────────┬────────────────────────────  
+      │ │                                    ╰────────────────────────────── While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1349 │ ├─▶ }
+      │ │       
+      │ ╰─────── Parent node 'source_file'
+──────╯
+Error: While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1251:1 ]
+      │
+    1 │ ╭─▶ 
+      ┆ ┆   
+ 1251 │ │   }
+      │ │   ┬  
+      │ │   ╰── While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1349 │ ├─▶ }
+      │ │       
+      │ ╰─────── Parent node 'source_file'
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_0
+      ╭─[ test.sus:1254:2 ]
+      │
+ 1254 │     MultiStateLoop loop
+      │     ───────┬──────  
+      │            ╰──────── Could not fully figure out the type of this object. type_variable_0
+──────╯
+Error: No Global of the name 'trigger' was found. Did you forget to import it?
+      ╭─[ test.sus:1256:2 ]
+      │
+ 1256 │     trigger request_input
+      │     ───┬───  
+      │        ╰───── No Global of the name 'trigger' was found. Did you forget to import it?
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_2
+      ╭─[ test.sus:1256:10 ]
+      │
+ 1256 │     trigger request_input
+      │             ──────┬──────  
+      │                   ╰──────── Could not fully figure out the type of this object. type_variable_2
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1256:10 ]
+      │
+ 1256 │     trigger request_input
+      │             ──────┬──────  
+      │                   ╰──────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: No Global of the name 'action' was found. Did you forget to import it?
+      ╭─[ test.sus:1257:3 ]
+      │
+ 1257 │        action input_valid : float new_input
+      │        ───┬──  
+      │           ╰──── No Global of the name 'action' was found. Did you forget to import it?
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_3
+      ╭─[ test.sus:1257:10 ]
+      │
+ 1257 │        action input_valid : float new_input
+      │               ─────┬─────  
+      │                    ╰─────── Could not fully figure out the type of this object. type_variable_3
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1257:10 ]
+      │
+ 1257 │        action input_valid : float new_input
+      │               ─────┬─────  
+      │                    ╰─────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1257:22 ]
+      │
+ 1253 │ ╭─▶ module use_MultiStateLoop {
+      ┆ ┆   
+ 1257 │ │          action input_valid : float new_input
+      │ │                             ────────┬────────  
+      │ │                                     ╰────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1269 │ ├─▶ }
+      │ │       
+      │ ╰─────── Parent node 'block'
+──────╯
+Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1259:2 ]
+      │
+ 1253 │ ╭─▶ module use_MultiStateLoop {
+      ┆ ┆   
+ 1259 │ │       action request_result : -> trigger result_valid : {
+      │ │       ────────────────────────┬────────────────────────  
+      │ │                               ╰────────────────────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1269 │ ├─▶ }
+      │ │       
+      │ ╰─────── Parent node 'block'
+──────╯
+Error: There is no port or interface of name 'process' on module MultiStateLoop
+      ╭─[ test.sus:1263:12 ]
+      │
+ 1245 │ module MultiStateLoop #(T, int II) {
+      │        ───────┬──────  
+      │               ╰──────── Module 'MultiStateLoop' defined here. module ::MultiStateLoop #(T, int II):
+domain clk:
+
+      │ 
+ 1263 │     when loop.process : float cur_state {
+      │               ───┬───  
+      │                  ╰───── There is no port or interface of name 'process' on module MultiStateLoop
+──────╯
+Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1263:20 ]
+      │
+ 1263 │ ╭─▶     when loop.process : float cur_state {
+      │ │                         ────────┬────────  
+      │ │                                 ╰────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1268 │ ├─▶     }
+      │ │           
+      │ ╰─────────── Parent node 'if_statement'
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1264:9 ]
+      │
+ 1264 │        float next_state = cur_state * cur_state
+      │              ─────┬────  
+      │                   ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+      ╭─[ test.sus:1264:22 ]
+      │
+ 1264 │        float next_state = cur_state * cur_state
+      │                           ────┬────  
+      │                               ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+──────╯
+Error: Typing Error: connection expects a ::float but was given a ::int
+      ╭─[ test.sus:1264:22 ]
+      │
+ 1264 │        float next_state = cur_state * cur_state
+      │              ─────┬────   ──────────┬──────────  
+      │                   ╰────────────────────────────── 'next_state' declared here
+      │                                     │            
+      │                                     ╰──────────── Typing Error: connection expects a ::float but was given a ::int
+──────╯
+Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+      ╭─[ test.sus:1264:34 ]
+      │
+ 1264 │        float next_state = cur_state * cur_state
+      │                                       ────┬────  
+      │                                           ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+──────╯
+Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+      ╭─[ test.sus:1265:8 ]
+      │
+ 1265 │        when cur_state >= 2.0 {
+      │             ────┬────  
+      │                 ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+──────╯
+Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1265:22 ]
+      │
+ 1265 │ ╭─▶        when cur_state >= 2.0 {
+      │ │                             ─┬  
+      │ │                              ╰── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1267 │ ├─▶        }
+      │ │              
+      │ ╰────────────── Parent node 'if_statement'
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1272:6 ]
+      │
+ 1272 │     int a = 3
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1273:6 ]
+      │
+ 1273 │     int b = 4
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Typing Error: write wire access expects a ::int[0] but was given a ::int[4]
+      ╭─[ test.sus:1275:2 ]
+      │
+ 1275 │     int[4] result = []
+      │     ──────┬──────  
+      │           ╰──────── Typing Error: write wire access expects a ::int[0] but was given a ::int[4]
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1275:9 ]
+      │
+ 1275 │     int[4] result = []
+      │            ───┬──  
+      │               ╰──── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1278:29 ]
+      │
+ 1278 │ module unknownLatency #(int V) {
+      │                             ┬  
+      │                             ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not fully instantiate ::unknownLatency #(
+    V: /* Could not infer */
+)
+      ╭─[ test.sus:1288:17 ]
+      │
+ 1288 │     unknownLatency ulat
+      │                    ──┬─  
+      │                      ╰─── Could not fully instantiate ::unknownLatency #(
+    V: /* Could not infer */
+)
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1294:20 ]
+      │
+ 1294 │     interface a: bool x'0 -> bool y'V
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1296:20 ]
+      │
+ 1296 │     interface b: bool p'0 -> bool q'-V
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not fully instantiate ::infer_me_conflicting_directions #(
+    V: /* Could not infer */
+)
+      ╭─[ test.sus:1302:34 ]
+      │
+ 1302 │     infer_me_conflicting_directions inf
+      │                                     ─┬─  
+      │                                      ╰─── Could not fully instantiate ::infer_me_conflicting_directions #(
+    V: /* Could not infer */
+)
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1309:20 ]
+      │
+ 1309 │     interface a: bool x'0 -> bool y'V
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1311:20 ]
+      │
+ 1311 │     interface b: bool p'0 -> bool q'V+30
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1324:20 ]
+      │
+ 1324 │     interface a: bool x'0 -> bool y'-V
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1326:20 ]
+      │
+ 1326 │     interface b: bool p'0 -> bool q'-V+30
+      │                       ┬  
+      │                       ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1338:35 ]
+      │
+ 1338 │ module infer_me_inputs_only #(int V) {
+      │                                   ┬  
+      │                                   ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1339:40 ]
+      │
+ 1339 │     interface infer_me_inputs_only : bool a'0, bool b'V
+      │                                           ┬  
+      │                                           ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1339:50 ]
+      │
+ 1339 │     interface infer_me_inputs_only : bool a'0, bool b'V
+      │                                                     ┬  
+      │                                                     ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1343:44 ]
+      │
+ 1343 │     interface use_infer_me_inputs_only : bool x'0
+      │                                               ┬  
+      │                                               ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1346:19 ]
+      │
+ 1346 │     reg reg reg bool y = x
+      │                      ┬  
+      │                      ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not fully instantiate ::infer_me_inputs_only #(
+    V: /* Could not infer */
+)
+      ╭─[ test.sus:1348:2 ]
+      │
+ 1348 │     infer_me_inputs_only(x, y)
+      │     ──────────┬─────────  
+      │               ╰─────────── Could not fully instantiate ::infer_me_inputs_only #(
+    V: /* Could not infer */
+)
 ──────╯

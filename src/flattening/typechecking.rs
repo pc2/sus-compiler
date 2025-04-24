@@ -24,10 +24,12 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
         let working_on: &Module = &linker.modules[module_uuid];
         let globals = GlobalResolver::new(linker, &working_on.link_info, errs_globals);
 
-        let ctx_info_string = format!("Typechecking {}", &working_on.link_info.name);
-        println!("{ctx_info_string}");
-        let _panic_guard =
-            SpanDebugger::new(&ctx_info_string, &linker.files[working_on.link_info.file]);
+        println!("Typechecking {}", &working_on.link_info.name);
+        let _panic_guard = SpanDebugger::new(
+            "Typechecking",
+            &working_on.link_info.name,
+            &linker.files[working_on.link_info.file],
+        );
 
         let mut context = TypeCheckingContext {
             globals: &globals,
@@ -57,6 +59,10 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
         working_on_mut
             .link_info
             .reabsorb_errors_globals(errs_and_globals, AFTER_TYPECHECK_CP);
+
+        if crate::debug::is_enabled("print-flattened") {
+            working_on_mut.print_flattened_module(&linker.files[working_on_mut.link_info.file]);
+        }
     }
 }
 
@@ -197,13 +203,19 @@ impl TypeCheckingContext<'_, '_> {
                         rank: PeanoType::Unknown(self.type_checker.alloc_peano_variable()),
                     };
                     let arr_span = bracket_span.outer_span();
-                    self.type_checker.typecheck_array_access(
-                        &current_type_in_progress,
-                        &idx_expr.typ.typ,
-                        arr_span,
-                        idx_expr.span,
-                        &new_resulting_variable,
-                    );
+                    {
+                        self.type_checker.type_substitutor.unify_report_error(
+                            &idx_expr.typ.typ,
+                            &INT_TYPE,
+                            idx_expr.span,
+                            "array index",
+                        );
+                        self.type_checker.unify_with_array_of(
+                            &current_type_in_progress,
+                            &new_resulting_variable,
+                            arr_span,
+                        );
+                    };
 
                     self.type_checker.unify_domains(
                         &idx_expr.typ.domain,
@@ -486,28 +498,66 @@ impl TypeCheckingContext<'_, '_> {
                     }
                     &ExpressionSource::UnaryOp { op, right } => {
                         let right_expr = self.working_on.instructions[right].unwrap_expression();
-                        self.type_checker.typecheck_unary_operator(
+                        self.type_checker.typecheck_unary_operator_abstr(
                             op,
-                            &right_expr.typ,
-                            &expr.typ,
+                            &right_expr.typ.typ,
                             right_expr.span,
+                            &expr.typ.typ,
+                        );
+                        self.type_checker.unify_domains(
+                            &right_expr.typ.domain,
+                            &expr.typ.domain,
+                            right_expr.span,
+                            "unary op",
                         );
                     }
                     &ExpressionSource::BinaryOp { op, left, right } => {
                         let left_expr = self.working_on.instructions[left].unwrap_expression();
                         let right_expr = self.working_on.instructions[right].unwrap_expression();
-                        self.type_checker.typecheck_binary_operator(
-                            op,
-                            &left_expr.typ,
-                            &right_expr.typ,
-                            left_expr.span,
-                            right_expr.span,
-                            &expr.typ,
-                        )
+                        {
+                            self.type_checker.typecheck_binary_operator_abstr(
+                                op,
+                                &left_expr.typ.typ,
+                                &right_expr.typ.typ,
+                                left_expr.span,
+                                right_expr.span,
+                                &expr.typ.typ,
+                            );
+                            self.type_checker.unify_domains(
+                                &left_expr.typ.domain,
+                                &expr.typ.domain,
+                                left_expr.span,
+                                "binop left",
+                            );
+                            self.type_checker.unify_domains(
+                                &right_expr.typ.domain,
+                                &expr.typ.domain,
+                                right_expr.span,
+                                "binop right",
+                            );
+                        }
                     }
                     ExpressionSource::Constant(value) => {
                         self.type_checker
                             .unify_with_constant(&expr.typ.typ, value, expr.span)
+                    }
+                    ExpressionSource::ArrayConstruct(arr) => {
+                        for elem_id in arr {
+                            let elem_expr =
+                                self.working_on.instructions[*elem_id].unwrap_expression();
+
+                            self.type_checker.unify_with_array_of(
+                                &expr.typ.typ,
+                                &elem_expr.typ.typ,
+                                elem_expr.span,
+                            );
+                            self.type_checker.unify_domains(
+                                &elem_expr.typ.domain,
+                                &expr.typ.domain,
+                                elem_expr.span,
+                                "Array construction",
+                            );
+                        }
                     }
                 };
             }

@@ -1,44 +1,20 @@
+// USE THIS FILE TO TEST SMALL SAMPLES OF SUS CODE IN ISOLATION. 
+// DO NOT COMMIT
+// To use with VSCode debugger, name the module "TEST", and in the code use `if crate::debug::is_enabled("TEST") {}` to enable breakpoint code
 
-module replicatee #(T, int NUM_REPLS) {
-	interface replicatee: T data -> T[NUM_REPLS] result
+// Recursive Tree Add module recurses smaller copies of itself. 
 
-	for int i in 0..NUM_REPLS {
-		result[i] = data
-	} 
+module infer_me_with_delta_d #(int V) {
+	interface a: bool x'0 -> bool y'V
+
+	interface b: bool p'0 -> bool q'V+30
 }
 
-module use_replicatee {
-	replicatee #(NUM_REPLS: 50, T: type bool) repl
+module TEST {
+	interface use_infer_me_with_delta: bool x'0 -> bool y'-1
 
-	bool[50] repls = repl(true)
-}
+	infer_me_with_delta_d inf
 
-extern module TestExtern {
-	input int in_a'3
-
-	output int in_b'5
-}
-
-struct Matrix #(T, int WIDTH, int HEIGHT) {
-	T[WIDTH][HEIGHT] data
-}
-
-struct float {}
-
-module ModUsingFloat {
-	input float beep
-
-	output float boop
-
-	boop = beep
-}
-
-
-
-module partialModule #(int UNKNOWN) {
-
-}
-
-module usePartialModule {
-	partialModule m
+	y = inf.a(x)
+	y = inf.b(x)
 }

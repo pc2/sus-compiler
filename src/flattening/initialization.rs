@@ -1,4 +1,3 @@
-use arrayvec::ArrayVec;
 use sus_proc_macro::{field, kind, kw};
 
 use crate::errors::ErrorStore;
@@ -6,7 +5,7 @@ use crate::linker::{IsExtern, AFTER_INITIAL_PARSE_CP};
 use crate::prelude::*;
 
 use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
-use crate::{file_position::FileText, flattening::Module, instantiation::InstantiationCache};
+use crate::{file_position::FileText, flattening::Module};
 
 use crate::typing::template::{
     GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind,
@@ -276,7 +275,7 @@ impl InitializationContext<'_> {
 pub fn gather_initial_file_data(mut builder: FileBuilder) {
     assert!(builder.file_data.associated_values.is_empty());
 
-    let mut cursor = match Cursor::new_at_root(builder.tree, &builder.file_data.file_text) {
+    let mut cursor = match Cursor::new_at_root(builder.tree, builder.file_data) {
         Ok(cursor) => cursor,
         Err(file_span) => {
             builder
@@ -361,7 +360,7 @@ fn initialize_global_object(
         errors: ErrorStore::new(),
         is_extern,
         resolved_globals: ResolvedGlobals::empty(),
-        checkpoints: ArrayVec::new(),
+        checkpoints: Vec::new(),
     };
 
     link_info.reabsorb_errors_globals(
@@ -375,10 +374,10 @@ fn initialize_global_object(
                 link_info,
                 ports: ctx.ports,
                 latency_inference_info: PortLatencyInferenceInfo::default(),
+                named_domains: ctx.domains.id_range(),
                 domains: ctx.domains,
                 implicit_clk_domain: ctx.implicit_clk_domain,
                 interfaces: ctx.interfaces,
-                instantiations: InstantiationCache::new(),
             });
         }
         GlobalObjectKind::Struct => {

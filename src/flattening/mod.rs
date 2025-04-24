@@ -6,7 +6,7 @@ mod parser;
 mod typechecking;
 mod walk;
 
-use crate::alloc::UUIDAllocator;
+use crate::alloc::{UUIDAllocator, UUIDRange};
 use crate::prelude::*;
 use crate::typing::abstract_type::DomainType;
 use crate::typing::type_inference::{
@@ -23,7 +23,7 @@ pub use lints::perform_lints;
 pub use typechecking::typecheck_all_modules;
 
 use crate::linker::{Documentation, LinkInfo};
-use crate::{file_position::FileText, instantiation::InstantiationCache, value::Value};
+use crate::{file_position::FileText, value::Value};
 
 use crate::typing::{abstract_type::FullType, template::GlobalReference};
 
@@ -52,20 +52,22 @@ pub struct Module {
     /// Created in Stage 1: Initialization
     ///
     /// [Port::declaration_instruction] are set in Stage 2: Flattening
+    ///
+    /// Ports can only use domains in [Self::named_domains]
     pub ports: FlatAlloc<Port, PortIDMarker>,
 
     /// Created in Stage 2: Flattening
     pub latency_inference_info: PortLatencyInferenceInfo,
 
     /// Created in Stage 1: Initialization
+    ///
+    /// [Self::domains] is then extended during abstract typechecking to add unnamed domains
     pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,
+    pub named_domains: UUIDRange<DomainIDMarker>,
     pub implicit_clk_domain: bool,
 
     /// Created in Stage 1: Initialization
     pub interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
-
-    /// Created in Stage 3: Instantiation
-    pub instantiations: InstantiationCache,
 }
 
 impl Module {
@@ -357,6 +359,15 @@ impl WireReferenceRoot {
         };
         *decl
     }
+    pub fn get_span(&self) -> Option<Span> {
+        match self {
+            WireReferenceRoot::LocalDecl(_uuid, span) => Some(*span),
+            WireReferenceRoot::NamedConstant(global_reference) => {
+                Some(global_reference.get_total_span())
+            }
+            WireReferenceRoot::SubModulePort(port_reference) => port_reference.port_name_span,
+        }
+    }
 }
 
 /// References to wires or generative variables.
@@ -370,21 +381,18 @@ impl WireReferenceRoot {
 pub struct WireReference {
     pub root: WireReferenceRoot,
     pub path: Vec<WireReferencePathElement>,
-    pub is_generative: bool,
 }
 
 impl WireReference {
     fn simple_port(port: PortReference) -> WireReference {
         WireReference {
             root: WireReferenceRoot::SubModulePort(port),
-            is_generative: false,
             path: Vec::new(),
         }
     }
-    fn simple_var_read(id: FlatID, is_generative: bool, name_span: Span) -> WireReference {
+    fn simple_var_read(id: FlatID, name_span: Span) -> WireReference {
         WireReference {
             root: WireReferenceRoot::LocalDecl(id, name_span),
-            is_generative,
             path: Vec::new(),
         }
     }
@@ -524,6 +532,7 @@ pub enum ExpressionSource {
         left: FlatID,
         right: FlatID,
     },
+    ArrayConstruct(Vec<FlatID>),
     Constant(Value),
 }
 

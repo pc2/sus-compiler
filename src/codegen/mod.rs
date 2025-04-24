@@ -5,11 +5,14 @@ pub mod vhdl;
 pub use system_verilog::VerilogCodegenBackend;
 pub use vhdl::VHDLCodegenBackend;
 
+use crate::prelude::*;
+
 use crate::{InstantiatedModule, Linker, Module};
 
 use std::{
     fs::{self, File},
     io::Write,
+    ops::Deref,
     path::PathBuf,
     rc::Rc,
 };
@@ -62,28 +65,27 @@ pub trait CodeGenBackend {
         write!(out_file, "{code}").unwrap();
     }
 
-    fn codegen_to_file(&self, md: &Module, linker: &Linker) {
+    fn codegen_to_file(&self, id: ModuleUUID, md: &Module, linker: &Linker) {
         let mut out_file = self.make_output_file(&md.link_info.name);
-        md.instantiations.for_each_instance(|_template_args, inst| {
+        for (_global_ref, inst) in linker.instantiator.borrow().iter_for_module(id) {
             self.codegen_instance(inst.as_ref(), md, linker, &mut out_file)
-        });
+        }
     }
 
-    fn codegen_with_dependencies(&self, linker: &Linker, md: &Module, file_name: &str) {
+    fn codegen_with_dependencies(&self, linker: &Linker, md_id: ModuleUUID, file_name: &str) {
         let mut out_file = self.make_output_file(file_name);
-        let mut top_level_instances: Vec<Rc<InstantiatedModule>> = Vec::new();
-        md.instantiations.for_each_instance(|_template_args, inst| {
-            top_level_instances.push(inst.clone());
-        });
-        let mut to_process_queue: Vec<(&InstantiatedModule, &Module)> = top_level_instances
-            .iter()
-            .map(|v| (v.as_ref(), md))
-            .collect();
+        let mut to_process_queue: Vec<Rc<InstantiatedModule>> = Vec::new();
+        for (_template_args, inst) in linker.instantiator.borrow().iter_for_module(md_id) {
+            to_process_queue.push(inst.clone());
+        }
+
+        let mut to_process_queue: Vec<&InstantiatedModule> =
+            to_process_queue.iter().map(|inst| inst.deref()).collect();
 
         let mut cur_idx = 0;
 
         while cur_idx < to_process_queue.len() {
-            let (cur_instance, cur_md) = to_process_queue[cur_idx];
+            let cur_instance = to_process_queue[cur_idx];
 
             for (_, sub_mod) in &cur_instance.submodules {
                 let new_inst = sub_mod.instance.get().unwrap().as_ref();
@@ -92,15 +94,20 @@ pub trait CodeGenBackend {
                 // Yeah yeah I know O(n²) but this list shouldn't grow too big. Fix if needed
                 if to_process_queue
                     .iter()
-                    .any(|existing| std::ptr::eq(existing.0, new_inst))
+                    .any(|existing| std::ptr::eq(*existing, new_inst))
                 {
                     continue;
                 }
 
-                to_process_queue.push((new_inst, &linker.modules[sub_mod.module_uuid]));
+                to_process_queue.push(new_inst);
             }
 
-            self.codegen_instance(cur_instance, cur_md, linker, &mut out_file);
+            self.codegen_instance(
+                cur_instance,
+                &linker.modules[cur_instance.global_ref.id],
+                linker,
+                &mut out_file,
+            );
 
             cur_idx += 1;
         }

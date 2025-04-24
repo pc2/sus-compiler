@@ -7,3 +7,5 @@ tree-sitter-sus/*.wasm linguist-generated
 tree-sitter-sus/Package.swift linguist-generated
 tree-sitter-sus/pyproject.toml linguist-generated
 tree-sitter-sus/setup.py linguist-generated
+test.sus_output.txt linguist-generated
+test.sus_errors.txt linguist-generated
