@@ -204,15 +204,15 @@ impl TypeCheckingContext<'_, '_> {
                     };
                     let arr_span = bracket_span.outer_span();
                     {
-                        self.type_checker.type_substitutor.unify_report_error(
-                            &idx_expr.typ.typ,
-                            &INT_TYPE,
+                        self.type_checker.abstract_type_substitutor.unify_report_error(
+                            &idx_expr.typ.typ.inner,
+                            &INT_TYPE.inner,
                             idx_expr.span,
                             "array index",
                         );
                         self.type_checker.unify_with_array_of(
                             &current_type_in_progress,
-                            &new_resulting_variable,
+                            new_resulting_variable.clone(),
                             arr_span,
                         );
                     };
@@ -234,14 +234,14 @@ impl TypeCheckingContext<'_, '_> {
                 &current_type_in_progress.inner,
                 &output_typ.typ.inner,
                 whole_span,
-                &"variable reference",
+                "variable reference",
             );
 
         self.type_checker.peano_substitutor.unify_report_error(
             &current_type_in_progress.rank,
             &output_typ.typ.rank,
             whole_span,
-            &"variable reference rank",
+            "variable reference rank",
         );
     }
 
@@ -386,7 +386,7 @@ impl TypeCheckingContext<'_, '_> {
                             &argument_expr.typ.typ,
                             argument_type,
                             argument_expr.span,
-                            &"generative template argument",
+                            "generative template argument",
                         );
                     }
                 }
@@ -415,7 +415,7 @@ impl TypeCheckingContext<'_, '_> {
                     &idx_expr.typ.typ,
                     &INT_TYPE,
                     idx_expr.span,
-                    &"array size",
+                    "array size",
                 );
             }
         }
@@ -453,7 +453,7 @@ impl TypeCheckingContext<'_, '_> {
                         &latency_specifier_expr.typ.typ,
                         &INT_TYPE,
                         latency_specifier_expr.span,
-                        &"latency specifier",
+                        "latency specifier",
                     );
                 }
 
@@ -470,7 +470,7 @@ impl TypeCheckingContext<'_, '_> {
                     &condition_expr.typ.typ,
                     &BOOL_TYPE,
                     condition_expr.span,
-                    &"if statement condition",
+                    "if statement condition",
                 );
             }
             Instruction::ForStatement(stm) => {
@@ -482,13 +482,13 @@ impl TypeCheckingContext<'_, '_> {
                     &start.typ.typ,
                     &loop_var.typ.typ,
                     start.span,
-                    &"for loop start",
+                    "for loop start",
                 );
                 self.type_checker.typecheck_write_to_abstract(
                     &end.typ.typ,
                     &loop_var.typ.typ,
                     end.span,
-                    &"for loop end",
+                    "for loop end",
                 );
             }
             Instruction::Expression(expr) => {
@@ -548,7 +548,7 @@ impl TypeCheckingContext<'_, '_> {
 
                             self.type_checker.unify_with_array_of(
                                 &expr.typ.typ,
-                                &elem_expr.typ.typ,
+                                elem_expr.typ.typ.clone(),
                                 elem_expr.span,
                             );
                             self.type_checker.unify_domains(
