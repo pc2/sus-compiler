@@ -8,7 +8,7 @@ use unique_names::UniqueNames;
 
 use crate::prelude::*;
 use crate::typing::template::TVec;
-use crate::typing::type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor};
+use crate::typing::type_inference::SimpleSingleSubstitutorUnifier;
 
 use std::cell::OnceCell;
 use std::rc::Rc;
@@ -282,7 +282,7 @@ pub struct InstantiationContext<'fl, 'l> {
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
 
-    pub type_substitutor: TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
+    pub type_substitutor: SimpleSingleSubstitutorUnifier<ConcreteType>,
 
     /// Used for Execution
     generation_state: GenerationState<'fl>,

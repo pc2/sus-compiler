@@ -17,11 +17,11 @@ use crate::typing::{
 
 use super::*;
 
-use crate::typing::type_inference::HindleyMilner;
+use crate::typing::type_inference::{HindleyMilner, TypeSubstitutor};
 
 impl InstantiationContext<'_, '_> {
     fn peano_to_nested_array_of(
-        &self,
+        &mut self,
         p: &PeanoType,
         c: ConcreteType,
         dims: &mut Vec<ConcreteType>,
@@ -29,7 +29,7 @@ impl InstantiationContext<'_, '_> {
         match p {
             PeanoType::Zero => c,
             PeanoType::Succ(p) => {
-                let this_dim_var = ConcreteType::Unknown(self.type_substitutor.alloc());
+                let this_dim_var = ConcreteType::Unknown(self.type_substitutor.alloc_var());
                 let arr = ConcreteType::Array(Box::new((c, this_dim_var.clone())));
                 let typ = self.peano_to_nested_array_of(p, arr, dims);
                 dims.push(this_dim_var.clone());
@@ -39,21 +39,21 @@ impl InstantiationContext<'_, '_> {
         }
     }
     fn walk_type_along_path(
-        &self,
+        type_substitutor: &mut SimpleSingleSubstitutorUnifier<ConcreteType>,
         mut current_type_in_progress: ConcreteType,
         path: &[RealWirePathElem],
     ) -> ConcreteType {
         for p in path {
-            let typ_after_applying_array = ConcreteType::Unknown(self.type_substitutor.alloc());
+            let typ_after_applying_array = ConcreteType::Unknown(type_substitutor.alloc_var());
             match p {
                 RealWirePathElem::ArrayAccess {
                     span: _,
                     idx_wire: _,
                 } => {
                     // TODO #28 integer size <-> array bound check
-                    let arr_size = ConcreteType::Unknown(self.type_substitutor.alloc());
+                    let arr_size = ConcreteType::Unknown(type_substitutor.alloc_var());
                     let arr_box = Box::new((typ_after_applying_array.clone(), arr_size));
-                    self.type_substitutor.unify_must_succeed(
+                    type_substitutor.unify_must_succeed(
                         &current_type_in_progress,
                         &ConcreteType::Array(arr_box),
                     );
@@ -65,14 +65,14 @@ impl InstantiationContext<'_, '_> {
         current_type_in_progress
     }
 
-    fn make_array_of(&self, concrete_typ: ConcreteType) -> ConcreteType {
+    fn make_array_of(&mut self, concrete_typ: ConcreteType) -> ConcreteType {
         ConcreteType::Array(Box::new((
             concrete_typ,
-            ConcreteType::Unknown(self.type_substitutor.alloc()),
+            ConcreteType::Unknown(self.type_substitutor.alloc_var()),
         )))
     }
 
-    fn typecheck_all_wires(&self) {
+    fn typecheck_all_wires(&mut self) {
         for this_wire_id in self.wires.id_range() {
             let this_wire = &self.wires[this_wire_id];
             let span = self.md.get_instruction_span(this_wire.original_instruction);
@@ -82,7 +82,7 @@ impl InstantiationContext<'_, '_> {
                 RealWireDataSource::ReadOnly => {}
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     if let Some(is_state) = is_state {
-                        let value_typ = is_state.get_type(&self.type_substitutor);
+                        let value_typ = is_state.get_type(&mut self.type_substitutor);
                         self.type_substitutor.unify_report_error(
                             &value_typ,
                             &this_wire.typ,
@@ -92,8 +92,11 @@ impl InstantiationContext<'_, '_> {
                     }
                     for s in sources {
                         let source_typ = &self.wires[s.from].typ;
-                        let destination_typ = self
-                            .walk_type_along_path(self.wires[this_wire_id].typ.clone(), &s.to_path);
+                        let destination_typ = Self::walk_type_along_path(
+                            &mut self.type_substitutor,
+                            self.wires[this_wire_id].typ.clone(),
+                            &s.to_path,
+                        );
                         self.type_substitutor.unify_report_error(
                             &destination_typ,
                             source_typ,
@@ -234,7 +237,11 @@ impl InstantiationContext<'_, '_> {
                     );
                 }
                 RealWireDataSource::Select { root, path } => {
-                    let found_typ = self.walk_type_along_path(self.wires[*root].typ.clone(), path);
+                    let found_typ = Self::walk_type_along_path(
+                        &mut self.type_substitutor,
+                        self.wires[*root].typ.clone(),
+                        path,
+                    );
                     self.type_substitutor.unify_report_error(
                         &found_typ,
                         &self.wires[this_wire_id].typ,
@@ -322,7 +329,7 @@ impl InstantiationContext<'_, '_> {
                     &port_decl.typ_expr,
                     &sm.refers_to.template_args,
                     &sub_module.link_info,
-                    &self.type_substitutor,
+                    &mut self.type_substitutor,
                 );
 
                 self.type_substitutor
@@ -378,10 +385,10 @@ fn concretize_written_type_with_possible_template_args(
     written_typ: &WrittenType,
     template_args: &TVec<ConcreteType>,
     link_info: &LinkInfo,
-    type_substitutor: &TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
+    type_substitutor: &mut TypeSubstitutor<ConcreteType>,
 ) -> ConcreteType {
     match written_typ {
-        WrittenType::Error(_span) => ConcreteType::Unknown(type_substitutor.alloc()),
+        WrittenType::Error(_span) => ConcreteType::Unknown(type_substitutor.alloc_var()),
         WrittenType::TemplateVariable(_span, uuid) => template_args[*uuid].clone(),
         WrittenType::Named(global_reference) => {
             let object_template_args: TVec<ConcreteType> =
@@ -404,12 +411,12 @@ fn concretize_written_type_with_possible_template_args(
                                     {
                                         template_args[found_template_arg].clone()
                                     } else {
-                                        ConcreteType::Unknown(type_substitutor.alloc())
+                                        ConcreteType::Unknown(type_substitutor.alloc_var())
                                     }
                                 }
                             }
                         } else {
-                            ConcreteType::Unknown(type_substitutor.alloc())
+                            ConcreteType::Unknown(type_substitutor.alloc_var())
                         }
                     });
 
@@ -432,7 +439,7 @@ fn concretize_written_type_with_possible_template_args(
             {
                 template_args[found_template_arg].clone()
             } else {
-                ConcreteType::Unknown(type_substitutor.alloc())
+                ConcreteType::Unknown(type_substitutor.alloc_var())
             };
 
             ConcreteType::Array(Box::new((arr_content_concrete, arr_idx_concrete)))

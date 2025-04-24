@@ -8,10 +8,8 @@ mod walk;
 
 use crate::alloc::{UUIDAllocator, UUIDRange};
 use crate::prelude::*;
-use crate::typing::abstract_type::DomainType;
-use crate::typing::type_inference::{
-    DomainVariableIDMarker, InnerTypeVariableIDMarker, PeanoVariableIDMarker,
-};
+use crate::typing::abstract_type::{AbstractInnerType, DomainType, PeanoType};
+use crate::typing::type_inference::SimpleSingleSubstitutorUnifier;
 
 use std::cell::OnceCell;
 use std::ops::Deref;
@@ -813,9 +811,9 @@ impl Instruction {
 /// required for [crate::typing::abstract_type::AbstractType::Unknown] and [DomainType::DomainVariable]
 ///
 /// See [crate::typing::type_inference::HindleyMilner]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TypingAllocator {
-    pub peano_variable_alloc: UUIDAllocator<PeanoVariableIDMarker>,
-    pub inner_type_variable_alloc: UUIDAllocator<InnerTypeVariableIDMarker>,
-    pub domain_variable_alloc: UUIDAllocator<DomainVariableIDMarker>,
+    pub peano_variable_alloc: SimpleSingleSubstitutorUnifier<PeanoType>,
+    pub inner_type_variable_alloc: SimpleSingleSubstitutorUnifier<AbstractInnerType>,
+    pub domain_variable_alloc: SimpleSingleSubstitutorUnifier<DomainType>,
 }

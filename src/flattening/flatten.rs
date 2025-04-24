@@ -228,13 +228,13 @@ impl TypingAllocator {
     fn alloc_unset_type(&mut self, domain: DomainAllocOption) -> FullType {
         FullType {
             typ: AbstractRankedType {
-                inner: AbstractInnerType::Unknown(self.inner_type_variable_alloc.alloc()),
-                rank: PeanoType::Unknown(self.peano_variable_alloc.alloc()),
+                inner: AbstractInnerType::Unknown(self.inner_type_variable_alloc.alloc_var()),
+                rank: PeanoType::Unknown(self.peano_variable_alloc.alloc_var()),
             },
             domain: match domain {
                 DomainAllocOption::Generative => DomainType::Generative,
                 DomainAllocOption::NonGenerativeUnknown => {
-                    DomainType::Unknown(self.domain_variable_alloc.alloc())
+                    DomainType::Unknown(self.domain_variable_alloc.alloc_var())
                 }
                 DomainAllocOption::NonGenerativeKnown(domain_id) => DomainType::Physical(domain_id),
             },
@@ -456,9 +456,9 @@ impl FlatteningContext<'_, '_> {
 
                 let template_arg_types = template_args.map(|_| AbstractRankedType {
                     inner: AbstractInnerType::Unknown(
-                        self.type_alloc.inner_type_variable_alloc.alloc(),
+                        self.type_alloc.inner_type_variable_alloc.alloc_var(),
                     ),
-                    rank: PeanoType::Unknown(self.type_alloc.peano_variable_alloc.alloc()),
+                    rank: PeanoType::Unknown(self.type_alloc.peano_variable_alloc.alloc_var()),
                 });
 
                 match global_id {
@@ -624,7 +624,7 @@ impl FlatteningContext<'_, '_> {
         let md = &self.globals[module_ref.id];
         let local_interface_domains = md
             .domains
-            .map(|_| DomainType::Unknown(self.type_alloc.domain_variable_alloc.alloc()));
+            .map(|_| DomainType::Unknown(self.type_alloc.domain_variable_alloc.alloc_var()));
 
         self.instructions
             .alloc(Instruction::SubModule(SubModuleInstance {
@@ -1724,7 +1724,13 @@ pub fn flatten_all_globals(linker: &mut Linker) {
 }
 
 fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Cursor<'_>) {
-    let errors_globals = GlobalResolver::take_errors_globals(linker, global_obj);
+    let obj_link_info_mut = Linker::get_link_info_mut(
+        &mut linker.modules,
+        &mut linker.types,
+        &mut linker.constants,
+        global_obj,
+    );
+    let errors_globals = obj_link_info_mut.take_errors_globals();
     let obj_link_info = linker.get_link_info(global_obj);
     let globals = GlobalResolver::new(linker, obj_link_info, errors_globals);
 
@@ -1783,9 +1789,9 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         working_on_link_info: linker.get_link_info(global_obj),
         instructions: FlatAlloc::new(),
         type_alloc: TypingAllocator {
-            peano_variable_alloc: UUIDAllocator::new(),
-            inner_type_variable_alloc: UUIDAllocator::new(),
-            domain_variable_alloc: UUIDAllocator::new(),
+            peano_variable_alloc: SimpleSingleSubstitutorUnifier::new(),
+            inner_type_variable_alloc: SimpleSingleSubstitutorUnifier::new(),
+            domain_variable_alloc: SimpleSingleSubstitutorUnifier::new(),
         },
         named_domain_alloc: UUIDAllocator::new(),
         local_variable_context,
@@ -1912,6 +1918,6 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
     }
 
     link_info.reabsorb_errors_globals(errors_globals, AFTER_FLATTEN_CP);
-    link_info.type_variable_alloc = type_alloc;
+    link_info.type_variable_alloc = Some(Box::new(type_alloc));
     link_info.instructions = instructions;
 }

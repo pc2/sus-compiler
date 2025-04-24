@@ -341,7 +341,7 @@ impl InstantiationContext<'_, '_> {
     }
 
     fn get_named_constant_value(
-        &self,
+        &mut self,
         cst_ref: &GlobalReference<ConstantUUID>,
     ) -> ExecutionResult<Value> {
         let concrete_ref = self.execute_global_ref(cst_ref)?;
@@ -548,7 +548,7 @@ impl InstantiationContext<'_, '_> {
             return Err((const_span, format!("This compile-time value was not fully resolved by the time it needed to be converted to a wire: {value}")));
         }
         Ok(self.wires.alloc(RealWire {
-            typ: value.get_type(&self.type_substitutor),
+            typ: value.get_type(&mut self.type_substitutor),
             source: RealWireDataSource::Constant { value },
             original_instruction,
             domain,
@@ -615,7 +615,7 @@ impl InstantiationContext<'_, '_> {
                 source,
                 original_instruction: submod_instance.original_instruction,
                 domain: domain.unwrap_physical(),
-                typ: ConcreteType::Unknown(self.type_substitutor.alloc()),
+                typ: ConcreteType::Unknown(self.type_substitutor.alloc_var()),
                 name: self
                     .unique_name_producer
                     .get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
@@ -716,7 +716,7 @@ impl InstantiationContext<'_, '_> {
         };
         Ok(self.wires.alloc(RealWire {
             name: self.unique_name_producer.get_unique_name(""),
-            typ: ConcreteType::Unknown(self.type_substitutor.alloc()),
+            typ: ConcreteType::Unknown(self.type_substitutor.alloc_var()),
             original_instruction,
             domain,
             source,
@@ -777,7 +777,7 @@ impl InstantiationContext<'_, '_> {
     }
 
     fn execute_global_ref<ID: Copy>(
-        &self,
+        &mut self,
         global_ref: &GlobalReference<ID>,
     ) -> ExecutionResult<ConcreteGlobalReference<ID>> {
         let template_args =
@@ -791,7 +791,7 @@ impl InstantiationContext<'_, '_> {
                                 self.generation_state.get_generation_value(*v)?.clone(),
                             ),
                         },
-                        None => ConcreteType::Unknown(self.type_substitutor.alloc()),
+                        None => ConcreteType::Unknown(self.type_substitutor.alloc_var()),
                     })
                 })?;
         Ok(ConcreteGlobalReference {
@@ -800,7 +800,7 @@ impl InstantiationContext<'_, '_> {
         })
     }
 
-    fn compute_compile_time_wireref(&self, wire_ref: &WireReference) -> ExecutionResult<Value> {
+    fn compute_compile_time_wireref(&mut self, wire_ref: &WireReference) -> ExecutionResult<Value> {
         let mut work_on_value: Value = match &wire_ref.root {
             &WireReferenceRoot::LocalDecl(decl_id, _span) => {
                 self.generation_state.get_generation_value(decl_id)?.clone()

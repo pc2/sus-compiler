@@ -8,8 +8,8 @@ use std::ops::Deref;
 
 use super::template::{GlobalReference, Parameter, TVec};
 use super::type_inference::{
-    DomainVariableID, DomainVariableIDMarker, InnerTypeVariableID, InnerTypeVariableIDMarker,
-    PeanoVariableID, PeanoVariableIDMarker, TypeSubstitutor, UnifyErrorReport,
+    DomainVariableID, InnerTypeVariableID, PeanoVariableID, SimpleSingleSubstitutorUnifier,
+    UnifyErrorReport,
 };
 use crate::flattening::{BinaryOperator, StructType, TypingAllocator, UnaryOperator, WrittenType};
 use crate::to_string::map_to_type_names;
@@ -153,43 +153,39 @@ pub struct FullType {
 /// 'x U 'y -> Substitute 'x = 'y
 pub struct TypeUnifier {
     pub template_type_names: FlatAlloc<String, TemplateIDMarker>,
-    pub abstract_type_substitutor: TypeSubstitutor<AbstractInnerType, InnerTypeVariableIDMarker>,
-    pub peano_substitutor: TypeSubstitutor<PeanoType, PeanoVariableIDMarker>,
-    pub domain_substitutor: TypeSubstitutor<DomainType, DomainVariableIDMarker>,
+    pub abstract_type_substitutor: SimpleSingleSubstitutorUnifier<AbstractInnerType>,
+    pub peano_substitutor: SimpleSingleSubstitutorUnifier<PeanoType>,
+    pub domain_substitutor: SimpleSingleSubstitutorUnifier<DomainType>,
 }
 
 impl TypeUnifier {
     pub fn new(parameters: &TVec<Parameter>, typing_alloc: TypingAllocator) -> Self {
-        let p = TypeSubstitutor::init(&typing_alloc.peano_variable_alloc);
-
         Self {
             template_type_names: map_to_type_names(parameters),
-            abstract_type_substitutor: TypeSubstitutor::init(
-                &typing_alloc.inner_type_variable_alloc,
-            ),
-            peano_substitutor: p,
-            domain_substitutor: TypeSubstitutor::init(&typing_alloc.domain_variable_alloc),
+            abstract_type_substitutor: typing_alloc.inner_type_variable_alloc,
+            peano_substitutor: typing_alloc.peano_variable_alloc,
+            domain_substitutor: typing_alloc.domain_variable_alloc,
         }
     }
 
-    pub fn alloc_typ_variable(&self) -> InnerTypeVariableID {
-        self.abstract_type_substitutor.alloc()
+    pub fn alloc_typ_variable(&mut self) -> InnerTypeVariableID {
+        self.abstract_type_substitutor.alloc_var()
     }
 
-    pub fn alloc_peano_variable(&self) -> PeanoVariableID {
-        self.peano_substitutor.alloc()
+    pub fn alloc_peano_variable(&mut self) -> PeanoVariableID {
+        self.peano_substitutor.alloc_var()
     }
 
     #[allow(dead_code)]
-    pub fn alloc_domain_variable(&self) -> DomainVariableID {
-        self.domain_substitutor.alloc()
+    pub fn alloc_domain_variable(&mut self) -> DomainVariableID {
+        self.domain_substitutor.alloc_var()
     }
 
     /// This should always be what happens first to a given variable.
     ///
     /// Therefore it should be impossible that one of the internal unifications ever fails
     pub fn unify_with_written_type_must_succeed(
-        &self,
+        &mut self,
         wr_typ: &WrittenType,
         typ: &AbstractRankedType,
     ) {
@@ -239,7 +235,7 @@ impl TypeUnifier {
     ///
     /// For Types this is the Type, for Values this is unified with the parameter declaration type
     pub fn unify_with_written_type_substitute_templates_must_succeed(
-        &self,
+        &mut self,
         wr_typ: &WrittenType,
         typ: &AbstractRankedType,
         template_type_args: &TVec<AbstractRankedType>,
@@ -322,8 +318,8 @@ impl TypeUnifier {
             }
             Value::Array(arr) => {
                 let arr_content_variable = AbstractRankedType {
-                    inner: AbstractInnerType::Unknown(self.abstract_type_substitutor.alloc()),
-                    rank: PeanoType::Unknown(self.peano_substitutor.alloc()),
+                    inner: AbstractInnerType::Unknown(self.abstract_type_substitutor.alloc_var()),
+                    rank: PeanoType::Unknown(self.peano_substitutor.alloc_var()),
                 };
 
                 for v in arr.deref() {
@@ -350,7 +346,7 @@ impl TypeUnifier {
 
     // Unifies arr_type with output_typ[]
     pub fn unify_with_array_of(
-        &self,
+        &mut self,
         arr_type: &AbstractRankedType,
         output_typ: AbstractRankedType,
         arr_span: Span,
@@ -371,7 +367,7 @@ impl TypeUnifier {
     }
 
     pub fn typecheck_unary_operator_abstr(
-        &self,
+        &mut self,
         op: UnaryOperator,
         input_typ: &AbstractRankedType,
         span: Span,
@@ -454,7 +450,7 @@ impl TypeUnifier {
     }
 
     pub fn typecheck_binary_operator_abstr(
-        &self,
+        &mut self,
         op: BinaryOperator,
         left_typ: &AbstractRankedType,
         right_typ: &AbstractRankedType,
@@ -515,7 +511,7 @@ impl TypeUnifier {
     // ===== Both =====
 
     pub fn unify_domains<Context: UnifyErrorReport>(
-        &self,
+        &mut self,
         from_domain: &DomainType,
         to_domain: &DomainType,
         span: Span,
@@ -529,7 +525,7 @@ impl TypeUnifier {
     }
 
     pub fn typecheck_write_to_abstract<Context: UnifyErrorReport + Clone>(
-        &self,
+        &mut self,
         found: &AbstractRankedType,
         expected: &AbstractRankedType,
         span: Span,
@@ -547,7 +543,7 @@ impl TypeUnifier {
     }
 
     pub fn typecheck_write_to<Context: UnifyErrorReport + Clone>(
-        &self,
+        &mut self,
         found: &FullType,
         expected: &FullType,
         span: Span,

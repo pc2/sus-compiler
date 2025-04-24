@@ -4,9 +4,7 @@ use crate::{
     instantiation::{SubModule, SubModulePort},
     prelude::*,
     typing::{
-        concrete_type::ConcreteType,
-        template::TVec,
-        type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor},
+        concrete_type::ConcreteType, template::TVec, type_inference::SimpleSingleSubstitutorUnifier,
     },
     value::Value,
 };
@@ -360,7 +358,7 @@ impl SubModule {
         &self,
         linker: &Linker,
         sm_id: SubModuleID,
-        type_substitutor: &TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
+        type_substitutor: &SimpleSingleSubstitutorUnifier<ConcreteType>,
         latency_inference_variables: &mut FlatAlloc<
             ValueToInfer<(SubModuleID, TemplateID)>,
             InferenceVarIDMarker,

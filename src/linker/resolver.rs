@@ -54,22 +54,6 @@ pub struct GlobalResolver<'linker> {
 }
 
 impl<'linker> GlobalResolver<'linker> {
-    pub fn take_errors_globals(
-        linker: &mut Linker,
-        global_obj: GlobalUUID,
-    ) -> (ErrorStore, ResolvedGlobals) {
-        let obj_link_info = Linker::get_link_info_mut(
-            &mut linker.modules,
-            &mut linker.types,
-            &mut linker.constants,
-            global_obj,
-        );
-
-        let errors = obj_link_info.errors.take();
-        let resolved_globals = obj_link_info.resolved_globals.take();
-
-        (errors, resolved_globals)
-    }
     pub fn new(
         linker: &'linker Linker,
         obj_link_info: &'linker LinkInfo,
@@ -217,6 +201,12 @@ impl Index<ConstantUUID> for GlobalResolver<'_> {
 }
 
 impl LinkInfo {
+    pub fn take_errors_globals(&mut self) -> (ErrorStore, ResolvedGlobals) {
+        let errors = self.errors.take();
+        let resolved_globals = self.resolved_globals.take();
+
+        (errors, resolved_globals)
+    }
     pub fn reabsorb_errors_globals(
         &mut self,
         (errors, resolved_globals): (ErrorCollector, ResolvedGlobals),

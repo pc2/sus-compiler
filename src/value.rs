@@ -4,10 +4,8 @@ use ibig::IBig;
 
 use crate::flattening::{BinaryOperator, UnaryOperator};
 
-use crate::typing::{
-    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
-    type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor},
-};
+use crate::typing::concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE};
+use crate::typing::type_inference::SimpleSingleSubstitutorUnifier;
 
 /// Top type for any kind of compiletime value while executing.
 ///
@@ -28,7 +26,7 @@ impl ConcreteType {
     /// TODO integrate into Hindley-Milner more closely
     fn get_smallest_common_supertype(
         list: &[Self],
-        type_substitutor: &TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
+        type_substitutor: &mut SimpleSingleSubstitutorUnifier<ConcreteType>,
     ) -> Option<Self> {
         let mut iter = list.iter();
 
@@ -50,7 +48,7 @@ impl Value {
     /// Panics when arrays contain mutually incompatible types
     pub fn get_type(
         &self,
-        type_substitutor: &TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
+        type_substitutor: &mut SimpleSingleSubstitutorUnifier<ConcreteType>,
     ) -> ConcreteType {
         match self {
             Value::Bool(_) => BOOL_CONCRETE_TYPE,
@@ -63,14 +61,14 @@ impl Value {
 
                 let shared_supertype =
                     ConcreteType::get_smallest_common_supertype(&typs_arr, type_substitutor)
-                        .unwrap_or_else(|| ConcreteType::Unknown(type_substitutor.alloc()));
+                        .unwrap_or_else(|| ConcreteType::Unknown(type_substitutor.alloc_var()));
 
                 ConcreteType::Array(Box::new((
                     shared_supertype,
                     ConcreteType::Value(Value::Integer(arr.len().into())),
                 )))
             }
-            Value::Unset => ConcreteType::Unknown(type_substitutor.alloc()),
+            Value::Unset => ConcreteType::Unknown(type_substitutor.alloc_var()),
             Value::Error => unreachable!("{self:?}"),
         }
     }

@@ -18,8 +18,9 @@ use super::*;
 pub fn typecheck_all_modules(linker: &mut Linker) {
     let module_uuids: Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
     for module_uuid in module_uuids {
-        let global_id = GlobalUUID::Module(module_uuid);
-        let errs_globals = GlobalResolver::take_errors_globals(linker, global_id);
+        let working_on_mut = &mut linker.modules[module_uuid];
+        let errs_globals = working_on_mut.link_info.take_errors_globals();
+        let type_alloc = *working_on_mut.link_info.type_variable_alloc.take().unwrap();
 
         let working_on: &Module = &linker.modules[module_uuid];
         let globals = GlobalResolver::new(linker, &working_on.link_info, errs_globals);
@@ -34,10 +35,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
         let mut context = TypeCheckingContext {
             globals: &globals,
             errors: &globals.errors,
-            type_checker: TypeUnifier::new(
-                &working_on.link_info.template_parameters,
-                working_on.link_info.type_variable_alloc.clone(),
-            ),
+            type_checker: TypeUnifier::new(&working_on.link_info.template_parameters, type_alloc),
             runtime_condition_stack: Vec::new(),
             working_on: &working_on.link_info,
         };
@@ -80,12 +78,12 @@ struct TypeCheckingContext<'l, 'errs> {
     runtime_condition_stack: Vec<ConditionStackElem>,
 }
 
-impl TypeCheckingContext<'_, '_> {
+impl<'l> TypeCheckingContext<'l, '_> {
     fn get_decl_of_module_port(
         &self,
         port: PortID,
         submodule_instr: FlatID,
-    ) -> (&Declaration, FileUUID) {
+    ) -> (&'l Declaration, FileUUID) {
         let submodule_id = self.working_on.instructions[submodule_instr]
             .unwrap_submodule()
             .module_ref
@@ -95,7 +93,7 @@ impl TypeCheckingContext<'_, '_> {
         (decl, module.link_info.file)
     }
 
-    fn get_type_of_port(&self, port: PortID, submodule_instr: FlatID) -> FullType {
+    fn get_type_of_port(&mut self, port: PortID, submodule_instr: FlatID) -> FullType {
         let submodule_inst = self.working_on.instructions[submodule_instr].unwrap_submodule();
         let submodule_module = &self.globals[submodule_inst.module_ref.id];
         let decl = submodule_module.get_port_decl(port);
@@ -150,7 +148,7 @@ impl TypeCheckingContext<'_, '_> {
     ///     The output_typ domain should be generative when wire_ref.root is generative, or a generative value is required such as with "initial"
     ///     When wire_ref.root is not generative, it should be an unknown domain variable
     fn typecheck_wire_reference(
-        &self,
+        &mut self,
         wire_ref: &WireReference,
         whole_span: Span,
         output_typ: &FullType,
@@ -204,12 +202,14 @@ impl TypeCheckingContext<'_, '_> {
                     };
                     let arr_span = bracket_span.outer_span();
                     {
-                        self.type_checker.abstract_type_substitutor.unify_report_error(
-                            &idx_expr.typ.typ.inner,
-                            &INT_TYPE.inner,
-                            idx_expr.span,
-                            "array index",
-                        );
+                        self.type_checker
+                            .abstract_type_substitutor
+                            .unify_report_error(
+                                &idx_expr.typ.typ.inner,
+                                &INT_TYPE.inner,
+                                idx_expr.span,
+                                "array index",
+                            );
                         self.type_checker.unify_with_array_of(
                             &current_type_in_progress,
                             new_resulting_variable.clone(),
@@ -345,7 +345,7 @@ impl TypeCheckingContext<'_, '_> {
     }
 
     fn typecheck_template_global<ID: Copy + Into<GlobalUUID>>(
-        &self,
+        &mut self,
         global_ref: &GlobalReference<ID>,
     ) {
         let global_obj: GlobalUUID = global_ref.id.into();
@@ -398,7 +398,7 @@ impl TypeCheckingContext<'_, '_> {
     /// That one unifies a given typ with the written type, without checking the written type.
     ///
     /// This function checks the written type itself.
-    fn typecheck_written_type(&self, wr_typ: &WrittenType) {
+    fn typecheck_written_type(&mut self, wr_typ: &WrittenType) {
         match wr_typ {
             WrittenType::Error(_) => {}
             WrittenType::TemplateVariable(_, _) => {}
@@ -429,7 +429,7 @@ impl TypeCheckingContext<'_, '_> {
     ///
     /// Also, this meshes with the thing where we only add condition wires to writes that go
     /// outside of a condition block
-    fn join_with_condition(&self, ref_domain: &DomainType, span: Span) {
+    fn join_with_condition(&mut self, ref_domain: &DomainType, span: Span) {
         if let Some(condition_domain) = self.get_current_condition_domain() {
             self.type_checker.unify_domains(
                 ref_domain,
@@ -588,25 +588,27 @@ impl TypeCheckingContext<'_, '_> {
             }
             Instruction::Write(conn) => {
                 // Typecheck the value with target type
-                let from_expr = self.working_on.instructions[conn.from].unwrap_expression();
+                let from_expr: &'l Expression =
+                    self.working_on.instructions[conn.from].unwrap_expression();
 
                 // Typecheck digging down into write side
                 self.typecheck_wire_reference(&conn.to, conn.to_span, &conn.to_type);
                 self.join_with_condition(&conn.to_type.domain, conn.to_span.debug());
 
                 from_expr.span.debug();
+
+                let write_context = match conn.write_modifiers {
+                    WriteModifiers::Connection { .. } => "connection",
+                    WriteModifiers::Initial { initial_kw_span: _ } => "initial value",
+                };
+                let declared_here = self.get_wire_ref_info(&conn.to.root);
+                let pass_to_write_to = (write_context.to_string(), vec![declared_here]);
+
                 self.type_checker.typecheck_write_to(
                     &from_expr.typ,
                     &conn.to_type,
                     from_expr.span,
-                    || {
-                        let write_context = match conn.write_modifiers {
-                            WriteModifiers::Connection { .. } => "connection",
-                            WriteModifiers::Initial { initial_kw_span: _ } => "initial value",
-                        };
-                        let declared_here = self.get_wire_ref_info(&conn.to.root);
-                        (write_context.to_string(), vec![declared_here])
-                    },
+                    || pass_to_write_to,
                 );
             }
         }
@@ -638,7 +640,7 @@ pub fn apply_types(
     // We just find domain IDs that haven't been
     let mut leftover_domain_alloc =
         UUIDAllocator::new_start_from(working_on.domains.get_next_alloc_id());
-    for d in type_checker.domain_substitutor.iter() {
+    for (_, d) in type_checker.domain_substitutor.iter() {
         if d.get().is_none() {
             assert!(d
                 .set(DomainType::Physical(leftover_domain_alloc.alloc()))

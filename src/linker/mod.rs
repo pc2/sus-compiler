@@ -98,8 +98,10 @@ pub struct LinkInfo {
 
     /// Created in Stage 2: Flattening
     ///
+    /// Removed in Stage 3: Typechecking
+    ///
     /// Is only temporary. It's used during typechecking to allocate the type unification block
-    pub type_variable_alloc: TypingAllocator,
+    pub type_variable_alloc: Option<Box<TypingAllocator>>,
 
     pub template_parameters: TVec<Parameter>,
 

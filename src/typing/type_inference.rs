@@ -1,16 +1,13 @@
 //! Implements the Hindley-Milner algorithm for Type Inference.
 
-use std::cell::{OnceCell, RefCell};
+use std::cell::OnceCell;
 use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::ops::{BitAnd, Deref, DerefMut, Index};
-use std::thread::panicking;
+use std::ops::{BitAnd, Deref, DerefMut};
 
-use crate::block_vector::{BlockVec, BlockVecIter};
 use crate::errors::ErrorInfo;
 use crate::prelude::*;
 
-use crate::alloc::{UUIDAllocator, UUIDMarker, UUIDRange, UUID};
+use crate::alloc::{UUIDMarker, UUID};
 use crate::value::Value;
 
 use super::abstract_type::PeanoType;
@@ -41,6 +38,7 @@ impl UUIDMarker for ConcreteTypeVariableIDMarker {
 }
 pub type ConcreteTypeVariableID = UUID<ConcreteTypeVariableIDMarker>;
 
+#[derive(Debug)]
 pub struct FailedUnification<MyType> {
     pub found: MyType,
     pub expected: MyType,
@@ -49,41 +47,13 @@ pub struct FailedUnification<MyType> {
     pub infos: Vec<ErrorInfo>,
 }
 
-/// Pretty big block size so for most typing needs we only need one
-const BLOCK_SIZE: usize = 512;
-
 /// Implements Hindley-Milner type inference
 ///
 /// It actually already does eager inference where possible (through [Self::unify])
 ///
 /// When eager inference is not possible, [DelayedConstraintsList] should be used
-pub struct TypeSubstitutor<MyType: HindleyMilner<VariableIDMarker>, VariableIDMarker: UUIDMarker> {
-    substitution_map: BlockVec<OnceCell<MyType>, BLOCK_SIZE>,
-    failed_unifications: RefCell<Vec<FailedUnification<MyType>>>,
-    _ph: PhantomData<VariableIDMarker>,
-}
-
-impl<'v, MyType: HindleyMilner<VariableIDMarker> + 'v, VariableIDMarker: UUIDMarker> IntoIterator
-    for &'v TypeSubstitutor<MyType, VariableIDMarker>
-{
-    type Item = &'v OnceCell<MyType>;
-
-    type IntoIter = BlockVecIter<'v, OnceCell<MyType>, BLOCK_SIZE>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.substitution_map.iter()
-    }
-}
-
-impl<MyType: HindleyMilner<VariableIDMarker>, VariableIDMarker: UUIDMarker>
-    Index<UUID<VariableIDMarker>> for TypeSubstitutor<MyType, VariableIDMarker>
-{
-    type Output = OnceCell<MyType>;
-
-    fn index(&self, index: UUID<VariableIDMarker>) -> &Self::Output {
-        &self.substitution_map[index.get_hidden_value()]
-    }
-}
+pub type TypeSubstitutor<MyType> =
+    FlatAlloc<OnceCell<MyType>, <MyType as HindleyMilner>::VariableIDMarker>;
 
 /// To be passed to [TypeSubstitutor::unify_report_error]
 pub trait UnifyErrorReport {
@@ -118,51 +88,18 @@ impl BitAnd for UnifyResult {
     }
 }
 
-impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: UUIDMarker> Default
-    for TypeSubstitutor<MyType, VariableIDMarker>
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: UUIDMarker>
-    TypeSubstitutor<MyType, VariableIDMarker>
-{
-    pub fn new() -> Self {
-        Self {
-            substitution_map: BlockVec::new(),
-            failed_unifications: RefCell::new(Vec::new()),
-            _ph: PhantomData,
-        }
-    }
-
-    pub fn init(variable_alloc: &UUIDAllocator<VariableIDMarker>) -> Self {
-        Self {
-            substitution_map: variable_alloc
-                .into_iter()
-                .map(|_| OnceCell::new())
-                .collect(),
-            failed_unifications: RefCell::new(Vec::new()),
-            _ph: PhantomData,
-        }
-    }
-
-    pub fn alloc(&self) -> UUID<VariableIDMarker> {
-        UUID::from_hidden_value(self.substitution_map.alloc(OnceCell::new()))
-    }
-
-    pub fn id_range(&self) -> UUIDRange<VariableIDMarker> {
-        UUIDRange::new_with_length(self.substitution_map.len())
+impl<MyType: HindleyMilner> TypeSubstitutor<MyType> {
+    pub fn alloc_var(&mut self) -> UUID<MyType::VariableIDMarker> {
+        self.alloc(OnceCell::new())
     }
 
     fn does_typ_reference_var_recurse_with_substitution(
         &self,
         does_this: &MyType,
-        reference_this: UUID<VariableIDMarker>,
+        reference_this: UUID<MyType::VariableIDMarker>,
     ) -> bool {
         let mut does_it_reference_it = false;
-        does_this.for_each_unknown(&mut |v: UUID<VariableIDMarker>| {
+        does_this.for_each_unknown(&mut |v: UUID<MyType::VariableIDMarker>| {
             if v == reference_this {
                 does_it_reference_it = true;
             } else if let Some(found_substitution) = self[v].get() {
@@ -177,7 +114,7 @@ impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: 
 
     fn try_fill_empty_var<'s>(
         &'s self,
-        empty_var: UUID<VariableIDMarker>,
+        empty_var: UUID<MyType::VariableIDMarker>,
         mut replace_with: &'s MyType,
     ) -> UnifyResult {
         assert!(self[empty_var].get().is_none());
@@ -247,60 +184,23 @@ impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: 
         //self.check_no_unknown_loop();
         result
     }
-    pub fn unify_must_succeed(&self, a: &MyType, b: &MyType) {
-        assert!(
-            self.unify(a, b) == UnifyResult::Success,
-            "This unification cannot fail. Usually because we're unifying with a Written Type"
-        );
-    }
-    pub fn unify_report_error<Report: UnifyErrorReport>(
-        &self,
-        found: &MyType,
-        expected: &MyType,
-        span: Span,
-        reporter: Report,
-    ) {
-        let unify_result = self.unify(found, expected);
-        if unify_result != UnifyResult::Success {
-            let (mut context, infos) = reporter.report();
-            if unify_result == UnifyResult::NoInfiniteTypes {
-                context.push_str(": Creating Infinite Types is Forbidden!");
-            }
-            self.failed_unifications
-                .borrow_mut()
-                .push(FailedUnification {
-                    found: found.clone(),
-                    expected: expected.clone(),
-                    span,
-                    context,
-                    infos,
-                });
-        }
-    }
-    pub fn extract_errors(&mut self) -> Vec<FailedUnification<MyType>> {
-        self.failed_unifications.replace(Vec::new())
-    }
-
-    pub fn iter(&self) -> BlockVecIter<'_, OnceCell<MyType>, BLOCK_SIZE> {
-        self.into_iter()
-    }
 
     /// Used for sanity-checking. The graph of Unknown nodes must be non-cyclical, such that we don't create infinite types
     ///
     /// Implements https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
-    pub fn check_no_unknown_loop(&self) {
+    pub fn check_no_unknown_loop(&self)
+    where
+        MyType: Debug,
+    {
         #[derive(Clone, Copy)]
         struct NodeInfo {
             is_not_part_of_loop: bool,
             is_part_of_stack: bool,
         }
-        fn is_node_infinite_loop<
-            MyType: HindleyMilner<VariableIDMarker> + Clone + Debug,
-            VariableIDMarker: UUIDMarker,
-        >(
-            slf: &TypeSubstitutor<MyType, VariableIDMarker>,
-            node_in_path: &mut FlatAlloc<NodeInfo, VariableIDMarker>,
-            unknown_id: UUID<VariableIDMarker>,
+        fn is_node_infinite_loop<MyType: HindleyMilner + Clone + Debug>(
+            slf: &TypeSubstitutor<MyType>,
+            node_in_path: &mut FlatAlloc<NodeInfo, MyType::VariableIDMarker>,
+            unknown_id: UUID<MyType::VariableIDMarker>,
         ) -> bool {
             // This is the core check we're doing. If this triggers then we have an infinite loop
             if node_in_path[unknown_id].is_not_part_of_loop {
@@ -331,8 +231,8 @@ impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: 
             is_infinite_loop
         }
 
-        let mut node_in_path: FlatAlloc<NodeInfo, VariableIDMarker> = FlatAlloc::with_size(
-            self.substitution_map.len(),
+        let mut node_in_path: FlatAlloc<NodeInfo, MyType::VariableIDMarker> = FlatAlloc::with_size(
+            self.len(),
             NodeInfo {
                 is_not_part_of_loop: false,
                 is_part_of_stack: false,
@@ -348,19 +248,6 @@ impl<MyType: HindleyMilner<VariableIDMarker> + Clone + Debug, VariableIDMarker: 
                     self[id]
                 )
             }
-        }
-    }
-}
-
-impl<MyType: HindleyMilner<VariableIDMarker>, VariableIDMarker: UUIDMarker> Drop
-    for TypeSubstitutor<MyType, VariableIDMarker>
-{
-    fn drop(&mut self) {
-        if !panicking() {
-            assert!(
-                self.failed_unifications.borrow().is_empty(),
-                "Errors were not extracted before dropping!"
-            );
         }
     }
 }
@@ -388,12 +275,14 @@ pub enum HindleyMilnerInfo<TypeFuncIdent, VariableIDMarker: UUIDMarker> {
 ///
 /// Though this implementation does eager unification as much as possible, while unifications that cannot
 /// be performed eagerly are handled by [DelayedConstraintsList].
-pub trait HindleyMilner<VariableIDMarker: UUIDMarker>: Sized {
+pub trait HindleyMilner: Sized + Clone {
     type TypeFuncIdent<'slf>: Eq
     where
         Self: 'slf;
 
-    fn get_hm_info(&self) -> HindleyMilnerInfo<Self::TypeFuncIdent<'_>, VariableIDMarker>;
+    type VariableIDMarker: UUIDMarker;
+
+    fn get_hm_info(&self) -> HindleyMilnerInfo<Self::TypeFuncIdent<'_>, Self::VariableIDMarker>;
 
     /// Iterate through all arguments and unify them
     ///
@@ -409,14 +298,14 @@ pub trait HindleyMilner<VariableIDMarker: UUIDMarker>: Sized {
     /// Has to be implemented separately per type
     ///
     /// Returns true when no Unknowns remain
-    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self, VariableIDMarker>) -> bool;
+    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self>) -> bool;
 
     /// Recursively called for each Unknown that is part of this. Used by [TypeSubstitutor::check_no_unknown_loop]
-    fn for_each_unknown(&self, f: &mut impl FnMut(UUID<VariableIDMarker>));
+    fn for_each_unknown(&self, f: &mut impl FnMut(UUID<Self::VariableIDMarker>));
 
-    fn contains_unknown(&self, var: UUID<VariableIDMarker>) -> bool {
+    fn contains_unknown(&self, var: UUID<Self::VariableIDMarker>) -> bool {
         let mut contains_var = false;
-        self.for_each_unknown(&mut |v: UUID<VariableIDMarker>| {
+        self.for_each_unknown(&mut |v: UUID<Self::VariableIDMarker>| {
             if v == var {
                 contains_var = true;
             }
@@ -432,8 +321,9 @@ pub enum AbstractTypeHMInfo {
     Named(TypeUUID),
 }
 
-impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
+impl HindleyMilner for AbstractInnerType {
     type TypeFuncIdent<'slf> = AbstractTypeHMInfo;
+    type VariableIDMarker = InnerTypeVariableIDMarker;
 
     fn get_hm_info(&self) -> HindleyMilnerInfo<AbstractTypeHMInfo, InnerTypeVariableIDMarker> {
         match self {
@@ -465,15 +355,11 @@ impl HindleyMilner<InnerTypeVariableIDMarker> for AbstractInnerType {
         }
     }
 
-    fn fully_substitute(
-        &mut self,
-        substitutor: &TypeSubstitutor<Self, InnerTypeVariableIDMarker>,
-    ) -> bool {
+    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self>) -> bool {
         match self {
             AbstractInnerType::Named(_) | AbstractInnerType::Template(_) => true, // Template Name & Name is included in get_hm_info
             AbstractInnerType::Unknown(var) => {
-                let Some(replacement) = substitutor.substitution_map[var.get_hidden_value()].get()
-                else {
+                let Some(replacement) = substitutor[*var].get() else {
                     return false;
                 };
                 assert!(!std::ptr::eq(self, replacement));
@@ -497,8 +383,9 @@ pub enum PeanoTypeHMInfo {
     Zero,
 }
 
-impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
+impl HindleyMilner for PeanoType {
     type TypeFuncIdent<'slf> = PeanoTypeHMInfo;
+    type VariableIDMarker = PeanoVariableIDMarker;
 
     fn get_hm_info(&self) -> HindleyMilnerInfo<PeanoTypeHMInfo, PeanoVariableIDMarker> {
         match self {
@@ -523,16 +410,12 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
         }
     }
 
-    fn fully_substitute(
-        &mut self,
-        substitutor: &TypeSubstitutor<Self, PeanoVariableIDMarker>,
-    ) -> bool {
+    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self>) -> bool {
         match self {
             PeanoType::Succ(typ) => typ.fully_substitute(substitutor),
             PeanoType::Zero => true,
             PeanoType::Unknown(var) => {
-                let Some(replacement) = substitutor.substitution_map[var.get_hidden_value()].get()
-                else {
+                let Some(replacement) = substitutor[*var].get() else {
                     return false;
                 };
                 assert!(!std::ptr::eq(self, replacement));
@@ -551,8 +434,9 @@ impl HindleyMilner<PeanoVariableIDMarker> for PeanoType {
     }
 }
 
-impl HindleyMilner<DomainVariableIDMarker> for DomainType {
+impl HindleyMilner for DomainType {
     type TypeFuncIdent<'slf> = DomainID;
+    type VariableIDMarker = DomainVariableIDMarker;
 
     fn get_hm_info(&self) -> HindleyMilnerInfo<DomainID, DomainVariableIDMarker> {
         match self {
@@ -572,14 +456,11 @@ impl HindleyMilner<DomainVariableIDMarker> for DomainType {
     }
 
     /// For domains, always returns true. Or rather it should, since any leftover unconnected domains should be assigned an ID of their own by the type checker
-    fn fully_substitute(
-        &mut self,
-        substitutor: &TypeSubstitutor<Self, DomainVariableIDMarker>,
-    ) -> bool {
+    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self>) -> bool {
         match self {
             DomainType::Generative | DomainType::Physical(_) => true, // Do nothing, These are done already
             DomainType::Unknown(var) => {
-                *self = *substitutor.substitution_map[var.get_hidden_value()].get().expect("It's impossible for domain variables to remain, as any unset domain variable would have been replaced with a new physical domain");
+                *self = *substitutor[*var].get().expect("It's impossible for domain variables to remain, as any unset domain variable would have been replaced with a new physical domain");
                 self.fully_substitute(substitutor)
             }
         }
@@ -601,8 +482,9 @@ pub enum ConcreteTypeHMInfo<'slf> {
     Array,
 }
 
-impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
+impl HindleyMilner for ConcreteType {
     type TypeFuncIdent<'slf> = ConcreteTypeHMInfo<'slf>;
+    type VariableIDMarker = ConcreteTypeVariableIDMarker;
 
     fn get_hm_info(&self) -> HindleyMilnerInfo<ConcreteTypeHMInfo, ConcreteTypeVariableIDMarker> {
         match self {
@@ -638,10 +520,7 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
         }
     }
 
-    fn fully_substitute(
-        &mut self,
-        substitutor: &TypeSubstitutor<Self, ConcreteTypeVariableIDMarker>,
-    ) -> bool {
+    fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self>) -> bool {
         match self {
             ConcreteType::Named(_) | ConcreteType::Value(_) => true, // Don't need to do anything, this is already final
             ConcreteType::Array(arr_typ) => {
@@ -649,8 +528,7 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
                 arr_typ.fully_substitute(substitutor) && arr_sz.fully_substitute(substitutor)
             }
             ConcreteType::Unknown(var) => {
-                let Some(replacement) = substitutor.substitution_map[var.get_hidden_value()].get()
-                else {
+                let Some(replacement) = substitutor[*var].get() else {
                     return false;
                 };
                 *self = replacement.clone();
@@ -668,6 +546,87 @@ impl HindleyMilner<ConcreteTypeVariableIDMarker> for ConcreteType {
                 arr_typ.for_each_unknown(f);
                 arr_sz.for_each_unknown(f);
             }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct SimpleSingleSubstitutorUnifier<MyType: HindleyMilner> {
+    substitutor: TypeSubstitutor<MyType>,
+    failed_unifications: Vec<FailedUnification<MyType>>,
+}
+
+impl<MyType: HindleyMilner> Deref for SimpleSingleSubstitutorUnifier<MyType> {
+    type Target = TypeSubstitutor<MyType>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.substitutor
+    }
+}
+
+impl<MyType: HindleyMilner> DerefMut for SimpleSingleSubstitutorUnifier<MyType> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.substitutor
+    }
+}
+
+impl<MyType: HindleyMilner> SimpleSingleSubstitutorUnifier<MyType> {
+    pub fn new() -> Self {
+        Self {
+            substitutor: TypeSubstitutor::new(),
+            failed_unifications: Vec::new(),
+        }
+    }
+
+    pub fn unify_must_succeed(&self, a: &MyType, b: &MyType) {
+        assert!(
+            self.substitutor.unify(a, b) == UnifyResult::Success,
+            "This unification cannot fail. Usually because we're unifying with a Written Type"
+        );
+    }
+    pub fn unify_report_error<Report: UnifyErrorReport>(
+        &mut self,
+        found: &MyType,
+        expected: &MyType,
+        span: Span,
+        reporter: Report,
+    ) {
+        let unify_result = self.substitutor.unify(found, expected);
+        if unify_result != UnifyResult::Success {
+            let (mut context, infos) = reporter.report();
+            if unify_result == UnifyResult::NoInfiniteTypes {
+                context.push_str(": Creating Infinite Types is Forbidden!");
+            }
+            self.failed_unifications.push(FailedUnification {
+                found: found.clone(),
+                expected: expected.clone(),
+                span,
+                context,
+                infos,
+            });
+        }
+    }
+    pub fn extract_errors(&mut self) -> Vec<FailedUnification<MyType>> {
+        std::mem::take(&mut self.failed_unifications)
+    }
+    pub fn alloc_var(&mut self) -> UUID<MyType::VariableIDMarker> {
+        self.substitutor.alloc_var()
+    }
+}
+
+impl<MyType: HindleyMilner> Default for SimpleSingleSubstitutorUnifier<MyType> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<MyType: HindleyMilner> Drop for SimpleSingleSubstitutorUnifier<MyType> {
+    fn drop(&mut self) {
+        if !std::thread::panicking() {
+            assert!(
+                self.failed_unifications.is_empty(),
+                "Errors were not extracted before dropping!"
+            );
         }
     }
 }
