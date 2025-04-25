@@ -111,7 +111,7 @@ impl<'g> CodeGenerationContext<'g> {
                     write!(result, "[{idx_wire_name}]").unwrap();
                 }
                 RealWirePathElem::ArraySlice {
-                    span,
+                    span: _,
                     idx_a_wire,
                     idx_b_wire,
                 } => {
@@ -426,6 +426,21 @@ impl<'g> CodeGenerationContext<'g> {
                         self.write_constant(&to, initial_value);
                     }
                 }
+                RealWireDataSource::ArrayLiteral { elements } => {
+                    write!(self.program_text, " = {{").unwrap();
+
+                    let first = false;
+                    for element in elements {
+                        if !first {
+                            write!(self.program_text, ", ").unwrap();
+                        }
+                        let wire = &self.instance.wires[*element];
+                        let wire_name = self.wire_name(wire, w.absolute_latency);
+                        write!(self.program_text, "{}", wire_name).unwrap()
+                    }
+
+                    writeln!(self.program_text, "}}").unwrap();
+                }
             }
             self.add_latency_registers(wire_id, w).unwrap();
         }
@@ -555,6 +570,7 @@ impl<'g> CodeGenerationContext<'g> {
                     right: _,
                 } => {}
                 RealWireDataSource::Constant { value: _ } => {}
+                RealWireDataSource::ArrayLiteral { elements: _ } => {}
             }
         }
     }

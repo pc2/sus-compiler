@@ -33,6 +33,11 @@ impl ExpressionSource {
                 func(left);
                 func(right)
             }
+            ExpressionSource::ArrayLiteral { elements } => {
+                for element in elements {
+                    func(*element);
+                }
+            }
             ExpressionSource::Constant(_) => {}
         }
     }
@@ -49,7 +54,7 @@ impl WireReferencePathElement {
                 WireReferencePathElement::ArraySlice {
                     idx_a,
                     idx_b,
-                    bracket_span
+                    bracket_span: _,
                 } => {
                     f(*idx_a);
                     f(*idx_b);

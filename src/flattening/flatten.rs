@@ -801,12 +801,23 @@ impl FlatteningContext<'_, '_> {
     fn flatten_array_bracket(
         &mut self,
         cursor: &mut Cursor,
-    ) -> (WireReferencePathElement, bool /*Is generative */, BracketSpan) {
+    ) -> (
+        WireReferencePathElement,
+        bool, /*Is generative */
+        BracketSpan,
+    ) {
         let bracket_span = BracketSpan::from_outer(cursor.span());
         cursor.go_down(kind!("array_bracket_expression"), |cursor| {
             if cursor.optional_field(field!("index")) {
                 let (expr, is_generative) = self.flatten_expr(cursor);
-                return (WireReferencePathElement::ArrayAccess { idx:expr, bracket_span }, is_generative, bracket_span)
+                (
+                    WireReferencePathElement::ArrayAccess {
+                        idx: expr,
+                        bracket_span,
+                    },
+                    is_generative,
+                    bracket_span,
+                )
             } else {
                 cursor.field(field!("slice"));
                 cursor.go_down(kind!("slice"), |cursor| {
@@ -814,14 +825,19 @@ impl FlatteningContext<'_, '_> {
                     let (expr_a, a_generative) = self.flatten_expr(cursor);
                     cursor.field(field!("index_b"));
                     let (expr_b, b_generative) = self.flatten_expr(cursor);
-                    
 
-                    return (WireReferencePathElement::ArraySlice { idx_a:expr_a, idx_b:expr_b, bracket_span }, a_generative && b_generative, bracket_span)
-                })   
+                    (
+                        WireReferencePathElement::ArraySlice {
+                            idx_a: expr_a,
+                            idx_b: expr_b,
+                            bracket_span,
+                        },
+                        a_generative && b_generative,
+                        bracket_span,
+                    )
+                })
             }
-            
         })
-       
     }
 
     fn alloc_error(&mut self, span: Span) -> FlatID {
@@ -981,6 +997,15 @@ impl FlatteningContext<'_, '_> {
                 ExpressionSource::Constant(Value::Integer(BigInt::from_str(text).unwrap())),
                 true,
             )
+        } else if kind == kind!("array_literal") {
+            let mut all_gen = true;
+            let elements = cursor.collect_list(kind!("array_literal"), |cursor| {
+                let (expr, is_comptime) = self.flatten_expr(cursor);
+                all_gen &= is_comptime;
+                expr
+            });
+
+            (ExpressionSource::ArrayLiteral { elements }, all_gen)
         } else if kind == kind!("unary_op") {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("operator"));
@@ -1062,11 +1087,11 @@ impl FlatteningContext<'_, '_> {
                             .typ
                             .domain
                             .is_generative()
-                    },
+                    }
                     WireReferencePathElement::ArraySlice {
                         idx_a,
                         idx_b,
-                        bracket_span: _
+                        bracket_span: _,
                     } => {
                         is_comptime &= self.instructions[*idx_a]
                             .unwrap_expression()
@@ -1172,7 +1197,7 @@ impl FlatteningContext<'_, '_> {
 
                 cursor.field(field!("arr_idx"));
                 let arr_idx_span = cursor.span();
-                let (access, _is_generative, bracket_span) = self.flatten_array_bracket(cursor);
+                let (access, _is_generative, _) = self.flatten_array_bracket(cursor);
 
                 // only unpack the subexpr after flattening the idx, so we catch all errors
                 match &mut flattened_arr_expr {
@@ -1188,8 +1213,7 @@ impl FlatteningContext<'_, '_> {
                     }
                     PartialWireReference::Error => {}
                     PartialWireReference::WireReference(wr) => {
-                        wr.path
-                            .push(access);
+                        wr.path.push(access);
                     }
                 }
 

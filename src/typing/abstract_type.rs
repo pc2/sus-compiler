@@ -599,24 +599,52 @@ impl TypeUnifier {
 
     pub fn typecheck_array_slice(
         &self,
-        arr_type: &AbstractType,
-        idx_a_type: &AbstractType,
-        idx_b_type: &AbstractType,
+        arr_type: &AbstractRankedType,
+        idx_a_type: &AbstractRankedType,
+        idx_b_type: &AbstractRankedType,
         arr_span: Span,
         idx_a_span: Span,
         idx_b_span: Span,
-        output_typ: &AbstractType,
+        output_typ: &AbstractRankedType,
     ) {
-        panic!("aaaa");
-        self.type_substitutor
-            .unify_report_error(idx_a_type, &INT_TYPE, idx_a_span, "array start index");
-        self.type_substitutor
-            .unify_report_error(idx_b_type, &INT_TYPE, idx_b_span, "array end index");
+        self.abstract_type_substitutor.unify_report_error(
+            &idx_a_type.inner,
+            &INT_TYPE.inner,
+            idx_a_span,
+            &"slice start index",
+        );
+        self.peano_substitutor.unify_report_error(
+            &idx_a_type.rank,
+            &INT_TYPE.rank,
+            idx_a_span,
+            &"slice start index rank",
+        );
 
-        self.type_substitutor
-            .unify_report_error(output_typ, arr_type, arr_span, "array slice");
+        self.abstract_type_substitutor.unify_report_error(
+            &idx_b_type.inner,
+            &INT_TYPE.inner,
+            idx_b_span,
+            &"slice end index",
+        );
+        self.peano_substitutor.unify_report_error(
+            &idx_b_type.rank,
+            &INT_TYPE.rank,
+            idx_b_span,
+            &"slice end index rank",
+        );
 
-        //self.unify_with_array_of(arr_type, output_typ.clone(), arr_span);
+        self.abstract_type_substitutor.unify_report_error(
+            &output_typ.inner,
+            &arr_type.inner,
+            arr_span,
+            &"array slice",
+        );
+        self.peano_substitutor.unify_report_error(
+            &output_typ.rank,
+            &arr_type.rank,
+            arr_span,
+            &"array slice rank",
+        );
     }
 
     pub fn typecheck_write_to_abstract<Context: UnifyErrorReport>(

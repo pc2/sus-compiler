@@ -1,5 +1,7 @@
 use std::ops::Deref;
 
+use num::BigInt;
+
 use crate::alloc::{zip_eq, zip_eq3};
 use crate::errors::ErrorInfoObject;
 use crate::flattening::{DeclarationKind, ExpressionSource, WireReferenceRoot, WrittenType};
@@ -57,14 +59,14 @@ impl InstantiationContext<'_, '_> {
                         &ConcreteType::Array(arr_box),
                     );
                     current_type_in_progress = typ_after_applying_array;
-                },
+                }
                 RealWirePathElem::ArraySlice {
                     span: _,
                     idx_a_wire: _,
-                    idx_b_wire: _ 
+                    idx_b_wire: _,
                 } => {
                     /*let arr_size = ConcreteType::Unknown(self.type_substitutor.alloc());
-                    
+
                     self.type_substitutor.unify_must_succeed(
                         &current_type_in_progress,
                         &typ_after_applying_array,
@@ -261,6 +263,30 @@ impl InstantiationContext<'_, '_> {
                         value.is_of_type(&this_wire.typ),
                         "Assigned type to a constant should already be of the type"
                     );
+                }
+                RealWireDataSource::ArrayLiteral { elements } => {
+                    let size = ConcreteType::Value(Value::Integer(BigInt::from(elements.len())));
+
+                    let array_element_type = ConcreteType::Unknown(self.type_substitutor.alloc());
+
+                    let new_array_type =
+                        ConcreteType::Array(Box::new((array_element_type.clone(), size)));
+
+                    self.type_substitutor.unify_report_error(
+                        &new_array_type,
+                        &self.wires[this_wire_id].typ,
+                        span,
+                        &"array literal",
+                    );
+
+                    for element in elements {
+                        self.type_substitutor.unify_report_error(
+                            &self.wires[*element].typ,
+                            &array_element_type,
+                            span,
+                            &"array element",
+                        );
+                    }
                 }
             };
         }

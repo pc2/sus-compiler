@@ -231,7 +231,8 @@ module.exports = grammar({
             $.unary_op,
             $.binary_op,
             $.func_call,
-            $.field_access
+            $.field_access,
+            $.array_literal
         ),
 
         unary_op: $ => prec(PREC.unary, seq(
@@ -277,6 +278,7 @@ module.exports = grammar({
             sepSeq($._expression, $._comma),
             ')'
         ),
+        
 
         parenthesis_expression: $ => seq(
             '(',
@@ -303,6 +305,12 @@ module.exports = grammar({
             field('index_a', $._expression),
             ':',
             field('index_b', $._expression)
+        ),
+
+        array_literal: $ => seq(
+            '[',
+            sepSeq($._expression, $._comma),
+            ']'
         ),
 
         // Utilities

@@ -127,6 +127,11 @@ impl RealWireDataSource {
                 RealWirePathElem::for_each_wire_in_path(path, |w| f(w, 0));
             }
             RealWireDataSource::Constant { value: _ } => {}
+            RealWireDataSource::ArrayLiteral { elements } => {
+                for elem in elements {
+                    f(*elem, 0);
+                }
+            }
         }
     }
 }

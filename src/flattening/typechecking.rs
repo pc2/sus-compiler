@@ -189,8 +189,8 @@ impl TypeCheckingContext<'_, '_> {
         let mut current_type_in_progress = root_type.typ;
         for p in &wire_ref.path {
             match p {
-                &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
-                    let idx_expr = self.working_on.instructions[idx].unwrap_expression();
+                WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
+                    let idx_expr = self.working_on.instructions[*idx].unwrap_expression();
 
                     let new_resulting_variable = AbstractRankedType {
                         inner: AbstractInnerType::Unknown(self.type_checker.alloc_typ_variable()),
@@ -212,18 +212,19 @@ impl TypeCheckingContext<'_, '_> {
                         "array access index",
                     );
                     current_type_in_progress = new_resulting_variable;
-                },
-                &WireReferencePathElement::ArraySlice {
+                }
+                WireReferencePathElement::ArraySlice {
                     idx_a,
                     idx_b,
-                    bracket_span 
+                    bracket_span,
                 } => {
-                    panic!("aaab");
-                    let idx_expr_a = self.working_on.instructions[idx_a].unwrap_expression();
-                    let idx_expr_b = self.working_on.instructions[idx_b].unwrap_expression();
+                    let idx_expr_a = self.working_on.instructions[*idx_a].unwrap_expression();
+                    let idx_expr_b = self.working_on.instructions[*idx_b].unwrap_expression();
 
-                    let new_resulting_variable =
-                        AbstractType::Unknown(self.type_checker.alloc_typ_variable());
+                    let new_resulting_variable = AbstractRankedType {
+                        inner: AbstractInnerType::Unknown(self.type_checker.alloc_typ_variable()),
+                        rank: PeanoType::Unknown(self.type_checker.alloc_peano_variable()),
+                    };
                     let arr_span = bracket_span.outer_span();
                     self.type_checker.typecheck_array_slice(
                         &current_type_in_progress,
@@ -540,6 +541,39 @@ impl TypeCheckingContext<'_, '_> {
                             right_expr.span,
                             &expr.typ,
                         )
+                    }
+                    ExpressionSource::ArrayLiteral { elements } => {
+                        if !elements.is_empty() {
+                            let first_expression =
+                                self.working_on.instructions[elements[0]].unwrap_expression();
+                            let first_type = &first_expression.typ;
+
+                            for element in elements {
+                                let element_expr =
+                                    self.working_on.instructions[*element].unwrap_expression();
+
+                                self.type_checker
+                                    .abstract_type_substitutor
+                                    .unify_report_error(
+                                        &element_expr.typ.typ.inner,
+                                        &first_type.typ.inner,
+                                        expr.span,
+                                        &"array literal",
+                                    );
+
+                                self.type_checker.peano_substitutor.unify_report_error(
+                                    &element_expr.typ.typ.rank,
+                                    &first_type.typ.rank,
+                                    expr.span,
+                                    &"array literal rank",
+                                );
+                            }
+                            self.type_checker.unify_with_array_of(
+                                &expr.typ.typ,
+                                first_type.typ.clone(),
+                                expr.span,
+                            );
+                        }
                     }
                     ExpressionSource::Constant(value) => {
                         self.type_checker
