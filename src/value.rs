@@ -5,7 +5,7 @@ use ibig::IBig;
 use crate::flattening::{BinaryOperator, UnaryOperator};
 
 use crate::typing::concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE};
-use crate::typing::type_inference::SimpleSingleSubstitutorUnifier;
+use crate::typing::type_inference::{Substitutor, TypeSubstitutor};
 
 /// Top type for any kind of compiletime value while executing.
 ///
@@ -26,7 +26,7 @@ impl ConcreteType {
     /// TODO integrate into Hindley-Milner more closely
     fn get_smallest_common_supertype(
         list: &[Self],
-        type_substitutor: &mut SimpleSingleSubstitutorUnifier<ConcreteType>,
+        type_substitutor: &mut TypeSubstitutor<ConcreteType>,
     ) -> Option<Self> {
         let mut iter = list.iter();
 
@@ -46,10 +46,7 @@ impl Value {
     /// but `Value::Array([])` becomes `ConcreteType::Array((ConcreteType::Unknown, 0))`
     ///
     /// Panics when arrays contain mutually incompatible types
-    pub fn get_type(
-        &self,
-        type_substitutor: &mut SimpleSingleSubstitutorUnifier<ConcreteType>,
-    ) -> ConcreteType {
+    pub fn get_type(&self, type_substitutor: &mut TypeSubstitutor<ConcreteType>) -> ConcreteType {
         match self {
             Value::Bool(_) => BOOL_CONCRETE_TYPE,
             Value::Integer(_) => INT_CONCRETE_TYPE,
@@ -61,14 +58,14 @@ impl Value {
 
                 let shared_supertype =
                     ConcreteType::get_smallest_common_supertype(&typs_arr, type_substitutor)
-                        .unwrap_or_else(|| ConcreteType::Unknown(type_substitutor.alloc_var()));
+                        .unwrap_or_else(|| type_substitutor.alloc_unknown());
 
                 ConcreteType::Array(Box::new((
                     shared_supertype,
                     ConcreteType::Value(Value::Integer(arr.len().into())),
                 )))
             }
-            Value::Unset => ConcreteType::Unknown(type_substitutor.alloc_var()),
+            Value::Unset => type_substitutor.alloc_unknown(),
             Value::Error => unreachable!("{self:?}"),
         }
     }

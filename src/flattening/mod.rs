@@ -8,8 +8,7 @@ mod walk;
 
 use crate::alloc::{UUIDAllocator, UUIDRange};
 use crate::prelude::*;
-use crate::typing::abstract_type::{AbstractInnerType, DomainType, PeanoType};
-use crate::typing::type_inference::SimpleSingleSubstitutorUnifier;
+use crate::typing::abstract_type::{DomainType, PeanoType};
 
 use std::cell::OnceCell;
 use std::ops::Deref;
@@ -523,10 +522,14 @@ pub enum ExpressionSource {
     WireRef(WireReference), // Used to add a span to the reference of a wire.
     UnaryOp {
         op: UnaryOperator,
+        /// Operators automatically parallelize across arrays
+        rank: PeanoType,
         right: FlatID,
     },
     BinaryOp {
         op: BinaryOperator,
+        /// Operators automatically parallelize across arrays
+        rank: PeanoType,
         left: FlatID,
         right: FlatID,
     },
@@ -805,15 +808,4 @@ impl Instruction {
         };
         fc
     }
-}
-
-/// Small wrapper struct for allocating the Hindley-Milner variables
-/// required for [crate::typing::abstract_type::AbstractType::Unknown] and [DomainType::DomainVariable]
-///
-/// See [crate::typing::type_inference::HindleyMilner]
-#[derive(Debug)]
-pub struct TypingAllocator {
-    pub peano_variable_alloc: SimpleSingleSubstitutorUnifier<PeanoType>,
-    pub inner_type_variable_alloc: SimpleSingleSubstitutorUnifier<AbstractInnerType>,
-    pub domain_variable_alloc: SimpleSingleSubstitutorUnifier<DomainType>,
 }

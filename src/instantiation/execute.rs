@@ -10,6 +10,7 @@ use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::IsExtern;
 use crate::prelude::*;
 use crate::typing::template::GlobalReference;
+use crate::typing::type_inference::Substitutor;
 
 use ibig::{IBig, UBig};
 
@@ -615,7 +616,7 @@ impl InstantiationContext<'_, '_> {
                 source,
                 original_instruction: submod_instance.original_instruction,
                 domain: domain.unwrap_physical(),
-                typ: ConcreteType::Unknown(self.type_substitutor.alloc_var()),
+                typ: self.type_substitutor.alloc_unknown(),
                 name: self
                     .unique_name_producer
                     .get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
@@ -693,14 +694,28 @@ impl InstantiationContext<'_, '_> {
                     path,
                 }
             }
-            &ExpressionSource::UnaryOp { op, right } => {
-                let right = self.get_wire_or_constant_as_wire(right, domain)?;
-                RealWireDataSource::UnaryOp { op, right }
+            ExpressionSource::UnaryOp { op, rank, right } => {
+                let right = self.get_wire_or_constant_as_wire(*right, domain)?;
+                RealWireDataSource::UnaryOp {
+                    op: *op,
+                    rank: rank.count_unwrap(),
+                    right,
+                }
             }
-            &ExpressionSource::BinaryOp { op, left, right } => {
-                let left = self.get_wire_or_constant_as_wire(left, domain)?;
-                let right = self.get_wire_or_constant_as_wire(right, domain)?;
-                RealWireDataSource::BinaryOp { op, left, right }
+            ExpressionSource::BinaryOp {
+                op,
+                rank,
+                left,
+                right,
+            } => {
+                let left = self.get_wire_or_constant_as_wire(*left, domain)?;
+                let right = self.get_wire_or_constant_as_wire(*right, domain)?;
+                RealWireDataSource::BinaryOp {
+                    op: *op,
+                    rank: rank.count_unwrap(),
+                    left,
+                    right,
+                }
             }
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut array_wires = Vec::with_capacity(arr.len());
@@ -716,7 +731,7 @@ impl InstantiationContext<'_, '_> {
         };
         Ok(self.wires.alloc(RealWire {
             name: self.unique_name_producer.get_unique_name(""),
-            typ: ConcreteType::Unknown(self.type_substitutor.alloc_var()),
+            typ: self.type_substitutor.alloc_unknown(),
             original_instruction,
             domain,
             source,
@@ -791,7 +806,7 @@ impl InstantiationContext<'_, '_> {
                                 self.generation_state.get_generation_value(*v)?.clone(),
                             ),
                         },
-                        None => ConcreteType::Unknown(self.type_substitutor.alloc_var()),
+                        None => self.type_substitutor.alloc_unknown(),
                     })
                 })?;
         Ok(ConcreteGlobalReference {
@@ -828,13 +843,18 @@ impl InstantiationContext<'_, '_> {
             ExpressionSource::WireRef(wire_ref) => {
                 self.compute_compile_time_wireref(wire_ref)?.clone()
             }
-            &ExpressionSource::UnaryOp { op, right } => {
-                let right_val = self.generation_state.get_generation_value(right)?;
-                compute_unary_op(op, right_val)
+            ExpressionSource::UnaryOp { op, rank, right } => {
+                let right_val = self.generation_state.get_generation_value(*right)?;
+                compute_unary_op(*op, right_val)
             }
-            &ExpressionSource::BinaryOp { op, left, right } => {
-                let left_val = self.generation_state.get_generation_value(left)?;
-                let right_val = self.generation_state.get_generation_value(right)?;
+            ExpressionSource::BinaryOp {
+                op,
+                rank,
+                left,
+                right,
+            } => {
+                let left_val = self.generation_state.get_generation_value(*left)?;
+                let right_val = self.generation_state.get_generation_value(*right)?;
 
                 match op {
                     BinaryOperator::Divide | BinaryOperator::Modulo => {
@@ -851,7 +871,7 @@ impl InstantiationContext<'_, '_> {
                     _ => {}
                 }
 
-                compute_binary_op(left_val, op, right_val)
+                compute_binary_op(left_val, *op, right_val)
             }
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut result = Vec::with_capacity(arr.len());

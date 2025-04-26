@@ -2,8 +2,10 @@ use crate::{
     flattening::{Instruction, NamedConstant},
     instantiation::instantiation_cache::Instantiator,
     prelude::*,
-    typing::template::{
-        GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind,
+    typing::{
+        abstract_type::DomainType,
+        template::{GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind},
+        type_inference::{AbstractTypeSubstitutor, TypeSubstitutor},
     },
 };
 
@@ -22,7 +24,7 @@ use crate::{alloc::ArenaAllocator, file_position::FileText, flattening::Module};
 
 use crate::errors::{CompileError, ErrorInfo, ErrorLevel, ErrorStore};
 
-use crate::flattening::{StructType, TypingAllocator};
+use crate::flattening::StructType;
 
 use self::checkpoint::CheckPoint;
 
@@ -101,7 +103,7 @@ pub struct LinkInfo {
     /// Removed in Stage 3: Typechecking
     ///
     /// Is only temporary. It's used during typechecking to allocate the type unification block
-    pub type_variable_alloc: Option<Box<TypingAllocator>>,
+    pub type_variable_alloc: Option<Box<(AbstractTypeSubstitutor, TypeSubstitutor<DomainType>)>>,
 
     pub template_parameters: TVec<Parameter>,
 

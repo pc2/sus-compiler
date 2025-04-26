@@ -17,7 +17,7 @@ use crate::typing::{
 
 use super::*;
 
-use crate::typing::type_inference::{HindleyMilner, TypeSubstitutor};
+use crate::typing::type_inference::{Substitutor, TypeSubstitutor};
 
 impl InstantiationContext<'_, '_> {
     fn peano_to_nested_array_of(
@@ -29,7 +29,7 @@ impl InstantiationContext<'_, '_> {
         match p {
             PeanoType::Zero => c,
             PeanoType::Succ(p) => {
-                let this_dim_var = ConcreteType::Unknown(self.type_substitutor.alloc_var());
+                let this_dim_var = self.type_substitutor.alloc_unknown();
                 let arr = ConcreteType::Array(Box::new((c, this_dim_var.clone())));
                 let typ = self.peano_to_nested_array_of(p, arr, dims);
                 dims.push(this_dim_var.clone());
@@ -39,19 +39,19 @@ impl InstantiationContext<'_, '_> {
         }
     }
     fn walk_type_along_path(
-        type_substitutor: &mut SimpleSingleSubstitutorUnifier<ConcreteType>,
+        type_substitutor: &mut TypeUnifier<TypeSubstitutor<ConcreteType>>,
         mut current_type_in_progress: ConcreteType,
         path: &[RealWirePathElem],
     ) -> ConcreteType {
         for p in path {
-            let typ_after_applying_array = ConcreteType::Unknown(type_substitutor.alloc_var());
+            let typ_after_applying_array = type_substitutor.alloc_unknown();
             match p {
                 RealWirePathElem::ArrayAccess {
                     span: _,
                     idx_wire: _,
                 } => {
                     // TODO #28 integer size <-> array bound check
-                    let arr_size = ConcreteType::Unknown(type_substitutor.alloc_var());
+                    let arr_size = type_substitutor.alloc_unknown();
                     let arr_box = Box::new((typ_after_applying_array.clone(), arr_size));
                     type_substitutor.unify_must_succeed(
                         &current_type_in_progress,
@@ -68,7 +68,7 @@ impl InstantiationContext<'_, '_> {
     fn make_array_of(&mut self, concrete_typ: ConcreteType) -> ConcreteType {
         ConcreteType::Array(Box::new((
             concrete_typ,
-            ConcreteType::Unknown(self.type_substitutor.alloc_var()),
+            self.type_substitutor.alloc_unknown(),
         )))
     }
 
@@ -105,7 +105,7 @@ impl InstantiationContext<'_, '_> {
                         );
                     }
                 }
-                &RealWireDataSource::UnaryOp { op, right } => {
+                &RealWireDataSource::UnaryOp { op, rank, right } => {
                     // TODO overloading
                     let (input_typ, output_typ) = match op {
                         UnaryOperator::Not => (BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE),
@@ -131,7 +131,12 @@ impl InstantiationContext<'_, '_> {
                         "unary output",
                     );
                 }
-                &RealWireDataSource::BinaryOp { op, left, right } => {
+                &RealWireDataSource::BinaryOp {
+                    op,
+                    rank,
+                    left,
+                    right,
+                } => {
                     // TODO overloading
                     let ((in_left_inner, in_right_inner), out_inner) = match op {
                         BinaryOperator::And => {
@@ -278,7 +283,7 @@ impl InstantiationContext<'_, '_> {
 
     fn finalize(&mut self) {
         for (_id, w) in &mut self.wires {
-            if !w.typ.fully_substitute(&self.type_substitutor) {
+            if !self.type_substitutor.fully_substitute(&mut w.typ) {
                 let typ_as_str = w.typ.display(&self.linker.types);
 
                 let span = self.md.get_instruction_span(w.original_instruction);
@@ -297,8 +302,8 @@ impl InstantiationContext<'_, '_> {
         } in self.type_substitutor.extract_errors()
         {
             // Not being able to fully substitute is not an issue. We just display partial types
-            let _ = found.fully_substitute(&self.type_substitutor);
-            let _ = expected.fully_substitute(&self.type_substitutor);
+            let _ = self.type_substitutor.fully_substitute(&mut found);
+            let _ = self.type_substitutor.fully_substitute(&mut expected);
 
             let expected_name = expected.display(&self.linker.types).to_string();
             let found_name = found.display(&self.linker.types).to_string();
@@ -388,7 +393,7 @@ fn concretize_written_type_with_possible_template_args(
     type_substitutor: &mut TypeSubstitutor<ConcreteType>,
 ) -> ConcreteType {
     match written_typ {
-        WrittenType::Error(_span) => ConcreteType::Unknown(type_substitutor.alloc_var()),
+        WrittenType::Error(_span) => type_substitutor.alloc_unknown(),
         WrittenType::TemplateVariable(_span, uuid) => template_args[*uuid].clone(),
         WrittenType::Named(global_reference) => {
             let object_template_args: TVec<ConcreteType> =
@@ -411,12 +416,12 @@ fn concretize_written_type_with_possible_template_args(
                                     {
                                         template_args[found_template_arg].clone()
                                     } else {
-                                        ConcreteType::Unknown(type_substitutor.alloc_var())
+                                        type_substitutor.alloc_unknown()
                                     }
                                 }
                             }
                         } else {
-                            ConcreteType::Unknown(type_substitutor.alloc_var())
+                            type_substitutor.alloc_unknown()
                         }
                     });
 
@@ -439,7 +444,7 @@ fn concretize_written_type_with_possible_template_args(
             {
                 template_args[found_template_arg].clone()
             } else {
-                ConcreteType::Unknown(type_substitutor.alloc_var())
+                type_substitutor.alloc_unknown()
             };
 
             ConcreteType::Array(Box::new((arr_content_concrete, arr_idx_concrete)))
@@ -459,7 +464,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
 
         // Check if there's any argument that isn't known
         for (_id, arg) in &mut Rc::get_mut(&mut sm.refers_to).unwrap().template_args {
-            if !arg.fully_substitute(&context.type_substitutor) {
+            if !context.type_substitutor.fully_substitute(arg) {
                 // We don't actually *need* to already fully_substitute here, but it's convenient and saves some work
                 return DelayedConstraintStatus::NoProgress;
             }

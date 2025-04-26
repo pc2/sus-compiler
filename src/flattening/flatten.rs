@@ -1,5 +1,6 @@
 use crate::alloc::{ArenaAllocator, UUIDAllocator, UUIDRange, UUID};
-use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, DomainType, PeanoType};
+use crate::typing::abstract_type::DomainType;
+use crate::typing::type_inference::{AbstractTypeSubstitutor, Substitutor, TypeSubstitutor};
 use crate::{alloc::UUIDRangeIter, prelude::*};
 
 use ibig::IBig;
@@ -224,18 +225,23 @@ enum ModuleOrWrittenType {
     Module(GlobalReference<ModuleUUID>),
 }
 
+/// Small wrapper struct for allocating the Hindley-Milner variables
+/// required for [crate::typing::abstract_type::AbstractType::Unknown] and [DomainType::DomainVariable]
+///
+/// See [crate::typing::type_inference::HindleyMilner]
+#[derive(Debug, Default)]
+struct TypingAllocator {
+    pub type_alloc: AbstractTypeSubstitutor,
+    pub domain_alloc: TypeSubstitutor<DomainType>,
+}
+
 impl TypingAllocator {
     fn alloc_unset_type(&mut self, domain: DomainAllocOption) -> FullType {
         FullType {
-            typ: AbstractRankedType {
-                inner: AbstractInnerType::Unknown(self.inner_type_variable_alloc.alloc_var()),
-                rank: PeanoType::Unknown(self.peano_variable_alloc.alloc_var()),
-            },
+            typ: self.type_alloc.alloc_unknown(),
             domain: match domain {
                 DomainAllocOption::Generative => DomainType::Generative,
-                DomainAllocOption::NonGenerativeUnknown => {
-                    DomainType::Unknown(self.domain_variable_alloc.alloc_var())
-                }
+                DomainAllocOption::NonGenerativeUnknown => self.domain_alloc.alloc_unknown(),
                 DomainAllocOption::NonGenerativeKnown(domain_id) => DomainType::Physical(domain_id),
             },
         }
@@ -454,12 +460,8 @@ impl FlatteningContext<'_, '_> {
                 let template_args =
                     self.flatten_template_args(global_id, template_args_used, cursor);
 
-                let template_arg_types = template_args.map(|_| AbstractRankedType {
-                    inner: AbstractInnerType::Unknown(
-                        self.type_alloc.inner_type_variable_alloc.alloc_var(),
-                    ),
-                    rank: PeanoType::Unknown(self.type_alloc.peano_variable_alloc.alloc_var()),
-                });
+                let template_arg_types =
+                    template_args.map(|_| self.type_alloc.type_alloc.alloc_unknown());
 
                 match global_id {
                     GlobalUUID::Module(id) => LocalOrGlobal::Module(GlobalReference {
@@ -624,7 +626,7 @@ impl FlatteningContext<'_, '_> {
         let md = &self.globals[module_ref.id];
         let local_interface_domains = md
             .domains
-            .map(|_| DomainType::Unknown(self.type_alloc.domain_variable_alloc.alloc_var()));
+            .map(|_| self.type_alloc.domain_alloc.alloc_unknown());
 
         self.instructions
             .alloc(Instruction::SubModule(SubModuleInstance {
@@ -976,7 +978,8 @@ impl FlatteningContext<'_, '_> {
                 cursor.field(field!("right"));
                 let (right, right_gen) = self.flatten_expr(cursor);
 
-                (ExpressionSource::UnaryOp { op, right }, right_gen)
+                let rank = self.type_alloc.type_alloc.rank_substitutor.alloc_unknown();
+                (ExpressionSource::UnaryOp { op, rank, right }, right_gen)
             }),
             kind!("binary_op") => cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("left"));
@@ -988,8 +991,14 @@ impl FlatteningContext<'_, '_> {
                 cursor.field(field!("right"));
                 let (right, right_gen) = self.flatten_expr(cursor);
 
+                let rank = self.type_alloc.type_alloc.rank_substitutor.alloc_unknown();
                 (
-                    ExpressionSource::BinaryOp { op, left, right },
+                    ExpressionSource::BinaryOp {
+                        op,
+                        rank,
+                        left,
+                        right,
+                    },
                     left_gen & right_gen,
                 )
             }),
@@ -1788,11 +1797,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         errors: &globals.errors,
         working_on_link_info: linker.get_link_info(global_obj),
         instructions: FlatAlloc::new(),
-        type_alloc: TypingAllocator {
-            peano_variable_alloc: SimpleSingleSubstitutorUnifier::new(),
-            inner_type_variable_alloc: SimpleSingleSubstitutorUnifier::new(),
-            domain_variable_alloc: SimpleSingleSubstitutorUnifier::new(),
-        },
+        type_alloc: Default::default(),
         named_domain_alloc: UUIDAllocator::new(),
         local_variable_context,
     };
@@ -1838,12 +1843,6 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
                 };
                 decl.typ.domain = DomainType::Physical(port.domain);
             }
-
-            md.latency_inference_info = PortLatencyInferenceInfo::make(
-                &md.ports,
-                &instructions,
-                md.link_info.template_parameters.len(),
-            );
 
             if crate::debug::is_enabled("print-flattened-pre-typecheck") {
                 md.print_flattened_module(&linker.files[md.link_info.file]);
@@ -1918,6 +1917,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
     }
 
     link_info.reabsorb_errors_globals(errors_globals, AFTER_FLATTEN_CP);
-    link_info.type_variable_alloc = Some(Box::new(type_alloc));
+    link_info.type_variable_alloc =
+        Some(Box::new((type_alloc.type_alloc, type_alloc.domain_alloc)));
     link_info.instructions = instructions;
 }

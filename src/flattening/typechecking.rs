@@ -1,15 +1,14 @@
 use crate::alloc::{zip_eq3, ArenaAllocator};
 use crate::errors::{ErrorInfo, ErrorInfoObject, FileKnowingErrorInfoObject};
 use crate::prelude::*;
-use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType};
 use crate::typing::template::ParameterKind;
-use crate::typing::type_inference::{FailedUnification, HindleyMilner};
+use crate::typing::type_inference::{FailedUnification, Substitutor};
 
 use crate::debug::SpanDebugger;
 use crate::linker::{GlobalResolver, GlobalUUID, AFTER_TYPECHECK_CP};
 
 use crate::typing::{
-    abstract_type::{DomainType, TypeUnifier, BOOL_TYPE, INT_TYPE},
+    abstract_type::{DomainType, FullTypeUnifier, BOOL_TYPE, INT_TYPE},
     template::TemplateArgKind,
 };
 
@@ -35,7 +34,10 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
         let mut context = TypeCheckingContext {
             globals: &globals,
             errors: &globals.errors,
-            type_checker: TypeUnifier::new(&working_on.link_info.template_parameters, type_alloc),
+            type_checker: FullTypeUnifier::new(
+                &working_on.link_info.template_parameters,
+                type_alloc,
+            ),
             runtime_condition_stack: Vec::new(),
             working_on: &working_on.link_info,
         };
@@ -58,6 +60,13 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
             .link_info
             .reabsorb_errors_globals(errs_and_globals, AFTER_TYPECHECK_CP);
 
+        // Also create the inference info now.
+        working_on_mut.latency_inference_info = PortLatencyInferenceInfo::make(
+            &working_on_mut.ports,
+            &working_on_mut.link_info.instructions,
+            working_on_mut.link_info.template_parameters.len(),
+        );
+
         if crate::debug::is_enabled("print-flattened") {
             working_on_mut.print_flattened_module(&linker.files[working_on_mut.link_info.file]);
         }
@@ -74,7 +83,7 @@ struct TypeCheckingContext<'l, 'errs> {
     globals: &'l GlobalResolver<'l>,
     errors: &'errs ErrorCollector<'l>,
     working_on: &'l LinkInfo,
-    type_checker: TypeUnifier,
+    type_checker: FullTypeUnifier,
     runtime_condition_stack: Vec<ConditionStackElem>,
 }
 
@@ -99,10 +108,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
         let decl = submodule_module.get_port_decl(port);
         let port_interface = submodule_module.ports[port].domain;
         let port_local_domain = submodule_inst.local_interface_domains[port_interface];
-        let typ = AbstractRankedType {
-            inner: AbstractInnerType::Unknown(self.type_checker.alloc_typ_variable()),
-            rank: PeanoType::Unknown(self.type_checker.alloc_peano_variable()),
-        };
+        let typ = self.type_checker.abstract_type_substitutor.alloc_unknown();
         self.type_checker
             .unify_with_written_type_substitute_templates_must_succeed(
                 &decl.typ_expr,
@@ -164,10 +170,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 let linker_cst = &self.globals[cst.id];
                 let decl =
                     linker_cst.link_info.instructions[linker_cst.output_decl].unwrap_declaration();
-                let typ = AbstractRankedType {
-                    inner: AbstractInnerType::Unknown(self.type_checker.alloc_typ_variable()),
-                    rank: PeanoType::Unknown(self.type_checker.alloc_peano_variable()),
-                };
+                let typ = self.type_checker.abstract_type_substitutor.alloc_unknown();
                 self.type_checker
                     .unify_with_written_type_substitute_templates_must_succeed(
                         &decl.typ_expr,
@@ -196,17 +199,15 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
                     let idx_expr = self.working_on.instructions[idx].unwrap_expression();
 
-                    let new_resulting_variable = AbstractRankedType {
-                        inner: AbstractInnerType::Unknown(self.type_checker.alloc_typ_variable()),
-                        rank: PeanoType::Unknown(self.type_checker.alloc_peano_variable()),
-                    };
+                    let new_resulting_variable =
+                        self.type_checker.abstract_type_substitutor.alloc_unknown();
                     let arr_span = bracket_span.outer_span();
                     {
                         self.type_checker
                             .abstract_type_substitutor
                             .unify_report_error(
-                                &idx_expr.typ.typ.inner,
-                                &INT_TYPE.inner,
+                                &idx_expr.typ.typ,
+                                &INT_TYPE.scalar(),
                                 idx_expr.span,
                                 "array index",
                             );
@@ -231,18 +232,11 @@ impl<'l> TypeCheckingContext<'l, '_> {
         self.type_checker
             .abstract_type_substitutor
             .unify_report_error(
-                &current_type_in_progress.inner,
-                &output_typ.typ.inner,
+                &current_type_in_progress,
+                &output_typ.typ,
                 whole_span,
                 "variable reference",
             );
-
-        self.type_checker.peano_substitutor.unify_report_error(
-            &current_type_in_progress.rank,
-            &output_typ.typ.rank,
-            whole_span,
-            "variable reference rank",
-        );
     }
 
     fn control_flow_visit_instruction(&mut self, inst_id: FlatID) {
@@ -413,7 +407,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 let idx_expr = self.working_on.instructions[*arr_idx].unwrap_expression();
                 self.type_checker.typecheck_write_to_abstract(
                     &idx_expr.typ.typ,
-                    &INT_TYPE,
+                    &INT_TYPE.scalar(),
                     idx_expr.span,
                     "array size",
                 );
@@ -451,7 +445,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                         self.working_on.instructions[latency_spec].unwrap_expression();
                     self.type_checker.typecheck_write_to_abstract(
                         &latency_specifier_expr.typ.typ,
-                        &INT_TYPE,
+                        &INT_TYPE.scalar(),
                         latency_specifier_expr.span,
                         "latency specifier",
                     );
@@ -468,7 +462,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     &self.working_on.instructions[stm.condition].unwrap_expression();
                 self.type_checker.typecheck_write_to_abstract(
                     &condition_expr.typ.typ,
-                    &BOOL_TYPE,
+                    &BOOL_TYPE.scalar(),
                     condition_expr.span,
                     "if statement condition",
                 );
@@ -496,10 +490,11 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     ExpressionSource::WireRef(from_wire) => {
                         self.typecheck_wire_reference(from_wire, expr.span, &expr.typ);
                     }
-                    &ExpressionSource::UnaryOp { op, right } => {
-                        let right_expr = self.working_on.instructions[right].unwrap_expression();
+                    ExpressionSource::UnaryOp { op, rank, right } => {
+                        let right_expr = self.working_on.instructions[*right].unwrap_expression();
                         self.type_checker.typecheck_unary_operator_abstr(
-                            op,
+                            *op,
+                            rank,
                             &right_expr.typ.typ,
                             right_expr.span,
                             &expr.typ.typ,
@@ -511,12 +506,18 @@ impl<'l> TypeCheckingContext<'l, '_> {
                             "unary op",
                         );
                     }
-                    &ExpressionSource::BinaryOp { op, left, right } => {
-                        let left_expr = self.working_on.instructions[left].unwrap_expression();
-                        let right_expr = self.working_on.instructions[right].unwrap_expression();
+                    ExpressionSource::BinaryOp {
+                        op,
+                        rank,
+                        left,
+                        right,
+                    } => {
+                        let left_expr = self.working_on.instructions[*left].unwrap_expression();
+                        let right_expr = self.working_on.instructions[*right].unwrap_expression();
                         {
                             self.type_checker.typecheck_binary_operator_abstr(
-                                op,
+                                *op,
+                                rank,
                                 &left_expr.typ.typ,
                                 &right_expr.typ.typ,
                                 left_expr.span,
@@ -631,7 +632,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
 // ====== Free functions for actually applying the result of type checking ======
 
 pub fn apply_types(
-    mut type_checker: TypeUnifier,
+    mut type_checker: FullTypeUnifier,
     working_on: &mut Module,
     errors: &ErrorCollector,
     linker_types: &ArenaAllocator<StructType, TypeUUIDMarker>,
@@ -665,10 +666,20 @@ pub fn apply_types(
         match inst {
             Instruction::Expression(expr) => {
                 type_checker.finalize_type(linker_types, &mut expr.typ, expr.span, errors);
-                if let ExpressionSource::WireRef(wr) = &mut expr.source {
-                    if let WireReferenceRoot::NamedConstant(cst) = &mut wr.root {
-                        type_checker.finalize_global_ref(linker_types, cst, errors);
+                match &mut expr.source {
+                    ExpressionSource::WireRef(wr) => {
+                        if let WireReferenceRoot::NamedConstant(cst) = &mut wr.root {
+                            type_checker.finalize_global_ref(linker_types, cst, errors);
+                        }
                     }
+                    ExpressionSource::UnaryOp { rank, .. }
+                    | ExpressionSource::BinaryOp { rank, .. } => {
+                        let _ = type_checker
+                            .abstract_type_substitutor
+                            .rank_substitutor
+                            .fully_substitute(rank); // No need to report incomplete peano error, as one of the ports would have reported it
+                    }
+                    _ => {}
                 }
             }
             Instruction::Declaration(decl) => {
@@ -708,8 +719,12 @@ pub fn apply_types(
     } in type_checker.abstract_type_substitutor.extract_errors()
     {
         // Not being able to fully substitute is not an issue. We just display partial types
-        let _ = found.fully_substitute(&type_checker.abstract_type_substitutor);
-        let _ = expected.fully_substitute(&type_checker.abstract_type_substitutor);
+        let _ = type_checker
+            .abstract_type_substitutor
+            .fully_substitute(&mut found);
+        let _ = type_checker
+            .abstract_type_substitutor
+            .fully_substitute(&mut expected);
 
         let expected_name = expected
             .display(linker_types, &type_checker.template_type_names)
@@ -732,32 +747,12 @@ pub fn apply_types(
         span,
         context,
         infos,
-    } in type_checker.peano_substitutor.extract_errors()
-    {
-        let _ = found.fully_substitute(&type_checker.peano_substitutor);
-        let _ = expected.fully_substitute(&type_checker.peano_substitutor);
-
-        let expected_name = expected.to_string();
-        let found_name = found.to_string();
-        errors
-            .error(span, format!("Rank error: Attempting to combine incompatible <inner type>{found_name} and <inner type>{expected_name} in {context}"))
-            .add_info_list(infos);
-
-        assert!(
-            expected_name != found_name,
-            "{expected_name} != {found_name}"
-        );
-    }
-    for FailedUnification {
-        mut found,
-        mut expected,
-        span,
-        context,
-        infos,
     } in type_checker.domain_substitutor.extract_errors()
     {
-        assert!(found.fully_substitute(&type_checker.domain_substitutor));
-        assert!(expected.fully_substitute(&type_checker.domain_substitutor));
+        assert!(type_checker.domain_substitutor.fully_substitute(&mut found));
+        assert!(type_checker
+            .domain_substitutor
+            .fully_substitute(&mut expected));
 
         let expected_name = format!("{expected:?}");
         let found_name = format!("{found:?}");

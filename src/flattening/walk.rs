@@ -28,8 +28,8 @@ impl ExpressionSource {
                 }
                 WireReferencePathElement::for_each_dependency(&wire_ref.path, func);
             }
-            &ExpressionSource::UnaryOp { op: _, right } => func(right),
-            &ExpressionSource::BinaryOp { op: _, left, right } => {
+            &ExpressionSource::UnaryOp { right, .. } => func(right),
+            &ExpressionSource::BinaryOp { left, right, .. } => {
                 func(left);
                 func(right)
             }

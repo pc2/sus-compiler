@@ -4,7 +4,10 @@ use crate::{
     instantiation::{SubModule, SubModulePort},
     prelude::*,
     typing::{
-        concrete_type::ConcreteType, template::TVec, type_inference::SimpleSingleSubstitutorUnifier,
+        abstract_type::PeanoType,
+        concrete_type::ConcreteType,
+        template::TVec,
+        type_inference::{Substitutor, TypeSubstitutor, TypeUnifier},
     },
     value::Value,
 };
@@ -111,6 +114,7 @@ fn recurse_down_expression(
     match &expr.source {
         ExpressionSource::UnaryOp {
             op: UnaryOperator::Negate,
+            rank: PeanoType::Zero,
             right,
         } => {
             let mut right_v = recurse_down_expression(instructions, *right, num_template_args)?;
@@ -120,7 +124,12 @@ fn recurse_down_expression(
             }
             Some(right_v)
         }
-        ExpressionSource::BinaryOp { op, left, right } => {
+        ExpressionSource::BinaryOp {
+            op,
+            rank: PeanoType::Zero,
+            left,
+            right,
+        } => {
             let mut left_v = recurse_down_expression(instructions, *left, num_template_args)?;
             let mut right_v = recurse_down_expression(instructions, *right, num_template_args)?;
             match op {
@@ -358,7 +367,7 @@ impl SubModule {
         &self,
         linker: &Linker,
         sm_id: SubModuleID,
-        type_substitutor: &SimpleSingleSubstitutorUnifier<ConcreteType>,
+        type_substitutor: &TypeUnifier<TypeSubstitutor<ConcreteType>>,
         latency_inference_variables: &mut FlatAlloc<
             ValueToInfer<(SubModuleID, TemplateID)>,
             InferenceVarIDMarker,
@@ -394,8 +403,7 @@ impl SubModule {
         } else {
             let known_template_args = self.refers_to.template_args.map(|(_, t)| {
                 let mut t_copy = t.clone();
-                use crate::typing::type_inference::HindleyMilner;
-                t_copy.fully_substitute(type_substitutor);
+                type_substitutor.fully_substitute(&mut t_copy);
                 if let ConcreteType::Value(Value::Integer(num)) = &t_copy {
                     i64::try_from(num).ok()
                 } else {
