@@ -532,6 +532,12 @@ impl Substitutor for TypeSubstitutor<ConcreteType> {
     }
 }
 
+impl TypeSubstitutor<ConcreteType> {
+    pub fn make_array_of(&mut self, content_typ: ConcreteType) -> ConcreteType {
+        ConcreteType::Array(Box::new((content_typ, self.alloc_unknown())))
+    }
+}
+
 impl Substitutor for TypeSubstitutor<DomainType> {
     type MyType = DomainType;
 

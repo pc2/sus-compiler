@@ -387,6 +387,7 @@ impl FullTypeUnifier {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn typecheck_binary_operator_abstr(
         &mut self,
         op: BinaryOperator,

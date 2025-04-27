@@ -101,6 +101,13 @@ impl Value {
         };
         *b
     }
+
+    pub fn unwrap_array(&self) -> &[Value] {
+        let Self::Array(arr) = self else {
+            panic!("{:?} is not an array!", self)
+        };
+        arr
+    }
 }
 
 pub fn compute_unary_op(op: UnaryOperator, v: &Value) -> Value {

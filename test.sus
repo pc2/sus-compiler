@@ -1347,3 +1347,15 @@ module use_infer_me_inputs_only {
 
 	infer_me_inputs_only(x, y)
 }
+
+
+module use_ranks {
+	gen int[15] v = [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5]
+
+	gen int[15] vv = v + v
+
+	state int[15] wire_v
+
+	wire_v = wire_v + vv
+}
+

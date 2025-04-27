@@ -839,13 +839,35 @@ impl InstantiationContext<'_, '_> {
         Ok(work_on_value)
     }
     fn compute_compile_time(&mut self, expression: &Expression) -> ExecutionResult<Value> {
+        fn duplicate_for_all_array_ranks<const SZ: usize>(
+            values: &[&Value; SZ],
+            rank: usize,
+            f: &mut impl FnMut(&[&Value; SZ]) -> ExecutionResult<Value>,
+        ) -> ExecutionResult<Value> {
+            if rank == 0 {
+                f(values)
+            } else {
+                let all_arrs: [_; SZ] = std::array::from_fn(|i| values[i].unwrap_array());
+                let len = all_arrs[0].len();
+                assert!(all_arrs.iter().all(|a| a.len() == len));
+                let mut results = Vec::with_capacity(len);
+                for j in 0..len {
+                    let values_parts: [_; SZ] = std::array::from_fn(|i| &all_arrs[i][j]);
+                    results.push(duplicate_for_all_array_ranks(&values_parts, rank - 1, f)?);
+                }
+                Ok(Value::Array(results))
+            }
+        }
+
         Ok(match &expression.source {
             ExpressionSource::WireRef(wire_ref) => {
                 self.compute_compile_time_wireref(wire_ref)?.clone()
             }
             ExpressionSource::UnaryOp { op, rank, right } => {
                 let right_val = self.generation_state.get_generation_value(*right)?;
-                compute_unary_op(*op, right_val)
+                duplicate_for_all_array_ranks(&[right_val], rank.count_unwrap(), &mut |[v]| {
+                    Ok(compute_unary_op(*op, v))
+                })?
             }
             ExpressionSource::BinaryOp {
                 op,
@@ -856,22 +878,28 @@ impl InstantiationContext<'_, '_> {
                 let left_val = self.generation_state.get_generation_value(*left)?;
                 let right_val = self.generation_state.get_generation_value(*right)?;
 
-                match op {
-                    BinaryOperator::Divide | BinaryOperator::Modulo => {
-                        if right_val.unwrap_integer() == &ibig::ibig!(0) {
-                            return Err((
-                                expression.span,
-                                format!(
-                                    "Divide or Modulo by zero: {} / 0",
-                                    left_val.unwrap_integer()
-                                ),
-                            ));
+                duplicate_for_all_array_ranks(
+                    &[left_val, right_val],
+                    rank.count_unwrap(),
+                    &mut |[l, r]| {
+                        match op {
+                            BinaryOperator::Divide | BinaryOperator::Modulo => {
+                                if right_val.unwrap_integer() == &ibig::ibig!(0) {
+                                    return Err((
+                                        expression.span,
+                                        format!(
+                                            "Divide or Modulo by zero: {} / 0",
+                                            l.unwrap_integer()
+                                        ),
+                                    ));
+                                }
+                            }
+                            _ => {}
                         }
-                    }
-                    _ => {}
-                }
 
-                compute_binary_op(left_val, *op, right_val)
+                        Ok(compute_binary_op(l, *op, r))
+                    },
+                )?
             }
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut result = Vec::with_capacity(arr.len());

@@ -65,13 +65,6 @@ impl InstantiationContext<'_, '_> {
         current_type_in_progress
     }
 
-    fn make_array_of(&mut self, concrete_typ: ConcreteType) -> ConcreteType {
-        ConcreteType::Array(Box::new((
-            concrete_typ,
-            self.type_substitutor.alloc_unknown(),
-        )))
-    }
-
     fn typecheck_all_wires(&mut self) {
         for this_wire_id in self.wires.id_range() {
             let this_wire = &self.wires[this_wire_id];
@@ -110,12 +103,14 @@ impl InstantiationContext<'_, '_> {
                     let (input_typ, output_typ) = match op {
                         UnaryOperator::Not => (BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE),
                         UnaryOperator::Negate => (INT_CONCRETE_TYPE, INT_CONCRETE_TYPE),
-                        UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => {
-                            (self.make_array_of(BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
-                        UnaryOperator::Sum | UnaryOperator::Product => {
-                            (self.make_array_of(INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
-                        }
+                        UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => (
+                            self.type_substitutor.make_array_of(BOOL_CONCRETE_TYPE),
+                            BOOL_CONCRETE_TYPE,
+                        ),
+                        UnaryOperator::Sum | UnaryOperator::Product => (
+                            self.type_substitutor.make_array_of(INT_CONCRETE_TYPE),
+                            INT_CONCRETE_TYPE,
+                        ),
                     };
 
                     self.type_substitutor.unify_report_error(
@@ -138,7 +133,7 @@ impl InstantiationContext<'_, '_> {
                     right,
                 } => {
                     // TODO overloading
-                    let ((in_left_inner, in_right_inner), out_inner) = match op {
+                    let ((left_typ, right_typ), output_typ) = match op {
                         BinaryOperator::And => {
                             ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
@@ -182,6 +177,7 @@ impl InstantiationContext<'_, '_> {
                             ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
                     };
+
                     // gets the corresponding abstract type to figure out how many layers of array to unify with:
                     let peano_type = &self.md.link_info.instructions
                         [this_wire.original_instruction]
@@ -191,11 +187,11 @@ impl InstantiationContext<'_, '_> {
                         .rank;
                     let mut out_dims = vec![];
                     let out_type =
-                        self.peano_to_nested_array_of(peano_type, out_inner, &mut out_dims);
+                        self.peano_to_nested_array_of(peano_type, output_typ, &mut out_dims);
 
                     let mut in_left_dims = vec![];
                     let in_left_type =
-                        self.peano_to_nested_array_of(peano_type, in_left_inner, &mut in_left_dims);
+                        self.peano_to_nested_array_of(peano_type, left_typ, &mut in_left_dims);
 
                     for (in_left, out) in out_dims.iter().zip(in_left_dims.iter()) {
                         self.type_substitutor.unify_report_error(
@@ -207,11 +203,8 @@ impl InstantiationContext<'_, '_> {
                     }
 
                     let mut in_right_dims = vec![];
-                    let in_right_type = self.peano_to_nested_array_of(
-                        peano_type,
-                        in_right_inner,
-                        &mut in_right_dims,
-                    );
+                    let in_right_type =
+                        self.peano_to_nested_array_of(peano_type, right_typ, &mut in_right_dims);
 
                     for (in_right, out) in out_dims.iter().zip(in_right_dims.iter()) {
                         self.type_substitutor.unify_report_error(
