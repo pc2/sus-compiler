@@ -1354,6 +1354,10 @@ module use_ranks {
 
 	gen int[15] vv = v + v
 
+	gen int[16] vvv = [1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 6]
+
+	gen int[3] qzd = vv + vvv
+
 	state int[15] wire_v
 
 	wire_v = wire_v + vv

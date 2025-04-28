@@ -98,7 +98,7 @@ impl InstantiationContext<'_, '_> {
                         );
                     }
                 }
-                &RealWireDataSource::UnaryOp { op, rank, right } => {
+                &RealWireDataSource::UnaryOp { op, rank: _, right } => {
                     // TODO overloading
                     let (input_typ, output_typ) = match op {
                         UnaryOperator::Not => (BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE),
@@ -128,7 +128,7 @@ impl InstantiationContext<'_, '_> {
                 }
                 &RealWireDataSource::BinaryOp {
                     op,
-                    rank,
+                    rank: _,
                     left,
                     right,
                 } => {

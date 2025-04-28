@@ -154,6 +154,7 @@ TREE SITTER module! infer_me_with_negative_delta
 TREE SITTER module! use_infer_me_with_negative_delta
 TREE SITTER module! infer_me_inputs_only
 TREE SITTER module! use_infer_me_inputs_only
+TREE SITTER module! use_ranks
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -294,6 +295,7 @@ Typechecking infer_me_with_negative_delta
 Typechecking use_infer_me_with_negative_delta
 Typechecking infer_me_inputs_only
 Typechecking use_infer_me_inputs_only
+Typechecking use_ranks
 Instantiating Iterator
 Concrete Typechecking Iterator
 Latency Counting Iterator
@@ -803,3 +805,4 @@ Instantiating use_infer_me_inputs_only
 Concrete Typechecking use_infer_me_inputs_only
 Latency Counting use_infer_me_inputs_only
 Checking array accesses use_infer_me_inputs_only
+Instantiating use_ranks

@@ -842,14 +842,21 @@ impl InstantiationContext<'_, '_> {
         fn duplicate_for_all_array_ranks<const SZ: usize>(
             values: &[&Value; SZ],
             rank: usize,
-            f: &mut impl FnMut(&[&Value; SZ]) -> ExecutionResult<Value>,
-        ) -> ExecutionResult<Value> {
+            f: &mut impl FnMut(&[&Value; SZ]) -> Result<Value, String>,
+        ) -> Result<Value, String> {
             if rank == 0 {
                 f(values)
             } else {
                 let all_arrs: [_; SZ] = std::array::from_fn(|i| values[i].unwrap_array());
+
                 let len = all_arrs[0].len();
-                assert!(all_arrs.iter().all(|a| a.len() == len));
+                if !all_arrs.iter().all(|a| len == a.len()) {
+                    let lens: [String; SZ] = std::array::from_fn(|i| all_arrs[i].len().to_string());
+                    return Err(format!(
+                        "Higher Rank array operation's arrays don't match in size: {}",
+                        lens.join(", ")
+                    ));
+                }
                 let mut results = Vec::with_capacity(len);
                 for j in 0..len {
                     let values_parts: [_; SZ] = std::array::from_fn(|i| &all_arrs[i][j]);
@@ -867,7 +874,8 @@ impl InstantiationContext<'_, '_> {
                 let right_val = self.generation_state.get_generation_value(*right)?;
                 duplicate_for_all_array_ranks(&[right_val], rank.count_unwrap(), &mut |[v]| {
                     Ok(compute_unary_op(*op, v))
-                })?
+                })
+                .unwrap()
             }
             ExpressionSource::BinaryOp {
                 op,
@@ -885,12 +893,9 @@ impl InstantiationContext<'_, '_> {
                         match op {
                             BinaryOperator::Divide | BinaryOperator::Modulo => {
                                 if right_val.unwrap_integer() == &ibig::ibig!(0) {
-                                    return Err((
-                                        expression.span,
-                                        format!(
-                                            "Divide or Modulo by zero: {} / 0",
-                                            l.unwrap_integer()
-                                        ),
+                                    return Err(format!(
+                                        "Divide or Modulo by zero: {} / 0",
+                                        l.unwrap_integer()
                                     ));
                                 }
                             }
@@ -899,7 +904,8 @@ impl InstantiationContext<'_, '_> {
 
                         Ok(compute_binary_op(l, *op, r))
                     },
-                )?
+                )
+                .map_err(|reason| (expression.span, reason))?
             }
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut result = Vec::with_capacity(arr.len());

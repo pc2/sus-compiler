@@ -3271,9 +3271,9 @@ Error: While parsing 'source_file', parser found a syntax error in a node of typ
       │ │       ─────────────────────────────┬────────────────────────────  
       │ │                                    ╰────────────────────────────── While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
       ┆ ┆   
- 1349 │ ├─▶ }
-      │ │       
-      │ ╰─────── Parent node 'source_file'
+ 1365 │ ├─▶ 
+      │ │      
+      │ ╰────── Parent node 'source_file'
 ──────╯
 Error: While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
       ╭─[ test.sus:1251:1 ]
@@ -3284,9 +3284,9 @@ Error: While parsing 'source_file', parser found a syntax error in a node of typ
       │ │   ┬  
       │ │   ╰── While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
       ┆ ┆   
- 1349 │ ├─▶ }
-      │ │       
-      │ ╰─────── Parent node 'source_file'
+ 1365 │ ├─▶ 
+      │ │      
+      │ ╰────── Parent node 'source_file'
 ──────╯
 Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
       ╭─[ test.sus:1254:2 ]
@@ -3579,4 +3579,46 @@ Error: Could not fully instantiate ::infer_me_inputs_only #(
       │               ╰─────────── Could not fully instantiate ::infer_me_inputs_only #(
     V: /* Could not infer */
 )
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1353:14 ]
+      │
+ 1353 │     gen int[15] v = [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5]
+      │                 ┬  
+      │                 ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1355:14 ]
+      │
+ 1355 │     gen int[15] vv = v + v
+      │                 ─┬  
+      │                  ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1357:14 ]
+      │
+ 1357 │     gen int[16] vvv = [1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 6]
+      │                 ─┬─  
+      │                  ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1359:13 ]
+      │
+ 1359 │     gen int[3] qzd = vv + vvv
+      │                ─┬─  
+      │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Higher Rank array operation's arrays don't match in size: 15, 16
+      ╭─[ test.sus:1359:19 ]
+      │
+ 1359 │     gen int[3] qzd = vv + vvv
+      │                      ────┬───  
+      │                          ╰───── Higher Rank array operation's arrays don't match in size: 15, 16
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1361:16 ]
+      │
+ 1361 │     state int[15] wire_v
+      │                   ───┬──  
+      │                      ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
