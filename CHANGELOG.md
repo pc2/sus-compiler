@@ -2,7 +2,9 @@
 ## 0.3.0 (indev)
 - Add `pow` and `pow2`
 - Fix ICEs when improperly using constants
-- 
+- Replace num-bigint with ibig to use its small integer optimization
+- Add `factorial`, `falling_factorial`, `comb`
+- Operators are now generic over array ranks (So int[15] + int[15] -> int[15])
 
 ### Technical changes
 - Revamped SpanDebugger system. Now use inline string IDs for debug code paths (use --debug and --debug-whitelist only)

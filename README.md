@@ -179,6 +179,7 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Latency Specifiers
 - [x] Get rid of semicolons
 - [x] Access module inputs / outputs through field names
+- [ ] Operator and Module Overloads
 - [ ] Array Slices
 - [ ] Sized Integers
 - [ ] Structs
@@ -236,6 +237,11 @@ In this example, we create a memory block with a read port and a write port. Thi
 - [x] Latency Cuts & Latency Counting for "disjoint Input-Output blocks"
 - [x] Latency Count Inference
 - [ ] Split Latencies
+
+### Rank Polymorphism
+- [x] Operator Rank Polymorphism
+- [ ] Submodule Rank Polymorphism
+- [ ] Struct Field Rank Polymorphism
 
 ### LSP
 - [x] Basic LSP for VSCode integration
