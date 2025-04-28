@@ -3,7 +3,6 @@ use sus_proc_macro::get_builtin_type;
 use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
 use crate::value::Value;
-use std::fmt::{self, Display};
 use std::ops::Deref;
 
 use super::template::{GlobalReference, Parameter, TVec};
@@ -138,25 +137,6 @@ impl DomainType {
             DomainType::Generative => true,
             DomainType::Physical(_) => false,
             DomainType::Unknown(_) => false,
-        }
-    }
-}
-
-impl Display for PeanoType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut cur = self;
-        loop {
-            match cur {
-                PeanoType::Zero => return Ok(()),
-                PeanoType::Succ(inner) => {
-                    f.write_str("[]")?;
-                    cur = inner;
-                }
-                PeanoType::Unknown(var) => {
-                    write!(f, "[...{var:?}]")?;
-                    return Ok(());
-                }
-            }
         }
     }
 }

@@ -773,8 +773,8 @@ pub enum Instruction {
     SubModule(SubModuleInstance),
     FuncCall(FuncCallInstruction),
     Declaration(Declaration),
-    Write(Write),
     Expression(Expression),
+    Write(Write),
     IfStatement(IfStatement),
     ForStatement(ForStatement),
 }

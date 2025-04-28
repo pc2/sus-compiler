@@ -93,8 +93,7 @@ impl WrittenType {
 
 #[derive(Debug)]
 pub struct AbstractRankedTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
-    inner_typ: &'a AbstractInnerType,
-    rank_typ: &'a PeanoType,
+    typ: &'a AbstractRankedType,
     linker_types: &'a TypVec,
     template_names: &'a TemplateVec,
 }
@@ -103,7 +102,7 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
     for AbstractRankedTypeDisplay<'_, TypVec, TemplateVec>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.inner_typ {
+        match &self.typ.inner {
             AbstractInnerType::Unknown(id) => write!(f, "{id:?}"),
             AbstractInnerType::Template(id) => {
                 f.write_str(self.template_names.get_template_name(*id))
@@ -112,7 +111,7 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
                 f.write_str(&self.linker_types[*id].link_info.get_full_name())
             }
         }
-        .and_then(|_| f.write_str(&self.rank_typ.to_string()))
+        .and_then(|_| f.write_fmt(format_args!("{}", &self.typ.rank)))
     }
 }
 
@@ -123,47 +122,28 @@ impl AbstractRankedType {
         template_names: &'a impl TemplateNameGetter,
     ) -> impl Display + 'a {
         AbstractRankedTypeDisplay {
-            inner_typ: &self.inner,
-            rank_typ: &self.rank,
+            typ: self,
             linker_types,
             template_names,
         }
     }
 }
 
-#[derive(Debug)]
-pub struct AbstractInnerTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
-    inner_typ: &'a AbstractInnerType,
-    linker_types: &'a TypVec,
-    template_names: &'a TemplateVec,
-}
-
-impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
-    for AbstractInnerTypeDisplay<'_, TypVec, TemplateVec>
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.inner_typ {
-            AbstractInnerType::Unknown(id) => write!(f, "{id:?}"),
-            AbstractInnerType::Template(id) => {
-                f.write_str(self.template_names.get_template_name(*id))
+impl Display for PeanoType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut cur = self;
+        loop {
+            match cur {
+                PeanoType::Zero => return Ok(()),
+                PeanoType::Succ(inner) => {
+                    f.write_str("[]")?;
+                    cur = inner;
+                }
+                PeanoType::Unknown(var) => {
+                    write!(f, "[...{var:?}]")?;
+                    return Ok(());
+                }
             }
-            AbstractInnerType::Named(id) => {
-                f.write_str(&self.linker_types[*id].link_info.get_full_name())
-            }
-        }
-    }
-}
-
-impl AbstractInnerType {
-    pub fn display<'a>(
-        &'a self,
-        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
-        template_names: &'a impl TemplateNameGetter,
-    ) -> impl Display + 'a {
-        AbstractInnerTypeDisplay {
-            inner_typ: self,
-            linker_types,
-            template_names,
         }
     }
 }
