@@ -12,7 +12,7 @@ use crate::prelude::*;
 
 use crate::flattening::{Instruction, WriteModifiers};
 use crate::typing::concrete_type::ConcreteType;
-use crate::typing::type_inference::DelayedConstraintStatus;
+use crate::typing::type_inference::{DelayedConstraintStatus, Substitutor};
 use crate::value::Value;
 
 use latency_algorithm::{
@@ -244,10 +244,10 @@ impl RealWireDataSource {
                     s.for_each_wire(&mut |from| f(from, s.num_regs));
                 }
             }
-            RealWireDataSource::UnaryOp { op: _, right } => {
+            RealWireDataSource::UnaryOp { right, .. } => {
                 f(*right, 0);
             }
-            RealWireDataSource::BinaryOp { op: _, left, right } => {
+            RealWireDataSource::BinaryOp { left, right, .. } => {
                 f(*left, 0);
                 f(*right, 0);
             }

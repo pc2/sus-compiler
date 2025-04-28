@@ -8,7 +8,6 @@ use crate::instantiation::{GenerationState, InstantiationContext, SubModuleOrWir
 use crate::typing::concrete_type::ConcreteGlobalReference;
 
 use crate::prelude::*;
-use crate::typing::type_inference::TypeSubstitutor;
 
 use super::InstantiatedModule;
 
@@ -146,7 +145,7 @@ fn perform_instantiation(
                 .instructions
                 .map(|(_, _)| SubModuleOrWire::Unnasigned),
         },
-        type_substitutor: TypeSubstitutor::new(),
+        type_substitutor: Default::default(),
         condition_stack: Vec::new(),
         wires: FlatAlloc::new(),
         submodules: FlatAlloc::new(),

@@ -8,7 +8,7 @@ use unique_names::UniqueNames;
 
 use crate::prelude::*;
 use crate::typing::template::TVec;
-use crate::typing::type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor};
+use crate::typing::type_inference::{TypeSubstitutor, TypeUnifier};
 
 use std::cell::OnceCell;
 use std::rc::Rc;
@@ -50,10 +50,12 @@ pub enum RealWireDataSource {
     },
     UnaryOp {
         op: UnaryOperator,
+        rank: usize,
         right: WireID,
     },
     BinaryOp {
         op: BinaryOperator,
+        rank: usize,
         left: WireID,
         right: WireID,
     },
@@ -253,14 +255,11 @@ impl ForEachContainedWire for RealWireDataSource {
     fn for_each_wire(&self, f: &mut impl FnMut(WireID)) {
         match self {
             RealWireDataSource::ReadOnly => {}
-            RealWireDataSource::Multiplexer {
-                is_state: _,
-                sources,
-            } => {
+            RealWireDataSource::Multiplexer { sources, .. } => {
                 sources.for_each_wire(f);
             }
-            RealWireDataSource::UnaryOp { op: _, right } => f(*right),
-            RealWireDataSource::BinaryOp { op: _, left, right } => {
+            RealWireDataSource::UnaryOp { right, .. } => f(*right),
+            RealWireDataSource::BinaryOp { left, right, .. } => {
                 f(*left);
                 f(*right)
             }
@@ -282,7 +281,7 @@ pub struct InstantiationContext<'fl, 'l> {
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
 
-    pub type_substitutor: TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
+    pub type_substitutor: TypeUnifier<TypeSubstitutor<ConcreteType>>,
 
     /// Used for Execution
     generation_state: GenerationState<'fl>,
