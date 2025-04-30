@@ -10,6 +10,7 @@ use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::IsExtern;
 use crate::prelude::*;
 use crate::typing::template::GlobalReference;
+use crate::typing::type_inference::Substitutor;
 
 use ibig::{IBig, UBig};
 
@@ -196,7 +197,7 @@ impl InstantiationContext<'_, '_> {
     /// Uses the current context to turn a [WrittenType] into a [ConcreteType].
     ///
     /// Failures are fatal.
-    fn concretize_type(&self, typ: &WrittenType) -> ExecutionResult<ConcreteType> {
+    fn concretize_type(&mut self, typ: &WrittenType) -> ExecutionResult<ConcreteType> {
         Ok(match typ {
             WrittenType::Error(_) => caught_by_typecheck!("Error Type"),
             WrittenType::TemplateVariable(_, template_id) => {
@@ -217,7 +218,7 @@ impl InstantiationContext<'_, '_> {
                             )),
                         }
                     } else {
-                        Ok(ConcreteType::Unknown(self.type_substitutor.alloc()))
+                        Ok(self.type_substitutor.alloc_unknown())
                     }
                 })?;
 
@@ -357,7 +358,7 @@ impl InstantiationContext<'_, '_> {
     }
 
     fn get_named_constant_value(
-        &self,
+        &mut self,
         cst_ref: &GlobalReference<ConstantUUID>,
     ) -> ExecutionResult<Value> {
         let concrete_ref = self.execute_global_ref(cst_ref)?;
@@ -431,9 +432,10 @@ impl InstantiationContext<'_, '_> {
             match v {
                 &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
                     let idx_wire = self.get_wire_or_constant_as_wire(idx, domain)?;
+                    let new_int = self.type_substitutor.new_int_type(None, None);
                     self.type_substitutor.unify_report_error(
                         &self.wires[idx_wire].typ,
-                        &self.type_substitutor.new_int_type(None, None),
+                        &new_int,
                         bracket_span.inner_span(),
                         "Caught by typecheck",
                     );
@@ -564,7 +566,9 @@ impl InstantiationContext<'_, '_> {
             return Err((const_span, format!("This compile-time value was not fully resolved by the time it needed to be converted to a wire: {value}")));
         }
         Ok(self.wires.alloc(RealWire {
-            typ: value.get_type(&self.type_substitutor),
+            typ: value
+                .get_type(&mut self.type_substitutor)
+                .map_err(|reason| (const_span, reason))?,
             source: RealWireDataSource::Constant { value },
             original_instruction,
             domain,
@@ -631,7 +635,7 @@ impl InstantiationContext<'_, '_> {
                 source,
                 original_instruction: submod_instance.original_instruction,
                 domain: domain.unwrap_physical(),
-                typ: ConcreteType::Unknown(self.type_substitutor.alloc()),
+                typ: self.type_substitutor.alloc_unknown(),
                 name: self
                     .unique_name_producer
                     .get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
@@ -709,14 +713,28 @@ impl InstantiationContext<'_, '_> {
                     path,
                 }
             }
-            &ExpressionSource::UnaryOp { op, right } => {
-                let right = self.get_wire_or_constant_as_wire(right, domain)?;
-                RealWireDataSource::UnaryOp { op, right }
+            ExpressionSource::UnaryOp { op, rank, right } => {
+                let right = self.get_wire_or_constant_as_wire(*right, domain)?;
+                RealWireDataSource::UnaryOp {
+                    op: *op,
+                    rank: rank.count_unwrap(),
+                    right,
+                }
             }
-            &ExpressionSource::BinaryOp { op, left, right } => {
-                let left = self.get_wire_or_constant_as_wire(left, domain)?;
-                let right = self.get_wire_or_constant_as_wire(right, domain)?;
-                RealWireDataSource::BinaryOp { op, left, right }
+            ExpressionSource::BinaryOp {
+                op,
+                rank,
+                left,
+                right,
+            } => {
+                let left = self.get_wire_or_constant_as_wire(*left, domain)?;
+                let right = self.get_wire_or_constant_as_wire(*right, domain)?;
+                RealWireDataSource::BinaryOp {
+                    op: *op,
+                    rank: rank.count_unwrap(),
+                    left,
+                    right,
+                }
             }
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut array_wires = Vec::with_capacity(arr.len());
@@ -732,7 +750,7 @@ impl InstantiationContext<'_, '_> {
         };
         Ok(self.wires.alloc(RealWire {
             name: self.unique_name_producer.get_unique_name(""),
-            typ: ConcreteType::Unknown(self.type_substitutor.alloc()),
+            typ: self.type_substitutor.alloc_unknown(),
             original_instruction,
             domain,
             source,
@@ -793,7 +811,7 @@ impl InstantiationContext<'_, '_> {
     }
 
     fn execute_global_ref<ID: Copy>(
-        &self,
+        &mut self,
         global_ref: &GlobalReference<ID>,
     ) -> ExecutionResult<ConcreteGlobalReference<ID>> {
         let template_args =
@@ -807,7 +825,7 @@ impl InstantiationContext<'_, '_> {
                                 self.generation_state.get_generation_value(*v)?.clone(),
                             ),
                         },
-                        None => ConcreteType::Unknown(self.type_substitutor.alloc()),
+                        None => self.type_substitutor.alloc_unknown(),
                     })
                 })?;
         Ok(ConcreteGlobalReference {
@@ -816,7 +834,7 @@ impl InstantiationContext<'_, '_> {
         })
     }
 
-    fn compute_compile_time_wireref(&self, wire_ref: &WireReference) -> ExecutionResult<Value> {
+    fn compute_compile_time_wireref(&mut self, wire_ref: &WireReference) -> ExecutionResult<Value> {
         let mut work_on_value: Value = match &wire_ref.root {
             &WireReferenceRoot::LocalDecl(decl_id, _span) => {
                 self.generation_state.get_generation_value(decl_id)?.clone()
@@ -840,34 +858,73 @@ impl InstantiationContext<'_, '_> {
         Ok(work_on_value)
     }
     fn compute_compile_time(&mut self, expression: &Expression) -> ExecutionResult<Value> {
+        fn duplicate_for_all_array_ranks<const SZ: usize>(
+            values: &[&Value; SZ],
+            rank: usize,
+            f: &mut impl FnMut(&[&Value; SZ]) -> Result<Value, String>,
+        ) -> Result<Value, String> {
+            if rank == 0 {
+                f(values)
+            } else {
+                let all_arrs: [_; SZ] = std::array::from_fn(|i| values[i].unwrap_array());
+
+                let len = all_arrs[0].len();
+                if !all_arrs.iter().all(|a| len == a.len()) {
+                    let lens: [String; SZ] = std::array::from_fn(|i| all_arrs[i].len().to_string());
+                    return Err(format!(
+                        "Higher Rank array operation's arrays don't match in size: {}",
+                        lens.join(", ")
+                    ));
+                }
+                let mut results = Vec::with_capacity(len);
+                for j in 0..len {
+                    let values_parts: [_; SZ] = std::array::from_fn(|i| &all_arrs[i][j]);
+                    results.push(duplicate_for_all_array_ranks(&values_parts, rank - 1, f)?);
+                }
+                Ok(Value::Array(results))
+            }
+        }
+
         Ok(match &expression.source {
             ExpressionSource::WireRef(wire_ref) => {
                 self.compute_compile_time_wireref(wire_ref)?.clone()
             }
-            &ExpressionSource::UnaryOp { op, right } => {
-                let right_val = self.generation_state.get_generation_value(right)?;
-                compute_unary_op(op, right_val)
+            ExpressionSource::UnaryOp { op, rank, right } => {
+                let right_val = self.generation_state.get_generation_value(*right)?;
+                duplicate_for_all_array_ranks(&[right_val], rank.count_unwrap(), &mut |[v]| {
+                    Ok(compute_unary_op(*op, v))
+                })
+                .unwrap()
             }
-            &ExpressionSource::BinaryOp { op, left, right } => {
-                let left_val = self.generation_state.get_generation_value(left)?;
-                let right_val = self.generation_state.get_generation_value(right)?;
+            ExpressionSource::BinaryOp {
+                op,
+                rank,
+                left,
+                right,
+            } => {
+                let left_val = self.generation_state.get_generation_value(*left)?;
+                let right_val = self.generation_state.get_generation_value(*right)?;
 
-                match op {
-                    BinaryOperator::Divide | BinaryOperator::Modulo => {
-                        if right_val.unwrap_integer() == &ibig::ibig!(0) {
-                            return Err((
-                                expression.span,
-                                format!(
-                                    "Divide or Modulo by zero: {} / 0",
-                                    left_val.unwrap_integer()
-                                ),
-                            ));
+                duplicate_for_all_array_ranks(
+                    &[left_val, right_val],
+                    rank.count_unwrap(),
+                    &mut |[l, r]| {
+                        match op {
+                            BinaryOperator::Divide | BinaryOperator::Modulo => {
+                                if right_val.unwrap_integer() == &ibig::ibig!(0) {
+                                    return Err(format!(
+                                        "Divide or Modulo by zero: {} / 0",
+                                        l.unwrap_integer()
+                                    ));
+                                }
+                            }
+                            _ => {}
                         }
-                    }
-                    _ => {}
-                }
 
-                compute_binary_op(left_val, op, right_val)
+                        Ok(compute_binary_op(l, *op, r))
+                    },
+                )
+                .map_err(|reason| (expression.span, reason))?
             }
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut result = Vec::with_capacity(arr.len());
@@ -1094,7 +1151,6 @@ mod tests {
 
         let a_factorial = factorial(a.clone());
         let a_b_factorial = factorial(&a - &b);
-        dbg!(&a_factorial, &a_b_factorial);
 
         assert_eq!(
             falling_factorial(a.clone(), &b),

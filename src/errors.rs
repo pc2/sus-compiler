@@ -1,7 +1,6 @@
 use crate::prelude::*;
 
 use std::cell::RefCell;
-use std::thread::panicking;
 
 use crate::{alloc::ArenaAllocator, typing::template::Parameter};
 
@@ -76,6 +75,32 @@ impl ErrorStore {
     /// Returns true if no errors have been reported
     pub fn is_untouched(&self) -> bool {
         self.errors.is_empty()
+    }
+
+    pub fn push(&mut self, err: CompileError) -> usize {
+        self.did_error |= err.level == ErrorLevel::Error;
+        let pos = self.errors.len();
+        self.errors.push(err);
+        pos
+    }
+
+    pub fn append(&mut self, errs: &ErrorStore) {
+        self.did_error |= errs.did_error;
+        self.errors.extend_from_slice(&errs.errors);
+    }
+
+    pub fn sort(&mut self) {
+        self.errors.sort_by_key(|a| a.position.as_range().start);
+    }
+}
+
+impl IntoIterator for ErrorStore {
+    type Item = CompileError;
+
+    type IntoIter = std::vec::IntoIter<CompileError>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.errors.into_iter()
     }
 }
 
@@ -157,9 +182,7 @@ impl<'linker> ErrorCollector<'linker> {
         self.assert_span_good(position);
 
         let mut store = self.error_store.borrow_mut();
-        store.did_error |= level == ErrorLevel::Error;
-        let pos = store.errors.len();
-        store.errors.push(CompileError {
+        let pos = store.push(CompileError {
             position,
             reason,
             infos: Vec::new(),
@@ -197,7 +220,7 @@ impl<'linker> ErrorCollector<'linker> {
 
 impl Drop for ErrorCollector<'_> {
     fn drop(&mut self) {
-        if !self.error_store.borrow().is_untouched() && !panicking() {
+        if !self.error_store.borrow().is_untouched() && !std::thread::panicking() {
             panic!("ErrorCollector should have been emptied!");
         }
     }

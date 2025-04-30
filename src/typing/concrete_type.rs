@@ -6,18 +6,16 @@ use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::zip_eq;
 use crate::alloc::UUID;
-use crate::flattening::StructType;
-use crate::linker::LinkInfo;
+use crate::linker::GlobalUUID;
 use crate::prelude::*;
-use std::ops::{Deref, Index};
+use std::ops::Deref;
 
 use crate::value::Value;
 
 use super::template::TVec;
 
 use super::type_inference::ConcreteTypeVariableID;
-use super::type_inference::ConcreteTypeVariableIDMarker;
-use super::type_inference::HindleyMilner;
+use super::type_inference::Substitutor;
 use super::type_inference::TypeSubstitutor;
 
 pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
@@ -38,11 +36,11 @@ impl<ID> ConcreteGlobalReference<ID> {
     pub fn is_final(&self) -> bool {
         !self.template_args.iter().any(|(_, v)| v.contains_unknown())
     }
-    pub fn pretty_print_concrete_instance(
-        &self,
-        target_link_info: &LinkInfo,
-        linker_types: &impl Index<TypeUUID, Output = StructType>,
-    ) -> String {
+    pub fn pretty_print_concrete_instance(&self, linker: &Linker) -> String
+    where
+        ID: Into<GlobalUUID> + Copy,
+    {
+        let target_link_info = linker.get_link_info(self.id.into());
         assert!(self.template_args.len() == target_link_info.template_parameters.len());
         let object_full_name = target_link_info.get_full_name();
         if self.template_args.is_empty() {
@@ -56,7 +54,7 @@ impl<ID> ConcreteGlobalReference<ID> {
             write!(result, "    {}: ", arg_in_target.name).unwrap();
             match arg {
                 ConcreteType::Named(_) | ConcreteType::Array(_) => {
-                    writeln!(result, "type {},", arg.display(linker_types)).unwrap();
+                    writeln!(result, "type {},", arg.display(&linker.types)).unwrap();
                 }
                 ConcreteType::Value(value) => {
                     writeln!(result, "{value},").unwrap();
@@ -94,6 +92,13 @@ pub enum ConcreteType {
 impl ConcreteType {
     pub fn new_int(int: IBig) -> Self {
         Self::Value(Value::Integer(int))
+    }
+    pub fn new_arrays_of(self, tensor_sizes: &[usize]) -> Self {
+        let mut result = self;
+        for s in tensor_sizes.iter().rev() {
+            result = ConcreteType::Array(Box::new((result, ConcreteType::new_int(IBig::from(*s)))));
+        }
+        result
     }
     #[track_caller]
     pub fn unwrap_value(&self) -> &Value {
@@ -178,12 +183,9 @@ impl ConcreteType {
             _other => todo!("Other Named Structs are not implemented yet"),
         }
     }
-    pub fn try_fully_substitute(
-        &self,
-        substitutor: &TypeSubstitutor<Self, ConcreteTypeVariableIDMarker>,
-    ) -> Option<Self> {
+    pub fn try_fully_substitute(&self, substitutor: &TypeSubstitutor<Self>) -> Option<Self> {
         let mut self_clone = self.clone();
-        if self_clone.fully_substitute(substitutor) {
+        if substitutor.fully_substitute(&mut self_clone) {
             Some(self_clone)
         } else {
             None

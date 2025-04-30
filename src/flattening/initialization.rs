@@ -5,7 +5,7 @@ use crate::linker::{IsExtern, AFTER_INITIAL_PARSE_CP};
 use crate::prelude::*;
 
 use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
-use crate::{file_position::FileText, flattening::Module, instantiation::InstantiationCache};
+use crate::{file_position::FileText, flattening::Module};
 
 use crate::typing::template::{
     GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind,
@@ -275,7 +275,7 @@ impl InitializationContext<'_> {
 pub fn gather_initial_file_data(mut builder: FileBuilder) {
     assert!(builder.file_data.associated_values.is_empty());
 
-    let mut cursor = match Cursor::new_at_root(builder.tree, &builder.file_data.file_text) {
+    let mut cursor = match Cursor::new_at_root(builder.tree, builder.file_data) {
         Ok(cursor) => cursor,
         Err(file_span) => {
             builder
@@ -345,10 +345,7 @@ fn initialize_global_object(
     let (name_span, name) = ctx.gather_initial_global_object(cursor);
 
     let mut link_info = LinkInfo {
-        type_variable_alloc: TypingAllocator {
-            domain_variable_alloc: UUIDAllocator::new(),
-            type_variable_alloc: UUIDAllocator::new(),
-        },
+        type_variable_alloc: None,
         template_parameters: ctx.parameters,
         instructions: FlatAlloc::new(),
         documentation: cursor.extract_gathered_comments(),
@@ -377,7 +374,6 @@ fn initialize_global_object(
                 domains: ctx.domains,
                 implicit_clk_domain: ctx.implicit_clk_domain,
                 interfaces: ctx.interfaces,
-                instantiations: InstantiationCache::new(),
             });
         }
         GlobalObjectKind::Struct => {

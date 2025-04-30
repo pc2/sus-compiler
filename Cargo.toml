@@ -26,7 +26,7 @@ members = [
 ariadne = "0.5.1" # for nice errors
 ibig = { version = "0.3.6", default-features = false, features = ["std"] }
 clap = { version = "4.5.21", features = ["derive", "wrap_help"] }
-bitvector = "0.1.5"
+circular-buffer = "0.1.9"
 
 # Tree sitter
 tree-sitter = "~0.24.7"
@@ -43,6 +43,9 @@ sus-proc-macro = {version = "~0.3.0-devel", path = "./sus-proc-macro"}
 # moore-circt = {version = "0.14.0", optional = true}
 # moore-circt-sys = {version = "0.14.0", optional = true}
 
+#dot
+dot = {version = "0.1.4", optional = true}
+
 #lsp
 lsp-server = {version = "0.7.1", optional = true}
 lsp-types = {version = "0.94.0", optional = true}
@@ -53,7 +56,7 @@ serde = {version = "1.0.156", optional = true}
 dirs-next = "2.0.0"
 
 [features]
-default = ["lsp"]
+default = ["lsp", "dot"]
 
 lsp = ["lsp-server", "lsp-types", "serde_json", "serde"]
 # codegen = ["calyx-ir", "calyx-opt", "calyx-backend"]

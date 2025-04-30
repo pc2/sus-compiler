@@ -1,6 +1,7 @@
 use crate::alloc::zip_eq;
 use crate::prelude::*;
 
+use crate::typing::abstract_type::{AbstractInnerType, PeanoType};
 use crate::typing::template::{Parameter, TVec};
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
@@ -9,7 +10,7 @@ use crate::flattening::{
 };
 use crate::linker::{FileData, LinkInfo};
 use crate::typing::{
-    abstract_type::{AbstractType, DomainType},
+    abstract_type::{AbstractRankedType, DomainType},
     concrete_type::ConcreteType,
 };
 
@@ -92,41 +93,58 @@ impl WrittenType {
 }
 
 #[derive(Debug)]
-pub struct AbstractTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
-    inner: &'a AbstractType,
+pub struct AbstractRankedTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
+    typ: &'a AbstractRankedType,
     linker_types: &'a TypVec,
     template_names: &'a TemplateVec,
 }
 
 impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
-    for AbstractTypeDisplay<'_, TypVec, TemplateVec>
+    for AbstractRankedTypeDisplay<'_, TypVec, TemplateVec>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.inner {
-            AbstractType::Unknown(id) => write!(f, "{id:?}"),
-            AbstractType::Template(id) => f.write_str(self.template_names.get_template_name(*id)),
-            AbstractType::Named(id) => {
+        match &self.typ.inner {
+            AbstractInnerType::Unknown(id) => write!(f, "{id:?}"),
+            AbstractInnerType::Template(id) => {
+                f.write_str(self.template_names.get_template_name(*id))
+            }
+            AbstractInnerType::Named(id) => {
                 f.write_str(&self.linker_types[*id].link_info.get_full_name())
             }
-            AbstractType::Array(sub) => write!(
-                f,
-                "{}[]",
-                sub.deref().display(self.linker_types, self.template_names)
-            ),
         }
+        .and_then(|_| f.write_fmt(format_args!("{}", &self.typ.rank)))
     }
 }
 
-impl AbstractType {
+impl AbstractRankedType {
     pub fn display<'a>(
         &'a self,
         linker_types: &'a impl Index<TypeUUID, Output = StructType>,
         template_names: &'a impl TemplateNameGetter,
     ) -> impl Display + 'a {
-        AbstractTypeDisplay {
-            inner: self,
+        AbstractRankedTypeDisplay {
+            typ: self,
             linker_types,
             template_names,
+        }
+    }
+}
+
+impl Display for PeanoType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut cur = self;
+        loop {
+            match cur {
+                PeanoType::Zero => return Ok(()),
+                PeanoType::Succ(inner) => {
+                    f.write_str("[]")?;
+                    cur = inner;
+                }
+                PeanoType::Unknown(var) => {
+                    write!(f, "[...{var:?}]")?;
+                    return Ok(());
+                }
+            }
         }
     }
 }

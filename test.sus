@@ -1274,3 +1274,92 @@ module CombineArray {
 
 	int[4] result = []
 }
+
+module unknownLatency #(int V) {
+	interface unknownLatency : bool a'0 -> bool b'5
+
+	b = a
+}
+
+module useUnknownLatency {
+	input bool x'0
+	output bool y
+
+	unknownLatency ulat
+
+	y = ulat(x)
+}
+
+module infer_me_conflicting_directions #(int V) {
+	interface a: bool x'0 -> bool y'V
+
+	interface b: bool p'0 -> bool q'-V
+}
+
+module use_infer_me_conflicting_directions {
+	interface use_infer_me_conflicting_directions: bool x'0 -> bool y'-1
+
+	infer_me_conflicting_directions inf
+
+	y = inf.a(x)
+	y = inf.b(x)
+}
+
+module infer_me_with_delta #(int V) {
+	interface a: bool x'0 -> bool y'V
+
+	interface b: bool p'0 -> bool q'V+30
+}
+
+module use_infer_me_with_delta {
+	interface use_infer_me_with_delta: bool x'0 -> bool y'-1
+
+	infer_me_with_delta inf
+
+	y = inf.a(x)
+	y = inf.b(x)
+}
+
+module infer_me_with_negative_delta #(int V) {
+	interface a: bool x'0 -> bool y'-V
+
+	interface b: bool p'0 -> bool q'-V+30
+}
+
+module use_infer_me_with_negative_delta {
+	interface use_infer_me_with_negative_delta: bool x'0 -> bool y'-1
+
+	infer_me_with_negative_delta inf
+
+	y = inf.a(x)
+	y = inf.b(x)
+}
+
+module infer_me_inputs_only #(int V) {
+	interface infer_me_inputs_only : bool a'0, bool b'V
+}
+
+module use_infer_me_inputs_only {
+	interface use_infer_me_inputs_only : bool x'0
+
+
+	reg reg reg bool y = x
+
+	infer_me_inputs_only(x, y)
+}
+
+
+module use_ranks {
+	gen int[15] v = [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5]
+
+	gen int[15] vv = v + v
+
+	gen int[16] vvv = [1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 6]
+
+	gen int[3] qzd = vv + vvv
+
+	state int[15] wire_v
+
+	wire_v = wire_v + vv
+}
+

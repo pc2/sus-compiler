@@ -21,8 +21,10 @@
             },
             "sourceLanguages": ["rust"],
             "args": [
-                "--debug",
-                "--debug-latency",
+                //"--debug", "dot-latency-problem",
+                //"--debug", "dot-latency-infer",
+                "--debug-whitelist", "TEST",
+                "--debug", "TEST", // Temporary to add in code when debugging
                 "tinyTestFile.sus",
             ],
             "cwd": "${workspaceFolder}"
@@ -44,8 +46,6 @@
             },
             "sourceLanguages": ["rust"],
             "args": [
-                "--debug",
-                "--debug-latency",
                 "--module-and-dependencies",
                 "BitSerialMatrixMultiply",
             ],

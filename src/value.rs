@@ -2,13 +2,12 @@ use std::ops::Deref;
 
 use ibig::IBig;
 
+use crate::alloc::FlatAlloc;
 use crate::flattening::{BinaryOperator, UnaryOperator};
 use sus_proc_macro::get_builtin_type;
 
-use crate::typing::{
-    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE},
-    type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor},
-};
+use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType, BOOL_CONCRETE_TYPE};
+use crate::typing::type_inference::{Substitutor, TypeSubstitutor};
 
 /// Top type for any kind of compiletime value while executing.
 ///
@@ -23,26 +22,6 @@ pub enum Value {
     Error,
 }
 
-impl ConcreteType {
-    /// On the road to implementing subtyping. Takes in a list of types,
-    /// and computes the smallest supertype that all list elements can coerce to.
-    /// TODO integrate into Hindley-Milner more closely
-    fn get_smallest_common_supertype(
-        list: &[Self],
-        type_substitutor: &TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
-    ) -> Option<Self> {
-        let mut iter = list.iter();
-
-        let first = iter.next()?.clone();
-
-        for elem in iter {
-            type_substitutor.unify_must_succeed(&first, elem);
-        }
-
-        Some(first)
-    }
-}
-
 impl Value {
     /// Traverses the Value, to create a best-effort [ConcreteType] for it.
     /// So '1' becomes `ConcreteType::Named(ConcreteGlobalReference{id: get_builtin_type!("int"), ...}})`,
@@ -51,30 +30,83 @@ impl Value {
     /// Panics when arrays contain mutually incompatible types
     pub fn get_type(
         &self,
-        type_substitutor: &TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
-    ) -> ConcreteType {
-        match self {
-            Value::Bool(_) => BOOL_CONCRETE_TYPE,
-            Value::Integer(value) => {
-                type_substitutor.new_int_type(Some(value.clone()), Some(value + 1))
-            }
-            Value::Array(arr) => {
-                let typs_arr: Vec<ConcreteType> = arr
-                    .iter()
-                    .map(|elem| elem.get_type(type_substitutor))
-                    .collect();
+        type_substitutor: &mut TypeSubstitutor<ConcreteType>,
+    ) -> Result<ConcreteType, String> {
+        let mut tensor_sizes = Vec::new();
 
-                let shared_supertype =
-                    ConcreteType::get_smallest_common_supertype(&typs_arr, type_substitutor)
-                        .unwrap_or_else(|| ConcreteType::Unknown(type_substitutor.alloc()));
+        enum ValuesRange {
+            Bool,
+            Int { min: IBig, max: IBig },
+        }
 
-                ConcreteType::Array(Box::new((
-                    shared_supertype,
-                    ConcreteType::Value(Value::Integer(arr.len().into())),
-                )))
+        let mut result_range: Option<ValuesRange> = None;
+
+        self.get_tensor_size_recursive(0, &mut tensor_sizes, &mut |v| {
+            match (&mut result_range, v) {
+                (None, Value::Bool(_)) => result_range = Some(ValuesRange::Bool),
+                (Some(ValuesRange::Bool), Value::Bool(_)) => {} // OK
+                (None, Value::Integer(v)) => {
+                    result_range = Some(ValuesRange::Int {
+                        min: v.clone(),
+                        max: v.clone(),
+                    })
+                }
+                (Some(ValuesRange::Int { min, max }), Value::Integer(v)) => {
+                    if v < min {
+                        *min = v.clone();
+                    }
+                    if v > max {
+                        *max = v.clone();
+                    }
+                }
+                (Some(_), Value::Bool(_)) | (Some(_), Value::Integer(_)) => {
+                    unreachable!("Differing types is caught by abstract typecheck!")
+                }
+                (_, Value::Array(_)) => {
+                    unreachable!("All arrays handled by get_tensor_size_recursive")
+                }
+                (_, Value::Unset) | (_, Value::Error) => {
+                    return Err("This compile-time constant contains a Unset or Error".into());
+                }
+            };
+            Ok(())
+        })?;
+
+        let content_typ = match result_range {
+            Some(ValuesRange::Bool) => BOOL_CONCRETE_TYPE,
+            Some(ValuesRange::Int { min, max }) => ConcreteType::Named(ConcreteGlobalReference {
+                id: get_builtin_type!("int"),
+                template_args: FlatAlloc::from_vec(vec![
+                    ConcreteType::new_int(min),
+                    ConcreteType::new_int(max + 1),
+                ]),
+            }),
+            None => type_substitutor.alloc_unknown(),
+        };
+
+        Ok(content_typ.new_arrays_of(&tensor_sizes))
+    }
+    fn get_tensor_size_recursive(
+        &self,
+        depth: usize,
+        tensor_sizes: &mut Vec<usize>,
+        elem_fn: &mut impl FnMut(&Value) -> Result<(), String>,
+    ) -> Result<(), String> {
+        if let Value::Array(values) = self {
+            if let Some(sz) = tensor_sizes.get(depth) {
+                if *sz != values.len() {
+                    return Err("Value is a Jagged Tensor. This is not allowed!".into());
+                }
+            } else {
+                assert!(tensor_sizes.len() == depth);
+                tensor_sizes.push(values.len());
             }
-            Value::Unset => ConcreteType::Unknown(type_substitutor.alloc()),
-            Value::Error => unreachable!("{self:?}"),
+            for v in values {
+                v.get_tensor_size_recursive(depth + 1, tensor_sizes, elem_fn)?;
+            }
+            Ok(())
+        } else {
+            elem_fn(self)
         }
     }
     pub fn is_of_type(&self, typ: &ConcreteType) -> bool {
@@ -131,6 +163,13 @@ impl Value {
             panic!("{:?} is not a bool!", self)
         };
         *b
+    }
+
+    pub fn unwrap_array(&self) -> &[Value] {
+        let Self::Array(arr) = self else {
+            panic!("{:?} is not an array!", self)
+        };
+        arr
     }
 }
 

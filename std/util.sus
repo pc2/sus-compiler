@@ -4,14 +4,14 @@ module DualPortMem #(T, int SIZE) {
 	state T[SIZE] mem
 
 	domain write_clk
-	interface write : bool write, int addr, T data
+	interface write : bool write'0, int addr'0, T data'0
 
 	when write {
 		mem[addr] = data
 	}
 
 	domain read_clk
-	interface read : int read_addr -> T read_data
+	interface read : int read_addr'0 -> T read_data'0
 
 	CrossDomain #(T: type T[SIZE]) cross_mem
 	cross_mem.in = mem

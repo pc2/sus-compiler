@@ -1,2 +1,20 @@
 // USE THIS FILE TO TEST SMALL SAMPLES OF SUS CODE IN ISOLATION. 
 // DO NOT COMMIT
+// To use with VSCode debugger, name the module "TEST", and in the code use `if crate::debug::is_enabled("TEST") {}` to enable breakpoint code
+
+// Recursive Tree Add module recurses smaller copies of itself. 
+
+module infer_me_with_delta_d #(int V) {
+	interface a: bool x'0 -> bool y'V
+
+	interface b: bool p'0 -> bool q'V+30
+}
+
+module TEST {
+	interface use_infer_me_with_delta: bool x'0 -> bool y'-1
+
+	infer_me_with_delta_d inf
+
+	y = inf.a(x)
+	y = inf.b(x)
+}
