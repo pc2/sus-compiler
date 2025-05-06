@@ -254,6 +254,12 @@ struct AssignLeftSideObject {
     is_generative: bool,
 }
 
+#[derive(Clone, Copy)]
+enum InterfacePortsInfo {
+    InputsThenOutputs,
+    OutputsThenInputs,
+    ConditionalBindings,
+}
 struct FlatteningContext<'l, 'errs> {
     globals: &'l GlobalResolver<'l>,
     errors: &'errs ErrorCollector<'l>,
@@ -272,8 +278,8 @@ struct FlatteningContext<'l, 'errs> {
     default_declaration_context: DeclarationContext,
 }
 
-impl FlatteningContext<'_, '_> {
-    fn flatten_parameters(&mut self, cursor: &mut Cursor) {
+impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
+    fn flatten_parameters(&mut self, cursor: &mut Cursor<'c>) {
         let mut parameters_to_visit = self
             .working_on_link_info
             .template_parameters
@@ -292,7 +298,11 @@ impl FlatteningContext<'_, '_> {
 
                         let name_span = selected_arg.name_span;
 
-                        self.alloc_local_name(name_span, NamedLocal::TemplateType(claimed_type_id));
+                        self.alloc_local_name(
+                            name_span,
+                            &cursor.file_data.file_text[name_span],
+                            NamedLocal::TemplateType(claimed_type_id),
+                        );
                     }),
                     kind!("declaration") => {
                         let _ = self.flatten_declaration::<false>(
@@ -316,11 +326,22 @@ impl FlatteningContext<'_, '_> {
         }
     }
 
+    fn flatten_latency_specifier(&mut self, cursor: &mut Cursor<'c>) -> Option<(FlatID, Span)> {
+        cursor.optional_field(field!("latency_specifier")).then(|| {
+            cursor.go_down_content(kind!("latency_specifier"), |cursor| {
+                let (expr, is_generative) = self.flatten_expr(cursor);
+                let span = cursor.span();
+                self.must_be_generative(is_generative, "Latency Specifier", span);
+                (expr, span)
+            })
+        })
+    }
+
     fn flatten_template_args(
         &mut self,
         found_global: GlobalUUID,
         has_template_args: bool,
-        cursor: &mut Cursor,
+        cursor: &mut Cursor<'c>,
     ) -> TVec<Option<TemplateArg>> {
         let link_info = self.globals.get_link_info(found_global);
         let full_object_name = link_info.get_full_name();
@@ -334,10 +355,8 @@ impl FlatteningContext<'_, '_> {
 
         cursor.list(kind!("template_args"), |cursor| {
             cursor.go_down(kind!("template_arg"), |cursor| {
-                let name_span =
+                let (name_span, name) =
                     cursor.field_span(field!("name"), kind!("identifier"));
-
-                let name = &self.globals.file_data.file_text[name_span];
 
                 let name_found = link_info.template_parameters.iter().find(|(_id, arg)| arg.name == name);
                 if name_found.is_none() {
@@ -417,7 +436,7 @@ impl FlatteningContext<'_, '_> {
         template_arg_map
     }
 
-    fn flatten_local_or_template_global(&mut self, cursor: &mut Cursor) -> LocalOrGlobal {
+    fn flatten_local_or_template_global(&mut self, cursor: &mut Cursor<'c>) -> LocalOrGlobal {
         cursor.go_down(kind!("template_global"), |cursor| {
             let mut must_be_global = cursor.optional_field(field!("is_global_path"));
 
@@ -441,7 +460,7 @@ impl FlatteningContext<'_, '_> {
                 let [local_name] = name_path.as_slice() else {
                     unreachable!()
                 };
-                let name_text = &self.globals.file_data.file_text[*local_name];
+                let name_text = &cursor.file_data.file_text[*local_name];
                 if let Some(decl_id) = self.local_variable_context.get_declaration_for(name_text) {
                     return LocalOrGlobal::Local(*local_name, decl_id);
                 }
@@ -452,7 +471,10 @@ impl FlatteningContext<'_, '_> {
                 self.errors.todo(name_path[1], "Namespaces");
                 return LocalOrGlobal::NotFound(name_path[0]);
             };
-            if let Some(global_id) = self.globals.resolve_global(name_span) {
+            if let Some(global_id) = self
+                .globals
+                .resolve_global(name_span, &cursor.file_data.file_text[name_span])
+            {
                 // MUST Still be at field!("template_args")
                 let template_span =
                     template_args_used.then(|| BracketSpan::from_outer(cursor.span()));
@@ -492,7 +514,7 @@ impl FlatteningContext<'_, '_> {
         })
     }
 
-    fn flatten_array_type(&mut self, span: Span, cursor: &mut Cursor) -> WrittenType {
+    fn flatten_array_type(&mut self, span: Span, cursor: &mut Cursor<'c>) -> WrittenType {
         cursor.go_down(kind!("array_type"), |cursor| {
             cursor.field(field!("arr"));
             let array_element_type = self.flatten_type(cursor);
@@ -509,7 +531,7 @@ impl FlatteningContext<'_, '_> {
         })
     }
 
-    fn flatten_type(&mut self, cursor: &mut Cursor) -> WrittenType {
+    fn flatten_type(&mut self, cursor: &mut Cursor<'c>) -> WrittenType {
         let ModuleOrWrittenType::WrittenType(wr_typ) = self.flatten_module_or_type::<false>(cursor)
         else {
             unreachable!("Can't not be type")
@@ -519,7 +541,7 @@ impl FlatteningContext<'_, '_> {
 
     fn flatten_module_or_type<const ALLOW_MODULES: bool>(
         &mut self,
-        cursor: &mut Cursor,
+        cursor: &mut Cursor<'c>,
     ) -> ModuleOrWrittenType {
         let accepted_text = if ALLOW_MODULES {
             "Type or Module"
@@ -588,10 +610,10 @@ impl FlatteningContext<'_, '_> {
         }
     }
 
-    fn alloc_local_name(&mut self, name_span: Span, named_local: NamedLocal) {
+    fn alloc_local_name(&mut self, name_span: Span, name: &'c str, named_local: NamedLocal) {
         if let Err(conflict) = self
             .local_variable_context
-            .add_declaration(&self.globals.file_data.file_text[name_span], named_local)
+            .add_declaration(name, named_local)
         {
             let err_ref = self.errors.error(
                 name_span,
@@ -642,7 +664,7 @@ impl FlatteningContext<'_, '_> {
         declaration_context: DeclarationContext,
         mut read_only: bool,
         declaration_itself_is_not_written_to: bool,
-        cursor: &mut Cursor,
+        cursor: &mut Cursor<'c>,
     ) -> FlatID {
         let whole_declaration_span = cursor.span();
         cursor.go_down(kind!("declaration"), |cursor| {
@@ -742,15 +764,9 @@ impl FlatteningContext<'_, '_> {
             let decl_span = Span::new_overarching(cursor.span(), whole_declaration_span.empty_span_at_end());
             let typ_or_module_expr = self.flatten_module_or_type::<ALLOW_MODULES>(cursor);
 
-            let name_span = cursor.field_span(field!("name"), kind!("identifier"));
+            let (name_span, name) = cursor.field_span(field!("name"), kind!("identifier"));
 
-            let span_latency_specifier = if cursor.optional_field(field!("latency_specifier")) {
-                cursor.go_down_content(kind!("latency_specifier"), |cursor| {
-                    let (expr, is_generative) = self.flatten_expr(cursor);
-                    let span = cursor.span();
-                    self.must_be_generative(is_generative, "Latency Specifier", span);
-                    Some((expr, span))
-                })} else {None};
+            let span_latency_specifier = self.flatten_latency_specifier(cursor);
             // Parsing components done
 
             let documentation = cursor.extract_gathered_comments();
@@ -764,17 +780,13 @@ impl FlatteningContext<'_, '_> {
                     if let Some((_, span)) = span_latency_specifier {
                         self.errors.error(span, "Cannot add latency specifier to module instances");
                     }
-                    let name = &self.globals.file_data.file_text[name_span];
-
                     let submod_id = self.alloc_submodule_instruction(module_ref, Some((name.to_owned(), name_span)), documentation);
 
-                    self.alloc_local_name(name_span, NamedLocal::SubModule(submod_id));
+                    self.alloc_local_name(name_span, name, NamedLocal::SubModule(submod_id));
 
                     return submod_id
                 }
             };
-
-            let name = &self.globals.file_data.file_text[name_span];
 
             if decl_kind.implies_read_only() {
                 read_only = true;
@@ -795,7 +807,7 @@ impl FlatteningContext<'_, '_> {
                 documentation
             }));
 
-            self.alloc_local_name(name_span, NamedLocal::Declaration(decl_id));
+            self.alloc_local_name(name_span, name, NamedLocal::Declaration(decl_id));
 
             decl_id
         })
@@ -803,7 +815,7 @@ impl FlatteningContext<'_, '_> {
 
     fn flatten_array_bracket(
         &mut self,
-        cursor: &mut Cursor,
+        cursor: &mut Cursor<'c>,
     ) -> (FlatID, bool /*Is generative */, BracketSpan) {
         let bracket_span = BracketSpan::from_outer(cursor.span());
         cursor.go_down_content(kind!("array_bracket_expression"), |cursor| {
@@ -823,7 +835,7 @@ impl FlatteningContext<'_, '_> {
     }
 
     /// Returns the ID of the [FuncCallInstruction]
-    fn flatten_func_call(&mut self, cursor: &mut Cursor) -> Option<FlatID> {
+    fn flatten_func_call(&mut self, cursor: &mut Cursor<'c>) -> Option<FlatID> {
         let whole_func_span = cursor.span();
         cursor.go_down(kind!("func_call"), |cursor| {
             cursor.field(field!("name"));
@@ -902,7 +914,7 @@ impl FlatteningContext<'_, '_> {
     }
 
     /// Produces a new [SubModuleInstance] if a global was passed, or a reference to the existing instance if it's referenced by name
-    fn get_or_alloc_module(&mut self, cursor: &mut Cursor) -> Option<ModuleInterfaceReference> {
+    fn get_or_alloc_module(&mut self, cursor: &mut Cursor<'c>) -> Option<ModuleInterfaceReference> {
         let outer_span = cursor.span();
 
         match self.flatten_wire_reference(cursor) {
@@ -958,13 +970,12 @@ impl FlatteningContext<'_, '_> {
         (md, interface)
     }
 
-    /// Returns the expression [FlatID] and if it's generative
-    fn flatten_expr(&mut self, cursor: &mut Cursor) -> (FlatID, bool) {
+    fn flatten_expr(&mut self, cursor: &mut Cursor<'c>) -> (FlatID, bool) {
         let (kind, expr_span) = cursor.kind_span();
 
         let (source, is_generative) = match kind {
             kind!("number") => {
-                let text = &self.globals.file_data.file_text[expr_span];
+                let text = &cursor.file_data.file_text[expr_span];
                 use std::str::FromStr;
                 (
                     ExpressionSource::Constant(Value::Integer(IBig::from_str(text).unwrap())),
@@ -1097,7 +1108,7 @@ impl FlatteningContext<'_, '_> {
         )
     }
 
-    fn flatten_wire_reference(&mut self, cursor: &mut Cursor) -> PartialWireReference {
+    fn flatten_wire_reference(&mut self, cursor: &mut Cursor<'c>) -> PartialWireReference {
         let (kind, expr_span) = cursor.kind_span();
         match kind {
         kind!("template_global") => {
@@ -1199,7 +1210,7 @@ impl FlatteningContext<'_, '_> {
                 cursor.field(field!("left"));
                 let flattened_arr_expr = self.flatten_wire_reference(cursor);
 
-                let port_name_span = cursor.field_span(field!("name"), kind!("identifier"));
+                let (port_name_span, port_name) = cursor.field_span(field!("name"), kind!("identifier"));
 
                 match flattened_arr_expr {
                     PartialWireReference::Error => PartialWireReference::Error,
@@ -1218,7 +1229,7 @@ impl FlatteningContext<'_, '_> {
 
                         let submod = &self.globals[submodule.module_ref.id];
 
-                        match submod.get_port_or_interface_by_name(port_name_span, &self.globals.file_data.file_text, self.errors) {
+                        match submod.get_port_or_interface_by_name(port_name_span, port_name, self.errors) {
                             Some(PortOrInterface::Port(port)) => {
                                 let port_info = PortReference{
                                     submodule_name_span : Some(submodule_name_span),
@@ -1271,22 +1282,27 @@ impl FlatteningContext<'_, '_> {
         }
     }
 
-    fn flatten_if_statement(&mut self, cursor: &mut Cursor) {
+    fn flatten_if_statement(&mut self, cursor: &mut Cursor<'c>) {
         cursor.go_down(kind!("if_statement"), |cursor| {
             cursor.field(field!("statement_type"));
-            let keyword_is_if = cursor.kind() == kw!("if");
+            let is_generative = match cursor.kind() {
+                kw!("if") => true,
+                kw!("when") => false,
+                _ => unreachable!(),
+            };
             let position_statement_keyword = cursor.span();
             cursor.field(field!("condition"));
+
             let (condition, condition_is_generative) = self.flatten_expr(cursor);
-            match (keyword_is_if, condition_is_generative) {
+            match (is_generative, condition_is_generative) {
                 (true, false) => {
-                    self.errors.warn(
+                    self.errors.error(
                         position_statement_keyword,
                         "Used 'if' in a non generative context, use 'when' instead",
                     );
                 }
                 (false, true) => {
-                    self.errors.error(
+                    self.errors.warn(
                         position_statement_keyword,
                         "Used 'when' in a generative context, use 'if' instead",
                     );
@@ -1298,39 +1314,45 @@ impl FlatteningContext<'_, '_> {
                 .instructions
                 .alloc(Instruction::IfStatement(IfStatement {
                     condition,
-                    is_generative: keyword_is_if,
-                    then_start: FlatID::PLACEHOLDER,
-                    then_end_else_start: FlatID::PLACEHOLDER,
-                    else_end: FlatID::PLACEHOLDER,
+                    is_generative,
+                    then_block: FlatIDRange::PLACEHOLDER,
+                    else_block: FlatIDRange::PLACEHOLDER,
                 }));
 
-            let then_start = self.instructions.get_next_alloc_id();
             cursor.field(field!("then_block"));
-            self.flatten_code(cursor);
-
-            let then_end_else_start = self.instructions.get_next_alloc_id();
-            if cursor.optional_field(field!("else_block")) {
-                if cursor.kind() == kind!("if_statement") {
-                    self.flatten_if_statement(cursor); // Chained if statements
-                } else {
-                    self.flatten_code(cursor)
-                }
-            };
-            let else_end = self.instructions.get_next_alloc_id();
+            let (then_block, else_block) = self.flatten_then_else_blocks(cursor);
 
             let Instruction::IfStatement(if_stmt) = &mut self.instructions[if_id] else {
                 unreachable!()
             };
-            if_stmt.then_start = then_start;
-            if_stmt.then_end_else_start = then_end_else_start;
-            if_stmt.else_end = else_end;
+            if_stmt.then_block = then_block;
+            if_stmt.else_block = else_block;
         })
+    }
+
+    fn flatten_then_else_blocks(&mut self, cursor: &mut Cursor<'c>) -> (FlatIDRange, FlatIDRange) {
+        let then_block = self.flatten_code(cursor);
+
+        let else_start = self.instructions.get_next_alloc_id();
+        if cursor.optional_field(field!("else_block")) {
+            cursor.go_down(kind!("else_block"), |cursor| {
+                cursor.field(field!("content"));
+                if cursor.kind() == kind!("if_statement") {
+                    self.flatten_if_statement(cursor); // Chained if statements
+                } else {
+                    self.flatten_code(cursor);
+                }
+            })
+        };
+        let else_end = self.instructions.get_next_alloc_id();
+        let else_block = FlatIDRange::new(else_start, else_end);
+        (then_block, else_block)
     }
 
     fn flatten_assign_function_call(
         &mut self,
         to: Vec<(Option<AssignLeftSideObject>, Span)>,
-        cursor: &mut Cursor,
+        cursor: &mut Cursor<'c>,
     ) {
         // Error on all to items that require writing a generative value
         for (left_item, to_span) in &to {
@@ -1421,18 +1443,22 @@ impl FlatteningContext<'_, '_> {
         }
     }
 
-    fn flatten_code(&mut self, cursor: &mut Cursor) {
+    fn flatten_code(&mut self, cursor: &mut Cursor<'c>) -> FlatIDRange {
         let old_frame = self.local_variable_context.new_frame();
 
-        self.flatten_code_keep_context(cursor);
+        let instr_range = self.flatten_code_keep_context(cursor);
 
         self.local_variable_context.pop_frame(old_frame);
+
+        instr_range
     }
-    fn flatten_code_keep_context(&mut self, cursor: &mut Cursor) {
+    /// Returns the range in the [self.instructions] buffer corresponding to the flattened instructions
+    fn flatten_code_keep_context(&mut self, cursor: &mut Cursor<'c>) -> FlatIDRange {
+        let start_of_code = self.instructions.get_next_alloc_id();
+
         cursor.clear_gathered_comments(); // Clear comments at the start of a block
         cursor.list(kind!("block"), |cursor| {
-            let kind = cursor.kind();
-            match kind {
+            match cursor.kind() {
                 kind!("assign_left_side") => {
                 self.flatten_standalone_decls(cursor);
             } kind!("decl_assign_statement") => {
@@ -1482,17 +1508,13 @@ impl FlatteningContext<'_, '_> {
 
                     let for_id = self.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: FlatIDRange::PLACEHOLDER}));
 
-                    let code_start = self.instructions.get_next_alloc_id();
-
                     cursor.field(field!("block"));
                     // We already started a new local_variable_context to include the loop var
-                    self.flatten_code_keep_context(cursor);
-
-                    let code_end = self.instructions.get_next_alloc_id();
+                    let loop_body = self.flatten_code_keep_context(cursor);
 
                     let Instruction::ForStatement(for_stmt) = &mut self.instructions[for_id] else {unreachable!()};
 
-                    for_stmt.loop_body = FlatIDRange::new(code_start, code_end);
+                    for_stmt.loop_body = loop_body;
 
                     self.local_variable_context.pop_frame(loop_var_decl_frame);
                 })
@@ -1502,7 +1524,7 @@ impl FlatteningContext<'_, '_> {
                     cursor.field(field!("name"));
 
                     if cursor.optional_field(field!("interface_ports")) {
-                        self.flatten_interface_ports(cursor);
+                        self.flatten_interface_ports(cursor, InterfacePortsInfo::InputsThenOutputs);
                     }
                 });
             } kind!("domain_statement") => {
@@ -1513,9 +1535,12 @@ impl FlatteningContext<'_, '_> {
             }}
             cursor.clear_gathered_comments(); // Clear comments after every statement, so comments don't bleed over
         });
+
+        let end_of_code = self.instructions.get_next_alloc_id();
+        FlatIDRange::new(start_of_code, end_of_code)
     }
 
-    fn flatten_write_modifiers(&self, cursor: &mut Cursor) -> WriteModifiers {
+    fn flatten_write_modifiers(&self, cursor: &mut Cursor<'c>) -> WriteModifiers {
         if cursor.optional_field(field!("write_modifiers")) {
             let modifiers_span = cursor.span();
             let mut initial_count = 0;
@@ -1554,7 +1579,7 @@ impl FlatteningContext<'_, '_> {
     ///     No modules, Yes write modifiers, Only assignable expressions
     fn flatten_assignment_left_side(
         &mut self,
-        cursor: &mut Cursor,
+        cursor: &mut Cursor<'c>,
     ) -> Vec<(Option<AssignLeftSideObject>, Span)> {
         cursor.collect_list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
@@ -1599,7 +1624,7 @@ impl FlatteningContext<'_, '_> {
     /// See [Self::flatten_assignment_left_side]
     /// - Standalone declarations:
     ///     Yes modules, No write modifiers, Yes expressions (-> single expressions)
-    fn flatten_standalone_decls(&mut self, cursor: &mut Cursor) {
+    fn flatten_standalone_decls(&mut self, cursor: &mut Cursor<'c>) {
         let mut is_first_item = true;
         cursor.list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
@@ -1632,33 +1657,49 @@ impl FlatteningContext<'_, '_> {
         &mut self,
         declaration_context: DeclarationContext,
         read_only: bool,
-        cursor: &mut Cursor,
-    ) {
-        cursor.list(kind!("declaration_list"), |cursor| {
-            let _ = self.flatten_declaration::<false>(declaration_context, read_only, true, cursor);
-        });
-    }
-
-    fn flatten_interface_ports(&mut self, cursor: &mut Cursor) {
-        cursor.go_down(kind!("interface_ports"), |cursor| {
-            if cursor.optional_field(field!("inputs")) {
-                self.flatten_declaration_list(
-                    DeclarationContext::IO { is_input: true },
-                    true,
-                    cursor,
-                )
-            }
-            if cursor.optional_field(field!("outputs")) {
-                self.flatten_declaration_list(
-                    DeclarationContext::IO { is_input: false },
-                    false,
-                    cursor,
-                )
-            }
+        cursor: &mut Cursor<'c>,
+    ) -> Vec<FlatID> {
+        cursor.collect_list(kind!("declaration_list"), |cursor| {
+            self.flatten_declaration::<false>(declaration_context, read_only, true, cursor)
         })
     }
 
-    fn flatten_global(&mut self, cursor: &mut Cursor) {
+    fn flatten_interface_ports(
+        &mut self,
+        cursor: &mut Cursor<'c>,
+        ctx: InterfacePortsInfo,
+    ) -> (Vec<FlatID>, Vec<FlatID>) {
+        let (inputs_ctx, outputs_ctx) = match ctx {
+            InterfacePortsInfo::InputsThenOutputs => (
+                DeclarationContext::IO { is_input: true },
+                DeclarationContext::IO { is_input: false },
+            ),
+            InterfacePortsInfo::OutputsThenInputs => (
+                DeclarationContext::IO { is_input: false },
+                DeclarationContext::IO { is_input: true },
+            ),
+            InterfacePortsInfo::ConditionalBindings => {
+                (DeclarationContext::PlainWire, DeclarationContext::PlainWire)
+            }
+        };
+
+        cursor.go_down(kind!("interface_ports"), |cursor| {
+            (
+                if cursor.optional_field(field!("inputs")) {
+                    self.flatten_declaration_list(inputs_ctx, true, cursor)
+                } else {
+                    Vec::new()
+                },
+                if cursor.optional_field(field!("outputs")) {
+                    self.flatten_declaration_list(outputs_ctx, false, cursor)
+                } else {
+                    Vec::new()
+                },
+            )
+        })
+    }
+
+    fn flatten_global(&mut self, cursor: &mut Cursor<'c>) {
         // Skip because we covered it in initialization.
         let _ = cursor.optional_field(field!("extern_marker"));
         // Skip because we know this from initialization.
@@ -1668,9 +1709,8 @@ impl FlatteningContext<'_, '_> {
         // const int[SIZE] range #(int SIZE) {}
         let const_type_cursor = (cursor.kind() == kind!("const_and_type")).then(|| cursor.clone());
 
-        let name_span = cursor.field_span(field!("name"), kind!("identifier"));
+        let (name_span, module_name) = cursor.field_span(field!("name"), kind!("identifier"));
         self.flatten_parameters(cursor);
-        let module_name = &self.globals.file_data.file_text[name_span];
         println!("TREE SITTER module! {module_name}");
 
         if let Some(mut const_type_cursor) = const_type_cursor {
@@ -1697,7 +1737,11 @@ impl FlatteningContext<'_, '_> {
                             documentation: const_type_cursor.extract_gathered_comments(),
                         }));
 
-                self.alloc_local_name(name_span, NamedLocal::Declaration(module_output_decl));
+                self.alloc_local_name(
+                    name_span,
+                    module_name,
+                    NamedLocal::Declaration(module_output_decl),
+                );
             });
         }
 
@@ -1732,7 +1776,7 @@ pub fn flatten_all_globals(linker: &mut Linker) {
     }
 }
 
-fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Cursor<'_>) {
+fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Cursor) {
     let obj_link_info_mut = Linker::get_link_info_mut(
         &mut linker.modules,
         &mut linker.types,

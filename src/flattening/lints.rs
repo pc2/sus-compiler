@@ -137,7 +137,7 @@ fn make_fanins(
                 wire.source.for_each_dependency(&mut collector_func);
             }
             Instruction::IfStatement(stm) => {
-                for id in FlatIDRange::new(stm.then_start, stm.else_end) {
+                for id in FlatIDRange::new(stm.then_block.0, stm.else_block.1) {
                     if let Instruction::Write(conn) = &instructions[id] {
                         if let Some(flat_root) = conn.to.root.get_root_flat() {
                             instruction_fanins[flat_root].push(stm.condition);

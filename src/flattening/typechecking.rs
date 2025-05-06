@@ -326,9 +326,9 @@ impl<'l> TypeCheckingContext<'l, '_> {
             Instruction::IfStatement(if_stmt) => {
                 let condition_expr =
                     self.working_on.instructions[if_stmt.condition].unwrap_expression();
-                if !condition_expr.typ.domain.is_generative() {
+                if !if_stmt.is_generative {
                     self.runtime_condition_stack.push(ConditionStackElem {
-                        ends_at: if_stmt.else_end,
+                        ends_at: if_stmt.else_block.1,
                         span: condition_expr.span,
                         domain: condition_expr.typ.domain,
                     });
@@ -434,22 +434,26 @@ impl<'l> TypeCheckingContext<'l, '_> {
         }
     }
 
+    fn typecheck_visit_latency_specifier(&mut self, lat_spec: Option<FlatID>) {
+        if let Some(latency_spec) = lat_spec {
+            let latency_specifier_expr =
+                self.working_on.instructions[latency_spec].unwrap_expression();
+            self.type_checker.typecheck_write_to_abstract(
+                &latency_specifier_expr.typ.typ,
+                &INT_TYPE.scalar(),
+                latency_specifier_expr.span,
+                "latency specifier",
+            );
+        }
+    }
+
     fn typecheck_visit_instruction(&mut self, instr_id: FlatID) {
         match &self.working_on.instructions[instr_id] {
             Instruction::SubModule(sm) => {
                 self.typecheck_template_global(&sm.module_ref);
             }
             Instruction::Declaration(decl) => {
-                if let Some(latency_spec) = decl.latency_specifier {
-                    let latency_specifier_expr =
-                        self.working_on.instructions[latency_spec].unwrap_expression();
-                    self.type_checker.typecheck_write_to_abstract(
-                        &latency_specifier_expr.typ.typ,
-                        &INT_TYPE.scalar(),
-                        latency_specifier_expr.span,
-                        "latency specifier",
-                    );
-                }
+                self.typecheck_visit_latency_specifier(decl.latency_specifier);
 
                 self.typecheck_written_type(&decl.typ_expr);
 

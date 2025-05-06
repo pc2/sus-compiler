@@ -20,7 +20,7 @@ pub use lints::perform_lints;
 pub use typechecking::typecheck_all_modules;
 
 use crate::linker::{Documentation, LinkInfo};
-use crate::{file_position::FileText, value::Value};
+use crate::value::Value;
 
 use crate::typing::{abstract_type::FullType, template::GlobalReference};
 
@@ -86,17 +86,16 @@ impl Module {
     pub fn get_port_or_interface_by_name(
         &self,
         name_span: Span,
-        file_text: &FileText,
+        name: &str,
         errors: &ErrorCollector,
     ) -> Option<PortOrInterface> {
-        let name_text = &file_text[name_span];
         for (id, data) in &self.interfaces {
-            if data.name == name_text {
+            if data.name == name {
                 return Some(PortOrInterface::Interface(id));
             }
         }
         for (id, data) in &self.ports {
-            if data.name == name_text {
+            if data.name == name {
                 return Some(PortOrInterface::Port(id));
             }
         }
@@ -104,7 +103,7 @@ impl Module {
             .error(
                 name_span,
                 format!(
-                    "There is no port or interface of name '{name_text}' on module {}",
+                    "There is no port or interface of name '{name}' on module {}",
                     self.link_info.name
                 ),
             )
@@ -744,9 +743,8 @@ impl FuncCallInstruction {
 pub struct IfStatement {
     pub condition: FlatID,
     pub is_generative: bool,
-    pub then_start: FlatID,
-    pub then_end_else_start: FlatID,
-    pub else_end: FlatID,
+    pub then_block: FlatIDRange,
+    pub else_block: FlatIDRange,
 }
 
 /// A control-flow altering [Instruction] to represent compiletime looping on a generative index

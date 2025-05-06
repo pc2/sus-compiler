@@ -2861,7 +2861,7 @@ Warning: Unused port 'data_out'
       │                                                    ────┬───  
       │                                                        ╰───── Port 'data_out' declared here
 ──────╯
-Warning: Used 'if' in a non generative context, use 'when' instead
+Error: Used 'if' in a non generative context, use 'when' instead
       ╭─[ test.sus:1064:2 ]
       │
  1064 │     if iter_valid {
@@ -2889,28 +2889,28 @@ Error: Assertion failed
       │     ────────────┬────────────  
       │                 ╰────────────── Assertion failed
 ──────╯
-Error: Used 'when' in a generative context, use 'if' instead
+Warning: Used 'when' in a generative context, use 'if' instead
       ╭─[ test.sus:1098:9 ]
       │
  1098 │         when WIDTH <= BASE_CASE_SIZE {
       │         ──┬─  
       │           ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
-Warning: Used 'if' in a non generative context, use 'when' instead
+Error: Used 'if' in a non generative context, use 'when' instead
       ╭─[ test.sus:1101:25 ]
       │
  1101 │                         if bits[I] {
       │                         ─┬  
       │                          ╰── Used 'if' in a non generative context, use 'when' instead
 ──────╯
-Warning: Used 'if' in a non generative context, use 'when' instead
+Error: Used 'if' in a non generative context, use 'when' instead
       ╭─[ test.sus:1103:32 ]
       │
  1103 │                         } else if !bits[I] {
       │                                ─┬  
       │                                 ╰── Used 'if' in a non generative context, use 'when' instead
 ──────╯
-Error: Used 'when' in a generative context, use 'if' instead
+Warning: Used 'when' in a generative context, use 'if' instead
       ╭─[ test.sus:1108:16 ]
       │
  1108 │         } else when WIDTH > BASE_CASE_SIZE {

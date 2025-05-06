@@ -193,10 +193,17 @@ impl<'t> Cursor<'t> {
     }
 
     #[track_caller]
-    pub fn field_span(&mut self, field_id: NonZeroU16, expected_kind: u16) -> Span {
+    pub fn field_span(&mut self, field_id: NonZeroU16, expected_kind: u16) -> (Span, &'t str) {
         self.field(field_id);
 
-        self.get_span_check_kind(expected_kind)
+        let span = self.get_span_check_kind(expected_kind);
+        (span, &self.file_data.file_text[span])
+    }
+
+    #[track_caller]
+    pub fn field_to_string(&mut self, field_id: NonZeroU16, expected_kind: u16) -> (Span, String) {
+        let (span, name) = self.field_span(field_id, expected_kind);
+        (span, name.to_owned())
     }
 
     #[track_caller]

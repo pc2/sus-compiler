@@ -80,20 +80,22 @@ impl GenerationState<'_> {
         Ok(())
     }
     fn get_generation_value(&self, v: FlatID) -> ExecutionResult<&Value> {
-        if let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] {
-            if let Value::Unset | Value::Error = vv {
-                Err((
-                    self.span_of(v),
-                    format!("This variable is set but it's {:?}!", vv),
-                ))
-            } else {
-                Ok(vv)
+        match &self.generation_state[v] {
+            SubModuleOrWire::CompileTimeValue(vv) => {
+                if let Value::Unset | Value::Error = vv {
+                    Err((
+                        self.span_of(v),
+                        format!("This variable is set but it's {:?}!", vv),
+                    ))
+                } else {
+                    Ok(vv)
+                }
             }
-        } else {
-            Err((
+            SubModuleOrWire::Unnasigned => Err((
                 self.span_of(v),
                 "This variable is not set at this point!".to_owned(),
-            ))
+            )),
+            SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => unreachable!(),
         }
     }
     fn get_generation_integer(&self, idx: FlatID) -> ExecutionResult<&IBig> {
@@ -740,6 +742,14 @@ impl InstantiationContext<'_, '_> {
         }))
     }
 
+    fn get_specified_latency(&mut self, spec_lat: Option<FlatID>) -> ExecutionResult<i64> {
+        Ok(if let Some(spec) = &spec_lat {
+            self.generation_state.get_generation_small_int(*spec)?
+        } else {
+            CALCULATE_LATENCY_LATER
+        })
+    }
+
     fn instantiate_declaration(
         &mut self,
         wire_decl: &Declaration,
@@ -773,11 +783,7 @@ impl InstantiationContext<'_, '_> {
                 }
             };
 
-            let specified_latency: i64 = if let Some(spec) = &wire_decl.latency_specifier {
-                self.generation_state.get_generation_small_int(*spec)?
-            } else {
-                CALCULATE_LATENCY_LATER
-            };
+            let specified_latency = self.get_specified_latency(wire_decl.latency_specifier)?;
             let wire_id = self.wires.alloc(RealWire {
                 name: self.unique_name_producer.get_unique_name(&wire_decl.name),
                 typ,
@@ -1008,42 +1014,32 @@ impl InstantiationContext<'_, '_> {
                     continue;
                 }
                 Instruction::IfStatement(stm) => {
-                    let then_range = FlatIDRange::new(stm.then_start, stm.then_end_else_start);
-                    let else_range = FlatIDRange::new(stm.then_end_else_start, stm.else_end);
-                    let if_condition_expr =
-                        self.md.link_info.instructions[stm.condition].unwrap_expression();
-                    match if_condition_expr.typ.domain {
-                        DomainType::Generative => {
-                            let condition_val =
-                                self.generation_state.get_generation_value(stm.condition)?;
-                            let run_range = if condition_val.unwrap_bool() {
-                                then_range
-                            } else {
-                                else_range
-                            };
-                            self.instantiate_code_block(run_range)?;
-                        }
-                        DomainType::Physical(_domain) => {
-                            let condition_wire = self.generation_state[stm.condition].unwrap_wire();
-                            self.condition_stack.push(ConditionStackElem {
-                                condition_wire,
-                                inverse: false,
-                            });
-                            self.instantiate_code_block(then_range)?;
+                    if stm.is_generative {
+                        let condition_val =
+                            self.generation_state.get_generation_value(stm.condition)?;
+                        let run_range = if condition_val.unwrap_bool() {
+                            stm.then_block
+                        } else {
+                            stm.else_block
+                        };
+                        self.instantiate_code_block(run_range)?;
+                    } else {
+                        let condition_wire = self.generation_state[stm.condition].unwrap_wire();
+                        self.condition_stack.push(ConditionStackElem {
+                            condition_wire,
+                            inverse: false,
+                        });
+                        self.instantiate_code_block(stm.then_block)?;
 
-                            if !else_range.is_empty() {
-                                self.condition_stack.last_mut().unwrap().inverse = true;
-                                self.instantiate_code_block(else_range)?;
-                            }
+                        if !stm.else_block.is_empty() {
+                            self.condition_stack.last_mut().unwrap().inverse = true;
+                            self.instantiate_code_block(stm.else_block)?;
+                        }
 
-                            // Get rid of the condition
-                            let _ = self.condition_stack.pop().unwrap();
-                        }
-                        DomainType::Unknown(_) => {
-                            unreachable!("Domain variables have been eliminated by type checking")
-                        }
+                        // Get rid of the condition
+                        let _ = self.condition_stack.pop().unwrap();
                     }
-                    instruction_range.skip_to(stm.else_end);
+                    instruction_range.skip_to(stm.else_block.1);
                     continue;
                 }
                 Instruction::ForStatement(stm) => {
