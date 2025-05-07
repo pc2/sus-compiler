@@ -1792,20 +1792,64 @@ Error: Index out of bounds. Array is of size 20, but the index is 29.
      │                                  ─┬─  
      │                                   ╰─── Index out of bounds. Array is of size 20, but the index is 29.
 ─────╯
-Error: This write is part of a net-positive latency cycle of +5
+Error: This instruction is part of a net-positive latency cycle of +5
 
 _1_i'0
+-> _1_i'0 (+0)
 -> test'5 (+5)
 -> _1_i'5 (+0)
 
 Which conflicts with the starting latency
-     ╭─[ test.sus:363:2 ]
+     ╭─[ test.sus:360:8 ]
      │
- 363 │     test = module_taking_time(test+a)
-     │     ──┬─  
-     │       ╰─── This write is part of a net-positive latency cycle of +5
+ 360 │     state int test
+     │           ────┬───  
+     │               ╰───── This instruction is part of a net-positive latency cycle of +5
 
 _1_i'0
+-> _1_i'0 (+0)
+-> test'5 (+5)
+-> _1_i'5 (+0)
+
+Which conflicts with the starting latency
+─────╯
+Error: This instruction is part of a net-positive latency cycle of +5
+
+_1_i'0
+-> _1_i'0 (+0)
+-> test'5 (+5)
+-> _1_i'5 (+0)
+
+Which conflicts with the starting latency
+     ╭─[ test.sus:363:9 ]
+     │
+ 363 │     test = module_taking_time(test+a)
+     │            ─────────┬────────  
+     │                     ╰────────── This instruction is part of a net-positive latency cycle of +5
+
+_1_i'0
+-> _1_i'0 (+0)
+-> test'5 (+5)
+-> _1_i'5 (+0)
+
+Which conflicts with the starting latency
+─────╯
+Error: This instruction is part of a net-positive latency cycle of +5
+
+_1_i'0
+-> _1_i'0 (+0)
+-> test'5 (+5)
+-> _1_i'5 (+0)
+
+Which conflicts with the starting latency
+     ╭─[ test.sus:363:9 ]
+     │
+ 363 │     test = module_taking_time(test+a)
+     │            ─────────┬────────  
+     │                     ╰────────── This instruction is part of a net-positive latency cycle of +5
+
+_1_i'0
+-> _1_i'0 (+0)
 -> test'5 (+5)
 -> _1_i'5 (+0)
 
@@ -2436,7 +2480,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                          ──┬──  
      │                                            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: A function called in this context may only return one result. Split this function call into a separate line instead.
+Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:894:7 ]
      │
  883 │     interface is_jump
@@ -2445,7 +2489,7 @@ Error: A function called in this context may only return one result. Split this 
      │ 
  894 │     when decoder.is_jump() : int target_addr {
      │          ────────┬────────  
-     │                  ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
+     │                  ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
 ─────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ╭─[ test.sus:894:25 ]
@@ -2458,7 +2502,7 @@ Error: While parsing 'if_statement', parser found a syntax error in a node of ty
      │ │           
      │ ╰─────────── Parent node 'if_statement'
 ─────╯
-Error: A function called in this context may only return one result. Split this function call into a separate line instead.
+Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:897:7 ]
      │
  884 │     interface is_load
@@ -2467,7 +2511,7 @@ Error: A function called in this context may only return one result. Split this 
      │ 
  897 │     when decoder.is_load() : int reg_to, int addr {
      │          ────────┬────────  
-     │                  ╰────────── A function called in this context may only return one result. Split this function call into a separate line instead.
+     │                  ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
 ─────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ╭─[ test.sus:897:25 ]

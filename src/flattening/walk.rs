@@ -6,37 +6,44 @@ use super::{ExpressionSource, WireReferencePathElement, WireReferenceRoot, Writt
 
 impl ExpressionSource {
     /// Enumerates all instructions that this instruction depends on. This includes (maybe compiletime) wires, and submodules.
-    pub fn for_each_dependency(&self, func: &mut impl FnMut(FlatID)) {
+    pub fn for_each_dependency(&self, collect: &mut impl FnMut(FlatID)) {
         match self {
             ExpressionSource::WireRef(wire_ref) => {
                 match &wire_ref.root {
-                    WireReferenceRoot::LocalDecl(decl_id, _) => func(*decl_id),
+                    WireReferenceRoot::LocalDecl(decl_id, _) => collect(*decl_id),
                     WireReferenceRoot::NamedConstant(cst) => {
                         for (_id, arg) in &cst.template_args {
                             let Some(arg) = arg else { continue };
                             match &arg.kind {
                                 TemplateArgKind::Type(written_type) => {
-                                    written_type.for_each_generative_input(func)
+                                    written_type.for_each_generative_input(collect)
                                 }
-                                TemplateArgKind::Value(uuid) => func(*uuid),
+                                TemplateArgKind::Value(uuid) => collect(*uuid),
                             }
                         }
                     }
                     WireReferenceRoot::SubModulePort(submod_port) => {
-                        func(submod_port.submodule_decl)
+                        collect(submod_port.submodule_decl)
                     }
+                    WireReferenceRoot::Error => {}
                 }
-                WireReferencePathElement::for_each_dependency(&wire_ref.path, func);
+                WireReferencePathElement::for_each_dependency(&wire_ref.path, collect);
             }
-            &ExpressionSource::UnaryOp { right, .. } => func(right),
+            &ExpressionSource::UnaryOp { right, .. } => collect(right),
             &ExpressionSource::BinaryOp { left, right, .. } => {
-                func(left);
-                func(right)
+                collect(left);
+                collect(right)
+            }
+            ExpressionSource::FuncCall(func_call) => {
+                collect(func_call.interface_reference.submodule_decl);
+                for arg in &func_call.arguments {
+                    collect(*arg)
+                }
             }
             ExpressionSource::Constant(_) => {}
             ExpressionSource::ArrayConstruct(arr) => {
                 for v in arr {
-                    func(*v);
+                    collect(*v);
                 }
             }
         }

@@ -121,8 +121,8 @@ impl<'l> TypeCheckingContext<'l, '_> {
         }
     }
 
-    fn get_wire_ref_info(&self, wire_ref_root: &WireReferenceRoot) -> ErrorInfo {
-        match wire_ref_root {
+    fn get_wire_ref_info(&self, wire_ref_root: &WireReferenceRoot) -> Option<ErrorInfo> {
+        Some(match wire_ref_root {
             WireReferenceRoot::LocalDecl(id, _) => {
                 let decl_root = self.working_on.instructions[*id].unwrap_declaration();
                 decl_root.make_info(self.errors.file).unwrap()
@@ -135,7 +135,10 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 let (decl, file) = self.get_decl_of_module_port(port.port, port.submodule_decl);
                 decl.make_info(file).unwrap()
             }
-        }
+            WireReferenceRoot::Error => {
+                return None;
+            }
+        })
     }
 
     /// Wire references are used in two contexts:
@@ -185,6 +188,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
             WireReferenceRoot::SubModulePort(port) => {
                 self.get_type_of_port(port.port, port.submodule_decl)
             }
+            WireReferenceRoot::Error => return,
         };
         self.type_checker.unify_domains(
             &root_type.domain,
@@ -259,12 +263,12 @@ impl<'l> TypeCheckingContext<'l, '_> {
             }
             Instruction::Expression(_) => {}
             Instruction::Write(conn) => {
-                let (decl, file) = match &conn.to.root {
+                let (decl, file) = match &conn.to.to.root {
                     WireReferenceRoot::LocalDecl(decl_id, _) => {
                         let decl = self.working_on.instructions[*decl_id].unwrap_declaration();
                         if decl.read_only {
                             self.errors
-                                .error(conn.to_span, format!("'{}' is read-only", decl.name))
+                                .error(conn.to.to_span, format!("'{}' is read-only", decl.name))
                                 .info_obj_same_file(decl);
                         }
                         (decl, self.errors.file)
@@ -280,29 +284,32 @@ impl<'l> TypeCheckingContext<'l, '_> {
 
                         if !module_port_decl.0.decl_kind.is_io_port().unwrap() {
                             self.errors
-                                .error(conn.to_span, "Cannot assign to a submodule output port")
+                                .error(conn.to.to_span, "Cannot assign to a submodule output port")
                                 .info_obj_different_file(module_port_decl.0, module_port_decl.1);
                         }
 
                         module_port_decl
                     }
+                    WireReferenceRoot::Error => {
+                        return;
+                    }
                 };
 
-                match conn.write_modifiers {
+                match conn.to.write_modifiers {
                     WriteModifiers::Connection {
                         num_regs: _,
                         regs_span: _,
                     } => {
                         if decl.identifier_type.is_generative() {
                             // Check that this generative declaration isn't used in a non-compiletime if
-                            if let Some(root_flat) = conn.to.root.get_root_flat() {
+                            if let Some(root_flat) = conn.to.to.root.get_root_flat() {
                                 let to_decl =
                                     self.working_on.instructions[root_flat].unwrap_declaration();
 
                                 let found_decl_depth =
                                     *to_decl.declaration_runtime_depth.get().unwrap();
                                 if self.runtime_condition_stack.len() > found_decl_depth {
-                                    let err_ref = self.errors.error(conn.to_span, "Cannot write to generative variables in runtime conditional block");
+                                    let err_ref = self.errors.error(conn.to.to_span, "Cannot write to generative variables in runtime conditional block");
                                     err_ref.info_obj_different_file(decl, file);
                                     for elem in &self.runtime_condition_stack[found_decl_depth..] {
                                         err_ref.info((elem.span, file), "Runtime condition here");
@@ -447,6 +454,123 @@ impl<'l> TypeCheckingContext<'l, '_> {
         }
     }
 
+    fn typecheck_visit_write_to(
+        &mut self,
+        write_to: &WriteTo,
+        from_typ: &FullType,
+        from_span: Span,
+    ) {
+        // Typecheck digging down into write side
+        self.typecheck_wire_reference(&write_to.to, write_to.to_span, &write_to.to_type);
+        self.join_with_condition(&write_to.to_type.domain, write_to.to_span.debug());
+
+        from_span.debug();
+
+        let write_context = match write_to.write_modifiers {
+            WriteModifiers::Connection { .. } => "connection",
+            WriteModifiers::Initial { initial_kw_span: _ } => "initial value",
+        };
+        let declared_here = self.get_wire_ref_info(&write_to.to.root);
+        let pass_to_write_to = (
+            write_context.to_string(),
+            declared_here.into_iter().collect(),
+        );
+
+        self.type_checker
+            .typecheck_write_to(from_typ, &write_to.to_type, from_span, || pass_to_write_to);
+    }
+
+    fn get_interface_reference(
+        &self,
+        interface_reference: &ModuleInterfaceReference,
+    ) -> (&'l Module, &'l Interface) {
+        let submodule =
+            self.working_on.instructions[interface_reference.submodule_decl].unwrap_submodule();
+        let md = &self.globals[submodule.module_ref.id];
+        let interface = &md.interfaces[interface_reference.submodule_interface];
+        (md, interface)
+    }
+
+    fn report_errors_for_bad_function_call(
+        &self,
+        func_call: &FuncCall,
+        mut to_spans_iter: impl ExactSizeIterator<Item = Span>,
+    ) {
+        let (md, interface) = self.get_interface_reference(&func_call.interface_reference);
+
+        let arg_count = func_call.arguments.len();
+        let expected_arg_count = interface.func_call_inputs.len();
+
+        if arg_count != expected_arg_count {
+            if arg_count > expected_arg_count {
+                // Too many args, complain about excess args at the end
+                let excess_args_span = Span::new_overarching(
+                    self.working_on.instructions[func_call.arguments[expected_arg_count]]
+                        .unwrap_expression()
+                        .span,
+                    self.working_on.instructions[*func_call.arguments.last().unwrap()]
+                        .unwrap_expression()
+                        .span,
+                );
+
+                self.errors
+                    .error(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."))
+                    .info_obj(&(md, interface));
+            } else {
+                // Too few args, mention missing argument names
+                self.errors
+                    .error(func_call.arguments_span.close_bracket(), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."))
+                    .info_obj(&(md, interface));
+            }
+        }
+
+        let num_func_outputs = interface.func_call_outputs.len();
+        let num_targets = to_spans_iter.size_hint().0;
+        if num_targets != num_func_outputs {
+            if num_targets > num_func_outputs {
+                let start_span: Span = to_spans_iter.nth(num_func_outputs).unwrap();
+                let mut end_span = start_span;
+                if let Some(end) = to_spans_iter.last() {
+                    end_span = end;
+                }
+
+                let excess_results_span = Span::new_overarching(start_span, end_span);
+                self.errors
+                    .error(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."))
+                    .info_obj(&(md, interface));
+            } else {
+                self.errors
+                    .error(func_call.whole_func_span, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."))
+                    .info_obj(&(md, interface));
+            }
+        }
+    }
+
+    fn typecheck_func_call(&mut self, func_call: &FuncCall) -> PortIDRange {
+        let (md, interface) = self.get_interface_reference(&func_call.interface_reference);
+
+        for (port, arg) in std::iter::zip(interface.func_call_inputs, &func_call.arguments) {
+            let port_type =
+                self.get_type_of_port(port, func_call.interface_reference.submodule_decl);
+
+            let decl = md.get_port_decl(port);
+
+            // Typecheck the value with target type
+            let from = self.working_on.instructions[*arg].unwrap_expression();
+
+            self.join_with_condition(&port_type.domain, from.span);
+            self.type_checker
+                .typecheck_write_to(&from.typ, &port_type, from.span, || {
+                    (
+                        "function argument".to_string(),
+                        vec![decl.make_info(md.link_info.file).unwrap()],
+                    )
+                });
+        }
+
+        interface.func_call_outputs
+    }
+
     fn typecheck_visit_instruction(&mut self, instr_id: FlatID) {
         match &self.working_on.instructions[instr_id] {
             Instruction::SubModule(sm) => {
@@ -542,6 +666,27 @@ impl<'l> TypeCheckingContext<'l, '_> {
                             );
                         }
                     }
+                    ExpressionSource::FuncCall(func_call) => {
+                        self.report_errors_for_bad_function_call(
+                            func_call,
+                            std::iter::once(expr.span),
+                        );
+
+                        let func_call_outputs = self.typecheck_func_call(func_call);
+                        if !func_call_outputs.is_empty() {
+                            let port_type = self.get_type_of_port(
+                                func_call_outputs.0,
+                                func_call.interface_reference.submodule_decl,
+                            );
+
+                            self.type_checker.typecheck_write_to(
+                                &port_type,
+                                &expr.typ,
+                                expr.span,
+                                "function call as expression",
+                            );
+                        }
+                    }
                     ExpressionSource::Constant(value) => {
                         self.type_checker
                             .unify_with_constant(&expr.typ.typ, value, expr.span)
@@ -567,28 +712,18 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 };
             }
             Instruction::FuncCall(fc) => {
-                for (port, arg) in std::iter::zip(fc.func_call_inputs.into_iter(), &fc.arguments) {
-                    let write_to_type =
-                        self.get_type_of_port(port, fc.interface_reference.submodule_decl);
+                self.report_errors_for_bad_function_call(
+                    &fc.func_call,
+                    fc.write_outputs.iter().map(|v| v.to_span),
+                );
 
-                    let (decl, file) =
-                        self.get_decl_of_module_port(port, fc.interface_reference.submodule_decl);
+                let func_call_outputs = self.typecheck_func_call(&fc.func_call);
 
-                    // Typecheck the value with target type
-                    let from_expr = self.working_on.instructions[*arg].unwrap_expression();
+                for (port, to) in std::iter::zip(func_call_outputs, &fc.write_outputs) {
+                    let port_type = self
+                        .get_type_of_port(port, fc.func_call.interface_reference.submodule_decl);
 
-                    self.join_with_condition(&write_to_type.domain, from_expr.span.debug());
-                    self.type_checker.typecheck_write_to(
-                        &from_expr.typ,
-                        &write_to_type,
-                        from_expr.span,
-                        || {
-                            (
-                                "function argument".to_string(),
-                                vec![decl.make_info(file).unwrap()],
-                            )
-                        },
-                    );
+                    self.typecheck_visit_write_to(to, &port_type, fc.func_call.whole_func_span);
                 }
             }
             Instruction::Write(conn) => {
@@ -596,25 +731,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 let from_expr: &'l Expression =
                     self.working_on.instructions[conn.from].unwrap_expression();
 
-                // Typecheck digging down into write side
-                self.typecheck_wire_reference(&conn.to, conn.to_span, &conn.to_type);
-                self.join_with_condition(&conn.to_type.domain, conn.to_span.debug());
-
-                from_expr.span.debug();
-
-                let write_context = match conn.write_modifiers {
-                    WriteModifiers::Connection { .. } => "connection",
-                    WriteModifiers::Initial { initial_kw_span: _ } => "initial value",
-                };
-                let declared_here = self.get_wire_ref_info(&conn.to.root);
-                let pass_to_write_to = (write_context.to_string(), vec![declared_here]);
-
-                self.type_checker.typecheck_write_to(
-                    &from_expr.typ,
-                    &conn.to_type,
-                    from_expr.span,
-                    || pass_to_write_to,
-                );
+                self.typecheck_visit_write_to(&conn.to, &from_expr.typ, from_expr.span);
             }
         }
     }
@@ -689,15 +806,15 @@ pub fn apply_types(
             Instruction::Declaration(decl) => {
                 type_checker.finalize_type(linker_types, &mut decl.typ, decl.name_span, errors)
             }
-            Instruction::Write(Write {
-                to_type,
-                to_span,
-                to,
-                ..
-            }) => {
-                type_checker.finalize_type(linker_types, to_type, *to_span, errors);
-                if let WireReferenceRoot::NamedConstant(cst) = &mut to.root {
+            Instruction::Write(Write { to, .. }) => {
+                type_checker.finalize_type(linker_types, &mut to.to_type, to.to_span, errors);
+                if let WireReferenceRoot::NamedConstant(cst) = &mut to.to.root {
                     type_checker.finalize_global_ref(linker_types, cst, errors);
+                }
+            }
+            Instruction::FuncCall(fc) => {
+                for wr in &mut fc.write_outputs {
+                    type_checker.finalize_type(linker_types, &mut wr.to_type, wr.to_span, errors);
                 }
             }
             // TODO Submodule domains may not be crossed either?

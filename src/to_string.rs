@@ -206,7 +206,6 @@ impl Display for Value {
                 f.write_str("]")
             }
             Value::Unset => f.write_str("{value_unset}"),
-            Value::Error => f.write_str("{value_error}"),
         }
     }
 }

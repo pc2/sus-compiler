@@ -294,7 +294,7 @@ impl FullTypeUnifier {
                     "array literal",
                 );
             }
-            Value::Error | Value::Unset => {} // Already an error, don't unify
+            Value::Unset => {} // Already an error, don't unify
         }
     }
 

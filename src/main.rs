@@ -13,6 +13,7 @@ mod latency;
 mod prelude;
 mod to_string;
 mod typing;
+mod util;
 mod value;
 
 mod codegen;

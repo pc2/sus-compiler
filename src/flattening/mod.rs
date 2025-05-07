@@ -114,10 +114,10 @@ impl Module {
     pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
         match &self.link_info.instructions[instr_id] {
             Instruction::SubModule(sm) => sm.module_ref.get_total_span(),
-            Instruction::FuncCall(fc) => fc.whole_func_span,
+            Instruction::FuncCall(fc) => fc.func_call.whole_func_span,
             Instruction::Declaration(decl) => decl.decl_span,
             Instruction::Expression(w) => w.span,
-            Instruction::Write(conn) => conn.to_span,
+            Instruction::Write(wr) => wr.to.to_span,
             Instruction::IfStatement(if_stmt) => self.get_instruction_span(if_stmt.condition),
             Instruction::ForStatement(for_stmt) => {
                 self.get_instruction_span(for_stmt.loop_var_decl)
@@ -338,6 +338,8 @@ pub enum WireReferenceRoot {
     /// local_submodule.data_in = 3 // root is local_submodule.data_in (yes, both)
     /// ```
     SubModulePort(PortReference),
+    /// Used to conveniently represent errors
+    Error,
 }
 
 impl WireReferenceRoot {
@@ -346,6 +348,7 @@ impl WireReferenceRoot {
             WireReferenceRoot::LocalDecl(f, _) => Some(*f),
             WireReferenceRoot::NamedConstant(_) => None,
             WireReferenceRoot::SubModulePort(port) => Some(port.submodule_decl),
+            WireReferenceRoot::Error => None,
         }
     }
     #[track_caller]
@@ -362,6 +365,7 @@ impl WireReferenceRoot {
                 Some(global_reference.get_total_span())
             }
             WireReferenceRoot::SubModulePort(port_reference) => port_reference.port_name_span,
+            WireReferenceRoot::Error => None,
         }
     }
 }
@@ -380,12 +384,10 @@ pub struct WireReference {
 }
 
 impl WireReference {
-    fn simple_port(port: PortReference) -> WireReference {
-        WireReference {
-            root: WireReferenceRoot::SubModulePort(port),
-            path: Vec::new(),
-        }
-    }
+    const ERROR: Self = WireReference {
+        root: WireReferenceRoot::Error,
+        path: Vec::new(),
+    };
     fn simple_var_read(id: FlatID, name_span: Span) -> WireReference {
         WireReference {
             root: WireReferenceRoot::LocalDecl(id, name_span),
@@ -430,8 +432,8 @@ impl WriteModifiers {
 /// }
 /// ```
 #[derive(Debug)]
-pub struct Write {
-    pub from: FlatID,
+pub struct WriteTo {
+    /// Invalid [WireReference] is possible.
     pub to: WireReference,
     pub to_span: Span,
     /// The type and domain to which will be written.
@@ -442,6 +444,12 @@ pub struct Write {
     /// In short, this should be the type and domain *to which* the read type must be unified.
     pub to_type: FullType,
     pub write_modifiers: WriteModifiers,
+}
+
+#[derive(Debug)]
+pub struct Write {
+    pub to: WriteTo,
+    pub from: FlatID,
 }
 
 /// -x
@@ -519,6 +527,7 @@ pub struct Expression {
 #[derive(Debug)]
 pub enum ExpressionSource {
     WireRef(WireReference), // Used to add a span to the reference of a wire.
+    FuncCall(FuncCall),
     UnaryOp {
         op: UnaryOperator,
         /// Operators automatically parallelize across arrays
@@ -534,12 +543,6 @@ pub enum ExpressionSource {
     },
     ArrayConstruct(Vec<FlatID>),
     Constant(Value),
-}
-
-impl ExpressionSource {
-    pub const fn new_error() -> ExpressionSource {
-        ExpressionSource::Constant(Value::Error)
-    }
 }
 
 /// The textual representation of a type expression in the source code.
@@ -678,6 +681,17 @@ pub struct ModuleInterfaceReference {
     pub interface_span: Span,
 }
 
+#[derive(Debug)]
+pub struct FuncCall {
+    pub interface_reference: ModuleInterfaceReference,
+
+    /// Points to a list of [Expression]
+    pub arguments: Vec<FlatID>,
+
+    pub arguments_span: BracketSpan,
+    pub whole_func_span: Span,
+}
+
 /// An [Instruction] that represents the calling on an interface of a [SubModuleInstance].
 /// It is the connecting of multiple input ports, and output ports on a submodule in one statement.
 ///
@@ -720,19 +734,12 @@ pub struct ModuleInterfaceReference {
 /// }
 /// ```
 #[derive(Debug)]
-pub struct FuncCallInstruction {
-    pub interface_reference: ModuleInterfaceReference,
-    /// arguments.len() == func_call_inputs.len() ALWAYS
-    pub arguments: Vec<FlatID>,
-    /// arguments.len() == func_call_inputs.len() ALWAYS
-    pub func_call_inputs: PortIDRange,
-    pub func_call_outputs: PortIDRange,
-
-    pub arguments_span: BracketSpan,
-    pub whole_func_span: Span,
+pub struct FuncCallMultiWrite {
+    pub func_call: FuncCall,
+    pub write_outputs: Vec<WriteTo>,
 }
 
-impl FuncCallInstruction {
+impl FuncCallMultiWrite {
     pub fn could_be_at_compile_time(&self) -> bool {
         todo!("self.name_span.is_none() but also other requirements, like if the module is a function")
     }
@@ -769,7 +776,7 @@ pub struct ForStatement {
 #[derive(Debug)]
 pub enum Instruction {
     SubModule(SubModuleInstance),
-    FuncCall(FuncCallInstruction),
+    FuncCall(FuncCallMultiWrite),
     Declaration(Declaration),
     Expression(Expression),
     Write(Write),
@@ -800,10 +807,26 @@ impl Instruction {
         sm
     }
     #[track_caller]
-    pub fn unwrap_func_call(&self) -> &FuncCallInstruction {
+    pub fn unwrap_func_call(&self) -> &FuncCallMultiWrite {
         let Self::FuncCall(fc) = self else {
             panic!("unwrap_func_call on not a FuncCallInstruction! Found {self:?}")
         };
         fc
+    }
+
+    pub fn get_span(&self) -> Span {
+        match self {
+            Instruction::SubModule(sub_module_instance) => {
+                sub_module_instance.get_most_relevant_span()
+            }
+            Instruction::FuncCall(func_call_multi_write) => {
+                func_call_multi_write.func_call.whole_func_span
+            }
+            Instruction::Declaration(declaration) => declaration.decl_span,
+            Instruction::Expression(expression) => expression.span,
+            Instruction::Write(write) => write.to.to_span,
+            Instruction::IfStatement(_) => unreachable!(),
+            Instruction::ForStatement(_) => unreachable!(),
+        }
     }
 }

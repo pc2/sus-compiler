@@ -284,6 +284,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                     );
                 }
             }
+            WireReferenceRoot::Error => {}
         }
     }
 
@@ -407,26 +408,37 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                             );
                         }
                     }
-                    Instruction::Expression(wire) => {
-                        if let ExpressionSource::WireRef(wire_ref) = &wire.source {
-                            self.walk_wire_ref(obj_id, link_info, wire_ref);
-                        } else {
-                            self.visit(
-                                wire.span,
-                                LocationInfo::InGlobal(
-                                    obj_id,
-                                    link_info,
-                                    id,
-                                    InGlobal::Temporary(wire),
-                                ),
-                            );
-                        };
-                    }
+                    Instruction::Expression(wire) => match &wire.source {
+                        ExpressionSource::WireRef(wire_ref) => {
+                            self.walk_wire_ref(obj_id, link_info, wire_ref)
+                        }
+                        ExpressionSource::FuncCall(func_call) => self.walk_interface_reference(
+                            obj_id,
+                            link_info,
+                            &func_call.interface_reference,
+                        ),
+                        _ => self.visit(
+                            wire.span,
+                            LocationInfo::InGlobal(
+                                obj_id,
+                                link_info,
+                                id,
+                                InGlobal::Temporary(wire),
+                            ),
+                        ),
+                    },
                     Instruction::Write(write) => {
-                        self.walk_wire_ref(obj_id, link_info, &write.to);
+                        self.walk_wire_ref(obj_id, link_info, &write.to.to);
                     }
                     Instruction::FuncCall(fc) => {
-                        self.walk_interface_reference(obj_id, link_info, &fc.interface_reference);
+                        self.walk_interface_reference(
+                            obj_id,
+                            link_info,
+                            &fc.func_call.interface_reference,
+                        );
+                        for output in &fc.write_outputs {
+                            self.walk_wire_ref(obj_id, link_info, &output.to);
+                        }
                     }
                     Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
                 };

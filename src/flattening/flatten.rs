@@ -36,8 +36,6 @@ enum LocalOrGlobal {
 
 #[derive(Debug)]
 enum PartialWireReference {
-    /// Means the error has already been reported
-    Error,
     /// A module that is implicitly declared in a function call.
     GlobalModuleName(GlobalReference<ModuleUUID>),
     /// Partial result, waiting for a port to be grabbed
@@ -57,9 +55,15 @@ enum PartialWireReference {
 }
 
 impl PartialWireReference {
-    fn expect_wireref(self, ctx: &FlatteningContext) -> Option<(WireReference, bool)> {
+    const ERROR: Self = PartialWireReference::WireReference {
+        wire_ref: WireReference::ERROR,
+        is_generative: false,
+    };
+}
+
+impl PartialWireReference {
+    fn extract(self, ctx: &FlatteningContext) -> (WireReference, bool) {
         match self {
-            PartialWireReference::Error => None, // Error already reported
             PartialWireReference::ModuleButNoPort(submod_decl, span) => {
                 let md_uuid = ctx.instructions[submod_decl]
                     .unwrap_submodule()
@@ -71,7 +75,7 @@ impl PartialWireReference {
                         "cannot operate on modules directly. Should use ports instead",
                     )
                     .info_obj(&ctx.globals[md_uuid]);
-                None
+                (WireReference::ERROR, false)
             }
             PartialWireReference::GlobalModuleName(md_ref) => {
                 let md = &ctx.globals[md_ref.id];
@@ -84,7 +88,7 @@ impl PartialWireReference {
                         ),
                     )
                     .info_obj(md);
-                None
+                (WireReference::ERROR, false)
             }
             PartialWireReference::ModuleWithInterface {
                 submodule_decl: submod_decl,
@@ -107,12 +111,12 @@ impl PartialWireReference {
                         ),
                     )
                     .info((interf.name_span, md.link_info.file), "Declared here");
-                None
+                (WireReference::ERROR, false)
             }
             PartialWireReference::WireReference {
                 wire_ref,
                 is_generative,
-            } => Some((wire_ref, is_generative)),
+            } => (wire_ref, is_generative),
         }
     }
 }
@@ -248,18 +252,13 @@ impl TypingAllocator {
     }
 }
 
-struct AssignLeftSideObject {
-    wire_ref: WireReference,
-    write_modifiers: WriteModifiers,
-    is_generative: bool,
-}
-
 #[derive(Clone, Copy)]
 enum InterfacePortsInfo {
     InputsThenOutputs,
     OutputsThenInputs,
     ConditionalBindings,
 }
+
 struct FlatteningContext<'l, 'errs> {
     globals: &'l GlobalResolver<'l>,
     errors: &'errs ErrorCollector<'l>,
@@ -824,18 +823,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         })
     }
 
-    fn alloc_error(&mut self, span: Span) -> FlatID {
-        self.instructions.alloc(Instruction::Expression(Expression {
-            typ: self
-                .type_alloc
-                .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown),
-            span,
-            source: ExpressionSource::new_error(),
-        }))
-    }
-
     /// Returns the ID of the [FuncCallInstruction]
-    fn flatten_func_call(&mut self, cursor: &mut Cursor<'c>) -> Option<FlatID> {
+    fn flatten_func_call(&mut self, cursor: &mut Cursor<'c>) -> Option<FuncCall> {
         let whole_func_span = cursor.span();
         cursor.go_down(kind!("func_call"), |cursor| {
             cursor.field(field!("name"));
@@ -845,7 +834,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             let arguments_span = BracketSpan::from_outer(cursor.span());
             // TODO compiletime functions https://github.com/pc2/sus-compiler/issues/10
             let mut all_were_compiletime = true;
-            let mut arguments = cursor.collect_list(kind!("parenthesis_expression_list"), |cursor| {
+            let arguments = cursor.collect_list(kind!("parenthesis_expression_list"), |cursor| {
                 let (expr, is_comptime) = self.flatten_expr(cursor);
                 all_were_compiletime &= is_comptime;
                 expr
@@ -853,44 +842,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
             let interface_reference = interface_reference?;
 
-            let (md, interface) = self.get_interface_reference(&interface_reference);
-
-            let func_call_inputs = interface.func_call_inputs;
-            let func_call_outputs = interface.func_call_outputs;
-
-            let arg_count = arguments.len();
-            let expected_arg_count = func_call_inputs.len();
-
-            if arg_count != expected_arg_count {
-                if arg_count > expected_arg_count {
-                    // Too many args, complain about excess args at the end
-                    let excess_args_span = Span::new_overarching(self.instructions[arguments[expected_arg_count]].unwrap_expression().span, self.instructions[*arguments.last().unwrap()].unwrap_expression().span);
-
-                    self.errors
-                        .error(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."))
-                        .info_obj(&(md, interface));
-                    // Shorten args to still get proper type checking for smaller arg array
-                    arguments.truncate(expected_arg_count);
-                } else {
-                    // Too few args, mention missing argument names
-                    self.errors
-                        .error(arguments_span.close_bracket(), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."))
-                        .info_obj(&(md, interface));
-
-                    while arguments.len() < expected_arg_count {
-                        arguments.push(self.alloc_error(arguments_span.close_bracket()));
-                    }
-                }
-            }
-
-            Some(self.instructions.alloc(Instruction::FuncCall(FuncCallInstruction{
+            Some(FuncCall {
                 interface_reference,
                 arguments,
-                func_call_inputs,
-                func_call_outputs,
                 arguments_span,
-                whole_func_span
-            })))
+                whole_func_span,
+            })
         })
     }
 
@@ -918,7 +875,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let outer_span = cursor.span();
 
         match self.flatten_wire_reference(cursor) {
-            PartialWireReference::Error => None,
             PartialWireReference::GlobalModuleName(module_ref) => {
                 let documentation = cursor.extract_gathered_comments();
                 let interface_span = module_ref.get_total_span();
@@ -950,24 +906,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 name_span: Some(submodule_name_span),
                 interface_span: interface_name_span,
             }),
-            PartialWireReference::WireReference { .. } => {
-                self.errors.error(
-                    outer_span,
-                    "Function call syntax is only possible on modules or interfaces of modules",
-                );
+            PartialWireReference::WireReference { wire_ref, .. } => {
+                if let WireReferenceRoot::Error = wire_ref.root { // Error already reported
+                } else {
+                    self.errors.error(
+                        outer_span,
+                        "Function call syntax is only possible on modules or interfaces of modules",
+                    );
+                }
                 None
             }
         }
-    }
-
-    fn get_interface_reference(
-        &self,
-        interface_reference: &ModuleInterfaceReference,
-    ) -> (&Module, &Interface) {
-        let submodule = self.instructions[interface_reference.submodule_decl].unwrap_submodule();
-        let md = &self.globals[submodule.module_ref.id];
-        let interface = &md.interfaces[interface_reference.submodule_interface];
-        (md, interface)
     }
 
     fn flatten_expr(&mut self, cursor: &mut Cursor<'c>) -> (FlatID, bool) {
@@ -1015,30 +964,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             }),
             kind!("func_call") => {
                 (
-                    if let Some(fc_id) = self.flatten_func_call(cursor) {
-                        let fc = self.instructions[fc_id].unwrap_func_call();
-                        let (md, interface) = self.get_interface_reference(&fc.interface_reference);
-                        if interface.func_call_outputs.len() != 1 {
-                            self.errors
-                        .error(expr_span, "A function called in this context may only return one result. Split this function call into a separate line instead.")
-                        .info_obj(&(md, interface));
-                        }
-
-                        if !interface.func_call_outputs.is_empty() {
-                            ExpressionSource::WireRef(WireReference::simple_port(PortReference {
-                                submodule_name_span: fc.interface_reference.name_span,
-                                submodule_decl: fc.interface_reference.submodule_decl,
-                                port: interface.func_call_outputs.0,
-                                port_name_span: None,
-                                is_input: false,
-                            }))
-                        } else {
-                            // Function desugaring or using threw an error
-                            ExpressionSource::new_error()
-                        }
+                    if let Some(func_call) = self.flatten_func_call(cursor) {
+                        ExpressionSource::FuncCall(func_call)
                     } else {
                         // Function desugaring or using threw an error
-                        ExpressionSource::new_error()
+                        ExpressionSource::WireRef(WireReference::ERROR)
                     },
                     false,
                 ) // TODO add compile-time functions https://github.com/pc2/sus-compiler/issues/10
@@ -1059,36 +989,22 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 (ExpressionSource::ArrayConstruct(list), is_generative)
             }
             _other => {
-                if let Some((wr, _is_generative)) =
-                    self.flatten_wire_reference(cursor).expect_wireref(self)
-                {
-                    let mut is_comptime = match wr.root {
-                        WireReferenceRoot::LocalDecl(uuid, _span) => self.instructions[uuid]
-                            .unwrap_declaration()
-                            .identifier_type
-                            .is_generative(),
-                        WireReferenceRoot::NamedConstant(_) => true,
-                        WireReferenceRoot::SubModulePort(_) => false,
-                    };
-
-                    for elem in &wr.path {
-                        match elem {
-                            WireReferencePathElement::ArrayAccess {
-                                idx,
-                                bracket_span: _,
-                            } => {
-                                is_comptime &= self.instructions[*idx]
-                                    .unwrap_expression()
-                                    .typ
-                                    .domain
-                                    .is_generative()
-                            }
+                let (wr, mut is_comptime) = self.flatten_wire_reference(cursor).extract(self);
+                for elem in &wr.path {
+                    match elem {
+                        WireReferencePathElement::ArrayAccess {
+                            idx,
+                            bracket_span: _,
+                        } => {
+                            is_comptime &= self.instructions[*idx]
+                                .unwrap_expression()
+                                .typ
+                                .domain
+                                .is_generative()
                         }
                     }
-                    (ExpressionSource::WireRef(wr), is_comptime)
-                } else {
-                    (ExpressionSource::new_error(), false)
                 }
+                (ExpressionSource::WireRef(wr), is_comptime)
             }
         };
 
@@ -1142,7 +1058,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             .info_obj_same_file(
                                 &self.working_on_link_info.template_parameters[template_id],
                             );
-                        PartialWireReference::Error
+                        PartialWireReference::ERROR
                     }
                     NamedLocal::DomainDecl(domain_id) => {
                         let domain = &self.domains[domain_id];
@@ -1155,7 +1071,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 ),
                             )
                             .info_same_file(span, format!("Domain {} declared here", domain.name));
-                        PartialWireReference::Error
+                        PartialWireReference::ERROR
                     }
                 },
                 LocalOrGlobal::Constant(cst_ref) => {
@@ -1171,9 +1087,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 LocalOrGlobal::Type(type_ref) => {
                     self.globals
                         .not_expected_global_error(&type_ref, "named wire: local or constant");
-                    PartialWireReference::Error
+                    PartialWireReference::ERROR
                 }
-                LocalOrGlobal::NotFound(_) => PartialWireReference::Error,
+                LocalOrGlobal::NotFound(_) => PartialWireReference::ERROR, // Error handled by [flatten_local_or_template_global]
             }
         } kind!("array_op") => {
             cursor.go_down_no_check(|cursor| {
@@ -1196,7 +1112,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     } => {
                         self.errors.todo(arr_idx_span, "Module Arrays");
                     }
-                    PartialWireReference::Error => {}
                     PartialWireReference::WireReference{wire_ref, is_generative: _} => {
                         wire_ref.path
                             .push(WireReferencePathElement::ArrayAccess { idx, bracket_span });
@@ -1213,16 +1128,15 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 let (port_name_span, port_name) = cursor.field_span(field!("name"), kind!("identifier"));
 
                 match flattened_arr_expr {
-                    PartialWireReference::Error => PartialWireReference::Error,
                     PartialWireReference::GlobalModuleName(md_ref) => {
                         self.errors.error(md_ref.get_total_span(), "Ports or interfaces can only be accessed on modules that have been explicitly declared. Declare this submodule on its own line");
-                        PartialWireReference::Error
+                        PartialWireReference::ERROR
                     }
                     PartialWireReference::ModuleWithInterface { submodule_decl:_, submodule_name_span, interface:_, interface_name_span } => {
                         self.errors.error(port_name_span, "Omit the interface when accessing a port")
                             .suggest_remove(Span::new_overarching(submodule_name_span.empty_span_at_end(), interface_name_span));
 
-                        PartialWireReference::Error
+                        PartialWireReference::ERROR
                     }
                     PartialWireReference::ModuleButNoPort(submodule_decl, submodule_name_span) => {
                         let submodule = self.instructions[submodule_decl].unwrap_submodule();
@@ -1248,35 +1162,35 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             Some(PortOrInterface::Interface(interface)) => {
                                 PartialWireReference::ModuleWithInterface { submodule_decl, submodule_name_span, interface, interface_name_span: port_name_span }
                             }
-                            None => PartialWireReference::Error
+                            None => PartialWireReference::ERROR
                         }
                     }
                     PartialWireReference::WireReference{..} => {
                         println!("TODO: Struct fields");
-                        PartialWireReference::Error
+                        PartialWireReference::ERROR
                     }
                 }
             })
         } kind!("number") => {
             self.errors
                 .error(expr_span, "A constant is not a wire reference");
-            PartialWireReference::Error
+            PartialWireReference::ERROR
         } kind!("unary_op") | kind!("binary_op") => {
             self.errors.error(
                 expr_span,
                 "The result of an operator is not a wire reference",
             );
-            PartialWireReference::Error
+            PartialWireReference::ERROR
         } kind!("func_call") => {
             self.errors
                 .error(expr_span, "A submodule call is not a wire reference");
-            PartialWireReference::Error
+            PartialWireReference::ERROR
         } kind!("parenthesis_expression") => {
             self.errors.error(
                 expr_span,
                 "Parentheses are not allowed within a wire reference",
             );
-            PartialWireReference::Error
+            PartialWireReference::ERROR
         } _other =>
             cursor.could_not_match()
         }
@@ -1349,100 +1263,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         (then_block, else_block)
     }
 
-    fn flatten_assign_function_call(
-        &mut self,
-        to: Vec<(Option<AssignLeftSideObject>, Span)>,
-        cursor: &mut Cursor<'c>,
-    ) {
-        // Error on all to items that require writing a generative value
-        for (left_item, to_span) in &to {
-            let Some(left_item) = left_item else { continue };
-            if left_item.is_generative {
-                self.errors.error(*to_span, "A generative value must be written to this, but function calls cannot return generative values");
-            }
-        }
-
-        let func_call_span = cursor.span();
-        let to_iter = if let Some(fc_id) = self.flatten_func_call(cursor) {
-            let fc = self.instructions[fc_id].unwrap_func_call();
-
-            let (md, interface) = self.get_interface_reference(&fc.interface_reference);
-            let outputs = interface.func_call_outputs;
-            // Already extract some fields here, so we don't keep a ref to fc
-            let submodule_name_span = fc.interface_reference.name_span;
-            let submodule_decl = fc.interface_reference.submodule_decl;
-
-            let num_func_outputs = outputs.len();
-            let num_targets = to.len();
-            if num_targets != num_func_outputs {
-                if num_targets > num_func_outputs {
-                    let excess_results_span =
-                        Span::new_overarching(to[num_func_outputs].1, to.last().unwrap().1);
-                    self.errors
-                        .error(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."))
-                        .info_obj(&(md, interface));
-                } else {
-                    self.errors
-                        .error(func_call_span, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."))
-                        .info_obj(&(md, interface));
-                }
-            }
-
-            let mut to_iter = to.into_iter();
-            for port in outputs {
-                let Some((Some(to), to_span)) = to_iter.next() else {
-                    continue;
-                };
-                let from = self.instructions.alloc(Instruction::Expression(Expression {
-                    typ: self
-                        .type_alloc
-                        .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown), // TODO Generative Function Calls https://github.com/pc2/sus-compiler/issues/10
-                    span: func_call_span,
-                    source: ExpressionSource::WireRef(WireReference::simple_port(PortReference {
-                        port,
-                        port_name_span: None,
-                        is_input: false,
-                        submodule_name_span,
-                        submodule_decl,
-                    })),
-                }));
-                self.instructions.alloc(Instruction::Write(Write {
-                    from,
-                    to: to.wire_ref,
-                    to_span,
-                    to_type: self
-                        .type_alloc
-                        .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown), // Module ports are always non-generative
-                    write_modifiers: to.write_modifiers,
-                }));
-            }
-            to_iter
-        } else {
-            to.into_iter()
-        };
-        for leftover_to in to_iter {
-            let (Some(to), to_span) = leftover_to else {
-                continue;
-            };
-            let err_id = self.instructions.alloc(Instruction::Expression(Expression {
-                typ: self
-                    .type_alloc
-                    .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown),
-                span: func_call_span,
-                source: ExpressionSource::new_error(),
-            }));
-            self.instructions.alloc(Instruction::Write(Write {
-                from: err_id,
-                to: to.wire_ref,
-                to_span,
-                to_type: self
-                    .type_alloc
-                    .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown), // Even non-existing Module ports are non-generative
-                write_modifiers: to.write_modifiers,
-            }));
-        }
-    }
-
     fn flatten_code(&mut self, cursor: &mut Cursor<'c>) -> FlatIDRange {
         let old_frame = self.local_variable_context.new_frame();
 
@@ -1460,79 +1280,95 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         cursor.list(kind!("block"), |cursor| {
             match cursor.kind() {
                 kind!("assign_left_side") => {
-                self.flatten_standalone_decls(cursor);
-            } kind!("decl_assign_statement") => {
-                cursor.go_down_no_check(|cursor| {
-                    cursor.field(field!("assign_left"));
-                    let to = self.flatten_assignment_left_side(cursor);
+                    self.flatten_standalone_decls(cursor);
+                }
+                kind!("decl_assign_statement") => {
+                    cursor.go_down_no_check(|cursor| {
+                        cursor.field(field!("assign_left"));
+                        let write_outputs = self.flatten_assignment_left_side(cursor);
 
-                    cursor.field(field!("assign_value"));
+                        cursor.field(field!("assign_value"));
 
-                    let (node_kind, value_span) = cursor.kind_span();
+                        let (node_kind, value_span) = cursor.kind_span();
 
-                    if node_kind == kind!("func_call") {
-                        self.flatten_assign_function_call(to, cursor);
-                    } else {
-                        let (read_side, read_side_is_generative) = self.flatten_expr(cursor);
-
-                        if to.len() != 1 {
-                            self.errors.error(value_span, format!("Non-function assignments must output exactly 1 output instead of {}", to.len()));
-                        }
-                        if let Some((Some(to), to_span)) = to.into_iter().next() {
-                            if to.is_generative && !read_side_is_generative {
-                                self.errors.error(value_span, "This value is non-generative, yet it is being assigned to a generative value")
-                                .info_same_file(to_span, "This object is generative");
+                        if node_kind == kind!("func_call") {
+                            if let Some(func_call) = self.flatten_func_call(cursor) {
+                                self.instructions.alloc(Instruction::FuncCall(FuncCallMultiWrite{
+                                    func_call,
+                                    write_outputs,
+                                }));
                             }
-                            let to_type = self.type_alloc.alloc_unset_type(if to.is_generative {DomainAllocOption::Generative} else {DomainAllocOption::NonGenerativeUnknown});
-                            self.instructions.alloc(Instruction::Write(Write{from: read_side, to: to.wire_ref, to_span, write_modifiers: to.write_modifiers, to_type}));
+                        } else {
+                            let (read_side, read_side_is_generative) = self.flatten_expr(cursor);
+
+                            if write_outputs.len() != 1 {
+                                self.errors.error(value_span, format!("Non-function assignments must output exactly 1 output instead of {}", write_outputs.len()));
+                            }
+                            if let Some(to) = write_outputs.into_iter().next() {
+                                if to.to_type.domain.is_generative() && !read_side_is_generative {
+                                    self.errors
+                                        .error(value_span, "This value is non-generative, yet it is being assigned to a generative value")
+                                        .info_same_file(to.to_span, "This object is generative");
+                                }
+                                self.instructions.alloc(Instruction::Write(Write{
+                                    from: read_side,
+                                    to
+                                }));
+                            }
                         }
-                    }
-                });
-            } kind!("block") => {
-                self.flatten_code(cursor);
-            } kind!("if_statement") => {
-                self.flatten_if_statement(cursor);
-            } kind!("for_statement") => {
-                cursor.go_down_no_check(|cursor| {
-                    let loop_var_decl_frame = self.local_variable_context.new_frame();
-                    cursor.field(field!("for_decl"));
-                    let loop_var_decl = self.flatten_declaration::<false>(DeclarationContext::Generative(GenerativeKind::ForLoopGenerative), true, true, cursor);
+                    });
+                }
+                kind!("block") => {
+                    self.flatten_code(cursor);
+                }
+                kind!("if_statement") => {
+                    self.flatten_if_statement(cursor);
+                }
+                kind!("for_statement") => {
+                    cursor.go_down_no_check(|cursor| {
+                        let loop_var_decl_frame = self.local_variable_context.new_frame();
+                        cursor.field(field!("for_decl"));
+                        let loop_var_decl = self.flatten_declaration::<false>(DeclarationContext::Generative(GenerativeKind::ForLoopGenerative), true, true, cursor);
 
-                    cursor.field(field!("from"));
-                    let (start, start_is_generative) = self.flatten_expr(cursor);
-                    self.must_be_generative(start_is_generative, "for loop start", cursor.span());
+                        cursor.field(field!("from"));
+                        let (start, start_is_generative) = self.flatten_expr(cursor);
+                        self.must_be_generative(start_is_generative, "for loop start", cursor.span());
 
-                    cursor.field(field!("to"));
-                    let (end, end_is_generative) = self.flatten_expr(cursor);
-                    self.must_be_generative(end_is_generative, "for loop end", cursor.span());
+                        cursor.field(field!("to"));
+                        let (end, end_is_generative) = self.flatten_expr(cursor);
+                        self.must_be_generative(end_is_generative, "for loop end", cursor.span());
 
-                    let for_id = self.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: FlatIDRange::PLACEHOLDER}));
+                        let for_id = self.instructions.alloc(Instruction::ForStatement(ForStatement{loop_var_decl, start, end, loop_body: FlatIDRange::PLACEHOLDER}));
 
-                    cursor.field(field!("block"));
-                    // We already started a new local_variable_context to include the loop var
-                    let loop_body = self.flatten_code_keep_context(cursor);
+                        cursor.field(field!("block"));
+                        // We already started a new local_variable_context to include the loop var
+                        let loop_body = self.flatten_code_keep_context(cursor);
 
-                    let Instruction::ForStatement(for_stmt) = &mut self.instructions[for_id] else {unreachable!()};
+                        let Instruction::ForStatement(for_stmt) = &mut self.instructions[for_id] else {unreachable!()};
 
-                    for_stmt.loop_body = loop_body;
+                        for_stmt.loop_body = loop_body;
 
-                    self.local_variable_context.pop_frame(loop_var_decl_frame);
-                })
-            } kind!("interface_statement") => {
-                cursor.go_down_no_check(|cursor| {
-                    // Skip name
-                    cursor.field(field!("name"));
+                        self.local_variable_context.pop_frame(loop_var_decl_frame);
+                    })
+                }
+                kind!("interface_statement") => {
+                    cursor.go_down_no_check(|cursor| {
+                        // Skip name
+                        cursor.field(field!("name"));
 
-                    if cursor.optional_field(field!("interface_ports")) {
-                        self.flatten_interface_ports(cursor, InterfacePortsInfo::InputsThenOutputs);
-                    }
-                });
-            } kind!("domain_statement") => {
-                // Skip, because we already covered domains in initialization. 
-                // TODO synchronous & async clocks
-            } _other => {
-                cursor.could_not_match()
-            }}
+                        if cursor.optional_field(field!("interface_ports")) {
+                            self.flatten_interface_ports(cursor, InterfacePortsInfo::InputsThenOutputs);
+                        }
+                    });
+                }
+                kind!("domain_statement") => {
+                    // Skip, because we already covered domains in initialization. 
+                    // TODO synchronous & async clocks
+                }
+                _other => {
+                    cursor.could_not_match()
+                }
+            }
             cursor.clear_gathered_comments(); // Clear comments after every statement, so comments don't bleed over
         });
 
@@ -1577,46 +1413,51 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     /// Two cases:
     /// - Left side of assignment:
     ///     No modules, Yes write modifiers, Only assignable expressions
-    fn flatten_assignment_left_side(
-        &mut self,
-        cursor: &mut Cursor<'c>,
-    ) -> Vec<(Option<AssignLeftSideObject>, Span)> {
+    fn flatten_assignment_left_side(&mut self, cursor: &mut Cursor<'c>) -> Vec<WriteTo> {
         cursor.collect_list(kind!("assign_left_side"), |cursor| {
             cursor.go_down(kind!("assign_to"), |cursor| {
                 let write_modifiers = self.flatten_write_modifiers(cursor);
 
                 cursor.field(field!("expr_or_decl"));
-                let (kind, span) = cursor.kind_span();
-                (
-                    if kind == kind!("declaration") {
-                        let root = self.flatten_declaration::<false>(
-                            self.default_declaration_context,
-                            false,
-                            true,
-                            cursor,
-                        );
-                        let flat_root_decl = self.instructions[root].unwrap_declaration();
-                        let is_generative = flat_root_decl.identifier_type.is_generative();
-                        Some(AssignLeftSideObject {
-                            wire_ref: WireReference {
-                                root: WireReferenceRoot::LocalDecl(root, flat_root_decl.name_span),
-                                path: Vec::new(),
-                            },
-                            write_modifiers,
-                            is_generative,
-                        })
+                let (kind, to_span) = cursor.kind_span();
+                if kind == kind!("declaration") {
+                    let root = self.flatten_declaration::<false>(
+                        self.default_declaration_context,
+                        false,
+                        true,
+                        cursor,
+                    );
+                    let flat_root_decl = self.instructions[root].unwrap_declaration();
+                    let is_generative = flat_root_decl.identifier_type.is_generative();
+                    let to_type = self.type_alloc.alloc_unset_type(if is_generative {
+                        DomainAllocOption::Generative
                     } else {
-                        // It's _expression
-                        self.flatten_wire_reference(cursor)
-                            .expect_wireref(self)
-                            .map(|(wire_ref, is_generative)| AssignLeftSideObject {
-                                wire_ref,
-                                write_modifiers,
-                                is_generative,
-                            })
-                    },
-                    span,
-                )
+                        DomainAllocOption::NonGenerativeUnknown
+                    });
+                    WriteTo {
+                        to: WireReference {
+                            root: WireReferenceRoot::LocalDecl(root, flat_root_decl.name_span),
+                            path: Vec::new(),
+                        },
+                        to_span,
+                        write_modifiers,
+                        to_type,
+                    }
+                } else {
+                    // It's _expression
+                    let (to, is_generative) = self.flatten_wire_reference(cursor).extract(self);
+                    let to_type = self.type_alloc.alloc_unset_type(if is_generative {
+                        DomainAllocOption::Generative
+                    } else {
+                        DomainAllocOption::NonGenerativeUnknown
+                    });
+                    WriteTo {
+                        to,
+                        to_span,
+                        write_modifiers,
+                        to_type,
+                    }
+                }
             })
         })
     }
@@ -1644,7 +1485,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     let _ = self.flatten_declaration::<true>(self.default_declaration_context, false, true, cursor);
                 } else { // It's _expression
                     if kind == kind!("func_call") {
-                        self.flatten_assign_function_call(Vec::new(), cursor);
+                        if let Some(func_call) = self.flatten_func_call(cursor) {
+                            self.instructions.alloc(Instruction::FuncCall(FuncCallMultiWrite { func_call, write_outputs: Vec::new() }));
+                        }
                     } else {
                         let _ = self.flatten_expr(cursor);
                     }

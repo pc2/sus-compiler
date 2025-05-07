@@ -11,6 +11,7 @@ use crate::linker::IsExtern;
 use crate::prelude::*;
 use crate::typing::template::GlobalReference;
 use crate::typing::type_inference::Substitutor;
+use crate::util::zip_eq;
 
 use ibig::{IBig, UBig};
 
@@ -80,22 +81,14 @@ impl GenerationState<'_> {
         Ok(())
     }
     fn get_generation_value(&self, v: FlatID) -> ExecutionResult<&Value> {
-        match &self.generation_state[v] {
-            SubModuleOrWire::CompileTimeValue(vv) => {
-                if let Value::Unset | Value::Error = vv {
-                    Err((
-                        self.span_of(v),
-                        format!("This variable is set but it's {:?}!", vv),
-                    ))
-                } else {
-                    Ok(vv)
-                }
-            }
-            SubModuleOrWire::Unnasigned => Err((
-                self.span_of(v),
-                "This variable is not set at this point!".to_owned(),
-            )),
-            SubModuleOrWire::SubModule(_) | SubModuleOrWire::Wire(_) => unreachable!(),
+        let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] else {
+            unreachable!()
+        };
+
+        if let Value::Unset = vv {
+            Err((self.span_of(v), "This variable is unset!".to_owned()))
+        } else {
+            Ok(vv)
         }
     }
     fn get_generation_integer(&self, idx: FlatID) -> ExecutionResult<&IBig> {
@@ -404,6 +397,7 @@ impl InstantiationContext<'_, '_> {
                     port.port_name_span,
                 ));
             }
+            WireReferenceRoot::Error => unreachable!(),
         })
     }
 
@@ -460,18 +454,52 @@ impl InstantiationContext<'_, '_> {
         });
     }
 
-    fn instantiate_connection(
+    fn instantiate_wire_connection(
         &mut self,
-        target_wire_ref: &WireReference,
-        write_modifiers: &WriteModifiers,
-        conn_from: FlatID,
+        write_to: &WriteTo,
+        from: WireID,
         original_connection: FlatID,
     ) -> ExecutionResult<()> {
-        match write_modifiers {
+        let (
             WriteModifiers::Connection {
                 num_regs,
                 regs_span: _,
-            } => match self.determine_wire_ref_root(&target_wire_ref.root)? {
+            },
+            RealWireRefRoot::Wire {
+                wire_id: target_wire,
+                preamble,
+            },
+        ) = (
+            &write_to.write_modifiers,
+            self.determine_wire_ref_root(&write_to.to.root)?,
+        )
+        else {
+            unreachable!()
+        };
+        let domain = self.wires[target_wire].domain;
+        let instantiated_path =
+            self.instantiate_wire_ref_path(preamble, &write_to.to.path, domain)?;
+        self.instantiate_write_to_wire(
+            target_wire,
+            instantiated_path,
+            from,
+            *num_regs,
+            original_connection,
+        );
+        Ok(())
+    }
+
+    fn instantiate_connection(
+        &mut self,
+        write_to: &WriteTo,
+        conn_from: FlatID,
+        original_connection: FlatID,
+    ) -> ExecutionResult<()> {
+        match &write_to.write_modifiers {
+            WriteModifiers::Connection {
+                num_regs,
+                regs_span: _,
+            } => match self.determine_wire_ref_root(&write_to.to.root)? {
                 RealWireRefRoot::Wire {
                     wire_id: target_wire,
                     preamble,
@@ -479,7 +507,7 @@ impl InstantiationContext<'_, '_> {
                     let domain = self.wires[target_wire].domain;
                     let from = self.get_wire_or_constant_as_wire(conn_from, domain)?;
                     let instantiated_path =
-                        self.instantiate_wire_ref_path(preamble, &target_wire_ref.path, domain)?;
+                        self.instantiate_wire_ref_path(preamble, &write_to.to.path, domain)?;
                     self.instantiate_write_to_wire(
                         target_wire,
                         instantiated_path,
@@ -498,10 +526,10 @@ impl InstantiationContext<'_, '_> {
                     else {
                         unreachable!()
                     };
-                    let mut new_val = std::mem::replace(v_writable, Value::Error);
+                    let mut new_val = std::mem::replace(v_writable, Value::Unset);
                     self.generation_state.write_gen_variable(
                         &mut new_val,
-                        &target_wire_ref.path,
+                        &write_to.to.path,
                         found_v,
                     )?;
 
@@ -523,7 +551,7 @@ impl InstantiationContext<'_, '_> {
                     .clone();
 
                 let root_wire =
-                    self.generation_state[target_wire_ref.root.unwrap_local_decl()].unwrap_wire();
+                    self.generation_state[write_to.to.root.unwrap_local_decl()].unwrap_wire();
                 let RealWireDataSource::Multiplexer {
                     is_state: Some(initial_value),
                     sources: _,
@@ -533,7 +561,7 @@ impl InstantiationContext<'_, '_> {
                 };
                 self.generation_state.write_gen_variable(
                     initial_value,
-                    &target_wire_ref.path,
+                    &write_to.to.path,
                     found_v,
                 )?;
             }
@@ -674,6 +702,38 @@ impl InstantiationContext<'_, '_> {
             ),
         })
     }
+
+    fn instantiate_func_call(
+        &mut self,
+        fc: &FuncCall,
+        original_instruction: FlatID,
+    ) -> ExecutionResult<(SubModuleID, PortIDRange)> {
+        let submod_id = self.generation_state[fc.interface_reference.submodule_decl]
+            .unwrap_submodule_instance();
+        let original_submod_instr = self.md.link_info.instructions
+            [fc.interface_reference.submodule_decl]
+            .unwrap_submodule();
+        let submod_md = &self.linker.modules[original_submod_instr.module_ref.id];
+        let interface = &submod_md.interfaces[fc.interface_reference.submodule_interface];
+        let submod_interface_domain = interface.domain;
+        let domain = original_submod_instr.local_interface_domains[submod_interface_domain]
+            .unwrap_physical();
+
+        add_to_small_set(
+            &mut self.submodules[submod_id].interface_call_sites
+                [fc.interface_reference.submodule_interface],
+            fc.interface_reference.interface_span,
+        );
+
+        for (port, arg) in zip_eq(interface.func_call_inputs, &fc.arguments) {
+            let from = self.get_wire_or_constant_as_wire(*arg, domain)?;
+            let port_wire = self.get_submodule_port(submod_id, port, None);
+            self.instantiate_write_to_wire(port_wire, Vec::new(), from, 0, original_instruction);
+        }
+
+        Ok((submod_id, interface.func_call_outputs))
+    }
+
     fn expression_to_real_wire(
         &mut self,
         expression: &Expression,
@@ -718,6 +778,14 @@ impl InstantiationContext<'_, '_> {
                     left,
                     right,
                 }
+            }
+            ExpressionSource::FuncCall(func_call) => {
+                let (submod_id, func_call_outputs) =
+                    self.instantiate_func_call(func_call, original_instruction)?;
+
+                assert_eq!(func_call_outputs.len(), 1);
+
+                return Ok(self.get_submodule_port(submod_id, func_call_outputs.0, None));
             }
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut array_wires = Vec::with_capacity(arr.len());
@@ -830,6 +898,7 @@ impl InstantiationContext<'_, '_> {
             &WireReferenceRoot::SubModulePort(_) => {
                 todo!("Don't yet support compile time functions")
             }
+            WireReferenceRoot::Error => caught_by_typecheck!(),
         };
 
         for path_elem in &wire_ref.path {
@@ -913,6 +982,9 @@ impl InstantiationContext<'_, '_> {
                 )
                 .map_err(|reason| (expression.span, reason))?
             }
+            ExpressionSource::FuncCall(_) => {
+                todo!("Func Calls cannot yet be executed at compiletime")
+            }
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut result = Vec::with_capacity(arr.len());
                 for v_id in arr {
@@ -971,44 +1043,19 @@ impl InstantiationContext<'_, '_> {
                     }
                 },
                 Instruction::Write(conn) => {
-                    self.instantiate_connection(
-                        &conn.to,
-                        &conn.write_modifiers,
-                        conn.from,
-                        original_instruction,
-                    )?;
+                    self.instantiate_connection(&conn.to, conn.from, original_instruction)?;
                     continue;
                 }
                 Instruction::FuncCall(fc) => {
-                    let submod_id = self.generation_state[fc.interface_reference.submodule_decl]
-                        .unwrap_submodule_instance();
-                    let original_submod_instr = self.md.link_info.instructions
-                        [fc.interface_reference.submodule_decl]
-                        .unwrap_submodule();
-                    let submod_md = &self.linker.modules[original_submod_instr.module_ref.id];
-                    let submod_interface_domain =
-                        submod_md.interfaces[fc.interface_reference.submodule_interface].domain;
-                    let domain =
-                        original_submod_instr.local_interface_domains[submod_interface_domain];
+                    self.instantiate_func_call(&fc.func_call, original_instruction)?;
 
-                    add_to_small_set(
-                        &mut self.submodules[submod_id].interface_call_sites
-                            [fc.interface_reference.submodule_interface],
-                        fc.interface_reference.interface_span,
-                    );
-                    for (port, arg) in
-                        std::iter::zip(fc.func_call_inputs.iter(), fc.arguments.iter())
-                    {
-                        let from =
-                            self.get_wire_or_constant_as_wire(*arg, domain.unwrap_physical())?;
+                    let (submod_id, func_call_outputs) =
+                        self.instantiate_func_call(&fc.func_call, original_instruction)?;
+
+                    for (port, write) in zip_eq(func_call_outputs, &fc.write_outputs) {
                         let port_wire = self.get_submodule_port(submod_id, port, None);
-                        self.instantiate_write_to_wire(
-                            port_wire,
-                            Vec::new(),
-                            from,
-                            0,
-                            original_instruction,
-                        );
+
+                        self.instantiate_wire_connection(write, port_wire, original_instruction)?;
                     }
 
                     continue;
