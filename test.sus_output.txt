@@ -4,12 +4,18 @@ TREE SITTER module! IntToBits
 TREE SITTER module! BitsToInt
 TREE SITTER module! bool
 TREE SITTER module! int
+TREE SITTER module! float
 TREE SITTER module! __crash_compiler
 TREE SITTER module! true
 TREE SITTER module! false
 TREE SITTER module! assert
 TREE SITTER module! sizeof
 TREE SITTER module! clog2
+TREE SITTER module! pow2
+TREE SITTER module! pow
+TREE SITTER module! factorial
+TREE SITTER module! falling_factorial
+TREE SITTER module! comb
 TREE SITTER module! DualPortMem
 TREE SITTER module! FIFO
 TREE SITTER module! JoinDomains
@@ -122,7 +128,33 @@ TREE SITTER module! UseSlice
 TREE SITTER module! UseBuiltinConstants
 TREE SITTER module! FailingAssert
 TREE SITTER module! IfTesting
+TREE SITTER module! latency_counting_disjoint_blocks
+TREE SITTER module! latency_counting_disjoint_blocks_merge_error
+TREE SITTER module! use_infer_me
+TREE SITTER module! infer_me
+TREE SITTER module! infer_from_local_context
+TREE SITTER module! instantiate_fifo
+TREE SITTER module! inference_edge_case
+TREE SITTER module! specified_latencies_not_ports_edge_case
 TREE SITTER module! testArrayWrite
+TREE SITTER module! infer_me_with_poison_output
+TREE SITTER module! instantiate_infer_me_with_poison_output
+TREE SITTER module! __add__
+TREE SITTER module! ShiftReg
+TREE SITTER module! MultiStateLoop
+TREE SITTER module! use_MultiStateLoop
+TREE SITTER module! CombineArray
+TREE SITTER module! unknownLatency
+TREE SITTER module! useUnknownLatency
+TREE SITTER module! infer_me_conflicting_directions
+TREE SITTER module! use_infer_me_conflicting_directions
+TREE SITTER module! infer_me_with_delta
+TREE SITTER module! use_infer_me_with_delta
+TREE SITTER module! infer_me_with_negative_delta
+TREE SITTER module! use_infer_me_with_negative_delta
+TREE SITTER module! infer_me_inputs_only
+TREE SITTER module! use_infer_me_inputs_only
+TREE SITTER module! use_ranks
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -237,15 +269,33 @@ Typechecking UseSlice
 Typechecking UseBuiltinConstants
 Typechecking FailingAssert
 Typechecking IfTesting
+Typechecking latency_counting_disjoint_blocks
+Typechecking latency_counting_disjoint_blocks_merge_error
+Typechecking use_infer_me
+Typechecking infer_me
+Typechecking infer_from_local_context
+Typechecking instantiate_fifo
+Typechecking inference_edge_case
+Typechecking specified_latencies_not_ports_edge_case
 Typechecking testArrayWrite
-Instantiating IntToBits
-Concrete Typechecking IntToBits
-Latency Counting IntToBits
-Checking array accesses IntToBits
-Instantiating BitsToInt
-Concrete Typechecking BitsToInt
-Latency Counting BitsToInt
-Checking array accesses BitsToInt
+Typechecking infer_me_with_poison_output
+Typechecking instantiate_infer_me_with_poison_output
+Typechecking __add__
+Typechecking ShiftReg
+Typechecking MultiStateLoop
+Typechecking use_MultiStateLoop
+Typechecking CombineArray
+Typechecking unknownLatency
+Typechecking useUnknownLatency
+Typechecking infer_me_conflicting_directions
+Typechecking use_infer_me_conflicting_directions
+Typechecking infer_me_with_delta
+Typechecking use_infer_me_with_delta
+Typechecking infer_me_with_negative_delta
+Typechecking use_infer_me_with_negative_delta
+Typechecking infer_me_inputs_only
+Typechecking use_infer_me_inputs_only
+Typechecking use_ranks
 Instantiating Iterator
 Concrete Typechecking Iterator
 Latency Counting Iterator
@@ -673,7 +723,86 @@ Concrete Typechecking UseBuiltinConstants
 Latency Counting UseBuiltinConstants
 Checking array accesses UseBuiltinConstants
 Instantiating FailingAssert
+Instantiating latency_counting_disjoint_blocks
+Concrete Typechecking latency_counting_disjoint_blocks
+Latency Counting latency_counting_disjoint_blocks
+Checking array accesses latency_counting_disjoint_blocks
+Instantiating latency_counting_disjoint_blocks_merge_error
+Concrete Typechecking latency_counting_disjoint_blocks_merge_error
+Latency Counting latency_counting_disjoint_blocks_merge_error
+Checking array accesses latency_counting_disjoint_blocks_merge_error
+Not Instantiating use_infer_me due to flattening errors
+Instantiating infer_from_local_context
+Concrete Typechecking infer_from_local_context
+Instantiating infer_me
+Concrete Typechecking infer_me
+Latency Counting infer_me
+Checking array accesses infer_me
+Latency Counting infer_from_local_context
+Checking array accesses infer_from_local_context
+Instantiating instantiate_fifo
+Concrete Typechecking instantiate_fifo
+Instantiating FIFO
+Concrete Typechecking FIFO
+Instantiating CrossDomain
+Concrete Typechecking CrossDomain
+Latency Counting CrossDomain
+Checking array accesses CrossDomain
+Instantiating LatencyOffset
+Concrete Typechecking LatencyOffset
+Latency Counting LatencyOffset
+Checking array accesses LatencyOffset
+Latency Counting FIFO
+Checking array accesses FIFO
+Latency Counting instantiate_fifo
+Checking array accesses instantiate_fifo
+Instantiating inference_edge_case
+Concrete Typechecking inference_edge_case
+Latency Counting inference_edge_case
+Checking array accesses inference_edge_case
+Instantiating specified_latencies_not_ports_edge_case
+Concrete Typechecking specified_latencies_not_ports_edge_case
+Latency Counting specified_latencies_not_ports_edge_case
+Checking array accesses specified_latencies_not_ports_edge_case
 Instantiating testArrayWrite
 Concrete Typechecking testArrayWrite
 Latency Counting testArrayWrite
 Checking array accesses testArrayWrite
+Instantiating instantiate_infer_me_with_poison_output
+Concrete Typechecking instantiate_infer_me_with_poison_output
+Latency Counting instantiate_infer_me_with_poison_output
+Checking array accesses instantiate_infer_me_with_poison_output
+Not Instantiating use_MultiStateLoop due to flattening errors
+Instantiating CombineArray
+Concrete Typechecking CombineArray
+Latency Counting CombineArray
+Checking array accesses CombineArray
+Instantiating useUnknownLatency
+Concrete Typechecking useUnknownLatency
+Latency Counting useUnknownLatency
+Checking array accesses useUnknownLatency
+Instantiating use_infer_me_conflicting_directions
+Concrete Typechecking use_infer_me_conflicting_directions
+Latency Counting use_infer_me_conflicting_directions
+Checking array accesses use_infer_me_conflicting_directions
+Instantiating use_infer_me_with_delta
+Concrete Typechecking use_infer_me_with_delta
+Instantiating infer_me_with_delta
+Concrete Typechecking infer_me_with_delta
+Latency Counting infer_me_with_delta
+Checking array accesses infer_me_with_delta
+Latency Counting use_infer_me_with_delta
+Checking array accesses use_infer_me_with_delta
+Instantiating use_infer_me_with_negative_delta
+Concrete Typechecking use_infer_me_with_negative_delta
+Instantiating infer_me_with_negative_delta
+Concrete Typechecking infer_me_with_negative_delta
+Latency Counting infer_me_with_negative_delta
+Checking array accesses infer_me_with_negative_delta
+Latency Counting use_infer_me_with_negative_delta
+Checking array accesses use_infer_me_with_negative_delta
+Instantiating use_infer_me_inputs_only
+Concrete Typechecking use_infer_me_inputs_only
+Latency Counting use_infer_me_inputs_only
+Checking array accesses use_infer_me_inputs_only
+Instantiating use_ranks

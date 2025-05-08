@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{linker::FileData, prelude::*};
 
 use sus_proc_macro::{field, kind, kw};
 use tree_sitter::{Tree, TreeCursor};
@@ -39,16 +39,16 @@ fn print_current_node_indented<'ft>(file_text: &'ft FileText, cursor: &TreeCurso
 #[derive(Clone)]
 pub struct Cursor<'t> {
     cursor: TreeCursor<'t>,
-    file_text: &'t FileText,
+    pub file_data: &'t FileData,
     gathered_comments: Vec<Span>,
     current_field_was_already_consumed: bool,
 }
 
 impl<'t> Cursor<'t> {
-    pub fn new_at_root(tree: &'t Tree, file_text: &'t FileText) -> Result<Self, Span> {
+    pub fn new_at_root(tree: &'t Tree, file_data: &'t FileData) -> Result<Self, Span> {
         let result = Self {
             cursor: tree.walk(),
-            file_text,
+            file_data,
             gathered_comments: Vec::new(),
             current_field_was_already_consumed: false,
         };
@@ -83,7 +83,7 @@ impl<'t> Cursor<'t> {
         let this_node_span = self.span();
         println!("Stack:");
         loop {
-            print_current_node_indented(self.file_text, &self.cursor);
+            print_current_node_indented(&self.file_data.file_text, &self.cursor);
             if !self.cursor.goto_parent() {
                 break;
             }
@@ -272,7 +272,8 @@ impl<'t> Cursor<'t> {
         result
     }
 
-    /// Goes down the current node, checks it's kind, and then selects the 'content' field. Useful for constructs like seq('[', field('content', $.expr), ']')
+    /// Goes down the current node, checks it's kind, and then selects the 'content' field.
+    /// Useful for constructs like `seq('[', field('content', $.expr), ']')`
     #[track_caller]
     pub fn go_down_content<OT>(
         &mut self,

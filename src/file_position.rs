@@ -20,7 +20,7 @@ impl From<Range<usize>> for Span {
 impl Span {
     /// Register that we have visited this span. Eases debugging when errors occur
     pub fn debug(&self) -> Span {
-        crate::debug::add_debug_span(self.0..self.1);
+        crate::debug::add_debug_span(*self);
         *self
     }
 

@@ -8,7 +8,7 @@
         "required": false,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -66,7 +66,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -106,7 +106,7 @@
     }
   },
   {
-    "type": "array_literal",
+    "type": "array_list_expression",
     "named": true,
     "fields": {
       "item": {
@@ -114,7 +114,7 @@
         "required": false,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -162,7 +162,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -266,7 +266,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -328,7 +328,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -432,7 +432,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -550,7 +550,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -698,7 +698,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -776,7 +776,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -818,7 +818,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -876,7 +876,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -992,7 +992,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -1130,7 +1130,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -1194,7 +1194,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -1242,7 +1242,7 @@
         "required": false,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -1290,7 +1290,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -1332,7 +1332,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -1421,7 +1421,7 @@
         "required": false,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {
@@ -1591,7 +1591,7 @@
         "required": true,
         "types": [
           {
-            "type": "array_literal",
+            "type": "array_list_expression",
             "named": true
           },
           {

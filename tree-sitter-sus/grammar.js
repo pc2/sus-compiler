@@ -232,7 +232,7 @@ module.exports = grammar({
             $.binary_op,
             $.func_call,
             $.field_access,
-            $.array_literal
+            $.array_list_expression
         ),
 
         unary_op: $ => prec(PREC.unary, seq(
@@ -310,6 +310,12 @@ module.exports = grammar({
         array_literal: $ => seq(
             '[',
             sepSeq($._expression, $._comma),
+            ']'
+        ),
+
+        array_list_expression: $ => seq(
+            '[',
+            commaSepSeq($, $._expression),
             ']'
         ),
 

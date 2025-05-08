@@ -1,13 +1,11 @@
 use std::ops::Deref;
 
-use num::BigInt;
+use ibig::IBig;
 
 use crate::flattening::{BinaryOperator, UnaryOperator};
 
-use crate::typing::{
-    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
-    type_inference::{ConcreteTypeVariableIDMarker, TypeSubstitutor},
-};
+use crate::typing::concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE};
+use crate::typing::type_inference::{Substitutor, TypeSubstitutor};
 
 /// Top type for any kind of compiletime value while executing.
 ///
@@ -15,70 +13,73 @@ use crate::typing::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
     Bool(bool),
-    Integer(BigInt),
-    Array(Box<[Value]>),
+    Integer(IBig),
+    Array(Vec<Value>),
     /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
     Error,
 }
 
+impl ConcreteType {
+    /// On the road to implementing subtyping. Takes in a list of types,
+    /// and computes the smallest supertype that all list elements can coerce to.
+    /// TODO integrate into Hindley-Milner more closely
+    fn get_smallest_common_supertype(
+        list: &[Self],
+        type_substitutor: &mut TypeSubstitutor<ConcreteType>,
+    ) -> Option<Self> {
+        let mut iter = list.iter();
+
+        let first = iter.next()?.clone();
+
+        for elem in iter {
+            type_substitutor.unify_must_succeed(&first, elem);
+        }
+
+        Some(first)
+    }
+}
+
 impl Value {
     /// Traverses the Value, to create a best-effort [ConcreteType] for it.
     /// So '1' becomes [INT_CONCRETE_TYPE],
-    /// but `Value::Array([])` becomes `ConcreteType::Array(ConcreteType::Unknown)`
+    /// but `Value::Array([])` becomes `ConcreteType::Array((ConcreteType::Unknown, 0))`
     ///
     /// Panics when arrays contain mutually incompatible types
-    pub fn get_type_best_effort(
-        &self,
-        type_substitutor: &mut TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
-    ) -> ConcreteType {
+    pub fn get_type(&self, type_substitutor: &mut TypeSubstitutor<ConcreteType>) -> ConcreteType {
         match self {
             Value::Bool(_) => BOOL_CONCRETE_TYPE,
             Value::Integer(_) => INT_CONCRETE_TYPE,
             Value::Array(arr) => {
-                let mut arr_iter = arr.iter();
-                let Some(fst) = arr_iter.next() else {
-                    return ConcreteType::Unknown(type_substitutor.alloc());
-                };
-                let typ = fst.get_type_best_effort(type_substitutor);
+                let typs_arr: Vec<ConcreteType> = arr
+                    .iter()
+                    .map(|elem| elem.get_type(type_substitutor))
+                    .collect();
 
-                for other in arr_iter {
-                    // Assert the types are correct
-                    assert!(other.is_of_type(&typ));
-                }
+                let shared_supertype =
+                    ConcreteType::get_smallest_common_supertype(&typs_arr, type_substitutor)
+                        .unwrap_or_else(|| type_substitutor.alloc_unknown());
 
                 ConcreteType::Array(Box::new((
-                    typ,
+                    shared_supertype,
                     ConcreteType::Value(Value::Integer(arr.len().into())),
                 )))
             }
-            Value::Unset | Value::Error => unreachable!(),
+            Value::Unset => type_substitutor.alloc_unknown(),
+            Value::Error => unreachable!("{self:?}"),
         }
     }
-    pub fn is_of_type(&self, typ: &ConcreteType) -> bool {
-        match (self, typ) {
-            (Self::Integer(_), typ) if *typ == INT_CONCRETE_TYPE => true,
-            (Self::Bool(_), typ) if *typ == BOOL_CONCRETE_TYPE => true,
-            (Self::Array(arr_slice), ConcreteType::Array(arr_typ_box)) => {
-                let (arr_content_typ, arr_size_typ) = arr_typ_box.deref();
-                if arr_slice.len() != arr_size_typ.unwrap_value().unwrap_usize() {
-                    return false;
-                }
-                for v in arr_slice.iter() {
-                    if !v.is_of_type(arr_content_typ) {
-                        return false;
-                    }
-                }
-                true
-            }
-            (Self::Unset, _) => true,
-            (Self::Error, _) => true,
-            _other => false,
+
+    pub fn contains_errors_or_unsets(&self) -> bool {
+        match self {
+            Value::Bool(_) | Value::Integer(_) => false,
+            Value::Array(values) => values.iter().any(|v| v.contains_errors_or_unsets()),
+            Value::Unset | Value::Error => true,
         }
     }
 
     #[track_caller]
-    pub fn unwrap_integer(&self) -> &BigInt {
+    pub fn unwrap_integer(&self) -> &IBig {
         let Self::Integer(i) = self else {
             panic!("{:?} is not an integer!", self)
         };
@@ -86,12 +87,11 @@ impl Value {
     }
 
     #[track_caller]
-    pub fn unwrap_usize(&self) -> usize {
+    pub fn unwrap_int<IntT: for<'i> TryFrom<&'i IBig>>(&self) -> IntT {
         let Self::Integer(i) = self else {
             panic!("{:?} is not an integer!", self)
         };
-        use num::ToPrimitive;
-        i.to_usize().expect("Integer too large? Program crash")
+        IntT::try_from(i).ok().unwrap()
     }
 
     #[track_caller]
@@ -100,6 +100,13 @@ impl Value {
             panic!("{:?} is not a bool!", self)
         };
         *b
+    }
+
+    pub fn unwrap_array(&self) -> &[Value] {
+        let Self::Array(arr) = self else {
+            panic!("{:?} is not an array!", self)
+        };
+        arr
     }
 }
 
@@ -168,13 +175,13 @@ impl ConcreteType {
             ConcreteType::Named(_name) => Value::Unset,
             ConcreteType::Array(arr) => {
                 let (arr_typ, arr_size) = arr.deref();
-                let arr_size = arr_size.unwrap_value().unwrap_usize();
+                let arr_size: usize = arr_size.unwrap_value().unwrap_int();
                 let mut arr = Vec::new();
                 if arr_size > 0 {
                     let content_typ = arr_typ.get_initial_val();
                     arr.resize(arr_size, content_typ);
                 }
-                Value::Array(arr.into_boxed_slice())
+                Value::Array(arr)
             }
             ConcreteType::Value(_) | ConcreteType::Unknown(_) => unreachable!(),
         }

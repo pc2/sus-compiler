@@ -1,9 +1,8 @@
 use std::ops::Deref;
 
-use num::BigInt;
+use ibig::IBig;
 
 use crate::alloc::{zip_eq, zip_eq3};
-use crate::errors::ErrorInfoObject;
 use crate::flattening::{DeclarationKind, ExpressionSource, WireReferenceRoot, WrittenType};
 use crate::linker::LinkInfo;
 use crate::typing::abstract_type::PeanoType;
@@ -18,11 +17,11 @@ use crate::typing::{
 
 use super::*;
 
-use crate::typing::type_inference::HindleyMilner;
+use crate::typing::type_inference::{Substitutor, TypeSubstitutor};
 
 impl InstantiationContext<'_, '_> {
     fn peano_to_nested_array_of(
-        &self,
+        &mut self,
         p: &PeanoType,
         c: ConcreteType,
         dims: &mut Vec<ConcreteType>,
@@ -30,7 +29,7 @@ impl InstantiationContext<'_, '_> {
         match p {
             PeanoType::Zero => c,
             PeanoType::Succ(p) => {
-                let this_dim_var = ConcreteType::Unknown(self.type_substitutor.alloc());
+                let this_dim_var = self.type_substitutor.alloc_unknown();
                 let arr = ConcreteType::Array(Box::new((c, this_dim_var.clone())));
                 let typ = self.peano_to_nested_array_of(p, arr, dims);
                 dims.push(this_dim_var.clone());
@@ -40,21 +39,21 @@ impl InstantiationContext<'_, '_> {
         }
     }
     fn walk_type_along_path(
-        &self,
+        type_substitutor: &mut TypeUnifier<TypeSubstitutor<ConcreteType>>,
         mut current_type_in_progress: ConcreteType,
         path: &[RealWirePathElem],
     ) -> ConcreteType {
         for p in path {
-            let typ_after_applying_array = ConcreteType::Unknown(self.type_substitutor.alloc());
+            let typ_after_applying_array = type_substitutor.alloc_unknown();
             match p {
+                // TODO #28 integer size <-> array bound check
                 RealWirePathElem::ArrayAccess {
                     span: _,
                     idx_wire: _,
                 } => {
-                    // TODO #28 integer size <-> array bound check
-                    let arr_size = ConcreteType::Unknown(self.type_substitutor.alloc());
+                    let arr_size = type_substitutor.alloc_unknown();
                     let arr_box = Box::new((typ_after_applying_array.clone(), arr_size));
-                    self.type_substitutor.unify_must_succeed(
+                    type_substitutor.unify_must_succeed(
                         &current_type_in_progress,
                         &ConcreteType::Array(arr_box),
                     );
@@ -65,20 +64,23 @@ impl InstantiationContext<'_, '_> {
                     idx_a_wire: _,
                     idx_b_wire: _,
                 } => {
-                    /*let arr_size = ConcreteType::Unknown(self.type_substitutor.alloc());
+                    let inner_of_array_being_sliced = type_substitutor.alloc_unknown();
 
-                    self.type_substitutor.unify_must_succeed(
+                    let array_being_sliced = Box::new((
+                        inner_of_array_being_sliced.clone(),
+                        type_substitutor.alloc_unknown(),
+                    ));
+
+                    let slice_size = type_substitutor.alloc_unknown();
+                    type_substitutor.unify_must_succeed(
                         &current_type_in_progress,
+                        &ConcreteType::Array(array_being_sliced),
+                    );
+                    type_substitutor.unify_must_succeed(
                         &typ_after_applying_array,
+                        &ConcreteType::Array(Box::new((inner_of_array_being_sliced, slice_size))),
                     );
-                    current_type_in_progress = typ_after_applying_array;*/
-                    // TODO #28 integer size <-> array bound check
-                    let arr_size = ConcreteType::Unknown(self.type_substitutor.alloc());
-                    let arr_box = Box::new((typ_after_applying_array.clone(), arr_size));
-                    self.type_substitutor.unify_must_succeed(
-                        &current_type_in_progress,
-                        &ConcreteType::Array(arr_box),
-                    );
+
                     current_type_in_progress = typ_after_applying_array;
                 }
             }
@@ -87,14 +89,7 @@ impl InstantiationContext<'_, '_> {
         current_type_in_progress
     }
 
-    fn make_array_of(&self, concrete_typ: ConcreteType) -> ConcreteType {
-        ConcreteType::Array(Box::new((
-            concrete_typ,
-            ConcreteType::Unknown(self.type_substitutor.alloc()),
-        )))
-    }
-
-    fn typecheck_all_wires(&self) {
+    fn typecheck_all_wires(&mut self) {
         for this_wire_id in self.wires.id_range() {
             let this_wire = &self.wires[this_wire_id];
             let span = self.md.get_instruction_span(this_wire.original_instruction);
@@ -104,49 +99,65 @@ impl InstantiationContext<'_, '_> {
                 RealWireDataSource::ReadOnly => {}
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     if let Some(is_state) = is_state {
-                        assert!(is_state.is_of_type(&this_wire.typ));
+                        let value_typ = is_state.get_type(&mut self.type_substitutor);
+                        self.type_substitutor.unify_report_error(
+                            &value_typ,
+                            &this_wire.typ,
+                            span,
+                            "initial value of state",
+                        );
                     }
                     for s in sources {
                         let source_typ = &self.wires[s.from].typ;
-                        let destination_typ = self
-                            .walk_type_along_path(self.wires[this_wire_id].typ.clone(), &s.to_path);
+                        let destination_typ = Self::walk_type_along_path(
+                            &mut self.type_substitutor,
+                            self.wires[this_wire_id].typ.clone(),
+                            &s.to_path,
+                        );
                         self.type_substitutor.unify_report_error(
                             &destination_typ,
                             source_typ,
                             span,
-                            &"write wire access",
+                            "write wire access",
                         );
                     }
                 }
-                &RealWireDataSource::UnaryOp { op, right } => {
+                &RealWireDataSource::UnaryOp { op, rank: _, right } => {
                     // TODO overloading
                     let (input_typ, output_typ) = match op {
                         UnaryOperator::Not => (BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE),
                         UnaryOperator::Negate => (INT_CONCRETE_TYPE, INT_CONCRETE_TYPE),
-                        UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => {
-                            (self.make_array_of(BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
-                        }
-                        UnaryOperator::Sum | UnaryOperator::Product => {
-                            (self.make_array_of(INT_CONCRETE_TYPE), INT_CONCRETE_TYPE)
-                        }
+                        UnaryOperator::And | UnaryOperator::Or | UnaryOperator::Xor => (
+                            self.type_substitutor.make_array_of(BOOL_CONCRETE_TYPE),
+                            BOOL_CONCRETE_TYPE,
+                        ),
+                        UnaryOperator::Sum | UnaryOperator::Product => (
+                            self.type_substitutor.make_array_of(INT_CONCRETE_TYPE),
+                            INT_CONCRETE_TYPE,
+                        ),
                     };
 
                     self.type_substitutor.unify_report_error(
                         &self.wires[right].typ,
                         &input_typ,
                         span,
-                        &"unary input",
+                        "unary input",
                     );
                     self.type_substitutor.unify_report_error(
                         &self.wires[this_wire_id].typ,
                         &output_typ,
                         span,
-                        &"unary output",
+                        "unary output",
                     );
                 }
-                &RealWireDataSource::BinaryOp { op, left, right } => {
+                &RealWireDataSource::BinaryOp {
+                    op,
+                    rank: _,
+                    left,
+                    right,
+                } => {
                     // TODO overloading
-                    let ((in_left_inner, in_right_inner), out_inner) = match op {
+                    let ((left_typ, right_typ), output_typ) = match op {
                         BinaryOperator::And => {
                             ((BOOL_CONCRETE_TYPE, BOOL_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
@@ -190,6 +201,7 @@ impl InstantiationContext<'_, '_> {
                             ((INT_CONCRETE_TYPE, INT_CONCRETE_TYPE), BOOL_CONCRETE_TYPE)
                         }
                     };
+
                     // gets the corresponding abstract type to figure out how many layers of array to unify with:
                     let peano_type = &self.md.link_info.instructions
                         [this_wire.original_instruction]
@@ -199,34 +211,31 @@ impl InstantiationContext<'_, '_> {
                         .rank;
                     let mut out_dims = vec![];
                     let out_type =
-                        self.peano_to_nested_array_of(peano_type, out_inner, &mut out_dims);
+                        self.peano_to_nested_array_of(peano_type, output_typ, &mut out_dims);
 
                     let mut in_left_dims = vec![];
                     let in_left_type =
-                        self.peano_to_nested_array_of(peano_type, in_left_inner, &mut in_left_dims);
+                        self.peano_to_nested_array_of(peano_type, left_typ, &mut in_left_dims);
 
                     for (in_left, out) in out_dims.iter().zip(in_left_dims.iter()) {
                         self.type_substitutor.unify_report_error(
                             in_left,
                             out,
                             span,
-                            &"binary output dimension",
+                            "binary output dimension",
                         );
                     }
 
                     let mut in_right_dims = vec![];
-                    let in_right_type = self.peano_to_nested_array_of(
-                        peano_type,
-                        in_right_inner,
-                        &mut in_right_dims,
-                    );
+                    let in_right_type =
+                        self.peano_to_nested_array_of(peano_type, right_typ, &mut in_right_dims);
 
                     for (in_right, out) in out_dims.iter().zip(in_right_dims.iter()) {
                         self.type_substitutor.unify_report_error(
                             in_right,
                             out,
                             span,
-                            &"binary output dimension",
+                            "binary output dimension",
                         );
                     }
 
@@ -234,67 +243,64 @@ impl InstantiationContext<'_, '_> {
                         &self.wires[this_wire_id].typ,
                         &out_type,
                         span,
-                        &"binary output",
+                        "binary output",
                     );
                     self.type_substitutor.unify_report_error(
                         &self.wires[left].typ,
                         &in_left_type,
                         span,
-                        &"binary left",
+                        "binary left",
                     );
                     self.type_substitutor.unify_report_error(
                         &self.wires[right].typ,
                         &in_right_type,
                         span,
-                        &"binary right",
+                        "binary right",
                     );
                 }
                 RealWireDataSource::Select { root, path } => {
-                    let found_typ = self.walk_type_along_path(self.wires[*root].typ.clone(), path);
+                    let found_typ = Self::walk_type_along_path(
+                        &mut self.type_substitutor,
+                        self.wires[*root].typ.clone(),
+                        path,
+                    );
                     self.type_substitutor.unify_report_error(
                         &found_typ,
                         &self.wires[this_wire_id].typ,
                         span,
-                        &"wire access",
+                        "wire access",
                     );
                 }
-                RealWireDataSource::Constant { value } => {
-                    assert!(
-                        value.is_of_type(&this_wire.typ),
-                        "Assigned type to a constant should already be of the type"
-                    );
-                }
-                RealWireDataSource::ArrayLiteral { elements } => {
-                    let size = ConcreteType::Value(Value::Integer(BigInt::from(elements.len())));
-
-                    let array_element_type = ConcreteType::Unknown(self.type_substitutor.alloc());
-
-                    let new_array_type =
-                        ConcreteType::Array(Box::new((array_element_type.clone(), size)));
-
-                    self.type_substitutor.unify_report_error(
-                        &new_array_type,
-                        &self.wires[this_wire_id].typ,
-                        span,
-                        &"array literal",
-                    );
-
-                    for element in elements {
+                RealWireDataSource::ConstructArray { array_wires } => {
+                    let mut array_wires_iter = array_wires.iter();
+                    let first_elem = array_wires_iter.next().unwrap();
+                    let element_type = self.wires[*first_elem].typ.clone();
+                    for w in array_wires_iter {
                         self.type_substitutor.unify_report_error(
-                            &self.wires[*element].typ,
-                            &array_element_type,
+                            &self.wires[*w].typ,
+                            &element_type,
                             span,
-                            &"array element",
+                            "array construction",
                         );
                     }
+                    let array_size_value =
+                        ConcreteType::Value(Value::Integer(IBig::from(array_wires.len())));
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[this_wire_id].typ,
+                        &ConcreteType::Array(Box::new((element_type, array_size_value))),
+                        span,
+                        "array construction",
+                    );
                 }
+                // type is already set when the wire was created
+                RealWireDataSource::Constant { value: _ } => {}
             };
         }
     }
 
     fn finalize(&mut self) {
         for (_id, w) in &mut self.wires {
-            if !w.typ.fully_substitute(&self.type_substitutor) {
+            if !self.type_substitutor.fully_substitute(&mut w.typ) {
                 let typ_as_str = w.typ.display(&self.linker.types);
 
                 let span = self.md.get_instruction_span(w.original_instruction);
@@ -313,8 +319,8 @@ impl InstantiationContext<'_, '_> {
         } in self.type_substitutor.extract_errors()
         {
             // Not being able to fully substitute is not an issue. We just display partial types
-            let _ = found.fully_substitute(&self.type_substitutor);
-            let _ = expected.fully_substitute(&self.type_substitutor);
+            let _ = self.type_substitutor.fully_substitute(&mut found);
+            let _ = self.type_substitutor.fully_substitute(&mut expected);
 
             let expected_name = expected.display(&self.linker.types).to_string();
             let found_name = found.display(&self.linker.types).to_string();
@@ -332,7 +338,7 @@ impl InstantiationContext<'_, '_> {
     pub fn typecheck(&mut self) {
         let mut delayed_constraints: DelayedConstraintsList<Self> = DelayedConstraintsList::new();
         for (sm_id, sm) in &self.submodules {
-            let sub_module = &self.linker.modules[sm.module_uuid];
+            let sub_module = &self.linker.modules[sm.refers_to.id];
 
             for (port_id, p) in sm.port_map.iter_valids() {
                 let wire = &self.wires[p.maps_to_wire];
@@ -343,9 +349,9 @@ impl InstantiationContext<'_, '_> {
 
                 let typ_for_inference = concretize_written_type_with_possible_template_args(
                     &port_decl.typ_expr,
-                    &sm.template_args,
+                    &sm.refers_to.template_args,
                     &sub_module.link_info,
-                    &self.type_substitutor,
+                    &mut self.type_substitutor,
                 );
 
                 self.type_substitutor
@@ -356,6 +362,8 @@ impl InstantiationContext<'_, '_> {
         }
 
         self.typecheck_all_wires();
+
+        delayed_constraints.push(LatencyInferenceDelayedConstraint {});
 
         delayed_constraints.resolve_delayed_constraints(self);
 
@@ -399,10 +407,10 @@ fn concretize_written_type_with_possible_template_args(
     written_typ: &WrittenType,
     template_args: &TVec<ConcreteType>,
     link_info: &LinkInfo,
-    type_substitutor: &TypeSubstitutor<ConcreteType, ConcreteTypeVariableIDMarker>,
+    type_substitutor: &mut TypeSubstitutor<ConcreteType>,
 ) -> ConcreteType {
     match written_typ {
-        WrittenType::Error(_span) => ConcreteType::Unknown(type_substitutor.alloc()),
+        WrittenType::Error(_span) => type_substitutor.alloc_unknown(),
         WrittenType::TemplateVariable(_span, uuid) => template_args[*uuid].clone(),
         WrittenType::Named(global_reference) => {
             let object_template_args: TVec<ConcreteType> =
@@ -425,12 +433,12 @@ fn concretize_written_type_with_possible_template_args(
                                     {
                                         template_args[found_template_arg].clone()
                                     } else {
-                                        ConcreteType::Unknown(type_substitutor.alloc())
+                                        type_substitutor.alloc_unknown()
                                     }
                                 }
                             }
                         } else {
-                            ConcreteType::Unknown(type_substitutor.alloc())
+                            type_substitutor.alloc_unknown()
                         }
                     });
 
@@ -453,7 +461,7 @@ fn concretize_written_type_with_possible_template_args(
             {
                 template_args[found_template_arg].clone()
             } else {
-                ConcreteType::Unknown(type_substitutor.alloc())
+                type_substitutor.alloc_unknown()
             };
 
             ConcreteType::Array(Box::new((arr_content_concrete, arr_idx_concrete)))
@@ -461,37 +469,29 @@ fn concretize_written_type_with_possible_template_args(
     }
 }
 
-impl SubmoduleTypecheckConstraint {
-    /// Directly named type and value parameters are immediately unified, but latency count deltas can only be computed from the latency counting graph
-    fn try_infer_latency_counts(&mut self, _context: &mut InstantiationContext) {
-        // TODO
-    }
-}
-
 impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConstraint {
     fn try_apply(&mut self, context: &mut InstantiationContext) -> DelayedConstraintStatus {
-        // Try to infer template arguments based on the connections to the ports of the module.
-        self.try_infer_latency_counts(context);
-
         let sm = &mut context.submodules[self.sm_id];
+        assert!(sm.instance.get().is_none());
 
         let submod_instr =
             context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
-        let sub_module = &context.linker.modules[sm.module_uuid];
+
+        let sub_module = &context.linker.modules[sm.refers_to.id];
 
         // Check if there's any argument that isn't known
-        for (_id, arg) in &mut sm.template_args {
-            if !arg.fully_substitute(&context.type_substitutor) {
+        for (_id, arg) in &mut Rc::get_mut(&mut sm.refers_to).unwrap().template_args {
+            if !context.type_substitutor.fully_substitute(arg) {
                 // We don't actually *need* to already fully_substitute here, but it's convenient and saves some work
                 return DelayedConstraintStatus::NoProgress;
             }
         }
 
-        if let Some(instance) = sub_module.instantiations.instantiate(
-            sub_module,
-            context.linker,
-            sm.template_args.clone(),
-        ) {
+        if let Some(instance) = context
+            .linker
+            .instantiator
+            .instantiate(context.linker, sm.refers_to.clone())
+        {
             for (_port_id, concrete_port, source_code_port, connecting_wire) in
                 zip_eq3(&instance.interface_ports, &sub_module.ports, &sm.port_map)
             {
@@ -525,7 +525,8 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                             &wire.typ,
                             &concrete_port.typ,
                             submod_instr.module_ref.get_total_span(),
-                            &|| {
+                            || {
+                                use crate::errors::ErrorInfoObject;
                                 let port_declared_here = source_code_port
                                     .make_info(sub_module.link_info.file)
                                     .unwrap();
@@ -574,16 +575,21 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                 }
             }
 
+            // Overwrite the refers_to with the identical instance.global_ref
+            assert!(sm.refers_to == instance.global_ref);
+            sm.refers_to = instance.global_ref.clone();
+
             sm.instance
                 .set(instance)
-                .expect("Can only set the instance of a submodule once");
+                .expect("Can only set an InstantiatedModule once");
+
             DelayedConstraintStatus::Resolved
         } else {
             context.errors.error(
                 submod_instr.module_ref.get_total_span(),
                 "Error instantiating submodule",
             );
-            DelayedConstraintStatus::NoProgress
+            DelayedConstraintStatus::Resolved
         }
     }
 
@@ -592,17 +598,22 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
 
         let submod_instr =
             context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
-        let sub_module = &context.linker.modules[sm.module_uuid];
 
-        let submodule_template_args_string = pretty_print_concrete_instance(
-            &sub_module.link_info,
-            &sm.template_args,
-            &context.linker.types,
-        );
+        let submodule_template_args_string =
+            sm.refers_to.pretty_print_concrete_instance(context.linker);
         let message = format!("Could not fully instantiate {submodule_template_args_string}");
 
         context
             .errors
             .error(submod_instr.get_most_relevant_span(), message);
     }
+}
+
+pub struct LatencyInferenceDelayedConstraint {}
+impl DelayedConstraint<InstantiationContext<'_, '_>> for LatencyInferenceDelayedConstraint {
+    fn try_apply(&mut self, context: &mut InstantiationContext<'_, '_>) -> DelayedConstraintStatus {
+        context.infer_parameters_for_latencies()
+    }
+
+    fn report_could_not_resolve_error(&self, _context: &InstantiationContext<'_, '_>) {} // Handled by incomplete submodules themselves
 }

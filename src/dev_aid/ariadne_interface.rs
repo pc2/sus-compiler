@@ -16,19 +16,19 @@ use ariadne::*;
 impl Cache<FileUUID> for (&Linker, &mut ArenaVector<Source<String>, FileUUIDMarker>) {
     type Storage = String;
 
-    fn fetch(&mut self, id: &FileUUID) -> Result<&Source, Box<dyn std::fmt::Debug + '_>> {
-        Ok(&self.1[*id])
+    fn fetch(&mut self, id: &FileUUID) -> Result<&Source<String>, impl std::fmt::Debug> {
+        Result::<&Source<String>, ()>::Ok(&self.1[*id])
     }
-    fn display<'a>(&self, id: &'a FileUUID) -> Option<Box<dyn std::fmt::Display + 'a>> {
+    fn display<'a>(&self, id: &'a FileUUID) -> Option<impl std::fmt::Display + 'a> {
         if config().ci {
             let filename = self.0.files[*id]
                 .file_identifier
                 .rsplit("/")
                 .next()
                 .unwrap_or(self.0.files[*id].file_identifier.as_str());
-            Some(Box::new(filename.to_string()))
+            Some(filename.to_string())
         } else {
-            Some(Box::new(self.0.files[*id].file_identifier.clone()))
+            Some(self.0.files[*id].file_identifier.clone())
         }
     }
 }
@@ -41,11 +41,11 @@ struct NamedSource<'s> {
 impl Cache<()> for NamedSource<'_> {
     type Storage = String;
 
-    fn fetch(&mut self, _id: &()) -> Result<&Source, Box<dyn std::fmt::Debug + '_>> {
-        Ok(&self.source)
+    fn fetch(&mut self, _id: &()) -> Result<&Source<String>, impl std::fmt::Debug> {
+        Result::<&Source<String>, ()>::Ok(&self.source)
     }
-    fn display<'a>(&self, _id: &'a ()) -> Option<Box<dyn std::fmt::Display + 'a>> {
-        Some(Box::new(self.name.to_owned()))
+    fn display<'a>(&self, _id: &'a ()) -> Option<impl std::fmt::Display + 'a> {
+        Some(self.name.to_owned())
     }
 }
 
@@ -110,7 +110,7 @@ fn ariadne_config() -> Config {
 }
 
 pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
-    error: &CompileError,
+    error: CompileError,
     file: FileUUID,
     linker: &Linker,
     file_cache: &mut AriadneCache,
@@ -129,20 +129,20 @@ pub fn pretty_print_error<AriadneCache: Cache<FileUUID>>(
 
     let config = ariadne_config();
     let mut report: ReportBuilder<'_, (FileUUID, Range<usize>)> =
-        Report::build(report_kind, file, error_span.start).with_config(config);
+        Report::build(report_kind, (file, error_span.clone())).with_config(config);
     report = report.with_message(&error.reason).with_label(
         Label::new((file, error_span))
-            .with_message(&error.reason)
+            .with_message(error.reason)
             .with_color(err_color),
     );
 
-    for info in &error.infos {
+    for info in error.infos {
         let info_span = info.position.as_range();
         // Assert that span is in file
         let _ = &linker.files[info.file].file_text[info.position];
         report = report.with_label(
             Label::new((info.file, info_span))
-                .with_message(&info.info)
+                .with_message(info.info)
                 .with_color(info_color),
         )
     }
@@ -155,10 +155,11 @@ pub fn print_all_errors(
     ariadne_sources: &mut ArenaVector<Source, FileUUIDMarker>,
 ) {
     let mut source_cache = (linker, ariadne_sources);
-    for (file_uuid, _f) in &linker.files {
-        linker.for_all_errors_in_file(file_uuid, |err| {
+    let errors = linker.collect_all_errors();
+    for (file_uuid, errs) in errors {
+        for err in errs {
             pretty_print_error(err, file_uuid, linker, &mut source_cache);
-        });
+        }
     }
 }
 
@@ -182,7 +183,7 @@ pub fn pretty_print_spans_in_reverse_order(file_data: &FileData, spans: Vec<Rang
         let config = ariadne_config();
 
         let mut report: ReportBuilder<'_, Range<usize>> =
-            Report::build(ReportKind::Advice, (), span.start).with_config(config);
+            Report::build(ReportKind::Advice, span.clone()).with_config(config);
         report = report.with_label(
             Label::new(span.clone())
                 .with_message(format!("Span({}, {})", span.start, span.end))
@@ -207,7 +208,7 @@ pub fn pretty_print_many_spans(file_data: &FileData, spans: &[(String, Range<usi
     }
 
     let mut report: ReportBuilder<'_, Range<usize>> =
-        Report::build(ReportKind::Advice, (), spans[0].1.start).with_config(config);
+        Report::build(ReportKind::Advice, spans[0].1.clone()).with_config(config);
 
     for (text, span) in spans.iter().rev() {
         // If span not in file, just don't print it. This happens.

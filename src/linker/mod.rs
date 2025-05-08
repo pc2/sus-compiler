@@ -1,14 +1,16 @@
 use crate::{
     flattening::{Instruction, NamedConstant},
+    instantiation::instantiation_cache::Instantiator,
     prelude::*,
-    typing::template::{
-        GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind,
+    typing::{
+        abstract_type::DomainType,
+        template::{GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind},
+        type_inference::{AbstractTypeSubstitutor, TypeSubstitutor},
     },
 };
 
 pub mod checkpoint;
 mod resolver;
-use arrayvec::ArrayVec;
 pub use resolver::*;
 
 use std::{
@@ -22,7 +24,7 @@ use crate::{alloc::ArenaAllocator, file_position::FileText, flattening::Module};
 
 use crate::errors::{CompileError, ErrorInfo, ErrorLevel, ErrorStore};
 
-use crate::flattening::{StructType, TypingAllocator};
+use crate::flattening::StructType;
 
 use self::checkpoint::CheckPoint;
 
@@ -98,8 +100,10 @@ pub struct LinkInfo {
 
     /// Created in Stage 2: Flattening
     ///
+    /// Removed in Stage 3: Typechecking
+    ///
     /// Is only temporary. It's used during typechecking to allocate the type unification block
-    pub type_variable_alloc: TypingAllocator,
+    pub type_variable_alloc: Option<Box<(AbstractTypeSubstitutor, TypeSubstitutor<DomainType>)>>,
 
     pub template_parameters: TVec<Parameter>,
 
@@ -111,7 +115,7 @@ pub struct LinkInfo {
     /// TODO the system is there, just need to actually do incremental compilation (#49)
     ///
     /// Right now it already functions as a sanity check, to make sure no steps in building modules/types are skipped
-    pub checkpoints: ArrayVec<CheckPoint, 4>,
+    pub checkpoints: Vec<CheckPoint>,
 }
 
 impl LinkInfo {
@@ -218,6 +222,7 @@ pub struct Linker {
     pub modules: ArenaAllocator<Module, ModuleUUIDMarker>,
     pub constants: ArenaAllocator<NamedConstant, ConstantUUIDMarker>,
     pub files: ArenaAllocator<FileData, FileUUIDMarker>,
+    pub instantiator: Instantiator,
     global_namespace: HashMap<String, NamespaceElement>,
 }
 
@@ -234,6 +239,7 @@ impl Linker {
             modules: ArenaAllocator::new(),
             constants: ArenaAllocator::new(),
             files: ArenaAllocator::new(),
+            instantiator: Instantiator::new(),
             global_namespace: HashMap::new(),
         }
     }
@@ -257,10 +263,26 @@ impl Linker {
             GlobalUUID::Constant(cst_id) => &mut constants[cst_id].link_info,
         }
     }
-    fn for_all_duplicate_declaration_errors(
+    fn iter_link_infos(&self) -> impl Iterator<Item = (GlobalUUID, &LinkInfo)> {
+        let md_iter = self
+            .modules
+            .iter()
+            .map(|(id, obj)| (id.into(), &obj.link_info));
+        let typ_iter = self
+            .types
+            .iter()
+            .map(|(id, obj)| (id.into(), &obj.link_info));
+        let cst_iter = self
+            .constants
+            .iter()
+            .map(|(id, obj)| (id.into(), &obj.link_info));
+
+        md_iter.chain(typ_iter).chain(cst_iter)
+    }
+
+    fn collect_duplicate_declaration_errors(
         &self,
-        file_uuid: FileUUID,
-        f: &mut impl FnMut(&CompileError),
+        all_errors: &mut ArenaAllocator<ErrorStore, FileUUIDMarker>,
     ) {
         // Conflicting Declarations
         for item in &self.global_namespace {
@@ -271,9 +293,6 @@ impl Linker {
                 colission.iter().map(|id| self.get_link_info(*id)).collect();
 
             for (idx, info) in infos.iter().enumerate() {
-                if info.file != file_uuid {
-                    continue;
-                }
                 let mut conflict_infos = Vec::new();
                 for (idx_2, conflicts_with) in infos.iter().enumerate() {
                     if idx_2 == idx {
@@ -293,7 +312,7 @@ impl Linker {
 
                 let reason = format!("'{this_object_name}' conflicts with other declarations:");
 
-                f(&CompileError {
+                all_errors[info.file].push(CompileError {
                     position: info.name_span,
                     reason,
                     infos,
@@ -303,32 +322,32 @@ impl Linker {
         }
     }
 
-    fn for_all_errors_after_compile(
+    fn collect_errors_after_compile(
         &self,
-        file_uuid: FileUUID,
-        func: &mut impl FnMut(&CompileError),
+        all_errs: &mut ArenaAllocator<ErrorStore, FileUUIDMarker>,
     ) {
-        for v in &self.files[file_uuid].associated_values {
-            match v {
-                GlobalUUID::Module(md_id) => {
-                    let md = &self.modules[*md_id];
-                    for e in &md.link_info.errors {
-                        func(e)
-                    }
-                    md.instantiations.for_each_error(func);
-                }
-                GlobalUUID::Type(_) => {}
-                GlobalUUID::Constant(_) => {}
-            }
+        for (_id, link_info) in self.iter_link_infos() {
+            all_errs[link_info.file].append(&link_info.errors);
+        }
+        for (_id, inst) in self.instantiator.borrow().iter() {
+            let file_id = self.modules[inst.global_ref.id].link_info.file;
+            all_errs[file_id].append(&inst.errors);
         }
     }
 
-    pub fn for_all_errors_in_file(&self, file_uuid: FileUUID, mut f: impl FnMut(&CompileError)) {
-        for err in &self.files[file_uuid].parsing_errors {
-            f(err);
+    pub fn collect_all_errors(&self) -> ArenaAllocator<ErrorStore, FileUUIDMarker> {
+        let mut result = self
+            .files
+            .map(|_id, file_data| file_data.parsing_errors.clone());
+
+        self.collect_duplicate_declaration_errors(&mut result);
+        self.collect_errors_after_compile(&mut result);
+
+        for (_, errs) in &mut result {
+            errs.sort();
         }
-        self.for_all_duplicate_declaration_errors(file_uuid, &mut f);
-        self.for_all_errors_after_compile(file_uuid, &mut f);
+
+        result
     }
 
     pub fn remove_everything_in_file(&mut self, file_uuid: FileUUID) -> &mut FileData {

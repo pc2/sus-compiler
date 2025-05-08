@@ -866,17 +866,7 @@ module permute_t #(T, int SIZE, int[SIZE] SOURCES) {
 }
 
 module use_permute {
-	gen int[8] SOURCES
-
-	SOURCES[0] = 3
-	SOURCES[1] = 2
-	SOURCES[2] = 4
-	SOURCES[3] = 5
-	SOURCES[4] = 1
-	SOURCES[5] = 2
-	SOURCES[6] = 7
-	SOURCES[7] = 6
-
+	gen int[8] SOURCES = [3, 2, 4, 5, 1, 2, 7, 6]
 
 	int[2] inArr
 
@@ -1119,6 +1109,99 @@ module IfTesting #(int WIDTH) {
         }
 }
 
+module latency_counting_disjoint_blocks {
+	interface x : bool a -> bool b
+	interface y : bool c -> bool d
+
+	bool shared = true
+
+	b = a ^ shared
+	d = c ^ shared
+}
+
+module latency_counting_disjoint_blocks_merge_error {
+	interface x : bool a -> bool b
+	interface y : bool c -> bool d
+
+	bool shared = true
+
+	reg bool a_delayed = a
+
+	bool out_shared = a_delayed ^ c
+
+	b = a ^ shared
+	d = c ^ shared
+}
+
+
+module use_infer_me {
+	interface use_infer_me : bool in_val'0, int in_val_2 -> bool out_val'3
+
+	out_val = infer_me(in_val | (in_val_2 == 0), in_val_2)
+
+}
+
+module infer_me #(int A) {
+	interface infer_me : bool x'0 -> bool y'A
+
+	y = x
+}
+
+module infer_from_local_context {
+	interface infer_from_local_context : bool in_val -> bool out_val
+
+	reg reg reg reg reg bool heavily_pipelined_computation = in_val
+
+	out_val = infer_me(in_val) | heavily_pipelined_computation
+}
+
+module instantiate_fifo {
+	output bool request_data'0
+	input int data_received'3
+
+	FIFO #(DEPTH: 30) fifo
+
+	request_data = fifo.ready
+	when fifo.ready {
+		reg reg reg reg reg int heavy_computation = data_received
+
+		fifo.push(true, heavy_computation)
+	}
+}
+
+// This produces a graph much like this:
+// a'0-.     .- b'3
+//  \  1\  1/   /
+//   x?-- i --y?
+//
+// Annoyingly, with the current inference implementation, it will infer x *and* y to get A: 2, conflicting b'4 with the specified b'3
+// There is no good inference here, so we must forbid inferring
+// 
+// IDEA: Do real ports first, then use the found port values as "specified latencies" and infer submodules using ports method in a *second* run. 
+module inference_edge_case {
+	interface inference_edge_case: bool a'0 -> bool b'3
+
+	reg bool a_d = a
+
+	// infer_me #(A: 2) x
+	infer_me x
+	infer_me y
+	bool loose_inbetween = x(a)
+	loose_inbetween = a_d
+	reg b = loose_inbetween
+
+	b = y(loose_inbetween)
+}
+
+module specified_latencies_not_ports_edge_case {
+	interface specified_latencies_not_ports_edge_case: bool in_port -> bool out_port
+
+	bool in_spec'0 = in_port
+
+	bool out_spec'5 = false
+
+	out_port = out_spec | in_port
+}
 module testArrayWrite {
 	interface testArrayWrite : int[10][6][2] in_arr -> int[10][6] out_arr
 
@@ -1132,3 +1215,151 @@ module testArrayWrite {
 		}
 	}
 }
+
+
+module infer_me_with_poison_output #(int N) {
+	interface infer_me_with_poison_output : bool i'0 -> bool o'N, bool p
+	o = i
+	reg reg reg reg p = i
+}
+// The poison output of infer_me_with_poison_output should make it impossible to infer it
+module instantiate_infer_me_with_poison_output {
+	interface instantiate_infer_me_with_poison_output : bool i -> bool o
+	reg reg reg reg reg reg reg o = i
+	bool x, bool y = infer_me_with_poison_output(i)
+	o = x
+	o = y
+}
+module __add__ #(int A, int B) {
+	interface __add__ : int#(MAX: A) a'0, int #(MAX:B) b'0 -> int #(MAX: A+B) o'clog2 #(V: 5)
+}
+module ShiftReg #(int DEPTH) {
+	interface ShiftReg : bool i'0 -> bool o'DEPTH
+	if DEPTH > 3 {
+		// Impl as BRAM
+	} else {
+		o = i
+	}
+}
+
+module MultiStateLoop #(T, int II) {
+	trigger may_process'0 : T cur_state {
+		action next_state'II : T next_state_value
+	}
+
+	action request_output : -> trigger output_valid : T result
+}
+
+module use_MultiStateLoop {
+	MultiStateLoop loop
+
+	trigger request_input
+		action input_valid : float new_input
+
+	action request_result : -> trigger result_valid : {
+
+	}
+
+	when loop.process : float cur_state {
+		float next_state = cur_state * cur_state
+		when cur_state >= 2.0 {
+			
+		}
+	}
+}
+
+module CombineArray {
+	int a = 3
+	int b = 4
+
+	int[4] result = []
+}
+
+module unknownLatency #(int V) {
+	interface unknownLatency : bool a'0 -> bool b'5
+
+	b = a
+}
+
+module useUnknownLatency {
+	input bool x'0
+	output bool y
+
+	unknownLatency ulat
+
+	y = ulat(x)
+}
+
+module infer_me_conflicting_directions #(int V) {
+	interface a: bool x'0 -> bool y'V
+
+	interface b: bool p'0 -> bool q'-V
+}
+
+module use_infer_me_conflicting_directions {
+	interface use_infer_me_conflicting_directions: bool x'0 -> bool y'-1
+
+	infer_me_conflicting_directions inf
+
+	y = inf.a(x)
+	y = inf.b(x)
+}
+
+module infer_me_with_delta #(int V) {
+	interface a: bool x'0 -> bool y'V
+
+	interface b: bool p'0 -> bool q'V+30
+}
+
+module use_infer_me_with_delta {
+	interface use_infer_me_with_delta: bool x'0 -> bool y'-1
+
+	infer_me_with_delta inf
+
+	y = inf.a(x)
+	y = inf.b(x)
+}
+
+module infer_me_with_negative_delta #(int V) {
+	interface a: bool x'0 -> bool y'-V
+
+	interface b: bool p'0 -> bool q'-V+30
+}
+
+module use_infer_me_with_negative_delta {
+	interface use_infer_me_with_negative_delta: bool x'0 -> bool y'-1
+
+	infer_me_with_negative_delta inf
+
+	y = inf.a(x)
+	y = inf.b(x)
+}
+
+module infer_me_inputs_only #(int V) {
+	interface infer_me_inputs_only : bool a'0, bool b'V
+}
+
+module use_infer_me_inputs_only {
+	interface use_infer_me_inputs_only : bool x'0
+
+
+	reg reg reg bool y = x
+
+	infer_me_inputs_only(x, y)
+}
+
+
+module use_ranks {
+	gen int[15] v = [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5]
+
+	gen int[15] vv = v + v
+
+	gen int[16] vvv = [1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 6]
+
+	gen int[3] qzd = vv + vvv
+
+	state int[15] wire_v
+
+	wire_v = wire_v + vv
+}
+

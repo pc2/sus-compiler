@@ -1,9 +1,10 @@
 **/target
 **/*.lock
-.vscode
 **/*.data
 **/*.old
 **/*.out
 **/*.vcd
 **/*.fst
+**/*.dot
 sus-lsp/
+tinyTestFile.sus

@@ -1,10 +1,12 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
 use crate::linker::AFTER_INITIAL_PARSE_CP;
 use crate::prelude::*;
+use crate::typing::concrete_type::ConcreteGlobalReference;
 
 use sus_proc_macro::{get_builtin_const, get_builtin_type};
 use tree_sitter::Parser;
@@ -53,6 +55,10 @@ impl Linker {
         // Critically, std/core.sus MUST be the first file to be loaded into the linker. Otherwise the IDs don't point to the correct objects
         assert_eq!(self.types[get_builtin_type!("int")].link_info.name, "int");
         assert_eq!(self.types[get_builtin_type!("bool")].link_info.name, "bool");
+        assert_eq!(
+            self.types[get_builtin_type!("float")].link_info.name,
+            "float"
+        );
 
         assert_eq!(
             self.constants[get_builtin_const!("true")].link_info.name,
@@ -132,8 +138,11 @@ impl Linker {
         );
 
         self.with_file_builder(file_id, |builder| {
-            let _panic_guard =
-                SpanDebugger::new("gather_initial_file_data in add_file", builder.file_data);
+            let _panic_guard = SpanDebugger::new(
+                "gather_initial_file_data in add_file",
+                &builder.file_data.file_identifier,
+                builder.file_data,
+            );
             gather_initial_file_data(builder);
         });
 
@@ -162,8 +171,11 @@ impl Linker {
             file_data.tree = tree;
 
             self.with_file_builder(file_id, |builder| {
-                let _panic_guard =
-                    SpanDebugger::new("gather_initial_file_data in update_file", builder.file_data);
+                let _panic_guard = SpanDebugger::new(
+                    "gather_initial_file_data in update_file",
+                    &builder.file_data.file_identifier,
+                    builder.file_data,
+                );
                 gather_initial_file_data(builder);
             });
 
@@ -179,16 +191,15 @@ impl Linker {
     }
 
     pub fn recompile_all(&mut self) {
+        let config = config();
+
+        self.instantiator.borrow_mut().clear_instances();
+
         // First reset all modules back to post-gather_initial_file_data
         for (_, md) in &mut self.modules {
-            let Module {
-                link_info,
-                instantiations,
-                ..
-            } = md;
+            let Module { link_info, .. } = md;
             link_info.reset_to(AFTER_INITIAL_PARSE_CP);
             link_info.instructions.clear();
-            instantiations.clear_instances()
         }
         for (_, typ) in &mut self.types {
             typ.link_info.reset_to(AFTER_INITIAL_PARSE_CP);
@@ -196,47 +207,42 @@ impl Linker {
         for (_, cst) in &mut self.constants {
             cst.link_info.reset_to(AFTER_INITIAL_PARSE_CP);
         }
-        if config().early_exit == EarlyExitUpTo::Initialize {
+        if config.early_exit == EarlyExitUpTo::Initialize {
             return;
         }
 
         flatten_all_globals(self);
-        config().for_each_debug_module(config().debug_print_module_contents, &self.modules, |md| {
-            md.print_flattened_module(&self.files[md.link_info.file]);
-        });
-        if config().early_exit == EarlyExitUpTo::Flatten {
+        if config.early_exit == EarlyExitUpTo::Flatten {
             return;
         }
 
         typecheck_all_modules(self);
 
-        config().for_each_debug_module(config().debug_print_module_contents, &self.modules, |md| {
-            md.print_flattened_module(&self.files[md.link_info.file]);
-        });
-        if config().early_exit == EarlyExitUpTo::AbstractTypecheck {
+        if config.early_exit == EarlyExitUpTo::AbstractTypecheck {
             return;
         }
 
         perform_lints(self);
 
-        if config().early_exit == EarlyExitUpTo::Lint {
+        if config.early_exit == EarlyExitUpTo::Lint {
             return;
         }
 
         // Make an initial instantiation of all modules
         // Won't be possible once we have template modules
-        for (_id, md) in &self.modules {
-            //md.print_flattened_module();
+        for (id, md) in &self.modules {
             // Already instantiate any modules without parameters
-            // Currently this is all modules
-            let span_debug_message = format!("instantiating {}", &md.link_info.name);
-            let _panic_guard =
-                SpanDebugger::new(&span_debug_message, &self.files[md.link_info.file]);
             // Can immediately instantiate modules that have no template args
             if md.link_info.template_parameters.is_empty() {
-                let _inst = md.instantiations.instantiate(md, self, FlatAlloc::new());
+                let _inst = self.instantiator.instantiate(
+                    self,
+                    Rc::new(ConcreteGlobalReference {
+                        id,
+                        template_args: FlatAlloc::new(),
+                    }),
+                );
             }
         }
-        if config().early_exit == EarlyExitUpTo::Instantiate {}
+        if config.early_exit == EarlyExitUpTo::Instantiate {}
     }
 }

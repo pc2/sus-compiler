@@ -1,7 +1,5 @@
 //! After instantiation, we preform a few final checks of each module.
 
-use num::BigInt;
-
 use crate::{typing::concrete_type::ConcreteType, value::Value};
 
 use super::{InstantiationContext, RealWireDataSource, RealWirePathElem};
@@ -21,7 +19,7 @@ impl InstantiationContext<'_, '_> {
                     if let RealWireDataSource::Constant { value } = &idx_wire_wire.source {
                         // Constant access into array! We can check.
                         let integer_value = value.unwrap_integer();
-                        if integer_value >= arr_sz || integer_value < &BigInt::ZERO {
+                        if integer_value >= arr_sz || integer_value < &ibig::ibig!(0) {
                             self.errors
                                 .error(span.inner_span(), format!("Index out of bounds. Array is of size {arr_sz}, but the index is {integer_value}."));
                         }
@@ -39,7 +37,7 @@ impl InstantiationContext<'_, '_> {
                         if let RealWireDataSource::Constant { value } = &wire.source {
                             // Constant access into array! We can check.
                             let integer_value = value.unwrap_integer();
-                            if integer_value >= arr_sz || integer_value < &BigInt::ZERO {
+                            if integer_value >= arr_sz || integer_value < &ibig::ibig!(0) {
                                 self.errors
                                     .error(span.inner_span(), format!("Index out of bounds. Array is of size {arr_sz}, but the index is {integer_value}."));
                             }
