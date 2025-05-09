@@ -127,18 +127,6 @@ fn make_fanins(
                     },
                 );
             }
-            Instruction::FuncCall(fc) => {
-                for a in &fc.func_call.arguments {
-                    instruction_fanins[fc.func_call.interface_reference.submodule_decl].push(*a);
-                }
-                for wr in &fc.write_outputs {
-                    handle_write_to(
-                        &mut instruction_fanins,
-                        wr,
-                        fc.func_call.interface_reference.submodule_decl,
-                    );
-                }
-            }
             Instruction::Declaration(decl) => {
                 if let Some(lat_spec) = decl.latency_specifier {
                     instruction_fanins[inst_id].push(lat_spec);
@@ -147,10 +135,21 @@ fn make_fanins(
                     instruction_fanins[inst_id].push(id);
                 });
             }
-            Instruction::Expression(wire) => {
-                wire.source.for_each_dependency(&mut |id| {
+            Instruction::Expression(expr) => {
+                expr.source.for_each_dependency(&mut |id| {
                     instruction_fanins[inst_id].push(id);
                 });
+                if let ExpressionSource::FuncCall(fc) = &expr.source {
+                    if let Some(multi_write) = &fc.multi_write_outputs {
+                        for wr in multi_write {
+                            handle_write_to(
+                                &mut instruction_fanins,
+                                wr,
+                                fc.interface_reference.submodule_decl,
+                            );
+                        }
+                    }
+                }
             }
             Instruction::IfStatement(stm) => {
                 for id in FlatIDRange::new(stm.then_block.0, stm.else_block.1) {

@@ -779,13 +779,8 @@ impl InstantiationContext<'_, '_> {
                     right,
                 }
             }
-            ExpressionSource::FuncCall(func_call) => {
-                let (submod_id, func_call_outputs) =
-                    self.instantiate_func_call(func_call, original_instruction)?;
-
-                assert_eq!(func_call_outputs.len(), 1);
-
-                return Ok(self.get_submodule_port(submod_id, func_call_outputs.0, None));
+            ExpressionSource::FuncCall(_func_call) => {
+                unreachable!("This is handled by instantiate_code_block already")
             }
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut array_wires = Vec::with_capacity(arr.len());
@@ -1033,31 +1028,42 @@ impl InstantiationContext<'_, '_> {
                         let value_computed = self.compute_compile_time(expr)?;
                         SubModuleOrWire::CompileTimeValue(value_computed)
                     }
-                    DomainType::Physical(domain) => {
-                        let wire_found =
-                            self.expression_to_real_wire(expr, original_instruction, domain)?;
-                        SubModuleOrWire::Wire(wire_found)
-                    }
+                    DomainType::Physical(domain) => SubModuleOrWire::Wire(
+                        if let ExpressionSource::FuncCall(fc) = &expr.source {
+                            let (submod_id, func_call_outputs) =
+                                self.instantiate_func_call(fc, original_instruction)?;
+
+                            match &fc.multi_write_outputs {
+                                Some(multi_write) => {
+                                    for (port, write) in zip_eq(func_call_outputs, multi_write) {
+                                        let port_wire =
+                                            self.get_submodule_port(submod_id, port, None);
+
+                                        self.instantiate_wire_connection(
+                                            write,
+                                            port_wire,
+                                            original_instruction,
+                                        )?;
+                                    }
+
+                                    continue;
+                                }
+                                None => self.get_submodule_port(
+                                    submod_id,
+                                    func_call_outputs.unwrap_len_1(),
+                                    None,
+                                ),
+                            }
+                        } else {
+                            self.expression_to_real_wire(expr, original_instruction, domain)?
+                        },
+                    ),
                     DomainType::Unknown(_) => {
                         unreachable!("Domain variables have been eliminated by type checking")
                     }
                 },
                 Instruction::Write(conn) => {
                     self.instantiate_connection(&conn.to, conn.from, original_instruction)?;
-                    continue;
-                }
-                Instruction::FuncCall(fc) => {
-                    self.instantiate_func_call(&fc.func_call, original_instruction)?;
-
-                    let (submod_id, func_call_outputs) =
-                        self.instantiate_func_call(&fc.func_call, original_instruction)?;
-
-                    for (port, write) in zip_eq(func_call_outputs, &fc.write_outputs) {
-                        let port_wire = self.get_submodule_port(submod_id, port, None);
-
-                        self.instantiate_wire_connection(write, port_wire, original_instruction)?;
-                    }
-
                     continue;
                 }
                 Instruction::IfStatement(stm) => {

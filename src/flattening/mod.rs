@@ -114,7 +114,6 @@ impl Module {
     pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
         match &self.link_info.instructions[instr_id] {
             Instruction::SubModule(sm) => sm.module_ref.get_total_span(),
-            Instruction::FuncCall(fc) => fc.func_call.whole_func_span,
             Instruction::Declaration(decl) => decl.decl_span,
             Instruction::Expression(w) => w.span,
             Instruction::Write(wr) => wr.to.to_span,
@@ -527,6 +526,48 @@ pub struct Expression {
 #[derive(Debug)]
 pub enum ExpressionSource {
     WireRef(WireReference), // Used to add a span to the reference of a wire.
+
+    /// An [Instruction] that represents the calling on an interface of a [SubModuleInstance].
+    /// It is the connecting of multiple input ports, and output ports on a submodule in one statement.
+    ///
+    /// One may ask, why is this not simply part of [Expression]?
+    /// That is because an Expression can only represent one output. Workarounds like putting multiple outputs
+    /// together in a tuple would not work, because:
+    /// - The function call syntax is just a convenient syntax sugar for connecting multiple inputs and outputs simultaneously.
+    ///     We want to conceptually keep the signals separate. Both input and output signals, while keeping the function call syntax that programmers are used to.
+    /// - Forcing all outputs together into one type would bind them together for latency counting, which we don't want
+    /// - We don't have tuple types
+    ///
+    /// The outputs of a function call are collected with [Write] instructions over the outputs of the underlying [SubModuleInstance]
+    ///
+    /// Function calls can come in three forms:
+    ///
+    /// ```sus
+    /// module xor {
+    ///     interface xor : bool a, bool b -> bool c
+    /// }
+    ///
+    /// module fifo #(T) {
+    ///     interface push : bool push, T data
+    ///     interface pop : bool pop -> bool valid, T data
+    /// }
+    ///
+    /// module use_modules {
+    ///     // We can use functions inline
+    ///     bool x = xor(true, false)
+    ///
+    ///     // Declare the submodule explicitly
+    ///     xor xor_inst
+    ///     bool y = xor_inst(true, false)
+    ///
+    ///     // Or access interfaces explicitly
+    ///     fifo my_fifo
+    ///     bool z, int data = my_fifo.pop()
+    ///
+    ///     // Finally, if a function returns a single argument, we can call it inline in an expression:
+    ///     bool w = true | xor(true, false)
+    /// }
+    /// ```
     FuncCall(FuncCall),
     UnaryOp {
         op: UnaryOperator,
@@ -690,56 +731,13 @@ pub struct FuncCall {
 
     pub arguments_span: BracketSpan,
     pub whole_func_span: Span,
+
+    /// If [None], then this function returns a single result like a normal expression
+    /// If Some(outputs), then this function is a dead-end expression, and does it's outputs manually
+    pub multi_write_outputs: Option<Vec<WriteTo>>,
 }
 
-/// An [Instruction] that represents the calling on an interface of a [SubModuleInstance].
-/// It is the connecting of multiple input ports, and output ports on a submodule in one statement.
-///
-/// One may ask, why is this not simply part of [Expression]?
-/// That is because an Expression can only represent one output. Workarounds like putting multiple outputs
-/// together in a tuple would not work, because:
-/// - The function call syntax is just a convenient syntax sugar for connecting multiple inputs and outputs simultaneously.
-///     We want to conceptually keep the signals separate. Both input and output signals, while keeping the function call syntax that programmers are used to.
-/// - Forcing all outputs together into one type would bind them together for latency counting, which we don't want
-/// - We don't have tuple types
-///
-/// The outputs of a function call are collected with [Write] instructions over the outputs of the underlying [SubModuleInstance]
-///
-/// Function calls can come in three forms:
-///
-/// ```sus
-/// module xor {
-///     interface xor : bool a, bool b -> bool c
-/// }
-///
-/// module fifo #(T) {
-///     interface push : bool push, T data
-///     interface pop : bool pop -> bool valid, T data
-/// }
-///
-/// module use_modules {
-///     // We can use functions inline
-///     bool x = xor(true, false)
-///
-///     // Declare the submodule explicitly
-///     xor xor_inst
-///     bool y = xor_inst(true, false)
-///
-///     // Or access interfaces explicitly
-///     fifo my_fifo
-///     bool z, int data = my_fifo.pop()
-///
-///     // Finally, if a function returns a single argument, we can call it inline in an expression:
-///     bool w = true | xor(true, false)
-/// }
-/// ```
-#[derive(Debug)]
-pub struct FuncCallMultiWrite {
-    pub func_call: FuncCall,
-    pub write_outputs: Vec<WriteTo>,
-}
-
-impl FuncCallMultiWrite {
+impl FuncCall {
     pub fn could_be_at_compile_time(&self) -> bool {
         todo!("self.name_span.is_none() but also other requirements, like if the module is a function")
     }
@@ -776,7 +774,6 @@ pub struct ForStatement {
 #[derive(Debug)]
 pub enum Instruction {
     SubModule(SubModuleInstance),
-    FuncCall(FuncCallMultiWrite),
     Declaration(Declaration),
     Expression(Expression),
     Write(Write),
@@ -806,21 +803,11 @@ impl Instruction {
         };
         sm
     }
-    #[track_caller]
-    pub fn unwrap_func_call(&self) -> &FuncCallMultiWrite {
-        let Self::FuncCall(fc) = self else {
-            panic!("unwrap_func_call on not a FuncCallInstruction! Found {self:?}")
-        };
-        fc
-    }
 
     pub fn get_span(&self) -> Span {
         match self {
             Instruction::SubModule(sub_module_instance) => {
                 sub_module_instance.get_most_relevant_span()
-            }
-            Instruction::FuncCall(func_call_multi_write) => {
-                func_call_multi_write.func_call.whole_func_span
             }
             Instruction::Declaration(declaration) => declaration.decl_span,
             Instruction::Expression(expression) => expression.span,

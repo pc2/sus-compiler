@@ -412,11 +412,18 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                         ExpressionSource::WireRef(wire_ref) => {
                             self.walk_wire_ref(obj_id, link_info, wire_ref)
                         }
-                        ExpressionSource::FuncCall(func_call) => self.walk_interface_reference(
-                            obj_id,
-                            link_info,
-                            &func_call.interface_reference,
-                        ),
+                        ExpressionSource::FuncCall(func_call) => {
+                            self.walk_interface_reference(
+                                obj_id,
+                                link_info,
+                                &func_call.interface_reference,
+                            );
+                            if let Some(multi_write) = &func_call.multi_write_outputs {
+                                for output in multi_write {
+                                    self.walk_wire_ref(obj_id, link_info, &output.to);
+                                }
+                            }
+                        }
                         _ => self.visit(
                             wire.span,
                             LocationInfo::InGlobal(
@@ -429,16 +436,6 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                     },
                     Instruction::Write(write) => {
                         self.walk_wire_ref(obj_id, link_info, &write.to.to);
-                    }
-                    Instruction::FuncCall(fc) => {
-                        self.walk_interface_reference(
-                            obj_id,
-                            link_info,
-                            &fc.func_call.interface_reference,
-                        );
-                        for output in &fc.write_outputs {
-                            self.walk_wire_ref(obj_id, link_info, &output.to);
-                        }
                     }
                     Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
                 };

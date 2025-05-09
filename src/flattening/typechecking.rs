@@ -254,7 +254,6 @@ impl<'l> TypeCheckingContext<'l, '_> {
             Instruction::SubModule(sm) => {
                 self.typecheck_template_global(&sm.module_ref);
             }
-            Instruction::FuncCall(_) => {}
             Instruction::Declaration(decl) => {
                 // For both runtime, and compiletime declarations.
                 decl.declaration_runtime_depth
@@ -667,24 +666,48 @@ impl<'l> TypeCheckingContext<'l, '_> {
                         }
                     }
                     ExpressionSource::FuncCall(func_call) => {
-                        self.report_errors_for_bad_function_call(
-                            func_call,
-                            std::iter::once(expr.span),
-                        );
-
                         let func_call_outputs = self.typecheck_func_call(func_call);
-                        if !func_call_outputs.is_empty() {
-                            let port_type = self.get_type_of_port(
-                                func_call_outputs.0,
-                                func_call.interface_reference.submodule_decl,
-                            );
 
-                            self.type_checker.typecheck_write_to(
-                                &port_type,
-                                &expr.typ,
-                                expr.span,
-                                "function call as expression",
-                            );
+                        match &func_call.multi_write_outputs {
+                            Some(multi_write) => {
+                                self.report_errors_for_bad_function_call(
+                                    func_call,
+                                    multi_write.iter().map(|v| v.to_span),
+                                );
+
+                                for (port, to) in std::iter::zip(func_call_outputs, multi_write) {
+                                    let port_type = self.get_type_of_port(
+                                        port,
+                                        func_call.interface_reference.submodule_decl,
+                                    );
+
+                                    self.typecheck_visit_write_to(
+                                        to,
+                                        &port_type,
+                                        func_call.whole_func_span,
+                                    );
+                                }
+                            }
+                            None => {
+                                self.report_errors_for_bad_function_call(
+                                    func_call,
+                                    std::iter::once(expr.span),
+                                );
+
+                                if !func_call_outputs.is_empty() {
+                                    let port_type = self.get_type_of_port(
+                                        func_call_outputs.0,
+                                        func_call.interface_reference.submodule_decl,
+                                    );
+
+                                    self.type_checker.typecheck_write_to(
+                                        &port_type,
+                                        &expr.typ,
+                                        expr.span,
+                                        "function call as expression",
+                                    );
+                                }
+                            }
                         }
                     }
                     ExpressionSource::Constant(value) => {
@@ -710,21 +733,6 @@ impl<'l> TypeCheckingContext<'l, '_> {
                         }
                     }
                 };
-            }
-            Instruction::FuncCall(fc) => {
-                self.report_errors_for_bad_function_call(
-                    &fc.func_call,
-                    fc.write_outputs.iter().map(|v| v.to_span),
-                );
-
-                let func_call_outputs = self.typecheck_func_call(&fc.func_call);
-
-                for (port, to) in std::iter::zip(func_call_outputs, &fc.write_outputs) {
-                    let port_type = self
-                        .get_type_of_port(port, fc.func_call.interface_reference.submodule_decl);
-
-                    self.typecheck_visit_write_to(to, &port_type, fc.func_call.whole_func_span);
-                }
             }
             Instruction::Write(conn) => {
                 // Typecheck the value with target type
@@ -800,6 +808,18 @@ pub fn apply_types(
                             .rank_substitutor
                             .fully_substitute(rank); // No need to report incomplete peano error, as one of the ports would have reported it
                     }
+                    ExpressionSource::FuncCall(fc) => {
+                        if let Some(multi_write) = &mut fc.multi_write_outputs {
+                            for wr in multi_write {
+                                type_checker.finalize_type(
+                                    linker_types,
+                                    &mut wr.to_type,
+                                    wr.to_span,
+                                    errors,
+                                );
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -810,11 +830,6 @@ pub fn apply_types(
                 type_checker.finalize_type(linker_types, &mut to.to_type, to.to_span, errors);
                 if let WireReferenceRoot::NamedConstant(cst) = &mut to.to.root {
                     type_checker.finalize_global_ref(linker_types, cst, errors);
-                }
-            }
-            Instruction::FuncCall(fc) => {
-                for wr in &mut fc.write_outputs {
-                    type_checker.finalize_type(linker_types, &mut wr.to_type, wr.to_span, errors);
                 }
             }
             // TODO Submodule domains may not be crossed either?

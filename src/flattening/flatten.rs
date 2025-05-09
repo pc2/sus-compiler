@@ -847,6 +847,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 arguments,
                 arguments_span,
                 whole_func_span,
+                multi_write_outputs: None,
             })
         })
     }
@@ -1289,31 +1290,32 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                         cursor.field(field!("assign_value"));
 
-                        let (node_kind, value_span) = cursor.kind_span();
-
-                        if node_kind == kind!("func_call") {
-                            if let Some(func_call) = self.flatten_func_call(cursor) {
-                                self.instructions.alloc(Instruction::FuncCall(FuncCallMultiWrite{
-                                    func_call,
-                                    write_outputs,
-                                }));
+                        let (read_side, read_side_is_generative) = self.flatten_expr(cursor);
+                        
+                        let Instruction::Expression(expr) = &mut self.instructions[read_side] else {unreachable!()};
+                        
+                        for to in &write_outputs {
+                            if to.to_type.domain.is_generative() && !read_side_is_generative {
+                                self.errors
+                                    .error(expr.span, "This value is non-generative, yet it is being assigned to a generative value")
+                                    .info_same_file(to.to_span, "This object is generative");
                             }
-                        } else {
-                            let (read_side, read_side_is_generative) = self.flatten_expr(cursor);
+                        }
 
-                            if write_outputs.len() != 1 {
-                                self.errors.error(value_span, format!("Non-function assignments must output exactly 1 output instead of {}", write_outputs.len()));
+                        match &mut expr.source {
+                            ExpressionSource::FuncCall(func_call) => {
+                                func_call.multi_write_outputs = Some(write_outputs);
                             }
-                            if let Some(to) = write_outputs.into_iter().next() {
-                                if to.to_type.domain.is_generative() && !read_side_is_generative {
-                                    self.errors
-                                        .error(value_span, "This value is non-generative, yet it is being assigned to a generative value")
-                                        .info_same_file(to.to_span, "This object is generative");
+                            _ => {
+                                if write_outputs.len() != 1 {
+                                    self.errors.error(expr.span, format!("Non-function assignments must output exactly 1 output instead of {}", write_outputs.len()));
                                 }
-                                self.instructions.alloc(Instruction::Write(Write{
-                                    from: read_side,
-                                    to
-                                }));
+                                if let Some(to) = write_outputs.into_iter().next() {
+                                    self.instructions.alloc(Instruction::Write(Write{
+                                        from: read_side,
+                                        to
+                                    }));
+                                }
                             }
                         }
                     });
@@ -1484,12 +1486,10 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 if kind == kind!("declaration") {
                     let _ = self.flatten_declaration::<true>(self.default_declaration_context, false, true, cursor);
                 } else { // It's _expression
-                    if kind == kind!("func_call") {
-                        if let Some(func_call) = self.flatten_func_call(cursor) {
-                            self.instructions.alloc(Instruction::FuncCall(FuncCallMultiWrite { func_call, write_outputs: Vec::new() }));
-                        }
-                    } else {
-                        let _ = self.flatten_expr(cursor);
+                    let (expr_id, _is_generative) = self.flatten_expr(cursor);
+                    // Edit func call expression to require it have 0 outputs
+                    if let Instruction::Expression(Expression{ source: ExpressionSource::FuncCall(fc), .. }) = &mut self.instructions[expr_id] {
+                        fc.multi_write_outputs = Some(Vec::new())
                     }
                 }
             });
