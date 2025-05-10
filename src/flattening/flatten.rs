@@ -776,13 +776,18 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
             };
 
+            let typ = self.type_alloc.type_alloc.written_to_abstract_type(&typ_expr);
+
             if decl_kind.implies_read_only() {
                 read_only = true;
             }
 
             let decl_id = self.instructions.alloc(Instruction::Declaration(Declaration{
                 typ_expr,
-                typ : self.type_alloc.alloc_unset_type(domain),
+                typ : FullType {
+                    typ,
+                    domain,
+                },
                 read_only,
                 declaration_itself_is_not_written_to,
                 decl_kind,

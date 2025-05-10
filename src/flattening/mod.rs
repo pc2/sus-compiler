@@ -9,6 +9,7 @@ mod walk;
 use crate::alloc::{UUIDAllocator, UUIDRange};
 use crate::prelude::*;
 use crate::typing::abstract_type::{DomainType, PeanoType};
+use crate::typing::written_type::WrittenType;
 
 use std::cell::OnceCell;
 use std::ops::Deref;
@@ -581,29 +582,6 @@ impl Expression {
                 ..
             })
         )
-    }
-}
-
-/// The textual representation of a type expression in the source code.
-///
-/// Not to be confused with [crate::typing::abstract_type::AbstractType] which is for working with types in the flattening stage,
-/// or [crate::typing::concrete_type::ConcreteType], which is for working with types post instantiation.
-#[derive(Debug)]
-pub enum WrittenType {
-    Error(Span),
-    TemplateVariable(Span, TemplateID),
-    Named(GlobalReference<TypeUUID>),
-    Array(Span, Box<(WrittenType, FlatID, BracketSpan)>),
-}
-
-impl WrittenType {
-    pub fn get_span(&self) -> Span {
-        match self {
-            WrittenType::Error(total_span)
-            | WrittenType::TemplateVariable(total_span, ..)
-            | WrittenType::Array(total_span, _) => *total_span,
-            WrittenType::Named(global_ref) => global_ref.get_total_span(),
-        }
     }
 }
 

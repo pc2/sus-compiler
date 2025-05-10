@@ -1,12 +1,13 @@
-use crate::alloc::{zip_eq3, ArenaAllocator};
+use crate::alloc::{zip_eq, ArenaAllocator};
 use crate::errors::{ErrorInfo, ErrorInfoObject, FileKnowingErrorInfoObject};
 use crate::prelude::*;
-use crate::typing::template::ParameterKind;
+use crate::typing::template::{ParameterKind, TemplateArg};
 use crate::typing::type_inference::{FailedUnification, Substitutor};
 
 use crate::debug::SpanDebugger;
 use crate::linker::{GlobalResolver, GlobalUUID, AFTER_TYPECHECK_CP};
 
+use crate::typing::written_type::WrittenType;
 use crate::typing::{
     abstract_type::{DomainType, FullTypeUnifier, BOOL_TYPE, INT_TYPE},
     template::TemplateArgKind,
@@ -108,11 +109,11 @@ impl<'l> TypeCheckingContext<'l, '_> {
         let decl = submodule_module.get_port_decl(port);
         let port_interface = submodule_module.ports[port].domain;
         let port_local_domain = submodule_inst.local_interface_domains[port_interface];
-        let typ = self.type_checker.abstract_type_substitutor.alloc_unknown();
-        self.type_checker
-            .unify_with_written_type_substitute_templates_must_succeed(
+        let typ = self
+            .type_checker
+            .abstract_type_substitutor
+            .written_to_abstract_type_substitute_templates(
                 &decl.typ_expr,
-                &typ,
                 &submodule_inst.module_ref.template_arg_types,
             );
         FullType {
@@ -174,11 +175,11 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 let linker_cst = &self.globals[cst.id];
                 let decl =
                     linker_cst.link_info.instructions[linker_cst.output_decl].unwrap_declaration();
-                let typ = self.type_checker.abstract_type_substitutor.alloc_unknown();
-                self.type_checker
-                    .unify_with_written_type_substitute_templates_must_succeed(
+                let typ = self
+                    .type_checker
+                    .abstract_type_substitutor
+                    .written_to_abstract_type_substitute_templates(
                         &decl.typ_expr,
-                        &typ,
                         &cst.template_arg_types,
                     );
                 FullType {
@@ -364,10 +365,29 @@ impl<'l> TypeCheckingContext<'l, '_> {
         let global_obj: GlobalUUID = global_ref.id.into();
         let target_link_info = self.globals.get_link_info(global_obj);
 
-        for (_parameter_id, argument_type, parameter, given_template_arg) in zip_eq3(
+        for (_, argument_type, given_arg) in
+            zip_eq(&global_ref.template_arg_types, &global_ref.template_args)
+        {
+            if let Some(TemplateArg {
+                kind: TemplateArgKind::Type(wr_typ),
+                ..
+            }) = given_arg
+            {
+                self.typecheck_written_type(wr_typ);
+                // This slot will not have been filled out yet
+                let specified_arg_type = self
+                    .type_checker
+                    .abstract_type_substitutor
+                    .written_to_abstract_type(wr_typ);
+                self.type_checker
+                    .abstract_type_substitutor
+                    .unify_must_succeed(argument_type, &specified_arg_type);
+            }
+        }
+
+        for (_parameter_id, argument_type, parameter) in zip_eq(
             &global_ref.template_arg_types,
             &target_link_info.template_parameters,
-            &global_ref.template_args,
         ) {
             match &parameter.kind {
                 ParameterKind::Type(_) => {} // Do nothing, nothing to unify with. Maybe in the future traits?
@@ -375,35 +395,37 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     let decl = target_link_info.instructions[parameter.declaration_instruction]
                         .unwrap_declaration();
 
-                    self.type_checker
-                        .unify_with_written_type_substitute_templates_must_succeed(
+                    let param_required_typ = self
+                        .type_checker
+                        .abstract_type_substitutor
+                        .written_to_abstract_type_substitute_templates(
                             &decl.typ_expr,
-                            argument_type,
                             &global_ref.template_arg_types, // Yes that's right. We already must substitute the templates for type variables here
                         );
+
+                    self.type_checker
+                        .abstract_type_substitutor
+                        .unify_must_succeed(argument_type, &param_required_typ);
                 }
             }
+        }
 
-            if let Some(given_arg) = given_template_arg {
-                match &given_arg.kind {
-                    TemplateArgKind::Type(wr_typ) => {
-                        self.typecheck_written_type(wr_typ);
-                        // This slot will not have been filled out yet
-                        self.type_checker
-                            .unify_with_written_type_must_succeed(wr_typ, argument_type);
-                    }
-                    TemplateArgKind::Value(val) => {
-                        let argument_expr =
-                            self.working_on.instructions[*val].unwrap_subexpression();
+        for (_, argument_type, given_arg) in
+            zip_eq(&global_ref.template_arg_types, &global_ref.template_args)
+        {
+            if let Some(TemplateArg {
+                kind: TemplateArgKind::Value(val),
+                ..
+            }) = given_arg
+            {
+                let argument_expr = self.working_on.instructions[*val].unwrap_subexpression();
 
-                        self.type_checker.typecheck_write_to_abstract(
-                            &argument_expr.typ.typ,
-                            argument_type,
-                            argument_expr.span,
-                            "generative template argument",
-                        );
-                    }
-                }
+                self.type_checker.typecheck_write_to_abstract(
+                    &argument_expr.typ.typ,
+                    argument_type,
+                    argument_expr.span,
+                    "generative template argument",
+                );
             }
         }
     }
@@ -735,10 +757,6 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 self.typecheck_visit_latency_specifier(decl.latency_specifier);
 
                 self.typecheck_written_type(&decl.typ_expr);
-
-                // Unify with the type written in the source code
-                self.type_checker
-                    .unify_with_written_type_must_succeed(&decl.typ_expr, &decl.typ.typ);
             }
             Instruction::IfStatement(stm) => {
                 let condition_expr =

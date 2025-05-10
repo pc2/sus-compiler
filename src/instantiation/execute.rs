@@ -11,6 +11,7 @@ use crate::linker::IsExtern;
 use crate::typing::abstract_type::DomainType;
 use crate::typing::template::GlobalReference;
 use crate::typing::type_inference::Substitutor;
+use crate::typing::written_type::WrittenType;
 use crate::util::{unwrap_single_element, zip_eq};
 use crate::{let_unwrap, prelude::*};
 
@@ -200,12 +201,10 @@ impl InstantiationContext<'_, '_> {
             WrittenType::TemplateVariable(_, template_id) => {
                 self.working_on_global_ref.template_args[*template_id].clone()
             }
-            WrittenType::Named(named_type) => {
-                ConcreteType::Named(crate::typing::concrete_type::ConcreteGlobalReference {
-                    id: named_type.id,
-                    template_args: FlatAlloc::new(),
-                })
-            }
+            WrittenType::Named(named_type) => ConcreteType::Named(ConcreteGlobalReference {
+                id: named_type.id,
+                template_args: FlatAlloc::new(),
+            }),
             WrittenType::Array(_, arr_box) => {
                 let (arr_content_typ, arr_size_wire, _bracket_span) = arr_box.deref();
                 let inner_typ = self.concretize_type(arr_content_typ)?;

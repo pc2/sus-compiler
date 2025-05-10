@@ -2,19 +2,7 @@
 // DO NOT COMMIT
 // To use with VSCode debugger, name the module "TEST", and in the code use `if crate::debug::is_enabled("TEST") {}` to enable breakpoint code
 
+
 module TEST {
-    domain a
-    interface x : int aa, bool aaa
-
-    domain b
-    interface y : bool bbb -> int bb
-
-    /*when aaa {
-        int aaaa = aa
-    }*/
-    when bbb {
-        bb = 5
-    }
-
-    //bb = aa
+	assert #(C: 15 + 3 == 19)
 }

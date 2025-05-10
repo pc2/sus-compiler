@@ -9,6 +9,7 @@ use crate::typing::template::{
     GenerativeParameterKind, GlobalReference, Parameter, ParameterKind, TemplateArgKind,
     TypeParameterKind,
 };
+use crate::typing::written_type::WrittenType;
 
 /// See [LocationInfo]
 #[derive(Clone, Copy, Debug)]

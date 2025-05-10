@@ -2,9 +2,7 @@ use sus_proc_macro::get_builtin_const;
 
 use crate::linker::{IsExtern, LinkInfo, AFTER_LINTS_CP};
 use crate::prelude::*;
-use crate::typing::template::ParameterKind;
-
-use super::walk::for_each_generative_input_in_template_args;
+use crate::typing::template::{for_each_generative_input_in_template_args, ParameterKind};
 
 use super::{
     Expression, ExpressionOutput, ExpressionSource, Instruction, Module, WireReferencePathElement,

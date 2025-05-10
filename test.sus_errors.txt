@@ -2262,12 +2262,12 @@ Error: ::int is not a named wire: local or constant, it is a Struct instead!
      │                    ─┬─  
      │                     ╰─── Defined here
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_4[...peano_variable_5]
+Error: Could not fully figure out the type of this object. type_variable_3[...peano_variable_4]
      ╭─[ test.sus:767:50 ]
      │
  767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
      │                                                  ─┬─  
-     │                                                   ╰─── Could not fully figure out the type of this object. type_variable_4[...peano_variable_5]
+     │                                                   ╰─── Could not fully figure out the type of this object. type_variable_3[...peano_variable_4]
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:767:55 ]
@@ -2305,12 +2305,12 @@ Error: 'beep' is read-only
      │     ──┬─  
      │       ╰─── 'beep' is read-only
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_10[...peano_variable_11]
+Error: Could not fully figure out the type of this object. type_variable_7[...peano_variable_8]
      ╭─[ test.sus:775:2 ]
      │
  775 │     FIFO #(BITWIDTH: 4) badoop
      │     ─────────┬─────────  
-     │              ╰─────────── Could not fully figure out the type of this object. type_variable_10[...peano_variable_11]
+     │              ╰─────────── Could not fully figure out the type of this object. type_variable_7[...peano_variable_8]
 ─────╯
 Error: BITWIDTH is not a valid template argument of ::FIFO
      ╭─[ test.sus:775:9 ]
@@ -2896,33 +2896,33 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ───┬──  
       │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_8[...peano_variable_9]
+Error: Could not fully figure out the type of this object. type_variable_7[...peano_variable_8]
       ╭─[ test.sus:1079:2 ]
       │
  1079 │     assert #(C: INT_ARR_SIZE == 3200)
       │     ────────────────┬────────────────  
-      │                     ╰────────────────── Could not fully figure out the type of this object. type_variable_8[...peano_variable_9]
+      │                     ╰────────────────── Could not fully figure out the type of this object. type_variable_7[...peano_variable_8]
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_14[...peano_variable_16]
+Error: Could not fully figure out the type of this object. type_variable_13[...peano_variable_15]
       ╭─[ test.sus:1081:2 ]
       │
  1081 │     assert #(C: clog2 #(V: 15) == 4)
       │     ────────────────┬───────────────  
-      │                     ╰───────────────── Could not fully figure out the type of this object. type_variable_14[...peano_variable_16]
+      │                     ╰───────────────── Could not fully figure out the type of this object. type_variable_13[...peano_variable_15]
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_20[...peano_variable_23]
+Error: Could not fully figure out the type of this object. type_variable_19[...peano_variable_22]
       ╭─[ test.sus:1082:2 ]
       │
  1082 │     assert #(C: clog2 #(V: 16) == 4)
       │     ────────────────┬───────────────  
-      │                     ╰───────────────── Could not fully figure out the type of this object. type_variable_20[...peano_variable_23]
+      │                     ╰───────────────── Could not fully figure out the type of this object. type_variable_19[...peano_variable_22]
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_26[...peano_variable_30]
+Error: Could not fully figure out the type of this object. type_variable_25[...peano_variable_29]
       ╭─[ test.sus:1083:2 ]
       │
  1083 │     assert #(C: clog2 #(V: 17) == 5)
       │     ────────────────┬───────────────  
-      │                     ╰───────────────── Could not fully figure out the type of this object. type_variable_26[...peano_variable_30]
+      │                     ╰───────────────── Could not fully figure out the type of this object. type_variable_25[...peano_variable_29]
 ──────╯
 Error: Could not fully figure out the type of this object. type_variable_5[...peano_variable_7]
       ╭─[ test.sus:1087:2 ]
@@ -2932,32 +2932,32 @@ Error: Could not fully figure out the type of this object. type_variable_5[...pe
       │                 ╰────────────── Could not fully figure out the type of this object. type_variable_5[...peano_variable_7]
 ──────╯
 Warning: Used 'when' in a generative context, use 'if' instead
-      ╭─[ test.sus:1098:9 ]
+      ╭─[ test.sus:1098:2 ]
       │
- 1098 │         when WIDTH <= BASE_CASE_SIZE {
-      │         ──┬─  
-      │           ╰─── Used 'when' in a generative context, use 'if' instead
+ 1098 │     when WIDTH <= BASE_CASE_SIZE {
+      │     ──┬─  
+      │       ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
 Error: Used 'if' in a non generative context, use 'when' instead
-      ╭─[ test.sus:1101:25 ]
+      ╭─[ test.sus:1101:4 ]
       │
- 1101 │                         if bits[I] {
-      │                         ─┬  
-      │                          ╰── Used 'if' in a non generative context, use 'when' instead
+ 1101 │          if bits[I] {
+      │          ─┬  
+      │           ╰── Used 'if' in a non generative context, use 'when' instead
 ──────╯
 Error: Used 'if' in a non generative context, use 'when' instead
-      ╭─[ test.sus:1103:32 ]
+      ╭─[ test.sus:1103:11 ]
       │
- 1103 │                         } else if !bits[I] {
-      │                                ─┬  
-      │                                 ╰── Used 'if' in a non generative context, use 'when' instead
+ 1103 │          } else if !bits[I] {
+      │                 ─┬  
+      │                  ╰── Used 'if' in a non generative context, use 'when' instead
 ──────╯
 Warning: Used 'when' in a generative context, use 'if' instead
-      ╭─[ test.sus:1108:16 ]
+      ╭─[ test.sus:1108:9 ]
       │
- 1108 │         } else when WIDTH > BASE_CASE_SIZE {
-      │                ──┬─  
-      │                  ╰─── Used 'when' in a generative context, use 'if' instead
+ 1108 │     } else when WIDTH > BASE_CASE_SIZE {
+      │            ──┬─  
+      │              ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -3236,12 +3236,12 @@ Error: No Global of the name 'trigger' was found. Did you forget to import it?
       │     ───┬───  
       │        ╰───── No Global of the name 'trigger' was found. Did you forget to import it?
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_2[...peano_variable_2]
+Error: Could not fully figure out the type of this object. type_variable_1[...peano_variable_1]
       ╭─[ test.sus:1246:10 ]
       │
  1246 │     trigger may_process'0 : T cur_state {
       │             ─────┬─────  
-      │                  ╰─────── Could not fully figure out the type of this object. type_variable_2[...peano_variable_2]
+      │                  ╰─────── Could not fully figure out the type of this object. type_variable_1[...peano_variable_1]
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1246:10 ]
@@ -3285,12 +3285,12 @@ Error: No Global of the name 'action' was found. Did you forget to import it?
       │        ───┬──  
       │           ╰──── No Global of the name 'action' was found. Did you forget to import it?
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_4[...peano_variable_4]
+Error: Could not fully figure out the type of this object. type_variable_3[...peano_variable_3]
       ╭─[ test.sus:1247:10 ]
       │
  1247 │        action next_state'II : T next_state_value
       │               ─────┬────  
-      │                    ╰────── Could not fully figure out the type of this object. type_variable_4[...peano_variable_4]
+      │                    ╰────── Could not fully figure out the type of this object. type_variable_3[...peano_variable_3]
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1247:10 ]

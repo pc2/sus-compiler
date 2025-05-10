@@ -2,11 +2,10 @@ use crate::prelude::*;
 
 use crate::typing::abstract_type::{AbstractInnerType, PeanoType};
 use crate::typing::template::{Parameter, TVec};
+use crate::typing::written_type::WrittenType;
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
-use crate::flattening::{
-    DomainInfo, Interface, InterfaceToDomainMap, Module, StructType, WrittenType,
-};
+use crate::flattening::{DomainInfo, Interface, InterfaceToDomainMap, Module, StructType};
 use crate::linker::FileData;
 use crate::typing::{
     abstract_type::{AbstractRankedType, DomainType},

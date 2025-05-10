@@ -11,7 +11,7 @@ use super::type_inference::{
     TypeSubstitutor, TypeUnifier, UnifyErrorReport,
 };
 use crate::flattening::{
-    BinaryOperator, StructType, UnaryOperator, WireReference, WireReferenceRoot, WrittenType,
+    BinaryOperator, StructType, UnaryOperator, WireReference, WireReferenceRoot,
 };
 use crate::to_string::map_to_type_names;
 
@@ -179,88 +179,6 @@ impl FullTypeUnifier {
             template_type_names: map_to_type_names(parameters),
             abstract_type_substitutor: typing_alloc.0.into(),
             domain_substitutor: typing_alloc.1.into(),
-        }
-    }
-
-    /// This should always be what happens first to a given variable.
-    ///
-    /// Therefore it should be impossible that one of the internal unifications ever fails
-    pub fn unify_with_written_type_must_succeed(
-        &mut self,
-        wr_typ: &WrittenType,
-        typ: &AbstractRankedType,
-    ) {
-        match wr_typ {
-            WrittenType::Error(_span) => {} // Already an error, don't unify
-            WrittenType::TemplateVariable(_span, argument_id) => {
-                self.abstract_type_substitutor
-                    .unify_must_succeed(typ, &AbstractInnerType::Template(*argument_id).scalar());
-            }
-            WrittenType::Named(global_reference) => {
-                self.abstract_type_substitutor.unify_must_succeed(
-                    typ,
-                    &AbstractInnerType::Named(global_reference.id).scalar(),
-                );
-            }
-            WrittenType::Array(_span, array_content_and_size) => {
-                let (arr_content_type, _size_flat, _array_bracket_span) =
-                    array_content_and_size.deref();
-
-                let arr_content_variable = self.abstract_type_substitutor.alloc_unknown();
-
-                self.abstract_type_substitutor
-                    .unify_must_succeed(typ, &arr_content_variable.clone().rank_up());
-
-                Self::unify_with_written_type_must_succeed(
-                    self,
-                    arr_content_type,
-                    &arr_content_variable,
-                );
-            }
-        }
-    }
-
-    /// This should always be what happens first to a given variable.
-    ///
-    /// Therefore it should be impossible that one of the internal unifications ever fails
-    ///
-    /// template_type_args applies to both Template Type args and Template Value args.
-    ///
-    /// For Types this is the Type, for Values this is unified with the parameter declaration type
-    pub fn unify_with_written_type_substitute_templates_must_succeed(
-        &mut self,
-        wr_typ: &WrittenType,
-        typ: &AbstractRankedType,
-        template_type_args: &TVec<AbstractRankedType>,
-    ) {
-        match wr_typ {
-            WrittenType::Error(_span) => {} // Already an error, don't unify
-            WrittenType::TemplateVariable(_span, argument_id) => {
-                self.abstract_type_substitutor
-                    .unify_must_succeed(typ, &template_type_args[*argument_id]);
-            }
-            WrittenType::Named(global_reference) => {
-                self.abstract_type_substitutor.unify_must_succeed(
-                    typ,
-                    &AbstractInnerType::Named(global_reference.id).scalar(),
-                );
-            }
-            WrittenType::Array(_span, array_content_and_size) => {
-                let (arr_content_type, _size_flat, _array_bracket_span) =
-                    array_content_and_size.deref();
-
-                let arr_content_variable = self.abstract_type_substitutor.alloc_unknown();
-
-                self.abstract_type_substitutor
-                    .unify_must_succeed(typ, &arr_content_variable.clone().rank_up());
-
-                Self::unify_with_written_type_substitute_templates_must_succeed(
-                    self,
-                    arr_content_type,
-                    &arr_content_variable,
-                    template_type_args,
-                );
-            }
         }
     }
 
@@ -482,6 +400,10 @@ impl FullTypeUnifier {
                 span,
                 format!("Could not fully figure out the type of this object. {typ_as_string}"),
             );
+
+            if crate::debug::is_enabled("TEST") {
+                println!("COULD_NOT_FULLY_FIGURE_OUT")
+            }
         }
     }
 
