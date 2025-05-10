@@ -182,6 +182,8 @@ impl InstantiationContext<'_, '_> {
                     let peano_type = &self.md.link_info.instructions
                         [this_wire.original_instruction]
                         .unwrap_expression()
+                        .as_single_output_expr()
+                        .unwrap()
                         .typ
                         .typ
                         .rank;

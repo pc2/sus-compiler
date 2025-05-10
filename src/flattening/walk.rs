@@ -54,10 +54,7 @@ impl WireReferencePathElement {
     pub fn for_each_dependency(path: &[WireReferencePathElement], mut f: impl FnMut(FlatID)) {
         for p in path {
             match p {
-                WireReferencePathElement::ArrayAccess {
-                    idx,
-                    bracket_span: _,
-                } => f(*idx),
+                WireReferencePathElement::ArrayAccess { idx, .. } => f(*idx),
             }
         }
     }

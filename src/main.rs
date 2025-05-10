@@ -52,6 +52,8 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         return dev_aid::lsp::lsp_main();
     }
 
+    debug::setup_panic_handler();
+
     let (linker, mut paths_arena) = compile_all(file_paths);
     print_all_errors(&linker, &mut paths_arena.file_sources);
 

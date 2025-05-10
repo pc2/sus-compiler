@@ -1,13 +1,15 @@
 use sus_proc_macro::get_builtin_const;
 
-use crate::flattening::WriteTo;
 use crate::linker::{IsExtern, LinkInfo, AFTER_LINTS_CP};
 use crate::prelude::*;
 use crate::typing::template::ParameterKind;
 
 use super::walk::for_each_generative_input_in_template_args;
 
-use super::{ExpressionSource, Instruction, Module, WireReferencePathElement, WireReferenceRoot};
+use super::{
+    Expression, ExpressionOutput, ExpressionSource, Instruction, Module, WireReferencePathElement,
+    WireReferenceRoot,
+};
 
 pub fn perform_lints(linker: &mut Linker) {
     for (_, md) in &mut linker.modules {
@@ -105,20 +107,7 @@ fn make_fanins(
         instructions.map(|_| Vec::new());
 
     for (inst_id, inst) in instructions.iter() {
-        fn handle_write_to(
-            instruction_fanins: &mut FlatAlloc<Vec<FlatID>, FlatIDMarker>,
-            wr: &WriteTo,
-            from: FlatID,
-        ) {
-            if let Some(flat_root) = wr.to.root.get_root_flat() {
-                instruction_fanins[flat_root].push(from);
-                WireReferencePathElement::for_each_dependency(&wr.to.path, |idx_wire| {
-                    instruction_fanins[flat_root].push(idx_wire)
-                });
-            }
-        }
         match inst {
-            Instruction::Write(wr) => handle_write_to(&mut instruction_fanins, &wr.to, wr.from),
             Instruction::SubModule(sm) => {
                 for_each_generative_input_in_template_args(
                     &sm.module_ref.template_args,
@@ -139,23 +128,32 @@ fn make_fanins(
                 expr.source.for_each_dependency(&mut |id| {
                     instruction_fanins[inst_id].push(id);
                 });
-                if let ExpressionSource::FuncCall(fc) = &expr.source {
-                    if let Some(multi_write) = &fc.multi_write_outputs {
-                        for wr in multi_write {
-                            handle_write_to(
-                                &mut instruction_fanins,
-                                wr,
-                                fc.interface_reference.submodule_decl,
-                            );
+                match &expr.output {
+                    ExpressionOutput::MultiWrite(writes) => {
+                        for wr in writes {
+                            if let Some(flat_root) = wr.to.root.get_root_flat() {
+                                instruction_fanins[flat_root].push(inst_id);
+                                WireReferencePathElement::for_each_dependency(
+                                    &wr.to.path,
+                                    |idx_wire| instruction_fanins[flat_root].push(idx_wire),
+                                );
+                            }
                         }
                     }
+                    ExpressionOutput::SubExpression(_) => {}
                 }
             }
             Instruction::IfStatement(stm) => {
                 for id in FlatIDRange::new(stm.then_block.0, stm.else_block.1) {
-                    if let Instruction::Write(conn) = &instructions[id] {
-                        if let Some(flat_root) = conn.to.to.root.get_root_flat() {
-                            instruction_fanins[flat_root].push(stm.condition);
+                    if let Instruction::Expression(Expression {
+                        output: ExpressionOutput::MultiWrite(writes),
+                        ..
+                    }) = &instructions[id]
+                    {
+                        for wr in writes {
+                            if let Some(flat_root) = wr.to.root.get_root_flat() {
+                                instruction_fanins[flat_root].push(stm.condition);
+                            }
                         }
                     }
                 }

@@ -10,7 +10,6 @@ use crate::dev_aid::dot_graphs::display_latency_count_graph;
 use crate::errors::ErrorInfoObject;
 use crate::prelude::*;
 
-use crate::flattening::{Instruction, WriteModifiers};
 use crate::typing::concrete_type::ConcreteType;
 use crate::typing::type_inference::{DelayedConstraintStatus, Substitutor};
 use crate::value::Value;
@@ -434,26 +433,6 @@ impl InstantiationContext<'_, '_> {
             self.errors.error(span, msg)
         };
 
-        fn filter_unique_write_flats<'w>(
-            writes: &'w [PathMuxSource<'w>],
-            instructions: &'w FlatAlloc<Instruction, FlatIDMarker>,
-        ) -> Vec<&'w crate::flattening::Write> {
-            let mut result: Vec<&'w crate::flattening::Write> = Vec::new();
-            for w in writes {
-                if let Instruction::Write(original_write) =
-                    &instructions[w.mux_input.original_connection]
-                {
-                    if !result
-                        .iter()
-                        .any(|found_write| std::ptr::eq(*found_write, original_write))
-                    {
-                        result.push(original_write)
-                    }
-                }
-            }
-            result
-        }
-
         match err {
             LatencyCountingError::NetPositiveLatencyCycle {
                 conflict_path,
@@ -475,10 +454,10 @@ impl InstantiationContext<'_, '_> {
                     first_write_desired_latency,
                     writes_involved.last().unwrap().to_latency,
                 );
-                let unique_write_instructions =
-                    filter_unique_write_flats(&writes_involved, &self.md.link_info.instructions);
                 let rest_of_message = format!(" part of a net-positive latency cycle of +{net_roundtrip_latency}\n\n{path_message}\nWhich conflicts with the starting latency");
 
+                /*let unique_write_instructions =
+                    filter_unique_write_flats(&writes_involved, &self.md.link_info.instructions);
                 let mut did_place_error = false;
                 for wr in &unique_write_instructions {
                     match wr.to.write_modifiers {
@@ -503,18 +482,17 @@ impl InstantiationContext<'_, '_> {
                             unreachable!("Initial assignment can only be from compile-time constant. Cannot be part of latency loop. ")
                         }
                     }
-                }
+                }*/
                 // Fallback if no register annotations used
-                if !did_place_error {
-                    for wr in writes_involved {
-                        let to_instr =
-                            &self.md.link_info.instructions[wr.to_wire.original_instruction];
-                        error(
-                            to_instr.get_span(),
-                            format!("This instruction is{rest_of_message}"),
-                        );
-                    }
+                //if !did_place_error {
+                for wr in writes_involved {
+                    let to_instr = &self.md.link_info.instructions[wr.to_wire.original_instruction];
+                    error(
+                        to_instr.get_span(),
+                        format!("This instruction is{rest_of_message}"),
+                    );
                 }
+                //}
             }
             LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
                 for (port, a, b) in bad_ports {

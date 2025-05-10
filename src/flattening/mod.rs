@@ -116,7 +116,6 @@ impl Module {
             Instruction::SubModule(sm) => sm.module_ref.get_total_span(),
             Instruction::Declaration(decl) => decl.decl_span,
             Instruction::Expression(w) => w.span,
-            Instruction::Write(wr) => wr.to.to_span,
             Instruction::IfStatement(if_stmt) => self.get_instruction_span(if_stmt.condition),
             Instruction::ForStatement(for_stmt) => {
                 self.get_instruction_span(for_stmt.loop_var_decl)
@@ -387,6 +386,9 @@ impl WireReference {
         root: WireReferenceRoot::Error,
         path: Vec::new(),
     };
+    pub fn is_error(&self) -> bool {
+        matches!(&self.root, WireReferenceRoot::Error)
+    }
     fn simple_var_read(id: FlatID, name_span: Span) -> WireReference {
         WireReference {
             root: WireReferenceRoot::LocalDecl(id, name_span),
@@ -421,7 +423,7 @@ impl WriteModifiers {
     }
 }
 
-/// An [Instruction] that refers to an assignment
+/// A part of [Expression] that refers to an assignment
 ///
 /// ```sus
 /// module md {
@@ -443,12 +445,6 @@ pub struct WriteTo {
     /// In short, this should be the type and domain *to which* the read type must be unified.
     pub to_type: FullType,
     pub write_modifiers: WriteModifiers,
-}
-
-#[derive(Debug)]
-pub struct Write {
-    pub to: WriteTo,
-    pub from: FlatID,
 }
 
 /// -x
@@ -510,64 +506,10 @@ pub struct PortReference {
     pub submodule_name_span: Option<Span>,
 }
 
-/// An [Instruction] that represents a single expression in the program. Like ((3) + (x))
-///
-/// See [ExpressionSource]
-///
-/// On instantiation, creates [crate::instantiation::RealWire] when non-generative
-#[derive(Debug)]
-pub struct Expression {
-    pub typ: FullType,
-    pub span: Span,
-    pub source: ExpressionSource,
-}
-
 /// See [Expression]
 #[derive(Debug)]
 pub enum ExpressionSource {
     WireRef(WireReference), // Used to add a span to the reference of a wire.
-
-    /// An [Instruction] that represents the calling on an interface of a [SubModuleInstance].
-    /// It is the connecting of multiple input ports, and output ports on a submodule in one statement.
-    ///
-    /// One may ask, why is this not simply part of [Expression]?
-    /// That is because an Expression can only represent one output. Workarounds like putting multiple outputs
-    /// together in a tuple would not work, because:
-    /// - The function call syntax is just a convenient syntax sugar for connecting multiple inputs and outputs simultaneously.
-    ///     We want to conceptually keep the signals separate. Both input and output signals, while keeping the function call syntax that programmers are used to.
-    /// - Forcing all outputs together into one type would bind them together for latency counting, which we don't want
-    /// - We don't have tuple types
-    ///
-    /// The outputs of a function call are collected with [Write] instructions over the outputs of the underlying [SubModuleInstance]
-    ///
-    /// Function calls can come in three forms:
-    ///
-    /// ```sus
-    /// module xor {
-    ///     interface xor : bool a, bool b -> bool c
-    /// }
-    ///
-    /// module fifo #(T) {
-    ///     interface push : bool push, T data
-    ///     interface pop : bool pop -> bool valid, T data
-    /// }
-    ///
-    /// module use_modules {
-    ///     // We can use functions inline
-    ///     bool x = xor(true, false)
-    ///
-    ///     // Declare the submodule explicitly
-    ///     xor xor_inst
-    ///     bool y = xor_inst(true, false)
-    ///
-    ///     // Or access interfaces explicitly
-    ///     fifo my_fifo
-    ///     bool z, int data = my_fifo.pop()
-    ///
-    ///     // Finally, if a function returns a single argument, we can call it inline in an expression:
-    ///     bool w = true | xor(true, false)
-    /// }
-    /// ```
     FuncCall(FuncCall),
     UnaryOp {
         op: UnaryOperator,
@@ -584,6 +526,62 @@ pub enum ExpressionSource {
     },
     ArrayConstruct(Vec<FlatID>),
     Constant(Value),
+}
+/// [FuncCall]s (and potentially, in the future, other things) can have multiple outputs.
+/// We make the distinction between [SubExpression] that can only represent one output, and [MultiWrite], which can represent multiple outputs.
+/// Workarounds like putting multiple outputs together in a tuple would not work, because:
+/// - The function call syntax is just a convenient syntax sugar for connecting multiple inputs and outputs simultaneously.
+///     We want to conceptually keep the signals separate. Both input and output signals, while keeping the function call syntax that programmers are used to.
+/// - Forcing all outputs together into one type would bind them together for latency counting, which we don't want
+/// - We refuse to have tuple types
+#[derive(Debug)]
+pub enum ExpressionOutput {
+    SubExpression(FullType),
+    MultiWrite(Vec<WriteTo>),
+}
+/// An [Instruction] that represents a single expression in the program. Like ((3) + (x))
+///
+/// See [ExpressionSource]
+///
+/// On instantiation, creates [crate::instantiation::RealWire] when non-generative
+#[derive(Debug)]
+pub struct Expression {
+    pub span: Span,
+    pub source: ExpressionSource,
+    /// Means [Self::source] can be computed at compiletime, not that [Self::output] neccesarily requires a generative result
+    pub domain: DomainType,
+
+    /// If [None], then this function returns a single result like a normal expression
+    /// If Some(outputs), then this function is a dead-end expression, and does it's outputs manually
+    pub output: ExpressionOutput,
+}
+
+impl Expression {
+    pub fn as_single_output_expr(&self) -> Option<SingleOutputExpression> {
+        let typ = match &self.output {
+            ExpressionOutput::SubExpression(typ) => typ,
+            ExpressionOutput::MultiWrite(write_tos) => {
+                let [single_write] = write_tos.as_slice() else {
+                    return None;
+                };
+                &single_write.to_type
+            }
+        };
+        Some(SingleOutputExpression {
+            typ,
+            span: self.span,
+            source: &self.source,
+        })
+    }
+    pub fn is_error(&self) -> bool {
+        matches!(
+            &self.source,
+            ExpressionSource::WireRef(WireReference {
+                root: WireReferenceRoot::Error,
+                ..
+            })
+        )
+    }
 }
 
 /// The textual representation of a type expression in the source code.
@@ -722,6 +720,41 @@ pub struct ModuleInterfaceReference {
     pub interface_span: Span,
 }
 
+/// An [Expression] that represents the calling on an interface of a [SubModuleInstance].
+/// It is the connecting of multiple input ports, and output ports on a submodule in one statement.
+///
+/// Multiple outputs (or zero outputs) are only supported for non-subexpressions.
+///
+/// See [ExpressionOutput]
+///
+/// Function calls can come in three forms:
+///
+/// ```sus
+/// module xor {
+///     interface xor : bool a, bool b -> bool c
+/// }
+///
+/// module fifo #(T) {
+///     interface push : bool push, T data
+///     interface pop : bool pop -> bool valid, T data
+/// }
+///
+/// module use_modules {
+///     // We can use functions inline
+///     bool x = xor(true, false)
+///
+///     // Declare the submodule explicitly
+///     xor xor_inst
+///     bool y = xor_inst(true, false)
+///
+///     // Or access interfaces explicitly
+///     fifo my_fifo
+///     bool z, int data = my_fifo.pop()
+///
+///     // Finally, if a function returns a single argument, we can call it inline in an expression:
+///     bool w = true | xor(true, false)
+/// }
+/// ```
 #[derive(Debug)]
 pub struct FuncCall {
     pub interface_reference: ModuleInterfaceReference,
@@ -730,11 +763,6 @@ pub struct FuncCall {
     pub arguments: Vec<FlatID>,
 
     pub arguments_span: BracketSpan,
-    pub whole_func_span: Span,
-
-    /// If [None], then this function returns a single result like a normal expression
-    /// If Some(outputs), then this function is a dead-end expression, and does it's outputs manually
-    pub multi_write_outputs: Option<Vec<WriteTo>>,
 }
 
 impl FuncCall {
@@ -776,9 +804,16 @@ pub enum Instruction {
     SubModule(SubModuleInstance),
     Declaration(Declaration),
     Expression(Expression),
-    Write(Write),
     IfStatement(IfStatement),
     ForStatement(ForStatement),
+}
+
+/// Used as a convenient shorthand for [ExpressionOutput::SubExpression], to replace old uses of [Expression]
+#[derive(Debug, Clone, Copy)]
+pub struct SingleOutputExpression<'e> {
+    pub typ: &'e FullType,
+    pub span: Span,
+    pub source: &'e ExpressionSource,
 }
 
 impl Instruction {
@@ -788,6 +823,18 @@ impl Instruction {
             panic!("unwrap_expression on not a expression! Found {self:?}")
         };
         expr
+    }
+    #[track_caller]
+    pub fn unwrap_subexpression(&self) -> SingleOutputExpression {
+        let expr = self.unwrap_expression();
+        let ExpressionOutput::SubExpression(typ) = &expr.output else {
+            unreachable!("unwrap_subexpression on not a SubExpression")
+        };
+        SingleOutputExpression {
+            typ,
+            span: expr.span,
+            source: &expr.source,
+        }
     }
     #[track_caller]
     pub fn unwrap_declaration(&self) -> &Declaration {
@@ -811,7 +858,6 @@ impl Instruction {
             }
             Instruction::Declaration(declaration) => declaration.decl_span,
             Instruction::Expression(expression) => expression.span,
-            Instruction::Write(write) => write.to.to_span,
             Instruction::IfStatement(_) => unreachable!(),
             Instruction::ForStatement(_) => unreachable!(),
         }

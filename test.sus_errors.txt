@@ -281,14 +281,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                                                        ──┬──  
      │                                                                          ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Typing Error: connection expects a ::bool[] but was given a ::int
-     ╭─[ test.sus:250:41 ]
+Error: Typing Error: variable reference expects a ::bool[] but was given a ::int
+     ╭─[ test.sus:250:2 ]
      │
  250 │     state bool[24] stored_valid_permutes = 000000000000000000000000
-     │                    ──────────┬──────────   ────────────┬───────────  
-     │                              ╰─────────────────────────────────────── 'stored_valid_permutes' declared here
-     │                                                        │             
-     │                                                        ╰───────────── Typing Error: connection expects a ::bool[] but was given a ::int
+     │     ──────────────────┬─────────────────  
+     │                       ╰─────────────────── Typing Error: variable reference expects a ::bool[] but was given a ::int
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:252:10 ]
@@ -375,17 +373,17 @@ a'0
 
 But this was specified as x'1
 ─────╯
-Error: This register is part of a net-positive latency cycle of +1
+Error: This instruction is part of a net-positive latency cycle of +1
 
 state_reg'1
 -> state_reg'2 (+1)
 
 Which conflicts with the starting latency
-     ╭─[ test.sus:337:2 ]
+     ╭─[ test.sus:332:8 ]
      │
- 337 │     reg state_reg = state_reg + a
-     │     ─┬─  
-     │      ╰─── This register is part of a net-positive latency cycle of +1
+ 332 │     state int state_reg
+     │           ──────┬──────  
+     │                 ╰──────── This instruction is part of a net-positive latency cycle of +1
 
 state_reg'1
 -> state_reg'2 (+1)
@@ -1795,7 +1793,6 @@ Error: Index out of bounds. Array is of size 20, but the index is 29.
 Error: This instruction is part of a net-positive latency cycle of +5
 
 _1_i'0
--> _1_i'0 (+0)
 -> test'5 (+5)
 -> _1_i'5 (+0)
 
@@ -1807,7 +1804,6 @@ Which conflicts with the starting latency
      │               ╰───── This instruction is part of a net-positive latency cycle of +5
 
 _1_i'0
--> _1_i'0 (+0)
 -> test'5 (+5)
 -> _1_i'5 (+0)
 
@@ -1816,7 +1812,6 @@ Which conflicts with the starting latency
 Error: This instruction is part of a net-positive latency cycle of +5
 
 _1_i'0
--> _1_i'0 (+0)
 -> test'5 (+5)
 -> _1_i'5 (+0)
 
@@ -1828,28 +1823,6 @@ Which conflicts with the starting latency
      │                     ╰────────── This instruction is part of a net-positive latency cycle of +5
 
 _1_i'0
--> _1_i'0 (+0)
--> test'5 (+5)
--> _1_i'5 (+0)
-
-Which conflicts with the starting latency
-─────╯
-Error: This instruction is part of a net-positive latency cycle of +5
-
-_1_i'0
--> _1_i'0 (+0)
--> test'5 (+5)
--> _1_i'5 (+0)
-
-Which conflicts with the starting latency
-     ╭─[ test.sus:363:9 ]
-     │
- 363 │     test = module_taking_time(test+a)
-     │            ─────────┬────────  
-     │                     ╰────────── This instruction is part of a net-positive latency cycle of +5
-
-_1_i'0
--> _1_i'0 (+0)
 -> test'5 (+5)
 -> _1_i'5 (+0)
 
@@ -2289,13 +2262,6 @@ Error: ::int is not a named wire: local or constant, it is a Struct instead!
      │                    ─┬─  
      │                     ╰─── Defined here
 ─────╯
-Error: Template arguments must be known at compile-time!
-     ╭─[ test.sus:767:50 ]
-     │
- 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
-     │                                                  ─┬─  
-     │                                                   ╰─── Template arguments must be known at compile-time!
-─────╯
 Error: Could not fully figure out the type of this object. type_variable_4[...peano_variable_5]
      ╭─[ test.sus:767:50 ]
      │
@@ -2339,12 +2305,12 @@ Error: 'beep' is read-only
      │     ──┬─  
      │       ╰─── 'beep' is read-only
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_12[...peano_variable_13]
+Error: Could not fully figure out the type of this object. type_variable_10[...peano_variable_11]
      ╭─[ test.sus:775:2 ]
      │
  775 │     FIFO #(BITWIDTH: 4) badoop
      │     ─────────┬─────────  
-     │              ╰─────────── Could not fully figure out the type of this object. type_variable_12[...peano_variable_13]
+     │              ╰─────────── Could not fully figure out the type of this object. type_variable_10[...peano_variable_11]
 ─────╯
 Error: BITWIDTH is not a valid template argument of ::FIFO
      ╭─[ test.sus:775:9 ]
@@ -2524,6 +2490,13 @@ Error: While parsing 'if_statement', parser found a syntax error in a node of ty
      │ │           
      │ ╰─────────── Parent node 'if_statement'
 ─────╯
+Warning: Used 'when' in a generative context, use 'if' instead
+     ╭─[ test.sus:900:2 ]
+     │
+ 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │     ──┬─  
+     │       ╰─── Used 'when' in a generative context, use 'if' instead
+─────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
      ╭─[ test.sus:900:7 ]
      │
@@ -2617,16 +2590,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │            ─┬─  
      │             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Typing Error: connection expects a ::int but was given a ::bool
-     ╭─[ test.sus:929:11 ]
+Error: Typing Error: variable reference expects a ::int but was given a ::bool
+     ╭─[ test.sus:929:2 ]
      │
- 926 │     int[3] xyz
-     │            ─┬─  
-     │             ╰─── 'xyz' declared here
-     │ 
  929 │     xyz[3] = true
-     │              ──┬─  
-     │                ╰─── Typing Error: connection expects a ::int but was given a ::bool
+     │     ───┬──  
+     │        ╰──── Typing Error: variable reference expects a ::int but was given a ::bool
 ─────╯
 Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
      ╭─[ test.sus:935:2 ]
@@ -2640,15 +2609,6 @@ Error: While parsing 'block', parser found a syntax error in a node of type 'ERR
  938 │ ├─▶ }
      │ │       
      │ ╰─────── Parent node 'block'
-─────╯
-Error: This value is non-generative, yet it is being assigned to a generative value
-     ╭─[ test.sus:936:15 ]
-     │
- 936 │         SUM_UP = SUM_UP + DATA[I]
-     │         ───┬──   ────────┬───────  
-     │            ╰─────────────────────── This object is generative
-     │                          │         
-     │                          ╰───────── This value is non-generative, yet it is being assigned to a generative value
 ─────╯
 Error: No Global of the name 'I' was found. Did you forget to import it?
      ╭─[ test.sus:936:29 ]
@@ -2790,30 +2750,33 @@ Error: Could not fully figure out the type of this object. type_variable_0[...pe
       │     ───────────┬───────────  
       │                ╰───────────── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_0[][...peano_variable_0]
+Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
       ╭─[ test.sus:1029:2 ]
       │
  1029 │     mtinf.a = mtinf.b
       │     ───┬───  
-      │        ╰───── Could not fully figure out the type of this object. type_variable_0[][...peano_variable_0]
+      │        ╰───── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
-      ╭─[ test.sus:1029:12 ]
+Error: Typing Error: variable reference: Creating Infinite Types is Forbidden! expects a type_variable_0[][...peano_variable_0] but was given a type_variable_0[...peano_variable_0]
+      ╭─[ test.sus:1029:2 ]
       │
  1029 │     mtinf.a = mtinf.b
-      │               ───┬───  
-      │                  ╰───── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+      │     ───┬───  
+      │        ╰───── Typing Error: variable reference: Creating Infinite Types is Forbidden! expects a type_variable_0[][...peano_variable_0] but was given a type_variable_0[...peano_variable_0]
 ──────╯
-Error: Typing Error: connection: Creating Infinite Types is Forbidden! expects a type_variable_0[][...peano_variable_0] but was given a type_variable_0[...peano_variable_0]
-      ╭─[ test.sus:1029:12 ]
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1036:8 ]
       │
- 1021 │     interface make_infinite_type_help: T[3] a -> T b
-      │                                             ┬  
-      │                                             ╰── 'a' declared here
-      │ 
- 1029 │     mtinf.a = mtinf.b
-      │               ───┬───  
-      │                  ╰───── Typing Error: connection: Creating Infinite Types is Forbidden! expects a type_variable_0[][...peano_variable_0] but was given a type_variable_0[...peano_variable_0]
+ 1036 │        bool do_write'0,
+      │             ────┬───  
+      │                 ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1038:13 ]
+      │
+ 1038 │        bool[500] data'0 ->
+      │                  ──┬─  
+      │                    ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Warning: Unused port 'ready'
       ╭─[ test.sus:1049:2 ]
@@ -2905,6 +2868,13 @@ Warning: Unused port 'data_out'
       │                                                    ────┬───  
       │                                                        ╰───── Port 'data_out' declared here
 ──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1053:35 ]
+      │
+ 1053 │     interface start_iteration : bool do_start
+      │                                      ────┬───  
+      │                                          ╰───── Unused Variable: This variable does not affect the output ports of this module
+──────╯
 Error: Used 'if' in a non generative context, use 'when' instead
       ╭─[ test.sus:1064:2 ]
       │
@@ -2926,12 +2896,40 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ───┬──  
       │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Assertion failed
+Error: Could not fully figure out the type of this object. type_variable_8[...peano_variable_9]
+      ╭─[ test.sus:1079:2 ]
+      │
+ 1079 │     assert #(C: INT_ARR_SIZE == 3200)
+      │     ────────────────┬────────────────  
+      │                     ╰────────────────── Could not fully figure out the type of this object. type_variable_8[...peano_variable_9]
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_14[...peano_variable_16]
+      ╭─[ test.sus:1081:2 ]
+      │
+ 1081 │     assert #(C: clog2 #(V: 15) == 4)
+      │     ────────────────┬───────────────  
+      │                     ╰───────────────── Could not fully figure out the type of this object. type_variable_14[...peano_variable_16]
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_20[...peano_variable_23]
+      ╭─[ test.sus:1082:2 ]
+      │
+ 1082 │     assert #(C: clog2 #(V: 16) == 4)
+      │     ────────────────┬───────────────  
+      │                     ╰───────────────── Could not fully figure out the type of this object. type_variable_20[...peano_variable_23]
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_26[...peano_variable_30]
+      ╭─[ test.sus:1083:2 ]
+      │
+ 1083 │     assert #(C: clog2 #(V: 17) == 5)
+      │     ────────────────┬───────────────  
+      │                     ╰───────────────── Could not fully figure out the type of this object. type_variable_26[...peano_variable_30]
+──────╯
+Error: Could not fully figure out the type of this object. type_variable_5[...peano_variable_7]
       ╭─[ test.sus:1087:2 ]
       │
  1087 │     assert #(C: 15 + 3 == 19)
       │     ────────────┬────────────  
-      │                 ╰────────────── Assertion failed
+      │                 ╰────────────── Could not fully figure out the type of this object. type_variable_5[...peano_variable_7]
 ──────╯
 Warning: Used 'when' in a generative context, use 'if' instead
       ╭─[ test.sus:1098:9 ]
@@ -3058,6 +3056,13 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │               ────┬───  
       │                   ╰───── Interface 'infer_me' defined here
 ──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1160:12 ]
+      │
+ 1160 │     input int data_received'3
+      │               ──────┬──────  
+      │                     ╰──────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
 Warning: Unused port 'pop'
       ╭─[ test.sus:1162:2 ]
       │
@@ -3102,6 +3107,13 @@ Warning: Unused port 'data_out'
    40 │     interface pop : bool pop -> bool data_valid, T data_out
       │                                                    ────┬───  
       │                                                        ╰───── Port 'data_out' declared here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1166:27 ]
+      │
+ 1166 │        reg reg reg reg reg int heavy_computation = data_received
+      │                                ────────┬────────  
+      │                                        ╰────────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Could not fully instantiate ::infer_me #(
     A: /* Could not infer */
@@ -3254,13 +3266,6 @@ Error: No Global of the name 'cur_state' was found. Did you forget to import it?
       │                               ────┬────  
       │                                   ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
 ──────╯
-Error: Latency Specifier must be a compile-time expression
-      ╭─[ test.sus:1246:28 ]
-      │
- 1246 │     trigger may_process'0 : T cur_state {
-      │                               ────┬────  
-      │                                   ╰────── Latency Specifier must be a compile-time expression
-──────╯
 Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
       ╭─[ test.sus:1246:38 ]
       │
@@ -3407,6 +3412,13 @@ Error: While parsing 'block', parser found a syntax error in a node of type 'ERR
       │ │       
       │ ╰─────── Parent node 'block'
 ──────╯
+Warning: Used 'when' in a generative context, use 'if' instead
+      ╭─[ test.sus:1263:2 ]
+      │
+ 1263 │     when loop.process : float cur_state {
+      │     ──┬─  
+      │       ╰─── Used 'when' in a generative context, use 'if' instead
+──────╯
 Error: There is no port or interface of name 'process' on module MultiStateLoop
       ╭─[ test.sus:1263:12 ]
       │
@@ -3431,6 +3443,13 @@ Error: While parsing 'if_statement', parser found a syntax error in a node of ty
       │ │           
       │ ╰─────────── Parent node 'if_statement'
 ──────╯
+Error: Typing Error: variable reference expects a ::float but was given a ::int
+      ╭─[ test.sus:1264:3 ]
+      │
+ 1264 │        float next_state = cur_state * cur_state
+      │        ────────┬───────  
+      │                ╰───────── Typing Error: variable reference expects a ::float but was given a ::int
+──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1264:9 ]
       │
@@ -3445,21 +3464,19 @@ Error: No Global of the name 'cur_state' was found. Did you forget to import it?
       │                           ────┬────  
       │                               ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
 ──────╯
-Error: Typing Error: connection expects a ::float but was given a ::int
-      ╭─[ test.sus:1264:22 ]
-      │
- 1264 │        float next_state = cur_state * cur_state
-      │              ─────┬────   ──────────┬──────────  
-      │                   ╰────────────────────────────── 'next_state' declared here
-      │                                     │            
-      │                                     ╰──────────── Typing Error: connection expects a ::float but was given a ::int
-──────╯
 Error: No Global of the name 'cur_state' was found. Did you forget to import it?
       ╭─[ test.sus:1264:34 ]
       │
  1264 │        float next_state = cur_state * cur_state
       │                                       ────┬────  
       │                                           ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+──────╯
+Warning: Used 'when' in a generative context, use 'if' instead
+      ╭─[ test.sus:1265:3 ]
+      │
+ 1265 │        when cur_state >= 2.0 {
+      │        ──┬─  
+      │          ╰─── Used 'when' in a generative context, use 'if' instead
 ──────╯
 Error: No Global of the name 'cur_state' was found. Did you forget to import it?
       ╭─[ test.sus:1265:8 ]

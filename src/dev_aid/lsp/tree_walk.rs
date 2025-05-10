@@ -15,7 +15,7 @@ use crate::typing::template::{
 pub enum InGlobal<'linker> {
     NamedLocal(&'linker Declaration),
     NamedSubmodule(&'linker SubModuleInstance),
-    Temporary(&'linker Expression),
+    Temporary(SingleOutputExpression<'linker>),
 }
 
 /// Information about an object in the source code. Used for hovering, completions, syntax highlighting etc.
@@ -408,34 +408,41 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                             );
                         }
                     }
-                    Instruction::Expression(wire) => match &wire.source {
-                        ExpressionSource::WireRef(wire_ref) => {
-                            self.walk_wire_ref(obj_id, link_info, wire_ref)
-                        }
-                        ExpressionSource::FuncCall(func_call) => {
-                            self.walk_interface_reference(
-                                obj_id,
-                                link_info,
-                                &func_call.interface_reference,
-                            );
-                            if let Some(multi_write) = &func_call.multi_write_outputs {
-                                for output in multi_write {
+                    Instruction::Expression(expr) => {
+                        match &expr.source {
+                            ExpressionSource::WireRef(wire_ref) => {
+                                self.walk_wire_ref(obj_id, link_info, wire_ref)
+                            }
+                            ExpressionSource::FuncCall(func_call) => {
+                                self.walk_interface_reference(
+                                    obj_id,
+                                    link_info,
+                                    &func_call.interface_reference,
+                                );
+                            }
+                            _ => {
+                                if let Some(single_output_expr) = expr.as_single_output_expr() {
+                                    self.visit(
+                                        expr.span,
+                                        LocationInfo::InGlobal(
+                                            obj_id,
+                                            link_info,
+                                            id,
+                                            InGlobal::Temporary(single_output_expr),
+                                        ),
+                                    )
+                                }
+                            }
+                        };
+
+                        match &expr.output {
+                            ExpressionOutput::SubExpression(_full_type) => {}
+                            ExpressionOutput::MultiWrite(write_tos) => {
+                                for output in write_tos {
                                     self.walk_wire_ref(obj_id, link_info, &output.to);
                                 }
                             }
                         }
-                        _ => self.visit(
-                            wire.span,
-                            LocationInfo::InGlobal(
-                                obj_id,
-                                link_info,
-                                id,
-                                InGlobal::Temporary(wire),
-                            ),
-                        ),
-                    },
-                    Instruction::Write(write) => {
-                        self.walk_wire_ref(obj_id, link_info, &write.to.to);
                     }
                     Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
                 };

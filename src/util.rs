@@ -10,6 +10,14 @@ pub fn all_equal<T, O: Eq + std::fmt::Debug>(
     Some(first)
 }
 
+#[track_caller]
+pub fn unwrap_single_element<T>(collection: impl IntoIterator<Item = T>) -> T {
+    let mut iter = collection.into_iter();
+    let result = iter.next().unwrap();
+    assert!(iter.next().is_none());
+    result
+}
+
 pub fn zip_eq<OA, OB>(
     iter_a: impl IntoIterator<Item = OA>,
     iter_b: impl IntoIterator<Item = OB>,
@@ -39,4 +47,25 @@ impl<OA, OB, IterA: Iterator<Item = OA>, IterB: Iterator<Item = OB>> Iterator
             _ => unreachable!("Unbalanced Iterators"),
         }
     }
+}
+
+#[macro_export]
+macro_rules! let_unwrap {
+    ($pat:pat, $val:expr) => {
+        // First try matching by reference to avoid consuming
+        let let_unwrap_executed_expr = $val;
+        #[allow(unused_variables)]
+        let $pat = &let_unwrap_executed_expr
+        else {
+            panic!(
+                "let_unwrap! failed: expected {}, found {:?}",
+                stringify!($pat),
+                let_unwrap_executed_expr
+            );
+        };
+        // Now match by value (may move)
+        let $pat = let_unwrap_executed_expr else {
+            unreachable!("let_unwrap! internal error: pattern matched by ref, but failed by value")
+        };
+    };
 }

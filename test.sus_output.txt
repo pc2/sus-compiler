@@ -715,11 +715,8 @@ Latency Counting Slice
 Checking array accesses Slice
 Latency Counting UseSlice
 Checking array accesses UseSlice
-Instantiating UseBuiltinConstants
-Concrete Typechecking UseBuiltinConstants
-Latency Counting UseBuiltinConstants
-Checking array accesses UseBuiltinConstants
-Instantiating FailingAssert
+Not Instantiating UseBuiltinConstants due to flattening errors
+Not Instantiating FailingAssert due to flattening errors
 Instantiating latency_counting_disjoint_blocks
 Concrete Typechecking latency_counting_disjoint_blocks
 Latency Counting latency_counting_disjoint_blocks

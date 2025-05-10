@@ -10,7 +10,9 @@ use super::type_inference::{
     AbstractTypeSubstitutor, DomainVariableID, InnerTypeVariableID, PeanoVariableID, Substitutor,
     TypeSubstitutor, TypeUnifier, UnifyErrorReport,
 };
-use crate::flattening::{BinaryOperator, StructType, UnaryOperator, WrittenType};
+use crate::flattening::{
+    BinaryOperator, StructType, UnaryOperator, WireReference, WireReferenceRoot, WrittenType,
+};
 use crate::to_string::map_to_type_names;
 
 /// This contains only the information that can be type-checked before template instantiation.
@@ -137,6 +139,12 @@ impl DomainType {
             DomainType::Generative => true,
             DomainType::Physical(_) => false,
             DomainType::Unknown(_) => false,
+        }
+    }
+    /// Used to quickly combine domains with each other. NOT A SUBSTITUTE FOR UNIFICATION.
+    pub fn combine_with(&mut self, other: DomainType) {
+        if *self == DomainType::Generative {
+            *self = other;
         }
     }
 }
@@ -497,6 +505,17 @@ impl FullTypeUnifier {
         let global_ref_span = global_ref.get_total_span();
         for (_template_id, template_type) in &mut global_ref.template_arg_types {
             self.finalize_abstract_type(linker_types, template_type, global_ref_span, errors);
+        }
+    }
+
+    pub fn finalize_wire_ref(
+        &mut self,
+        linker_types: &ArenaAllocator<StructType, TypeUUIDMarker>,
+        wire_ref: &mut WireReference,
+        errors: &ErrorCollector,
+    ) {
+        if let WireReferenceRoot::NamedConstant(cst) = &mut wire_ref.root {
+            self.finalize_global_ref(linker_types, cst, errors);
         }
     }
 }
