@@ -743,6 +743,17 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 }
             }
         }
+        if let ExpressionSource::WireRef(wire_ref) = &expr.source {
+            if let Some(first_write) = multi_write.first() {
+                self.typecheck_wire_reference(wire_ref, expr.span, &first_write.to_type);
+            } else {
+                let sentinel = FullType {
+                    typ: self.type_checker.abstract_type_substitutor.alloc_unknown(),
+                    domain: expr.domain,
+                };
+                self.typecheck_wire_reference(wire_ref, expr.span, &sentinel);
+            }
+        }
         for wr in multi_write {
             self.typecheck_wire_reference(&wr.to, wr.to_span, &wr.to_type);
         }

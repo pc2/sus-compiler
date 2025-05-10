@@ -1027,12 +1027,13 @@ impl InstantiationContext<'_, '_> {
                             match &expr.output {
                                 ExpressionOutput::SubExpression(_full_type) => {} // Simply returning value_computed is enough
                                 ExpressionOutput::MultiWrite(write_tos) => {
-                                    let single_write = unwrap_single_element(write_tos);
-                                    self.write_generative(
-                                        single_write,
-                                        value_computed.clone(), // We do an extra clone, maybe not needed, such that we can show the value in GenerationState
-                                        original_instruction,
-                                    )?;
+                                    if let Some(single_write) = write_tos.first() {
+                                        self.write_generative(
+                                            single_write,
+                                            value_computed.clone(), // We do an extra clone, maybe not needed, such that we can show the value in GenerationState
+                                            original_instruction,
+                                        )?;
+                                    }
                                 }
                             }
                             SubModuleOrWire::CompileTimeValue(value_computed)

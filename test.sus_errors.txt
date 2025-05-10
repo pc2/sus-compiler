@@ -2896,40 +2896,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ───┬──  
       │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_7[...peano_variable_8]
-      ╭─[ test.sus:1079:2 ]
-      │
- 1079 │     assert #(C: INT_ARR_SIZE == 3200)
-      │     ────────────────┬────────────────  
-      │                     ╰────────────────── Could not fully figure out the type of this object. type_variable_7[...peano_variable_8]
-──────╯
-Error: Could not fully figure out the type of this object. type_variable_13[...peano_variable_15]
-      ╭─[ test.sus:1081:2 ]
-      │
- 1081 │     assert #(C: clog2 #(V: 15) == 4)
-      │     ────────────────┬───────────────  
-      │                     ╰───────────────── Could not fully figure out the type of this object. type_variable_13[...peano_variable_15]
-──────╯
-Error: Could not fully figure out the type of this object. type_variable_19[...peano_variable_22]
-      ╭─[ test.sus:1082:2 ]
-      │
- 1082 │     assert #(C: clog2 #(V: 16) == 4)
-      │     ────────────────┬───────────────  
-      │                     ╰───────────────── Could not fully figure out the type of this object. type_variable_19[...peano_variable_22]
-──────╯
-Error: Could not fully figure out the type of this object. type_variable_25[...peano_variable_29]
-      ╭─[ test.sus:1083:2 ]
-      │
- 1083 │     assert #(C: clog2 #(V: 17) == 5)
-      │     ────────────────┬───────────────  
-      │                     ╰───────────────── Could not fully figure out the type of this object. type_variable_25[...peano_variable_29]
-──────╯
-Error: Could not fully figure out the type of this object. type_variable_5[...peano_variable_7]
+Error: Assertion failed
       ╭─[ test.sus:1087:2 ]
       │
  1087 │     assert #(C: 15 + 3 == 19)
       │     ────────────┬────────────  
-      │                 ╰────────────── Could not fully figure out the type of this object. type_variable_5[...peano_variable_7]
+      │                 ╰────────────── Assertion failed
 ──────╯
 Warning: Used 'when' in a generative context, use 'if' instead
       ╭─[ test.sus:1098:2 ]
