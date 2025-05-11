@@ -240,6 +240,7 @@ impl TypingAllocator {
 }
 
 #[derive(Clone, Copy)]
+#[allow(unused)]
 enum InterfacePortsInfo {
     InputsThenOutputs,
     OutputsThenInputs,

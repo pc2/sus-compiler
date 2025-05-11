@@ -30,6 +30,7 @@ pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
 struct PathMuxSource<'s> {
     to_wire: &'s RealWire,
     to_latency: i64,
+    #[allow(unused)]
     mux_input: &'s MultiplexerSource,
 }
 
