@@ -1,3 +1,4 @@
+#[allow(unused)]
 pub fn all_equal<T, O: Eq + std::fmt::Debug>(
     iter: impl IntoIterator<Item = T>,
     mut f: impl FnMut(T) -> O,
