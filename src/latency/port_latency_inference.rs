@@ -107,7 +107,7 @@ fn recurse_down_expression(
     cur_instr: FlatID,
     num_template_args: usize,
 ) -> Option<PortLatencyLinearity> {
-    let expr = instructions[cur_instr].unwrap_expression();
+    let expr = instructions[cur_instr].unwrap_subexpression();
     if !expr.typ.domain.is_generative() {
         return None; // Early exit, the user can create an invalid interface, we just don't handle it
     }

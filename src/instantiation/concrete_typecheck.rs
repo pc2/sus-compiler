@@ -1,13 +1,7 @@
-use std::ops::Deref;
-
 use ibig::IBig;
 
 use crate::alloc::{zip_eq, zip_eq3};
-use crate::flattening::{DeclarationKind, ExpressionSource, WireReferenceRoot, WrittenType};
-use crate::linker::LinkInfo;
 use crate::typing::abstract_type::PeanoType;
-use crate::typing::concrete_type::ConcreteGlobalReference;
-use crate::typing::template::TemplateArgKind;
 use crate::typing::{
     concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE},
     type_inference::{
@@ -182,6 +176,8 @@ impl InstantiationContext<'_, '_> {
                     let peano_type = &self.md.link_info.instructions
                         [this_wire.original_instruction]
                         .unwrap_expression()
+                        .as_single_output_expr()
+                        .unwrap()
                         .typ
                         .typ
                         .rank;
@@ -323,12 +319,13 @@ impl InstantiationContext<'_, '_> {
                 let port_decl =
                     sub_module.link_info.instructions[port_decl_instr].unwrap_declaration();
 
-                let typ_for_inference = concretize_written_type_with_possible_template_args(
-                    &port_decl.typ_expr,
-                    &sm.refers_to.template_args,
-                    &sub_module.link_info,
-                    &mut self.type_substitutor,
-                );
+                let typ_for_inference = self
+                    .type_substitutor
+                    .concretize_written_type_with_possible_template_args(
+                        &port_decl.typ_expr,
+                        &sm.refers_to.template_args,
+                        &sub_module.link_info,
+                    );
 
                 self.type_substitutor
                     .unify_must_succeed(&wire.typ, &typ_for_inference);
@@ -349,100 +346,6 @@ impl InstantiationContext<'_, '_> {
 
 struct SubmoduleTypecheckConstraint {
     sm_id: SubModuleID,
-}
-
-/// Part of Template Value Inference.
-///
-/// Specifically, for code like this:
-///
-/// ```sus
-/// module add_all #(int Size) {
-///     input int[Size] arr // We're targeting the 'Size' within the array size
-///     output int total
-/// }
-/// ```
-fn can_expression_be_value_inferred(link_info: &LinkInfo, expr_id: FlatID) -> Option<TemplateID> {
-    let expr = link_info.instructions[expr_id].unwrap_expression();
-    let ExpressionSource::WireRef(wr) = &expr.source else {
-        return None;
-    };
-    if !wr.path.is_empty() {
-        return None;
-    } // Must be a plain, no fuss reference to a de
-    let WireReferenceRoot::LocalDecl(wire_declaration, _span) = &wr.root else {
-        return None;
-    };
-    let template_arg_decl = link_info.instructions[*wire_declaration].unwrap_declaration();
-    let DeclarationKind::GenerativeInput(template_id) = &template_arg_decl.decl_kind else {
-        return None;
-    };
-    Some(*template_id)
-}
-
-fn concretize_written_type_with_possible_template_args(
-    written_typ: &WrittenType,
-    template_args: &TVec<ConcreteType>,
-    link_info: &LinkInfo,
-    type_substitutor: &mut TypeSubstitutor<ConcreteType>,
-) -> ConcreteType {
-    match written_typ {
-        WrittenType::Error(_span) => type_substitutor.alloc_unknown(),
-        WrittenType::TemplateVariable(_span, uuid) => template_args[*uuid].clone(),
-        WrittenType::Named(global_reference) => {
-            let object_template_args: TVec<ConcreteType> =
-                global_reference
-                    .template_args
-                    .map(|(_arg_id, arg)| -> ConcreteType {
-                        if let Some(arg) = arg {
-                            match &arg.kind {
-                                TemplateArgKind::Type(arg_wr_typ) => {
-                                    concretize_written_type_with_possible_template_args(
-                                        arg_wr_typ,
-                                        template_args,
-                                        link_info,
-                                        type_substitutor,
-                                    )
-                                }
-                                TemplateArgKind::Value(uuid) => {
-                                    if let Some(found_template_arg) =
-                                        can_expression_be_value_inferred(link_info, *uuid)
-                                    {
-                                        template_args[found_template_arg].clone()
-                                    } else {
-                                        type_substitutor.alloc_unknown()
-                                    }
-                                }
-                            }
-                        } else {
-                            type_substitutor.alloc_unknown()
-                        }
-                    });
-
-            ConcreteType::Named(ConcreteGlobalReference {
-                id: global_reference.id,
-                template_args: object_template_args,
-            })
-        }
-        WrittenType::Array(_span, arr_box) => {
-            let (arr_content_wr, arr_idx_id, _arr_brackets) = arr_box.deref();
-
-            let arr_content_concrete = concretize_written_type_with_possible_template_args(
-                arr_content_wr,
-                template_args,
-                link_info,
-                type_substitutor,
-            );
-            let arr_idx_concrete = if let Some(found_template_arg) =
-                can_expression_be_value_inferred(link_info, *arr_idx_id)
-            {
-                template_args[found_template_arg].clone()
-            } else {
-                type_substitutor.alloc_unknown()
-            };
-
-            ConcreteType::Array(Box::new((arr_content_concrete, arr_idx_concrete)))
-        }
-    }
 }
 
 impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConstraint {

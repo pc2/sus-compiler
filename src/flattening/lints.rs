@@ -2,11 +2,12 @@ use sus_proc_macro::get_builtin_const;
 
 use crate::linker::{IsExtern, LinkInfo, AFTER_LINTS_CP};
 use crate::prelude::*;
-use crate::typing::template::ParameterKind;
+use crate::typing::template::{for_each_generative_input_in_template_args, ParameterKind};
 
-use super::walk::for_each_generative_input_in_template_args;
-
-use super::{ExpressionSource, Instruction, Module, WireReferencePathElement, WireReferenceRoot};
+use super::{
+    Expression, ExpressionOutput, ExpressionSource, Instruction, Module, WireReferencePathElement,
+    WireReferenceRoot,
+};
 
 pub fn perform_lints(linker: &mut Linker) {
     for (_, md) in &mut linker.modules {
@@ -104,43 +105,53 @@ fn make_fanins(
         instructions.map(|_| Vec::new());
 
     for (inst_id, inst) in instructions.iter() {
-        let mut collector_func = |id| {
-            instruction_fanins[inst_id].push(id);
-        };
         match inst {
-            Instruction::Write(conn) => {
-                if let Some(flat_root) = conn.to.root.get_root_flat() {
-                    instruction_fanins[flat_root].push(conn.from);
-                    WireReferencePathElement::for_each_dependency(&conn.to.path, |idx_wire| {
-                        instruction_fanins[flat_root].push(idx_wire)
-                    });
-                }
-            }
             Instruction::SubModule(sm) => {
                 for_each_generative_input_in_template_args(
                     &sm.module_ref.template_args,
-                    &mut collector_func,
+                    &mut |id| {
+                        instruction_fanins[inst_id].push(id);
+                    },
                 );
-            }
-            Instruction::FuncCall(fc) => {
-                for a in &fc.arguments {
-                    instruction_fanins[fc.interface_reference.submodule_decl].push(*a);
-                }
             }
             Instruction::Declaration(decl) => {
                 if let Some(lat_spec) = decl.latency_specifier {
-                    collector_func(lat_spec);
+                    instruction_fanins[inst_id].push(lat_spec);
                 }
-                decl.typ_expr.for_each_generative_input(&mut collector_func);
+                decl.typ_expr.for_each_generative_input(&mut |id| {
+                    instruction_fanins[inst_id].push(id);
+                });
             }
-            Instruction::Expression(wire) => {
-                wire.source.for_each_dependency(&mut collector_func);
+            Instruction::Expression(expr) => {
+                expr.source.for_each_dependency(&mut |id| {
+                    instruction_fanins[inst_id].push(id);
+                });
+                match &expr.output {
+                    ExpressionOutput::MultiWrite(writes) => {
+                        for wr in writes {
+                            if let Some(flat_root) = wr.to.root.get_root_flat() {
+                                instruction_fanins[flat_root].push(inst_id);
+                                WireReferencePathElement::for_each_dependency(
+                                    &wr.to.path,
+                                    |idx_wire| instruction_fanins[flat_root].push(idx_wire),
+                                );
+                            }
+                        }
+                    }
+                    ExpressionOutput::SubExpression(_) => {}
+                }
             }
             Instruction::IfStatement(stm) => {
-                for id in FlatIDRange::new(stm.then_start, stm.else_end) {
-                    if let Instruction::Write(conn) = &instructions[id] {
-                        if let Some(flat_root) = conn.to.root.get_root_flat() {
-                            instruction_fanins[flat_root].push(stm.condition);
+                for id in FlatIDRange::new(stm.then_block.0, stm.else_block.1) {
+                    if let Instruction::Expression(Expression {
+                        output: ExpressionOutput::MultiWrite(writes),
+                        ..
+                    }) = &instructions[id]
+                    {
+                        for wr in writes {
+                            if let Some(flat_root) = wr.to.root.get_root_flat() {
+                                instruction_fanins[flat_root].push(stm.condition);
+                            }
                         }
                     }
                 }

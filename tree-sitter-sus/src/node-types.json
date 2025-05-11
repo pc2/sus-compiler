@@ -632,6 +632,26 @@
     }
   },
   {
+    "type": "else_block",
+    "named": true,
+    "fields": {
+      "content": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "if_statement",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "field_access",
     "named": true,
     "fields": {
@@ -976,11 +996,7 @@
         "required": false,
         "types": [
           {
-            "type": "block",
-            "named": true
-          },
-          {
-            "type": "if_statement",
+            "type": "else_block",
             "named": true
           }
         ]

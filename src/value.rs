@@ -17,7 +17,6 @@ pub enum Value {
     Array(Vec<Value>),
     /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
-    Error,
 }
 
 impl ConcreteType {
@@ -66,7 +65,6 @@ impl Value {
                 )))
             }
             Value::Unset => type_substitutor.alloc_unknown(),
-            Value::Error => unreachable!("{self:?}"),
         }
     }
 
@@ -74,7 +72,7 @@ impl Value {
         match self {
             Value::Bool(_) | Value::Integer(_) => false,
             Value::Array(values) => values.iter().any(|v| v.contains_errors_or_unsets()),
-            Value::Unset | Value::Error => true,
+            Value::Unset => true,
         }
     }
 
@@ -111,10 +109,6 @@ impl Value {
 }
 
 pub fn compute_unary_op(op: UnaryOperator, v: &Value) -> Value {
-    if *v == Value::Error {
-        unreachable!("unary op on Value::Error!")
-        //return Value::Error
-    }
     match op {
         UnaryOperator::Or => {
             todo!("Array Values")
@@ -145,10 +139,6 @@ pub fn compute_unary_op(op: UnaryOperator, v: &Value) -> Value {
 }
 
 pub fn compute_binary_op(left: &Value, op: BinaryOperator, right: &Value) -> Value {
-    if *left == Value::Error || *right == Value::Error {
-        unreachable!("binary op on Value::Error!")
-        //return Value::Error
-    }
     match op {
         BinaryOperator::Equals => Value::Bool(left == right),
         BinaryOperator::NotEquals => Value::Bool(left != right),
