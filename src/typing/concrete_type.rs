@@ -5,7 +5,6 @@ use ibig::UBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::zip_eq;
-use crate::alloc::UUID;
 use crate::linker::GlobalUUID;
 use crate::prelude::*;
 use std::ops::Deref;
@@ -169,14 +168,10 @@ impl ConcreteType {
     pub fn sizeof_named(type_ref: &ConcreteGlobalReference<TypeUUID>) -> u64 {
         match type_ref.id {
             get_builtin_type!("int") => {
-                let min = type_ref.template_args[UUID::from_hidden_value(0)]
-                    .unwrap_value()
-                    .unwrap_integer();
-                let max = type_ref.template_args[UUID::from_hidden_value(1)]
-                    .unwrap_value()
-                    .unwrap_integer()
-                    - ibig!(1);
-                bound_to_bits(min, &max)
+                let [min, max] = type_ref
+                    .template_args
+                    .map_to_array(|_id, v| v.unwrap_value().unwrap_integer());
+                bound_to_bits(min, &(max - 1))
             }
             get_builtin_type!("bool") => 1,
             get_builtin_type!("float") => 32,
@@ -193,12 +188,10 @@ impl ConcreteType {
     }
     /// Returns the inclusive bounds of an int. An int #(MIN: 0, MAX: 15) will return (0, 14)
     pub fn get_bounds(&self) -> (IBig, IBig) {
-        let min = self.unwrap_named().template_args[UUID::from_hidden_value(0)]
-            .unwrap_value()
-            .unwrap_integer();
-        let max = self.unwrap_named().template_args[UUID::from_hidden_value(1)]
-            .unwrap_value()
-            .unwrap_integer();
+        let [min, max] = self
+            .unwrap_named()
+            .template_args
+            .map_to_array(|_id, v| v.unwrap_value().unwrap_integer());
         (min.clone(), max - 1)
     }
 }

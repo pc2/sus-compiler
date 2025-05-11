@@ -22,6 +22,26 @@ pub enum Value {
     Error,
 }
 
+impl ConcreteType {
+    /// On the road to implementing subtyping. Takes in a list of types,
+    /// and computes the smallest supertype that all list elements can coerce to.
+    /// TODO integrate into Hindley-Milner more closely
+    fn get_smallest_common_supertype(
+        list: &[Self],
+        type_substitutor: &mut TypeSubstitutor<ConcreteType>,
+    ) -> Option<Self> {
+        let mut iter = list.iter();
+
+        let first = iter.next()?.clone();
+
+        for elem in iter {
+            type_substitutor.unify_must_succeed(&first, elem);
+        }
+
+        Some(first)
+    }
+}
+
 impl Value {
     /// Traverses the Value, to create a best-effort [ConcreteType] for it.
     /// So '1' becomes `ConcreteType::Named(ConcreteGlobalReference{id: get_builtin_type!("int"), ...}})`,
