@@ -117,7 +117,6 @@ impl InitializationContext<'_> {
                     cursor.go_down_no_check(|cursor| {
                         let (domain_name_span, domain_name) =
                             cursor.field_to_string(field!("name"), kind!("identifier"));
-                        
                         if self.implicit_clk_domain {
                             if let Some(existing_port) = self.ports.iter().next() {
                                 // Sad Path: Having ports on the implicit clk domain is not allowed. 
