@@ -676,9 +676,9 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
         assert!(self.len() == N);
         self.data.as_slice().try_into().unwrap()
     }
-    pub fn map_to_array<O, const N: usize>(
-        &self,
-        mut f: impl FnMut(UUID<IndexMarker>, &T) -> O,
+    pub fn map_to_array<'slf, O, const N: usize>(
+        &'slf self,
+        mut f: impl FnMut(UUID<IndexMarker>, &'slf T) -> O + 'slf,
     ) -> [O; N] {
         assert!(self.len() == N);
         std::array::from_fn(|i| f(UUID::from_hidden_value(i), &self.data[i]))
