@@ -1,5 +1,27 @@
-use super::{abstract_type::AbstractRankedType, written_type::WrittenType};
-use crate::prelude::*;
+use super::{
+    abstract_type::AbstractRankedType, concrete_type::ConcreteType, written_type::WrittenType,
+};
+use crate::{let_unwrap, prelude::*, value::Value};
+
+/// See [TVec]. All circumstances handling Templates need to handle both Types and Values.
+#[derive(Debug)]
+pub enum TemplateKind<T, V> {
+    Type(T),
+    Value(V),
+}
+
+impl<T: std::fmt::Debug, V: std::fmt::Debug> TemplateKind<T, V> {
+    #[track_caller]
+    pub fn unwrap_type(&self) -> &T {
+        let_unwrap!(Self::Type(t), self);
+        t
+    }
+    #[track_caller]
+    pub fn unwrap_value(&self) -> &V {
+        let_unwrap!(Self::Value(t), self);
+        t
+    }
+}
 
 /// References any [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant],
 /// and includes any template arguments.
@@ -36,7 +58,7 @@ impl<ID> GlobalReference<ID> {
 pub struct Parameter {
     pub name: String,
     pub name_span: Span,
-    pub kind: ParameterKind,
+    pub kind: TemplateKind<TypeParameterKind, GenerativeParameterKind>,
 }
 
 /// See [Parameter]
@@ -51,32 +73,6 @@ pub struct GenerativeParameterKind {
 #[derive(Debug)]
 pub struct TypeParameterKind {}
 
-/// See [Parameter]
-///
-/// Must match the [TemplateArgKind] that is passed
-#[derive(Debug)]
-pub enum ParameterKind {
-    Type(TypeParameterKind),
-    Generative(GenerativeParameterKind),
-}
-
-impl ParameterKind {
-    #[track_caller]
-    pub fn unwrap_type(&self) -> &TypeParameterKind {
-        let Self::Type(t) = self else {
-            unreachable!("ParameterKind::unwrap_type on {self:?}")
-        };
-        t
-    }
-    #[track_caller]
-    pub fn unwrap_value(&self) -> &GenerativeParameterKind {
-        let Self::Generative(v) = self else {
-            unreachable!("ParameterKind::unwrap_value on {self:?}")
-        };
-        v
-    }
-}
-
 /// An argument passed to a template parameter.
 ///
 /// See [GlobalReference]
@@ -88,33 +84,7 @@ impl ParameterKind {
 pub struct TemplateArg {
     pub name_span: Span,
     pub value_span: Span,
-    pub kind: TemplateArgKind,
-}
-
-/// See [TemplateArg]
-///
-/// The argument kind passed to [ParameterKind], which it must match
-#[derive(Debug)]
-pub enum TemplateArgKind {
-    Type(WrittenType),
-    Value(FlatID),
-}
-
-impl TemplateArgKind {
-    #[track_caller]
-    pub fn unwrap_type(&self) -> &WrittenType {
-        let Self::Type(t) = self else {
-            unreachable!("TemplateArgKind::unwrap_type on {self:?}")
-        };
-        t
-    }
-    #[track_caller]
-    pub fn unwrap_value(&self) -> FlatID {
-        let Self::Value(v) = self else {
-            unreachable!("TemplateArgKind::unwrap_value on {self:?}")
-        };
-        *v
-    }
+    pub kind: TemplateKind<WrittenType, FlatID>,
 }
 
 /// A convienent type alias for all places where lists of template args are needed
@@ -126,8 +96,8 @@ pub fn for_each_generative_input_in_template_args(
 ) {
     for (_id, t_arg) in template_args.iter_valids() {
         match &t_arg.kind {
-            TemplateArgKind::Type(typ) => typ.for_each_generative_input(f),
-            TemplateArgKind::Value(val) => f(*val),
+            TemplateKind::Type(typ) => typ.for_each_generative_input(f),
+            TemplateKind::Value(val) => f(*val),
         }
     }
 }

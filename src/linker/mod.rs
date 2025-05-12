@@ -4,7 +4,7 @@ use crate::{
     prelude::*,
     typing::{
         abstract_type::DomainType,
-        template::{GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind},
+        template::{GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind},
         type_inference::{AbstractTypeSubstitutor, TypeSubstitutor},
     },
 };
@@ -129,8 +129,8 @@ impl LinkInfo {
         let mut template_args: Vec<&str> = Vec::new();
         for (_id, t) in &self.template_parameters {
             match &t.kind {
-                ParameterKind::Type(TypeParameterKind {}) => template_args.push(&t.name),
-                ParameterKind::Generative(GenerativeParameterKind {
+                TemplateKind::Type(TypeParameterKind {}) => template_args.push(&t.name),
+                TemplateKind::Value(GenerativeParameterKind {
                     decl_span,
                     declaration_instruction: _,
                 }) => template_args.push(&file_text[*decl_span]),

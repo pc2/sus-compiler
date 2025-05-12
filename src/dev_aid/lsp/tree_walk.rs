@@ -6,8 +6,7 @@ use crate::prelude::*;
 use crate::linker::{FileData, GlobalUUID, LinkInfo};
 
 use crate::typing::template::{
-    GenerativeParameterKind, GlobalReference, Parameter, ParameterKind, TemplateArgKind,
-    TypeParameterKind,
+    GenerativeParameterKind, GlobalReference, Parameter, TemplateKind, TypeParameterKind,
 };
 use crate::typing::written_type::WrittenType;
 
@@ -83,8 +82,8 @@ impl From<LocationInfo<'_>> for RefersTo {
             LocationInfo::Type(_, _) => {}
             LocationInfo::Parameter(obj, _link_info, template_id, template_arg) => {
                 match &template_arg.kind {
-                    ParameterKind::Type(TypeParameterKind {}) => {}
-                    ParameterKind::Generative(GenerativeParameterKind {
+                    TemplateKind::Type(TypeParameterKind {}) => {}
+                    TemplateKind::Value(GenerativeParameterKind {
                         decl_span: _,
                         declaration_instruction,
                     }) => {
@@ -230,10 +229,10 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                 ),
             );
             match &template_arg.kind {
-                TemplateArgKind::Type(typ_expr) => {
+                TemplateKind::Type(typ_expr) => {
                     self.walk_type(parent, link_info, typ_expr);
                 }
-                TemplateArgKind::Value(_) => {} // Covered by FlatIDs
+                TemplateKind::Value(_) => {} // Covered by FlatIDs
             }
         }
     }
@@ -365,7 +364,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
         self.visit(link_info.name_span, LocationInfo::Global(name_elem));
 
         for (template_id, template_arg) in &link_info.template_parameters {
-            if let ParameterKind::Type(TypeParameterKind {}) = &template_arg.kind {
+            if let TemplateKind::Type(TypeParameterKind {}) = &template_arg.kind {
                 self.visit(
                     template_arg.name_span,
                     LocationInfo::Parameter(name_elem, link_info, template_id, template_arg),

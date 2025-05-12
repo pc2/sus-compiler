@@ -1,7 +1,7 @@
 use crate::alloc::{zip_eq, ArenaAllocator};
 use crate::errors::{ErrorInfo, ErrorInfoObject, FileKnowingErrorInfoObject};
 use crate::prelude::*;
-use crate::typing::template::{ParameterKind, TemplateArg};
+use crate::typing::template::TemplateArg;
 use crate::typing::type_inference::{FailedUnification, Substitutor};
 
 use crate::debug::SpanDebugger;
@@ -10,7 +10,7 @@ use crate::linker::{GlobalResolver, GlobalUUID, AFTER_TYPECHECK_CP};
 use crate::typing::written_type::WrittenType;
 use crate::typing::{
     abstract_type::{DomainType, FullTypeUnifier, BOOL_TYPE, INT_TYPE},
-    template::TemplateArgKind,
+    template::TemplateKind,
 };
 
 use super::*;
@@ -369,7 +369,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
             zip_eq(&global_ref.template_arg_types, &global_ref.template_args)
         {
             if let Some(TemplateArg {
-                kind: TemplateArgKind::Type(wr_typ),
+                kind: TemplateKind::Type(wr_typ),
                 ..
             }) = given_arg
             {
@@ -390,8 +390,8 @@ impl<'l> TypeCheckingContext<'l, '_> {
             &target_link_info.template_parameters,
         ) {
             match &parameter.kind {
-                ParameterKind::Type(_) => {} // Do nothing, nothing to unify with. Maybe in the future traits?
-                ParameterKind::Generative(parameter) => {
+                TemplateKind::Type(_) => {} // Do nothing, nothing to unify with. Maybe in the future traits?
+                TemplateKind::Value(parameter) => {
                     let decl = target_link_info.instructions[parameter.declaration_instruction]
                         .unwrap_declaration();
 
@@ -414,7 +414,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
             zip_eq(&global_ref.template_arg_types, &global_ref.template_args)
         {
             if let Some(TemplateArg {
-                kind: TemplateArgKind::Value(val),
+                kind: TemplateKind::Value(val),
                 ..
             }) = given_arg
             {

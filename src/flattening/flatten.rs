@@ -13,9 +13,7 @@ use super::name_context::LocalVariableContext;
 use super::parser::Cursor;
 use super::*;
 
-use crate::typing::template::{
-    GenerativeParameterKind, ParameterKind, TVec, TemplateArg, TemplateArgKind,
-};
+use crate::typing::template::{GenerativeParameterKind, TVec, TemplateArg, TemplateKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NamedLocal {
@@ -358,14 +356,14 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     if !domain.is_generative() {
                         self.errors.error(value_span, "Template arguments must be known at compile-time!");
                     }
-                    (TemplateArgKind::Value(expr), value_span)
+                    (TemplateKind::Value(expr), value_span)
                 } else if cursor.optional_field(field!("type_arg")) {
                     let value_span = cursor.span();
                     let typ = self.flatten_type(cursor);
-                    (TemplateArgKind::Type(typ), value_span)
+                    (TemplateKind::Type(typ), value_span)
                 } else {
                     (match self.local_variable_context.get_declaration_for(name) {
-                        Some(NamedLocal::TemplateType(t)) => TemplateArgKind::Type(WrittenType::TemplateVariable(name_span, t)),
+                        Some(NamedLocal::TemplateType(t)) => TemplateKind::Type(WrittenType::TemplateVariable(name_span, t)),
                         Some(NamedLocal::Declaration(decl_id)) => {
                             // Insert extra Expression, to support named template arg syntax #(MY_VAR, OTHER_VAR: BEEP)
                             let wire_read_id = self.instructions.alloc(Instruction::Expression(Expression {
@@ -374,7 +372,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 domain: DomainType::Generative,
                                 source: ExpressionSource::WireRef(WireReference::simple_var_read(decl_id, name_span))
                             }));
-                            TemplateArgKind::Value(wire_read_id)
+                            TemplateKind::Value(wire_read_id)
                         }
                         Some(NamedLocal::SubModule(sm)) => {
                             self.errors.error(name_span, format!("{name} does not name a Type or a Value. Local submodules are not allowed!"))
@@ -395,8 +393,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                 if let Some((id, parameter)) = name_found {
                     match (&parameter.kind, &template_arg) {
-                        (ParameterKind::Type(_), TemplateArgKind::Type(_))
-                        | (ParameterKind::Generative(_), TemplateArgKind::Value(_)) => {
+                        (TemplateKind::Type(_), TemplateKind::Type(_))
+                        | (TemplateKind::Value(_), TemplateKind::Value(_)) => {
                             // Correct pairing
                             let elem = &mut template_arg_map[id];
                             if let Some(prev) = elem {
@@ -410,11 +408,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 });
                             }
                         }
-                        (ParameterKind::Type(_), TemplateArgKind::Value(_)) => {
+                        (TemplateKind::Type(_), TemplateKind::Value(_)) => {
                             self.errors.error(name_span, format!("'{name}' is not a value. `type` keyword cannot be used for values"))
                                 .info((parameter.name_span, link_info.file), "Declared here");
                         }
-                        (ParameterKind::Generative(_), TemplateArgKind::Type(_)) => {
+                        (TemplateKind::Value(_), TemplateKind::Type(_)) => {
                             self.errors.error(name_span, format!("'{name}' is not a type. To use template type arguments use the `type` keyword like `T: type int[123]`"))
                                 .info((parameter.name_span, link_info.file), "Declared here");
                         }
@@ -1791,7 +1789,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
     for (decl_id, instr) in &mut instructions {
         if let Instruction::Declaration(decl) = instr {
             if let DeclarationKind::GenerativeInput(this_template_id) = decl.decl_kind {
-                let ParameterKind::Generative(GenerativeParameterKind {
+                let TemplateKind::Value(GenerativeParameterKind {
                     decl_span: _,
                     declaration_instruction,
                 }) = &mut link_info.template_parameters[this_template_id].kind

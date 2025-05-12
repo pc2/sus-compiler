@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use crate::alloc::ArenaAllocator;
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::prelude::*;
+use crate::typing::template::TemplateKind;
 
 use lsp_types::{LanguageString, MarkedString};
 
@@ -12,7 +13,7 @@ use crate::linker::{Documentation, FileData, GlobalUUID, LinkInfo};
 
 use crate::typing::{
     abstract_type::DomainType,
-    template::{GenerativeParameterKind, ParameterKind, TypeParameterKind},
+    template::{GenerativeParameterKind, TypeParameterKind},
 };
 
 use super::tree_walk::{InGlobal, LocationInfo};
@@ -214,10 +215,10 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
         }
         LocationInfo::Parameter(obj_id, link_info, _template_id, template_arg) => {
             match &template_arg.kind {
-                ParameterKind::Type(TypeParameterKind {}) => {
+                TemplateKind::Type(TypeParameterKind {}) => {
                     hover.monospace(format!("type {}", template_arg.name));
                 }
-                ParameterKind::Generative(GenerativeParameterKind {
+                TemplateKind::Value(GenerativeParameterKind {
                     decl_span: _,
                     declaration_instruction,
                 }) => {

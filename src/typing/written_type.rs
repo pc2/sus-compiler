@@ -9,9 +9,7 @@ use crate::{
 use super::{
     abstract_type::{AbstractInnerType, AbstractRankedType},
     concrete_type::{ConcreteGlobalReference, ConcreteType},
-    template::{
-        for_each_generative_input_in_template_args, GlobalReference, TVec, TemplateArgKind,
-    },
+    template::{for_each_generative_input_in_template_args, GlobalReference, TVec, TemplateKind},
     type_inference::{AbstractTypeSubstitutor, Substitutor, TypeSubstitutor},
 };
 
@@ -127,13 +125,13 @@ impl TypeSubstitutor<ConcreteType> {
                         .map(|(_arg_id, arg)| -> ConcreteType {
                             if let Some(arg) = arg {
                                 match &arg.kind {
-                                    TemplateArgKind::Type(arg_wr_typ) => self
+                                    TemplateKind::Type(arg_wr_typ) => self
                                         .concretize_written_type_with_possible_template_args(
                                             arg_wr_typ,
                                             template_args,
                                             link_info,
                                         ),
-                                    TemplateArgKind::Value(uuid) => {
+                                    TemplateKind::Value(uuid) => {
                                         if let Some(found_template_arg) =
                                             can_expression_be_value_inferred(link_info, *uuid)
                                         {

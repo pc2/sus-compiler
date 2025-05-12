@@ -22,7 +22,7 @@ use crate::flattening::*;
 use crate::value::{compute_binary_op, compute_unary_op, Value};
 
 use crate::typing::{
-    abstract_type::DomainType, concrete_type::ConcreteType, template::TemplateArgKind,
+    abstract_type::DomainType, concrete_type::ConcreteType, template::TemplateKind,
 };
 
 use super::*;
@@ -203,10 +203,8 @@ impl InstantiationContext<'_, '_> {
                 let template_args = named_type.template_args.try_map(|template_arg| {
                     if let (_, Some(template_arg)) = template_arg {
                         match &template_arg.kind {
-                            TemplateArgKind::Type(written_type) => {
-                                self.concretize_type(written_type)
-                            }
-                            TemplateArgKind::Value(uuid) => Ok(ConcreteType::Value(
+                            TemplateKind::Type(written_type) => self.concretize_type(written_type),
+                            TemplateKind::Value(uuid) => Ok(ConcreteType::Value(
                                 self.generation_state
                                     .get_generation_value(*uuid)
                                     .unwrap()
@@ -888,8 +886,8 @@ impl InstantiationContext<'_, '_> {
                 .try_map(|(_, v)| -> ExecutionResult<ConcreteType> {
                     Ok(match v {
                         Some(arg) => match &arg.kind {
-                            TemplateArgKind::Type(typ) => self.concretize_type(typ)?,
-                            TemplateArgKind::Value(v) => ConcreteType::Value(
+                            TemplateKind::Type(typ) => self.concretize_type(typ)?,
+                            TemplateKind::Value(v) => ConcreteType::Value(
                                 self.generation_state.get_generation_value(*v)?.clone(),
                             ),
                         },
