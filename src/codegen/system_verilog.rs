@@ -237,7 +237,6 @@ impl<'g> CodeGenerationContext<'g> {
                     self.write_constant(&new_to, v);
                 }
             }
-            Value::Error => unreachable!("Error values should never have reached codegen!"),
         }
     }
 
@@ -650,7 +649,6 @@ impl Value {
             Value::Integer(v) => Cow::Owned(v.to_string()),
             Value::Unset => Cow::Borrowed("'x"),
             Value::Array(_) => unreachable!("Not an inline constant!"),
-            Value::Error => unreachable!("Error values should never have reached codegen!"),
         }
     }
 }

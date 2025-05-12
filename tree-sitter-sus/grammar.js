@@ -137,12 +137,13 @@ module.exports = grammar({
             field('condition', $._expression),
             //optional(field('conditional_bindings', $.interface_ports)),
             field('then_block', $.block),
-            optional(seq(
-                'else',
-                field('else_block', choice(
-                    $.block,
-                    $.if_statement
-                ))
+            optional(field('else_block', $.else_block))
+        ),
+        else_block: $ => seq(
+            'else',
+            field('content', choice(
+                $.block,
+                $.if_statement
             ))
         ),
         for_statement: $ => seq(
@@ -305,12 +306,6 @@ module.exports = grammar({
             field('index_a', $._expression),
             ':',
             field('index_b', $._expression)
-        ),
-
-        array_literal: $ => seq(
-            '[',
-            sepSeq($._expression, $._comma),
-            ']'
         ),
 
         array_list_expression: $ => seq(

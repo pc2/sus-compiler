@@ -1043,7 +1043,7 @@ mod tests {
         assert_eq!(found.len(), correct.len());
 
         assert!(
-            std::iter::zip(found.iter(), correct.iter()).all(|(x, y)| *x == *y),
+            std::iter::zip(found, correct).all(|(x, y)| *x == *y),
             "Latencies don't match exactly: {found:?} !=lat= {correct:?}"
         );
     }
@@ -1053,7 +1053,7 @@ mod tests {
         assert_eq!(found.len(), correct.len());
 
         assert!(
-            std::iter::zip(found.iter(), correct.iter()).all(|(x, y)| { *x == *y }),
+            std::iter::zip(found, correct).all(|(x, y)| { *x == *y }),
             "Latencies don't match exactly: {found:?} !=lat= {correct:?}"
         );
     }
@@ -1067,7 +1067,7 @@ mod tests {
         let diff = found[0] - correct[0];
 
         assert!(
-            std::iter::zip(found.iter(), correct.iter()).all(|(x, y)| x - y == diff),
+            std::iter::zip(found, correct).all(|(x, y)| x - y == diff),
             "Latencies don't match even with an offset: {found:?} != {correct:?}"
         );
     }

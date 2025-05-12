@@ -10,7 +10,9 @@ use super::type_inference::{
     AbstractTypeSubstitutor, DomainVariableID, InnerTypeVariableID, PeanoVariableID, Substitutor,
     TypeSubstitutor, TypeUnifier, UnifyErrorReport,
 };
-use crate::flattening::{BinaryOperator, StructType, UnaryOperator, WrittenType};
+use crate::flattening::{
+    BinaryOperator, StructType, UnaryOperator, WireReference, WireReferenceRoot,
+};
 use crate::to_string::map_to_type_names;
 
 /// This contains only the information that can be type-checked before template instantiation.
@@ -139,6 +141,12 @@ impl DomainType {
             DomainType::Unknown(_) => false,
         }
     }
+    /// Used to quickly combine domains with each other. NOT A SUBSTITUTE FOR UNIFICATION.
+    pub fn combine_with(&mut self, other: DomainType) {
+        if *self == DomainType::Generative {
+            *self = other;
+        }
+    }
 }
 
 /// Represents all typing information needed in the Flattening Stage.
@@ -171,88 +179,6 @@ impl FullTypeUnifier {
             template_type_names: map_to_type_names(parameters),
             abstract_type_substitutor: typing_alloc.0.into(),
             domain_substitutor: typing_alloc.1.into(),
-        }
-    }
-
-    /// This should always be what happens first to a given variable.
-    ///
-    /// Therefore it should be impossible that one of the internal unifications ever fails
-    pub fn unify_with_written_type_must_succeed(
-        &mut self,
-        wr_typ: &WrittenType,
-        typ: &AbstractRankedType,
-    ) {
-        match wr_typ {
-            WrittenType::Error(_span) => {} // Already an error, don't unify
-            WrittenType::TemplateVariable(_span, argument_id) => {
-                self.abstract_type_substitutor
-                    .unify_must_succeed(typ, &AbstractInnerType::Template(*argument_id).scalar());
-            }
-            WrittenType::Named(global_reference) => {
-                self.abstract_type_substitutor.unify_must_succeed(
-                    typ,
-                    &AbstractInnerType::Named(global_reference.id).scalar(),
-                );
-            }
-            WrittenType::Array(_span, array_content_and_size) => {
-                let (arr_content_type, _size_flat, _array_bracket_span) =
-                    array_content_and_size.deref();
-
-                let arr_content_variable = self.abstract_type_substitutor.alloc_unknown();
-
-                self.abstract_type_substitutor
-                    .unify_must_succeed(typ, &arr_content_variable.clone().rank_up());
-
-                Self::unify_with_written_type_must_succeed(
-                    self,
-                    arr_content_type,
-                    &arr_content_variable,
-                );
-            }
-        }
-    }
-
-    /// This should always be what happens first to a given variable.
-    ///
-    /// Therefore it should be impossible that one of the internal unifications ever fails
-    ///
-    /// template_type_args applies to both Template Type args and Template Value args.
-    ///
-    /// For Types this is the Type, for Values this is unified with the parameter declaration type
-    pub fn unify_with_written_type_substitute_templates_must_succeed(
-        &mut self,
-        wr_typ: &WrittenType,
-        typ: &AbstractRankedType,
-        template_type_args: &TVec<AbstractRankedType>,
-    ) {
-        match wr_typ {
-            WrittenType::Error(_span) => {} // Already an error, don't unify
-            WrittenType::TemplateVariable(_span, argument_id) => {
-                self.abstract_type_substitutor
-                    .unify_must_succeed(typ, &template_type_args[*argument_id]);
-            }
-            WrittenType::Named(global_reference) => {
-                self.abstract_type_substitutor.unify_must_succeed(
-                    typ,
-                    &AbstractInnerType::Named(global_reference.id).scalar(),
-                );
-            }
-            WrittenType::Array(_span, array_content_and_size) => {
-                let (arr_content_type, _size_flat, _array_bracket_span) =
-                    array_content_and_size.deref();
-
-                let arr_content_variable = self.abstract_type_substitutor.alloc_unknown();
-
-                self.abstract_type_substitutor
-                    .unify_must_succeed(typ, &arr_content_variable.clone().rank_up());
-
-                Self::unify_with_written_type_substitute_templates_must_succeed(
-                    self,
-                    arr_content_type,
-                    &arr_content_variable,
-                    template_type_args,
-                );
-            }
         }
     }
 
@@ -294,7 +220,7 @@ impl FullTypeUnifier {
                     "array literal",
                 );
             }
-            Value::Error | Value::Unset => {} // Already an error, don't unify
+            Value::Unset => {} // Already an error, don't unify
         }
     }
 
@@ -474,6 +400,10 @@ impl FullTypeUnifier {
                 span,
                 format!("Could not fully figure out the type of this object. {typ_as_string}"),
             );
+
+            if crate::debug::is_enabled("TEST") {
+                println!("COULD_NOT_FULLY_FIGURE_OUT")
+            }
         }
     }
 
@@ -497,6 +427,17 @@ impl FullTypeUnifier {
         let global_ref_span = global_ref.get_total_span();
         for (_template_id, template_type) in &mut global_ref.template_arg_types {
             self.finalize_abstract_type(linker_types, template_type, global_ref_span, errors);
+        }
+    }
+
+    pub fn finalize_wire_ref(
+        &mut self,
+        linker_types: &ArenaAllocator<StructType, TypeUUIDMarker>,
+        wire_ref: &mut WireReference,
+        errors: &ErrorCollector,
+    ) {
+        if let WireReferenceRoot::NamedConstant(cst) = &mut wire_ref.root {
+            self.finalize_global_ref(linker_types, cst, errors);
         }
     }
 }

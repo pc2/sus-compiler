@@ -10,7 +10,6 @@ use crate::dev_aid::dot_graphs::display_latency_count_graph;
 use crate::errors::ErrorInfoObject;
 use crate::prelude::*;
 
-use crate::flattening::{Instruction, WriteModifiers};
 use crate::typing::concrete_type::ConcreteType;
 use crate::typing::type_inference::{DelayedConstraintStatus, Substitutor};
 use crate::value::Value;
@@ -31,6 +30,7 @@ pub const CALCULATE_LATENCY_LATER: i64 = i64::MIN;
 struct PathMuxSource<'s> {
     to_wire: &'s RealWire,
     to_latency: i64,
+    #[allow(unused)]
     mux_input: &'s MultiplexerSource,
 }
 
@@ -76,24 +76,6 @@ fn make_path_info_string(
         prev_decl_absolute_latency = to_absolute_latency;
     }
 
-    result
-}
-
-fn filter_unique_write_flats<'w>(
-    writes: &'w [PathMuxSource<'w>],
-    instructions: &'w FlatAlloc<Instruction, FlatIDMarker>,
-) -> Vec<&'w crate::flattening::Write> {
-    let mut result: Vec<&'w crate::flattening::Write> = Vec::new();
-    for w in writes {
-        if let Instruction::Write(original_write) = &instructions[w.mux_input.original_connection] {
-            if !result
-                .iter()
-                .any(|found_write| std::ptr::eq(*found_write, original_write))
-            {
-                result.push(original_write)
-            }
-        }
-    }
     result
 }
 
@@ -446,6 +428,12 @@ impl InstantiationContext<'_, '_> {
     }
 
     fn report_error(&self, latency_node_meanings: &[WireID], err: LatencyCountingError) {
+        let mut error_placed_successfully = false;
+        let mut error = |span, msg: String| {
+            error_placed_successfully = true;
+            self.errors.error(span, msg)
+        };
+
         match err {
             LatencyCountingError::NetPositiveLatencyCycle {
                 conflict_path,
@@ -467,13 +455,13 @@ impl InstantiationContext<'_, '_> {
                     first_write_desired_latency,
                     writes_involved.last().unwrap().to_latency,
                 );
-                let unique_write_instructions =
-                    filter_unique_write_flats(&writes_involved, &self.md.link_info.instructions);
                 let rest_of_message = format!(" part of a net-positive latency cycle of +{net_roundtrip_latency}\n\n{path_message}\nWhich conflicts with the starting latency");
 
+                /*let unique_write_instructions =
+                    filter_unique_write_flats(&writes_involved, &self.md.link_info.instructions);
                 let mut did_place_error = false;
                 for wr in &unique_write_instructions {
-                    match wr.write_modifiers {
+                    match wr.to.write_modifiers {
                         WriteModifiers::Connection {
                             num_regs,
                             regs_span,
@@ -485,7 +473,7 @@ impl InstantiationContext<'_, '_> {
                                 } else {
                                     "These registers are"
                                 };
-                                self.errors.error(
+                                error(
                                     regs_span,
                                     format!("{this_register_plural}{rest_of_message}"),
                                 );
@@ -495,21 +483,24 @@ impl InstantiationContext<'_, '_> {
                             unreachable!("Initial assignment can only be from compile-time constant. Cannot be part of latency loop. ")
                         }
                     }
-                }
+                }*/
                 // Fallback if no register annotations used
-                if !did_place_error {
-                    for wr in unique_write_instructions {
-                        self.errors
-                            .error(wr.to_span, format!("This write is{rest_of_message}"));
-                    }
+                //if !did_place_error {
+                for wr in writes_involved {
+                    let to_instr = &self.md.link_info.instructions[wr.to_wire.original_instruction];
+                    error(
+                        to_instr.get_span(),
+                        format!("This instruction is{rest_of_message}"),
+                    );
                 }
+                //}
             }
             LatencyCountingError::IndeterminablePortLatency { bad_ports } => {
                 for (port, a, b) in bad_ports {
                     let port_decl = self.md.link_info.instructions
                         [self.wires[latency_node_meanings[port]].original_instruction]
                         .unwrap_declaration();
-                    self.errors.error(port_decl.name_span, format!("Cannot determine port latency. Options are {a} and {b}\nTry specifying an explicit latency or rework the module to remove this ambiguity"));
+                    error(port_decl.name_span, format!("Cannot determine port latency. Options are {a} and {b}\nTry specifying an explicit latency or rework the module to remove this ambiguity"));
                 }
             }
             LatencyCountingError::UnreachablePortInThisDomain { hit_and_not_hit } => {
@@ -549,7 +540,7 @@ impl InstantiationContext<'_, '_> {
                             .unwrap_declaration()
                             .name_span;
 
-                        self.errors.error(node_instr_span, format!("This port is not strongly connected to the strongly connected port cluster {strongly_connected_port_list}.\nAn input and output port are strongly connected if there is a direct dependency path from the input port to the output port.\nStrongly connected ports are also transitive.\nIf you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.")).add_info_list(hit_names_error_infos.clone());
+                        error(node_instr_span, format!("This port is not strongly connected to the strongly connected port cluster {strongly_connected_port_list}.\nAn input and output port are strongly connected if there is a direct dependency path from the input port to the output port.\nStrongly connected ports are also transitive.\nIf you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.")).add_info_list(hit_names_error_infos.clone());
                     }
                 }
             }
@@ -577,10 +568,10 @@ impl InstantiationContext<'_, '_> {
 
                 let end_name = &end_wire.name;
                 let specified_end_latency = end_wire.specified_latency;
-                self.errors
-                    .error(end_latency_decl.span, format!("Conflicting specified latency\n\n{path_message}\nBut this was specified as {end_name}'{specified_end_latency}"))
+                error(end_latency_decl.span, format!("Conflicting specified latency\n\n{path_message}\nBut this was specified as {end_name}'{specified_end_latency}"))
                     .info_obj_same_file(start_decl);
             }
         }
+        assert!(error_placed_successfully);
     }
 }

@@ -7,7 +7,6 @@ mod unique_names;
 use unique_names::UniqueNames;
 
 use crate::prelude::*;
-use crate::typing::template::TVec;
 use crate::typing::type_inference::{TypeSubstitutor, TypeUnifier};
 
 use std::cell::OnceCell;

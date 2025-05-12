@@ -1,42 +1,48 @@
-use crate::typing::template::{TVec, TemplateArg, TemplateArgKind};
+use crate::typing::template::TemplateArgKind;
 
+use super::{ExpressionSource, WireReferencePathElement, WireReferenceRoot};
 use crate::prelude::*;
-
-use super::{ExpressionSource, WireReferencePathElement, WireReferenceRoot, WrittenType};
 
 impl ExpressionSource {
     /// Enumerates all instructions that this instruction depends on. This includes (maybe compiletime) wires, and submodules.
-    pub fn for_each_dependency(&self, func: &mut impl FnMut(FlatID)) {
+    pub fn for_each_dependency(&self, collect: &mut impl FnMut(FlatID)) {
         match self {
             ExpressionSource::WireRef(wire_ref) => {
                 match &wire_ref.root {
-                    WireReferenceRoot::LocalDecl(decl_id, _) => func(*decl_id),
+                    WireReferenceRoot::LocalDecl(decl_id, _) => collect(*decl_id),
                     WireReferenceRoot::NamedConstant(cst) => {
                         for (_id, arg) in &cst.template_args {
                             let Some(arg) = arg else { continue };
                             match &arg.kind {
                                 TemplateArgKind::Type(written_type) => {
-                                    written_type.for_each_generative_input(func)
+                                    written_type.for_each_generative_input(collect)
                                 }
-                                TemplateArgKind::Value(uuid) => func(*uuid),
+                                TemplateArgKind::Value(uuid) => collect(*uuid),
                             }
                         }
                     }
                     WireReferenceRoot::SubModulePort(submod_port) => {
-                        func(submod_port.submodule_decl)
+                        collect(submod_port.submodule_decl)
                     }
+                    WireReferenceRoot::Error => {}
                 }
-                WireReferencePathElement::for_each_dependency(&wire_ref.path, func);
+                WireReferencePathElement::for_each_dependency(&wire_ref.path, collect);
             }
-            &ExpressionSource::UnaryOp { right, .. } => func(right),
+            &ExpressionSource::UnaryOp { right, .. } => collect(right),
             &ExpressionSource::BinaryOp { left, right, .. } => {
-                func(left);
-                func(right)
+                collect(left);
+                collect(right)
+            }
+            ExpressionSource::FuncCall(func_call) => {
+                collect(func_call.interface_reference.submodule_decl);
+                for arg in &func_call.arguments {
+                    collect(*arg)
+                }
             }
             ExpressionSource::Constant(_) => {}
             ExpressionSource::ArrayConstruct(arr) => {
                 for v in arr {
-                    func(*v);
+                    collect(*v);
                 }
             }
         }
@@ -47,15 +53,8 @@ impl WireReferencePathElement {
     pub fn for_each_dependency(path: &[WireReferencePathElement], mut f: impl FnMut(FlatID)) {
         for p in path {
             match p {
-                WireReferencePathElement::ArrayAccess {
-                    idx,
-                    bracket_span: _,
-                } => f(*idx),
-                WireReferencePathElement::ArraySlice {
-                    idx_a,
-                    idx_b,
-                    bracket_span: _,
-                } => {
+                WireReferencePathElement::ArrayAccess { idx, .. } => f(*idx),
+                WireReferencePathElement::ArraySlice { idx_a, idx_b, .. } => {
                     f(*idx_a);
                     f(*idx_b);
                 }
@@ -64,29 +63,31 @@ impl WireReferencePathElement {
     }
 }
 
-pub fn for_each_generative_input_in_template_args(
-    template_args: &TVec<Option<TemplateArg>>,
-    f: &mut impl FnMut(FlatID),
-) {
-    for (_id, t_arg) in template_args.iter_valids() {
-        match &t_arg.kind {
-            TemplateArgKind::Type(typ) => typ.for_each_generative_input(f),
-            TemplateArgKind::Value(val) => f(*val),
-        }
-    }
-}
+// todo: removed from here
 
-impl WrittenType {
-    pub fn for_each_generative_input(&self, f: &mut impl FnMut(FlatID)) {
-        match self {
-            WrittenType::Error(_) | WrittenType::TemplateVariable(_, _) => {}
-            WrittenType::Named(name) => {
-                for_each_generative_input_in_template_args(&name.template_args, f)
-            }
-            WrittenType::Array(_span, arr_box) => {
-                use std::ops::Deref;
-                f(arr_box.deref().1)
-            }
-        }
-    }
-}
+// pub fn for_each_generative_input_in_template_args(
+//     template_args: &TVec<Option<TemplateArg>>,
+//     f: &mut impl FnMut(FlatID),
+// ) {
+//     for (_id, t_arg) in template_args.iter_valids() {
+//         match &t_arg.kind {
+//             TemplateArgKind::Type(typ) => typ.for_each_generative_input(f),
+//             TemplateArgKind::Value(val) => f(*val),
+//         }
+//     }
+// }
+
+// impl WrittenType {
+//     pub fn for_each_generative_input(&self, f: &mut impl FnMut(FlatID)) {
+//         match self {
+//             WrittenType::Error(_) | WrittenType::TemplateVariable(_, _) => {}
+//             WrittenType::Named(name) => {
+//                 for_each_generative_input_in_template_args(&name.template_args, f)
+//             }
+//             WrittenType::Array(_span, arr_box) => {
+//                 use std::ops::Deref;
+//                 f(arr_box.deref().1)
+//             }
+//         }
+//     }
+// }

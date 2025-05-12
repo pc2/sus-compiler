@@ -9,6 +9,7 @@ mod walk;
 use crate::alloc::{UUIDAllocator, UUIDRange};
 use crate::prelude::*;
 use crate::typing::abstract_type::{DomainType, PeanoType};
+use crate::typing::written_type::WrittenType;
 
 use std::cell::OnceCell;
 use std::ops::Deref;
@@ -20,7 +21,7 @@ pub use lints::perform_lints;
 pub use typechecking::typecheck_all_modules;
 
 use crate::linker::{Documentation, LinkInfo};
-use crate::{file_position::FileText, value::Value};
+use crate::value::Value;
 
 use crate::typing::{abstract_type::FullType, template::GlobalReference};
 
@@ -86,17 +87,16 @@ impl Module {
     pub fn get_port_or_interface_by_name(
         &self,
         name_span: Span,
-        file_text: &FileText,
+        name: &str,
         errors: &ErrorCollector,
     ) -> Option<PortOrInterface> {
-        let name_text = &file_text[name_span];
         for (id, data) in &self.interfaces {
-            if data.name == name_text {
+            if data.name == name {
                 return Some(PortOrInterface::Interface(id));
             }
         }
         for (id, data) in &self.ports {
-            if data.name == name_text {
+            if data.name == name {
                 return Some(PortOrInterface::Port(id));
             }
         }
@@ -104,7 +104,7 @@ impl Module {
             .error(
                 name_span,
                 format!(
-                    "There is no port or interface of name '{name_text}' on module {}",
+                    "There is no port or interface of name '{name}' on module {}",
                     self.link_info.name
                 ),
             )
@@ -115,10 +115,8 @@ impl Module {
     pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
         match &self.link_info.instructions[instr_id] {
             Instruction::SubModule(sm) => sm.module_ref.get_total_span(),
-            Instruction::FuncCall(fc) => fc.whole_func_span,
             Instruction::Declaration(decl) => decl.decl_span,
             Instruction::Expression(w) => w.span,
-            Instruction::Write(conn) => conn.to_span,
             Instruction::IfStatement(if_stmt) => self.get_instruction_span(if_stmt.condition),
             Instruction::ForStatement(for_stmt) => {
                 self.get_instruction_span(for_stmt.loop_var_decl)
@@ -345,6 +343,8 @@ pub enum WireReferenceRoot {
     /// local_submodule.data_in = 3 // root is local_submodule.data_in (yes, both)
     /// ```
     SubModulePort(PortReference),
+    /// Used to conveniently represent errors
+    Error,
 }
 
 impl WireReferenceRoot {
@@ -353,6 +353,7 @@ impl WireReferenceRoot {
             WireReferenceRoot::LocalDecl(f, _) => Some(*f),
             WireReferenceRoot::NamedConstant(_) => None,
             WireReferenceRoot::SubModulePort(port) => Some(port.submodule_decl),
+            WireReferenceRoot::Error => None,
         }
     }
     #[track_caller]
@@ -369,6 +370,7 @@ impl WireReferenceRoot {
                 Some(global_reference.get_total_span())
             }
             WireReferenceRoot::SubModulePort(port_reference) => port_reference.port_name_span,
+            WireReferenceRoot::Error => None,
         }
     }
 }
@@ -387,11 +389,12 @@ pub struct WireReference {
 }
 
 impl WireReference {
-    fn simple_port(port: PortReference) -> WireReference {
-        WireReference {
-            root: WireReferenceRoot::SubModulePort(port),
-            path: Vec::new(),
-        }
+    const ERROR: Self = WireReference {
+        root: WireReferenceRoot::Error,
+        path: Vec::new(),
+    };
+    pub fn is_error(&self) -> bool {
+        matches!(&self.root, WireReferenceRoot::Error)
     }
     fn simple_var_read(id: FlatID, name_span: Span) -> WireReference {
         WireReference {
@@ -427,7 +430,7 @@ impl WriteModifiers {
     }
 }
 
-/// An [Instruction] that refers to an assignment
+/// A part of [Expression] that refers to an assignment
 ///
 /// ```sus
 /// module md {
@@ -437,8 +440,8 @@ impl WriteModifiers {
 /// }
 /// ```
 #[derive(Debug)]
-pub struct Write {
-    pub from: FlatID,
+pub struct WriteTo {
+    /// Invalid [WireReference] is possible.
     pub to: WireReference,
     pub to_span: Span,
     /// The type and domain to which will be written.
@@ -510,22 +513,11 @@ pub struct PortReference {
     pub submodule_name_span: Option<Span>,
 }
 
-/// An [Instruction] that represents a single expression in the program. Like ((3) + (x))
-///
-/// See [ExpressionSource]
-///
-/// On instantiation, creates [crate::instantiation::RealWire] when non-generative
-#[derive(Debug)]
-pub struct Expression {
-    pub typ: FullType,
-    pub span: Span,
-    pub source: ExpressionSource,
-}
-
 /// See [Expression]
 #[derive(Debug)]
 pub enum ExpressionSource {
     WireRef(WireReference), // Used to add a span to the reference of a wire.
+    FuncCall(FuncCall),
     UnaryOp {
         op: UnaryOperator,
         /// Operators automatically parallelize across arrays
@@ -542,33 +534,60 @@ pub enum ExpressionSource {
     ArrayConstruct(Vec<FlatID>),
     Constant(Value),
 }
-
-impl ExpressionSource {
-    pub const fn new_error() -> ExpressionSource {
-        ExpressionSource::Constant(Value::Error)
-    }
-}
-
-/// The textual representation of a type expression in the source code.
-///
-/// Not to be confused with [crate::typing::abstract_type::AbstractType] which is for working with types in the flattening stage,
-/// or [crate::typing::concrete_type::ConcreteType], which is for working with types post instantiation.
+/// [FuncCall]s (and potentially, in the future, other things) can have multiple outputs.
+/// We make the distinction between [SubExpression] that can only represent one output, and [MultiWrite], which can represent multiple outputs.
+/// Workarounds like putting multiple outputs together in a tuple would not work, because:
+/// - The function call syntax is just a convenient syntax sugar for connecting multiple inputs and outputs simultaneously.
+///     We want to conceptually keep the signals separate. Both input and output signals, while keeping the function call syntax that programmers are used to.
+/// - Forcing all outputs together into one type would bind them together for latency counting, which we don't want
+/// - We refuse to have tuple types
 #[derive(Debug)]
-pub enum WrittenType {
-    Error(Span),
-    TemplateVariable(Span, TemplateID),
-    Named(GlobalReference<TypeUUID>),
-    Array(Span, Box<(WrittenType, FlatID, BracketSpan)>),
+pub enum ExpressionOutput {
+    SubExpression(FullType),
+    MultiWrite(Vec<WriteTo>),
+}
+/// An [Instruction] that represents a single expression in the program. Like ((3) + (x))
+///
+/// See [ExpressionSource]
+///
+/// On instantiation, creates [crate::instantiation::RealWire] when non-generative
+#[derive(Debug)]
+pub struct Expression {
+    pub span: Span,
+    pub source: ExpressionSource,
+    /// Means [Self::source] can be computed at compiletime, not that [Self::output] neccesarily requires a generative result
+    pub domain: DomainType,
+
+    /// If [None], then this function returns a single result like a normal expression
+    /// If Some(outputs), then this function is a dead-end expression, and does it's outputs manually
+    pub output: ExpressionOutput,
 }
 
-impl WrittenType {
-    pub fn get_span(&self) -> Span {
-        match self {
-            WrittenType::Error(total_span)
-            | WrittenType::TemplateVariable(total_span, ..)
-            | WrittenType::Array(total_span, _) => *total_span,
-            WrittenType::Named(global_ref) => global_ref.get_total_span(),
-        }
+impl Expression {
+    pub fn as_single_output_expr(&self) -> Option<SingleOutputExpression> {
+        let typ = match &self.output {
+            ExpressionOutput::SubExpression(typ) => typ,
+            ExpressionOutput::MultiWrite(write_tos) => {
+                let [single_write] = write_tos.as_slice() else {
+                    return None;
+                };
+                &single_write.to_type
+            }
+        };
+        Some(SingleOutputExpression {
+            typ,
+            span: self.span,
+            source: &self.source,
+        })
+    }
+    pub fn is_error(&self) -> bool {
+        matches!(
+            &self.source,
+            ExpressionSource::WireRef(WireReference {
+                root: WireReferenceRoot::Error,
+                ..
+            })
+        )
     }
 }
 
@@ -685,18 +704,12 @@ pub struct ModuleInterfaceReference {
     pub interface_span: Span,
 }
 
-/// An [Instruction] that represents the calling on an interface of a [SubModuleInstance].
+/// An [Expression] that represents the calling on an interface of a [SubModuleInstance].
 /// It is the connecting of multiple input ports, and output ports on a submodule in one statement.
 ///
-/// One may ask, why is this not simply part of [Expression]?
-/// That is because an Expression can only represent one output. Workarounds like putting multiple outputs
-/// together in a tuple would not work, because:
-/// - The function call syntax is just a convenient syntax sugar for connecting multiple inputs and outputs simultaneously.
-///     We want to conceptually keep the signals separate. Both input and output signals, while keeping the function call syntax that programmers are used to.
-/// - Forcing all outputs together into one type would bind them together for latency counting, which we don't want
-/// - We don't have tuple types
+/// Multiple outputs (or zero outputs) are only supported for non-subexpressions.
 ///
-/// The outputs of a function call are collected with [Write] instructions over the outputs of the underlying [SubModuleInstance]
+/// See [ExpressionOutput]
 ///
 /// Function calls can come in three forms:
 ///
@@ -727,19 +740,16 @@ pub struct ModuleInterfaceReference {
 /// }
 /// ```
 #[derive(Debug)]
-pub struct FuncCallInstruction {
+pub struct FuncCall {
     pub interface_reference: ModuleInterfaceReference,
-    /// arguments.len() == func_call_inputs.len() ALWAYS
+
+    /// Points to a list of [Expression]
     pub arguments: Vec<FlatID>,
-    /// arguments.len() == func_call_inputs.len() ALWAYS
-    pub func_call_inputs: PortIDRange,
-    pub func_call_outputs: PortIDRange,
 
     pub arguments_span: BracketSpan,
-    pub whole_func_span: Span,
 }
 
-impl FuncCallInstruction {
+impl FuncCall {
     pub fn could_be_at_compile_time(&self) -> bool {
         todo!("self.name_span.is_none() but also other requirements, like if the module is a function")
     }
@@ -750,9 +760,8 @@ impl FuncCallInstruction {
 pub struct IfStatement {
     pub condition: FlatID,
     pub is_generative: bool,
-    pub then_start: FlatID,
-    pub then_end_else_start: FlatID,
-    pub else_end: FlatID,
+    pub then_block: FlatIDRange,
+    pub else_block: FlatIDRange,
 }
 
 /// A control-flow altering [Instruction] to represent compiletime looping on a generative index
@@ -777,12 +786,18 @@ pub struct ForStatement {
 #[derive(Debug)]
 pub enum Instruction {
     SubModule(SubModuleInstance),
-    FuncCall(FuncCallInstruction),
     Declaration(Declaration),
     Expression(Expression),
-    Write(Write),
     IfStatement(IfStatement),
     ForStatement(ForStatement),
+}
+
+/// Used as a convenient shorthand for [ExpressionOutput::SubExpression], to replace old uses of [Expression]
+#[derive(Debug, Clone, Copy)]
+pub struct SingleOutputExpression<'e> {
+    pub typ: &'e FullType,
+    pub span: Span,
+    pub source: &'e ExpressionSource,
 }
 
 impl Instruction {
@@ -792,6 +807,18 @@ impl Instruction {
             panic!("unwrap_expression on not a expression! Found {self:?}")
         };
         expr
+    }
+    #[track_caller]
+    pub fn unwrap_subexpression(&self) -> SingleOutputExpression {
+        let expr = self.unwrap_expression();
+        let ExpressionOutput::SubExpression(typ) = &expr.output else {
+            unreachable!("unwrap_subexpression on not a SubExpression")
+        };
+        SingleOutputExpression {
+            typ,
+            span: expr.span,
+            source: &expr.source,
+        }
     }
     #[track_caller]
     pub fn unwrap_declaration(&self) -> &Declaration {
@@ -807,11 +834,16 @@ impl Instruction {
         };
         sm
     }
-    #[track_caller]
-    pub fn unwrap_func_call(&self) -> &FuncCallInstruction {
-        let Self::FuncCall(fc) = self else {
-            panic!("unwrap_func_call on not a FuncCallInstruction! Found {self:?}")
-        };
-        fc
+
+    pub fn get_span(&self) -> Span {
+        match self {
+            Instruction::SubModule(sub_module_instance) => {
+                sub_module_instance.get_most_relevant_span()
+            }
+            Instruction::Declaration(declaration) => declaration.decl_span,
+            Instruction::Expression(expression) => expression.span,
+            Instruction::IfStatement(_) => unreachable!(),
+            Instruction::ForStatement(_) => unreachable!(),
+        }
     }
 }

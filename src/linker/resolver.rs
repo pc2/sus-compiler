@@ -47,7 +47,6 @@ struct LinkingErrorLocation {
 /// and remembers all of the requested globals in preparation for #49
 pub struct GlobalResolver<'linker> {
     linker: &'linker Linker,
-    pub file_data: &'linker FileData,
 
     pub errors: ErrorCollector<'linker>,
     resolved_globals: RefCell<ResolvedGlobals>,
@@ -59,11 +58,8 @@ impl<'linker> GlobalResolver<'linker> {
         obj_link_info: &'linker LinkInfo,
         errors_globals: (ErrorStore, ResolvedGlobals),
     ) -> Self {
-        let file_data = &linker.files[obj_link_info.file];
-
         GlobalResolver {
             linker,
-            file_data,
             errors: ErrorCollector::from_storage(
                 errors_globals.0,
                 obj_link_info.file,
@@ -97,9 +93,7 @@ impl<'linker> GlobalResolver<'linker> {
     }
 
     /// SAFETY: Files are never touched, and as long as this object is managed properly linker will also exist long enough.
-    pub fn resolve_global(&self, name_span: Span) -> Option<GlobalUUID> {
-        let name = &self.file_data.file_text[name_span];
-
+    pub fn resolve_global(&self, name_span: Span, name: &str) -> Option<GlobalUUID> {
         let mut resolved_globals = self.resolved_globals.borrow_mut();
         match self.linker.global_namespace.get(name) {
             Some(NamespaceElement::Global(found)) => {
