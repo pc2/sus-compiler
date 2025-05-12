@@ -310,8 +310,14 @@ impl Interface {
 /// When executing, this turns into [crate::instantiation::RealWirePathElem]
 #[derive(Debug, Clone, Copy)]
 pub enum WireReferencePathElement {
+    // todo: redundancy
     ArrayAccess {
         idx: FlatID,
+        bracket_span: BracketSpan,
+    },
+    ArraySlice {
+        idx_a: FlatID,
+        idx_b: FlatID,
         bracket_span: BracketSpan,
     },
 }
@@ -524,6 +530,10 @@ pub enum ExpressionSource {
         rank: PeanoType,
         left: FlatID,
         right: FlatID,
+    },
+    Range {
+        start: FlatID,
+        end: FlatID,
     },
     ArrayConstruct(Vec<FlatID>),
     Constant(Value),

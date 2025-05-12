@@ -40,17 +40,41 @@ impl InstantiationContext<'_, '_> {
         for p in path {
             let typ_after_applying_array = type_substitutor.alloc_unknown();
             match p {
+                // TODO #28 integer size <-> array bound check
                 RealWirePathElem::ArrayAccess {
                     span: _,
                     idx_wire: _,
                 } => {
-                    // TODO #28 integer size <-> array bound check
                     let arr_size = type_substitutor.alloc_unknown();
                     let arr_box = Box::new((typ_after_applying_array.clone(), arr_size));
                     type_substitutor.unify_must_succeed(
                         &current_type_in_progress,
                         &ConcreteType::Array(arr_box),
                     );
+                    current_type_in_progress = typ_after_applying_array;
+                }
+                RealWirePathElem::ArraySlice {
+                    span: _,
+                    idx_a_wire: _,
+                    idx_b_wire: _,
+                } => {
+                    let inner_of_array_being_sliced = type_substitutor.alloc_unknown();
+
+                    let array_being_sliced = Box::new((
+                        inner_of_array_being_sliced.clone(),
+                        type_substitutor.alloc_unknown(),
+                    ));
+
+                    let slice_size = type_substitutor.alloc_unknown();
+                    type_substitutor.unify_must_succeed(
+                        &current_type_in_progress,
+                        &ConcreteType::Array(array_being_sliced),
+                    );
+                    type_substitutor.unify_must_succeed(
+                        &typ_after_applying_array,
+                        &ConcreteType::Array(Box::new((inner_of_array_being_sliced, slice_size))),
+                    );
+
                     current_type_in_progress = typ_after_applying_array;
                 }
             }

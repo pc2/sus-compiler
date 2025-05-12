@@ -22,7 +22,15 @@ use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
 /// This is the post-instantiation equivalent of [crate::flattening::WireReferencePathElement]
 #[derive(Debug, Clone)]
 pub enum RealWirePathElem {
-    ArrayAccess { span: BracketSpan, idx_wire: WireID },
+    ArrayAccess {
+        span: BracketSpan,
+        idx_wire: WireID,
+    },
+    ArraySlice {
+        span: BracketSpan,
+        idx_a_wire: WireID,
+        idx_b_wire: WireID,
+    },
 }
 
 /// One arm of a multiplexer. Each arm has an attached condition that is also stored here.
@@ -231,6 +239,14 @@ impl ForEachContainedWire for RealWirePathElem {
         match self {
             RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
                 f(*idx_wire);
+            }
+            RealWirePathElem::ArraySlice {
+                span: _,
+                idx_a_wire,
+                idx_b_wire,
+            } => {
+                f(*idx_a_wire);
+                f(*idx_b_wire);
             }
         }
     }

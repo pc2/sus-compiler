@@ -510,7 +510,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             let array_element_type = self.flatten_type(cursor);
 
             cursor.field(field!("arr_idx"));
-            let (array_size_wire_id, domain, bracket_span) = self.flatten_array_bracket(cursor);
+            let (array_size_wire_id, domain, bracket_span) =
+                self.flatten_array_type_bracket(cursor);
             self.must_be_generative(domain, "Array Size", span);
 
             WrittenType::Array(
@@ -807,14 +808,55 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         })
     }
 
-    fn flatten_array_bracket(
+    // function to flatten a straightforward xxx[size] array type expression (no slicing)
+    fn flatten_array_type_bracket(
         &mut self,
         cursor: &mut Cursor<'c>,
     ) -> (FlatID, DomainType, BracketSpan) {
         let bracket_span = BracketSpan::from_outer(cursor.span());
-        cursor.go_down_content(kind!("array_bracket_expression"), |cursor| {
+        cursor.go_down_content(kind!("array_type_bracket"), |cursor| {
             let (expr, is_generative) = self.flatten_subexpr(cursor);
             (expr, is_generative, bracket_span)
+        })
+    }
+
+    fn flatten_array_access_bracket(
+        &mut self,
+        cursor: &mut Cursor<'c>,
+    ) -> (WireReferencePathElement, DomainType, BracketSpan) {
+        let bracket_span = BracketSpan::from_outer(cursor.span());
+        cursor.go_down(kind!("array_access_bracket_expression"), |cursor| {
+            if cursor.optional_field(field!("index")) {
+                let (expr, is_generative) = self.flatten_subexpr(cursor);
+                (
+                    WireReferencePathElement::ArrayAccess {
+                        idx: expr,
+                        bracket_span,
+                    },
+                    is_generative,
+                    bracket_span,
+                )
+            } else {
+                cursor.field(field!("slice"));
+                cursor.go_down(kind!("slice"), |cursor| {
+                    cursor.field(field!("index_a"));
+                    let (expr_a, a_generative) = self.flatten_subexpr(cursor);
+                    cursor.field(field!("index_b"));
+                    let (expr_b, b_generative) = self.flatten_subexpr(cursor);
+                    let mut generative = a_generative;
+                    generative.combine_with(b_generative);
+
+                    (
+                        WireReferencePathElement::ArraySlice {
+                            idx_a: expr_a,
+                            idx_b: expr_b,
+                            bracket_span,
+                        },
+                        generative,
+                        bracket_span,
+                    )
+                })
+            }
         })
     }
 
@@ -969,6 +1011,29 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     right,
                 }
             }),
+            kind!("range") => cursor.go_down_no_check(|cursor| {
+                cursor.field(field!("start"));
+                let (start, start_domain) = self.flatten_subexpr(cursor);
+                resulting_domain.combine_with(start_domain);
+                if !resulting_domain.is_generative() {
+                    self.errors.error(
+                        cursor.span(),
+                        "Used non-generative expression in range start",
+                    );
+                    return ExpressionSource::WireRef(WireReference::ERROR);
+                }
+
+                cursor.field(field!("end"));
+                let (end, end_domain) = self.flatten_subexpr(cursor);
+                resulting_domain.combine_with(end_domain);
+                if !resulting_domain.is_generative() {
+                    self.errors
+                        .error(cursor.span(), "Used non-generative expression in range end");
+                    return ExpressionSource::WireRef(WireReference::ERROR);
+                }
+
+                ExpressionSource::Range { start, end }
+            }),
             kind!("func_call") => cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("name"));
                 let interface_reference = self.get_or_alloc_module(cursor);
@@ -1013,7 +1078,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             }
             _other => {
                 let (wr, root_domain) = self.flatten_wire_reference(cursor).extract(self);
-
                 resulting_domain.combine_with(root_domain);
                 for elem in &wr.path {
                     match elem {
@@ -1023,6 +1087,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         } => {
                             let idx_expr = self.instructions[*idx].unwrap_subexpression();
                             resulting_domain.combine_with(idx_expr.typ.domain);
+                        }
+                        WireReferencePathElement::ArraySlice {
+                            idx_a,
+                            idx_b,
+                            bracket_span: _,
+                        } => {
+                            let idx_a_expr = self.instructions[*idx_a].unwrap_subexpression();
+                            resulting_domain.combine_with(idx_a_expr.typ.domain);
+
+                            let idx_b_expr = self.instructions[*idx_b].unwrap_subexpression();
+                            resulting_domain.combine_with(idx_b_expr.typ.domain);
                         }
                     }
                 }
@@ -1105,7 +1180,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                 cursor.field(field!("arr_idx"));
                 let arr_idx_span = cursor.span();
-                let (idx, _is_generative, bracket_span) = self.flatten_array_bracket(cursor);
+                let (access, _is_generative, _) = self.flatten_array_access_bracket(cursor);
 
                 // only unpack the subexpr after flattening the idx, so we catch all errors
                 match &mut flattened_arr_expr {
@@ -1121,7 +1196,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     }
                     PartialWireReference::WireReference{wire_ref, domain: _} => {
                         wire_ref.path
-                            .push(WireReferencePathElement::ArrayAccess { idx, bracket_span });
+                            .push(access);
                     }
                 }
 

@@ -33,6 +33,10 @@ impl ExpressionSource {
                 collect(left);
                 collect(right)
             }
+            &ExpressionSource::Range { start, end } => {
+                collect(start);
+                collect(end);
+            }
             ExpressionSource::FuncCall(func_call) => {
                 collect(func_call.interface_reference.submodule_decl);
                 for arg in &func_call.arguments {
@@ -54,6 +58,10 @@ impl WireReferencePathElement {
         for p in path {
             match p {
                 WireReferencePathElement::ArrayAccess { idx, .. } => f(*idx),
+                WireReferencePathElement::ArraySlice { idx_a, idx_b, .. } => {
+                    f(*idx_a);
+                    f(*idx_b);
+                }
             }
         }
     }

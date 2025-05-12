@@ -15,6 +15,7 @@ use crate::typing::written_type::WrittenType;
 use crate::util::{unwrap_single_element, zip_eq};
 use crate::{let_unwrap, prelude::*};
 
+use ibig::ops::{Abs, UnsignedAbs};
 use ibig::{IBig, UBig};
 
 use sus_proc_macro::get_builtin_const;
@@ -52,33 +53,92 @@ impl GenerationState<'_> {
 
     fn write_gen_variable(
         &self,
-        mut target: &mut Value,
+        target: &mut Value,
         conn_path: &[WireReferencePathElement],
         to_write: Value,
     ) -> ExecutionResult<()> {
-        for elem in conn_path {
-            match elem {
-                &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
-                    let idx = self.get_generation_integer(idx)?; // Caught by typecheck
-                    let Value::Array(a_box) = target else {
-                        caught_by_typecheck!("Non-array")
-                    };
-                    let array_len = a_box.len();
-                    let Some(tt) = usize::try_from(idx).ok().and_then(|pos| a_box.get_mut(pos))
-                    else {
+        // must be an array, from earlier typechecking
+
+        let mut cur_targets: Vec<(&mut Value, Value)> = vec![(target, to_write)];
+        for path_elem in conn_path {
+            let cur_targets_len = cur_targets.len();
+            match path_elem {
+                WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
+                    let idx = self.get_generation_integer(*idx)?;
+                    let Some(idx) = usize::try_from(idx).ok() else {
                         return Err((
                             bracket_span.inner_span(),
-                            format!(
-                                "Index {idx} is out of bounds for this array of size {}",
-                                array_len
-                            ),
+                            format!("Index {idx} must be > 0"),
                         ));
                     };
-                    target = tt
+                    let old_targets =
+                        std::mem::replace(&mut cur_targets, Vec::with_capacity(cur_targets_len));
+                    for (to, _from) in old_targets {
+                        // must be an array, from earlier typechecking
+                        let Value::Array(t_values) = to else {
+                            unreachable!()
+                        };
+                        let t_values_len = t_values.len();
+                        let Some(p) = t_values.get_mut(idx) else {
+                            return Err((
+                                bracket_span.inner_span(),
+                                format!("Index {idx} is out of bounds for this array of length {t_values_len}"),
+                            ));
+                        };
+                        cur_targets.push((p, _from.clone()));
+                    }
+                }
+                WireReferencePathElement::ArraySlice {
+                    idx_a,
+                    idx_b,
+                    bracket_span,
+                } => {
+                    let end = self.get_generation_integer(*idx_a)?;
+                    let Some(end) = usize::try_from(end).ok() else {
+                        return Err((
+                            bracket_span.inner_span(),
+                            format!("End index {end} must be > 0"),
+                        ));
+                    };
+
+                    let start = self.get_generation_integer(*idx_b)?;
+                    let Some(start) = usize::try_from(start).ok() else {
+                        return Err((
+                            bracket_span.inner_span(),
+                            format!("Start index {start} must be > 0"),
+                        ));
+                    };
+                    let old_targets = std::mem::replace(
+                        &mut cur_targets,
+                        Vec::with_capacity((end - start) * cur_targets_len),
+                    );
+                    for (t, f) in old_targets {
+                        // &mut [Value]
+                        let Value::Array(t_values) = t else {
+                            unreachable!()
+                        }; // must be an array, from earlier typechecking
+                           // Vec<Value>
+                        let Value::Array(f_values) = f else {
+                            unreachable!()
+                        }; // must be an array, from earlier typechecking
+                        assert_eq!(end - start, f_values.len());
+                        let t_values_len = t_values.len();
+                        let Some(p) = t_values.get_mut(start..end) else {
+                            return Err((
+                                bracket_span.inner_span(),
+                                format!("Slice {start}:{end} is out of bounds for this array of length {t_values_len}"),
+                            ));
+                        };
+                        for (tt, ff) in p.iter_mut().zip(f_values.iter()) {
+                            cur_targets.push((tt, ff.clone()));
+                        }
+                    }
                 }
             }
         }
-        *target = to_write;
+        for (t, f) in cur_targets.into_boxed_slice() {
+            *t = f;
+        }
         Ok(())
     }
     fn get_generation_value(&self, v: FlatID) -> ExecutionResult<&Value> {
@@ -148,6 +208,58 @@ fn array_access<'v>(
             ),
         ))
     }
+}
+
+fn array_slice(
+    arr_val: &mut Value,
+    idx_a: &IBig,
+    idx_b: &IBig,
+    span: BracketSpan,
+) -> ExecutionResult<Vec<Value>> {
+    let Value::Array(a_box) = arr_val else {
+        caught_by_typecheck!("Non-array")
+    };
+
+    let array_len = a_box.len();
+
+    let Some(idx_a) = usize::try_from(idx_a).ok() else {
+        return Err((
+            span.inner_span(),
+            format!(
+                "Index {idx_a} is out of bounds for this array of size {}",
+                array_len
+            ),
+        ));
+    };
+
+    let Some(idx_b) = usize::try_from(idx_b).ok() else {
+        return Err((
+            span.inner_span(),
+            format!(
+                "Index {idx_b} is out of bounds for this array of size {}",
+                array_len
+            ),
+        ));
+    };
+
+    // make right sized empty vector of values
+    let mut values = Vec::<Value>::with_capacity(idx_b - idx_a);
+
+    for idx in idx_a..idx_b {
+        let Some(tt) = a_box.get_mut(idx) else {
+            return Err((
+                span.inner_span(),
+                format!(
+                    "Index {idx} is out of bounds for this array of size {}",
+                    array_len
+                ),
+            ));
+        };
+
+        values.push(tt.clone());
+    }
+
+    Ok(values)
 }
 
 fn add_to_small_set<T: Eq>(set_vec: &mut Vec<T>, elem: T) {
@@ -420,6 +532,32 @@ impl InstantiationContext<'_, '_> {
                     preamble.push(RealWirePathElem::ArrayAccess {
                         span: bracket_span,
                         idx_wire,
+                    });
+                }
+                WireReferencePathElement::ArraySlice {
+                    idx_a,
+                    idx_b,
+                    bracket_span,
+                } => {
+                    let idx_wire_a = self.get_wire_or_constant_as_wire(*idx_a, domain)?;
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[idx_wire_a].typ,
+                        &INT_CONCRETE_TYPE,
+                        bracket_span.inner_span(),
+                        "Caught by typecheck",
+                    );
+
+                    let idx_wire_b = self.get_wire_or_constant_as_wire(*idx_b, domain)?;
+                    self.type_substitutor.unify_report_error(
+                        &self.wires[idx_wire_b].typ,
+                        &INT_CONCRETE_TYPE,
+                        bracket_span.inner_span(),
+                        "Caught by typecheck",
+                    );
+                    preamble.push(RealWirePathElem::ArraySlice {
+                        span: *bracket_span,
+                        idx_a_wire: idx_wire_a,
+                        idx_b_wire: idx_wire_b,
                     });
                 }
             }
@@ -790,6 +928,9 @@ impl InstantiationContext<'_, '_> {
             ExpressionSource::Constant(_) => {
                 unreachable!("Constant cannot be non-compile-time");
             }
+            ExpressionSource::Range { .. } => {
+                unreachable!("Range cannot be non-compile-time");
+            }
         };
         Ok(vec![self.wires.alloc(RealWire {
             name: self.unique_name_producer.get_unique_name(""),
@@ -900,6 +1041,18 @@ impl InstantiationContext<'_, '_> {
 
                     array_access(&work_on_value, idx, bracket_span)?.clone()
                 }
+                &WireReferencePathElement::ArraySlice {
+                    idx_a,
+                    idx_b,
+                    bracket_span,
+                } => {
+                    let idx_a = self.generation_state.get_generation_integer(idx_a)?;
+                    let idx_b = self.generation_state.get_generation_integer(idx_b)?;
+
+                    Value::Array(
+                        array_slice(&mut work_on_value, idx_a, idx_b, bracket_span)?.clone(),
+                    )
+                }
             }
         }
 
@@ -973,6 +1126,36 @@ impl InstantiationContext<'_, '_> {
                     },
                 )
                 .map_err(|reason| (expr.span, reason))?
+            }
+            ExpressionSource::Range { start, end } => {
+                let start_val = self
+                    .generation_state
+                    .get_generation_value(*start)?
+                    .unwrap_integer();
+                let end_val = self
+                    .generation_state
+                    .get_generation_value(*end)?
+                    .unwrap_integer();
+
+                let length: usize = match (end_val - start_val).abs().unsigned_abs().try_into() {
+                    Ok(n) => n,
+                    Err(_) => {
+                        let max = usize::MAX;
+                        panic!("Range larger than {max}")
+                    }
+                };
+
+                let mut result = Vec::with_capacity(length);
+                let mut value = start_val.clone();
+                for _ in 0..length {
+                    result.push(Value::Integer(value.clone()));
+                    if end_val > start_val {
+                        value += 1;
+                    } else {
+                        value -= 1;
+                    }
+                }
+                Value::Array(result)
             }
             ExpressionSource::FuncCall(_) => {
                 todo!("Func Calls cannot yet be executed at compiletime")

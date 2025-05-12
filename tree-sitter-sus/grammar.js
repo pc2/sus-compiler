@@ -42,13 +42,14 @@ function commaSepSeq($, rule) {
 
 const PREC = {
     compare : 2,
-    xor: 3,
-    or: 4,
-    and: 5,
-    additive: 6,
-    multiplicative: 7,
-    unary: 8,
-    postscript_op : 9
+    range: 3,
+    xor: 4,
+    or: 5,
+    and: 6,
+    additive: 7,
+    multiplicative: 8,
+    unary: 9,
+    postscript_op : 10
 }
 
 module.exports = grammar({
@@ -219,7 +220,7 @@ module.exports = grammar({
 
         array_type: $ => seq(
             field('arr', $._type),
-            field('arr_idx', $.array_bracket_expression)
+            field('arr_idx', $.array_type_bracket)
         ),
 
         // Expressions
@@ -231,6 +232,7 @@ module.exports = grammar({
             $.parenthesis_expression,
             $.unary_op,
             $.binary_op,
+            $.range,
             $.func_call,
             $.field_access,
             $.array_list_expression
@@ -258,9 +260,18 @@ module.exports = grammar({
             ))));
         },
 
+        // despite being a binary operation, this is not a binary_op
+        // because it should not be rank-polymorphic, and has a very
+        // different signature to other binary operators
+        range: $ => prec.left(PREC.range, seq(
+            field('start', $._expression),
+            '..',
+            field('end', $._expression)
+        )),
+
         array_op: $ => prec(PREC.postscript_op, seq(
             field('arr', $._expression),
-            field('arr_idx', $.array_bracket_expression)
+            field('arr_idx', $.array_access_bracket_expression)
         )),
 
         func_call: $ => prec(PREC.postscript_op, seq(
@@ -279,6 +290,7 @@ module.exports = grammar({
             sepSeq($._expression, $._comma),
             ')'
         ),
+        
 
         parenthesis_expression: $ => seq(
             '(',
@@ -286,10 +298,25 @@ module.exports = grammar({
             ')'
         ),
 
-        array_bracket_expression: $ => seq(
+        array_type_bracket: $ => seq(
             '[',
             field('content', $._expression),
+            ']',
+        ),
+
+        array_access_bracket_expression: $ => seq(
+            '[',
+            choice(
+                field('slice', $.slice),
+                field('index', $._expression)
+            ),
             ']'
+        ),
+        
+        slice: $ => seq(
+            field('index_a', $._expression),
+            ':',
+            field('index_b', $._expression)
         ),
 
         array_list_expression: $ => seq(
