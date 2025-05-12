@@ -62,32 +62,3 @@ impl WireReferencePathElement {
         }
     }
 }
-
-// todo: removed from here
-
-// pub fn for_each_generative_input_in_template_args(
-//     template_args: &TVec<Option<TemplateArg>>,
-//     f: &mut impl FnMut(FlatID),
-// ) {
-//     for (_id, t_arg) in template_args.iter_valids() {
-//         match &t_arg.kind {
-//             TemplateArgKind::Type(typ) => typ.for_each_generative_input(f),
-//             TemplateArgKind::Value(val) => f(*val),
-//         }
-//     }
-// }
-
-// impl WrittenType {
-//     pub fn for_each_generative_input(&self, f: &mut impl FnMut(FlatID)) {
-//         match self {
-//             WrittenType::Error(_) | WrittenType::TemplateVariable(_, _) => {}
-//             WrittenType::Named(name) => {
-//                 for_each_generative_input_in_template_args(&name.template_args, f)
-//             }
-//             WrittenType::Array(_span, arr_box) => {
-//                 use std::ops::Deref;
-//                 f(arr_box.deref().1)
-//             }
-//         }
-//     }
-// }

@@ -511,7 +511,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
             cursor.field(field!("arr_idx"));
             let (array_size_wire_id, domain, bracket_span) =
-                self.flatten_array_bracket_type(cursor);
+                self.flatten_array_type_bracket(cursor);
             self.must_be_generative(domain, "Array Size", span);
 
             WrittenType::Array(
@@ -808,26 +808,24 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         })
     }
 
-    // function to flatten a straightforward xxx[size] array type without the extra
-    // complications of the syntax of other array operations
-    fn flatten_array_bracket_type(
+    // function to flatten a straightforward xxx[size] array type expression (no slicing)
+    fn flatten_array_type_bracket(
         &mut self,
         cursor: &mut Cursor<'c>,
     ) -> (FlatID, DomainType, BracketSpan) {
         let bracket_span = BracketSpan::from_outer(cursor.span());
-        cursor.go_down_content(kind!("array_bracket_expression"), |cursor| {
+        cursor.go_down_content(kind!("array_type_bracket"), |cursor| {
             let (expr, is_generative) = self.flatten_subexpr(cursor);
             (expr, is_generative, bracket_span)
         })
     }
 
-    // todo: removed from here
-    fn flatten_array_bracket(
+    fn flatten_array_access_bracket(
         &mut self,
         cursor: &mut Cursor<'c>,
     ) -> (WireReferencePathElement, DomainType, BracketSpan) {
         let bracket_span = BracketSpan::from_outer(cursor.span());
-        cursor.go_down(kind!("array_bracket_expression"), |cursor| {
+        cursor.go_down(kind!("array_access_bracket_expression"), |cursor| {
             if cursor.optional_field(field!("index")) {
                 let (expr, is_generative) = self.flatten_subexpr(cursor);
                 (
@@ -862,76 +860,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         })
     }
 
-    // fn alloc_error(&mut self, span: Span) -> FlatID {
-    //     self.instructions.alloc(Instruction::Expression(Expression {
-    //         typ: self
-    //             .type_alloc
-    //             .alloc_unset_type(DomainAllocOption::NonGenerativeUnknown),
-    //         span,
-    //         source: ExpressionSource::new_error(),
-    //     }))
-    // }
-
-    // /// Returns the ID of the [FuncCallInstruction]
-    // fn flatten_func_call(&mut self, cursor: &mut Cursor) -> Option<FlatID> {
-    //     let whole_func_span = cursor.span();
-    //     cursor.go_down(kind!("func_call"), |cursor| {
-    //         cursor.field(field!("name"));
-    //         let interface_reference = self.get_or_alloc_module(cursor);
-
-    //         cursor.field(field!("arguments"));
-    //         let arguments_span = BracketSpan::from_outer(cursor.span());
-    //         // TODO compiletime functions https://github.com/pc2/sus-compiler/issues/10
-    //         let mut all_were_compiletime = true;
-    //         let mut arguments = cursor.collect_list(kind!("parenthesis_expression_list"), |cursor| {
-    //             let (expr, is_comptime) = self.flatten_expr(cursor);
-    //             all_were_compiletime &= is_comptime;
-    //             expr
-    //         });
-
-    //         let interface_reference = interface_reference?;
-
-    //         let (md, interface) = self.get_interface_reference(&interface_reference);
-
-    //         let func_call_inputs = interface.func_call_inputs;
-    //         let func_call_outputs = interface.func_call_outputs;
-
-    //         let arg_count = arguments.len();
-    //         let expected_arg_count = func_call_inputs.len();
-
-    //         if arg_count != expected_arg_count {
-    //             if arg_count > expected_arg_count {
-    //                 // Too many args, complain about excess args at the end
-    //                 let excess_args_span = Span::new_overarching(self.instructions[arguments[expected_arg_count]].unwrap_expression().span, self.instructions[*arguments.last().unwrap()].unwrap_expression().span);
-
-    //                 self.errors
-    //                     .error(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."))
-    //                     .info_obj(&(md, interface));
-    //                 // Shorten args to still get proper type checking for smaller arg array
-    //                 arguments.truncate(expected_arg_count);
-    //             } else {
-    //                 // Too few args, mention missing argument names
-    //                 self.errors
-    //                     .error(arguments_span.close_bracket(), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."))
-    //                     .info_obj(&(md, interface));
-
-    //                 while arguments.len() < expected_arg_count {
-    //                     arguments.push(self.alloc_error(arguments_span.close_bracket()));
-    //                 }
-    //             }
-    //         }
-
-    //         Some(self.instructions.alloc(Instruction::FuncCall(FuncCallInstruction{
-    //             interface_reference,
-    //             arguments,
-    //             func_call_inputs,
-    //             func_call_outputs,
-    //             arguments_span,
-    //             whole_func_span
-    //         })))
-    //     })
-    // }
-    // todo: removed up to here
     fn get_main_interface(
         &self,
         submodule_decl: FlatID,
@@ -1229,7 +1157,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                 cursor.field(field!("arr_idx"));
                 let arr_idx_span = cursor.span();
-                let (access, _is_generative, _) = self.flatten_array_bracket(cursor);
+                let (access, _is_generative, _) = self.flatten_array_access_bracket(cursor);
 
                 // only unpack the subexpr after flattening the idx, so we catch all errors
                 match &mut flattened_arr_expr {

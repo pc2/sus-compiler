@@ -219,7 +219,7 @@ module.exports = grammar({
 
         array_type: $ => seq(
             field('arr', $._type),
-            field('arr_idx', $.array_bracket_type)
+            field('arr_idx', $.array_type_bracket)
         ),
 
         // Expressions
@@ -260,7 +260,7 @@ module.exports = grammar({
 
         array_op: $ => prec(PREC.postscript_op, seq(
             field('arr', $._expression),
-            field('arr_idx', $.array_bracket_expression)
+            field('arr_idx', $.array_access_bracket_expression)
         )),
 
         func_call: $ => prec(PREC.postscript_op, seq(
@@ -287,13 +287,13 @@ module.exports = grammar({
             ')'
         ),
 
-        array_bracket_type: $ => seq(
+        array_type_bracket: $ => seq(
             '[',
             field('content', $._expression),
             ']',
         ),
 
-        array_bracket_expression: $ => seq(
+        array_access_bracket_expression: $ => seq(
             '[',
             choice(
                 field('slice', $.slice),
