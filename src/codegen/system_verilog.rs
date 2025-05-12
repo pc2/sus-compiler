@@ -226,6 +226,9 @@ impl<'g> CodeGenerationContext<'g> {
                     self.write_constant(&new_to, v);
                 }
             }
+            Value::Unknown(_) => {
+                unreachable!("Unresolved Value! Should have been caught by concrete typecheck!")
+            }
         }
     }
 
@@ -638,6 +641,9 @@ impl Value {
             Value::Integer(v) => Cow::Owned(v.to_string()),
             Value::Unset => Cow::Borrowed("'x"),
             Value::Array(_) => unreachable!("Not an inline constant!"),
+            Value::Unknown(_) => {
+                unreachable!("Unresolved Value! Should have been caught by concrete typecheck!")
+            }
         }
     }
 }

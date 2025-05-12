@@ -10,7 +10,7 @@ use sus_proc_macro::get_builtin_type;
 use crate::errors::ErrorInfo;
 use crate::prelude::*;
 
-use crate::alloc::{zip_eq, UUIDMarker, UUID};
+use crate::alloc::{get2_mut, zip_eq, UUIDMarker, UUID};
 use crate::value::Value;
 
 use super::abstract_type::{AbstractInnerType, PeanoType};
@@ -735,6 +735,81 @@ impl<S: Substitutor> Drop for TypeUnifier<S> {
                 "Errors were not extracted before dropping!"
             );
         }
+    }
+}
+
+enum KnownValue<T, ID> {
+    Unknown(Vec<ID>),
+    Known(T),
+}
+
+impl<T: Unifyable + Eq> Default for SetUnifier<T> {
+    fn default() -> Self {
+        Self {
+            ptrs: Default::default(),
+            known_values: Default::default(),
+        }
+    }
+}
+pub struct SetUnifier<T: Unifyable + Eq> {
+    ptrs: FlatAlloc<usize, T::IDMarker>,
+    known_values: Vec<KnownValue<T, UUID<T::IDMarker>>>,
+}
+
+pub trait Unifyable {
+    type IDMarker;
+
+    fn get_unknown(&self) -> Option<UUID<Self::IDMarker>>;
+    fn new_unknown(id: UUID<Self::IDMarker>) -> Self;
+}
+
+impl<T: Unifyable + Eq + Clone> SetUnifier<T> {
+    pub fn must_be_equal(&mut self, a: &T, b: &T) -> Option<()> {
+        match (a, a.get_unknown(), b, b.get_unknown()) {
+            (_, None, _, None) => None,
+            (v, None, _, Some(var)) | (_, Some(var), v, None) => {
+                let k = &mut self.known_values[self.ptrs[var]];
+                if let KnownValue::Known(k) = k {
+                    (k == v).then_some(())
+                } else {
+                    *k = KnownValue::Known(v.clone());
+                    Some(())
+                }
+            }
+            (_, Some(idx_a), _, Some(idx_b)) => {
+                let idx_a = self.ptrs[idx_a];
+                let idx_b = self.ptrs[idx_b];
+                let (old_vector, to) = match get2_mut(&mut self.known_values, idx_a, idx_b) {
+                    Some((KnownValue::Unknown(a_v), KnownValue::Unknown(b_v))) => {
+                        if a_v.len() > b_v.len() {
+                            a_v.extend_from_slice(b_v);
+                            (b_v, idx_a)
+                        } else {
+                            b_v.extend_from_slice(a_v);
+                            (a_v, idx_b)
+                        }
+                    }
+                    Some((KnownValue::Unknown(v), KnownValue::Known(_))) => (v, idx_a),
+                    Some((KnownValue::Known(_), KnownValue::Unknown(v))) => (v, idx_b),
+                    Some((KnownValue::Known(x), KnownValue::Known(y))) => {
+                        return (x == y).then_some(())
+                    }
+                    None => return Some(()),
+                };
+
+                for v in std::mem::take(old_vector) {
+                    self.ptrs[v] = to;
+                }
+
+                Some(())
+            }
+        }
+    }
+
+    pub fn alloc_unknown(&mut self) -> T {
+        let new_ptr = self.ptrs.alloc(self.known_values.len());
+        self.known_values.push(KnownValue::Unknown(vec![new_ptr]));
+        T::new_unknown(new_ptr)
     }
 }
 

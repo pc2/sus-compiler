@@ -187,7 +187,7 @@ impl ConcreteType {
         }
     }
     /// Returns the inclusive bounds of an int. An int #(MIN: 0, MAX: 15) will return (0, 14)
-    pub fn get_bounds(&self) -> (IBig, IBig) {
+    pub fn unwrap_integer_bounds(&self) -> (IBig, IBig) {
         let [min, max] = self
             .unwrap_named()
             .template_args

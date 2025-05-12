@@ -221,6 +221,9 @@ impl FullTypeUnifier {
                 );
             }
             Value::Unset => {} // Already an error, don't unify
+            Value::Unknown(_) => {
+                todo!("THIS METHOD WILL GET DELETED")
+            }
         }
     }
 

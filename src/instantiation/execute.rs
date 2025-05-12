@@ -7,7 +7,8 @@
 use std::ops::{Deref, Index, IndexMut};
 
 use crate::latency::CALCULATE_LATENCY_LATER;
-use crate::linker::IsExtern;
+use crate::linker::{GlobalUUID, IsExtern};
+use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType};
 use crate::typing::template::GlobalReference;
 use crate::typing::type_inference::Substitutor;
 use crate::typing::written_type::WrittenType;
@@ -190,49 +191,91 @@ enum RealWireRefRoot {
 }
 
 impl InstantiationContext<'_, '_> {
+    fn concretize_type_recurse(
+        &mut self,
+        inner: &AbstractInnerType,
+        rank: &PeanoType,
+        wr_typ: Option<&WrittenType>,
+    ) -> ExecutionResult<ConcreteType> {
+        Ok(match rank {
+            PeanoType::Zero => match inner {
+                AbstractInnerType::Template(id) => {
+                    self.working_on_global_ref.template_args[*id].clone()
+                }
+                AbstractInnerType::Named(name) => {
+                    let template_params = &self.linker.types[*name].link_info.template_parameters;
+                    let template_args = match wr_typ {
+                        Some(WrittenType::Named(wr_named)) => {
+                            assert_eq!(wr_named.id, *name);
+                            FlatAlloc::try_map2(
+                                &wr_named.template_args,
+                                template_params,
+                                |(_, arg, param)| {
+                                    Ok(match (arg, &param.kind) {
+                                        (_, TemplateKind::Type(_)) => {
+                                            todo!("Abstract Type Args aren't yet supported!")
+                                        }
+                                        (Some(value), TemplateKind::Value(_)) => {
+                                            let arg_value = self
+                                                .generation_state
+                                                .get_generation_value(*value.kind.unwrap_value())?;
+                                            ConcreteType::Value(arg_value.clone())
+                                        }
+                                        (None, TemplateKind::Value(_)) => {
+                                            self.type_substitutor.alloc_unknown()
+                                        }
+                                    })
+                                },
+                            )?
+                        }
+                        Some(_) => unreachable!("Can't get Array from Non-Array WrittenType!"), // TODO Fix with Let bindings (#57)
+                        None => template_params.map(|(_, arg)| match &arg.kind {
+                            TemplateKind::Type(_) => {
+                                todo!("Abstract Type Args aren't yet supported!")
+                            }
+                            TemplateKind::Value(_) => self.type_substitutor.alloc_unknown(),
+                        }),
+                    };
+
+                    ConcreteType::Named(ConcreteGlobalReference {
+                        id: *name,
+                        template_args,
+                    })
+                }
+                AbstractInnerType::Unknown(_) => {
+                    unreachable!("Should have been resolved already!")
+                }
+            },
+            PeanoType::Succ(one_down) => {
+                let (new_wr_typ, size) = match wr_typ {
+                    Some(WrittenType::Array(_span, arr)) => {
+                        let (content, arr_size, _) = arr.deref();
+                        let arr_size = self.generation_state.get_generation_value(*arr_size)?;
+                        (Some(content), ConcreteType::Value(arr_size.clone()))
+                    }
+                    Some(_) => unreachable!("Can't get Array from Non-Array WrittenType!"), // TODO Fix with Let bindings (#57)
+                    None => (None, self.type_substitutor.alloc_unknown()),
+                };
+                ConcreteType::Array(Box::new((
+                    self.concretize_type_recurse(inner, one_down, new_wr_typ)?,
+                    size,
+                )))
+            }
+            PeanoType::Unknown(_) => {
+                caught_by_typecheck!("No PeanoType::Unknown should be left in execute!")
+            }
+        })
+    }
+
     /// Uses the current context to turn a [WrittenType] into a [ConcreteType].
     ///
     /// Failures are fatal.
-    fn concretize_type(&mut self, typ: &WrittenType) -> ExecutionResult<ConcreteType> {
-        Ok(match typ {
-            WrittenType::Error(_) => caught_by_typecheck!("Error Type"),
-            WrittenType::TemplateVariable(_, template_id) => {
-                self.working_on_global_ref.template_args[*template_id].clone()
-            }
-            WrittenType::Named(named_type) => {
-                let template_args = named_type.template_args.try_map(|template_arg| {
-                    if let (_, Some(template_arg)) = template_arg {
-                        match &template_arg.kind {
-                            TemplateKind::Type(written_type) => self.concretize_type(written_type),
-                            TemplateKind::Value(uuid) => Ok(ConcreteType::Value(
-                                self.generation_state
-                                    .get_generation_value(*uuid)
-                                    .unwrap()
-                                    .clone(),
-                            )),
-                        }
-                    } else {
-                        Ok(self.type_substitutor.alloc_unknown())
-                    }
-                })?;
-
-                ConcreteType::Named(crate::typing::concrete_type::ConcreteGlobalReference {
-                    id: named_type.id,
-                    template_args,
-                })
-            }
-            WrittenType::Array(_, arr_box) => {
-                let (arr_content_typ, arr_size_wire, _bracket_span) = arr_box.deref();
-                let inner_typ = self.concretize_type(arr_content_typ)?;
-                let arr_size = self
-                    .generation_state
-                    .get_generation_integer(*arr_size_wire)?;
-                ConcreteType::Array(Box::new((
-                    inner_typ,
-                    ConcreteType::Value(Value::Integer(arr_size.clone())),
-                )))
-            }
-        })
+    fn concretize_type(
+        &mut self,
+        abs: &AbstractRankedType,
+        wr_typ: Option<&WrittenType>,
+    ) -> ExecutionResult<ConcreteType> {
+        self.concretize_type_recurse(&abs.inner, &abs.rank, wr_typ)
     }
 
     fn instantiate_port_wire_ref_root(
@@ -834,7 +877,7 @@ impl InstantiationContext<'_, '_> {
         wire_decl: &Declaration,
         original_instruction: FlatID,
     ) -> ExecutionResult<SubModuleOrWire> {
-        let typ = self.concretize_type(&wire_decl.typ_expr)?;
+        let typ = self.concretize_type(&wire_decl.typ.typ, Some(&wire_decl.typ_expr))?;
 
         Ok(if wire_decl.identifier_type == IdentifierType::Generative {
             let value = if let DeclarationKind::GenerativeInput(template_id) = wire_decl.decl_kind {
@@ -876,24 +919,35 @@ impl InstantiationContext<'_, '_> {
         })
     }
 
-    fn execute_global_ref<ID: Copy>(
+    fn execute_global_ref<ID: Copy + Into<GlobalUUID>>(
         &mut self,
         global_ref: &GlobalReference<ID>,
     ) -> ExecutionResult<ConcreteGlobalReference<ID>> {
-        let template_args =
-            global_ref
-                .template_args
-                .try_map(|(_, v)| -> ExecutionResult<ConcreteType> {
-                    Ok(match v {
-                        Some(arg) => match &arg.kind {
-                            TemplateKind::Type(typ) => self.concretize_type(typ)?,
-                            TemplateKind::Value(v) => ConcreteType::Value(
+        let template_args = global_ref.template_args.try_map3(
+            &global_ref.template_arg_types,
+            &self
+                .linker
+                .get_link_info(global_ref.id.into())
+                .template_parameters,
+            |(_, arg, arg_typ, param)| -> ExecutionResult<ConcreteType> {
+                Ok(match &param.kind {
+                    TemplateKind::Type(_) => {
+                        let wr_typ = arg.as_ref().map(|arg| arg.kind.unwrap_type());
+                        self.concretize_type(arg_typ, wr_typ)?
+                    }
+                    TemplateKind::Value(_) => {
+                        if let Some(arg) = arg {
+                            let v = arg.kind.unwrap_value();
+                            ConcreteType::Value(
                                 self.generation_state.get_generation_value(*v)?.clone(),
-                            ),
-                        },
-                        None => self.type_substitutor.alloc_unknown(),
-                    })
-                })?;
+                            )
+                        } else {
+                            self.type_substitutor.alloc_unknown()
+                        }
+                    }
+                })
+            },
+        )?;
         Ok(ConcreteGlobalReference {
             id: global_ref.id,
             template_args,

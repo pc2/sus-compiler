@@ -146,6 +146,7 @@ fn perform_instantiation(
                 .map(|(_, _)| SubModuleOrWire::Unnasigned),
         },
         type_substitutor: Default::default(),
+        //type_value_substitutor: Default::default(),
         condition_stack: Vec::new(),
         wires: FlatAlloc::new(),
         submodules: FlatAlloc::new(),

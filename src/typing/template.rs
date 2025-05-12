@@ -1,7 +1,5 @@
-use super::{
-    abstract_type::AbstractRankedType, concrete_type::ConcreteType, written_type::WrittenType,
-};
-use crate::{let_unwrap, prelude::*, value::Value};
+use super::{abstract_type::AbstractRankedType, written_type::WrittenType};
+use crate::{let_unwrap, prelude::*};
 
 /// See [TVec]. All circumstances handling Templates need to handle both Types and Values.
 #[derive(Debug)]

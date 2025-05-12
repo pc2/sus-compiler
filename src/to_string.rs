@@ -211,6 +211,7 @@ impl Display for Value {
                 f.write_str("]")
             }
             Value::Unset => f.write_str("{value_unset}"),
+            Value::Unknown(id) => f.write_fmt(format_args!("{id:?}")),
         }
     }
 }

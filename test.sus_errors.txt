@@ -35326,32 +35326,6 @@ Warning: Unused port 'o'
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[255]
-     ╭─[ test.sus:799:8 ]
-     │
- 799 │     input int[WIDTH] values
-     │           ────────┬────────  
-     │                   ╰────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[255]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[15]
-     ╭─[ test.sus:799:8 ]
-     │
- 799 │     input int[WIDTH] values
-     │           ────────┬────────  
-     │                   ╰────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[15]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
 )[63]
      ╭─[ test.sus:799:8 ]
      │
@@ -35361,6 +35335,19 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )[63]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[255]
+     ╭─[ test.sus:799:8 ]
+     │
+ 799 │     input int[WIDTH] values
+     │           ────────┬────────  
+     │                   ╰────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[255]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -35391,7 +35378,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[7]
+)[31]
      ╭─[ test.sus:799:8 ]
      │
  799 │     input int[WIDTH] values
@@ -35399,12 +35386,12 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                   ╰────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[7]
+)[31]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[31]
+)[15]
      ╭─[ test.sus:799:8 ]
      │
  799 │     input int[WIDTH] values
@@ -35412,7 +35399,20 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                   ╰────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[31]
+)[15]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[7]
+     ╭─[ test.sus:799:8 ]
+     │
+ 799 │     input int[WIDTH] values
+     │           ────────┬────────  
+     │                   ╰────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[7]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -35554,7 +35554,7 @@ Error: Error instantiating submodule
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[127]
+)[31]
      ╭─[ test.sus:806:3 ]
      │
  806 │        tree_add #(WIDTH: HALF_WIDTH) left
@@ -35562,7 +35562,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[127]
+)[31]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -35587,7 +35587,7 @@ Error: Error instantiating submodule
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[7]
+)[127]
      ╭─[ test.sus:806:3 ]
      │
  806 │        tree_add #(WIDTH: HALF_WIDTH) left
@@ -35595,40 +35595,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[7]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[31]
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[31]
+)[127]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -35719,39 +35686,6 @@ Error: Error instantiating submodule
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[3]
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[3]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
 )[15]
      ╭─[ test.sus:806:3 ]
      │
@@ -35776,32 +35710,32 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 )
 ─────╯
 Error: Error instantiating submodule
-     ╭─[ test.sus:807:3 ]
+     ╭─[ test.sus:806:3 ]
      │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
      │        ──────────────┬──────────────  
      │                      ╰──────────────── Error instantiating submodule
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[127]
-     ╭─[ test.sus:807:3 ]
+)[7]
+     ╭─[ test.sus:806:3 ]
      │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
      │        ──────────────┬──────────────  
      │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[127]
+)[7]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:807:3 ]
+     ╭─[ test.sus:806:3 ]
      │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
      │        ──────────────┬──────────────  
      │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -35809,32 +35743,32 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 )
 ─────╯
 Error: Error instantiating submodule
-     ╭─[ test.sus:807:3 ]
+     ╭─[ test.sus:806:3 ]
      │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
      │        ──────────────┬──────────────  
      │                      ╰──────────────── Error instantiating submodule
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[7]
-     ╭─[ test.sus:807:3 ]
+)[3]
+     ╭─[ test.sus:806:3 ]
      │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
      │        ──────────────┬──────────────  
      │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[7]
+)[3]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:807:3 ]
+     ╭─[ test.sus:806:3 ]
      │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
      │        ──────────────┬──────────────  
      │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -35860,6 +35794,39 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )[31]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[127]
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[127]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -35950,7 +35917,7 @@ Error: Error instantiating submodule
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[3]
+)[15]
      ╭─[ test.sus:807:3 ]
      │
  807 │        tree_add #(WIDTH: HALF_WIDTH) right
@@ -35958,7 +35925,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[3]
+)[15]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -35983,7 +35950,7 @@ Error: Error instantiating submodule
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[15]
+)[7]
      ╭─[ test.sus:807:3 ]
      │
  807 │        tree_add #(WIDTH: HALF_WIDTH) right
@@ -35991,7 +35958,40 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[15]
+)[7]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[3]
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[3]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -42424,74 +42424,6 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
  811 │          right.values[i] = values[i+HALF_WIDTH]
      │                            ──────────┬─────────  
      │                                      ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Failed to Typecheck Unknown(concrete_type_variable_1284) = Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_1291), Unknown(concrete_type_variable_1292)]) }) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_1295), Unknown(concrete_type_variable_1296)]) })
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Failed to Typecheck Unknown(concrete_type_variable_1284) = Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_1291), Unknown(concrete_type_variable_1292)]) }) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_1295), Unknown(concrete_type_variable_1296)]) })
-─────╯
-Error: Failed to Typecheck Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_4), Unknown(concrete_type_variable_5)]) }) = Unknown(concrete_type_variable_1284) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_2), Unknown(concrete_type_variable_3)]) })
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Failed to Typecheck Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_4), Unknown(concrete_type_variable_5)]) }) = Unknown(concrete_type_variable_1284) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_2), Unknown(concrete_type_variable_3)]) })
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: {concrete_type_variable_1284}
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: {concrete_type_variable_1284}
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Failed to Typecheck Unknown(concrete_type_variable_84) = Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_91), Unknown(concrete_type_variable_92)]) }) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_95), Unknown(concrete_type_variable_96)]) })
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Failed to Typecheck Unknown(concrete_type_variable_84) = Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_91), Unknown(concrete_type_variable_92)]) }) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_95), Unknown(concrete_type_variable_96)]) })
-─────╯
-Error: Failed to Typecheck Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_4), Unknown(concrete_type_variable_5)]) }) = Unknown(concrete_type_variable_84) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_2), Unknown(concrete_type_variable_3)]) })
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Failed to Typecheck Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_4), Unknown(concrete_type_variable_5)]) }) = Unknown(concrete_type_variable_84) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_2), Unknown(concrete_type_variable_3)]) })
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: {concrete_type_variable_84}
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: {concrete_type_variable_84}
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -42516,6 +42448,40 @@ Error: Could not finalize this type, some parameters were still unknown: {concre
  817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
      │                    ──────────┬─────────  
      │                              ╰─────────── Could not finalize this type, some parameters were still unknown: {concrete_type_variable_324}
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Failed to Typecheck Unknown(concrete_type_variable_1284) = Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_1291), Unknown(concrete_type_variable_1292)]) }) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_1295), Unknown(concrete_type_variable_1296)]) })
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Failed to Typecheck Unknown(concrete_type_variable_1284) = Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_1291), Unknown(concrete_type_variable_1292)]) }) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_1295), Unknown(concrete_type_variable_1296)]) })
+─────╯
+Error: Failed to Typecheck Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_4), Unknown(concrete_type_variable_5)]) }) = Unknown(concrete_type_variable_1284) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_2), Unknown(concrete_type_variable_3)]) })
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Failed to Typecheck Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_4), Unknown(concrete_type_variable_5)]) }) = Unknown(concrete_type_variable_1284) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_2), Unknown(concrete_type_variable_3)]) })
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: {concrete_type_variable_1284}
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: {concrete_type_variable_1284}
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -42598,40 +42564,6 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Failed to Typecheck Unknown(concrete_type_variable_44) = Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_51), Unknown(concrete_type_variable_52)]) }) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_55), Unknown(concrete_type_variable_56)]) })
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Failed to Typecheck Unknown(concrete_type_variable_44) = Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_51), Unknown(concrete_type_variable_52)]) }) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_55), Unknown(concrete_type_variable_56)]) })
-─────╯
-Error: Failed to Typecheck Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_4), Unknown(concrete_type_variable_5)]) }) = Unknown(concrete_type_variable_44) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_2), Unknown(concrete_type_variable_3)]) })
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Failed to Typecheck Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_4), Unknown(concrete_type_variable_5)]) }) = Unknown(concrete_type_variable_44) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_2), Unknown(concrete_type_variable_3)]) })
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: {concrete_type_variable_44}
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: {concrete_type_variable_44}
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
 Error: Failed to Typecheck Unknown(concrete_type_variable_164) = Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_171), Unknown(concrete_type_variable_172)]) }) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_175), Unknown(concrete_type_variable_176)]) })
      ╭─[ test.sus:817:14 ]
      │
@@ -42652,6 +42584,74 @@ Error: Could not finalize this type, some parameters were still unknown: {concre
  817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
      │                    ──────────┬─────────  
      │                              ╰─────────── Could not finalize this type, some parameters were still unknown: {concrete_type_variable_164}
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Failed to Typecheck Unknown(concrete_type_variable_84) = Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_91), Unknown(concrete_type_variable_92)]) }) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_95), Unknown(concrete_type_variable_96)]) })
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Failed to Typecheck Unknown(concrete_type_variable_84) = Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_91), Unknown(concrete_type_variable_92)]) }) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_95), Unknown(concrete_type_variable_96)]) })
+─────╯
+Error: Failed to Typecheck Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_4), Unknown(concrete_type_variable_5)]) }) = Unknown(concrete_type_variable_84) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_2), Unknown(concrete_type_variable_3)]) })
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Failed to Typecheck Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_4), Unknown(concrete_type_variable_5)]) }) = Unknown(concrete_type_variable_84) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_2), Unknown(concrete_type_variable_3)]) })
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: {concrete_type_variable_84}
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: {concrete_type_variable_84}
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Failed to Typecheck Unknown(concrete_type_variable_44) = Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_51), Unknown(concrete_type_variable_52)]) }) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_55), Unknown(concrete_type_variable_56)]) })
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Failed to Typecheck Unknown(concrete_type_variable_44) = Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_51), Unknown(concrete_type_variable_52)]) }) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_55), Unknown(concrete_type_variable_56)]) })
+─────╯
+Error: Failed to Typecheck Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_4), Unknown(concrete_type_variable_5)]) }) = Unknown(concrete_type_variable_44) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_2), Unknown(concrete_type_variable_3)]) })
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Failed to Typecheck Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_4), Unknown(concrete_type_variable_5)]) }) = Unknown(concrete_type_variable_44) + Named(ConcreteGlobalReference { id: type_1, template_args: FlatAlloc::from_vec(vec![Unknown(concrete_type_variable_2), Unknown(concrete_type_variable_3)]) })
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: {concrete_type_variable_44}
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: {concrete_type_variable_44}
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -47949,7 +47949,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[5]
+)[{concrete_type_variable_2}]
      ╭─[ test.sus:958:2 ]
      │
  958 │     CrossDomain cr
@@ -47957,12 +47957,12 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │          ╰─────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[5]
+)[{concrete_type_variable_2}]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[5]
+)[{concrete_type_variable_2}]
      ╭─[ test.sus:958:2 ]
      │
  958 │     CrossDomain cr
@@ -47970,13 +47970,13 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │          ╰─────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[5]
+)[{concrete_type_variable_2}]
 ─────╯
 Error: Could not fully instantiate ::CrossDomain #(
     T: type ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[5],
+)[{concrete_type_variable_2}],
 )
      ╭─[ test.sus:958:14 ]
      │
@@ -47986,7 +47986,7 @@ Error: Could not fully instantiate ::CrossDomain #(
     T: type ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[5],
+)[{concrete_type_variable_2}],
 )
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(

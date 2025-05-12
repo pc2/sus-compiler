@@ -1,13 +1,15 @@
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 use ibig::IBig;
 
-use crate::alloc::FlatAlloc;
+use crate::alloc::{zip_eq, FlatAlloc};
 use crate::flattening::{BinaryOperator, UnaryOperator};
 use sus_proc_macro::get_builtin_type;
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType, BOOL_CONCRETE_TYPE};
-use crate::typing::type_inference::{Substitutor, TypeSubstitutor};
+use crate::typing::type_inference::{
+    ConcreteTypeVariableID, ConcreteTypeVariableIDMarker, Substitutor, TypeSubstitutor, Unifyable,
+};
 
 /// Top type for any kind of compiletime value while executing.
 ///
@@ -19,22 +21,82 @@ pub enum Value {
     Array(Vec<Value>),
     /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
+    Unknown(ConcreteTypeVariableID),
+}
+
+impl Unifyable for Value {
+    type IDMarker = ConcreteTypeVariableIDMarker;
+    fn get_unknown(&self) -> Option<ConcreteTypeVariableID> {
+        if let Value::Unknown(var) = self {
+            Some(*var)
+        } else {
+            None
+        }
+    }
+
+    fn new_unknown(id: ConcreteTypeVariableID) -> Self {
+        Value::Unknown(id)
+    }
 }
 
 impl ConcreteType {
+    fn update_smallest_common_supertype(&mut self, other: &Self) -> Option<()> {
+        match (self, other) {
+            (_, ConcreteType::Unknown(_)) | (ConcreteType::Unknown(_), _) => None,
+            (ConcreteType::Named(left), ConcreteType::Named(right)) => {
+                assert_eq!(left.id, right.id);
+                if left.id == get_builtin_type!("int") {
+                    if let (
+                        [ConcreteType::Value(Value::Integer(left_min)), ConcreteType::Value(Value::Integer(left_max))],
+                        [ConcreteType::Value(Value::Integer(right_min)), ConcreteType::Value(Value::Integer(right_max))],
+                    ) = (
+                        left.template_args.cast_to_array_mut(),
+                        right.template_args.cast_to_array(),
+                    ) {
+                        if right_min < left_min {
+                            *left_min = right_min.clone();
+                        }
+                        if right_max > left_max {
+                            *left_max = right_max.clone();
+                        }
+                        Some(())
+                    } else {
+                        None
+                    }
+                } else {
+                    for (_, left_arg, right_arg) in
+                        zip_eq(left.template_args.iter_mut(), right.template_args.iter())
+                    {
+                        left_arg.update_smallest_common_supertype(right_arg)?;
+                    }
+                    Some(())
+                }
+            }
+            (ConcreteType::Array(left), ConcreteType::Array(right)) => {
+                let (left_content, left_size) = left.deref_mut();
+                let (right_content, right_size) = right.deref();
+                left_size.update_smallest_common_supertype(right_size)?;
+                left_content.update_smallest_common_supertype(right_content)
+            }
+            (ConcreteType::Value(left), ConcreteType::Value(right)) => {
+                (left == right).then_some(())
+            }
+            _ => unreachable!("Caught by typecheck"),
+        }
+    }
     /// On the road to implementing subtyping. Takes in a list of types,
     /// and computes the smallest supertype that all list elements can coerce to.
     /// TODO integrate into Hindley-Milner more closely
     fn get_smallest_common_supertype(
-        list: &[Self],
+        mut iter: impl Iterator<Item = Self>,
         type_substitutor: &mut TypeSubstitutor<ConcreteType>,
     ) -> Option<Self> {
-        let mut iter = list.iter();
+        let mut first = iter.next()?;
+        let _ = type_substitutor.fully_substitute(&mut first);
 
-        let first = iter.next()?.clone();
-
-        for elem in iter {
-            type_substitutor.unify_must_succeed(&first, elem);
+        for mut elem in iter {
+            let _ = type_substitutor.fully_substitute(&mut elem);
+            first.update_smallest_common_supertype(&elem)?;
         }
 
         Some(first)
@@ -87,6 +149,9 @@ impl Value {
                 (_, Value::Unset) => {
                     return Err("This compile-time constant contains Unset".into());
                 }
+                (_, Value::Unknown(_)) => {
+                    panic!("get_type on Value::Unknown!");
+                }
             };
             Ok(())
         })?;
@@ -134,6 +199,9 @@ impl Value {
             Value::Bool(_) | Value::Integer(_) => false,
             Value::Array(values) => values.iter().any(|v| v.contains_errors_or_unsets()),
             Value::Unset => true,
+            Value::Unknown(_) => {
+                panic!("contains_errors_or_unsets on Value::Unknown!");
+            }
         }
     }
 
