@@ -1011,6 +1011,29 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     right,
                 }
             }),
+            kind!("range") => cursor.go_down_no_check(|cursor| {
+                cursor.field(field!("start"));
+                let (start, start_domain) = self.flatten_subexpr(cursor);
+                resulting_domain.combine_with(start_domain);
+                if !resulting_domain.is_generative() {
+                    self.errors.error(
+                        cursor.span(),
+                        "Used non-generative expression in range start",
+                    );
+                    return ExpressionSource::WireRef(WireReference::ERROR);
+                }
+
+                cursor.field(field!("end"));
+                let (end, end_domain) = self.flatten_subexpr(cursor);
+                resulting_domain.combine_with(end_domain);
+                if !resulting_domain.is_generative() {
+                    self.errors
+                        .error(cursor.span(), "Used non-generative expression in range end");
+                    return ExpressionSource::WireRef(WireReference::ERROR);
+                }
+
+                ExpressionSource::Range { start, end }
+            }),
             kind!("func_call") => cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("name"));
                 let interface_reference = self.get_or_alloc_module(cursor);

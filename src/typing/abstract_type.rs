@@ -95,6 +95,13 @@ impl PeanoType {
         };
         cnt
     }
+    pub fn from_natural(count: usize) -> Self {
+        if count == 0 {
+            PeanoType::Zero
+        } else {
+            PeanoType::Succ(Box::new(PeanoType::from_natural(count - 1)))
+        }
+    }
 }
 
 pub const BOOL_TYPE: AbstractInnerType = AbstractInnerType::Named(get_builtin_type!("bool"));

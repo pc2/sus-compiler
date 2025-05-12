@@ -15,6 +15,7 @@ use crate::typing::written_type::WrittenType;
 use crate::util::{unwrap_single_element, zip_eq};
 use crate::{let_unwrap, prelude::*};
 
+use ibig::ops::{Abs, UnsignedAbs};
 use ibig::{IBig, UBig};
 
 use sus_proc_macro::get_builtin_const;
@@ -927,6 +928,9 @@ impl InstantiationContext<'_, '_> {
             ExpressionSource::Constant(_) => {
                 unreachable!("Constant cannot be non-compile-time");
             }
+            ExpressionSource::Range { .. } => {
+                unreachable!("Range cannot be non-compile-time");
+            }
         };
         Ok(vec![self.wires.alloc(RealWire {
             name: self.unique_name_producer.get_unique_name(""),
@@ -1122,6 +1126,36 @@ impl InstantiationContext<'_, '_> {
                     },
                 )
                 .map_err(|reason| (expr.span, reason))?
+            }
+            ExpressionSource::Range { start, end } => {
+                let start_val = self
+                    .generation_state
+                    .get_generation_value(*start)?
+                    .unwrap_integer();
+                let end_val = self
+                    .generation_state
+                    .get_generation_value(*end)?
+                    .unwrap_integer();
+
+                let length: usize = match (end_val - start_val).abs().unsigned_abs().try_into() {
+                    Ok(n) => n,
+                    Err(_) => {
+                        let max = usize::MAX;
+                        panic!("Range larger than {max}")
+                    }
+                };
+
+                let mut result = Vec::with_capacity(length);
+                let mut value = start_val.clone();
+                for _ in 0..length {
+                    result.push(Value::Integer(value.clone()));
+                    if end_val > start_val {
+                        value += 1;
+                    } else {
+                        value -= 1;
+                    }
+                }
+                Value::Array(result)
             }
             ExpressionSource::FuncCall(_) => {
                 todo!("Func Calls cannot yet be executed at compiletime")

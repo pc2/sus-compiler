@@ -707,6 +707,49 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     );
                 }
             }
+            ExpressionSource::Range { start, end } => {
+                let start_expr = self.working_on.instructions[*start].unwrap_subexpression();
+                let end_expr = self.working_on.instructions[*end].unwrap_subexpression();
+
+                self.type_checker
+                    .abstract_type_substitutor
+                    .unify_report_error(
+                        &start_expr.typ.typ,
+                        &INT_TYPE.scalar(),
+                        start_expr.span,
+                        "range start",
+                    );
+                self.type_checker.unify_domains(
+                    &start_expr.typ.domain,
+                    &expr.typ.domain,
+                    start_expr.span,
+                    "range start",
+                );
+
+                self.type_checker
+                    .abstract_type_substitutor
+                    .unify_report_error(
+                        &end_expr.typ.typ,
+                        &INT_TYPE.scalar(),
+                        end_expr.span,
+                        "range end",
+                    );
+                self.type_checker.unify_domains(
+                    &end_expr.typ.domain,
+                    &expr.typ.domain,
+                    end_expr.span,
+                    "range end",
+                );
+
+                self.type_checker
+                    .abstract_type_substitutor
+                    .unify_report_error(
+                        &expr.typ.typ,
+                        &INT_TYPE.scalar().rank_up(),
+                        Span::new_overarching(start_expr.span, end_expr.span),
+                        "range",
+                    );
+            }
             ExpressionSource::FuncCall(func_call) => {
                 let func_call_outputs = self.typecheck_func_call(func_call);
 
@@ -775,7 +818,8 @@ impl<'l> TypeCheckingContext<'l, '_> {
             | ExpressionSource::UnaryOp { .. }
             | ExpressionSource::BinaryOp { .. }
             | ExpressionSource::ArrayConstruct(..)
-            | ExpressionSource::Constant(..) => {
+            | ExpressionSource::Constant(..)
+            | ExpressionSource::Range { .. } => {
                 if let Some(single_write) = multi_write.first() {
                     self.typecheck_single_output_expr(SingleOutputExpression {
                         typ: &single_write.to_type,

@@ -42,13 +42,14 @@ function commaSepSeq($, rule) {
 
 const PREC = {
     compare : 2,
-    xor: 3,
-    or: 4,
-    and: 5,
-    additive: 6,
-    multiplicative: 7,
-    unary: 8,
-    postscript_op : 9
+    range: 3,
+    xor: 4,
+    or: 5,
+    and: 6,
+    additive: 7,
+    multiplicative: 8,
+    unary: 9,
+    postscript_op : 10
 }
 
 module.exports = grammar({
@@ -231,6 +232,7 @@ module.exports = grammar({
             $.parenthesis_expression,
             $.unary_op,
             $.binary_op,
+            $.range,
             $.func_call,
             $.field_access,
             $.array_list_expression
@@ -257,6 +259,15 @@ module.exports = grammar({
                 field('right', $._expression)
             ))));
         },
+
+        // despite being a binary operation, this is not a binary_op
+        // because it should not be rank-polymorphic, and has a very
+        // different signature to other binary operators
+        range: $ => prec.left(PREC.range, seq(
+            field('start', $._expression),
+            '..',
+            field('end', $._expression)
+        )),
 
         array_op: $ => prec(PREC.postscript_op, seq(
             field('arr', $._expression),

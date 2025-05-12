@@ -531,6 +531,10 @@ pub enum ExpressionSource {
         left: FlatID,
         right: FlatID,
     },
+    Range {
+        start: FlatID,
+        end: FlatID,
+    },
     ArrayConstruct(Vec<FlatID>),
     Constant(Value),
 }
