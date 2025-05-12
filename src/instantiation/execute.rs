@@ -8,9 +8,11 @@ use std::ops::{Deref, Index, IndexMut};
 
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::IsExtern;
-use crate::prelude::*;
 use crate::typing::template::GlobalReference;
 use crate::typing::type_inference::Substitutor;
+use crate::typing::written_type::WrittenType;
+use crate::util::{unwrap_single_element, zip_eq};
+use crate::{let_unwrap, prelude::*};
 
 use ibig::{IBig, UBig};
 
@@ -78,20 +80,14 @@ impl GenerationState<'_> {
         Ok(())
     }
     fn get_generation_value(&self, v: FlatID) -> ExecutionResult<&Value> {
-        if let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] {
-            if let Value::Unset | Value::Error = vv {
-                Err((
-                    self.span_of(v),
-                    format!("This variable is set but it's {:?}!", vv),
-                ))
-            } else {
-                Ok(vv)
-            }
+        let SubModuleOrWire::CompileTimeValue(vv) = &self.generation_state[v] else {
+            unreachable!()
+        };
+
+        if let Value::Unset = vv {
+            Err((self.span_of(v), "This variable is unset!".to_owned()))
         } else {
-            Err((
-                self.span_of(v),
-                "This variable is not set at this point!".to_owned(),
-            ))
+            Ok(vv)
         }
     }
     fn get_generation_integer(&self, idx: FlatID) -> ExecutionResult<&IBig> {
@@ -418,6 +414,7 @@ impl InstantiationContext<'_, '_> {
                     port.port_name_span,
                 ));
             }
+            WireReferenceRoot::Error => unreachable!(),
         })
     }
 
@@ -475,26 +472,65 @@ impl InstantiationContext<'_, '_> {
         });
     }
 
-    fn instantiate_connection(
+    fn write_non_generative(
         &mut self,
-        target_wire_ref: &WireReference,
-        write_modifiers: &WriteModifiers,
-        conn_from: FlatID,
+        write_to: &WriteTo,
+        from: WireID,
         original_connection: FlatID,
     ) -> ExecutionResult<()> {
-        match write_modifiers {
+        let_unwrap!(
             WriteModifiers::Connection {
                 num_regs,
                 regs_span: _,
-            } => match self.determine_wire_ref_root(&target_wire_ref.root)? {
+            },
+            &write_to.write_modifiers
+        );
+        let_unwrap!(
+            RealWireRefRoot::Wire {
+                wire_id: target_wire,
+                preamble,
+            },
+            self.determine_wire_ref_root(&write_to.to.root)?
+        );
+        let domain = self.wires[target_wire].domain;
+        let instantiated_path =
+            self.instantiate_wire_ref_path(preamble, &write_to.to.path, domain)?;
+        self.instantiate_write_to_wire(
+            target_wire,
+            instantiated_path,
+            from,
+            *num_regs,
+            original_connection,
+        );
+        Ok(())
+    }
+
+    fn write_generative(
+        &mut self,
+        write_to: &WriteTo,
+        value: Value,
+        original_connection: FlatID,
+    ) -> ExecutionResult<()> {
+        match &write_to.write_modifiers {
+            WriteModifiers::Connection {
+                num_regs,
+                regs_span: _,
+            } => match self.determine_wire_ref_root(&write_to.to.root)? {
                 RealWireRefRoot::Wire {
                     wire_id: target_wire,
                     preamble,
                 } => {
                     let domain = self.wires[target_wire].domain;
-                    let from = self.get_wire_or_constant_as_wire(conn_from, domain)?;
+                    let from = self.alloc_wire_for_const(
+                        value,
+                        original_connection,
+                        domain,
+                        self.md.link_info.instructions[original_connection]
+                            .unwrap_expression()
+                            .span,
+                    )?;
                     let instantiated_path =
-                        self.instantiate_wire_ref_path(preamble, &target_wire_ref.path, domain)?;
+                        self.instantiate_wire_ref_path(preamble, &write_to.to.path, domain)?;
                     self.instantiate_write_to_wire(
                         target_wire,
                         instantiated_path,
@@ -504,20 +540,16 @@ impl InstantiationContext<'_, '_> {
                     );
                 }
                 RealWireRefRoot::Generative(target_decl) => {
-                    let found_v = self.generation_state[conn_from]
-                        .unwrap_generation_value()
-                        .clone();
-
                     let SubModuleOrWire::CompileTimeValue(v_writable) =
                         &mut self.generation_state[target_decl]
                     else {
                         unreachable!()
                     };
-                    let mut new_val = std::mem::replace(v_writable, Value::Error);
+                    let mut new_val = std::mem::replace(v_writable, Value::Unset);
                     self.generation_state.write_gen_variable(
                         &mut new_val,
-                        &target_wire_ref.path,
-                        found_v,
+                        &write_to.to.path,
+                        value,
                     )?;
 
                     let SubModuleOrWire::CompileTimeValue(v_writable) =
@@ -532,13 +564,8 @@ impl InstantiationContext<'_, '_> {
                 }
             },
             WriteModifiers::Initial { initial_kw_span: _ } => {
-                let found_v = self
-                    .generation_state
-                    .get_generation_value(conn_from)?
-                    .clone();
-
                 let root_wire =
-                    self.generation_state[target_wire_ref.root.unwrap_local_decl()].unwrap_wire();
+                    self.generation_state[write_to.to.root.unwrap_local_decl()].unwrap_wire();
                 let RealWireDataSource::Multiplexer {
                     is_state: Some(initial_value),
                     sources: _,
@@ -548,8 +575,8 @@ impl InstantiationContext<'_, '_> {
                 };
                 self.generation_state.write_gen_variable(
                     initial_value,
-                    &target_wire_ref.path,
-                    found_v,
+                    &write_to.to.path,
+                    value,
                 )?;
             }
         }
@@ -691,12 +718,13 @@ impl InstantiationContext<'_, '_> {
             ),
         })
     }
+
     fn expression_to_real_wire(
         &mut self,
         expression: &Expression,
         original_instruction: FlatID,
         domain: DomainID,
-    ) -> ExecutionResult<WireID> {
+    ) -> ExecutionResult<Vec<WireID>> {
         let source = match &expression.source {
             ExpressionSource::WireRef(wire_ref) => {
                 let (root_wire, path_preamble) =
@@ -705,7 +733,7 @@ impl InstantiationContext<'_, '_> {
 
                 if path.is_empty() {
                     // Little optimization reduces instructions
-                    return Ok(root_wire);
+                    return Ok(vec![root_wire]);
                 }
 
                 RealWireDataSource::Select {
@@ -736,6 +764,42 @@ impl InstantiationContext<'_, '_> {
                     right,
                 }
             }
+            ExpressionSource::FuncCall(fc) => {
+                let submod_id = self.generation_state[fc.interface_reference.submodule_decl]
+                    .unwrap_submodule_instance();
+                let original_submod_instr = self.md.link_info.instructions
+                    [fc.interface_reference.submodule_decl]
+                    .unwrap_submodule();
+                let submod_md = &self.linker.modules[original_submod_instr.module_ref.id];
+                let interface = &submod_md.interfaces[fc.interface_reference.submodule_interface];
+                let submod_interface_domain = interface.domain;
+                let domain = original_submod_instr.local_interface_domains[submod_interface_domain]
+                    .unwrap_physical();
+
+                add_to_small_set(
+                    &mut self.submodules[submod_id].interface_call_sites
+                        [fc.interface_reference.submodule_interface],
+                    fc.interface_reference.interface_span,
+                );
+
+                for (port, arg) in zip_eq(interface.func_call_inputs, &fc.arguments) {
+                    let from = self.get_wire_or_constant_as_wire(*arg, domain)?;
+                    let port_wire = self.get_submodule_port(submod_id, port, None);
+                    self.instantiate_write_to_wire(
+                        port_wire,
+                        Vec::new(),
+                        from,
+                        0,
+                        original_instruction,
+                    );
+                }
+
+                return Ok(interface
+                    .func_call_outputs
+                    .iter()
+                    .map(|port_id| self.get_submodule_port(submod_id, port_id, None))
+                    .collect());
+            }
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut array_wires = Vec::with_capacity(arr.len());
                 for v_id in arr {
@@ -748,7 +812,7 @@ impl InstantiationContext<'_, '_> {
                 unreachable!("Constant cannot be non-compile-time");
             }
         };
-        Ok(self.wires.alloc(RealWire {
+        Ok(vec![self.wires.alloc(RealWire {
             name: self.unique_name_producer.get_unique_name(""),
             typ: self.type_substitutor.alloc_unknown(),
             original_instruction,
@@ -756,7 +820,15 @@ impl InstantiationContext<'_, '_> {
             source,
             specified_latency: CALCULATE_LATENCY_LATER,
             absolute_latency: CALCULATE_LATENCY_LATER,
-        }))
+        })])
+    }
+
+    fn get_specified_latency(&mut self, spec_lat: Option<FlatID>) -> ExecutionResult<i64> {
+        Ok(if let Some(spec) = &spec_lat {
+            self.generation_state.get_generation_small_int(*spec)?
+        } else {
+            CALCULATE_LATENCY_LATER
+        })
     }
 
     fn instantiate_declaration(
@@ -792,11 +864,7 @@ impl InstantiationContext<'_, '_> {
                 }
             };
 
-            let specified_latency: i64 = if let Some(spec) = &wire_decl.latency_specifier {
-                self.generation_state.get_generation_small_int(*spec)?
-            } else {
-                CALCULATE_LATENCY_LATER
-            };
+            let specified_latency = self.get_specified_latency(wire_decl.latency_specifier)?;
             let wire_id = self.wires.alloc(RealWire {
                 name: self.unique_name_producer.get_unique_name(&wire_decl.name),
                 typ,
@@ -843,6 +911,7 @@ impl InstantiationContext<'_, '_> {
             &WireReferenceRoot::SubModulePort(_) => {
                 todo!("Don't yet support compile time functions")
             }
+            WireReferenceRoot::Error => caught_by_typecheck!(),
         };
 
         for path_elem in &wire_ref.path {
@@ -857,7 +926,7 @@ impl InstantiationContext<'_, '_> {
 
         Ok(work_on_value)
     }
-    fn compute_compile_time(&mut self, expression: &Expression) -> ExecutionResult<Value> {
+    fn compute_compile_time(&mut self, expr: &Expression) -> ExecutionResult<Value> {
         fn duplicate_for_all_array_ranks<const SZ: usize>(
             values: &[&Value; SZ],
             rank: usize,
@@ -885,7 +954,7 @@ impl InstantiationContext<'_, '_> {
             }
         }
 
-        Ok(match &expression.source {
+        Ok(match &expr.source {
             ExpressionSource::WireRef(wire_ref) => {
                 self.compute_compile_time_wireref(wire_ref)?.clone()
             }
@@ -924,7 +993,10 @@ impl InstantiationContext<'_, '_> {
                         Ok(compute_binary_op(l, *op, r))
                     },
                 )
-                .map_err(|reason| (expression.span, reason))?
+                .map_err(|reason| (expr.span, reason))?
+            }
+            ExpressionSource::FuncCall(_) => {
+                todo!("Func Calls cannot yet be executed at compiletime")
             }
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut result = Vec::with_capacity(arr.len());
@@ -969,100 +1041,77 @@ impl InstantiationContext<'_, '_> {
                 Instruction::Declaration(wire_decl) => {
                     self.instantiate_declaration(wire_decl, original_instruction)?
                 }
-                Instruction::Expression(expr) => match expr.typ.domain {
-                    DomainType::Generative => {
-                        let value_computed = self.compute_compile_time(expr)?;
-                        SubModuleOrWire::CompileTimeValue(value_computed)
+                Instruction::Expression(expr) => {
+                    match expr.domain {
+                        DomainType::Generative => {
+                            let value_computed = self.compute_compile_time(expr)?;
+                            match &expr.output {
+                                ExpressionOutput::SubExpression(_full_type) => {} // Simply returning value_computed is enough
+                                ExpressionOutput::MultiWrite(write_tos) => {
+                                    if let Some(single_write) = write_tos.first() {
+                                        self.write_generative(
+                                            single_write,
+                                            value_computed.clone(), // We do an extra clone, maybe not needed, such that we can show the value in GenerationState
+                                            original_instruction,
+                                        )?;
+                                    }
+                                }
+                            }
+                            SubModuleOrWire::CompileTimeValue(value_computed)
+                        }
+                        DomainType::Physical(domain) => {
+                            let output_wires =
+                                self.expression_to_real_wire(expr, original_instruction, domain)?;
+                            match &expr.output {
+                                ExpressionOutput::SubExpression(_full_type) => {
+                                    let single_wire = unwrap_single_element(output_wires);
+                                    SubModuleOrWire::Wire(single_wire)
+                                }
+                                ExpressionOutput::MultiWrite(write_tos) => {
+                                    if write_tos.is_empty() {
+                                        continue; // See no errors on zero outputs (#79)
+                                    }
+                                    for (expr_output, write) in zip_eq(output_wires, write_tos) {
+                                        self.write_non_generative(
+                                            write,
+                                            expr_output,
+                                            original_instruction,
+                                        )?;
+                                    }
+                                    continue;
+                                }
+                            }
+                        }
+                        DomainType::Unknown(_) => caught_by_typecheck!(),
                     }
-                    DomainType::Physical(domain) => {
-                        let wire_found =
-                            self.expression_to_real_wire(expr, original_instruction, domain)?;
-                        SubModuleOrWire::Wire(wire_found)
-                    }
-                    DomainType::Unknown(_) => {
-                        unreachable!("Domain variables have been eliminated by type checking")
-                    }
-                },
-                Instruction::Write(conn) => {
-                    self.instantiate_connection(
-                        &conn.to,
-                        &conn.write_modifiers,
-                        conn.from,
-                        original_instruction,
-                    )?;
-                    continue;
-                }
-                Instruction::FuncCall(fc) => {
-                    let submod_id = self.generation_state[fc.interface_reference.submodule_decl]
-                        .unwrap_submodule_instance();
-                    let original_submod_instr = self.md.link_info.instructions
-                        [fc.interface_reference.submodule_decl]
-                        .unwrap_submodule();
-                    let submod_md = &self.linker.modules[original_submod_instr.module_ref.id];
-                    let submod_interface_domain =
-                        submod_md.interfaces[fc.interface_reference.submodule_interface].domain;
-                    let domain =
-                        original_submod_instr.local_interface_domains[submod_interface_domain];
-
-                    add_to_small_set(
-                        &mut self.submodules[submod_id].interface_call_sites
-                            [fc.interface_reference.submodule_interface],
-                        fc.interface_reference.interface_span,
-                    );
-                    for (port, arg) in
-                        std::iter::zip(fc.func_call_inputs.iter(), fc.arguments.iter())
-                    {
-                        let from =
-                            self.get_wire_or_constant_as_wire(*arg, domain.unwrap_physical())?;
-                        let port_wire = self.get_submodule_port(submod_id, port, None);
-                        self.instantiate_write_to_wire(
-                            port_wire,
-                            Vec::new(),
-                            from,
-                            0,
-                            original_instruction,
-                        );
-                    }
-
-                    continue;
                 }
                 Instruction::IfStatement(stm) => {
-                    let then_range = FlatIDRange::new(stm.then_start, stm.then_end_else_start);
-                    let else_range = FlatIDRange::new(stm.then_end_else_start, stm.else_end);
-                    let if_condition_expr =
-                        self.md.link_info.instructions[stm.condition].unwrap_expression();
-                    match if_condition_expr.typ.domain {
-                        DomainType::Generative => {
-                            let condition_val =
-                                self.generation_state.get_generation_value(stm.condition)?;
-                            let run_range = if condition_val.unwrap_bool() {
-                                then_range
-                            } else {
-                                else_range
-                            };
-                            self.instantiate_code_block(run_range)?;
-                        }
-                        DomainType::Physical(_domain) => {
-                            let condition_wire = self.generation_state[stm.condition].unwrap_wire();
-                            self.condition_stack.push(ConditionStackElem {
-                                condition_wire,
-                                inverse: false,
-                            });
-                            self.instantiate_code_block(then_range)?;
+                    if stm.is_generative {
+                        let condition_val =
+                            self.generation_state.get_generation_value(stm.condition)?;
+                        let run_range = if condition_val.unwrap_bool() {
+                            stm.then_block
+                        } else {
+                            stm.else_block
+                        };
+                        self.instantiate_code_block(run_range)?;
+                    } else {
+                        let condition_wire = self.generation_state[stm.condition].unwrap_wire();
+                        self.condition_stack.push(ConditionStackElem {
+                            condition_wire,
+                            inverse: false,
+                        });
+                        self.instantiate_code_block(stm.then_block)?;
 
-                            if !else_range.is_empty() {
-                                self.condition_stack.last_mut().unwrap().inverse = true;
-                                self.instantiate_code_block(else_range)?;
-                            }
+                        if !stm.else_block.is_empty() {
+                            self.condition_stack.last_mut().unwrap().inverse = true;
+                            self.instantiate_code_block(stm.else_block)?;
+                        }
 
-                            // Get rid of the condition
-                            let _ = self.condition_stack.pop().unwrap();
-                        }
-                        DomainType::Unknown(_) => {
-                            unreachable!("Domain variables have been eliminated by type checking")
-                        }
+                        // Get rid of the condition
+                        let _ = self.condition_stack.pop().unwrap();
                     }
-                    instruction_range.skip_to(stm.else_end);
+                    instruction_range.skip_to(stm.else_block.1);
                     continue;
                 }
                 Instruction::ForStatement(stm) => {

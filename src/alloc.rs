@@ -169,6 +169,10 @@ impl<IndexMarker> UUIDRange<IndexMarker> {
     pub fn len(&self) -> usize {
         self.1 .0 - self.0 .0
     }
+    pub fn unwrap_len_1(&self) -> UUID<IndexMarker> {
+        assert!(self.len() == 1);
+        self.0
+    }
     pub fn first(&self) -> Option<UUID<IndexMarker>> {
         (self.0 .0 < self.1 .0).then_some(self.0)
     }

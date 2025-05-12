@@ -1,5 +1,4 @@
-use super::abstract_type::AbstractRankedType;
-use crate::flattening::WrittenType;
+use super::{abstract_type::AbstractRankedType, written_type::WrittenType};
 use crate::prelude::*;
 
 /// References any [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant],
@@ -120,3 +119,15 @@ impl TemplateArgKind {
 
 /// A convienent type alias for all places where lists of template args are needed
 pub type TVec<T> = FlatAlloc<T, TemplateIDMarker>;
+
+pub fn for_each_generative_input_in_template_args(
+    template_args: &TVec<Option<TemplateArg>>,
+    f: &mut impl FnMut(FlatID),
+) {
+    for (_id, t_arg) in template_args.iter_valids() {
+        match &t_arg.kind {
+            TemplateArgKind::Type(typ) => typ.for_each_generative_input(f),
+            TemplateArgKind::Value(val) => f(*val),
+        }
+    }
+}

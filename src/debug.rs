@@ -6,7 +6,13 @@ use crate::{config::config, linker::FileData, prelude::Span, pretty_print_spans_
 
 /// Many duplicates will be produced, and filtering them out in the code itself is inefficient. Therefore just keep a big buffer and deduplicate as needed
 const SPAN_TOUCH_HISTORY_SIZE: usize = 256;
+const RECENT_DEBUG_FLAG_SIZE: usize = 10;
 const NUM_SPANS_TO_PRINT: usize = 10;
+
+struct PerThreadDebugInfo {
+    debug_stack: Vec<SpanDebuggerStackElement>,
+    recent_debug_options: CircularBuffer<RECENT_DEBUG_FLAG_SIZE, &'static str>,
+}
 
 struct SpanDebuggerStackElement {
     context: String,
@@ -15,7 +21,7 @@ struct SpanDebuggerStackElement {
 }
 
 thread_local! {
-    static DEBUG_STACK : RefCell<Vec<SpanDebuggerStackElement>> = const { RefCell::new(Vec::new()) };
+    static DEBUG_STACK : RefCell<PerThreadDebugInfo> = const { RefCell::new(PerThreadDebugInfo{debug_stack: Vec::new(), recent_debug_options: CircularBuffer::new()}) };
 }
 
 /// Register a [crate::file_position::Span] for potential printing by [PanicGuardSpanPrinter] on panic.
@@ -26,7 +32,7 @@ thread_local! {
 pub fn add_debug_span(sp: Span) {
     // Convert to range so we don't invoke any of Span's triggers
     DEBUG_STACK.with_borrow_mut(|history| {
-        let Some(last) = history.last_mut() else {
+        let Some(last) = history.debug_stack.last_mut() else {
             return; // Can't track Spans not in a SpanDebugger region
         };
 
@@ -36,7 +42,7 @@ pub fn add_debug_span(sp: Span) {
 
 fn print_most_recent_spans(file_data: &FileData) {
     DEBUG_STACK.with_borrow_mut(|history| {
-        let Some(history) = history.last_mut() else {return;}; // Exit because we can't know what context. TODO FIX AND SPAN + FileUUID
+        let Some(history) = history.debug_stack.last_mut() else {return;}; // Exit because we can't know what context. TODO FIX AND SPAN + FileUUID
 
         let mut spans_to_print: Vec<Range<usize>> = Vec::with_capacity(NUM_SPANS_TO_PRINT);
 
@@ -71,7 +77,7 @@ fn print_stack_top(enter_exit: &str) {
         if !config().enabled_debug_paths.contains("spandebugger") {
             return;
         }
-        if let Some(top) = stack.last() {
+        if let Some(top) = stack.debug_stack.last() {
             let debug_enabled = if top.debugging_enabled {
                 " DEBUGGING ENABLED"
             } else {
@@ -79,7 +85,7 @@ fn print_stack_top(enter_exit: &str) {
             };
             println!(
                 "{enter_exit}SpanDebugger (x{}) {}{debug_enabled}",
-                stack.len(),
+                stack.debug_stack.len(),
                 top.context
             );
         } else {
@@ -101,7 +107,7 @@ impl<'text> SpanDebugger<'text> {
                     .iter()
                     .any(|v| global_obj_name.contains(v));
 
-            history.push(SpanDebuggerStackElement {
+            history.debug_stack.push(SpanDebuggerStackElement {
                 context,
                 debugging_enabled,
                 span_history: CircularBuffer::new(),
@@ -116,7 +122,7 @@ impl<'text> SpanDebugger<'text> {
 impl Drop for SpanDebugger<'_> {
     fn drop(&mut self) {
         print_stack_top("Exit ");
-        DEBUG_STACK.with_borrow_mut(|stack| stack.pop());
+        DEBUG_STACK.with_borrow_mut(|stack| stack.debug_stack.pop());
         print_stack_top("");
 
         if std::thread::panicking() {
@@ -128,8 +134,9 @@ impl Drop for SpanDebugger<'_> {
 
 /// Check if the debug path is enabled
 pub fn is_enabled(path_id: &'static str) -> bool {
-    DEBUG_STACK.with_borrow(|stack| {
-        let Some(last) = stack.last() else {
+    DEBUG_STACK.with_borrow_mut(|stack| {
+        stack.recent_debug_options.push_back(path_id);
+        let Some(last) = stack.debug_stack.last() else {
             return false;
         };
         if !last.debugging_enabled {
@@ -138,4 +145,18 @@ pub fn is_enabled(path_id: &'static str) -> bool {
 
         config().enabled_debug_paths.contains(path_id)
     })
+}
+
+pub fn setup_panic_handler() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        default_hook(info);
+
+        DEBUG_STACK.with_borrow(|history| {
+            println!("Most recent available debug paths:");
+            for d in &history.recent_debug_options {
+                println!("--debug {d}");
+            }
+        })
+    }));
 }

@@ -19,7 +19,6 @@ pub enum Value {
     Array(Vec<Value>),
     /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
-    Error,
 }
 
 impl ConcreteType {
@@ -85,8 +84,8 @@ impl Value {
                 (_, Value::Array(_)) => {
                     unreachable!("All arrays handled by get_tensor_size_recursive")
                 }
-                (_, Value::Unset) | (_, Value::Error) => {
-                    return Err("This compile-time constant contains a Unset or Error".into());
+                (_, Value::Unset) => {
+                    return Err("This compile-time constant contains Unset".into());
                 }
             };
             Ok(())
@@ -129,35 +128,12 @@ impl Value {
             elem_fn(self)
         }
     }
-    pub fn is_of_type(&self, typ: &ConcreteType) -> bool {
-        match (self, typ) {
-            (Self::Integer(_), ConcreteType::Named(global_ref)) => {
-                global_ref.id == get_builtin_type!("int")
-            }
-            (Self::Bool(_), typ) if *typ == BOOL_CONCRETE_TYPE => true,
-            (Self::Array(arr_slice), ConcreteType::Array(arr_typ_box)) => {
-                let (arr_content_typ, arr_size_typ) = arr_typ_box.deref();
-                if IBig::from(arr_slice.len()) != *arr_size_typ.unwrap_value().unwrap_integer() {
-                    return false;
-                }
-                for v in arr_slice.iter() {
-                    if !v.is_of_type(arr_content_typ) {
-                        return false;
-                    }
-                }
-                true
-            }
-            (Self::Unset, _) => true,
-            (Self::Error, _) => true,
-            _other => false,
-        }
-    }
 
     pub fn contains_errors_or_unsets(&self) -> bool {
         match self {
             Value::Bool(_) | Value::Integer(_) => false,
             Value::Array(values) => values.iter().any(|v| v.contains_errors_or_unsets()),
-            Value::Unset | Value::Error => true,
+            Value::Unset => true,
         }
     }
 
@@ -194,10 +170,6 @@ impl Value {
 }
 
 pub fn compute_unary_op(op: UnaryOperator, v: &Value) -> Value {
-    if *v == Value::Error {
-        unreachable!("unary op on Value::Error!")
-        //return Value::Error
-    }
     match op {
         UnaryOperator::Or => {
             todo!("Array Values")
@@ -228,10 +200,6 @@ pub fn compute_unary_op(op: UnaryOperator, v: &Value) -> Value {
 }
 
 pub fn compute_binary_op(left: &Value, op: BinaryOperator, right: &Value) -> Value {
-    if *left == Value::Error || *right == Value::Error {
-        unreachable!("binary op on Value::Error!")
-        //return Value::Error
-    }
     match op {
         BinaryOperator::Equals => Value::Bool(left == right),
         BinaryOperator::NotEquals => Value::Bool(left != right),

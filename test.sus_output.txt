@@ -665,14 +665,7 @@ Instantiating example_FIFO
 Concrete Typechecking example_FIFO
 Latency Counting example_FIFO
 Checking array accesses example_FIFO
-Instantiating use_Iterator
-Concrete Typechecking use_Iterator
-Instantiating Iterator
-Concrete Typechecking Iterator
-Latency Counting Iterator
-Checking array accesses Iterator
-Latency Counting use_Iterator
-Checking array accesses use_Iterator
+Not Instantiating use_Iterator due to flattening errors
 Instantiating UseSlice
 Concrete Typechecking UseSlice
 Latency Counting UseSlice

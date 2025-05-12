@@ -4,8 +4,8 @@ use crate::errors::ErrorStore;
 use crate::linker::{IsExtern, AFTER_INITIAL_PARSE_CP};
 use crate::prelude::*;
 
+use crate::flattening::Module;
 use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
-use crate::{file_position::FileText, flattening::Module};
 
 use crate::typing::template::{
     GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind,
@@ -28,14 +28,11 @@ struct InitializationContext<'linker> {
     fields: FlatAlloc<StructField, FieldIDMarker>,
 
     errors: ErrorCollector<'linker>,
-
-    file_text: &'linker FileText,
 }
 
 impl InitializationContext<'_> {
     fn gather_initial_global_object(&mut self, cursor: &mut Cursor) -> (Span, String) {
-        let name_span = cursor.field_span(field!("name"), kind!("identifier"));
-        let name = self.file_text[name_span].to_owned();
+        let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
         self.domains.alloc(DomainInfo {
             name: "clk".to_string(),
             name_span: None,
@@ -45,8 +42,8 @@ impl InitializationContext<'_> {
                 let (kind, decl_span) = cursor.kind_span();
                 match kind {
                     kind!("template_declaration_type") => cursor.go_down_no_check(|cursor| {
-                        let name_span = cursor.field_span(field!("name"), kind!("identifier"));
-                        let name = self.file_text[name_span].to_owned();
+                        let (name_span, name) =
+                            cursor.field_to_string(field!("name"), kind!("identifier"));
                         self.parameters.alloc(Parameter {
                             name,
                             name_span,
@@ -57,8 +54,8 @@ impl InitializationContext<'_> {
                         let _ = cursor.optional_field(field!("io_port_modifiers"));
                         let _ = cursor.optional_field(field!("declaration_modifiers"));
                         cursor.field(field!("type"));
-                        let name_span = cursor.field_span(field!("name"), kind!("identifier"));
-                        let name = self.file_text[name_span].to_owned();
+                        let (name_span, name) =
+                            cursor.field_to_string(field!("name"), kind!("identifier"));
 
                         self.parameters.alloc(Parameter {
                             name,
@@ -85,18 +82,7 @@ impl InitializationContext<'_> {
             cursor.field(field!("statement_type"));
             cursor.field(field!("condition"));
             cursor.field(field!("then_block"));
-            self.gather_all_ports_in_block(cursor);
-            if cursor.optional_field(field!("else_block")) {
-                match cursor.kind() {
-                    kind!("if_statement") => {
-                        self.gather_ports_in_if_stmt(cursor);
-                    }
-                    kind!("block") => {
-                        self.gather_all_ports_in_block(cursor);
-                    }
-                    _other => unreachable!(),
-                }
-            }
+            self.gather_all_ports_in_block_and_else_block(cursor);
         })
     }
 
@@ -129,10 +115,8 @@ impl InitializationContext<'_> {
                 kind!("domain_statement") => {
                     let whole_domain_statement_span = cursor.span();
                     cursor.go_down_no_check(|cursor| {
-                        let domain_name_span =
-                            cursor.field_span(field!("name"), kind!("identifier"));
-                        let name = &self.file_text[domain_name_span];
-
+                        let (domain_name_span, domain_name) =
+                            cursor.field_to_string(field!("name"), kind!("identifier"));
                         if self.implicit_clk_domain {
                             if let Some(existing_port) = self.ports.iter().next() {
                                 // Sad Path: Having ports on the implicit clk domain is not allowed. 
@@ -145,14 +129,14 @@ impl InitializationContext<'_> {
 
                             self.implicit_clk_domain = false;
                         }
-                        self.domains.alloc(DomainInfo { name: name.to_owned(), name_span: Some(domain_name_span) })
+                        self.domains.alloc(DomainInfo { name: domain_name, name_span: Some(domain_name_span) })
                     });
                 }
                 kind!("interface_statement") => {
                     cursor.go_down_no_check(|cursor| {
-                        let name_span = cursor.field_span(field!("name"), kind!("identifier"));
+                        let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
 
-                        self.gather_func_call_ports(name_span, cursor);
+                        self.gather_func_call_ports(name_span, name, cursor);
                     });
                 }
                 kind!("block") => {
@@ -182,17 +166,39 @@ impl InitializationContext<'_> {
         });
     }
 
-    fn gather_func_call_ports(&mut self, interface_name_span: Span, cursor: &mut Cursor) {
+    fn gather_all_ports_in_block_and_else_block(&mut self, cursor: &mut Cursor) {
+        self.gather_all_ports_in_block(cursor);
+        if cursor.optional_field(field!("else_block")) {
+            cursor.go_down_no_check(|cursor| {
+                cursor.field(field!("content"));
+                match cursor.kind() {
+                    kind!("if_statement") => {
+                        self.gather_ports_in_if_stmt(cursor);
+                    }
+                    kind!("block") => {
+                        self.gather_all_ports_in_block(cursor);
+                    }
+                    _other => unreachable!(),
+                }
+            });
+        }
+    }
+
+    fn gather_func_call_ports(
+        &mut self,
+        interface_name_span: Span,
+        name: String,
+        cursor: &mut Cursor,
+    ) {
         let ports = if cursor.optional_field(field!("interface_ports")) {
             cursor.go_down(kind!("interface_ports"), |cursor| {
-                (
-                    cursor
-                        .optional_field(field!("inputs"))
-                        .then(|| self.gather_decl_names_in_list(true, cursor)),
-                    cursor
-                        .optional_field(field!("outputs"))
-                        .then(|| self.gather_decl_names_in_list(false, cursor)),
-                )
+                let inputs = cursor
+                    .optional_field(field!("inputs"))
+                    .then(|| self.gather_decl_names_in_list(true, cursor));
+                let outputs = cursor
+                    .optional_field(field!("outputs"))
+                    .then(|| self.gather_decl_names_in_list(false, cursor));
+                (inputs, outputs)
             })
         } else {
             (None, None)
@@ -212,7 +218,7 @@ impl InitializationContext<'_> {
             func_call_outputs,
             domain: self.domains.last_id(),
             name_span: interface_name_span,
-            name: self.file_text[interface_name_span].to_owned(),
+            name,
         });
     }
 
@@ -245,8 +251,7 @@ impl InitializationContext<'_> {
         cursor.field(field!("type"));
         let type_span = cursor.span();
         let decl_span = Span::new_overarching(type_span, whole_decl_span.empty_span_at_end());
-        let name_span = cursor.field_span(field!("name"), kind!("identifier"));
-        let name = self.file_text[name_span].to_owned();
+        let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
 
         match (is_generative, is_input) {
             (false, Some(is_input)) => {
@@ -261,7 +266,7 @@ impl InitializationContext<'_> {
             }
             (false, None) => {
                 self.fields.alloc(StructField {
-                    name: name.clone(),
+                    name,
                     name_span,
                     decl_span,
                     declaration_instruction: FlatID::PLACEHOLDER,
@@ -339,7 +344,6 @@ fn initialize_global_object(
         parameters: FlatAlloc::new(),
         fields: FlatAlloc::new(),
         errors: parsing_errors,
-        file_text: &builder.file_data.file_text,
     };
 
     let (name_span, name) = ctx.gather_initial_global_object(cursor);
