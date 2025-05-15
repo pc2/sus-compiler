@@ -4,15 +4,19 @@ use std::cell::OnceCell;
 use std::fmt::Debug;
 use std::ops::{BitAnd, Deref, DerefMut};
 
+use ibig::IBig;
+use sus_proc_macro::get_builtin_type;
+
 use crate::errors::ErrorInfo;
 use crate::prelude::*;
 
-use crate::alloc::{UUIDMarker, UUID};
+use crate::alloc::{get2_mut, zip_eq, UUIDMarker, UUID};
+use crate::typing::template::TemplateKind;
 use crate::value::Value;
 
-use super::abstract_type::{AbstractInnerType, DomainType};
-use super::abstract_type::{AbstractRankedType, PeanoType};
-use super::concrete_type::ConcreteType;
+use super::abstract_type::{AbstractInnerType, PeanoType};
+use super::abstract_type::{AbstractRankedType, DomainType};
+use super::concrete_type::{ConcreteGlobalReference, ConcreteType};
 
 pub struct InnerTypeVariableIDMarker;
 impl UUIDMarker for InnerTypeVariableIDMarker {
@@ -455,8 +459,16 @@ impl HindleyMilner for ConcreteType {
     ) -> UnifyResult {
         match (left, right) {
             (ConcreteType::Named(na), ConcreteType::Named(nb)) => {
-                assert!(*na == *nb);
-                UnifyResult::Success
+                zip_eq(na.template_args.iter(), nb.template_args.iter())
+                    .map(|(_, template_arg_a, template_arg_b)| {
+                        match template_arg_a.and_by_ref(template_arg_b) {
+                            TemplateKind::Type((ta, tb)) => unify(ta, tb),
+                            TemplateKind::Value((va, vb)) => unify(va, vb),
+                        }
+                    })
+                    .fold(UnifyResult::Success, |result_acc, result| {
+                        result_acc & result
+                    })
             } // Already covered by get_hm_info
             (ConcreteType::Value(v_1), ConcreteType::Value(v_2)) => {
                 assert!(*v_1 == *v_2);
@@ -508,7 +520,18 @@ impl Substitutor for TypeSubstitutor<ConcreteType> {
 
     fn fully_substitute(&self, typ: &mut ConcreteType) -> bool {
         match typ {
-            ConcreteType::Named(_) | ConcreteType::Value(_) => true, // Don't need to do anything, this is already final
+            ConcreteType::Value(_) => true, // Don't need to do anything, this is already final
+            ConcreteType::Named(concrete_global_ref) => {
+                let mut result = true;
+                for (_, template_arg) in &mut concrete_global_ref.template_args {
+                    result = result
+                        && match template_arg {
+                            TemplateKind::Type(t) => self.fully_substitute(t),
+                            TemplateKind::Value(v) => self.fully_substitute(v),
+                        };
+                }
+                result
+            }
             ConcreteType::Array(arr_typ) => {
                 let (arr_typ, arr_sz) = arr_typ.deref_mut();
                 self.fully_substitute(arr_typ) && self.fully_substitute(arr_sz)
@@ -535,6 +558,22 @@ impl Substitutor for TypeSubstitutor<ConcreteType> {
 impl TypeSubstitutor<ConcreteType> {
     pub fn make_array_of(&mut self, content_typ: ConcreteType) -> ConcreteType {
         ConcreteType::Array(Box::new((content_typ, self.alloc_unknown())))
+    }
+    fn mk_int_maybe(&mut self, v: Option<IBig>) -> TemplateKind<ConcreteType, ConcreteType> {
+        TemplateKind::Value(match v {
+            Some(v) => ConcreteType::Value(Value::Integer(v)),
+            None => self.alloc_unknown(),
+        })
+    }
+    /// Creates a new `int #(int MIN, int MAX)`. The resulting int can have a value from `MIN` to `MAX-1`
+    pub fn new_int_type(&mut self, min: Option<IBig>, max: Option<IBig>) -> ConcreteType {
+        let template_args =
+            FlatAlloc::from_vec(vec![self.mk_int_maybe(min), self.mk_int_maybe(max)]);
+
+        ConcreteType::Named(ConcreteGlobalReference {
+            id: get_builtin_type!("int"),
+            template_args,
+        })
     }
 }
 
@@ -701,6 +740,81 @@ impl<S: Substitutor> Drop for TypeUnifier<S> {
                 "Errors were not extracted before dropping!"
             );
         }
+    }
+}
+
+enum KnownValue<T, ID> {
+    Unknown(Vec<ID>),
+    Known(T),
+}
+
+impl<T: Unifyable + Eq> Default for SetUnifier<T> {
+    fn default() -> Self {
+        Self {
+            ptrs: Default::default(),
+            known_values: Default::default(),
+        }
+    }
+}
+pub struct SetUnifier<T: Unifyable + Eq> {
+    ptrs: FlatAlloc<usize, T::IDMarker>,
+    known_values: Vec<KnownValue<T, UUID<T::IDMarker>>>,
+}
+
+pub trait Unifyable {
+    type IDMarker;
+
+    fn get_unknown(&self) -> Option<UUID<Self::IDMarker>>;
+    fn new_unknown(id: UUID<Self::IDMarker>) -> Self;
+}
+
+impl<T: Unifyable + Eq + Clone> SetUnifier<T> {
+    pub fn must_be_equal(&mut self, a: &T, b: &T) -> Option<()> {
+        match (a, a.get_unknown(), b, b.get_unknown()) {
+            (_, None, _, None) => None,
+            (v, None, _, Some(var)) | (_, Some(var), v, None) => {
+                let k = &mut self.known_values[self.ptrs[var]];
+                if let KnownValue::Known(k) = k {
+                    (k == v).then_some(())
+                } else {
+                    *k = KnownValue::Known(v.clone());
+                    Some(())
+                }
+            }
+            (_, Some(idx_a), _, Some(idx_b)) => {
+                let idx_a = self.ptrs[idx_a];
+                let idx_b = self.ptrs[idx_b];
+                let (old_vector, to) = match get2_mut(&mut self.known_values, idx_a, idx_b) {
+                    Some((KnownValue::Unknown(a_v), KnownValue::Unknown(b_v))) => {
+                        if a_v.len() > b_v.len() {
+                            a_v.extend_from_slice(b_v);
+                            (b_v, idx_a)
+                        } else {
+                            b_v.extend_from_slice(a_v);
+                            (a_v, idx_b)
+                        }
+                    }
+                    Some((KnownValue::Unknown(v), KnownValue::Known(_))) => (v, idx_a),
+                    Some((KnownValue::Known(_), KnownValue::Unknown(v))) => (v, idx_b),
+                    Some((KnownValue::Known(x), KnownValue::Known(y))) => {
+                        return (x == y).then_some(())
+                    }
+                    None => return Some(()),
+                };
+
+                for v in std::mem::take(old_vector) {
+                    self.ptrs[v] = to;
+                }
+
+                Some(())
+            }
+        }
+    }
+
+    pub fn alloc_unknown(&mut self) -> T {
+        let new_ptr = self.ptrs.alloc(self.known_values.len());
+        self.known_values.push(KnownValue::Unknown(vec![new_ptr]));
+        T::new_unknown(new_ptr)
     }
 }
 

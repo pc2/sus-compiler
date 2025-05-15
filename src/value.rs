@@ -2,10 +2,15 @@ use std::ops::Deref;
 
 use ibig::IBig;
 
+use crate::alloc::FlatAlloc;
 use crate::flattening::{BinaryOperator, UnaryOperator};
+use crate::typing::template::TemplateKind;
+use sus_proc_macro::get_builtin_type;
 
-use crate::typing::concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE, INT_CONCRETE_TYPE};
-use crate::typing::type_inference::{Substitutor, TypeSubstitutor};
+use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType, BOOL_CONCRETE_TYPE};
+use crate::typing::type_inference::{
+    ConcreteTypeVariableID, ConcreteTypeVariableIDMarker, Substitutor, TypeSubstitutor, Unifyable,
+};
 
 /// Top type for any kind of compiletime value while executing.
 ///
@@ -17,54 +22,176 @@ pub enum Value {
     Array(Vec<Value>),
     /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
+    Unknown(ConcreteTypeVariableID),
 }
 
-impl ConcreteType {
+impl Unifyable for Value {
+    type IDMarker = ConcreteTypeVariableIDMarker;
+    fn get_unknown(&self) -> Option<ConcreteTypeVariableID> {
+        if let Value::Unknown(var) = self {
+            Some(*var)
+        } else {
+            None
+        }
+    }
+
+    fn new_unknown(id: ConcreteTypeVariableID) -> Self {
+        Value::Unknown(id)
+    }
+}
+
+/*impl ConcreteType {
+    fn update_smallest_common_supertype(&mut self, other: &Self) -> Option<()> {
+        match (self, other) {
+            (_, ConcreteType::Unknown(_)) | (ConcreteType::Unknown(_), _) => None,
+            (ConcreteType::Named(left), ConcreteType::Named(right)) => {
+                assert_eq!(left.id, right.id);
+                if left.id == get_builtin_type!("int") {
+                    if let (
+                        [TemplateKind::Value(ConcreteType::Value(Value::Integer(left_min))), TemplateKind::Value(ConcreteType::Value(Value::Integer(left_max)))],
+                        [TemplateKind::Value(ConcreteType::Value(Value::Integer(right_min))), TemplateKind::Value(ConcreteType::Value(Value::Integer(right_max)))],
+                    ) = (
+                        left.template_args.cast_to_array_mut(),
+                        right.template_args.cast_to_array(),
+                    ) {
+                        if right_min < left_min {
+                            *left_min = right_min.clone();
+                        }
+                        if right_max > left_max {
+                            *left_max = right_max.clone();
+                        }
+                        Some(())
+                    } else {
+                        None
+                    }
+                } else {
+                    for (_, left_arg, right_arg) in
+                        zip_eq(left.template_args.iter_mut(), right.template_args.iter())
+                    {
+                        left_arg.update_smallest_common_supertype(right_arg)?;
+                    }
+                    Some(())
+                }
+            }
+            (ConcreteType::Array(left), ConcreteType::Array(right)) => {
+                let (left_content, left_size) = left.deref_mut();
+                let (right_content, right_size) = right.deref();
+                left_size.update_smallest_common_supertype(right_size)?;
+                left_content.update_smallest_common_supertype(right_content)
+            }
+            (ConcreteType::Value(left), ConcreteType::Value(right)) => {
+                (left == right).then_some(())
+            }
+            _ => unreachable!("Caught by typecheck"),
+        }
+    }
     /// On the road to implementing subtyping. Takes in a list of types,
     /// and computes the smallest supertype that all list elements can coerce to.
     /// TODO integrate into Hindley-Milner more closely
     fn get_smallest_common_supertype(
-        list: &[Self],
+        mut iter: impl Iterator<Item = Self>,
         type_substitutor: &mut TypeSubstitutor<ConcreteType>,
     ) -> Option<Self> {
-        let mut iter = list.iter();
+        let mut first = iter.next()?;
+        let _ = type_substitutor.fully_substitute(&mut first);
 
-        let first = iter.next()?.clone();
-
-        for elem in iter {
-            type_substitutor.unify_must_succeed(&first, elem);
+        for mut elem in iter {
+            let _ = type_substitutor.fully_substitute(&mut elem);
+            first.update_smallest_common_supertype(&elem)?;
         }
 
         Some(first)
     }
-}
+}*/
 
 impl Value {
     /// Traverses the Value, to create a best-effort [ConcreteType] for it.
-    /// So '1' becomes [INT_CONCRETE_TYPE],
+    /// So '1' becomes `ConcreteType::Named(ConcreteGlobalReference{id: get_builtin_type!("int"), ...}})`,
     /// but `Value::Array([])` becomes `ConcreteType::Array((ConcreteType::Unknown, 0))`
     ///
     /// Panics when arrays contain mutually incompatible types
-    pub fn get_type(&self, type_substitutor: &mut TypeSubstitutor<ConcreteType>) -> ConcreteType {
-        match self {
-            Value::Bool(_) => BOOL_CONCRETE_TYPE,
-            Value::Integer(_) => INT_CONCRETE_TYPE,
-            Value::Array(arr) => {
-                let typs_arr: Vec<ConcreteType> = arr
-                    .iter()
-                    .map(|elem| elem.get_type(type_substitutor))
-                    .collect();
+    pub fn get_type(
+        &self,
+        type_substitutor: &mut TypeSubstitutor<ConcreteType>,
+    ) -> Result<ConcreteType, String> {
+        let mut tensor_sizes = Vec::new();
 
-                let shared_supertype =
-                    ConcreteType::get_smallest_common_supertype(&typs_arr, type_substitutor)
-                        .unwrap_or_else(|| type_substitutor.alloc_unknown());
+        enum ValuesRange {
+            Bool,
+            Int { min: IBig, max: IBig },
+        }
 
-                ConcreteType::Array(Box::new((
-                    shared_supertype,
-                    ConcreteType::Value(Value::Integer(arr.len().into())),
-                )))
+        let mut result_range: Option<ValuesRange> = None;
+
+        self.get_tensor_size_recursive(0, &mut tensor_sizes, &mut |v| {
+            match (&mut result_range, v) {
+                (None, Value::Bool(_)) => result_range = Some(ValuesRange::Bool),
+                (Some(ValuesRange::Bool), Value::Bool(_)) => {} // OK
+                (None, Value::Integer(v)) => {
+                    result_range = Some(ValuesRange::Int {
+                        min: v.clone(),
+                        max: v.clone(),
+                    })
+                }
+                (Some(ValuesRange::Int { min, max }), Value::Integer(v)) => {
+                    if v < min {
+                        *min = v.clone();
+                    }
+                    if v > max {
+                        *max = v.clone();
+                    }
+                }
+                (Some(_), Value::Bool(_)) | (Some(_), Value::Integer(_)) => {
+                    unreachable!("Differing types is caught by abstract typecheck!")
+                }
+                (_, Value::Array(_)) => {
+                    unreachable!("All arrays handled by get_tensor_size_recursive")
+                }
+                (_, Value::Unset) => {
+                    return Err("This compile-time constant contains Unset".into());
+                }
+                (_, Value::Unknown(_)) => {
+                    panic!("get_type on Value::Unknown!");
+                }
+            };
+            Ok(())
+        })?;
+
+        let content_typ = match result_range {
+            Some(ValuesRange::Bool) => BOOL_CONCRETE_TYPE,
+            Some(ValuesRange::Int { min, max }) => ConcreteType::Named(ConcreteGlobalReference {
+                id: get_builtin_type!("int"),
+                template_args: FlatAlloc::from_vec(vec![
+                    TemplateKind::Value(ConcreteType::new_int(min)),
+                    TemplateKind::Value(ConcreteType::new_int(max + 1)),
+                ]),
+            }),
+            None => type_substitutor.alloc_unknown(),
+        };
+
+        Ok(content_typ.new_arrays_of(&tensor_sizes))
+    }
+    fn get_tensor_size_recursive(
+        &self,
+        depth: usize,
+        tensor_sizes: &mut Vec<usize>,
+        elem_fn: &mut impl FnMut(&Value) -> Result<(), String>,
+    ) -> Result<(), String> {
+        if let Value::Array(values) = self {
+            if let Some(sz) = tensor_sizes.get(depth) {
+                if *sz != values.len() {
+                    return Err("Value is a Jagged Tensor. This is not allowed!".into());
+                }
+            } else {
+                assert!(tensor_sizes.len() == depth);
+                tensor_sizes.push(values.len());
             }
-            Value::Unset => type_substitutor.alloc_unknown(),
+            for v in values {
+                v.get_tensor_size_recursive(depth + 1, tensor_sizes, elem_fn)?;
+            }
+            Ok(())
+        } else {
+            elem_fn(self)
         }
     }
 
@@ -73,6 +200,9 @@ impl Value {
             Value::Bool(_) | Value::Integer(_) => false,
             Value::Array(values) => values.iter().any(|v| v.contains_errors_or_unsets()),
             Value::Unset => true,
+            Value::Unknown(_) => {
+                panic!("contains_errors_or_unsets on Value::Unknown!");
+            }
         }
     }
 

@@ -137,7 +137,7 @@ fn perform_instantiation(
     );
 
     let mut context = InstantiationContext {
-        name: working_on_global_ref.pretty_print_concrete_instance(linker),
+        name: working_on_global_ref.display(linker, false).to_string(),
         generation_state: GenerationState {
             md,
             generation_state: md
@@ -146,6 +146,7 @@ fn perform_instantiation(
                 .map(|(_, _)| SubModuleOrWire::Unnasigned),
         },
         type_substitutor: Default::default(),
+        //type_value_substitutor: Default::default(),
         condition_stack: Vec::new(),
         wires: FlatAlloc::new(),
         submodules: FlatAlloc::new(),

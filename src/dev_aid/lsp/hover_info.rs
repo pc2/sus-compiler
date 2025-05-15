@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use crate::alloc::ArenaAllocator;
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::prelude::*;
+use crate::typing::template::TemplateKind;
 
 use lsp_types::{LanguageString, MarkedString};
 
@@ -12,7 +13,7 @@ use crate::linker::{Documentation, FileData, GlobalUUID, LinkInfo};
 
 use crate::typing::{
     abstract_type::DomainType,
-    template::{GenerativeParameterKind, ParameterKind, TypeParameterKind},
+    template::{GenerativeParameterKind, TypeParameterKind},
 };
 
 use super::tree_walk::{InGlobal, LocationInfo};
@@ -67,7 +68,7 @@ impl HoverCollector<'_> {
                         let typ_str = wire.typ.display(&self.linker.types);
                         let name_str = &wire.name;
                         let latency_str = if wire.absolute_latency != CALCULATE_LATENCY_LATER {
-                            format!("{}", wire.absolute_latency)
+                            wire.absolute_latency.to_string()
                         } else {
                             "?".to_owned()
                         };
@@ -82,7 +83,7 @@ impl HoverCollector<'_> {
         for (_template_args, inst) in self.linker.instantiator.borrow().iter_for_module(md_id) {
             for (_id, sm) in &inst.submodules {
                 if sm.original_instruction == submodule_instr {
-                    self.sus_code(sm.refers_to.pretty_print_concrete_instance(self.linker));
+                    self.sus_code(sm.refers_to.display(self.linker, true).to_string());
                 }
             }
         }
@@ -214,10 +215,10 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
         }
         LocationInfo::Parameter(obj_id, link_info, _template_id, template_arg) => {
             match &template_arg.kind {
-                ParameterKind::Type(TypeParameterKind {}) => {
+                TemplateKind::Type(TypeParameterKind {}) => {
                     hover.monospace(format!("type {}", template_arg.name));
                 }
-                ParameterKind::Generative(GenerativeParameterKind {
+                TemplateKind::Value(GenerativeParameterKind {
                     decl_span: _,
                     declaration_instruction,
                 }) => {

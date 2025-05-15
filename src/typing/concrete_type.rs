@@ -1,8 +1,9 @@
+use ibig::ibig;
+use ibig::ops::Abs;
 use ibig::IBig;
+use ibig::UBig;
 use sus_proc_macro::get_builtin_type;
 
-use crate::alloc::zip_eq;
-use crate::linker::GlobalUUID;
 use crate::prelude::*;
 use std::ops::Deref;
 
@@ -10,22 +11,31 @@ use crate::value::Value;
 
 use super::template::TVec;
 
+use super::template::TemplateKind;
 use super::type_inference::ConcreteTypeVariableID;
+use super::type_inference::Substitutor;
+use super::type_inference::TypeSubstitutor;
 
 pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
     id: get_builtin_type!("bool"),
     template_args: FlatAlloc::new(),
 });
 
-pub const INT_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
-    id: get_builtin_type!("int"),
-    template_args: FlatAlloc::new(),
-});
+pub type ConcreteTemplateArg = TemplateKind<ConcreteType, ConcreteType>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConcreteGlobalReference<ID> {
     pub id: ID,
-    pub template_args: TVec<ConcreteType>,
+    pub template_args: TVec<ConcreteTemplateArg>,
+}
+
+impl ConcreteTemplateArg {
+    pub fn contains_unknown(&self) -> bool {
+        match self {
+            TemplateKind::Type(t) => t.contains_unknown(),
+            TemplateKind::Value(v) => v.contains_unknown(),
+        }
+    }
 }
 
 impl<ID> ConcreteGlobalReference<ID> {
@@ -34,37 +44,6 @@ impl<ID> ConcreteGlobalReference<ID> {
     /// If true, then this is a unique ID for a specific instantiated object
     pub fn is_final(&self) -> bool {
         !self.template_args.iter().any(|(_, v)| v.contains_unknown())
-    }
-    pub fn pretty_print_concrete_instance(&self, linker: &Linker) -> String
-    where
-        ID: Into<GlobalUUID> + Copy,
-    {
-        let target_link_info = linker.get_link_info(self.id.into());
-        assert!(self.template_args.len() == target_link_info.template_parameters.len());
-        let object_full_name = target_link_info.get_full_name();
-        if self.template_args.is_empty() {
-            return format!("{object_full_name} #()");
-        }
-        use std::fmt::Write;
-        let mut result = format!("{object_full_name} #(\n");
-        for (_id, arg, arg_in_target) in
-            zip_eq(&self.template_args, &target_link_info.template_parameters)
-        {
-            write!(result, "    {}: ", arg_in_target.name).unwrap();
-            match arg {
-                ConcreteType::Named(_) | ConcreteType::Array(_) => {
-                    writeln!(result, "type {},", arg.display(&linker.types)).unwrap();
-                }
-                ConcreteType::Value(value) => {
-                    writeln!(result, "{value},").unwrap();
-                }
-                ConcreteType::Unknown(_) => {
-                    writeln!(result, "/* Could not infer */").unwrap();
-                }
-            }
-        }
-        result.push(')');
-        result
     }
 }
 
@@ -89,12 +68,43 @@ pub enum ConcreteType {
 }
 
 impl ConcreteType {
+    pub fn new_int(int: IBig) -> Self {
+        Self::Value(Value::Integer(int))
+    }
+    pub fn new_arrays_of(self, tensor_sizes: &[usize]) -> Self {
+        let mut result = self;
+        for s in tensor_sizes.iter().rev() {
+            result = ConcreteType::Array(Box::new((result, ConcreteType::new_int(IBig::from(*s)))));
+        }
+        result
+    }
     #[track_caller]
     pub fn unwrap_value(&self) -> &Value {
         let ConcreteType::Value(v) = self else {
             unreachable!("unwrap_value on {self:?}")
         };
         v
+    }
+    #[track_caller]
+    pub fn unwrap_named(&self) -> &ConcreteGlobalReference<TypeUUID> {
+        let ConcreteType::Named(v) = self else {
+            unreachable!("unwrap_named")
+        };
+        v
+    }
+    #[track_caller]
+    pub fn unwrap_array(&self) -> &(ConcreteType, ConcreteType) {
+        let ConcreteType::Array(arr_box) = self else {
+            unreachable!("unwrap_array")
+        };
+        arr_box
+    }
+    pub fn down_array(&self) -> &ConcreteType {
+        let ConcreteType::Array(arr_box) = self else {
+            unreachable!("Must be an array!")
+        };
+        let (sub, _sz) = arr_box.deref();
+        sub
     }
     pub fn contains_unknown(&self) -> bool {
         match self {
@@ -134,13 +144,99 @@ impl ConcreteType {
         }
     }
 
-    /// TODO #50 Ranged Int work should be integrated
     pub fn sizeof_named(type_ref: &ConcreteGlobalReference<TypeUUID>) -> u64 {
         match type_ref.id {
-            get_builtin_type!("int") => 32, // TODO concrete int sizes
+            get_builtin_type!("int") => {
+                let [min, max] = type_ref
+                    .template_args
+                    .map_to_array(|_id, v| v.unwrap_value().unwrap_value().unwrap_integer());
+                bound_to_bits(min, &(max - 1))
+            }
             get_builtin_type!("bool") => 1,
             get_builtin_type!("float") => 32,
             _other => todo!("Other Named Structs are not implemented yet"),
         }
+    }
+    pub fn try_fully_substitute(&self, substitutor: &TypeSubstitutor<Self>) -> Option<Self> {
+        let mut self_clone = self.clone();
+        if substitutor.fully_substitute(&mut self_clone) {
+            Some(self_clone)
+        } else {
+            None
+        }
+    }
+    /// Returns the inclusive bounds of an int. An int #(MIN: 0, MAX: 15) will return (0, 14)
+    pub fn unwrap_integer_bounds(&self) -> (IBig, IBig) {
+        let [min, max] = self
+            .unwrap_named()
+            .template_args
+            .map_to_array(|_id, v| v.unwrap_value().unwrap_value().unwrap_integer());
+        (min.clone(), max - 1)
+    }
+}
+
+fn bits_negative(value: &IBig) -> u64 {
+    (UBig::try_from(value.abs() - 1).unwrap().bit_len() + 1)
+        .try_into()
+        .unwrap()
+}
+
+fn bits_positive(value: &IBig) -> u64 {
+    (UBig::try_from(value).unwrap().bit_len() + 1)
+        .try_into()
+        .unwrap()
+}
+
+fn bound_to_bits(min: &IBig, max: &IBig) -> u64 {
+    [min, max]
+        .iter()
+        .map(|&num| {
+            if num >= &ibig!(0) {
+                bits_positive(num)
+            } else {
+                bits_negative(num)
+            }
+        })
+        .max()
+        .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_bits_negative() {
+        assert_eq!(bits_negative(&ibig!(-1)), 1);
+        assert_eq!(bits_negative(&ibig!(-2)), 2);
+        assert_eq!(bits_negative(&ibig!(-3)), 3);
+        assert_eq!(bits_negative(&ibig!(-4)), 3);
+        assert_eq!(bits_negative(&ibig!(-5)), 4);
+        assert_eq!(bits_negative(&ibig!(-8)), 4);
+        assert_eq!(bits_negative(&ibig!(-9)), 5);
+        assert_eq!(bits_negative(&ibig!(-16)), 5);
+    }
+    #[test]
+    fn test_bits_positive() {
+        assert_eq!(bits_positive(&ibig!(0)), 1);
+        assert_eq!(bits_positive(&ibig!(1)), 2);
+        assert_eq!(bits_positive(&ibig!(2)), 3);
+        assert_eq!(bits_positive(&ibig!(3)), 3);
+        assert_eq!(bits_positive(&ibig!(4)), 4);
+        assert_eq!(bits_positive(&ibig!(7)), 4);
+        assert_eq!(bits_positive(&ibig!(8)), 5);
+        assert_eq!(bits_positive(&ibig!(15)), 5);
+        assert_eq!(bits_positive(&ibig!(16)), 6);
+        assert_eq!(bits_positive(&ibig!(31)), 6);
+    }
+    #[test]
+    fn test_bound_to_bits() {
+        assert_eq!(bound_to_bits(&ibig!(-1), &ibig!(0)), 1);
+        assert_eq!(bound_to_bits(&ibig!(-2), &ibig!(0)), 2);
+        assert_eq!(bound_to_bits(&ibig!(-1), &ibig!(1)), 2);
+        assert_eq!(bound_to_bits(&ibig!(-2), &ibig!(2)), 3);
+        assert_eq!(bound_to_bits(&ibig!(2), &ibig!(8)), 5);
+        assert_eq!(bound_to_bits(&ibig!(-1000), &ibig!(0)), 11);
+        assert_eq!(bound_to_bits(&ibig!(-2000), &ibig!(-1000)), 12);
+        assert_eq!(bound_to_bits(&ibig!(-256), &ibig!(255)), 9);
     }
 }
