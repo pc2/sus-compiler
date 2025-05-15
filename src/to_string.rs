@@ -42,7 +42,6 @@ impl TemplateNameGetter for TVec<Parameter> {
     }
 }
 
-#[derive(Debug)]
 pub struct WrittenTypeDisplay<
     'a,
     TypVec: Index<TypeUUID, Output = StructType>,
@@ -92,7 +91,6 @@ impl WrittenType {
     }
 }
 
-#[derive(Debug)]
 pub struct AbstractRankedTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
     typ: &'a AbstractRankedType,
     linker_types: &'a TypVec,
@@ -149,7 +147,6 @@ impl Display for PeanoType {
     }
 }
 
-#[derive(Debug)]
 pub struct ConcreteTypeDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
     inner: &'a ConcreteType,
     linker_types: &'a T,

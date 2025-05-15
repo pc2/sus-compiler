@@ -548,8 +548,10 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for UnaryOpTypecheckConstra
         let mut out_full = context.wires[self.out].typ.clone();
         context.type_substitutor.fully_substitute(&mut out_full);
         let message = format!(
-            "Failed to Typecheck {:?} = {}{:?}",
-            out_full, self.op, in_full
+            "Failed to Typecheck {} = {}{}",
+            out_full.display(&context.linker.types),
+            self.op,
+            in_full.display(&context.linker.types)
         );
 
         context.errors.error(self.span, message);
@@ -655,8 +657,11 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for BinaryOpTypecheckConstr
         let mut out_full = context.wires[self.out].typ.clone();
         context.type_substitutor.fully_substitute(&mut out_full);
         let message = format!(
-            "Failed to Typecheck {:?} = {:?} {} {:?}",
-            out_full, left_full, self.op, right_full,
+            "Failed to Typecheck {} = {} {} {}",
+            out_full.display(&context.linker.types),
+            left_full.display(&context.linker.types),
+            self.op,
+            right_full.display(&context.linker.types),
         );
 
         context.errors.error(self.span, message);

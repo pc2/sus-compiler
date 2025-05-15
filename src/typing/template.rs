@@ -24,6 +24,8 @@ impl<T: std::fmt::Debug, V: std::fmt::Debug> TemplateKind<T, V> {
         let_unwrap!(Self::Value(t), self);
         t
     }
+}
+impl<T, V> TemplateKind<T, V> {
     pub fn as_ref(&self) -> TemplateKind<&T, &V> {
         match self {
             TemplateKind::Type(t) => TemplateKind::Type(t),

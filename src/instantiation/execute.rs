@@ -339,14 +339,31 @@ impl InstantiationContext<'_, '_> {
     fn concretize_type(
         &mut self,
         abs: &AbstractRankedType,
-        wr_typ: Option<&WrittenType>,
+        wr_typ: &WrittenType,
     ) -> ExecutionResult<ConcreteType> {
         let mut concretizer = LocalTypeConcretizer {
             template_args: &self.working_on_global_ref.template_args,
             generation_state: &self.generation_state,
             type_substitutor: &mut self.type_substitutor,
         };
-        concretize_type_recurse(self.linker, &abs.inner, &abs.rank, wr_typ, &mut concretizer)
+        concretize_type_recurse(
+            self.linker,
+            &abs.inner,
+            &abs.rank,
+            Some(wr_typ),
+            &mut concretizer,
+        )
+    }
+    /// Uses the current context to turn a [AbstractRankedType] into a [ConcreteType].
+    ///
+    /// Failures as impossible as we don't need to read from [Self::generation_state]
+    fn concretize_type_no_written_reference(&mut self, abs: &AbstractRankedType) -> ConcreteType {
+        let mut concretizer = LocalTypeConcretizer {
+            template_args: &self.working_on_global_ref.template_args,
+            generation_state: &self.generation_state,
+            type_substitutor: &mut self.type_substitutor,
+        };
+        concretize_type_recurse(self.linker, &abs.inner, &abs.rank, None, &mut concretizer).unwrap()
     }
     /// Uses the current context to turn a [WrittenType] from a [SubModule] into a [ConcreteType].
     ///
@@ -949,9 +966,12 @@ impl InstantiationContext<'_, '_> {
                 unreachable!("Constant cannot be non-compile-time");
             }
         };
+        let typ = self.concretize_type_no_written_reference(
+            &expression.as_single_output_expr().unwrap().typ.typ,
+        );
         Ok(vec![self.wires.alloc(RealWire {
             name: self.unique_name_producer.get_unique_name(""),
-            typ: self.type_substitutor.alloc_unknown(),
+            typ,
             original_instruction,
             domain,
             source,
@@ -973,7 +993,7 @@ impl InstantiationContext<'_, '_> {
         wire_decl: &Declaration,
         original_instruction: FlatID,
     ) -> ExecutionResult<SubModuleOrWire> {
-        let typ = self.concretize_type(&wire_decl.typ.typ, Some(&wire_decl.typ_expr))?;
+        let typ = self.concretize_type(&wire_decl.typ.typ, &wire_decl.typ_expr)?;
 
         Ok(if wire_decl.identifier_type == IdentifierType::Generative {
             let value = if let DeclarationKind::GenerativeInput(template_id) = wire_decl.decl_kind {
@@ -1023,13 +1043,14 @@ impl InstantiationContext<'_, '_> {
         let template_args = global_ref.template_args.try_map(
             |(_, arg)| -> ExecutionResult<ConcreteTemplateArg> {
                 Ok(match arg {
-                    TemplateKind::Type(arg) => {
-                        let (abs_typ, wr_typ) = match arg {
-                            TemplateArg::Provided { arg, abs_typ, .. } => (abs_typ, Some(arg)),
-                            TemplateArg::NotProvided { abs_typ } => (abs_typ, None),
-                        };
-                        TemplateKind::Type(self.concretize_type(abs_typ, wr_typ)?)
-                    }
+                    TemplateKind::Type(arg) => TemplateKind::Type(match arg {
+                        TemplateArg::Provided { arg, abs_typ, .. } => {
+                            self.concretize_type(abs_typ, arg)?
+                        }
+                        TemplateArg::NotProvided { abs_typ } => {
+                            self.concretize_type_no_written_reference(abs_typ)
+                        }
+                    }),
                     TemplateKind::Value(arg) => TemplateKind::Value({
                         match arg {
                             TemplateArg::Provided { arg, .. } => ConcreteType::Value(
