@@ -311,28 +311,7 @@ impl InstantiationContext<'_, '_> {
 
     pub fn typecheck(&mut self) {
         let mut delayed_constraints: DelayedConstraintsList<Self> = DelayedConstraintsList::new();
-        for (sm_id, sm) in &self.submodules {
-            let sub_module = &self.linker.modules[sm.refers_to.id];
-
-            for (port_id, p) in sm.port_map.iter_valids() {
-                let wire = &self.wires[p.maps_to_wire];
-
-                let port_decl_instr = sub_module.ports[port_id].declaration_instruction;
-                let port_decl =
-                    sub_module.link_info.instructions[port_decl_instr].unwrap_declaration();
-
-                let typ_for_inference = self
-                    .type_substitutor
-                    .concretize_written_type_with_possible_template_args(
-                        &port_decl.typ_expr,
-                        &sm.refers_to.template_args,
-                        &sub_module.link_info,
-                    );
-
-                self.type_substitutor
-                    .unify_must_succeed(&wire.typ, &typ_for_inference);
-            }
-
+        for (sm_id, _sm) in &self.submodules {
             delayed_constraints.push(SubmoduleTypecheckConstraint { sm_id });
         }
 
@@ -362,7 +341,10 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
 
         // Check if there's any argument that isn't known
         for (_id, arg) in &mut Rc::get_mut(&mut sm.refers_to).unwrap().template_args {
-            if !context.type_substitutor.fully_substitute(arg) {
+            if !context
+                .type_substitutor
+                .fully_substitute(arg.as_mut().unwrap_identical())
+            {
                 // We don't actually *need* to already fully_substitute here, but it's convenient and saves some work
                 return DelayedConstraintStatus::NoProgress;
             }
@@ -480,8 +462,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
         let submod_instr =
             context.md.link_info.instructions[sm.original_instruction].unwrap_submodule();
 
-        let submodule_template_args_string =
-            sm.refers_to.pretty_print_concrete_instance(context.linker);
+        let submodule_template_args_string = sm.refers_to.display(context.linker, true);
         let message = format!("Could not fully instantiate {submodule_template_args_string}");
 
         context

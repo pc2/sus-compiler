@@ -1,13 +1,14 @@
-use crate::alloc::zip_eq;
+use crate::alloc::{zip_eq, ArenaAllocator};
 use crate::prelude::*;
 
 use crate::typing::abstract_type::{AbstractInnerType, PeanoType};
-use crate::typing::template::{Parameter, TVec};
+use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg};
+use crate::typing::template::{Parameter, TVec, TemplateKind};
 use crate::typing::written_type::WrittenType;
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
 use crate::flattening::{DomainInfo, Interface, InterfaceToDomainMap, Module, StructType};
-use crate::linker::{FileData, LinkInfo};
+use crate::linker::{FileData, GlobalUUID, LinkInfo};
 use crate::typing::{
     abstract_type::{AbstractRankedType, DomainType},
     concrete_type::ConcreteType,
@@ -157,14 +158,13 @@ pub struct ConcreteTypeDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
 impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner {
-            ConcreteType::Named(global_ref) => {
-                f.write_str(&pretty_print_concrete_instance(
-                    &self.linker_types[global_ref.id].link_info,
-                    &global_ref.template_args,
-                    self.linker_types,
-                ))?;
-                Ok(())
+            ConcreteType::Named(global_ref) => ConcreteGlobalReferenceDisplay {
+                target_link_info: &self.linker_types[global_ref.id].link_info,
+                template_args: &global_ref.template_args,
+                linker_types: self.linker_types,
+                newline: "\n",
             }
+            .fmt(f),
             ConcreteType::Array(arr_box) => {
                 let (elem_typ, arr_size) = arr_box.deref();
                 write!(
@@ -315,35 +315,62 @@ impl Module {
     }
 }
 
-pub fn pretty_print_concrete_instance(
-    target_link_info: &LinkInfo,
-    given_template_args: &TVec<ConcreteType>,
-    linker_types: &impl Index<TypeUUID, Output = StructType>,
-) -> String {
-    assert!(given_template_args.len() == target_link_info.template_parameters.len());
-    let object_full_name = target_link_info.get_full_name();
-    if given_template_args.is_empty() {
-        return format!("{object_full_name} #()");
-    }
+pub struct ConcreteGlobalReferenceDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
+    template_args: &'a TVec<ConcreteTemplateArg>,
+    target_link_info: &'a LinkInfo,
+    linker_types: &'a T,
+    /// If there should be newlines: "\n", otherwise ""
+    newline: &'static str,
+}
 
-    let mut result = format!("{object_full_name} #(\n");
-    for (_id, arg, arg_in_target) in
-        zip_eq(given_template_args, &target_link_info.template_parameters)
-    {
-        write!(result, "    {}: ", arg_in_target.name).unwrap();
-        match arg {
-            ConcreteType::Named(_) | ConcreteType::Array(_) => {
-                writeln!(result, "type {},", arg.display(linker_types)).unwrap();
-            }
-            ConcreteType::Value(value) => {
-                writeln!(result, "{value},").unwrap();
-            }
-            ConcreteType::Unknown(_) => {
-                writeln!(result, "/* Could not infer */").unwrap();
+impl<'a, T: Index<TypeUUID, Output = StructType>> Display
+    for ConcreteGlobalReferenceDisplay<'a, T>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let nl = self.newline;
+        assert!(self.template_args.len() == self.target_link_info.template_parameters.len());
+        let object_full_name = self.target_link_info.get_full_name();
+        f.write_str(&object_full_name)?;
+        if self.template_args.is_empty() {
+            return f.write_str(" #()");
+        } else {
+            f.write_str(" #(")?;
+        }
+
+        for (_id, arg, arg_in_target) in zip_eq(
+            self.template_args,
+            &self.target_link_info.template_parameters,
+        ) {
+            f.write_fmt(format_args!("{nl}    {}: ", arg_in_target.name))?;
+            match arg {
+                TemplateKind::Type(typ_arg) => {
+                    f.write_fmt(format_args!("type {},", typ_arg.display(self.linker_types)))?;
+                }
+                TemplateKind::Value(v) => {
+                    if v.contains_unknown() {
+                        f.write_fmt(format_args!("/* Could not infer */"))?;
+                    } else {
+                        f.write_fmt(format_args!("{},", v.unwrap_value()))?;
+                    }
+                }
             }
         }
+        f.write_str(nl)?;
+        f.write_char(')')
     }
-
-    result.push(')');
-    result
+}
+impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
+    pub fn display<'v>(
+        &'v self,
+        linker: &'v Linker,
+        use_newlines: bool,
+    ) -> ConcreteGlobalReferenceDisplay<'v, ArenaAllocator<StructType, TypeUUIDMarker>> {
+        let target_link_info = linker.get_link_info(self.id.into());
+        ConcreteGlobalReferenceDisplay {
+            template_args: &self.template_args,
+            target_link_info,
+            linker_types: &linker.types,
+            newline: if use_newlines { "\n" } else { "" },
+        }
+    }
 }

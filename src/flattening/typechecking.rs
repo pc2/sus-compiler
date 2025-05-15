@@ -114,7 +114,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
             .abstract_type_substitutor
             .written_to_abstract_type_substitute_templates(
                 &decl.typ_expr,
-                &submodule_inst.module_ref.template_arg_types,
+                &submodule_inst.module_ref.template_args,
             );
         FullType {
             typ,
@@ -180,7 +180,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     .abstract_type_substitutor
                     .written_to_abstract_type_substitute_templates(
                         &decl.typ_expr,
-                        &cst.template_arg_types,
+                        &cst.template_args,
                     );
                 FullType {
                     typ,
@@ -365,33 +365,13 @@ impl<'l> TypeCheckingContext<'l, '_> {
         let global_obj: GlobalUUID = global_ref.id.into();
         let target_link_info = self.globals.get_link_info(global_obj);
 
-        for (_, argument_type, given_arg) in
-            zip_eq(&global_ref.template_arg_types, &global_ref.template_args)
-        {
-            if let Some(TemplateArg {
-                kind: TemplateKind::Type(wr_typ),
-                ..
-            }) = given_arg
-            {
-                self.typecheck_written_type(wr_typ);
-                // This slot will not have been filled out yet
-                let specified_arg_type = self
-                    .type_checker
-                    .abstract_type_substitutor
-                    .written_to_abstract_type(wr_typ);
-                self.type_checker
-                    .abstract_type_substitutor
-                    .unify_must_succeed(argument_type, &specified_arg_type);
-            }
-        }
-
-        for (_parameter_id, argument_type, parameter) in zip_eq(
-            &global_ref.template_arg_types,
+        for (_parameter_id, arg, parameter) in zip_eq(
+            &global_ref.template_args,
             &target_link_info.template_parameters,
         ) {
-            match &parameter.kind {
+            match arg.and_by_ref(&parameter.kind) {
                 TemplateKind::Type(_) => {} // Do nothing, nothing to unify with. Maybe in the future traits?
-                TemplateKind::Value(parameter) => {
+                TemplateKind::Value((arg, parameter)) => {
                     let decl = target_link_info.instructions[parameter.declaration_instruction]
                         .unwrap_declaration();
 
@@ -400,32 +380,31 @@ impl<'l> TypeCheckingContext<'l, '_> {
                         .abstract_type_substitutor
                         .written_to_abstract_type_substitute_templates(
                             &decl.typ_expr,
-                            &global_ref.template_arg_types, // Yes that's right. We already must substitute the templates for type variables here
+                            &global_ref.template_args, // Yes that's right. We already must substitute the templates for type variables here
                         );
 
-                    self.type_checker
-                        .abstract_type_substitutor
-                        .unify_must_succeed(argument_type, &param_required_typ);
+                    match arg {
+                        TemplateArg::Provided {
+                            value_span,
+                            abs_typ,
+                            ..
+                        } => {
+                            self.type_checker
+                                .abstract_type_substitutor
+                                .unify_report_error(
+                                    abs_typ,
+                                    &param_required_typ,
+                                    *value_span,
+                                    "template value parameter",
+                                );
+                        }
+                        TemplateArg::NotProvided { abs_typ } => {
+                            self.type_checker
+                                .abstract_type_substitutor
+                                .unify_must_succeed(abs_typ, &param_required_typ);
+                        }
+                    }
                 }
-            }
-        }
-
-        for (_, argument_type, given_arg) in
-            zip_eq(&global_ref.template_arg_types, &global_ref.template_args)
-        {
-            if let Some(TemplateArg {
-                kind: TemplateKind::Value(val),
-                ..
-            }) = given_arg
-            {
-                let argument_expr = self.working_on.instructions[*val].unwrap_subexpression();
-
-                self.type_checker.typecheck_write_to_abstract(
-                    &argument_expr.typ.typ,
-                    argument_type,
-                    argument_expr.span,
-                    "generative template argument",
-                );
             }
         }
     }

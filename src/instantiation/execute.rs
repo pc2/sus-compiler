@@ -7,9 +7,10 @@
 use std::ops::{Deref, Index, IndexMut};
 
 use crate::latency::CALCULATE_LATENCY_LATER;
-use crate::linker::{GlobalUUID, IsExtern};
+use crate::linker::{GlobalUUID, IsExtern, LinkInfo};
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType};
-use crate::typing::template::GlobalReference;
+use crate::typing::concrete_type::ConcreteTemplateArg;
+use crate::typing::template::{GlobalReference, TVec, TemplateArg};
 use crate::typing::type_inference::Substitutor;
 use crate::typing::written_type::WrittenType;
 use crate::util::{unwrap_single_element, zip_eq};
@@ -190,83 +191,148 @@ enum RealWireRefRoot {
     Constant(Value),
 }
 
-impl InstantiationContext<'_, '_> {
-    fn concretize_type_recurse(
-        &mut self,
-        inner: &AbstractInnerType,
-        rank: &PeanoType,
-        wr_typ: Option<&WrittenType>,
-    ) -> ExecutionResult<ConcreteType> {
-        Ok(match rank {
-            PeanoType::Zero => match inner {
-                AbstractInnerType::Template(id) => {
-                    self.working_on_global_ref.template_args[*id].clone()
-                }
-                AbstractInnerType::Named(name) => {
-                    let template_params = &self.linker.types[*name].link_info.template_parameters;
-                    let template_args = match wr_typ {
-                        Some(WrittenType::Named(wr_named)) => {
-                            assert_eq!(wr_named.id, *name);
-                            FlatAlloc::try_map2(
-                                &wr_named.template_args,
-                                template_params,
-                                |(_, arg, param)| {
-                                    Ok(match (arg, &param.kind) {
-                                        (_, TemplateKind::Type(_)) => {
-                                            todo!("Abstract Type Args aren't yet supported!")
-                                        }
-                                        (Some(value), TemplateKind::Value(_)) => {
-                                            let arg_value = self
-                                                .generation_state
-                                                .get_generation_value(*value.kind.unwrap_value())?;
-                                            ConcreteType::Value(arg_value.clone())
-                                        }
-                                        (None, TemplateKind::Value(_)) => {
-                                            self.type_substitutor.alloc_unknown()
-                                        }
-                                    })
-                                },
-                            )?
-                        }
-                        Some(_) => unreachable!("Can't get Array from Non-Array WrittenType!"), // TODO Fix with Let bindings (#57)
-                        None => template_params.map(|(_, arg)| match &arg.kind {
-                            TemplateKind::Type(_) => {
-                                todo!("Abstract Type Args aren't yet supported!")
-                            }
-                            TemplateKind::Value(_) => self.type_substitutor.alloc_unknown(),
-                        }),
-                    };
+trait Concretizer {
+    fn get_type(&mut self, id: TemplateID) -> ConcreteType;
+    fn get_value(&mut self, expr: FlatID) -> ExecutionResult<ConcreteType>;
+    fn alloc_unknown(&mut self) -> ConcreteType;
+}
 
-                    ConcreteType::Named(ConcreteGlobalReference {
-                        id: *name,
-                        template_args,
-                    })
-                }
-                AbstractInnerType::Unknown(_) => {
-                    unreachable!("Should have been resolved already!")
-                }
-            },
-            PeanoType::Succ(one_down) => {
-                let (new_wr_typ, size) = match wr_typ {
-                    Some(WrittenType::Array(_span, arr)) => {
-                        let (content, arr_size, _) = arr.deref();
-                        let arr_size = self.generation_state.get_generation_value(*arr_size)?;
-                        (Some(content), ConcreteType::Value(arr_size.clone()))
-                    }
-                    Some(_) => unreachable!("Can't get Array from Non-Array WrittenType!"), // TODO Fix with Let bindings (#57)
-                    None => (None, self.type_substitutor.alloc_unknown()),
+struct LocalTypeConcretizer<'fl, 'substitutor> {
+    template_args: &'fl TVec<ConcreteTemplateArg>,
+    generation_state: &'fl GenerationState<'fl>,
+    type_substitutor: &'substitutor mut TypeSubstitutor<ConcreteType>,
+}
+impl Concretizer for LocalTypeConcretizer<'_, '_> {
+    fn get_type(&mut self, id: TemplateID) -> ConcreteType {
+        self.template_args[id].unwrap_type().clone()
+    }
+    fn get_value(&mut self, expr: FlatID) -> ExecutionResult<ConcreteType> {
+        Ok(ConcreteType::Value(
+            self.generation_state.get_generation_value(expr)?.clone(),
+        ))
+    }
+
+    fn alloc_unknown(&mut self) -> ConcreteType {
+        self.type_substitutor.alloc_unknown()
+    }
+}
+struct SubModuleTypeConcretizer<'fl, 'substitutor> {
+    submodule_template_args: &'fl TVec<ConcreteTemplateArg>,
+    instructions: &'fl FlatAlloc<Instruction, FlatIDMarker>,
+    type_substitutor: &'substitutor mut TypeSubstitutor<ConcreteType>,
+}
+impl Concretizer for SubModuleTypeConcretizer<'_, '_> {
+    fn get_type(&mut self, id: TemplateID) -> ConcreteType {
+        self.submodule_template_args[id].unwrap_type().clone()
+    }
+
+    /// Part of Template Value Inference.
+    ///
+    /// Specifically, for code like this:
+    ///
+    /// ```sus
+    /// module add_all #(int Size) {
+    ///     input int[Size] arr // We're targeting the 'Size' within the array size
+    ///     output int total
+    /// }
+    /// ```
+    fn get_value(&mut self, expr: FlatID) -> ExecutionResult<ConcreteType> {
+        let expr = self.instructions[expr].unwrap_expression();
+        Ok(match &expr.source {
+            ExpressionSource::WireRef(wr) => {
+                if !wr.path.is_empty() {
+                    return Ok(self.type_substitutor.alloc_unknown());
+                } // Must be a plain, no fuss reference to a de
+                let WireReferenceRoot::LocalDecl(wire_declaration, _span) = &wr.root else {
+                    return Ok(self.type_substitutor.alloc_unknown());
                 };
-                ConcreteType::Array(Box::new((
-                    self.concretize_type_recurse(inner, one_down, new_wr_typ)?,
-                    size,
-                )))
+                let template_arg_decl = self.instructions[*wire_declaration].unwrap_declaration();
+                let DeclarationKind::GenerativeInput(template_id) = &template_arg_decl.decl_kind
+                else {
+                    return Ok(self.type_substitutor.alloc_unknown());
+                };
+                self.submodule_template_args[*template_id]
+                    .unwrap_value()
+                    .clone()
             }
-            PeanoType::Unknown(_) => {
-                caught_by_typecheck!("No PeanoType::Unknown should be left in execute!")
-            }
+            ExpressionSource::Constant(cst) => ConcreteType::Value(cst.clone()),
+            _ => self.type_substitutor.alloc_unknown(),
         })
     }
 
+    fn alloc_unknown(&mut self) -> ConcreteType {
+        self.type_substitutor.alloc_unknown()
+    }
+}
+
+fn concretize_type_recurse(
+    linker: &Linker,
+    inner: &AbstractInnerType,
+    rank: &PeanoType,
+    wr_typ: Option<&WrittenType>,
+    concretizer: &mut impl Concretizer,
+) -> ExecutionResult<ConcreteType> {
+    Ok(match rank {
+        PeanoType::Zero => match inner {
+            AbstractInnerType::Template(id) => concretizer.get_type(*id),
+            AbstractInnerType::Named(name) => {
+                let template_params = &linker.types[*name].link_info.template_parameters;
+                let template_args = match wr_typ {
+                    Some(WrittenType::Named(wr_named)) => {
+                        assert_eq!(wr_named.id, *name);
+                        wr_named.template_args.try_map(|(_, arg)| {
+                            Ok(match arg {
+                                TemplateKind::Type(_) => {
+                                    todo!("Abstract Type Args aren't yet supported!")
+                                }
+                                TemplateKind::Value(TemplateArg::Provided { arg, .. }) => {
+                                    TemplateKind::Value(concretizer.get_value(*arg)?)
+                                }
+                                TemplateKind::Value(TemplateArg::NotProvided { .. }) => {
+                                    TemplateKind::Value(concretizer.alloc_unknown())
+                                }
+                            })
+                        })?
+                    }
+                    Some(_) => unreachable!("Can't get Array from Non-Array WrittenType!"), // TODO Fix with Let bindings (#57)
+                    None => template_params.map(|(_, arg)| match &arg.kind {
+                        TemplateKind::Type(_) => {
+                            todo!("Abstract Type Args aren't yet supported!")
+                        }
+                        TemplateKind::Value(_) => TemplateKind::Value(concretizer.alloc_unknown()),
+                    }),
+                };
+
+                ConcreteType::Named(ConcreteGlobalReference {
+                    id: *name,
+                    template_args,
+                })
+            }
+            AbstractInnerType::Unknown(_) => {
+                unreachable!("Should have been resolved already!")
+            }
+        },
+        PeanoType::Succ(one_down) => {
+            let (new_wr_typ, size) = match wr_typ {
+                Some(WrittenType::Array(_span, arr)) => {
+                    let (content, arr_size, _) = arr.deref();
+                    (Some(content), concretizer.get_value(*arr_size)?)
+                }
+                Some(_) => unreachable!("Impossible: Can't get Array from Non-Array WrittenType!"), // TODO Fix with Let bindings (#57)
+                None => (None, concretizer.alloc_unknown()),
+            };
+            ConcreteType::Array(Box::new((
+                concretize_type_recurse(linker, inner, one_down, new_wr_typ, concretizer)?,
+                size,
+            )))
+        }
+        PeanoType::Unknown(_) => {
+            caught_by_typecheck!("No PeanoType::Unknown should be left in execute!")
+        }
+    })
+}
+
+impl InstantiationContext<'_, '_> {
     /// Uses the current context to turn a [WrittenType] into a [ConcreteType].
     ///
     /// Failures are fatal.
@@ -275,7 +341,39 @@ impl InstantiationContext<'_, '_> {
         abs: &AbstractRankedType,
         wr_typ: Option<&WrittenType>,
     ) -> ExecutionResult<ConcreteType> {
-        self.concretize_type_recurse(&abs.inner, &abs.rank, wr_typ)
+        let mut concretizer = LocalTypeConcretizer {
+            template_args: &self.working_on_global_ref.template_args,
+            generation_state: &self.generation_state,
+            type_substitutor: &mut self.type_substitutor,
+        };
+        concretize_type_recurse(self.linker, &abs.inner, &abs.rank, wr_typ, &mut concretizer)
+    }
+    /// Uses the current context to turn a [WrittenType] from a [SubModule] into a [ConcreteType].
+    ///
+    /// Cannot fail, since we're not using [Self::generation_state]
+    fn concretize_submodule_port_type(
+        type_substitutor: &mut TypeSubstitutor<ConcreteType>,
+        linker: &Linker,
+        submodule_port: &Port,
+        submodule_template_args: &TVec<ConcreteTemplateArg>,
+        submodule_link_info: &LinkInfo,
+    ) -> ConcreteType {
+        let submodule_decl = submodule_link_info.instructions
+            [submodule_port.declaration_instruction]
+            .unwrap_declaration();
+        let mut concretizer = SubModuleTypeConcretizer {
+            submodule_template_args,
+            instructions: &submodule_link_info.instructions,
+            type_substitutor,
+        };
+        concretize_type_recurse(
+            linker,
+            &submodule_decl.typ.typ.inner,
+            &submodule_decl.typ.typ.rank,
+            Some(&submodule_decl.typ_expr),
+            &mut concretizer,
+        )
+        .unwrap()
     }
 
     fn instantiate_port_wire_ref_root(
@@ -300,8 +398,7 @@ impl InstantiationContext<'_, '_> {
             get_builtin_const!("true") => Ok(Value::Bool(true)),
             get_builtin_const!("false") => Ok(Value::Bool(false)),
             get_builtin_const!("clog2") => {
-                let [val] = cst_ref.template_args.cast_to_array();
-                let val = val.unwrap_value().unwrap_integer();
+                let [val] = cst_ref.template_args.cast_to_int_array();
                 if val > &ibig::ibig!(0) {
                     let val = UBig::try_from(val - 1).unwrap();
                     Ok(Value::Integer(IBig::from(val.bit_len())))
@@ -312,8 +409,7 @@ impl InstantiationContext<'_, '_> {
                 }
             }
             get_builtin_const!("pow2") => {
-                let [exponent] = cst_ref.template_args.cast_to_array();
-                let exponent = exponent.unwrap_value().unwrap_integer();
+                let [exponent] = cst_ref.template_args.cast_to_int_array();
                 if let Ok(exp) = usize::try_from(exponent) {
                     let mut result = ibig::ubig!(0);
                     result.set_bit(exp);
@@ -323,9 +419,7 @@ impl InstantiationContext<'_, '_> {
                 }
             }
             get_builtin_const!("pow") => {
-                let [base, exponent] = cst_ref.template_args.cast_to_array();
-                let base = base.unwrap_value().unwrap_integer();
-                let exponent = exponent.unwrap_value().unwrap_integer();
+                let [base, exponent] = cst_ref.template_args.cast_to_int_array();
                 if let Ok(exp) = usize::try_from(exponent) {
                     Ok(Value::Integer(base.pow(exp)))
                 } else {
@@ -333,17 +427,14 @@ impl InstantiationContext<'_, '_> {
                 }
             }
             get_builtin_const!("factorial") => {
-                let [n] = cst_ref.template_args.cast_to_array();
-                let n = n.unwrap_value().unwrap_integer();
+                let [n] = cst_ref.template_args.cast_to_int_array();
                 let n = must_be_positive(n, "factorial parameter")?;
 
                 Ok(Value::Integer(factorial(n).into()))
             }
             get_builtin_const!("falling_factorial") => {
-                let [n, k] = cst_ref.template_args.cast_to_array();
-                let n = n.unwrap_value().unwrap_integer();
+                let [n, k] = cst_ref.template_args.cast_to_int_array();
                 let n = must_be_positive(n, "comb n parameter")?;
-                let k = k.unwrap_value().unwrap_integer();
                 let k = must_be_positive(k, "comb k parameter")?;
 
                 if k > n {
@@ -353,10 +444,8 @@ impl InstantiationContext<'_, '_> {
                 Ok(Value::Integer(falling_factorial(n, &k).into()))
             }
             get_builtin_const!("comb") => {
-                let [n, k] = cst_ref.template_args.cast_to_array();
-                let n = n.unwrap_value().unwrap_integer();
+                let [n, k] = cst_ref.template_args.cast_to_int_array();
                 let n = must_be_positive(n, "comb n parameter")?;
-                let k = k.unwrap_value().unwrap_integer();
                 let k = must_be_positive(k, "comb k parameter")?;
 
                 if k > n {
@@ -370,7 +459,7 @@ impl InstantiationContext<'_, '_> {
             get_builtin_const!("assert") => {
                 let [condition] = cst_ref.template_args.cast_to_array();
 
-                if condition.unwrap_value().unwrap_bool() {
+                if condition.unwrap_value().unwrap_value().unwrap_bool() {
                     Ok(Value::Bool(true))
                 } else {
                     Err("Assertion failed".into())
@@ -379,7 +468,7 @@ impl InstantiationContext<'_, '_> {
             get_builtin_const!("sizeof") => {
                 let [concrete_typ] = cst_ref.template_args.cast_to_array();
 
-                if let Some(typ_sz) = concrete_typ.sizeof() {
+                if let Some(typ_sz) = concrete_typ.unwrap_type().sizeof() {
                     Ok(Value::Integer(typ_sz))
                 } else {
                     Err("This is an incomplete type".into())
@@ -686,7 +775,8 @@ impl InstantiationContext<'_, '_> {
             }
             wire_found.maps_to_wire
         } else {
-            let port_data = &self.linker.modules[submod_instance.refers_to.id].ports[port_id];
+            let submod_md = &self.linker.modules[submod_instance.refers_to.id];
+            let port_data = &submod_md.ports[port_id];
             let submodule_instruction = self.md.link_info.instructions
                 [submod_instance.original_instruction]
                 .unwrap_submodule();
@@ -703,7 +793,13 @@ impl InstantiationContext<'_, '_> {
                 source,
                 original_instruction: submod_instance.original_instruction,
                 domain: domain.unwrap_physical(),
-                typ: self.type_substitutor.alloc_unknown(),
+                typ: Self::concretize_submodule_port_type(
+                    &mut self.type_substitutor,
+                    self.linker,
+                    port_data,
+                    &submod_instance.refers_to.template_args,
+                    &submod_md.link_info,
+                ),
                 name: self
                     .unique_name_producer
                     .get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
@@ -884,6 +980,7 @@ impl InstantiationContext<'_, '_> {
                 // Only for template arguments, we must initialize their value to the value they've been assigned in the template instantiation
                 self.working_on_global_ref.template_args[template_id]
                     .unwrap_value()
+                    .unwrap_value()
                     .clone()
             } else {
                 // Empty initial value
@@ -923,28 +1020,26 @@ impl InstantiationContext<'_, '_> {
         &mut self,
         global_ref: &GlobalReference<ID>,
     ) -> ExecutionResult<ConcreteGlobalReference<ID>> {
-        let template_args = global_ref.template_args.try_map3(
-            &global_ref.template_arg_types,
-            &self
-                .linker
-                .get_link_info(global_ref.id.into())
-                .template_parameters,
-            |(_, arg, arg_typ, param)| -> ExecutionResult<ConcreteType> {
-                Ok(match &param.kind {
-                    TemplateKind::Type(_) => {
-                        let wr_typ = arg.as_ref().map(|arg| arg.kind.unwrap_type());
-                        self.concretize_type(arg_typ, wr_typ)?
+        let template_args = global_ref.template_args.try_map(
+            |(_, arg)| -> ExecutionResult<ConcreteTemplateArg> {
+                Ok(match arg {
+                    TemplateKind::Type(arg) => {
+                        let (abs_typ, wr_typ) = match arg {
+                            TemplateArg::Provided { arg, abs_typ, .. } => (abs_typ, Some(arg)),
+                            TemplateArg::NotProvided { abs_typ } => (abs_typ, None),
+                        };
+                        TemplateKind::Type(self.concretize_type(abs_typ, wr_typ)?)
                     }
-                    TemplateKind::Value(_) => {
-                        if let Some(arg) = arg {
-                            let v = arg.kind.unwrap_value();
-                            ConcreteType::Value(
-                                self.generation_state.get_generation_value(*v)?.clone(),
-                            )
-                        } else {
-                            self.type_substitutor.alloc_unknown()
+                    TemplateKind::Value(arg) => TemplateKind::Value({
+                        match arg {
+                            TemplateArg::Provided { arg, .. } => ConcreteType::Value(
+                                self.generation_state.get_generation_value(*arg)?.clone(),
+                            ),
+                            TemplateArg::NotProvided { .. } => {
+                                self.type_substitutor.alloc_unknown()
+                            }
                         }
-                    }
+                    }),
                 })
             },
         )?;

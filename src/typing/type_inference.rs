@@ -11,6 +11,7 @@ use crate::errors::ErrorInfo;
 use crate::prelude::*;
 
 use crate::alloc::{get2_mut, zip_eq, UUIDMarker, UUID};
+use crate::typing::template::TemplateKind;
 use crate::value::Value;
 
 use super::abstract_type::{AbstractInnerType, PeanoType};
@@ -460,7 +461,10 @@ impl HindleyMilner for ConcreteType {
             (ConcreteType::Named(na), ConcreteType::Named(nb)) => {
                 zip_eq(na.template_args.iter(), nb.template_args.iter())
                     .map(|(_, template_arg_a, template_arg_b)| {
-                        unify(template_arg_a, template_arg_b)
+                        match template_arg_a.and_by_ref(template_arg_b) {
+                            TemplateKind::Type((ta, tb)) => unify(ta, tb),
+                            TemplateKind::Value((va, vb)) => unify(va, vb),
+                        }
                     })
                     .fold(UnifyResult::Success, |result_acc, result| {
                         result_acc & result
@@ -520,7 +524,11 @@ impl Substitutor for TypeSubstitutor<ConcreteType> {
             ConcreteType::Named(concrete_global_ref) => {
                 let mut result = true;
                 for (_, template_arg) in &mut concrete_global_ref.template_args {
-                    result = result && self.fully_substitute(template_arg);
+                    result = result
+                        && match template_arg {
+                            TemplateKind::Type(t) => self.fully_substitute(t),
+                            TemplateKind::Value(v) => self.fully_substitute(v),
+                        };
                 }
                 result
             }
@@ -551,19 +559,16 @@ impl TypeSubstitutor<ConcreteType> {
     pub fn make_array_of(&mut self, content_typ: ConcreteType) -> ConcreteType {
         ConcreteType::Array(Box::new((content_typ, self.alloc_unknown())))
     }
+    fn mk_int_maybe(&mut self, v: Option<IBig>) -> TemplateKind<ConcreteType, ConcreteType> {
+        TemplateKind::Value(match v {
+            Some(v) => ConcreteType::Value(Value::Integer(v)),
+            None => self.alloc_unknown(),
+        })
+    }
     /// Creates a new `int #(int MIN, int MAX)`. The resulting int can have a value from `MIN` to `MAX-1`
     pub fn new_int_type(&mut self, min: Option<IBig>, max: Option<IBig>) -> ConcreteType {
-        let mut template_args = FlatAlloc::new();
-        if let Some(min) = min {
-            template_args.alloc(ConcreteType::Value(Value::Integer(min)));
-        } else {
-            template_args.alloc(self.alloc_unknown());
-        }
-        if let Some(max) = max {
-            template_args.alloc(ConcreteType::Value(Value::Integer(max)));
-        } else {
-            template_args.alloc(self.alloc_unknown());
-        }
+        let template_args =
+            FlatAlloc::from_vec(vec![self.mk_int_maybe(min), self.mk_int_maybe(max)]);
 
         ConcreteType::Named(ConcreteGlobalReference {
             id: get_builtin_type!("int"),

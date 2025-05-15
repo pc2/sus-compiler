@@ -6,7 +6,7 @@ use crate::{
     typing::{
         abstract_type::PeanoType,
         concrete_type::ConcreteType,
-        template::TVec,
+        template::{TVec, TemplateKind},
         type_inference::{Substitutor, TypeSubstitutor, TypeUnifier},
     },
     value::Value,
@@ -401,10 +401,14 @@ impl SubModule {
 
             InferenceEdgesForDomain { edges }
         } else {
-            let known_template_args = self.refers_to.template_args.map(|(_, t)| {
-                let mut t_copy = t.clone();
-                type_substitutor.fully_substitute(&mut t_copy);
-                if let ConcreteType::Value(Value::Integer(num)) = &t_copy {
+            let known_template_args = self.refers_to.template_args.map(|(_, arg)| {
+                let TemplateKind::Value(v) = arg else {
+                    return None;
+                };
+
+                let mut v_copy = v.clone();
+                type_substitutor.fully_substitute(&mut v_copy);
+                if let ConcreteType::Value(Value::Integer(num)) = &v_copy {
                     i64::try_from(num).ok()
                 } else {
                     None

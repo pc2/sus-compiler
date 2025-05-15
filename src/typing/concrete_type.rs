@@ -4,8 +4,6 @@ use ibig::IBig;
 use ibig::UBig;
 use sus_proc_macro::get_builtin_type;
 
-use crate::alloc::zip_eq;
-use crate::linker::GlobalUUID;
 use crate::prelude::*;
 use std::ops::Deref;
 
@@ -13,6 +11,7 @@ use crate::value::Value;
 
 use super::template::TVec;
 
+use super::template::TemplateKind;
 use super::type_inference::ConcreteTypeVariableID;
 use super::type_inference::Substitutor;
 use super::type_inference::TypeSubstitutor;
@@ -22,10 +21,21 @@ pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalR
     template_args: FlatAlloc::new(),
 });
 
+pub type ConcreteTemplateArg = TemplateKind<ConcreteType, ConcreteType>;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConcreteGlobalReference<ID> {
     pub id: ID,
-    pub template_args: TVec<ConcreteType>,
+    pub template_args: TVec<ConcreteTemplateArg>,
+}
+
+impl ConcreteTemplateArg {
+    pub fn contains_unknown(&self) -> bool {
+        match self {
+            TemplateKind::Type(t) => t.contains_unknown(),
+            TemplateKind::Value(v) => v.contains_unknown(),
+        }
+    }
 }
 
 impl<ID> ConcreteGlobalReference<ID> {
@@ -34,37 +44,6 @@ impl<ID> ConcreteGlobalReference<ID> {
     /// If true, then this is a unique ID for a specific instantiated object
     pub fn is_final(&self) -> bool {
         !self.template_args.iter().any(|(_, v)| v.contains_unknown())
-    }
-    pub fn pretty_print_concrete_instance(&self, linker: &Linker) -> String
-    where
-        ID: Into<GlobalUUID> + Copy,
-    {
-        let target_link_info = linker.get_link_info(self.id.into());
-        assert!(self.template_args.len() == target_link_info.template_parameters.len());
-        let object_full_name = target_link_info.get_full_name();
-        if self.template_args.is_empty() {
-            return format!("{object_full_name} #()");
-        }
-        use std::fmt::Write;
-        let mut result = format!("{object_full_name} #(\n");
-        for (_id, arg, arg_in_target) in
-            zip_eq(&self.template_args, &target_link_info.template_parameters)
-        {
-            write!(result, "    {}: ", arg_in_target.name).unwrap();
-            match arg {
-                ConcreteType::Named(_) | ConcreteType::Array(_) => {
-                    writeln!(result, "type {},", arg.display(&linker.types)).unwrap();
-                }
-                ConcreteType::Value(value) => {
-                    writeln!(result, "{value},").unwrap();
-                }
-                ConcreteType::Unknown(_) => {
-                    writeln!(result, "/* Could not infer */").unwrap();
-                }
-            }
-        }
-        result.push(')');
-        result
     }
 }
 
@@ -170,7 +149,7 @@ impl ConcreteType {
             get_builtin_type!("int") => {
                 let [min, max] = type_ref
                     .template_args
-                    .map_to_array(|_id, v| v.unwrap_value().unwrap_integer());
+                    .map_to_array(|_id, v| v.unwrap_value().unwrap_value().unwrap_integer());
                 bound_to_bits(min, &(max - 1))
             }
             get_builtin_type!("bool") => 1,
@@ -191,7 +170,7 @@ impl ConcreteType {
         let [min, max] = self
             .unwrap_named()
             .template_args
-            .map_to_array(|_id, v| v.unwrap_value().unwrap_integer());
+            .map_to_array(|_id, v| v.unwrap_value().unwrap_value().unwrap_integer());
         (min.clone(), max - 1)
     }
 }

@@ -1,9 +1,10 @@
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 use ibig::IBig;
 
-use crate::alloc::{zip_eq, FlatAlloc};
+use crate::alloc::FlatAlloc;
 use crate::flattening::{BinaryOperator, UnaryOperator};
+use crate::typing::template::TemplateKind;
 use sus_proc_macro::get_builtin_type;
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType, BOOL_CONCRETE_TYPE};
@@ -39,7 +40,7 @@ impl Unifyable for Value {
     }
 }
 
-impl ConcreteType {
+/*impl ConcreteType {
     fn update_smallest_common_supertype(&mut self, other: &Self) -> Option<()> {
         match (self, other) {
             (_, ConcreteType::Unknown(_)) | (ConcreteType::Unknown(_), _) => None,
@@ -47,8 +48,8 @@ impl ConcreteType {
                 assert_eq!(left.id, right.id);
                 if left.id == get_builtin_type!("int") {
                     if let (
-                        [ConcreteType::Value(Value::Integer(left_min)), ConcreteType::Value(Value::Integer(left_max))],
-                        [ConcreteType::Value(Value::Integer(right_min)), ConcreteType::Value(Value::Integer(right_max))],
+                        [TemplateKind::Value(ConcreteType::Value(Value::Integer(left_min))), TemplateKind::Value(ConcreteType::Value(Value::Integer(left_max)))],
+                        [TemplateKind::Value(ConcreteType::Value(Value::Integer(right_min))), TemplateKind::Value(ConcreteType::Value(Value::Integer(right_max)))],
                     ) = (
                         left.template_args.cast_to_array_mut(),
                         right.template_args.cast_to_array(),
@@ -101,7 +102,7 @@ impl ConcreteType {
 
         Some(first)
     }
-}
+}*/
 
 impl Value {
     /// Traverses the Value, to create a best-effort [ConcreteType] for it.
@@ -161,8 +162,8 @@ impl Value {
             Some(ValuesRange::Int { min, max }) => ConcreteType::Named(ConcreteGlobalReference {
                 id: get_builtin_type!("int"),
                 template_args: FlatAlloc::from_vec(vec![
-                    ConcreteType::new_int(min),
-                    ConcreteType::new_int(max + 1),
+                    TemplateKind::Value(ConcreteType::new_int(min)),
+                    TemplateKind::Value(ConcreteType::new_int(max + 1)),
                 ]),
             }),
             None => type_substitutor.alloc_unknown(),

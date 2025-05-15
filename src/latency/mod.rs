@@ -371,7 +371,7 @@ impl InstantiationContext<'_, '_> {
                 let (submod_id, arg_id) = var.back_reference;
 
                 self.type_substitutor.unify_must_succeed(
-                    &self.submodules[submod_id].refers_to.template_args[arg_id],
+                    self.submodules[submod_id].refers_to.template_args[arg_id].unwrap_value(),
                     &ConcreteType::Value(Value::Integer(inferred_value.into())),
                 );
 

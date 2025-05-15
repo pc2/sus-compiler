@@ -1,4 +1,4 @@
-use crate::typing::template::TemplateKind;
+use crate::typing::template::{TemplateArg, TemplateKind};
 
 use super::{ExpressionSource, WireReferencePathElement, WireReferenceRoot};
 use crate::prelude::*;
@@ -12,12 +12,16 @@ impl ExpressionSource {
                     WireReferenceRoot::LocalDecl(decl_id, _) => collect(*decl_id),
                     WireReferenceRoot::NamedConstant(cst) => {
                         for (_id, arg) in &cst.template_args {
-                            let Some(arg) = arg else { continue };
-                            match &arg.kind {
-                                TemplateKind::Type(written_type) => {
-                                    written_type.for_each_generative_input(collect)
-                                }
-                                TemplateKind::Value(uuid) => collect(*uuid),
+                            match arg {
+                                TemplateKind::Type(TemplateArg::Provided {
+                                    arg: wr_typ, ..
+                                }) => wr_typ.for_each_generative_input(collect),
+                                TemplateKind::Value(TemplateArg::Provided {
+                                    arg: value_id,
+                                    ..
+                                }) => collect(*value_id),
+                                TemplateKind::Type(TemplateArg::NotProvided { .. })
+                                | TemplateKind::Value(TemplateArg::NotProvided { .. }) => {}
                             }
                         }
                     }

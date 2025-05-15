@@ -5,7 +5,7 @@ use crate::prelude::*;
 use crate::value::Value;
 use std::ops::Deref;
 
-use super::template::{GlobalReference, Parameter, TVec};
+use super::template::{GlobalReference, Parameter, TVec, TemplateKind};
 use super::type_inference::{
     AbstractTypeSubstitutor, DomainVariableID, InnerTypeVariableID, PeanoVariableID, Substitutor,
     TypeSubstitutor, TypeUnifier, UnifyErrorReport,
@@ -428,8 +428,12 @@ impl FullTypeUnifier {
         errors: &ErrorCollector,
     ) {
         let global_ref_span = global_ref.get_total_span();
-        for (_template_id, template_type) in &mut global_ref.template_arg_types {
-            self.finalize_abstract_type(linker_types, template_type, global_ref_span, errors);
+        for (_template_id, arg) in &mut global_ref.template_args {
+            let template_typ = match arg {
+                TemplateKind::Type(t) => t.get_abstract_typ_mut(),
+                TemplateKind::Value(v) => v.get_abstract_typ_mut(),
+            };
+            self.finalize_abstract_type(linker_types, template_typ, global_ref_span, errors);
         }
     }
 
