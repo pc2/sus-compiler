@@ -10,8 +10,7 @@ use crate::dev_aid::dot_graphs::display_latency_count_graph;
 use crate::errors::ErrorInfoObject;
 use crate::prelude::*;
 
-use crate::typing::concrete_type::ConcreteType;
-use crate::typing::type_inference::{DelayedConstraintStatus, Substitutor};
+use crate::typing::type_inference::DelayedConstraintStatus;
 use crate::value::Value;
 
 use latency_algorithm::{
@@ -370,10 +369,10 @@ impl InstantiationContext<'_, '_> {
             if let Some(inferred_value) = var.get() {
                 let (submod_id, arg_id) = var.back_reference;
 
-                self.type_substitutor.unify_must_succeed(
+                assert!(self.type_substitutor.unify(
                     self.submodules[submod_id].refers_to.template_args[arg_id].unwrap_value(),
-                    &ConcreteType::Value(Value::Integer(inferred_value.into())),
-                );
+                    &Value::Integer(inferred_value.into()).into(),
+                ));
 
                 any_new_values = true;
             } else {

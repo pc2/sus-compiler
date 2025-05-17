@@ -4,7 +4,7 @@ use super::{
     abstract_type::AbstractRankedType, concrete_type::ConcreteTemplateArg,
     written_type::WrittenType,
 };
-use crate::{let_unwrap, prelude::*};
+use crate::{let_unwrap, prelude::*, typing::type_inference::Unifyable, value::Value};
 
 /// See [TVec]. All circumstances handling Templates need to handle both Types and Values.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -197,6 +197,15 @@ pub fn for_each_generative_input_in_template_args(
 
 impl TVec<ConcreteTemplateArg> {
     pub fn cast_to_int_array<const N: usize>(&self) -> [&IBig; N] {
-        self.map_to_array(|_, v| v.unwrap_value().unwrap_value().unwrap_integer())
+        self.cast_to_array().map(|v| {
+            let_unwrap!(TemplateKind::Value(Unifyable::Set(Value::Integer(i))), v);
+            i
+        })
+    }
+    pub fn cast_to_int_array_mut<const N: usize>(&mut self) -> [&mut IBig; N] {
+        self.cast_to_array_mut().map(|v| {
+            let_unwrap!(TemplateKind::Value(Unifyable::Set(Value::Integer(i))), v);
+            i
+        })
     }
 }

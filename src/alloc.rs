@@ -718,20 +718,17 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
             _ph: PhantomData,
         })
     }
-    pub fn cast_to_array<const N: usize>(&self) -> &[T; N] {
-        assert!(self.len() == N);
-        self.data.as_slice().try_into().unwrap()
+    pub fn cast_to_array<const N: usize>(&self) -> [&T; N] {
+        assert_eq!(self.len(), N);
+        std::array::from_fn(|i| &self.data[i])
     }
-    pub fn cast_to_array_mut<const N: usize>(&mut self) -> &mut [T; N] {
-        assert!(self.len() == N);
-        self.data.as_mut_slice().try_into().unwrap()
-    }
-    pub fn map_to_array<'slf, O, const N: usize>(
-        &'slf self,
-        mut f: impl FnMut(UUID<IndexMarker>, &'slf T) -> O + 'slf,
-    ) -> [O; N] {
-        assert!(self.len() == N);
-        std::array::from_fn(|i| f(UUID::from_hidden_value(i), &self.data[i]))
+    pub fn cast_to_array_mut<const N: usize>(&mut self) -> [&mut T; N] {
+        assert_eq!(self.len(), N);
+        std::array::from_fn(|i| {
+            let ptr: *mut T = &mut self.data[i];
+            // SAFETY: Of course, the data[i] accesses are all disjoint
+            unsafe { &mut *ptr }
+        })
     }
     pub fn find(
         &self,

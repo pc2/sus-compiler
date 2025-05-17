@@ -1,11 +1,12 @@
 use crate::alloc::{zip_eq, ArenaAllocator};
 use crate::errors::{ErrorInfo, ErrorInfoObject, FileKnowingErrorInfoObject};
 use crate::prelude::*;
+use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType};
 use crate::typing::template::TemplateArg;
-use crate::typing::type_inference::{FailedUnification, Substitutor};
+use crate::typing::type_inference::{AbstractTypeSubstitutor, FailedUnification, Substitutor};
 
 use crate::debug::SpanDebugger;
-use crate::linker::{GlobalResolver, GlobalUUID, AFTER_TYPECHECK_CP};
+use crate::linker::{FileData, GlobalResolver, GlobalUUID, AFTER_TYPECHECK_CP};
 
 use crate::typing::written_type::WrittenType;
 use crate::typing::{
@@ -80,6 +81,83 @@ struct ConditionStackElem {
     domain: DomainType,
 }
 
+struct RemoteSubModule<'l> {
+    submodule: &'l SubModuleInstance,
+    md: &'l Module,
+}
+impl<'l> RemoteSubModule<'l> {
+    fn get_port(&self, port_id: PortID) -> RemoteDeclaration<'l> {
+        RemoteDeclaration {
+            submodule: self.submodule,
+            remote_decl: self.md.get_port_decl(port_id),
+            file: self.md.link_info.file,
+        }
+    }
+    fn get_interface_reference(&self, interface_id: InterfaceID) -> RemoteInterface<'l> {
+        let interface = &self.md.interfaces[interface_id];
+        RemoteInterface {
+            submodule: self.submodule,
+            md: self.md,
+            interface,
+        }
+    }
+}
+struct RemoteInterface<'l> {
+    submodule: &'l SubModuleInstance,
+    md: &'l Module,
+    interface: &'l Interface,
+}
+impl<'l> RemoteInterface<'l> {
+    fn get_port(&self, port_id: PortID) -> RemoteDeclaration<'l> {
+        RemoteDeclaration {
+            submodule: self.submodule,
+            remote_decl: self.md.get_port_decl(port_id),
+            file: self.md.link_info.file,
+        }
+    }
+}
+/// For interfaces of this module
+impl FileKnowingErrorInfoObject for RemoteInterface<'_> {
+    fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
+        ErrorInfo {
+            position: self.interface.name_span,
+            file: self.md.link_info.file,
+            info: format!("Interface '{}' defined here", &self.interface.name),
+        }
+    }
+}
+
+struct RemoteDeclaration<'l> {
+    submodule: &'l SubModuleInstance,
+    remote_decl: &'l Declaration,
+    file: FileUUID,
+}
+impl<'l> RemoteDeclaration<'l> {
+    fn get_local_type(&self, type_checker: &mut AbstractTypeSubstitutor) -> FullType {
+        let port_local_domain =
+            self.submodule.local_interface_domains[self.remote_decl.typ.domain.unwrap_physical()];
+        let typ = type_checker.written_to_abstract_type_substitute_templates(
+            &self.remote_decl.typ_expr,
+            &self.submodule.module_ref.template_args,
+        );
+        FullType {
+            typ,
+            domain: port_local_domain,
+        }
+    }
+    fn make_info(&self) -> ErrorInfo {
+        self.remote_decl.make_info(self.file).unwrap()
+    }
+    fn is_input(&self) -> bool {
+        self.remote_decl.decl_kind.is_io_port().unwrap()
+    }
+}
+impl FileKnowingErrorInfoObject for RemoteDeclaration<'_> {
+    fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
+        self.make_info()
+    }
+}
+
 struct TypeCheckingContext<'l, 'errs> {
     globals: &'l GlobalResolver<'l>,
     errors: &'errs ErrorCollector<'l>,
@@ -89,57 +167,12 @@ struct TypeCheckingContext<'l, 'errs> {
 }
 
 impl<'l> TypeCheckingContext<'l, '_> {
-    fn get_decl_of_module_port(
-        &self,
-        port: PortID,
-        submodule_instr: FlatID,
-    ) -> (&'l Declaration, FileUUID) {
-        let submodule_id = self.working_on.instructions[submodule_instr]
-            .unwrap_submodule()
-            .module_ref
-            .id;
-        let module = &self.globals[submodule_id];
-        let decl = module.get_port_decl(port);
-        (decl, module.link_info.file)
-    }
-
-    fn get_type_of_port(&mut self, port: PortID, submodule_instr: FlatID) -> FullType {
-        let submodule_inst = self.working_on.instructions[submodule_instr].unwrap_submodule();
-        let submodule_module = &self.globals[submodule_inst.module_ref.id];
-        let decl = submodule_module.get_port_decl(port);
-        let port_interface = submodule_module.ports[port].domain;
-        let port_local_domain = submodule_inst.local_interface_domains[port_interface];
-        let typ = self
-            .type_checker
-            .abstract_type_substitutor
-            .written_to_abstract_type_substitute_templates(
-                &decl.typ_expr,
-                &submodule_inst.module_ref.template_args,
-            );
-        FullType {
-            typ,
-            domain: port_local_domain,
+    fn get_submodule(&self, submodule_instr: FlatID) -> RemoteSubModule<'l> {
+        let submodule = self.working_on.instructions[submodule_instr].unwrap_submodule();
+        RemoteSubModule {
+            submodule,
+            md: &self.globals[submodule.module_ref.id],
         }
-    }
-
-    fn get_wire_ref_info(&self, wire_ref_root: &WireReferenceRoot) -> Option<ErrorInfo> {
-        Some(match wire_ref_root {
-            WireReferenceRoot::LocalDecl(id, _) => {
-                let decl_root = self.working_on.instructions[*id].unwrap_declaration();
-                decl_root.make_info(self.errors.file).unwrap()
-            }
-            WireReferenceRoot::NamedConstant(cst) => {
-                let linker_cst = &self.globals[cst.id];
-                linker_cst.link_info.make_global_info(self.errors.files)
-            }
-            WireReferenceRoot::SubModulePort(port) => {
-                let (decl, file) = self.get_decl_of_module_port(port.port, port.submodule_decl);
-                decl.make_info(file).unwrap()
-            }
-            WireReferenceRoot::Error => {
-                return None;
-            }
-        })
     }
 
     /// Wire references are used in two contexts:
@@ -161,13 +194,11 @@ impl<'l> TypeCheckingContext<'l, '_> {
         &mut self,
         wire_ref: &WireReference,
         whole_span: Span,
-        output_typ: &FullType,
+        result_domain: DomainType,
     ) {
-        self.join_with_condition(&output_typ.domain, whole_span);
-        let root_type = match &wire_ref.root {
-            WireReferenceRoot::LocalDecl(id, _) => {
-                let decl_root = self.working_on.instructions[*id].unwrap_declaration();
-                decl_root.typ.clone()
+        match &wire_ref.root {
+            WireReferenceRoot::LocalDecl(_uuid) => {
+                // When the decl was flattened, we set wire_ref.root_typ to decl.typ
             }
             WireReferenceRoot::NamedConstant(cst) => {
                 self.typecheck_template_global(cst);
@@ -182,68 +213,77 @@ impl<'l> TypeCheckingContext<'l, '_> {
                         &decl.typ_expr,
                         &cst.template_args,
                     );
-                FullType {
-                    typ,
-                    domain: DomainType::Generative,
-                }
+                self.type_checker
+                    .abstract_type_substitutor
+                    .unify_must_succeed(&wire_ref.root_typ.typ, &typ);
+
+                assert!(wire_ref.root_typ.domain.is_generative());
             }
             WireReferenceRoot::SubModulePort(port) => {
-                self.get_type_of_port(port.port, port.submodule_decl)
+                let submod_port = self.get_submodule(port.submodule_decl).get_port(port.port);
+                if submod_port.remote_decl.typ.domain.is_generative() {
+                    self.errors
+                        .error(
+                            wire_ref.root_span,
+                            "Invalid Submodule port: It is marked as generative!",
+                        )
+                        .info_obj(&submod_port);
+                }
+                let submod_port_typ =
+                    submod_port.get_local_type(&mut self.type_checker.abstract_type_substitutor);
+                self.type_checker
+                    .unify_must_succeed(&wire_ref.root_typ, &submod_port_typ);
             }
-            WireReferenceRoot::Error => return,
-        };
+            WireReferenceRoot::Error => {}
+        }
 
+        self.join_with_condition(&result_domain, whole_span);
         self.type_checker.unify_domains(
-            &root_type.domain,
-            &output_typ.domain,
+            &wire_ref.root_typ.domain,
+            &result_domain,
             whole_span,
             "wire reference root with root type",
         );
 
-        let mut current_type_in_progress = root_type.typ;
+        let mut current_type_in_progress = &wire_ref.root_typ.typ;
         for p in &wire_ref.path {
             match p {
-                &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
-                    let idx_expr = self.working_on.instructions[idx].unwrap_subexpression();
+                WireReferencePathElement::ArrayAccess {
+                    idx,
+                    bracket_span,
+                    output_typ,
+                } => {
+                    let idx_expr = self.working_on.instructions[*idx].unwrap_subexpression();
 
-                    let new_resulting_variable =
-                        self.type_checker.abstract_type_substitutor.alloc_unknown();
                     let arr_span = bracket_span.outer_span();
-                    {
-                        self.type_checker
-                            .abstract_type_substitutor
-                            .unify_report_error(
-                                &idx_expr.typ.typ,
-                                &INT_TYPE.scalar(),
-                                idx_expr.span,
-                                "array index",
-                            );
-                        self.type_checker.unify_with_array_of(
-                            &current_type_in_progress,
-                            new_resulting_variable.clone(),
-                            arr_span,
+                    self.type_checker
+                        .abstract_type_substitutor
+                        .unify_report_error(
+                            idx_expr.typ,
+                            &INT_TYPE.scalar(),
+                            idx_expr.span,
+                            "array index",
                         );
-                    };
+
+                    self.type_checker
+                        .abstract_type_substitutor
+                        .unify_report_error(
+                            current_type_in_progress,
+                            &output_typ.clone().rank_up(),
+                            arr_span,
+                            "array access",
+                        );
 
                     self.type_checker.unify_domains(
-                        &idx_expr.typ.domain,
-                        &output_typ.domain,
+                        &idx_expr.domain,
+                        &result_domain,
                         idx_expr.span,
                         "array access index",
                     );
-                    current_type_in_progress = new_resulting_variable;
+                    current_type_in_progress = output_typ;
                 }
             }
         }
-
-        self.type_checker
-            .abstract_type_substitutor
-            .unify_report_error(
-                &output_typ.typ,
-                &current_type_in_progress,
-                whole_span,
-                "variable reference",
-            );
     }
 
     fn control_flow_visit_instruction(&mut self, inst_id: FlatID) {
@@ -272,74 +312,68 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 ..
             }) => {
                 for wr in writes {
-                    let (decl, file) = match &wr.to.root {
-                        WireReferenceRoot::LocalDecl(decl_id, _) => {
+                    match &wr.to.root {
+                        WireReferenceRoot::LocalDecl(decl_id) => {
                             let decl = self.working_on.instructions[*decl_id].unwrap_declaration();
                             if decl.read_only {
                                 self.errors
                                     .error(wr.to_span, format!("'{}' is read-only", decl.name))
                                     .info_obj_same_file(decl);
                             }
-                            (decl, self.errors.file)
-                        }
-                        WireReferenceRoot::NamedConstant(cst) => {
-                            self.errors
-                                .error(cst.name_span, "Cannot assign to a global");
-                            return;
-                        }
-                        WireReferenceRoot::SubModulePort(port) => {
-                            let module_port_decl =
-                                self.get_decl_of_module_port(port.port, port.submodule_decl);
 
-                            if !module_port_decl.0.decl_kind.is_io_port().unwrap() {
-                                self.errors
-                                    .error(wr.to_span, "Cannot assign to a submodule output port")
-                                    .info_obj_different_file(
-                                        module_port_decl.0,
-                                        module_port_decl.1,
-                                    );
-                            }
+                            match wr.write_modifiers {
+                                WriteModifiers::Connection { .. } => {
+                                    if decl.identifier_type.is_generative() {
+                                        // Check that this generative declaration isn't used in a non-compiletime if
+                                        if let Some(root_flat) = wr.to.root.get_root_flat() {
+                                            let to_decl = self.working_on.instructions[root_flat]
+                                                .unwrap_declaration();
 
-                            module_port_decl
-                        }
-                        WireReferenceRoot::Error => {
-                            return;
-                        }
-                    };
-
-                    match wr.write_modifiers {
-                        WriteModifiers::Connection { .. } => {
-                            if decl.identifier_type.is_generative() {
-                                // Check that this generative declaration isn't used in a non-compiletime if
-                                if let Some(root_flat) = wr.to.root.get_root_flat() {
-                                    let to_decl = self.working_on.instructions[root_flat]
-                                        .unwrap_declaration();
-
-                                    let found_decl_depth =
-                                        *to_decl.declaration_runtime_depth.get().unwrap();
-                                    if self.runtime_condition_stack.len() > found_decl_depth {
-                                        let err_ref = self.errors.error(wr.to_span, "Cannot write to generative variables in runtime conditional block");
-                                        err_ref.info_obj_different_file(decl, file);
-                                        for elem in
-                                            &self.runtime_condition_stack[found_decl_depth..]
-                                        {
-                                            err_ref
-                                                .info((elem.span, file), "Runtime condition here");
+                                            let found_decl_depth =
+                                                *to_decl.declaration_runtime_depth.get().unwrap();
+                                            if self.runtime_condition_stack.len() > found_decl_depth
+                                            {
+                                                let err_ref = self.errors.error(wr.to_span, "Cannot write to generative variables in runtime conditional block");
+                                                err_ref.info_obj_same_file(decl);
+                                                for elem in &self.runtime_condition_stack
+                                                    [found_decl_depth..]
+                                                {
+                                                    err_ref.info_same_file(
+                                                        elem.span,
+                                                        "Runtime condition here",
+                                                    );
+                                                }
+                                            }
                                         }
+                                    }
+                                }
+                                WriteModifiers::Initial { initial_kw_span } => {
+                                    if decl.identifier_type != IdentifierType::State {
+                                        self.errors
+                                            .error(
+                                                initial_kw_span,
+                                                "Initial values can only be given to state registers",
+                                            )
+                                            .info_obj_same_file(decl);
                                     }
                                 }
                             }
                         }
-                        WriteModifiers::Initial { initial_kw_span } => {
-                            if decl.identifier_type != IdentifierType::State {
+                        WireReferenceRoot::NamedConstant(cst) => {
+                            self.errors
+                                .error(cst.name_span, "Cannot assign to a global");
+                        }
+                        WireReferenceRoot::SubModulePort(port) => {
+                            let module_port_decl =
+                                self.get_submodule(port.submodule_decl).get_port(port.port);
+
+                            if !module_port_decl.is_input() {
                                 self.errors
-                                    .error(
-                                        initial_kw_span,
-                                        "Initial values can only be given to state registers",
-                                    )
-                                    .info_obj_different_file(decl, file);
+                                    .error(wr.to_span, "Cannot assign to a submodule output port")
+                                    .info_obj(&module_port_decl);
                             }
                         }
+                        WireReferenceRoot::Error => {}
                     }
                 }
             }
@@ -350,7 +384,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     self.runtime_condition_stack.push(ConditionStackElem {
                         ends_at: if_stmt.else_block.1,
                         span: condition_expr.span,
-                        domain: condition_expr.typ.domain,
+                        domain: condition_expr.domain,
                     });
                 }
             }
@@ -426,8 +460,8 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 self.typecheck_written_type(content_typ);
 
                 let idx_expr = self.working_on.instructions[*arr_idx].unwrap_subexpression();
-                self.type_checker.typecheck_write_to_abstract(
-                    &idx_expr.typ.typ,
+                self.type_checker.unify_write_to_abstract(
+                    idx_expr.typ,
                     &INT_TYPE.scalar(),
                     idx_expr.span,
                     "array size",
@@ -459,8 +493,8 @@ impl<'l> TypeCheckingContext<'l, '_> {
         if let Some(latency_spec) = lat_spec {
             let latency_specifier_expr =
                 self.working_on.instructions[latency_spec].unwrap_subexpression();
-            self.type_checker.typecheck_write_to_abstract(
-                &latency_specifier_expr.typ.typ,
+            self.type_checker.unify_write_to_abstract(
+                latency_specifier_expr.typ,
                 &INT_TYPE.scalar(),
                 latency_specifier_expr.span,
                 "latency specifier",
@@ -468,47 +502,15 @@ impl<'l> TypeCheckingContext<'l, '_> {
         }
     }
 
-    fn typecheck_visit_write_to(
-        &mut self,
-        write_to: &WriteTo,
-        from_typ: &FullType,
-        from_span: Span,
-    ) {
-        let write_context = match write_to.write_modifiers {
-            WriteModifiers::Connection { .. } => "connection",
-            WriteModifiers::Initial { initial_kw_span: _ } => "initial value",
-        };
-        let declared_here = self.get_wire_ref_info(&write_to.to.root);
-        self.type_checker
-            .typecheck_write_to(from_typ, &write_to.to_type, from_span, || {
-                (
-                    write_context.to_string(),
-                    declared_here.into_iter().collect(),
-                )
-            });
-    }
-
-    fn get_interface_reference(
-        &self,
-        interface_reference: &ModuleInterfaceReference,
-    ) -> (&'l Module, &'l Interface) {
-        let submodule =
-            self.working_on.instructions[interface_reference.submodule_decl].unwrap_submodule();
-        let md = &self.globals[submodule.module_ref.id];
-        let interface = &md.interfaces[interface_reference.submodule_interface];
-        (md, interface)
-    }
-
     fn report_errors_for_bad_function_call(
         &self,
         func_call: &FuncCall,
+        interface: &RemoteInterface<'l>,
         whole_func_span: Span,
         mut to_spans_iter: impl ExactSizeIterator<Item = Span>,
     ) {
-        let (md, interface) = self.get_interface_reference(&func_call.interface_reference);
-
         let arg_count = func_call.arguments.len();
-        let expected_arg_count = interface.func_call_inputs.len();
+        let expected_arg_count = interface.interface.func_call_inputs.len();
 
         if arg_count != expected_arg_count {
             if arg_count > expected_arg_count {
@@ -524,16 +526,16 @@ impl<'l> TypeCheckingContext<'l, '_> {
 
                 self.errors
                     .error(excess_args_span, format!("Excess argument. Function takes {expected_arg_count} args, but {arg_count} were passed."))
-                    .info_obj(&(md, interface));
+                    .info_obj(interface);
             } else {
                 // Too few args, mention missing argument names
                 self.errors
                     .error(func_call.arguments_span.close_bracket(), format!("Too few arguments. Function takes {expected_arg_count} args, but {arg_count} were passed."))
-                    .info_obj(&(md, interface));
+                    .info_obj(interface);
             }
         }
 
-        let num_func_outputs = interface.func_call_outputs.len();
+        let num_func_outputs = interface.interface.func_call_outputs.len();
         let num_targets = to_spans_iter.size_hint().0;
         if num_targets != num_func_outputs {
             if num_targets > num_func_outputs {
@@ -546,57 +548,66 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 let excess_results_span = Span::new_overarching(start_span, end_span);
                 self.errors
                     .error(excess_results_span, format!("Excess output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."))
-                    .info_obj(&(md, interface));
+                    .info_obj(interface);
             } else {
                 self.errors
                     .error(whole_func_span, format!("Too few output targets. Function returns {num_func_outputs} results, but {num_targets} targets were given."))
-                    .info_obj(&(md, interface));
+                    .info_obj(interface);
             }
         }
     }
 
-    fn typecheck_func_call(&mut self, func_call: &FuncCall) -> PortIDRange {
-        let (md, interface) = self.get_interface_reference(&func_call.interface_reference);
+    fn typecheck_func_call(&mut self, func_call: &FuncCall) -> RemoteInterface<'l> {
+        let interface = self
+            .get_submodule(func_call.interface_reference.submodule_decl)
+            .get_interface_reference(func_call.interface_reference.submodule_interface);
 
-        for (port, arg) in std::iter::zip(interface.func_call_inputs, &func_call.arguments) {
+        for (port, arg) in
+            std::iter::zip(interface.interface.func_call_inputs, &func_call.arguments)
+        {
+            let port_decl = interface.get_port(port);
             let port_type =
-                self.get_type_of_port(port, func_call.interface_reference.submodule_decl);
-
-            let decl = md.get_port_decl(port);
+                port_decl.get_local_type(&mut self.type_checker.abstract_type_substitutor);
 
             // Typecheck the value with target type
             let from = self.working_on.instructions[*arg].unwrap_subexpression();
 
             self.join_with_condition(&port_type.domain, from.span);
             self.type_checker
-                .typecheck_write_to(from.typ, &port_type, from.span, || {
-                    (
-                        "function argument".to_string(),
-                        vec![decl.make_info(md.link_info.file).unwrap()],
-                    )
+                .unify_write_to(from.typ, &from.domain, &port_type, from.span, || {
+                    ("function argument".to_string(), vec![port_decl.make_info()])
                 });
         }
 
-        interface.func_call_outputs
+        interface
     }
 
     fn typecheck_single_output_expr(&mut self, expr: SingleOutputExpression) {
         match expr.source {
-            ExpressionSource::WireRef(from_wire) => {
-                self.typecheck_wire_reference(from_wire, expr.span, expr.typ);
+            ExpressionSource::WireRef(wire_ref) => {
+                self.typecheck_wire_reference(wire_ref, expr.span, expr.domain);
+
+                self.type_checker
+                    .abstract_type_substitutor
+                    .unify_report_error(
+                        expr.typ,
+                        wire_ref.get_output_typ(),
+                        expr.span,
+                        "reading from wire reference",
+                    );
             }
             ExpressionSource::UnaryOp { op, rank, right } => {
                 let right_expr = self.working_on.instructions[*right].unwrap_subexpression();
                 self.type_checker.typecheck_unary_operator_abstr(
                     *op,
                     rank,
-                    &right_expr.typ.typ,
+                    right_expr.typ,
                     right_expr.span,
-                    &expr.typ.typ,
+                    expr.typ,
                 );
                 self.type_checker.unify_domains(
-                    &right_expr.typ.domain,
-                    &expr.typ.domain,
+                    &right_expr.domain,
+                    &expr.domain,
                     right_expr.span,
                     "unary op",
                 );
@@ -613,65 +624,73 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     self.type_checker.typecheck_binary_operator_abstr(
                         *op,
                         rank,
-                        &left_expr.typ.typ,
-                        &right_expr.typ.typ,
+                        left_expr.typ,
+                        right_expr.typ,
                         left_expr.span,
                         right_expr.span,
-                        &expr.typ.typ,
+                        expr.typ,
                     );
                     self.type_checker.unify_domains(
-                        &left_expr.typ.domain,
-                        &expr.typ.domain,
+                        &left_expr.domain,
+                        &expr.domain,
                         left_expr.span,
                         "binop left",
                     );
                     self.type_checker.unify_domains(
-                        &right_expr.typ.domain,
-                        &expr.typ.domain,
+                        &right_expr.domain,
+                        &expr.domain,
                         right_expr.span,
                         "binop right",
                     );
                 }
             }
             ExpressionSource::FuncCall(func_call) => {
-                let func_call_outputs = self.typecheck_func_call(func_call);
+                let interface = self.typecheck_func_call(func_call);
 
                 self.report_errors_for_bad_function_call(
                     func_call,
+                    &interface,
                     expr.span,
                     std::iter::once(expr.span),
                 );
 
-                if let Some(first_output) = func_call_outputs.first() {
-                    let port_type = self.get_type_of_port(
-                        first_output,
-                        func_call.interface_reference.submodule_decl,
-                    );
+                if let Some(first_output) = interface.interface.func_call_outputs.first() {
+                    let port_decl = interface.get_port(first_output);
+                    let port_type =
+                        port_decl.get_local_type(&mut self.type_checker.abstract_type_substitutor);
 
-                    self.type_checker.typecheck_write_to(
-                        &port_type,
+                    self.type_checker.unify_write_to(
                         expr.typ,
+                        &expr.domain,
+                        &port_type,
                         expr.span,
                         "function call as expression",
                     );
                 }
             }
             ExpressionSource::Constant(value) => {
+                let var_typ = AbstractRankedType {
+                    inner: AbstractInnerType::Named(value.get_type_id()),
+                    rank: PeanoType::Zero,
+                };
                 self.type_checker
-                    .unify_with_constant(&expr.typ.typ, value, expr.span)
+                    .unify_write_to_abstract(expr.typ, &var_typ, expr.span, "Constant");
             }
             ExpressionSource::ArrayConstruct(arr) => {
                 for elem_id in arr {
                     let elem_expr = self.working_on.instructions[*elem_id].unwrap_subexpression();
 
-                    self.type_checker.unify_with_array_of(
-                        &expr.typ.typ,
-                        elem_expr.typ.typ.clone(),
-                        elem_expr.span,
-                    );
+                    self.type_checker
+                        .abstract_type_substitutor
+                        .unify_report_error(
+                            expr.typ,
+                            &elem_expr.typ.clone().rank_up(),
+                            elem_expr.span,
+                            "array access",
+                        );
                     self.type_checker.unify_domains(
-                        &elem_expr.typ.domain,
-                        &expr.typ.domain,
+                        &elem_expr.domain,
+                        &expr.domain,
                         elem_expr.span,
                         "Array construction",
                     );
@@ -680,21 +699,33 @@ impl<'l> TypeCheckingContext<'l, '_> {
         };
     }
     fn typecheck_multi_output_expr(&mut self, expr: &Expression, multi_write: &[WriteTo]) {
+        for wr in multi_write {
+            self.typecheck_wire_reference(&wr.to, wr.to_span, expr.domain);
+        }
         match &expr.source {
             ExpressionSource::FuncCall(func_call) => {
-                let func_call_outputs = self.typecheck_func_call(func_call);
+                let interface = self.typecheck_func_call(func_call);
 
                 self.report_errors_for_bad_function_call(
                     func_call,
+                    &interface,
                     expr.span,
                     multi_write.iter().map(|v| v.to_span),
                 );
 
-                for (port, to) in std::iter::zip(func_call_outputs, multi_write) {
+                for (port, to) in std::iter::zip(interface.interface.func_call_outputs, multi_write)
+                {
+                    let port_decl = interface.get_port(port);
                     let port_type =
-                        self.get_type_of_port(port, func_call.interface_reference.submodule_decl);
+                        port_decl.get_local_type(&mut self.type_checker.abstract_type_substitutor);
 
-                    self.typecheck_visit_write_to(to, &port_type, expr.span);
+                    self.type_checker.unify_write_to(
+                        to.to.get_output_typ(),
+                        &expr.domain,
+                        &port_type,
+                        to.to_span,
+                        || ("function output".to_string(), vec![port_decl.make_info()]),
+                    );
                 }
             }
             ExpressionSource::WireRef(..)
@@ -702,9 +733,19 @@ impl<'l> TypeCheckingContext<'l, '_> {
             | ExpressionSource::BinaryOp { .. }
             | ExpressionSource::ArrayConstruct(..)
             | ExpressionSource::Constant(..) => {
-                if let Some(single_write) = multi_write.first() {
+                if let Some(first_write) = multi_write.first() {
                     self.typecheck_single_output_expr(SingleOutputExpression {
-                        typ: &single_write.to_type,
+                        typ: first_write.to.get_output_typ(),
+                        domain: expr.domain,
+                        span: expr.span,
+                        source: &expr.source,
+                    });
+                } else {
+                    let sentinel = self.type_checker.abstract_type_substitutor.alloc_unknown();
+
+                    self.typecheck_single_output_expr(SingleOutputExpression {
+                        typ: &sentinel,
+                        domain: expr.domain,
                         span: expr.span,
                         source: &expr.source,
                     });
@@ -722,20 +763,6 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 }
             }
         }
-        if let ExpressionSource::WireRef(wire_ref) = &expr.source {
-            if let Some(first_write) = multi_write.first() {
-                self.typecheck_wire_reference(wire_ref, expr.span, &first_write.to_type);
-            } else {
-                let sentinel = FullType {
-                    typ: self.type_checker.abstract_type_substitutor.alloc_unknown(),
-                    domain: expr.domain,
-                };
-                self.typecheck_wire_reference(wire_ref, expr.span, &sentinel);
-            }
-        }
-        for wr in multi_write {
-            self.typecheck_wire_reference(&wr.to, wr.to_span, &wr.to_type);
-        }
     }
 
     fn typecheck_visit_instruction(&mut self, instr_id: FlatID) {
@@ -751,8 +778,8 @@ impl<'l> TypeCheckingContext<'l, '_> {
             Instruction::IfStatement(stm) => {
                 let condition_expr =
                     &self.working_on.instructions[stm.condition].unwrap_subexpression();
-                self.type_checker.typecheck_write_to_abstract(
-                    &condition_expr.typ.typ,
+                self.type_checker.unify_write_to_abstract(
+                    condition_expr.typ,
                     &BOOL_TYPE.scalar(),
                     condition_expr.span,
                     "if statement condition",
@@ -763,14 +790,14 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 let start = self.working_on.instructions[stm.start].unwrap_subexpression();
                 let end = self.working_on.instructions[stm.end].unwrap_subexpression();
 
-                self.type_checker.typecheck_write_to_abstract(
-                    &start.typ.typ,
+                self.type_checker.unify_write_to_abstract(
+                    start.typ,
                     &loop_var.typ.typ,
                     start.span,
                     "for loop start",
                 );
-                self.type_checker.typecheck_write_to_abstract(
-                    &end.typ.typ,
+                self.type_checker.unify_write_to_abstract(
+                    end.typ,
                     &loop_var.typ.typ,
                     end.span,
                     "for loop end",
@@ -780,6 +807,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 ExpressionOutput::SubExpression(typ) => {
                     self.typecheck_single_output_expr(SingleOutputExpression {
                         typ,
+                        domain: expr.domain,
                         span: expr.span,
                         source: &expr.source,
                     });
@@ -844,16 +872,15 @@ pub fn apply_types(
                 type_checker.finalize_domain_type(&mut expr.domain);
                 match &mut expr.output {
                     ExpressionOutput::SubExpression(expr_typ) => {
-                        type_checker.finalize_type(linker_types, expr_typ, expr.span, errors);
+                        type_checker.finalize_abstract_type(
+                            linker_types,
+                            expr_typ,
+                            expr.span,
+                            errors,
+                        );
                     }
                     ExpressionOutput::MultiWrite(write_tos) => {
                         for wr in write_tos {
-                            type_checker.finalize_type(
-                                linker_types,
-                                &mut wr.to_type,
-                                wr.to_span,
-                                errors,
-                            );
                             type_checker.finalize_wire_ref(linker_types, &mut wr.to, errors);
                         }
                     }

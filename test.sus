@@ -482,12 +482,12 @@ module fizz_buzz {
 	}
 }
 
-module fizz_buzz_gen {
-    interface fizz_buzz_gen : int v -> int fb 
+module fizz_buzz_gen #(int TABLE_SIZE) {
+    interface fizz_buzz_gen : int#(MIN: 0, MAX: TABLE_SIZE) v -> int fb 
 	gen int FIZZ = 888
 	gen int BUZZ = 555
 	gen int FIZZ_BUZZ = 888555
-	gen int TABLE_SIZE = 256
+
 
 	gen int[TABLE_SIZE] lut
 	

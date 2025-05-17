@@ -1,7 +1,9 @@
+use std::ops::Deref;
+
 use ibig::IBig;
 
 use crate::alloc::{zip_eq, zip_eq3, UUID};
-use crate::typing::abstract_type::PeanoType;
+use crate::let_unwrap;
 use crate::typing::{
     concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE},
     type_inference::{
@@ -11,65 +13,51 @@ use crate::typing::{
 
 use super::*;
 
-use crate::typing::type_inference::{Substitutor, TypeSubstitutor};
+use crate::typing::type_inference::Substitutor;
 
 impl InstantiationContext<'_, '_> {
-    fn peano_to_nested_array_of(
-        &mut self,
-        p: &PeanoType,
-        c: ConcreteType,
-        dims: &mut Vec<ConcreteType>,
-    ) -> ConcreteType {
-        match p {
-            PeanoType::Zero => c,
-            PeanoType::Succ(p) => {
-                let this_dim_var = self.type_substitutor.alloc_unknown();
-                let arr = ConcreteType::Array(Box::new((c, this_dim_var.clone())));
-                let typ = self.peano_to_nested_array_of(p, arr, dims);
-                dims.push(this_dim_var.clone());
-                typ
-            }
-            _ => unreachable!("Peano abstract ranks being used at concrete type-checking time should never be anything other than Zero, Succ or Named ({p:?})"),
-        }
+    fn alloc_array_dimensions_stack(&mut self, num_array_dimensions: usize) -> Vec<UnifyableValue> {
+        (0..num_array_dimensions)
+            .map(|_| self.type_substitutor.alloc_unknown())
+            .collect()
     }
-    fn walk_type_along_path(
-        type_substitutor: &mut TypeUnifier<TypeSubstitutor<ConcreteType>>,
-        mut current_type_in_progress: ConcreteType,
+    fn walk_type_along_path<'t>(
+        mut cur_type: &'t ConcreteType,
         path: &[RealWirePathElem],
-    ) -> ConcreteType {
+    ) -> &'t ConcreteType {
         for p in path {
-            let typ_after_applying_array = type_substitutor.alloc_unknown();
             match p {
                 RealWirePathElem::ArrayAccess {
                     span: _,
                     idx_wire: _,
                 } => {
-                    // TODO #28 integer size <-> array bound check
-                    let arr_size = type_substitutor.alloc_unknown();
-                    let arr_box = Box::new((typ_after_applying_array.clone(), arr_size));
-                    type_substitutor.unify_must_succeed(
-                        &current_type_in_progress,
-                        &ConcreteType::Array(arr_box),
-                    );
-                    current_type_in_progress = typ_after_applying_array;
+                    let_unwrap!(ConcreteType::Array(arr_box), cur_type);
+                    let (arr_content, _arr_size) = arr_box.deref();
+                    cur_type = arr_content;
                 }
             }
         }
 
-        current_type_in_progress
+        cur_type
     }
 
     fn typecheck_all_wires(&mut self, delayed_constraints: &mut DelayedConstraintsList<Self>) {
         for this_wire_id in self.wires.id_range() {
             let this_wire = &self.wires[this_wire_id];
-            let span = self.md.get_instruction_span(this_wire.original_instruction);
+            let original_instr = &self.md.link_info.instructions[this_wire.original_instruction];
+            let span = original_instr.get_span();
             span.debug();
 
             match &this_wire.source {
                 RealWireDataSource::ReadOnly => {}
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     if let Some(is_state) = is_state {
-                        match is_state.get_type(&mut self.type_substitutor) {
+                        match is_state.concretize_type(
+                            self.linker,
+                            &original_instr.unwrap_declaration().typ.typ,
+                            &self.working_on_global_ref.template_args,
+                            &mut self.type_substitutor,
+                        ) {
                             Ok(value_typ) => self.type_substitutor.unify_report_error(
                                 &value_typ,
                                 &this_wire.typ,
@@ -83,13 +71,10 @@ impl InstantiationContext<'_, '_> {
                     }
                     for s in sources {
                         let source_typ = &self.wires[s.from].typ;
-                        let destination_typ = Self::walk_type_along_path(
-                            &mut self.type_substitutor,
-                            self.wires[this_wire_id].typ.clone(),
-                            &s.to_path,
-                        );
+                        let destination_typ =
+                            Self::walk_type_along_path(&self.wires[this_wire_id].typ, &s.to_path);
                         self.type_substitutor.unify_report_error(
-                            &destination_typ,
+                            destination_typ,
                             source_typ,
                             span,
                             "write wire access",
@@ -181,65 +166,38 @@ impl InstantiationContext<'_, '_> {
                         .as_single_output_expr()
                         .unwrap()
                         .typ
-                        .typ
                         .rank;
-                    let mut out_dims = vec![];
-                    let out_type =
-                        self.peano_to_nested_array_of(peano_type, output_typ, &mut out_dims);
 
-                    let mut in_left_dims = vec![];
-                    let in_left_type =
-                        self.peano_to_nested_array_of(peano_type, left_typ, &mut in_left_dims);
+                    let dimension_variables =
+                        self.alloc_array_dimensions_stack(peano_type.count().unwrap());
 
-                    for (in_left, out) in out_dims.iter().zip(in_left_dims.iter()) {
-                        self.type_substitutor.unify_report_error(
-                            in_left,
-                            out,
-                            span,
-                            "binary output dimension",
-                        );
-                    }
-
-                    let mut in_right_dims = vec![];
-                    let in_right_type =
-                        self.peano_to_nested_array_of(peano_type, right_typ, &mut in_right_dims);
-
-                    for (in_right, out) in out_dims.iter().zip(in_right_dims.iter()) {
-                        self.type_substitutor.unify_report_error(
-                            in_right,
-                            out,
-                            span,
-                            "binary output dimension",
-                        );
-                    }
+                    let output_typ = output_typ.stack_arrays(&dimension_variables);
+                    let left_typ = left_typ.stack_arrays(&dimension_variables);
+                    let right_typ = right_typ.stack_arrays(&dimension_variables);
 
                     self.type_substitutor.unify_report_error(
                         &self.wires[this_wire_id].typ,
-                        &out_type,
+                        &output_typ,
                         span,
                         "binary output",
                     );
                     self.type_substitutor.unify_report_error(
                         &self.wires[left].typ,
-                        &in_left_type,
+                        &left_typ,
                         span,
                         "binary left",
                     );
                     self.type_substitutor.unify_report_error(
                         &self.wires[right].typ,
-                        &in_right_type,
+                        &right_typ,
                         span,
                         "binary right",
                     );
                 }
                 RealWireDataSource::Select { root, path } => {
-                    let found_typ = Self::walk_type_along_path(
-                        &mut self.type_substitutor,
-                        self.wires[*root].typ.clone(),
-                        path,
-                    );
+                    let found_typ = Self::walk_type_along_path(&self.wires[*root].typ, path);
                     self.type_substitutor.unify_report_error(
-                        &found_typ,
+                        found_typ,
                         &self.wires[this_wire_id].typ,
                         span,
                         "wire access",
@@ -257,8 +215,7 @@ impl InstantiationContext<'_, '_> {
                             "array construction",
                         );
                     }
-                    let array_size_value =
-                        ConcreteType::Value(Value::Integer(IBig::from(array_wires.len())));
+                    let array_size_value = Value::Integer(IBig::from(array_wires.len())).into();
                     self.type_substitutor.unify_report_error(
                         &self.wires[this_wire_id].typ,
                         &ConcreteType::Array(Box::new((element_type, array_size_value))),
@@ -341,10 +298,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
 
         // Check if there's any argument that isn't known
         for (_id, arg) in &mut Rc::get_mut(&mut sm.refers_to).unwrap().template_args {
-            if !context
-                .type_substitutor
-                .fully_substitute(arg.as_mut().unwrap_identical())
-            {
+            if !arg.fully_substitute(&context.type_substitutor) {
                 // We don't actually *need* to already fully_substitute here, but it's convenient and saves some work
                 return DelayedConstraintStatus::NoProgress;
             }
@@ -501,7 +455,7 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for UnaryOpTypecheckConstra
             }
             if let UnaryOperator::Product | UnaryOperator::Sum = self.op {
                 let (array_type, array_size) = input_complete_type.unwrap_array();
-                let array_size = array_size.unwrap_value().unwrap_integer();
+                let array_size = array_size.unwrap_integer();
                 let (min, max) = array_type.unwrap_integer_bounds();
                 let (out_size_min, out_size_max) = match self.op {
                     UnaryOperator::Sum => (min * array_size, max * array_size + 1),

@@ -11,7 +11,7 @@ use crate::linker::{GlobalUUID, IsExtern, LinkInfo};
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType};
 use crate::typing::concrete_type::ConcreteTemplateArg;
 use crate::typing::template::{GlobalReference, TVec, TemplateArg};
-use crate::typing::type_inference::Substitutor;
+use crate::typing::value_unifier::ValueUnifier;
 use crate::typing::written_type::WrittenType;
 use crate::util::{unwrap_single_element, zip_eq};
 use crate::{let_unwrap, prelude::*};
@@ -58,7 +58,11 @@ impl GenerationState<'_> {
     ) -> ExecutionResult<()> {
         for elem in conn_path {
             match elem {
-                &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
+                &WireReferencePathElement::ArrayAccess {
+                    idx,
+                    bracket_span,
+                    output_typ: _,
+                } => {
                     let idx = self.get_generation_integer(idx)?; // Caught by typecheck
                     let Value::Array(a_box) = target else {
                         caught_by_typecheck!("Non-array")
@@ -181,45 +185,47 @@ fn factorial(mut n: UBig) -> UBig {
 ///
 /// See [WireReferenceRoot]
 #[derive(Debug, Clone)]
-enum RealWireRefRoot {
+enum RealWireRefRoot<'t> {
     /// The preamble isn't really used yet, but it's there for when we have submodule arrays (soon)
     Wire {
         wire_id: WireID,
         preamble: Vec<RealWirePathElem>,
     },
     Generative(FlatID),
-    Constant(Value),
+    Constant(Value, &'t AbstractRankedType),
 }
 
 trait Concretizer {
     fn get_type(&mut self, id: TemplateID) -> ConcreteType;
-    fn get_value(&mut self, expr: FlatID) -> ExecutionResult<ConcreteType>;
-    fn alloc_unknown(&mut self) -> ConcreteType;
+    fn get_value(&mut self, expr: FlatID) -> ExecutionResult<UnifyableValue>;
+    fn alloc_unknown(&mut self) -> UnifyableValue;
 }
 
 struct LocalTypeConcretizer<'fl, 'substitutor> {
     template_args: &'fl TVec<ConcreteTemplateArg>,
     generation_state: &'fl GenerationState<'fl>,
-    type_substitutor: &'substitutor mut TypeSubstitutor<ConcreteType>,
+    type_substitutor: &'substitutor mut ValueUnifier,
 }
 impl Concretizer for LocalTypeConcretizer<'_, '_> {
     fn get_type(&mut self, id: TemplateID) -> ConcreteType {
         self.template_args[id].unwrap_type().clone()
     }
-    fn get_value(&mut self, expr: FlatID) -> ExecutionResult<ConcreteType> {
-        Ok(ConcreteType::Value(
-            self.generation_state.get_generation_value(expr)?.clone(),
-        ))
+    fn get_value(&mut self, expr: FlatID) -> ExecutionResult<UnifyableValue> {
+        Ok(self
+            .generation_state
+            .get_generation_value(expr)?
+            .clone()
+            .into())
     }
 
-    fn alloc_unknown(&mut self) -> ConcreteType {
+    fn alloc_unknown(&mut self) -> UnifyableValue {
         self.type_substitutor.alloc_unknown()
     }
 }
 struct SubModuleTypeConcretizer<'fl, 'substitutor> {
     submodule_template_args: &'fl TVec<ConcreteTemplateArg>,
     instructions: &'fl FlatAlloc<Instruction, FlatIDMarker>,
-    type_substitutor: &'substitutor mut TypeSubstitutor<ConcreteType>,
+    type_substitutor: &'substitutor mut ValueUnifier,
 }
 impl Concretizer for SubModuleTypeConcretizer<'_, '_> {
     fn get_type(&mut self, id: TemplateID) -> ConcreteType {
@@ -236,14 +242,14 @@ impl Concretizer for SubModuleTypeConcretizer<'_, '_> {
     ///     output int total
     /// }
     /// ```
-    fn get_value(&mut self, expr: FlatID) -> ExecutionResult<ConcreteType> {
+    fn get_value(&mut self, expr: FlatID) -> ExecutionResult<UnifyableValue> {
         let expr = self.instructions[expr].unwrap_expression();
         Ok(match &expr.source {
             ExpressionSource::WireRef(wr) => {
                 if !wr.path.is_empty() {
                     return Ok(self.type_substitutor.alloc_unknown());
                 } // Must be a plain, no fuss reference to a de
-                let WireReferenceRoot::LocalDecl(wire_declaration, _span) = &wr.root else {
+                let WireReferenceRoot::LocalDecl(wire_declaration) = &wr.root else {
                     return Ok(self.type_substitutor.alloc_unknown());
                 };
                 let template_arg_decl = self.instructions[*wire_declaration].unwrap_declaration();
@@ -255,12 +261,12 @@ impl Concretizer for SubModuleTypeConcretizer<'_, '_> {
                     .unwrap_value()
                     .clone()
             }
-            ExpressionSource::Constant(cst) => ConcreteType::Value(cst.clone()),
+            ExpressionSource::Constant(cst) => cst.clone().into(),
             _ => self.type_substitutor.alloc_unknown(),
         })
     }
 
-    fn alloc_unknown(&mut self) -> ConcreteType {
+    fn alloc_unknown(&mut self) -> UnifyableValue {
         self.type_substitutor.alloc_unknown()
     }
 }
@@ -332,7 +338,7 @@ fn concretize_type_recurse(
     })
 }
 
-impl InstantiationContext<'_, '_> {
+impl<'fl> InstantiationContext<'fl, '_> {
     /// Uses the current context to turn a [WrittenType] into a [ConcreteType].
     ///
     /// Failures are fatal.
@@ -369,7 +375,7 @@ impl InstantiationContext<'_, '_> {
     ///
     /// Cannot fail, since we're not using [Self::generation_state]
     fn concretize_submodule_port_type(
-        type_substitutor: &mut TypeSubstitutor<ConcreteType>,
+        type_substitutor: &mut ValueUnifier,
         linker: &Linker,
         submodule_port: &Port,
         submodule_template_args: &TVec<ConcreteTemplateArg>,
@@ -398,7 +404,7 @@ impl InstantiationContext<'_, '_> {
         port: PortID,
         submodule_instr: FlatID,
         port_name_span: Option<Span>,
-    ) -> RealWireRefRoot {
+    ) -> RealWireRefRoot<'fl> {
         let submod_id = self.generation_state[submodule_instr].unwrap_submodule_instance();
         let wire_id = self.get_submodule_port(submod_id, port, port_name_span);
         RealWireRefRoot::Wire {
@@ -476,7 +482,7 @@ impl InstantiationContext<'_, '_> {
             get_builtin_const!("assert") => {
                 let [condition] = cst_ref.template_args.cast_to_array();
 
-                if condition.unwrap_value().unwrap_value().unwrap_bool() {
+                if condition.unwrap_value().unwrap_bool() {
                     Ok(Value::Bool(true))
                 } else {
                     Err("Assertion failed".into())
@@ -539,10 +545,10 @@ impl InstantiationContext<'_, '_> {
     // Points to the wire in the hardware that corresponds to the root of this.
     fn determine_wire_ref_root(
         &mut self,
-        wire_ref_root: &WireReferenceRoot,
-    ) -> ExecutionResult<RealWireRefRoot> {
-        Ok(match wire_ref_root {
-            &WireReferenceRoot::LocalDecl(decl_id, _) => match &self.generation_state[decl_id] {
+        wire_ref: &'fl WireReference,
+    ) -> ExecutionResult<RealWireRefRoot<'fl>> {
+        Ok(match &wire_ref.root {
+            &WireReferenceRoot::LocalDecl(decl_id) => match &self.generation_state[decl_id] {
                 SubModuleOrWire::Wire(w) => RealWireRefRoot::Wire {
                     wire_id: *w,
                     preamble: Vec::new(),
@@ -551,9 +557,10 @@ impl InstantiationContext<'_, '_> {
                 SubModuleOrWire::SubModule(_) => unreachable!(),
                 SubModuleOrWire::Unnasigned => unreachable!(),
             },
-            WireReferenceRoot::NamedConstant(cst) => {
-                RealWireRefRoot::Constant(self.get_named_constant_value(cst)?)
-            }
+            WireReferenceRoot::NamedConstant(cst) => RealWireRefRoot::Constant(
+                self.get_named_constant_value(cst)?,
+                &wire_ref.root_typ.typ,
+            ),
             WireReferenceRoot::SubModulePort(port) => {
                 return Ok(self.instantiate_port_wire_ref_root(
                     port.port,
@@ -574,7 +581,11 @@ impl InstantiationContext<'_, '_> {
     ) -> ExecutionResult<Vec<RealWirePathElem>> {
         for v in path {
             match v {
-                &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
+                &WireReferencePathElement::ArrayAccess {
+                    idx,
+                    bracket_span,
+                    output_typ: _,
+                } => {
                     let idx_wire = self.get_wire_or_constant_as_wire(idx, domain)?;
                     let new_int = self.type_substitutor.new_int_type(None, None);
                     self.type_substitutor.unify_report_error(
@@ -621,7 +632,7 @@ impl InstantiationContext<'_, '_> {
 
     fn write_non_generative(
         &mut self,
-        write_to: &WriteTo,
+        write_to: &'fl WriteTo,
         from: WireID,
         original_connection: FlatID,
     ) -> ExecutionResult<()> {
@@ -637,7 +648,7 @@ impl InstantiationContext<'_, '_> {
                 wire_id: target_wire,
                 preamble,
             },
-            self.determine_wire_ref_root(&write_to.to.root)?
+            self.determine_wire_ref_root(&write_to.to)?
         );
         let domain = self.wires[target_wire].domain;
         let instantiated_path =
@@ -654,7 +665,7 @@ impl InstantiationContext<'_, '_> {
 
     fn write_generative(
         &mut self,
-        write_to: &WriteTo,
+        write_to: &'fl WriteTo,
         value: Value,
         original_connection: FlatID,
     ) -> ExecutionResult<()> {
@@ -662,7 +673,7 @@ impl InstantiationContext<'_, '_> {
             WriteModifiers::Connection {
                 num_regs,
                 regs_span: _,
-            } => match self.determine_wire_ref_root(&write_to.to.root)? {
+            } => match self.determine_wire_ref_root(&write_to.to)? {
                 RealWireRefRoot::Wire {
                     wire_id: target_wire,
                     preamble,
@@ -670,6 +681,7 @@ impl InstantiationContext<'_, '_> {
                     let domain = self.wires[target_wire].domain;
                     let from = self.alloc_wire_for_const(
                         value,
+                        write_to.to.get_output_typ(),
                         original_connection,
                         domain,
                         self.md.link_info.instructions[original_connection]
@@ -706,7 +718,7 @@ impl InstantiationContext<'_, '_> {
                     };
                     *v_writable = new_val;
                 }
-                RealWireRefRoot::Constant(_cst) => {
+                RealWireRefRoot::Constant(_cst, _) => {
                     caught_by_typecheck!("Cannot assign to constants");
                 }
             },
@@ -732,17 +744,23 @@ impl InstantiationContext<'_, '_> {
     fn alloc_wire_for_const(
         &mut self,
         value: Value,
+        abs_typ: &AbstractRankedType,
         original_instruction: FlatID,
         domain: DomainID,
         const_span: Span,
     ) -> ExecutionResult<WireID> {
-        if value.contains_errors_or_unsets() {
+        if value.contains_unset() {
             return Err((const_span, format!("This compile-time value was not fully resolved by the time it needed to be converted to a wire: {value}")));
         }
         Ok(self.wires.alloc(RealWire {
             typ: value
-                .get_type(&mut self.type_substitutor)
-                .map_err(|reason| (const_span, reason))?,
+                .concretize_type(
+                    self.linker,
+                    abs_typ,
+                    &self.working_on_global_ref.template_args,
+                    &mut self.type_substitutor,
+                )
+                .map_err(|msg| (const_span, msg))?,
             source: RealWireDataSource::Constant { value },
             original_instruction,
             domain,
@@ -762,14 +780,14 @@ impl InstantiationContext<'_, '_> {
             SubModuleOrWire::Wire(w) => Ok(*w),
             SubModuleOrWire::CompileTimeValue(v) => {
                 let value = v.clone();
-
+                let original_expr =
+                    self.md.link_info.instructions[original_instruction].unwrap_subexpression();
                 self.alloc_wire_for_const(
                     value,
+                    original_expr.typ,
                     original_instruction,
                     domain,
-                    self.md.link_info.instructions[original_instruction]
-                        .unwrap_expression()
-                        .span,
+                    original_expr.span,
                 )
             }
         }
@@ -840,33 +858,36 @@ impl InstantiationContext<'_, '_> {
 
     fn get_wire_ref_root_as_wire(
         &mut self,
-        wire_ref_root: &WireReferenceRoot,
+        wire_ref: &'fl WireReference,
         original_instruction: FlatID,
         domain: DomainID,
     ) -> ExecutionResult<(WireID, Vec<RealWirePathElem>)> {
-        let root = self.determine_wire_ref_root(wire_ref_root)?;
+        let root = self.determine_wire_ref_root(wire_ref)?;
         Ok(match root {
             RealWireRefRoot::Wire { wire_id, preamble } => (wire_id, preamble),
             RealWireRefRoot::Generative(decl_id) => {
+                let decl = self.md.link_info.instructions[decl_id].unwrap_declaration();
                 let value = self.generation_state[decl_id]
                     .unwrap_generation_value()
                     .clone();
                 (
                     self.alloc_wire_for_const(
                         value,
+                        &decl.typ.typ,
                         decl_id,
                         domain,
-                        wire_ref_root.get_span().unwrap(),
+                        wire_ref.root_span,
                     )?,
                     Vec::new(),
                 )
             }
-            RealWireRefRoot::Constant(value) => (
+            RealWireRefRoot::Constant(value, typ) => (
                 self.alloc_wire_for_const(
                     value,
+                    typ,
                     original_instruction,
                     domain,
-                    wire_ref_root.get_span().unwrap(),
+                    wire_ref.root_span,
                 )?,
                 Vec::new(),
             ),
@@ -875,14 +896,14 @@ impl InstantiationContext<'_, '_> {
 
     fn expression_to_real_wire(
         &mut self,
-        expression: &Expression,
+        expression: &'fl Expression,
         original_instruction: FlatID,
         domain: DomainID,
     ) -> ExecutionResult<Vec<WireID>> {
         let source = match &expression.source {
             ExpressionSource::WireRef(wire_ref) => {
                 let (root_wire, path_preamble) =
-                    self.get_wire_ref_root_as_wire(&wire_ref.root, original_instruction, domain)?;
+                    self.get_wire_ref_root_as_wire(wire_ref, original_instruction, domain)?;
                 let path = self.instantiate_wire_ref_path(path_preamble, &wire_ref.path, domain)?;
 
                 if path.is_empty() {
@@ -899,7 +920,7 @@ impl InstantiationContext<'_, '_> {
                 let right = self.get_wire_or_constant_as_wire(*right, domain)?;
                 RealWireDataSource::UnaryOp {
                     op: *op,
-                    rank: rank.count_unwrap(),
+                    rank: rank.count().unwrap(),
                     right,
                 }
             }
@@ -913,7 +934,7 @@ impl InstantiationContext<'_, '_> {
                 let right = self.get_wire_or_constant_as_wire(*right, domain)?;
                 RealWireDataSource::BinaryOp {
                     op: *op,
-                    rank: rank.count_unwrap(),
+                    rank: rank.count().unwrap(),
                     left,
                     right,
                 }
@@ -966,9 +987,8 @@ impl InstantiationContext<'_, '_> {
                 unreachable!("Constant cannot be non-compile-time");
             }
         };
-        let typ = self.concretize_type_no_written_reference(
-            &expression.as_single_output_expr().unwrap().typ.typ,
-        );
+        let typ = self
+            .concretize_type_no_written_reference(expression.as_single_output_expr().unwrap().typ);
         Ok(vec![self.wires.alloc(RealWire {
             name: self.unique_name_producer.get_unique_name(""),
             typ,
@@ -996,16 +1016,17 @@ impl InstantiationContext<'_, '_> {
         let typ = self.concretize_type(&wire_decl.typ.typ, &wire_decl.typ_expr)?;
 
         Ok(if wire_decl.identifier_type == IdentifierType::Generative {
-            let value = if let DeclarationKind::GenerativeInput(template_id) = wire_decl.decl_kind {
-                // Only for template arguments, we must initialize their value to the value they've been assigned in the template instantiation
-                self.working_on_global_ref.template_args[template_id]
-                    .unwrap_value()
-                    .unwrap_value()
-                    .clone()
-            } else {
-                // Empty initial value
-                typ.get_initial_val()
-            };
+            let value: Value =
+                if let DeclarationKind::GenerativeInput(template_id) = wire_decl.decl_kind {
+                    // Only for template arguments, we must initialize their value to the value they've been assigned in the template instantiation
+                    self.working_on_global_ref.template_args[template_id]
+                        .unwrap_value()
+                        .unwrap_set()
+                        .clone()
+                } else {
+                    // Empty initial value
+                    typ.get_initial_val()
+                };
             SubModuleOrWire::CompileTimeValue(value)
         } else {
             let source = if wire_decl.read_only {
@@ -1053,9 +1074,11 @@ impl InstantiationContext<'_, '_> {
                     }),
                     TemplateKind::Value(arg) => TemplateKind::Value({
                         match arg {
-                            TemplateArg::Provided { arg, .. } => ConcreteType::Value(
-                                self.generation_state.get_generation_value(*arg)?.clone(),
-                            ),
+                            TemplateArg::Provided { arg, .. } => self
+                                .generation_state
+                                .get_generation_value(*arg)?
+                                .clone()
+                                .into(),
                             TemplateArg::NotProvided { .. } => {
                                 self.type_substitutor.alloc_unknown()
                             }
@@ -1072,7 +1095,7 @@ impl InstantiationContext<'_, '_> {
 
     fn compute_compile_time_wireref(&mut self, wire_ref: &WireReference) -> ExecutionResult<Value> {
         let mut work_on_value: Value = match &wire_ref.root {
-            &WireReferenceRoot::LocalDecl(decl_id, _span) => {
+            &WireReferenceRoot::LocalDecl(decl_id) => {
                 self.generation_state.get_generation_value(decl_id)?.clone()
             }
             WireReferenceRoot::NamedConstant(cst) => self.get_named_constant_value(cst)?,
@@ -1084,7 +1107,11 @@ impl InstantiationContext<'_, '_> {
 
         for path_elem in &wire_ref.path {
             work_on_value = match path_elem {
-                &WireReferencePathElement::ArrayAccess { idx, bracket_span } => {
+                &WireReferencePathElement::ArrayAccess {
+                    idx,
+                    bracket_span,
+                    output_typ: _,
+                } => {
                     let idx = self.generation_state.get_generation_integer(idx)?;
 
                     array_access(&work_on_value, idx, bracket_span)?.clone()
@@ -1128,7 +1155,7 @@ impl InstantiationContext<'_, '_> {
             }
             ExpressionSource::UnaryOp { op, rank, right } => {
                 let right_val = self.generation_state.get_generation_value(*right)?;
-                duplicate_for_all_array_ranks(&[right_val], rank.count_unwrap(), &mut |[v]| {
+                duplicate_for_all_array_ranks(&[right_val], rank.count().unwrap(), &mut |[v]| {
                     Ok(compute_unary_op(*op, v))
                 })
                 .unwrap()
@@ -1144,7 +1171,7 @@ impl InstantiationContext<'_, '_> {
 
                 duplicate_for_all_array_ranks(
                     &[left_val, right_val],
-                    rank.count_unwrap(),
+                    rank.count().unwrap(),
                     &mut |[l, r]| {
                         match op {
                             BinaryOperator::Divide | BinaryOperator::Modulo => {

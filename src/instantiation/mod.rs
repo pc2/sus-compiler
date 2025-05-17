@@ -7,7 +7,7 @@ mod unique_names;
 use unique_names::UniqueNames;
 
 use crate::prelude::*;
-use crate::typing::type_inference::{TypeSubstitutor, TypeUnifier};
+use crate::typing::value_unifier::{UnifyableValue, ValueUnifier};
 
 use std::cell::OnceCell;
 use std::rc::Rc;
@@ -280,8 +280,7 @@ pub struct InstantiationContext<'fl, 'l> {
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
 
-    pub type_substitutor: TypeUnifier<TypeSubstitutor<ConcreteType>>,
-    //pub type_value_substitutor: SetUnifier<Value>,
+    pub type_substitutor: ValueUnifier,
     /// Used for Execution
     generation_state: GenerationState<'fl>,
     unique_name_producer: UniqueNames,

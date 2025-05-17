@@ -44,7 +44,7 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
     let mut array_string = String::new();
     while let ConcreteType::Array(arr) = typ {
         let (content_typ, size) = arr.deref();
-        let sz = size.unwrap_value().unwrap_integer();
+        let sz = size.unwrap_integer();
         write!(array_string, "[{}:0]", sz - 1).unwrap();
         typ = content_typ;
     }
@@ -58,7 +58,6 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
             }
         }
         ConcreteType::Array(_) => unreachable!("All arrays have been used up already"),
-        ConcreteType::Value(_) | ConcreteType::Unknown(_) => unreachable!(),
     }
 }
 
@@ -227,9 +226,6 @@ impl<'g> CodeGenerationContext<'g> {
                     self.write_constant(&new_to, v);
                 }
             }
-            Value::Unknown(_) => {
-                unreachable!("Unresolved Value! Should have been caught by concrete typecheck!")
-            }
         }
     }
 
@@ -255,7 +251,7 @@ impl<'g> CodeGenerationContext<'g> {
             idx += 1;
             let (new_typ, sz) = arr_box.deref();
             typ = new_typ;
-            let sz = sz.unwrap_value().unwrap_integer();
+            let sz = sz.unwrap_integer();
             write!(
                 for_stack,
                 "for({for_should_declare_var}{var_name} = 0; {var_name} < {sz}; {var_name} = {var_name} + 1) "
@@ -505,7 +501,7 @@ impl<'g> CodeGenerationContext<'g> {
                         "No extern module type arguments. Should have been caught by Lint"
                     );
                 }
-                TemplateKind::Value(value) => value.unwrap_value().inline_constant_to_string(),
+                TemplateKind::Value(value) => value.inline_constant_to_string(),
             };
             if first {
                 self.program_text.write_char(',').unwrap();
@@ -643,9 +639,6 @@ impl Value {
             Value::Integer(v) => Cow::Owned(v.to_string()),
             Value::Unset => Cow::Borrowed("'x"),
             Value::Array(_) => unreachable!("Not an inline constant!"),
-            Value::Unknown(_) => {
-                unreachable!("Unresolved Value! Should have been caught by concrete typecheck!")
-            }
         }
     }
 }

@@ -182,9 +182,9 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.documentation_link_info(&submodule.link_info);
             hover.gather_submodule_hover_infos(md_id, id);
         }
-        LocationInfo::InGlobal(obj_id, link_info, id, InGlobal::Temporary(wire)) => {
+        LocationInfo::InGlobal(obj_id, link_info, id, InGlobal::Temporary(expr)) => {
             let mut details_vec: Vec<Cow<str>> = Vec::with_capacity(2);
-            match wire.typ.domain {
+            match expr.domain {
                 DomainType::Generative => details_vec.push(Cow::Borrowed("gen")),
                 DomainType::Physical(ph) => {
                     if let Some(md) = try_get_module(&linker.modules, obj_id) {
@@ -199,13 +199,12 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 }
             };
             details_vec.push(Cow::Owned(
-                wire.typ
-                    .typ
+                expr.typ
                     .display(&linker.types, &link_info.template_parameters)
                     .to_string(),
             ));
             hover.sus_code(details_vec.join(" "));
-            hover.gather_hover_infos(obj_id, id, wire.typ.domain.is_generative());
+            hover.gather_hover_infos(obj_id, id, expr.domain.is_generative());
         }
         LocationInfo::Type(typ, link_info) => {
             hover.sus_code(

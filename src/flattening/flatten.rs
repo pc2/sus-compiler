@@ -1,6 +1,6 @@
 use crate::alloc::{ArenaAllocator, UUIDAllocator, UUIDRange, UUID};
 use crate::typing::abstract_type::DomainType;
-use crate::typing::type_inference::{AbstractTypeSubstitutor, Substitutor, TypeSubstitutor};
+use crate::typing::type_inference::{AbstractTypeSubstitutor, TypeSubstitutor};
 use crate::{alloc::UUIDRangeIter, prelude::*};
 
 use ibig::IBig;
@@ -48,75 +48,7 @@ enum PartialWireReference {
         interface_name_span: Span,
     },
     /// It's ready for use higher up
-    WireReference {
-        wire_ref: WireReference,
-        domain: DomainType,
-    },
-}
-
-impl PartialWireReference {
-    const ERROR: Self = PartialWireReference::WireReference {
-        wire_ref: WireReference::ERROR,
-        domain: DomainType::Generative,
-    };
-}
-
-impl PartialWireReference {
-    /// Returns the domain of the WireReferenceRoot
-    fn extract(self, ctx: &FlatteningContext) -> (WireReference, DomainType) {
-        match self {
-            PartialWireReference::ModuleButNoPort(submod_decl, span) => {
-                let md_uuid = ctx.instructions[submod_decl]
-                    .unwrap_submodule()
-                    .module_ref
-                    .id;
-                ctx.errors
-                    .error(
-                        span,
-                        "cannot operate on modules directly. Should use ports instead",
-                    )
-                    .info_obj(&ctx.globals[md_uuid]);
-                (WireReference::ERROR, DomainType::Generative)
-            }
-            PartialWireReference::GlobalModuleName(md_ref) => {
-                let md = &ctx.globals[md_ref.id];
-                ctx.errors
-                    .error(
-                        md_ref.name_span,
-                        format!(
-                            "Expected a Wire Reference, but found module '{}' instead",
-                            md.link_info.name
-                        ),
-                    )
-                    .info_obj(md);
-                (WireReference::ERROR, DomainType::Generative)
-            }
-            PartialWireReference::ModuleWithInterface {
-                submodule_decl: submod_decl,
-                submodule_name_span: _,
-                interface,
-                interface_name_span,
-            } => {
-                let md_uuid = ctx.instructions[submod_decl]
-                    .unwrap_submodule()
-                    .module_ref
-                    .id;
-                let md = &ctx.globals[md_uuid];
-                let interf = &md.interfaces[interface];
-                ctx.errors
-                    .error(
-                        interface_name_span,
-                        format!(
-                            "Expected a port, but found module interface '{}' instead",
-                            &interf.name
-                        ),
-                    )
-                    .info((interf.name_span, md.link_info.file), "Declared here");
-                (WireReference::ERROR, DomainType::Generative)
-            }
-            PartialWireReference::WireReference { wire_ref, domain } => (wire_ref, domain),
-        }
-    }
+    WireReference(WireReference),
 }
 
 impl UnaryOperator {
@@ -354,11 +286,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         Some(NamedLocal::TemplateType(t)) => Some(TemplateKind::Type(WrittenType::TemplateVariable(name_span, t))),
                         Some(NamedLocal::Declaration(decl_id)) => {
                             // Insert extra Expression, to support named template arg syntax #(MY_VAR, OTHER_VAR: BEEP)
+                            let decl = self.instructions[decl_id].unwrap_declaration();
                             let wire_read_id = self.instructions.alloc(Instruction::Expression(Expression {
-                                output: ExpressionOutput::SubExpression(self.type_alloc.alloc_unset_type(DomainType::Generative)),
+                                output: ExpressionOutput::SubExpression(self.type_alloc.type_alloc.alloc_unknown()),
                                 span: name_span,
                                 domain: DomainType::Generative,
-                                source: ExpressionSource::WireRef(WireReference::simple_var_read(decl_id, name_span))
+                                source: ExpressionSource::WireRef(WireReference {
+                                    root: WireReferenceRoot::LocalDecl(decl_id),
+                                    root_span: name_span,
+                                    root_typ: decl.typ.clone(),
+                                    path: Vec::new(),
+                                })
                             }));
                             Some(TemplateKind::Value(wire_read_id))
                         }
@@ -417,7 +355,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         }
                         // Correct pairing
                         (TemplateKind::Value(_), TemplateKind::Value(arg)) => {
-                            let abs_typ = self.instructions[arg].unwrap_subexpression().typ.typ.clone();
+                            let abs_typ = self.instructions[arg].unwrap_subexpression().typ.clone();
                             TemplateKind::Value(TemplateArg::Provided { name_span, value_span, arg, abs_typ })
                         }
                         (TemplateKind::Type(_), TemplateKind::Value(_)) => {
@@ -873,7 +811,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn get_or_alloc_module(&mut self, cursor: &mut Cursor<'c>) -> Option<ModuleInterfaceReference> {
         let outer_span = cursor.span();
 
-        match self.flatten_wire_reference(cursor) {
+        match self.flatten_partial_wire_reference(cursor) {
             PartialWireReference::GlobalModuleName(module_ref) => {
                 let documentation = cursor.extract_gathered_comments();
                 let interface_span = module_ref.get_total_span();
@@ -905,7 +843,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 name_span: Some(submodule_name_span),
                 interface_span: interface_name_span,
             }),
-            PartialWireReference::WireReference { wire_ref, .. } => {
+            PartialWireReference::WireReference(wire_ref) => {
                 if !wire_ref.is_error() {
                     // Error already reported
                     self.errors.error(
@@ -921,7 +859,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn flatten_subexpr(&mut self, cursor: &mut Cursor<'c>) -> (FlatID, DomainType) {
         let (source, span, domain) = self.flatten_expr_source(cursor);
 
-        let typ = self.type_alloc.alloc_unset_type(domain);
+        let typ = self.type_alloc.type_alloc.alloc_unknown();
         let wire_instance = Expression {
             domain,
             span,
@@ -939,7 +877,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let (source, span, domain) = self.flatten_expr_source(cursor);
 
         for to in &writes {
-            if to.to_type.domain.is_generative() && !domain.is_generative() {
+            if to.to.root_typ.domain.is_generative() && !domain.is_generative() {
                 self.errors
                     .error(span, "This value is non-generative, yet it is being assigned to a generative value")
                     .info_same_file(to.to_span, "This object is generative");
@@ -954,6 +892,15 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         };
         self.instructions
             .alloc(Instruction::Expression(wire_instance));
+    }
+
+    fn new_error(&mut self, root_span: Span) -> WireReference {
+        WireReference {
+            root: WireReferenceRoot::Error,
+            path: Vec::new(),
+            root_span,
+            root_typ: self.type_alloc.alloc_unset_type(DomainType::Generative),
+        }
     }
 
     fn flatten_expr_source(
@@ -1017,7 +964,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                 // TODO add compile-time functions https://github.com/pc2/sus-compiler/issues/10
                 if resulting_domain.is_generative() {
-                    resulting_domain.combine_with(self.type_alloc.domain_alloc.alloc_unknown());
+                    resulting_domain = self.type_alloc.domain_alloc.alloc_unknown();
                 }
 
                 match interface_reference {
@@ -1026,7 +973,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         arguments,
                         arguments_span,
                     }),
-                    None => ExpressionSource::WireRef(WireReference::ERROR),
+                    None => ExpressionSource::WireRef(self.new_error(expr_span)),
                 }
             }),
             kind!("parenthesis_expression") => {
@@ -1044,17 +991,14 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 ExpressionSource::ArrayConstruct(list)
             }
             _other => {
-                let (wr, root_domain) = self.flatten_wire_reference(cursor).extract(self);
+                let wr = self.flatten_wire_reference(cursor, expr_span);
 
-                resulting_domain.combine_with(root_domain);
+                resulting_domain.combine_with(wr.root_typ.domain);
                 for elem in &wr.path {
                     match elem {
-                        WireReferencePathElement::ArrayAccess {
-                            idx,
-                            bracket_span: _,
-                        } => {
+                        WireReferencePathElement::ArrayAccess { idx, .. } => {
                             let idx_expr = self.instructions[*idx].unwrap_subexpression();
-                            resulting_domain.combine_with(idx_expr.typ.domain);
+                            resulting_domain.combine_with(idx_expr.domain);
                         }
                     }
                 }
@@ -1064,23 +1008,77 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         (source, expr_span, resulting_domain)
     }
 
-    fn flatten_wire_reference(&mut self, cursor: &mut Cursor<'c>) -> PartialWireReference {
+    fn flatten_wire_reference(&mut self, cursor: &mut Cursor<'c>, span: Span) -> WireReference {
+        match self.flatten_partial_wire_reference(cursor) {
+            PartialWireReference::ModuleButNoPort(submod_decl, span) => {
+                let md_uuid = self.instructions[submod_decl]
+                    .unwrap_submodule()
+                    .module_ref
+                    .id;
+                self.errors
+                    .error(
+                        span,
+                        "cannot operate on modules directly. Should use ports instead",
+                    )
+                    .info_obj(&self.globals[md_uuid]);
+                self.new_error(span)
+            }
+            PartialWireReference::GlobalModuleName(md_ref) => {
+                let md = &self.globals[md_ref.id];
+                self.errors
+                    .error(
+                        md_ref.name_span,
+                        format!(
+                            "Expected a Wire Reference, but found module '{}' instead",
+                            md.link_info.name
+                        ),
+                    )
+                    .info_obj(md);
+                self.new_error(span)
+            }
+            PartialWireReference::ModuleWithInterface {
+                submodule_decl: submod_decl,
+                submodule_name_span: _,
+                interface,
+                interface_name_span,
+            } => {
+                let md_uuid = self.instructions[submod_decl]
+                    .unwrap_submodule()
+                    .module_ref
+                    .id;
+                let md = &self.globals[md_uuid];
+                let interf = &md.interfaces[interface];
+                self.errors
+                    .error(
+                        interface_name_span,
+                        format!(
+                            "Expected a port, but found module interface '{}' instead",
+                            &interf.name
+                        ),
+                    )
+                    .info((interf.name_span, md.link_info.file), "Declared here");
+                self.new_error(span)
+            }
+            PartialWireReference::WireReference(wr) => wr,
+        }
+    }
+
+    fn flatten_partial_wire_reference(&mut self, cursor: &mut Cursor<'c>) -> PartialWireReference {
         let (kind, expr_span) = cursor.kind_span();
         match kind {
         kind!("template_global") => {
             match self.flatten_local_or_template_global(cursor) {
                 LocalOrGlobal::Local(span, named_obj) => match named_obj {
                     NamedLocal::Declaration(decl_id) => {
-                        let root = WireReferenceRoot::LocalDecl(decl_id, expr_span);
-                        PartialWireReference::WireReference{
-                            wire_ref: WireReference {
-                                root,
-                                path: Vec::new(),
-                            },
-                            domain: self.instructions[decl_id]
-                                .unwrap_declaration()
-                                .typ.domain
-                        }
+                        let decl = self.instructions[decl_id].unwrap_declaration();
+                        let root = WireReferenceRoot::LocalDecl(decl_id);
+                        let root_typ = decl.typ.clone();
+                        PartialWireReference::WireReference(WireReference {
+                            root,
+                            root_typ,
+                            root_span: expr_span,
+                            path: Vec::new(),
+                        })
                     }
                     NamedLocal::SubModule(submod_id) => {
                         PartialWireReference::ModuleButNoPort(submod_id, expr_span)
@@ -1097,7 +1095,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             .info_obj_same_file(
                                 &self.working_on_link_info.template_parameters[template_id],
                             );
-                        PartialWireReference::ERROR
+                        PartialWireReference::WireReference(self.new_error(expr_span))
                     }
                     NamedLocal::DomainDecl(domain_id) => {
                         let domain = &self.domains[domain_id];
@@ -1110,30 +1108,31 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 ),
                             )
                             .info_same_file(span, format!("Domain {} declared here", domain.name));
-                        PartialWireReference::ERROR
+                        PartialWireReference::WireReference(self.new_error(expr_span))
                     }
                 },
                 LocalOrGlobal::Constant(cst_ref) => {
+                    let root_span = cst_ref.get_total_span();
                     let root = WireReferenceRoot::NamedConstant(cst_ref);
-                    PartialWireReference::WireReference{
-                        wire_ref: WireReference {
+                    PartialWireReference::WireReference(WireReference {
                         root,
+                        root_typ: self.type_alloc.alloc_unset_type(DomainType::Generative),
+                        root_span,
                         path: Vec::new(),
-                    },
-                    domain: DomainType::Generative}
+                    })
                 }
                 LocalOrGlobal::Module(md_ref) => PartialWireReference::GlobalModuleName(md_ref),
                 LocalOrGlobal::Type(type_ref) => {
                     self.globals
                         .not_expected_global_error(&type_ref, "named wire: local or constant");
-                    PartialWireReference::ERROR
+                    PartialWireReference::WireReference(self.new_error(expr_span))
                 }
-                LocalOrGlobal::NotFound(_) => PartialWireReference::ERROR, // Error handled by [flatten_local_or_template_global]
+                LocalOrGlobal::NotFound(_) => PartialWireReference::WireReference(self.new_error(expr_span)), // Error handled by [flatten_local_or_template_global]
             }
         } kind!("array_op") => {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("arr"));
-                let mut flattened_arr_expr = self.flatten_wire_reference(cursor);
+                let mut flattened_arr_expr = self.flatten_partial_wire_reference(cursor);
 
                 cursor.field(field!("arr_idx"));
                 let arr_idx_span = cursor.span();
@@ -1151,9 +1150,14 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     } => {
                         self.errors.todo(arr_idx_span, "Module Arrays");
                     }
-                    PartialWireReference::WireReference{wire_ref, domain: _} => {
+                    PartialWireReference::WireReference(wire_ref) => {
+                        let current_typ = wire_ref.get_output_typ();
+                        let output_typ = AbstractRankedType {
+                            inner: current_typ.inner.clone(),
+                            rank: self.type_alloc.type_alloc.rank_substitutor.alloc_unknown()
+                        };
                         wire_ref.path
-                            .push(WireReferencePathElement::ArrayAccess { idx, bracket_span });
+                            .push(WireReferencePathElement::ArrayAccess { idx, bracket_span, output_typ });
                     }
                 }
 
@@ -1162,20 +1166,20 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         } kind!("field_access") => {
             cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("left"));
-                let flattened_arr_expr = self.flatten_wire_reference(cursor);
+                let flattened_arr_expr = self.flatten_partial_wire_reference(cursor);
 
                 let (port_name_span, port_name) = cursor.field_span(field!("name"), kind!("identifier"));
 
                 match flattened_arr_expr {
                     PartialWireReference::GlobalModuleName(md_ref) => {
                         self.errors.error(md_ref.get_total_span(), "Ports or interfaces can only be accessed on modules that have been explicitly declared. Declare this submodule on its own line");
-                        PartialWireReference::ERROR
+                        PartialWireReference::WireReference(self.new_error(expr_span))
                     }
                     PartialWireReference::ModuleWithInterface { submodule_decl:_, submodule_name_span, interface:_, interface_name_span } => {
                         self.errors.error(port_name_span, "Omit the interface when accessing a port")
                             .suggest_remove(Span::new_overarching(submodule_name_span.empty_span_at_end(), interface_name_span));
 
-                        PartialWireReference::ERROR
+                        PartialWireReference::WireReference(self.new_error(expr_span))
                     }
                     PartialWireReference::ModuleButNoPort(submodule_decl, submodule_name_span) => {
                         let submodule = self.instructions[submodule_decl].unwrap_submodule();
@@ -1191,45 +1195,46 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                     port_name_span : Some(port_name_span),
                                     is_input: submod.ports[port].is_input
                                 };
-                                PartialWireReference::WireReference{
-                                    wire_ref: WireReference{
+                                let root_typ_domain = self.type_alloc.domain_alloc.alloc_unknown();
+                                PartialWireReference::WireReference(WireReference{
                                     root : WireReferenceRoot::SubModulePort(port_info),
+                                    root_typ: self.type_alloc.alloc_unset_type(root_typ_domain),
+                                    root_span: expr_span,
                                     path : Vec::new()
-                                },
-                            domain: self.type_alloc.domain_alloc.alloc_unknown()}
+                                })
                             }
                             Some(PortOrInterface::Interface(interface)) => {
                                 PartialWireReference::ModuleWithInterface { submodule_decl, submodule_name_span, interface, interface_name_span: port_name_span }
                             }
-                            None => PartialWireReference::ERROR
+                            None => PartialWireReference::WireReference(self.new_error(expr_span))
                         }
                     }
-                    PartialWireReference::WireReference{..} => {
+                    PartialWireReference::WireReference(_) => {
                         println!("TODO: Struct fields");
-                        PartialWireReference::ERROR
+                        PartialWireReference::WireReference(self.new_error(expr_span))
                     }
                 }
             })
         } kind!("number") => {
             self.errors
                 .error(expr_span, "A constant is not a wire reference");
-            PartialWireReference::ERROR
+            PartialWireReference::WireReference(self.new_error(expr_span))
         } kind!("unary_op") | kind!("binary_op") => {
             self.errors.error(
                 expr_span,
                 "The result of an operator is not a wire reference",
             );
-            PartialWireReference::ERROR
+            PartialWireReference::WireReference(self.new_error(expr_span))
         } kind!("func_call") => {
             self.errors
                 .error(expr_span, "A submodule call is not a wire reference");
-            PartialWireReference::ERROR
+            PartialWireReference::WireReference(self.new_error(expr_span))
         } kind!("parenthesis_expression") => {
             self.errors.error(
                 expr_span,
                 "Parentheses are not allowed within a wire reference",
             );
-            PartialWireReference::ERROR
+            PartialWireReference::WireReference(self.new_error(expr_span))
         } _other =>
             cursor.could_not_match()
         }
@@ -1454,7 +1459,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                 cursor.field(field!("expr_or_decl"));
                 let (kind, to_span) = cursor.kind_span();
-                if kind == kind!("declaration") {
+                let mut to = if kind == kind!("declaration") {
                     let root = self.flatten_declaration::<false>(
                         self.default_declaration_context,
                         false,
@@ -1462,32 +1467,47 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         cursor,
                     );
                     let flat_root_decl = self.instructions[root].unwrap_declaration();
-                    let is_generative = flat_root_decl.identifier_type.is_generative();
-                    let domain = if is_generative {
-                        DomainType::Generative
-                    } else {
-                        self.type_alloc.domain_alloc.alloc_unknown()
-                    };
-                    let to_type = self.type_alloc.alloc_unset_type(domain);
-                    WriteTo {
-                        to: WireReference {
-                            root: WireReferenceRoot::LocalDecl(root, flat_root_decl.name_span),
-                            path: Vec::new(),
-                        },
-                        to_span,
-                        write_modifiers,
-                        to_type,
+                    WireReference {
+                        root: WireReferenceRoot::LocalDecl(root),
+                        root_typ: flat_root_decl.typ.clone(),
+                        root_span: flat_root_decl.name_span,
+                        path: Vec::new(),
                     }
                 } else {
                     // It's _expression
-                    let (to, domain) = self.flatten_wire_reference(cursor).extract(self);
-                    let to_type = self.type_alloc.alloc_unset_type(domain);
-                    WriteTo {
-                        to,
-                        to_span,
-                        write_modifiers,
-                        to_type,
+                    self.flatten_wire_reference(cursor, to_span)
+                };
+                if let WireReferenceRoot::NamedConstant(global_reference) = &to.root {
+                    self.errors
+                        .error(
+                            global_reference.name_span,
+                            "Cannot write to a global constant!",
+                        )
+                        .info_obj(&self.globals[global_reference.id].link_info);
+                }
+                match write_modifiers {
+                    WriteModifiers::Connection { .. } => {}
+                    WriteModifiers::Initial { initial_kw_span } => {
+                        if to.root_typ.domain.is_generative() {
+                            if let WireReferenceRoot::LocalDecl(decl_id) = &to.root {
+                                self.errors
+                                    .error(
+                                        initial_kw_span,
+                                        "'initial' cannot be used with generative variables!",
+                                    )
+                                    .info_obj_same_file(
+                                        self.instructions[*decl_id].unwrap_declaration(),
+                                    );
+                            }
+                        } else {
+                            to.root_typ.domain = DomainType::Generative;
+                        }
                     }
+                }
+                WriteTo {
+                    to,
+                    to_span,
+                    write_modifiers,
                 }
             })
         })

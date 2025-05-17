@@ -4,9 +4,7 @@ use std::cell::RefCell;
 
 use crate::{alloc::ArenaAllocator, typing::template::Parameter};
 
-use crate::flattening::{
-    Declaration, DomainInfo, Instruction, Interface, Module, Port, SubModuleInstance,
-};
+use crate::flattening::{Declaration, DomainInfo, Instruction, Module, Port, SubModuleInstance};
 use crate::linker::{checkpoint::ErrorCheckpoint, FileData, LinkInfo};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -375,18 +373,6 @@ impl FileKnowingErrorInfoObject for LinkInfo {
             position: self.name_span,
             file: self.file,
             info: format!("'{}' defined here", &self.name),
-        }
-    }
-}
-
-/// For interfaces of this module
-impl FileKnowingErrorInfoObject for (&'_ Module, &'_ Interface) {
-    fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
-        let (md, interface) = *self;
-        ErrorInfo {
-            position: interface.name_span,
-            file: md.link_info.file,
-            info: format!("Interface '{}' defined here", &interface.name),
         }
     }
 }

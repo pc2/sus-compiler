@@ -7,7 +7,7 @@ use super::{
     template::{
         for_each_generative_input_in_template_args, AbstractTemplateArg, GlobalReference, TVec,
     },
-    type_inference::{AbstractTypeSubstitutor, Substitutor},
+    type_inference::AbstractTypeSubstitutor,
 };
 
 /// The textual representation of a type expression in the source code.

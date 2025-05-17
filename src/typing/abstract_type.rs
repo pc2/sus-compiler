@@ -2,8 +2,6 @@ use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
-use crate::value::Value;
-use std::ops::Deref;
 
 use super::template::{GlobalReference, Parameter, TVec, TemplateKind};
 use super::type_inference::{
@@ -11,7 +9,8 @@ use super::type_inference::{
     TypeSubstitutor, TypeUnifier, UnifyErrorReport,
 };
 use crate::flattening::{
-    BinaryOperator, StructType, UnaryOperator, WireReference, WireReferenceRoot,
+    BinaryOperator, StructType, UnaryOperator, WireReference, WireReferencePathElement,
+    WireReferenceRoot,
 };
 use crate::to_string::map_to_type_names;
 
@@ -88,12 +87,6 @@ impl PeanoType {
             PeanoType::Succ(inner) => Some(inner.count()? + 1),
             PeanoType::Unknown(_) => None,
         }
-    }
-    pub fn count_unwrap(&self) -> usize {
-        let Some(cnt) = self.count() else {
-            panic!("Peano Number {self:?} still contains Unknown!");
-        };
-        cnt
     }
 }
 
@@ -182,64 +175,14 @@ impl FullTypeUnifier {
         }
     }
 
-    /// TODO make WrittenValue compared to Value to encode Spans
-    pub fn unify_with_constant(
-        &mut self,
-        typ: &AbstractRankedType,
-        value: &Value,
-        value_span: Span,
-    ) {
-        match value {
-            Value::Bool(_) => {
-                self.abstract_type_substitutor.unify_report_error(
-                    typ,
-                    &BOOL_TYPE.scalar(),
-                    value_span,
-                    "bool constant",
-                );
-            }
-            Value::Integer(_big_int) => {
-                self.abstract_type_substitutor.unify_report_error(
-                    typ,
-                    &INT_TYPE.scalar(),
-                    value_span,
-                    "int constant",
-                );
-            }
-            Value::Array(arr) => {
-                let arr_content_variable = self.abstract_type_substitutor.alloc_unknown();
+    pub fn unify_must_succeed(&mut self, ta: &FullType, tb: &FullType) {
+        self.abstract_type_substitutor
+            .unify_must_succeed(&ta.typ, &tb.typ);
 
-                for v in arr.deref() {
-                    self.unify_with_constant(&arr_content_variable, v, value_span);
-                }
-
-                self.abstract_type_substitutor.unify_report_error(
-                    typ,
-                    &arr_content_variable,
-                    value_span,
-                    "array literal",
-                );
-            }
-            Value::Unset => {} // Already an error, don't unify
-            Value::Unknown(_) => {
-                todo!("THIS METHOD WILL GET DELETED")
-            }
+        if !ta.domain.is_generative() && !tb.domain.is_generative() {
+            self.domain_substitutor
+                .unify_must_succeed(&ta.domain, &tb.domain);
         }
-    }
-
-    // Unifies arr_type with output_typ[]
-    pub fn unify_with_array_of(
-        &mut self,
-        arr_type: &AbstractRankedType,
-        output_typ: AbstractRankedType,
-        arr_span: Span,
-    ) {
-        self.abstract_type_substitutor.unify_report_error(
-            arr_type,
-            &output_typ.rank_up(),
-            arr_span,
-            "array access",
-        );
     }
 
     pub fn typecheck_unary_operator_abstr(
@@ -292,7 +235,16 @@ impl FullTypeUnifier {
                 span,
                 "array reduction",
             );
-            self.unify_with_array_of(input_typ, output_typ.clone(), span);
+            {
+                let this = &mut *self;
+                let output_typ = output_typ.clone();
+                this.abstract_type_substitutor.unify_report_error(
+                    input_typ,
+                    &output_typ.rank_up(),
+                    span,
+                    "array access",
+                );
+            };
         }
     }
 
@@ -364,7 +316,7 @@ impl FullTypeUnifier {
         }
     }
 
-    pub fn typecheck_write_to_abstract<Context: UnifyErrorReport>(
+    pub fn unify_write_to_abstract<Context: UnifyErrorReport>(
         &mut self,
         found: &AbstractRankedType,
         expected: &AbstractRankedType,
@@ -375,15 +327,16 @@ impl FullTypeUnifier {
             .unify_report_error(found, expected, span, context);
     }
 
-    pub fn typecheck_write_to<Context: UnifyErrorReport + Clone>(
+    pub fn unify_write_to<Context: UnifyErrorReport + Clone>(
         &mut self,
-        found: &FullType,
+        found_typ: &AbstractRankedType,
+        found_domain: &DomainType,
         expected: &FullType,
         span: Span,
         context: Context,
     ) {
-        self.typecheck_write_to_abstract(&found.typ, &expected.typ, span, context.clone());
-        self.unify_domains(&found.domain, &expected.domain, span, context);
+        self.unify_write_to_abstract(found_typ, &expected.typ, span, context.clone());
+        self.unify_domains(found_domain, &expected.domain, span, context);
     }
 
     pub fn finalize_domain_type(&self, typ_domain: &mut DomainType) {
@@ -445,6 +398,28 @@ impl FullTypeUnifier {
     ) {
         if let WireReferenceRoot::NamedConstant(cst) = &mut wire_ref.root {
             self.finalize_global_ref(linker_types, cst, errors);
+        }
+        self.finalize_type(
+            linker_types,
+            &mut wire_ref.root_typ,
+            wire_ref.root_span,
+            errors,
+        );
+        for path_elem in &mut wire_ref.path {
+            match path_elem {
+                WireReferencePathElement::ArrayAccess {
+                    output_typ,
+                    bracket_span,
+                    ..
+                } => {
+                    self.finalize_abstract_type(
+                        linker_types,
+                        output_typ,
+                        bracket_span.outer_span(),
+                        errors,
+                    );
+                }
+            }
         }
     }
 }

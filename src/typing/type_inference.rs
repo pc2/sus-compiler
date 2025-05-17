@@ -1,22 +1,16 @@
 //! Implements the Hindley-Milner algorithm for Type Inference.
 
 use std::cell::OnceCell;
-use std::fmt::Debug;
-use std::ops::{BitAnd, Deref, DerefMut};
-
-use ibig::IBig;
-use sus_proc_macro::get_builtin_type;
+use std::fmt::{Debug, Display, Formatter};
+use std::ops::{BitAnd, BitAndAssign, Deref, DerefMut};
 
 use crate::errors::ErrorInfo;
-use crate::prelude::*;
+use crate::{let_unwrap, prelude::*};
 
-use crate::alloc::{get2_mut, zip_eq, UUIDMarker, UUID};
-use crate::typing::template::TemplateKind;
-use crate::value::Value;
+use crate::alloc::{get2_mut, UUIDMarker, UUID};
 
 use super::abstract_type::{AbstractInnerType, PeanoType};
 use super::abstract_type::{AbstractRankedType, DomainType};
-use super::concrete_type::{ConcreteGlobalReference, ConcreteType};
 
 pub struct InnerTypeVariableIDMarker;
 impl UUIDMarker for InnerTypeVariableIDMarker {
@@ -40,6 +34,7 @@ pub struct ConcreteTypeVariableIDMarker;
 impl UUIDMarker for ConcreteTypeVariableIDMarker {
     const DISPLAY_NAME: &'static str = "concrete_type_variable_";
 }
+#[allow(unused)]
 pub type ConcreteTypeVariableID = UUID<ConcreteTypeVariableIDMarker>;
 
 #[derive(Debug)]
@@ -88,6 +83,13 @@ impl BitAnd for UnifyResult {
             rhs
         } else {
             self
+        }
+    }
+}
+impl BitAndAssign for UnifyResult {
+    fn bitand_assign(&mut self, rhs: Self) {
+        if *self == UnifyResult::Success {
+            *self = rhs;
         }
     }
 }
@@ -429,81 +431,14 @@ impl HindleyMilner for DomainType {
     }
 }
 
-/// [HindleyMilnerInfo] `TypeFuncIdent` for [ConcreteType]
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ConcreteTypeHMInfo<'slf> {
-    Named(TypeUUID),
-    Value(&'slf Value),
-    Array,
-}
-
-impl HindleyMilner for ConcreteType {
-    type TypeFuncIdent<'slf> = ConcreteTypeHMInfo<'slf>;
-    type VariableIDMarker = ConcreteTypeVariableIDMarker;
-
-    fn get_hm_info(&self) -> HindleyMilnerInfo<ConcreteTypeHMInfo, ConcreteTypeVariableIDMarker> {
-        match self {
-            ConcreteType::Unknown(var_id) => HindleyMilnerInfo::TypeVar(*var_id),
-            ConcreteType::Named(named_id) => {
-                HindleyMilnerInfo::TypeFunc(ConcreteTypeHMInfo::Named(named_id.id))
-            }
-            ConcreteType::Value(v) => HindleyMilnerInfo::TypeFunc(ConcreteTypeHMInfo::Value(v)),
-            ConcreteType::Array(_) => HindleyMilnerInfo::TypeFunc(ConcreteTypeHMInfo::Array),
-        }
-    }
-
-    fn unify_all_args<F: FnMut(&Self, &Self) -> UnifyResult>(
-        left: &Self,
-        right: &Self,
-        unify: &mut F,
-    ) -> UnifyResult {
-        match (left, right) {
-            (ConcreteType::Named(na), ConcreteType::Named(nb)) => {
-                zip_eq(na.template_args.iter(), nb.template_args.iter())
-                    .map(|(_, template_arg_a, template_arg_b)| {
-                        match template_arg_a.and_by_ref(template_arg_b) {
-                            TemplateKind::Type((ta, tb)) => unify(ta, tb),
-                            TemplateKind::Value((va, vb)) => unify(va, vb),
-                        }
-                    })
-                    .fold(UnifyResult::Success, |result_acc, result| {
-                        result_acc & result
-                    })
-            } // Already covered by get_hm_info
-            (ConcreteType::Value(v_1), ConcreteType::Value(v_2)) => {
-                assert!(*v_1 == *v_2);
-                UnifyResult::Success
-            } // Already covered by get_hm_info
-            (ConcreteType::Array(arr_typ_1), ConcreteType::Array(arr_typ_2)) => {
-                let (arr_typ_1_arr, arr_typ_1_sz) = arr_typ_1.deref();
-                let (arr_typ_2_arr, arr_typ_2_sz) = arr_typ_2.deref();
-                unify(arr_typ_1_arr, arr_typ_2_arr) & unify(arr_typ_1_sz, arr_typ_2_sz)
-            }
-            (_, _) => unreachable!("All others should have been eliminated by get_hm_info check"),
-        }
-    }
-
-    fn for_each_unknown(&self, f: &mut impl FnMut(ConcreteTypeVariableID)) {
-        match self {
-            ConcreteType::Named(_) | ConcreteType::Value(_) => {}
-            ConcreteType::Unknown(uuid) => f(*uuid),
-            ConcreteType::Array(arr_typ) => {
-                let (arr_typ, arr_sz) = arr_typ.deref();
-                arr_typ.for_each_unknown(f);
-                arr_sz.for_each_unknown(f);
-            }
-        }
-    }
-}
-
 pub trait Substitutor {
-    type MyType: Clone;
+    type MyType: Clone + Debug;
     fn unify_total(&mut self, from: &Self::MyType, to: &Self::MyType) -> UnifyResult;
 
     fn unify_must_succeed(&mut self, a: &Self::MyType, b: &Self::MyType) {
         assert!(
             self.unify_total(a, b) == UnifyResult::Success,
-            "This unification cannot fail. Usually because we're unifying with a Written Type"
+            "This unification cannot fail. Usually because we're unifying with a Written Type: {a:?} <-> {b:?}"
         );
     }
 
@@ -511,70 +446,6 @@ pub trait Substitutor {
     ///
     /// Returns true when no Unknowns remain
     fn fully_substitute(&self, typ: &mut Self::MyType) -> bool;
-
-    fn alloc_unknown(&mut self) -> Self::MyType;
-}
-
-impl Substitutor for TypeSubstitutor<ConcreteType> {
-    type MyType = ConcreteType;
-
-    fn fully_substitute(&self, typ: &mut ConcreteType) -> bool {
-        match typ {
-            ConcreteType::Value(_) => true, // Don't need to do anything, this is already final
-            ConcreteType::Named(concrete_global_ref) => {
-                let mut result = true;
-                for (_, template_arg) in &mut concrete_global_ref.template_args {
-                    result = result
-                        && match template_arg {
-                            TemplateKind::Type(t) => self.fully_substitute(t),
-                            TemplateKind::Value(v) => self.fully_substitute(v),
-                        };
-                }
-                result
-            }
-            ConcreteType::Array(arr_typ) => {
-                let (arr_typ, arr_sz) = arr_typ.deref_mut();
-                self.fully_substitute(arr_typ) && self.fully_substitute(arr_sz)
-            }
-            ConcreteType::Unknown(var) => {
-                let Some(replacement) = self[*var].get() else {
-                    return false;
-                };
-                *typ = replacement.clone();
-                self.fully_substitute(typ)
-            }
-        }
-    }
-
-    fn unify_total(&mut self, from: &ConcreteType, to: &ConcreteType) -> UnifyResult {
-        self.unify(from, to)
-    }
-
-    fn alloc_unknown(&mut self) -> ConcreteType {
-        ConcreteType::Unknown(self.alloc(OnceCell::new()))
-    }
-}
-
-impl TypeSubstitutor<ConcreteType> {
-    pub fn make_array_of(&mut self, content_typ: ConcreteType) -> ConcreteType {
-        ConcreteType::Array(Box::new((content_typ, self.alloc_unknown())))
-    }
-    fn mk_int_maybe(&mut self, v: Option<IBig>) -> TemplateKind<ConcreteType, ConcreteType> {
-        TemplateKind::Value(match v {
-            Some(v) => ConcreteType::Value(Value::Integer(v)),
-            None => self.alloc_unknown(),
-        })
-    }
-    /// Creates a new `int #(int MIN, int MAX)`. The resulting int can have a value from `MIN` to `MAX-1`
-    pub fn new_int_type(&mut self, min: Option<IBig>, max: Option<IBig>) -> ConcreteType {
-        let template_args =
-            FlatAlloc::from_vec(vec![self.mk_int_maybe(min), self.mk_int_maybe(max)]);
-
-        ConcreteType::Named(ConcreteGlobalReference {
-            id: get_builtin_type!("int"),
-            template_args,
-        })
-    }
 }
 
 impl Substitutor for TypeSubstitutor<DomainType> {
@@ -593,8 +464,10 @@ impl Substitutor for TypeSubstitutor<DomainType> {
     fn unify_total(&mut self, from: &DomainType, to: &DomainType) -> UnifyResult {
         self.unify(from, to)
     }
+}
 
-    fn alloc_unknown(&mut self) -> DomainType {
+impl TypeSubstitutor<DomainType> {
+    pub fn alloc_unknown(&mut self) -> DomainType {
         DomainType::Unknown(self.alloc(OnceCell::new()))
     }
 }
@@ -626,8 +499,9 @@ impl Substitutor for TypeSubstitutor<PeanoType> {
             }
         }
     }
-
-    fn alloc_unknown(&mut self) -> PeanoType {
+}
+impl TypeSubstitutor<PeanoType> {
+    pub fn alloc_unknown(&mut self) -> PeanoType {
         PeanoType::Unknown(self.alloc(OnceCell::new()))
     }
 }
@@ -656,8 +530,10 @@ impl Substitutor for AbstractTypeSubstitutor {
         self.inner_substitutor.unify(&from.inner, &to.inner)
             & self.rank_substitutor.unify(&from.rank, &to.rank)
     }
+}
 
-    fn alloc_unknown(&mut self) -> AbstractRankedType {
+impl AbstractTypeSubstitutor {
+    pub fn alloc_unknown(&mut self) -> AbstractRankedType {
         AbstractRankedType {
             inner: AbstractInnerType::Unknown(self.inner_substitutor.alloc(OnceCell::new())),
             rank: PeanoType::Unknown(self.rank_substitutor.alloc(OnceCell::new())),
@@ -748,7 +624,11 @@ enum KnownValue<T, ID> {
     Known(T),
 }
 
-impl<T: Unifyable + Eq> Default for SetUnifier<T> {
+pub struct SetUnifier<T: Eq + Clone, IDMarker> {
+    ptrs: FlatAlloc<usize, IDMarker>,
+    known_values: Vec<KnownValue<T, UUID<IDMarker>>>,
+}
+impl<T: Eq + Clone, IDMarker> Default for SetUnifier<T, IDMarker> {
     fn default() -> Self {
         Self {
             ptrs: Default::default(),
@@ -756,34 +636,123 @@ impl<T: Unifyable + Eq> Default for SetUnifier<T> {
         }
     }
 }
-pub struct SetUnifier<T: Unifyable + Eq> {
-    ptrs: FlatAlloc<usize, T::IDMarker>,
-    known_values: Vec<KnownValue<T, UUID<T::IDMarker>>>,
+
+/// Referencing [Unifyable::Unknown] is a strong code smell.
+/// It is likely you should use [crate::typing::type_inference::TypeSubstitutor::unify_must_succeed]
+/// or [crate::typing::type_inference::TypeSubstitutor::unify_report_error] instead
+///
+/// It should only occur in creation `Unifyable::Unknown(self.type_substitutor.alloc())`
+pub enum Unifyable<T, IDMarker: UUIDMarker> {
+    Set(T),
+    Unknown(UUID<IDMarker>),
 }
 
-pub trait Unifyable {
-    type IDMarker;
-
-    fn get_unknown(&self) -> Option<UUID<Self::IDMarker>>;
-    fn new_unknown(id: UUID<Self::IDMarker>) -> Self;
+impl<T: Eq + Clone, IDMarker: UUIDMarker> Unifyable<T, IDMarker> {
+    pub fn is_unknown(&self) -> bool {
+        match self {
+            Unifyable::Set(_) => false,
+            Unifyable::Unknown(_) => true,
+        }
+    }
+    pub fn get_substitution<'s>(&'s self, unifier: &'s SetUnifier<T, IDMarker>) -> Option<&'s T> {
+        match self {
+            Unifyable::Set(v) => Some(v),
+            Unifyable::Unknown(id) => match &unifier.known_values[unifier.ptrs[*id]] {
+                KnownValue::Unknown(_) => None,
+                KnownValue::Known(new_v) => Some(new_v),
+            },
+        }
+    }
+    pub fn substitute(&mut self, unifier: &SetUnifier<T, IDMarker>) -> bool {
+        match self {
+            Unifyable::Set(_) => true,
+            Unifyable::Unknown(id) => match &unifier.known_values[unifier.ptrs[*id]] {
+                KnownValue::Unknown(_) => false,
+                KnownValue::Known(new_v) => {
+                    *self = Unifyable::Set(new_v.clone());
+                    true
+                }
+            },
+        }
+    }
+    pub fn unwrap_set(&self) -> &T {
+        match self {
+            Unifyable::Set(s) => s,
+            Unifyable::Unknown(_) => panic!("unwrap_set not allowed to be Unknown"),
+        }
+    }
 }
 
-impl<T: Unifyable + Eq + Clone> SetUnifier<T> {
-    pub fn must_be_equal(&mut self, a: &T, b: &T) -> Option<()> {
-        match (a, a.get_unknown(), b, b.get_unknown()) {
-            (_, None, _, None) => None,
-            (v, None, _, Some(var)) | (_, Some(var), v, None) => {
-                let k = &mut self.known_values[self.ptrs[var]];
+impl<T, IDMarker: UUIDMarker> Deref for Unifyable<T, IDMarker> {
+    type Target = T;
+
+    #[track_caller]
+    fn deref(&self) -> &T {
+        let Self::Set(v) = self else {
+            unreachable!("Attempting to Deref a not-Set Unifyable!")
+        };
+        v
+    }
+}
+
+impl<T: Display, IDMarker: UUIDMarker> Display for Unifyable<T, IDMarker> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Unifyable::Set(v) => v.fmt(f),
+            Unifyable::Unknown(id) => f.write_fmt(format_args!("{id:?}")),
+        }
+    }
+}
+
+impl<T: Debug, IDMarker: UUIDMarker> Debug for Unifyable<T, IDMarker> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Unifyable::Set(v) => v.fmt(f),
+            Unifyable::Unknown(id) => f.write_fmt(format_args!("{id:?}")),
+        }
+    }
+}
+
+impl<T: Clone, IDMarker: UUIDMarker> Clone for Unifyable<T, IDMarker> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Set(arg0) => Self::Set(arg0.clone()),
+            Self::Unknown(arg0) => Self::Unknown(*arg0),
+        }
+    }
+}
+impl<T: PartialEq + Debug, IDMarker: UUIDMarker> PartialEq for Unifyable<T, IDMarker> {
+    fn eq(&self, other: &Self) -> bool {
+        let_unwrap!(Self::Set(a), self);
+        let_unwrap!(Self::Set(b), other);
+        a.eq(b)
+    }
+}
+impl<T: Eq + Debug, IDMarker: UUIDMarker> Eq for Unifyable<T, IDMarker> {}
+impl<T: std::hash::Hash + Debug, IDMarker: UUIDMarker> std::hash::Hash for Unifyable<T, IDMarker> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        let_unwrap!(Self::Set(a), self);
+        a.hash(state);
+    }
+}
+
+impl<T: Eq + Clone, IDMarker: UUIDMarker> SetUnifier<T, IDMarker> {
+    pub fn unify(&mut self, a: &Unifyable<T, IDMarker>, b: &Unifyable<T, IDMarker>) -> bool {
+        match (a, b) {
+            (Unifyable::Set(a), Unifyable::Set(b)) => a == b,
+            (Unifyable::Set(v), Unifyable::Unknown(var))
+            | (Unifyable::Unknown(var), Unifyable::Set(v)) => {
+                let k = &mut self.known_values[self.ptrs[*var]];
                 if let KnownValue::Known(k) = k {
-                    (k == v).then_some(())
+                    k == v
                 } else {
                     *k = KnownValue::Known(v.clone());
-                    Some(())
+                    true
                 }
             }
-            (_, Some(idx_a), _, Some(idx_b)) => {
-                let idx_a = self.ptrs[idx_a];
-                let idx_b = self.ptrs[idx_b];
+            (Unifyable::Unknown(idx_a), Unifyable::Unknown(idx_b)) => {
+                let idx_a = self.ptrs[*idx_a];
+                let idx_b = self.ptrs[*idx_b];
                 let (old_vector, to) = match get2_mut(&mut self.known_values, idx_a, idx_b) {
                     Some((KnownValue::Unknown(a_v), KnownValue::Unknown(b_v))) => {
                         if a_v.len() > b_v.len() {
@@ -796,25 +765,23 @@ impl<T: Unifyable + Eq + Clone> SetUnifier<T> {
                     }
                     Some((KnownValue::Unknown(v), KnownValue::Known(_))) => (v, idx_a),
                     Some((KnownValue::Known(_), KnownValue::Unknown(v))) => (v, idx_b),
-                    Some((KnownValue::Known(x), KnownValue::Known(y))) => {
-                        return (x == y).then_some(())
-                    }
-                    None => return Some(()),
+                    Some((KnownValue::Known(x), KnownValue::Known(y))) => return x == y,
+                    None => return true,
                 };
 
                 for v in std::mem::take(old_vector) {
                     self.ptrs[v] = to;
                 }
 
-                Some(())
+                true
             }
         }
     }
 
-    pub fn alloc_unknown(&mut self) -> T {
+    pub fn alloc_unknown(&mut self) -> Unifyable<T, IDMarker> {
         let new_ptr = self.ptrs.alloc(self.known_values.len());
         self.known_values.push(KnownValue::Unknown(vec![new_ptr]));
-        T::new_unknown(new_ptr)
+        Unifyable::Unknown(new_ptr)
     }
 }
 

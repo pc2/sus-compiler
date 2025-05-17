@@ -261,9 +261,9 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
         wire_ref: &'linker WireReference,
     ) {
         match &wire_ref.root {
-            WireReferenceRoot::LocalDecl(decl_id, span) => {
+            WireReferenceRoot::LocalDecl(decl_id) => {
                 self.visit(
-                    *span,
+                    wire_ref.root_span,
                     LocationInfo::InGlobal(
                         obj_id,
                         link_info,

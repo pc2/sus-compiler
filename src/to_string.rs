@@ -4,6 +4,7 @@ use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractInnerType, PeanoType};
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg};
 use crate::typing::template::{Parameter, TVec, TemplateKind};
+use crate::typing::type_inference::Unifyable;
 use crate::typing::written_type::WrittenType;
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
@@ -164,15 +165,8 @@ impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_
             .fmt(f),
             ConcreteType::Array(arr_box) => {
                 let (elem_typ, arr_size) = arr_box.deref();
-                write!(
-                    f,
-                    "{}[{}]",
-                    elem_typ.display(self.linker_types),
-                    arr_size.display(self.linker_types)
-                )
+                write!(f, "{}[{arr_size}]", elem_typ.display(self.linker_types))
             }
-            ConcreteType::Value(v) => write!(f, "{v}"),
-            ConcreteType::Unknown(u) => write!(f, "{{{u:?}}}"),
         }
     }
 }
@@ -208,7 +202,6 @@ impl Display for Value {
                 f.write_str("]")
             }
             Value::Unset => f.write_str("{value_unset}"),
-            Value::Unknown(id) => f.write_fmt(format_args!("{id:?}")),
         }
     }
 }
@@ -343,13 +336,10 @@ impl<'a, T: Index<TypeUUID, Output = StructType>> Display
                 TemplateKind::Type(typ_arg) => {
                     f.write_fmt(format_args!("type {},", typ_arg.display(self.linker_types)))?;
                 }
-                TemplateKind::Value(v) => {
-                    if v.contains_unknown() {
-                        f.write_fmt(format_args!("/* Could not infer */"))?;
-                    } else {
-                        f.write_fmt(format_args!("{},", v.unwrap_value()))?;
-                    }
-                }
+                TemplateKind::Value(v) => match v {
+                    Unifyable::Set(value) => f.write_fmt(format_args!("{value},"))?,
+                    Unifyable::Unknown(_) => f.write_str("/* Could not infer */")?,
+                },
             }
         }
         f.write_str(nl)?;

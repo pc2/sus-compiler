@@ -2,15 +2,9 @@ use std::ops::Deref;
 
 use ibig::IBig;
 
-use crate::alloc::FlatAlloc;
 use crate::flattening::{BinaryOperator, UnaryOperator};
-use crate::typing::template::TemplateKind;
-use sus_proc_macro::get_builtin_type;
 
-use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType, BOOL_CONCRETE_TYPE};
-use crate::typing::type_inference::{
-    ConcreteTypeVariableID, ConcreteTypeVariableIDMarker, Substitutor, TypeSubstitutor, Unifyable,
-};
+use crate::typing::concrete_type::ConcreteType;
 
 /// Top type for any kind of compiletime value while executing.
 ///
@@ -22,24 +16,7 @@ pub enum Value {
     Array(Vec<Value>),
     /// The initial [Value] a variable has, before it's been set. (translates to `'x` don't care)
     Unset,
-    Unknown(ConcreteTypeVariableID),
 }
-
-impl Unifyable for Value {
-    type IDMarker = ConcreteTypeVariableIDMarker;
-    fn get_unknown(&self) -> Option<ConcreteTypeVariableID> {
-        if let Value::Unknown(var) = self {
-            Some(*var)
-        } else {
-            None
-        }
-    }
-
-    fn new_unknown(id: ConcreteTypeVariableID) -> Self {
-        Value::Unknown(id)
-    }
-}
-
 /*impl ConcreteType {
     fn update_smallest_common_supertype(&mut self, other: &Self) -> Option<()> {
         match (self, other) {
@@ -105,104 +82,11 @@ impl Unifyable for Value {
 }*/
 
 impl Value {
-    /// Traverses the Value, to create a best-effort [ConcreteType] for it.
-    /// So '1' becomes `ConcreteType::Named(ConcreteGlobalReference{id: get_builtin_type!("int"), ...}})`,
-    /// but `Value::Array([])` becomes `ConcreteType::Array((ConcreteType::Unknown, 0))`
-    ///
-    /// Panics when arrays contain mutually incompatible types
-    pub fn get_type(
-        &self,
-        type_substitutor: &mut TypeSubstitutor<ConcreteType>,
-    ) -> Result<ConcreteType, String> {
-        let mut tensor_sizes = Vec::new();
-
-        enum ValuesRange {
-            Bool,
-            Int { min: IBig, max: IBig },
-        }
-
-        let mut result_range: Option<ValuesRange> = None;
-
-        self.get_tensor_size_recursive(0, &mut tensor_sizes, &mut |v| {
-            match (&mut result_range, v) {
-                (None, Value::Bool(_)) => result_range = Some(ValuesRange::Bool),
-                (Some(ValuesRange::Bool), Value::Bool(_)) => {} // OK
-                (None, Value::Integer(v)) => {
-                    result_range = Some(ValuesRange::Int {
-                        min: v.clone(),
-                        max: v.clone(),
-                    })
-                }
-                (Some(ValuesRange::Int { min, max }), Value::Integer(v)) => {
-                    if v < min {
-                        *min = v.clone();
-                    }
-                    if v > max {
-                        *max = v.clone();
-                    }
-                }
-                (Some(_), Value::Bool(_)) | (Some(_), Value::Integer(_)) => {
-                    unreachable!("Differing types is caught by abstract typecheck!")
-                }
-                (_, Value::Array(_)) => {
-                    unreachable!("All arrays handled by get_tensor_size_recursive")
-                }
-                (_, Value::Unset) => {
-                    return Err("This compile-time constant contains Unset".into());
-                }
-                (_, Value::Unknown(_)) => {
-                    panic!("get_type on Value::Unknown!");
-                }
-            };
-            Ok(())
-        })?;
-
-        let content_typ = match result_range {
-            Some(ValuesRange::Bool) => BOOL_CONCRETE_TYPE,
-            Some(ValuesRange::Int { min, max }) => ConcreteType::Named(ConcreteGlobalReference {
-                id: get_builtin_type!("int"),
-                template_args: FlatAlloc::from_vec(vec![
-                    TemplateKind::Value(ConcreteType::new_int(min)),
-                    TemplateKind::Value(ConcreteType::new_int(max + 1)),
-                ]),
-            }),
-            None => type_substitutor.alloc_unknown(),
-        };
-
-        Ok(content_typ.new_arrays_of(&tensor_sizes))
-    }
-    fn get_tensor_size_recursive(
-        &self,
-        depth: usize,
-        tensor_sizes: &mut Vec<usize>,
-        elem_fn: &mut impl FnMut(&Value) -> Result<(), String>,
-    ) -> Result<(), String> {
-        if let Value::Array(values) = self {
-            if let Some(sz) = tensor_sizes.get(depth) {
-                if *sz != values.len() {
-                    return Err("Value is a Jagged Tensor. This is not allowed!".into());
-                }
-            } else {
-                assert!(tensor_sizes.len() == depth);
-                tensor_sizes.push(values.len());
-            }
-            for v in values {
-                v.get_tensor_size_recursive(depth + 1, tensor_sizes, elem_fn)?;
-            }
-            Ok(())
-        } else {
-            elem_fn(self)
-        }
-    }
-
-    pub fn contains_errors_or_unsets(&self) -> bool {
+    pub fn contains_unset(&self) -> bool {
         match self {
             Value::Bool(_) | Value::Integer(_) => false,
-            Value::Array(values) => values.iter().any(|v| v.contains_errors_or_unsets()),
+            Value::Array(values) => values.iter().any(|v| v.contains_unset()),
             Value::Unset => true,
-            Value::Unknown(_) => {
-                panic!("contains_errors_or_unsets on Value::Unknown!");
-            }
         }
     }
 
@@ -295,7 +179,7 @@ impl ConcreteType {
             ConcreteType::Named(_name) => Value::Unset,
             ConcreteType::Array(arr) => {
                 let (arr_typ, arr_size) = arr.deref();
-                let arr_size: usize = arr_size.unwrap_value().unwrap_int();
+                let arr_size: usize = arr_size.unwrap_int();
                 let mut arr = Vec::new();
                 if arr_size > 0 {
                     let content_typ = arr_typ.get_initial_val();
@@ -303,7 +187,6 @@ impl ConcreteType {
                 }
                 Value::Array(arr)
             }
-            ConcreteType::Value(_) | ConcreteType::Unknown(_) => unreachable!(),
         }
     }
 }

@@ -9,7 +9,7 @@ impl ExpressionSource {
         match self {
             ExpressionSource::WireRef(wire_ref) => {
                 match &wire_ref.root {
-                    WireReferenceRoot::LocalDecl(decl_id, _) => collect(*decl_id),
+                    WireReferenceRoot::LocalDecl(decl_id) => collect(*decl_id),
                     WireReferenceRoot::NamedConstant(cst) => {
                         for (_id, arg) in &cst.template_args {
                             match arg {

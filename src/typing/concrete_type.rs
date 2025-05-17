@@ -12,16 +12,14 @@ use crate::value::Value;
 use super::template::TVec;
 
 use super::template::TemplateKind;
-use super::type_inference::ConcreteTypeVariableID;
-use super::type_inference::Substitutor;
-use super::type_inference::TypeSubstitutor;
+use super::value_unifier::UnifyableValue;
 
 pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
     id: get_builtin_type!("bool"),
     template_args: FlatAlloc::new(),
 });
 
-pub type ConcreteTemplateArg = TemplateKind<ConcreteType, ConcreteType>;
+pub type ConcreteTemplateArg = TemplateKind<ConcreteType, UnifyableValue>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConcreteGlobalReference<ID> {
@@ -33,7 +31,7 @@ impl ConcreteTemplateArg {
     pub fn contains_unknown(&self) -> bool {
         match self {
             TemplateKind::Type(t) => t.contains_unknown(),
-            TemplateKind::Value(v) => v.contains_unknown(),
+            TemplateKind::Value(v) => v.is_unknown(),
         }
     }
 }
@@ -57,33 +55,23 @@ impl<ID> ConcreteGlobalReference<ID> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConcreteType {
     Named(ConcreteGlobalReference<TypeUUID>),
-    Value(Value),
-    Array(Box<(ConcreteType, ConcreteType)>),
-    /// Referencing [ConcreteType::Unknown] is a strong code smell.
-    /// It is likely you should use [crate::typing::type_inference::TypeSubstitutor::unify_must_succeed]
-    /// or [crate::typing::type_inference::TypeSubstitutor::unify_report_error] instead
-    ///
-    /// It should only occur in creation `ConcreteType::Unknown(self.type_substitutor.alloc())`
-    Unknown(ConcreteTypeVariableID),
+    Array(Box<(ConcreteType, UnifyableValue)>),
 }
 
 impl ConcreteType {
-    pub fn new_int(int: IBig) -> Self {
-        Self::Value(Value::Integer(int))
-    }
-    pub fn new_arrays_of(self, tensor_sizes: &[usize]) -> Self {
+    pub fn stack_arrays_usize(self, tensor_sizes: &[usize]) -> Self {
         let mut result = self;
         for s in tensor_sizes.iter().rev() {
-            result = ConcreteType::Array(Box::new((result, ConcreteType::new_int(IBig::from(*s)))));
+            result = ConcreteType::Array(Box::new((result, Value::Integer(IBig::from(*s)).into())));
         }
         result
     }
-    #[track_caller]
-    pub fn unwrap_value(&self) -> &Value {
-        let ConcreteType::Value(v) = self else {
-            unreachable!("unwrap_value on {self:?}")
-        };
-        v
+    pub fn stack_arrays(self, tensor_sizes: &[UnifyableValue]) -> Self {
+        let mut result = self;
+        for s in tensor_sizes.iter().rev() {
+            result = ConcreteType::Array(Box::new((result, s.clone())));
+        }
+        result
     }
     #[track_caller]
     pub fn unwrap_named(&self) -> &ConcreteGlobalReference<TypeUUID> {
@@ -93,7 +81,7 @@ impl ConcreteType {
         v
     }
     #[track_caller]
-    pub fn unwrap_array(&self) -> &(ConcreteType, ConcreteType) {
+    pub fn unwrap_array(&self) -> &(ConcreteType, UnifyableValue) {
         let ConcreteType::Array(arr_box) = self else {
             unreachable!("unwrap_array")
         };
@@ -112,12 +100,10 @@ impl ConcreteType {
                 .template_args
                 .iter()
                 .any(|concrete_template_arg| concrete_template_arg.1.contains_unknown()),
-            ConcreteType::Value(_) => false,
             ConcreteType::Array(arr_box) => {
                 let (arr_arr, arr_size) = arr_box.deref();
-                arr_arr.contains_unknown() || arr_size.contains_unknown()
+                arr_arr.contains_unknown() || arr_size.is_unknown()
             }
-            ConcreteType::Unknown(_) => true,
         }
     }
     /// Returns the size of this type in *wires*. So int #(MAX: 255) would return '8'
@@ -126,30 +112,22 @@ impl ConcreteType {
     pub fn sizeof(&self) -> Option<IBig> {
         match self {
             ConcreteType::Named(reference) => Some(Self::sizeof_named(reference).into()),
-            ConcreteType::Value(_value) => unreachable!("Root of ConcreteType cannot be a value"),
             ConcreteType::Array(arr_box) => {
                 let (typ, size) = arr_box.deref();
 
                 let mut typ_sz = typ.sizeof()?;
 
-                let ConcreteType::Value(arr_sz) = size else {
-                    return None;
-                };
-
-                typ_sz *= arr_sz.unwrap_integer();
+                typ_sz *= size.unwrap_integer();
 
                 Some(typ_sz)
             }
-            ConcreteType::Unknown(_uuid) => None,
         }
     }
 
     pub fn sizeof_named(type_ref: &ConcreteGlobalReference<TypeUUID>) -> u64 {
         match type_ref.id {
             get_builtin_type!("int") => {
-                let [min, max] = type_ref
-                    .template_args
-                    .map_to_array(|_id, v| v.unwrap_value().unwrap_value().unwrap_integer());
+                let [min, max] = type_ref.template_args.cast_to_int_array();
                 bound_to_bits(min, &(max - 1))
             }
             get_builtin_type!("bool") => 1,
@@ -157,20 +135,9 @@ impl ConcreteType {
             _other => todo!("Other Named Structs are not implemented yet"),
         }
     }
-    pub fn try_fully_substitute(&self, substitutor: &TypeSubstitutor<Self>) -> Option<Self> {
-        let mut self_clone = self.clone();
-        if substitutor.fully_substitute(&mut self_clone) {
-            Some(self_clone)
-        } else {
-            None
-        }
-    }
     /// Returns the inclusive bounds of an int. An int #(MIN: 0, MAX: 15) will return (0, 14)
     pub fn unwrap_integer_bounds(&self) -> (IBig, IBig) {
-        let [min, max] = self
-            .unwrap_named()
-            .template_args
-            .map_to_array(|_id, v| v.unwrap_value().unwrap_value().unwrap_integer());
+        let [min, max] = self.unwrap_named().template_args.cast_to_int_array();
         (min.clone(), max - 1)
     }
 }

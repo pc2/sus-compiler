@@ -456,10 +456,6 @@ Instantiating fizz_buzz
 Concrete Typechecking fizz_buzz
 Latency Counting fizz_buzz
 Checking array accesses fizz_buzz
-Instantiating fizz_buzz_gen
-Concrete Typechecking fizz_buzz_gen
-Latency Counting fizz_buzz_gen
-Checking array accesses fizz_buzz_gen
 Instantiating mbf_dual
 Concrete Typechecking mbf_dual
 Latency Counting mbf_dual
@@ -586,10 +582,6 @@ Latency Counting make_tree_add
 Checking array accesses make_tree_add
 Instantiating use_replicate
 Concrete Typechecking use_replicate
-Instantiating replicate
-Concrete Typechecking replicate
-Latency Counting replicate
-Checking array accesses replicate
 Latency Counting use_replicate
 Checking array accesses use_replicate
 Instantiating use_permute
