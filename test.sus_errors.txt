@@ -161,19 +161,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[3]
-     ╭─[ util.sus:198:22 ]
-     │
- 198 │     interface TreeAdd : int[WIDTH] values'0 -> int total
-     │                         ─────────┬─────────  
-     │                                  ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[3]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
 )[1]
      ╭─[ util.sus:198:22 ]
      │
@@ -196,6 +183,19 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )[2]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[3]
+     ╭─[ util.sus:198:22 ]
+     │
+ 198 │     interface TreeAdd : int[WIDTH] values'0 -> int total
+     │                         ─────────┬─────────  
+     │                                  ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[3]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -323,6 +323,84 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
+)[1]
+     ╭─[ util.sus:212:3 ]
+     │
+ 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
+     │        ───────────────────────────┬──────────────────────────  
+     │                                   ╰──────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[1]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[1]
+     ╭─[ util.sus:212:3 ]
+     │
+ 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
+     │        ───────────────────────────┬──────────────────────────  
+     │                                   ╰──────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[1]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[1]
+     ╭─[ util.sus:212:3 ]
+     │
+ 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
+     │        ───────────────────────────┬──────────────────────────  
+     │                                   ╰──────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[1]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[2]
+     ╭─[ util.sus:212:3 ]
+     │
+ 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
+     │        ───────────────────────────┬──────────────────────────  
+     │                                   ╰──────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[2]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[2]
+     ╭─[ util.sus:212:3 ]
+     │
+ 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
+     │        ───────────────────────────┬──────────────────────────  
+     │                                   ╰──────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[2]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[2]
+     ╭─[ util.sus:212:3 ]
+     │
+ 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
+     │        ───────────────────────────┬──────────────────────────  
+     │                                   ╰──────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[2]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
 )[3]
      ╭─[ util.sus:212:3 ]
      │
@@ -336,7 +414,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[1]
+)[3]
      ╭─[ util.sus:212:3 ]
      │
  212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
@@ -344,59 +422,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                                   ╰──────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[1]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[2]
-     ╭─[ util.sus:212:3 ]
-     │
- 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
-     │        ───────────────────────────┬──────────────────────────  
-     │                                   ╰──────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[2]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[2]
-     ╭─[ util.sus:212:3 ]
-     │
- 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
-     │        ───────────────────────────┬──────────────────────────  
-     │                                   ╰──────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[2]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[1]
-     ╭─[ util.sus:212:3 ]
-     │
- 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
-     │        ───────────────────────────┬──────────────────────────  
-     │                                   ╰──────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[1]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[1]
-     ╭─[ util.sus:212:3 ]
-     │
- 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
-     │        ───────────────────────────┬──────────────────────────  
-     │                                   ╰──────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[1]
+)[3]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -410,53 +436,6 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )[5]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[2]
-     ╭─[ util.sus:212:3 ]
-     │
- 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
-     │        ───────────────────────────┬──────────────────────────  
-     │                                   ╰──────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[2]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[3]
-     ╭─[ util.sus:212:3 ]
-     │
- 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
-     │        ───────────────────────────┬──────────────────────────  
-     │                                   ╰──────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[3]
-─────╯
-Error: Could not fully instantiate ::SplitAt #(
-    T: type ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-),
-    SIZE: 3,
-    SPLIT_POINT: 1,
-)
-     ╭─[ util.sus:212:58 ]
-     │
- 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
-     │                                                               ──┬──  
-     │                                                                 ╰──── Could not fully instantiate ::SplitAt #(
-    T: type ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-),
-    SIZE: 3,
-    SPLIT_POINT: 1,
-)
 ─────╯
 Error: Could not fully instantiate ::SplitAt #(
     T: type ::int #(
@@ -476,6 +455,27 @@ Error: Could not fully instantiate ::SplitAt #(
     MAX: /* Could not infer */
 ),
     SIZE: 2,
+    SPLIT_POINT: 1,
+)
+─────╯
+Error: Could not fully instantiate ::SplitAt #(
+    T: type ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+),
+    SIZE: 3,
+    SPLIT_POINT: 1,
+)
+     ╭─[ util.sus:212:58 ]
+     │
+ 212 │        SplitAt #(SIZE: WIDTH, SPLIT_POINT: L_SZ, T: type int) split
+     │                                                               ──┬──  
+     │                                                                 ╰──── Could not fully instantiate ::SplitAt #(
+    T: type ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+),
+    SIZE: 3,
     SPLIT_POINT: 1,
 )
 ─────╯
@@ -542,7 +542,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[2]
+)[1]
      ╭─[ util.sus:213:24 ]
      │
  213 │        int[L_SZ] left_part, int[R_SZ] right_part = split(values)
@@ -550,12 +550,12 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                                       ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[2]
+)[1]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[1]
+)[2]
      ╭─[ util.sus:213:24 ]
      │
  213 │        int[L_SZ] left_part, int[R_SZ] right_part = split(values)
@@ -563,7 +563,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                                       ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[1]
+)[2]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -617,12 +617,44 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Error instantiating submodule
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
      ╭─[ util.sus:216:20 ]
      │
  216 │        int left_total = TreeAdd #(WIDTH: L_SZ)(left_part)
      │                         ───────────┬──────────  
-     │                                    ╰──────────── Error instantiating submodule
+     │                                    ╰──────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ util.sus:216:20 ]
+     │
+ 216 │        int left_total = TreeAdd #(WIDTH: L_SZ)(left_part)
+     │                         ───────────┬──────────  
+     │                                    ╰──────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ util.sus:216:20 ]
+     │
+ 216 │        int left_total = TreeAdd #(WIDTH: L_SZ)(left_part)
+     │                         ───────────┬──────────  
+     │                                    ╰──────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -640,26 +672,6 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)
-     ╭─[ util.sus:216:20 ]
-     │
- 216 │        int left_total = TreeAdd #(WIDTH: L_SZ)(left_part)
-     │                         ───────────┬──────────  
-     │                                    ╰──────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ util.sus:216:20 ]
-     │
- 216 │        int left_total = TreeAdd #(WIDTH: L_SZ)(left_part)
-     │                         ───────────┬──────────  
-     │                                    ╰──────────── Error instantiating submodule
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
 )[1]
      ╭─[ util.sus:216:20 ]
      │
@@ -669,26 +681,6 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )[1]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ util.sus:216:20 ]
-     │
- 216 │        int left_total = TreeAdd #(WIDTH: L_SZ)(left_part)
-     │                         ───────────┬──────────  
-     │                                    ╰──────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ util.sus:216:20 ]
-     │
- 216 │        int left_total = TreeAdd #(WIDTH: L_SZ)(left_part)
-     │                         ───────────┬──────────  
-     │                                    ╰──────────── Error instantiating submodule
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -703,18 +695,26 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MAX: /* Could not infer */
 )[2]
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
+Error: Error instantiating submodule
      ╭─[ util.sus:216:20 ]
      │
  216 │        int left_total = TreeAdd #(WIDTH: L_SZ)(left_part)
      │                         ───────────┬──────────  
-     │                                    ╰──────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
+     │                                    ╰──────────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ util.sus:216:20 ]
+     │
+ 216 │        int left_total = TreeAdd #(WIDTH: L_SZ)(left_part)
+     │                         ───────────┬──────────  
+     │                                    ╰──────────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ util.sus:216:20 ]
+     │
+ 216 │        int left_total = TreeAdd #(WIDTH: L_SZ)(left_part)
+     │                         ───────────┬──────────  
+     │                                    ╰──────────── Error instantiating submodule
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -755,17 +755,10 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Error instantiating submodule
-     ╭─[ util.sus:217:21 ]
-     │
- 217 │        int right_total = TreeAdd #(WIDTH: R_SZ)(right_part)
-     │                          ───────────┬──────────  
-     │                                     ╰──────────── Error instantiating submodule
-─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[2]
+)
      ╭─[ util.sus:217:21 ]
      │
  217 │        int right_total = TreeAdd #(WIDTH: R_SZ)(right_part)
@@ -773,7 +766,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                                     ╰──────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[2]
+)
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -788,12 +781,18 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Error instantiating submodule
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
      ╭─[ util.sus:217:21 ]
      │
  217 │        int right_total = TreeAdd #(WIDTH: R_SZ)(right_part)
      │                          ───────────┬──────────  
-     │                                     ╰──────────── Error instantiating submodule
+     │                                     ╰──────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -811,7 +810,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)
+)[2]
      ╭─[ util.sus:217:21 ]
      │
  217 │        int right_total = TreeAdd #(WIDTH: R_SZ)(right_part)
@@ -819,14 +818,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                                     ╰──────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ util.sus:217:21 ]
-     │
- 217 │        int right_total = TreeAdd #(WIDTH: R_SZ)(right_part)
-     │                          ───────────┬──────────  
-     │                                     ╰──────────── Error instantiating submodule
+)[2]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -841,26 +833,28 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MAX: /* Could not infer */
 )[3]
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
+Error: Error instantiating submodule
      ╭─[ util.sus:217:21 ]
      │
  217 │        int right_total = TreeAdd #(WIDTH: R_SZ)(right_part)
      │                          ───────────┬──────────  
-     │                                     ╰──────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
+     │                                     ╰──────────── Error instantiating submodule
 ─────╯
-Error: Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) + ::int #(
+Error: Error instantiating submodule
+     ╭─[ util.sus:217:21 ]
+     │
+ 217 │        int right_total = TreeAdd #(WIDTH: R_SZ)(right_part)
+     │                          ───────────┬──────────  
+     │                                     ╰──────────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ util.sus:217:21 ]
+     │
+ 217 │        int right_total = TreeAdd #(WIDTH: R_SZ)(right_part)
+     │                          ───────────┬──────────  
+     │                                     ╰──────────── Error instantiating submodule
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -868,13 +862,20 @@ Error: Failed to Typecheck ::int #(
      │
  221 │        reg total = left_total + right_total
      │                    ────────────┬───────────  
-     │                                ╰───────────── Failed to Typecheck ::int #(
+     │                                ╰───────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-) = ::int #(
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-) + ::int #(
+)
+     ╭─[ util.sus:221:15 ]
+     │
+ 221 │        reg total = left_total + right_total
+     │                    ────────────┬───────────  
+     │                                ╰───────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -917,19 +918,6 @@ Error: Failed to Typecheck ::int #(
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ util.sus:221:15 ]
-     │
- 221 │        reg total = left_total + right_total
-     │                    ────────────┬───────────  
-     │                                ╰───────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
 Error: Failed to Typecheck ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
@@ -955,7 +943,13 @@ Error: Failed to Typecheck ::int #(
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
+Error: Failed to Typecheck ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) = ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) + ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -963,7 +957,13 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │
  221 │        reg total = left_total + right_total
      │                    ────────────┬───────────  
-     │                                ╰───────────── Could not finalize this type, some parameters were still unknown: ::int #(
+     │                                ╰───────────── Failed to Typecheck ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) = ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) + ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -1444,13 +1444,6 @@ An input and output port are strongly connected if there is a direct dependency 
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
 ─────╯
-Error: This compile-time constant contains Unset
-     ╭─[ test.sus:178:8 ]
-     │
- 178 │     state int[3] st
-     │           ────┬────  
-     │               ╰────── This compile-time constant contains Unset
-─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
@@ -1463,6 +1456,13 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )[3]
+─────╯
+Error: This compile-time constant contains Unset
+     ╭─[ test.sus:178:8 ]
+     │
+ 178 │     state int[3] st
+     │           ────┬────  
+     │               ╰────── This compile-time constant contains Unset
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:178:15 ]
@@ -1498,38 +1498,38 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ┬  
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:180:32 ]
+     │
+ 180 │     reg int a, st[2], reg reg b = assignment_producer()
+     │                                   ─────────┬─────────  
+     │                                            ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:180:32 ]
+     │
+ 180 │     reg int a, st[2], reg reg b = assignment_producer()
+     │                                   ─────────┬─────────  
+     │                                            ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
 Error: Error instantiating submodule
      ╭─[ test.sus:180:32 ]
      │
  180 │     reg int a, st[2], reg reg b = assignment_producer()
      │                                   ─────────┬─────────  
      │                                            ╰─────────── Error instantiating submodule
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:180:32 ]
-     │
- 180 │     reg int a, st[2], reg reg b = assignment_producer()
-     │                                   ─────────┬─────────  
-     │                                            ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:180:32 ]
-     │
- 180 │     reg int a, st[2], reg reg b = assignment_producer()
-     │                                   ─────────┬─────────  
-     │                                            ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
     MIN: 1,
@@ -1790,34 +1790,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                         ─────┬─────  
      │                              ╰─────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:234:34 ]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │                                       ───────┬───────  
-     │                                              ╰───────── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:234:34 ]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │                                       ───────┬───────  
-     │                                              ╰───────── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:234:34 ]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │                                       ───────┬───────  
-     │                                              ╰───────── Error instantiating submodule
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:234:34 ]
-     │
- 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
-     │                                       ───────┬───────  
-     │                                              ╰───────── Error instantiating submodule
-─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
@@ -1870,12 +1842,33 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MAX: /* Could not infer */
 )
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:241:62 ]
+Error: Error instantiating submodule
+     ╭─[ test.sus:234:34 ]
      │
- 241 │     interface permute : bool[128] mbf, int#(MIN:0, MAX: 100) selected_permutation -> bool[128] permuted_mbf
-     │                                                              ──────────┬─────────  
-     │                                                                        ╰─────────── Unused Variable: This variable does not affect the output ports of this module
+ 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
+     │                                       ───────┬───────  
+     │                                              ╰───────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:234:34 ]
+     │
+ 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
+     │                                       ───────┬───────  
+     │                                              ╰───────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:234:34 ]
+     │
+ 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
+     │                                       ───────┬───────  
+     │                                              ╰───────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:234:34 ]
+     │
+ 234 │        int offset, bool was_nonzero = first_bit_idx_6(these_bits)
+     │                                       ───────┬───────  
+     │                                              ╰───────── Error instantiating submodule
 ─────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'mbf'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -1891,6 +1884,13 @@ If you do not wish to change your design, then 'virtually' connect this port to 
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:241:62 ]
+     │
+ 241 │     interface permute : bool[128] mbf, int#(MIN:0, MAX: 100) selected_permutation -> bool[128] permuted_mbf
+     │                                                              ──────────┬─────────  
+     │                                                                        ╰─────────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'mbf'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -1942,13 +1942,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ──┬──  
      │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Function call syntax is only possible on modules or interfaces of modules
-     ╭─[ test.sus:267:2 ]
-     │
- 267 │     aaaaa()
-     │     ──┬──  
-     │       ╰──── Function call syntax is only possible on modules or interfaces of modules
-─────╯
 Error: Could not fully figure out the type of this object. type_variable_30[...peano_variable_38]
      ╭─[ test.sus:267:2 ]
      │
@@ -1956,12 +1949,12 @@ Error: Could not fully figure out the type of this object. type_variable_30[...p
      │     ───┬───  
      │        ╰───── Could not fully figure out the type of this object. type_variable_30[...peano_variable_38]
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:278:104 ]
+Error: Function call syntax is only possible on modules or interfaces of modules
+     ╭─[ test.sus:267:2 ]
      │
- 278 │     interface disjoint_ports : int#(MIN:0, MAX: 100) a, int#(MIN:0, MAX: 100) b, int#(MIN:0, MAX: 100) c -> int result
-     │                                                                                                        ┬  
-     │                                                                                                        ╰── Unused Variable: This variable does not affect the output ports of this module
+ 267 │     aaaaa()
+     │     ──┬──  
+     │       ╰──── Function call syntax is only possible on modules or interfaces of modules
 ─────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -1979,6 +1972,13 @@ If you do not wish to change your design, then 'virtually' connect this port to 
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:278:104 ]
+     │
+ 278 │     interface disjoint_ports : int#(MIN:0, MAX: 100) a, int#(MIN:0, MAX: 100) b, int#(MIN:0, MAX: 100) c -> int result
+     │                                                                                                        ┬  
+     │                                                                                                        ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'a', 'b'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
@@ -2045,6 +2045,19 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MAX: /* Could not infer */
 )
 ─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:320:9 ]
+     │
+ 320 │     x = t_d + a_dd
+     │         ─────┬────  
+     │              ╰────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
 Error: Failed to Typecheck ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
@@ -2068,19 +2081,6 @@ Error: Failed to Typecheck ::int #(
 ) + ::int #(
     MIN: 0,
     MAX: 100,
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:320:9 ]
-     │
- 320 │     x = t_d + a_dd
-     │         ─────┬────  
-     │              ╰────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
 )
 ─────╯
 Error: Conflicting specified latency
@@ -3639,13 +3639,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                                                            ┬  
      │                                                            ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:400:85 ]
-     │
- 400 │     interface multiple_inputs_only : int#(MIN:0, MAX: 100) i, int#(MIN:0, MAX: 100) i2
-     │                                                                                     ─┬  
-     │                                                                                      ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'i'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
@@ -3660,6 +3653,13 @@ If you do not wish to change your design, then 'virtually' connect this port to 
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:400:85 ]
+     │
+ 400 │     interface multiple_inputs_only : int#(MIN:0, MAX: 100) i, int#(MIN:0, MAX: 100) i2
+     │                                                                                     ─┬  
+     │                                                                                      ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:401:12 ]
@@ -3735,8 +3735,8 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 )
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
-    MIN: 888,
-    MAX: 889,
+    MIN: 555,
+    MAX: 556,
 ) but was given a ::int #(
     MIN: 888555,
     MAX: 888556,
@@ -3746,16 +3746,16 @@ Error: Typing Error: write wire access expects a ::int #(
  466 │     interface fizz_buzz : int v -> int fb
      │                                    ───┬──  
      │                                       ╰──── Typing Error: write wire access expects a ::int #(
-    MIN: 888,
-    MAX: 889,
+    MIN: 555,
+    MAX: 556,
 ) but was given a ::int #(
     MIN: 888555,
     MAX: 888556,
 )
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
-    MIN: 555,
-    MAX: 556,
+    MIN: 888,
+    MAX: 889,
 ) but was given a ::int #(
     MIN: 888555,
     MAX: 888556,
@@ -3765,13 +3765,26 @@ Error: Typing Error: write wire access expects a ::int #(
  466 │     interface fizz_buzz : int v -> int fb
      │                                    ───┬──  
      │                                       ╰──── Typing Error: write wire access expects a ::int #(
-    MIN: 555,
-    MAX: 556,
+    MIN: 888,
+    MAX: 889,
 ) but was given a ::int #(
     MIN: 888555,
     MAX: 888556,
 )
 ─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:471:14 ]
+     │
+ 471 │     bool fizz = v % 3 == 0
+     │                 ──┬──  
+     │                   ╰──── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
 Error: Failed to Typecheck ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
@@ -3801,9 +3814,9 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:471:14 ]
+     ╭─[ test.sus:472:14 ]
      │
- 471 │     bool fizz = v % 3 == 0
+ 472 │     bool buzz = v % 5 == 0
      │                 ──┬──  
      │                   ╰──── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -3833,19 +3846,6 @@ Error: Failed to Typecheck ::int #(
 ) % ::int #(
     MIN: 5,
     MAX: 6,
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:472:14 ]
-     │
- 472 │     bool buzz = v % 5 == 0
-     │                 ──┬──  
-     │                   ╰──── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
 )
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
@@ -4222,13 +4222,6 @@ Error: Port 'a' is used, but the instantiated module has this port disabled
      │        ┬  
      │        ╰── Port 'a' is used, but the instantiated module has this port disabled
 ─────╯
-Error: This compile-time constant contains Unset
-     ╭─[ test.sus:727:40 ]
-     │
- 727 │     interface iter : -> bool valid, state int index
-     │                                           ────┬────  
-     │                                               ╰────── This compile-time constant contains Unset
-─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
@@ -4242,6 +4235,13 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MAX: /* Could not infer */
 )
 ─────╯
+Error: This compile-time constant contains Unset
+     ╭─[ test.sus:727:40 ]
+     │
+ 727 │     interface iter : -> bool valid, state int index
+     │                                           ────┬────  
+     │                                               ╰────── This compile-time constant contains Unset
+─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
@@ -4251,6 +4251,19 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
  732 │     cross_int upTo_cr
      │     ────┬────  
      │         ╰────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:741:11 ]
+     │
+ 741 │        index = index - 1
+     │                ────┬────  
+     │                    ╰────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -4280,32 +4293,12 @@ Error: Failed to Typecheck ::int #(
     MAX: 2,
 )
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:741:11 ]
-     │
- 741 │        index = index - 1
-     │                ────┬────  
-     │                    ╰────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:750:30 ]
      │
  750 │     interface sumUpTo : bool start
      │                              ──┬──  
      │                                ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:752:2 ]
-     │
- 752 │     sequenceDownFrom sdf
-     │     ────────┬───────  
-     │             ╰───────── Error instantiating submodule
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -4319,6 +4312,13 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:752:2 ]
+     │
+ 752 │     sequenceDownFrom sdf
+     │     ────────┬───────  
+     │             ╰───────── Error instantiating submodule
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
     MIN: 20,
@@ -4578,32 +4578,6 @@ Warning: Unused port 'o'
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[255]
-     ╭─[ test.sus:799:8 ]
-     │
- 799 │     input int[WIDTH] values
-     │           ────────┬────────  
-     │                   ╰────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[255]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[31]
-     ╭─[ test.sus:799:8 ]
-     │
- 799 │     input int[WIDTH] values
-     │           ────────┬────────  
-     │                   ╰────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[31]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
 )[127]
      ╭─[ test.sus:799:8 ]
      │
@@ -4643,6 +4617,32 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
+)[255]
+     ╭─[ test.sus:799:8 ]
+     │
+ 799 │     input int[WIDTH] values
+     │           ────────┬────────  
+     │                   ╰────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[255]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[31]
+     ╭─[ test.sus:799:8 ]
+     │
+ 799 │     input int[WIDTH] values
+     │           ────────┬────────  
+     │                   ╰────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[31]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
 )[3]
      ╭─[ test.sus:799:8 ]
      │
@@ -4656,7 +4656,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[7]
+)[63]
      ╭─[ test.sus:799:8 ]
      │
  799 │     input int[WIDTH] values
@@ -4664,12 +4664,12 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                   ╰────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[7]
+)[63]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[63]
+)[7]
      ╭─[ test.sus:799:8 ]
      │
  799 │     input int[WIDTH] values
@@ -4677,7 +4677,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                   ╰────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[63]
+)[7]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -4796,12 +4796,96 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Error instantiating submodule
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
      ╭─[ test.sus:806:3 ]
      │
  806 │        tree_add #(WIDTH: HALF_WIDTH) left
      │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:806:3 ]
+     │
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:806:3 ]
+     │
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:806:3 ]
+     │
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:806:3 ]
+     │
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:806:3 ]
+     │
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:806:3 ]
+     │
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -4819,26 +4903,6 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
 )[15]
      ╭─[ test.sus:806:3 ]
      │
@@ -4848,92 +4912,6 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )[15]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[63]
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[63]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[7]
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[7]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -4951,7 +4929,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)
+)[31]
      ╭─[ test.sus:806:3 ]
      │
  806 │        tree_add #(WIDTH: HALF_WIDTH) left
@@ -4959,14 +4937,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
+)[31]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -4984,7 +4955,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)
+)[63]
      ╭─[ test.sus:806:3 ]
      │
  806 │        tree_add #(WIDTH: HALF_WIDTH) left
@@ -4992,7 +4963,62 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)
+)[63]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[7]
+     ╭─[ test.sus:806:3 ]
+     │
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[7]
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:806:3 ]
+     │
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:806:3 ]
+     │
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:806:3 ]
+     │
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:806:3 ]
+     │
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:806:3 ]
+     │
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:806:3 ]
+     │
+ 806 │        tree_add #(WIDTH: HALF_WIDTH) left
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
 ─────╯
 Error: Error instantiating submodule
      ╭─[ test.sus:806:3 ]
@@ -5004,35 +5030,93 @@ Error: Error instantiating submodule
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[31]
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[31]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
 )
-     ╭─[ test.sus:806:3 ]
-     │
- 806 │        tree_add #(WIDTH: HALF_WIDTH) left
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
      ╭─[ test.sus:807:3 ]
      │
  807 │        tree_add #(WIDTH: HALF_WIDTH) right
      │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -5050,26 +5134,6 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)
-     ╭─[ test.sus:807:3 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:807:3 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
 )[15]
      ╭─[ test.sus:807:3 ]
      │
@@ -5079,92 +5143,6 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )[15]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:807:3 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:807:3 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[63]
-     ╭─[ test.sus:807:3 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[63]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:807:3 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:807:3 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[7]
-     ╭─[ test.sus:807:3 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[7]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:807:3 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:807:3 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -5182,7 +5160,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)
+)[31]
      ╭─[ test.sus:807:3 ]
      │
  807 │        tree_add #(WIDTH: HALF_WIDTH) right
@@ -5190,14 +5168,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)
-─────╯
-Error: Error instantiating submodule
-     ╭─[ test.sus:807:3 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Error instantiating submodule
+)[31]
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -5215,7 +5186,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)
+)[63]
      ╭─[ test.sus:807:3 ]
      │
  807 │        tree_add #(WIDTH: HALF_WIDTH) right
@@ -5223,7 +5194,62 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)
+)[63]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[7]
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[7]
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
+─────╯
+Error: Error instantiating submodule
+     ╭─[ test.sus:807:3 ]
+     │
+ 807 │        tree_add #(WIDTH: HALF_WIDTH) right
+     │        ──────────────┬──────────────  
+     │                      ╰──────────────── Error instantiating submodule
 ─────╯
 Error: Error instantiating submodule
      ╭─[ test.sus:807:3 ]
@@ -5235,32 +5261,6 @@ Error: Error instantiating submodule
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-)[31]
-     ╭─[ test.sus:807:3 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[31]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:807:3 ]
-     │
- 807 │        tree_add #(WIDTH: HALF_WIDTH) right
-     │        ──────────────┬──────────────  
-     │                      ╰──────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
 )
      ╭─[ test.sus:810:21 ]
      │
@@ -11680,13 +11680,7 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) + ::int #(
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -11694,24 +11688,12 @@ Error: Failed to Typecheck ::int #(
      │
  817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
      │                    ──────────┬─────────  
-     │                              ╰─────────── Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) + ::int #(
+     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) + ::int #(
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -11719,13 +11701,137 @@ Error: Failed to Typecheck ::int #(
      │
  817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
      │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Failed to Typecheck ::int #(
+     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-) = ::int #(
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
-) + ::int #(
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -11806,7 +11912,13 @@ Error: Failed to Typecheck ::int #(
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
+Error: Failed to Typecheck ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) = ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) + ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -11814,12 +11926,24 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │
  817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
      │                    ──────────┬─────────  
-     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
+     │                              ╰─────────── Failed to Typecheck ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) = ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) + ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
+Error: Failed to Typecheck ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) = ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) + ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -11827,7 +11951,13 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │
  817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
      │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+     │                                        ╰───────────────────── Failed to Typecheck ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) = ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) + ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -11882,7 +12012,13 @@ Error: Failed to Typecheck ::int #(
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
+Error: Failed to Typecheck ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) = ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) + ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -11890,12 +12026,24 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │
  817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
      │                    ──────────┬─────────  
-     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
+     │                              ╰─────────── Failed to Typecheck ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) = ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) + ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
+Error: Failed to Typecheck ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) = ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) + ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -11903,7 +12051,13 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
      │
  817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
      │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+     │                                        ╰───────────────────── Failed to Typecheck ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) = ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+) + ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -11958,32 +12112,6 @@ Error: Failed to Typecheck ::int #(
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
 Error: Failed to Typecheck ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
@@ -12034,32 +12162,6 @@ Error: Failed to Typecheck ::int #(
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
 Error: Failed to Typecheck ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
@@ -12106,108 +12208,6 @@ Error: Failed to Typecheck ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 ) + ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) + ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) + ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) + ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) + ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
@@ -12323,158 +12323,6 @@ Error: Typing Error: write wire access expects a ::int #(
 )
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
-    MIN: 2,
-    MAX: 3,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 2,
-    MAX: 3,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 3,
-    MAX: 4,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 3,
-    MAX: 4,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 4,
-    MAX: 5,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 4,
-    MAX: 5,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 5,
-    MAX: 6,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 5,
-    MAX: 6,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 6,
-    MAX: 7,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 6,
-    MAX: 7,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 7,
-    MAX: 8,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 7,
-    MAX: 8,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 8,
-    MAX: 9,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 8,
-    MAX: 9,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 9,
-    MAX: 10,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 9,
-    MAX: 10,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
     MIN: 10,
     MAX: 11,
 ) but was given a ::int #(
@@ -12488,1697 +12336,6 @@ Error: Typing Error: write wire access expects a ::int #(
      │           ╰─────── Typing Error: write wire access expects a ::int #(
     MIN: 10,
     MAX: 11,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 11,
-    MAX: 12,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 11,
-    MAX: 12,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 12,
-    MAX: 13,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 12,
-    MAX: 13,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 13,
-    MAX: 14,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 13,
-    MAX: 14,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 14,
-    MAX: 15,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 14,
-    MAX: 15,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 15,
-    MAX: 16,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 15,
-    MAX: 16,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 16,
-    MAX: 17,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 16,
-    MAX: 17,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 17,
-    MAX: 18,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 17,
-    MAX: 18,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 18,
-    MAX: 19,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 18,
-    MAX: 19,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 19,
-    MAX: 20,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 19,
-    MAX: 20,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 20,
-    MAX: 21,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 20,
-    MAX: 21,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 21,
-    MAX: 22,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 21,
-    MAX: 22,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 22,
-    MAX: 23,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 22,
-    MAX: 23,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 23,
-    MAX: 24,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 23,
-    MAX: 24,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 24,
-    MAX: 25,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 24,
-    MAX: 25,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 25,
-    MAX: 26,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 25,
-    MAX: 26,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 26,
-    MAX: 27,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 26,
-    MAX: 27,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 27,
-    MAX: 28,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 27,
-    MAX: 28,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 28,
-    MAX: 29,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 28,
-    MAX: 29,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 29,
-    MAX: 30,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 29,
-    MAX: 30,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 30,
-    MAX: 31,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 30,
-    MAX: 31,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 31,
-    MAX: 32,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 31,
-    MAX: 32,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 32,
-    MAX: 33,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 32,
-    MAX: 33,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 33,
-    MAX: 34,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 33,
-    MAX: 34,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 34,
-    MAX: 35,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 34,
-    MAX: 35,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 35,
-    MAX: 36,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 35,
-    MAX: 36,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 36,
-    MAX: 37,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 36,
-    MAX: 37,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 37,
-    MAX: 38,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 37,
-    MAX: 38,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 38,
-    MAX: 39,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 38,
-    MAX: 39,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 39,
-    MAX: 40,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 39,
-    MAX: 40,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 40,
-    MAX: 41,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 40,
-    MAX: 41,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 41,
-    MAX: 42,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 41,
-    MAX: 42,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 42,
-    MAX: 43,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 42,
-    MAX: 43,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 43,
-    MAX: 44,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 43,
-    MAX: 44,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 44,
-    MAX: 45,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 44,
-    MAX: 45,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 45,
-    MAX: 46,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 45,
-    MAX: 46,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 46,
-    MAX: 47,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 46,
-    MAX: 47,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 47,
-    MAX: 48,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 47,
-    MAX: 48,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 48,
-    MAX: 49,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 48,
-    MAX: 49,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 49,
-    MAX: 50,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 49,
-    MAX: 50,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 50,
-    MAX: 51,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 50,
-    MAX: 51,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 51,
-    MAX: 52,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 51,
-    MAX: 52,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 52,
-    MAX: 53,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 52,
-    MAX: 53,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 53,
-    MAX: 54,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 53,
-    MAX: 54,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 54,
-    MAX: 55,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 54,
-    MAX: 55,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 55,
-    MAX: 56,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 55,
-    MAX: 56,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 56,
-    MAX: 57,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 56,
-    MAX: 57,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 57,
-    MAX: 58,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 57,
-    MAX: 58,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 58,
-    MAX: 59,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 58,
-    MAX: 59,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 59,
-    MAX: 60,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 59,
-    MAX: 60,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 60,
-    MAX: 61,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 60,
-    MAX: 61,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 61,
-    MAX: 62,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 61,
-    MAX: 62,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 62,
-    MAX: 63,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 62,
-    MAX: 63,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 63,
-    MAX: 64,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 63,
-    MAX: 64,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 64,
-    MAX: 65,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 64,
-    MAX: 65,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 65,
-    MAX: 66,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 65,
-    MAX: 66,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 66,
-    MAX: 67,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 66,
-    MAX: 67,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 67,
-    MAX: 68,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 67,
-    MAX: 68,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 68,
-    MAX: 69,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 68,
-    MAX: 69,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 69,
-    MAX: 70,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 69,
-    MAX: 70,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 70,
-    MAX: 71,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 70,
-    MAX: 71,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 71,
-    MAX: 72,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 71,
-    MAX: 72,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 72,
-    MAX: 73,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 72,
-    MAX: 73,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 73,
-    MAX: 74,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 73,
-    MAX: 74,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 74,
-    MAX: 75,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 74,
-    MAX: 75,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 75,
-    MAX: 76,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 75,
-    MAX: 76,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 76,
-    MAX: 77,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 76,
-    MAX: 77,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 77,
-    MAX: 78,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 77,
-    MAX: 78,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 78,
-    MAX: 79,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 78,
-    MAX: 79,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 79,
-    MAX: 80,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 79,
-    MAX: 80,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 80,
-    MAX: 81,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 80,
-    MAX: 81,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 81,
-    MAX: 82,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 81,
-    MAX: 82,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 82,
-    MAX: 83,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 82,
-    MAX: 83,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 83,
-    MAX: 84,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 83,
-    MAX: 84,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 84,
-    MAX: 85,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 84,
-    MAX: 85,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 85,
-    MAX: 86,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 85,
-    MAX: 86,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 86,
-    MAX: 87,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 86,
-    MAX: 87,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 87,
-    MAX: 88,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 87,
-    MAX: 88,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 88,
-    MAX: 89,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 88,
-    MAX: 89,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 89,
-    MAX: 90,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 89,
-    MAX: 90,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 90,
-    MAX: 91,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 90,
-    MAX: 91,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 91,
-    MAX: 92,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 91,
-    MAX: 92,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 92,
-    MAX: 93,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 92,
-    MAX: 93,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 93,
-    MAX: 94,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 93,
-    MAX: 94,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 94,
-    MAX: 95,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 94,
-    MAX: 95,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 95,
-    MAX: 96,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 95,
-    MAX: 96,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 96,
-    MAX: 97,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 96,
-    MAX: 97,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 97,
-    MAX: 98,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 97,
-    MAX: 98,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 98,
-    MAX: 99,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 98,
-    MAX: 99,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-─────╯
-Error: Typing Error: write wire access expects a ::int #(
-    MIN: 99,
-    MAX: 100,
-) but was given a ::int #(
-    MIN: 0,
-    MAX: 1,
-)
-     ╭─[ test.sus:825:2 ]
-     │
- 825 │     int[SIZE] vs
-     │     ──────┬─────  
-     │           ╰─────── Typing Error: write wire access expects a ::int #(
-    MIN: 99,
-    MAX: 100,
 ) but was given a ::int #(
     MIN: 0,
     MAX: 1,
@@ -14375,6 +12532,25 @@ Error: Typing Error: write wire access expects a ::int #(
 )
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
+    MIN: 11,
+    MAX: 12,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 11,
+    MAX: 12,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
     MIN: 110,
     MAX: 111,
 ) but was given a ::int #(
@@ -14559,6 +12735,25 @@ Error: Typing Error: write wire access expects a ::int #(
      │           ╰─────── Typing Error: write wire access expects a ::int #(
     MIN: 119,
     MAX: 120,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 12,
+    MAX: 13,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 12,
+    MAX: 13,
 ) but was given a ::int #(
     MIN: 0,
     MAX: 1,
@@ -14755,6 +12950,25 @@ Error: Typing Error: write wire access expects a ::int #(
 )
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
+    MIN: 13,
+    MAX: 14,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 13,
+    MAX: 14,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
     MIN: 130,
     MAX: 131,
 ) but was given a ::int #(
@@ -14939,6 +13153,25 @@ Error: Typing Error: write wire access expects a ::int #(
      │           ╰─────── Typing Error: write wire access expects a ::int #(
     MIN: 139,
     MAX: 140,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 14,
+    MAX: 15,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 14,
+    MAX: 15,
 ) but was given a ::int #(
     MIN: 0,
     MAX: 1,
@@ -15135,6 +13368,25 @@ Error: Typing Error: write wire access expects a ::int #(
 )
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
+    MIN: 15,
+    MAX: 16,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 15,
+    MAX: 16,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
     MIN: 150,
     MAX: 151,
 ) but was given a ::int #(
@@ -15319,6 +13571,25 @@ Error: Typing Error: write wire access expects a ::int #(
      │           ╰─────── Typing Error: write wire access expects a ::int #(
     MIN: 159,
     MAX: 160,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 16,
+    MAX: 17,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 16,
+    MAX: 17,
 ) but was given a ::int #(
     MIN: 0,
     MAX: 1,
@@ -15515,6 +13786,25 @@ Error: Typing Error: write wire access expects a ::int #(
 )
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
+    MIN: 17,
+    MAX: 18,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 17,
+    MAX: 18,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
     MIN: 170,
     MAX: 171,
 ) but was given a ::int #(
@@ -15699,6 +13989,25 @@ Error: Typing Error: write wire access expects a ::int #(
      │           ╰─────── Typing Error: write wire access expects a ::int #(
     MIN: 179,
     MAX: 180,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 18,
+    MAX: 19,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 18,
+    MAX: 19,
 ) but was given a ::int #(
     MIN: 0,
     MAX: 1,
@@ -15895,6 +14204,25 @@ Error: Typing Error: write wire access expects a ::int #(
 )
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
+    MIN: 19,
+    MAX: 20,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 19,
+    MAX: 20,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
     MIN: 190,
     MAX: 191,
 ) but was given a ::int #(
@@ -16079,6 +14407,44 @@ Error: Typing Error: write wire access expects a ::int #(
      │           ╰─────── Typing Error: write wire access expects a ::int #(
     MIN: 199,
     MAX: 200,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 2,
+    MAX: 3,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 2,
+    MAX: 3,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 20,
+    MAX: 21,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 20,
+    MAX: 21,
 ) but was given a ::int #(
     MIN: 0,
     MAX: 1,
@@ -16275,6 +14641,25 @@ Error: Typing Error: write wire access expects a ::int #(
 )
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
+    MIN: 21,
+    MAX: 22,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 21,
+    MAX: 22,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
     MIN: 210,
     MAX: 211,
 ) but was given a ::int #(
@@ -16459,6 +14844,25 @@ Error: Typing Error: write wire access expects a ::int #(
      │           ╰─────── Typing Error: write wire access expects a ::int #(
     MIN: 219,
     MAX: 220,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 22,
+    MAX: 23,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 22,
+    MAX: 23,
 ) but was given a ::int #(
     MIN: 0,
     MAX: 1,
@@ -16655,6 +15059,25 @@ Error: Typing Error: write wire access expects a ::int #(
 )
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
+    MIN: 23,
+    MAX: 24,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 23,
+    MAX: 24,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
     MIN: 230,
     MAX: 231,
 ) but was given a ::int #(
@@ -16839,6 +15262,25 @@ Error: Typing Error: write wire access expects a ::int #(
      │           ╰─────── Typing Error: write wire access expects a ::int #(
     MIN: 239,
     MAX: 240,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 24,
+    MAX: 25,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 24,
+    MAX: 25,
 ) but was given a ::int #(
     MIN: 0,
     MAX: 1,
@@ -17035,6 +15477,25 @@ Error: Typing Error: write wire access expects a ::int #(
 )
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
+    MIN: 25,
+    MAX: 26,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 25,
+    MAX: 26,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
     MIN: 250,
     MAX: 251,
 ) but was given a ::int #(
@@ -17128,6 +15589,1571 @@ Error: Typing Error: write wire access expects a ::int #(
     MIN: 0,
     MAX: 1,
 )
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 26,
+    MAX: 27,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 26,
+    MAX: 27,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 27,
+    MAX: 28,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 27,
+    MAX: 28,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 28,
+    MAX: 29,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 28,
+    MAX: 29,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 29,
+    MAX: 30,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 29,
+    MAX: 30,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 3,
+    MAX: 4,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 3,
+    MAX: 4,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 30,
+    MAX: 31,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 30,
+    MAX: 31,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 31,
+    MAX: 32,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 31,
+    MAX: 32,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 32,
+    MAX: 33,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 32,
+    MAX: 33,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 33,
+    MAX: 34,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 33,
+    MAX: 34,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 34,
+    MAX: 35,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 34,
+    MAX: 35,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 35,
+    MAX: 36,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 35,
+    MAX: 36,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 36,
+    MAX: 37,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 36,
+    MAX: 37,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 37,
+    MAX: 38,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 37,
+    MAX: 38,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 38,
+    MAX: 39,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 38,
+    MAX: 39,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 39,
+    MAX: 40,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 39,
+    MAX: 40,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 4,
+    MAX: 5,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 4,
+    MAX: 5,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 40,
+    MAX: 41,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 40,
+    MAX: 41,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 41,
+    MAX: 42,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 41,
+    MAX: 42,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 42,
+    MAX: 43,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 42,
+    MAX: 43,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 43,
+    MAX: 44,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 43,
+    MAX: 44,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 44,
+    MAX: 45,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 44,
+    MAX: 45,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 45,
+    MAX: 46,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 45,
+    MAX: 46,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 46,
+    MAX: 47,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 46,
+    MAX: 47,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 47,
+    MAX: 48,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 47,
+    MAX: 48,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 48,
+    MAX: 49,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 48,
+    MAX: 49,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 49,
+    MAX: 50,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 49,
+    MAX: 50,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 5,
+    MAX: 6,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 5,
+    MAX: 6,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 50,
+    MAX: 51,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 50,
+    MAX: 51,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 51,
+    MAX: 52,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 51,
+    MAX: 52,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 52,
+    MAX: 53,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 52,
+    MAX: 53,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 53,
+    MAX: 54,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 53,
+    MAX: 54,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 54,
+    MAX: 55,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 54,
+    MAX: 55,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 55,
+    MAX: 56,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 55,
+    MAX: 56,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 56,
+    MAX: 57,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 56,
+    MAX: 57,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 57,
+    MAX: 58,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 57,
+    MAX: 58,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 58,
+    MAX: 59,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 58,
+    MAX: 59,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 59,
+    MAX: 60,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 59,
+    MAX: 60,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 6,
+    MAX: 7,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 6,
+    MAX: 7,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 60,
+    MAX: 61,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 60,
+    MAX: 61,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 61,
+    MAX: 62,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 61,
+    MAX: 62,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 62,
+    MAX: 63,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 62,
+    MAX: 63,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 63,
+    MAX: 64,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 63,
+    MAX: 64,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 64,
+    MAX: 65,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 64,
+    MAX: 65,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 65,
+    MAX: 66,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 65,
+    MAX: 66,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 66,
+    MAX: 67,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 66,
+    MAX: 67,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 67,
+    MAX: 68,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 67,
+    MAX: 68,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 68,
+    MAX: 69,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 68,
+    MAX: 69,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 69,
+    MAX: 70,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 69,
+    MAX: 70,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 7,
+    MAX: 8,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 7,
+    MAX: 8,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 70,
+    MAX: 71,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 70,
+    MAX: 71,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 71,
+    MAX: 72,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 71,
+    MAX: 72,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 72,
+    MAX: 73,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 72,
+    MAX: 73,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 73,
+    MAX: 74,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 73,
+    MAX: 74,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 74,
+    MAX: 75,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 74,
+    MAX: 75,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 75,
+    MAX: 76,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 75,
+    MAX: 76,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 76,
+    MAX: 77,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 76,
+    MAX: 77,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 77,
+    MAX: 78,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 77,
+    MAX: 78,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 78,
+    MAX: 79,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 78,
+    MAX: 79,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 79,
+    MAX: 80,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 79,
+    MAX: 80,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 8,
+    MAX: 9,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 8,
+    MAX: 9,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 80,
+    MAX: 81,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 80,
+    MAX: 81,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 81,
+    MAX: 82,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 81,
+    MAX: 82,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 82,
+    MAX: 83,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 82,
+    MAX: 83,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 83,
+    MAX: 84,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 83,
+    MAX: 84,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 84,
+    MAX: 85,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 84,
+    MAX: 85,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 85,
+    MAX: 86,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 85,
+    MAX: 86,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 86,
+    MAX: 87,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 86,
+    MAX: 87,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 87,
+    MAX: 88,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 87,
+    MAX: 88,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 88,
+    MAX: 89,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 88,
+    MAX: 89,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 89,
+    MAX: 90,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 89,
+    MAX: 90,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 9,
+    MAX: 10,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 9,
+    MAX: 10,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 90,
+    MAX: 91,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 90,
+    MAX: 91,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 91,
+    MAX: 92,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 91,
+    MAX: 92,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 92,
+    MAX: 93,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 92,
+    MAX: 93,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 93,
+    MAX: 94,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 93,
+    MAX: 94,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 94,
+    MAX: 95,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 94,
+    MAX: 95,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 95,
+    MAX: 96,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 95,
+    MAX: 96,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 96,
+    MAX: 97,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 96,
+    MAX: 97,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 97,
+    MAX: 98,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 97,
+    MAX: 98,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 98,
+    MAX: 99,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 98,
+    MAX: 99,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: write wire access expects a ::int #(
+    MIN: 99,
+    MAX: 100,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:825:2 ]
+     │
+ 825 │     int[SIZE] vs
+     │     ──────┬─────  
+     │           ╰─────── Typing Error: write wire access expects a ::int #(
+    MIN: 99,
+    MAX: 100,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:831:2 ]
+     │
+ 831 │     tree_add #(WIDTH: SIZE) tr
+     │     ───────────┬───────────  
+     │                ╰───────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[255]
+     ╭─[ test.sus:831:2 ]
+     │
+ 831 │     tree_add #(WIDTH: SIZE) tr
+     │     ───────────┬───────────  
+     │                ╰───────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[255]
 ─────╯
 Error: Error instantiating submodule
      ╭─[ test.sus:831:2 ]
@@ -17135,32 +17161,6 @@ Error: Error instantiating submodule
  831 │     tree_add #(WIDTH: SIZE) tr
      │     ───────────┬───────────  
      │                ╰───────────── Error instantiating submodule
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[255]
-     ╭─[ test.sus:831:2 ]
-     │
- 831 │     tree_add #(WIDTH: SIZE) tr
-     │     ───────────┬───────────  
-     │                ╰───────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[255]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:831:2 ]
-     │
- 831 │     tree_add #(WIDTH: SIZE) tr
-     │     ───────────┬───────────  
-     │                ╰───────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -17633,38 +17633,38 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │            ─┬─  
      │             ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:973:2 ]
+     │
+ 973 │     TreeAdd adder
+     │     ───┬───  
+     │        ╰───── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[5]
+     ╭─[ test.sus:973:2 ]
+     │
+ 973 │     TreeAdd adder
+     │     ───┬───  
+     │        ╰───── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[5]
+─────╯
 Error: Error instantiating submodule
      ╭─[ test.sus:973:2 ]
      │
  973 │     TreeAdd adder
      │     ───┬───  
      │        ╰───── Error instantiating submodule
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[5]
-     ╭─[ test.sus:973:2 ]
-     │
- 973 │     TreeAdd adder
-     │     ───┬───  
-     │        ╰───── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[5]
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:973:2 ]
-     │
- 973 │     TreeAdd adder
-     │     ───┬───  
-     │        ╰───── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: ::int #(
     MIN: /* Could not infer */
@@ -17787,38 +17787,38 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                  ──┬─  
       │                    ╰─── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+      ╭─[ test.sus:1041:2 ]
+      │
+ 1041 │     DualPortMem #(SIZE: 128, T: type bool[500]) mem
+      │     ─────────────────────┬─────────────────────  
+      │                          ╰─────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+──────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+      ╭─[ test.sus:1041:2 ]
+      │
+ 1041 │     DualPortMem #(SIZE: 128, T: type bool[500]) mem
+      │     ─────────────────────┬─────────────────────  
+      │                          ╰─────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)
+──────╯
 Error: Error instantiating submodule
       ╭─[ test.sus:1041:2 ]
       │
  1041 │     DualPortMem #(SIZE: 128, T: type bool[500]) mem
       │     ─────────────────────┬─────────────────────  
       │                          ╰─────────────────────── Error instantiating submodule
-──────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-      ╭─[ test.sus:1041:2 ]
-      │
- 1041 │     DualPortMem #(SIZE: 128, T: type bool[500]) mem
-      │     ─────────────────────┬─────────────────────  
-      │                          ╰─────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-──────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-      ╭─[ test.sus:1041:2 ]
-      │
- 1041 │     DualPortMem #(SIZE: 128, T: type bool[500]) mem
-      │     ─────────────────────┬─────────────────────  
-      │                          ╰─────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
 ──────╯
 Error: Could not fully instantiate ::FIFO #(
     T: type ::int #(
@@ -17895,6 +17895,32 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │            ───┬──  
       │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[20]
+      ╭─[ test.sus:1072:18 ]
+      │
+ 1072 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
+      │                     ──────────────────────────┬─────────────────────────  
+      │                                               ╰─────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[20]
+──────╯
+Error: Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[5]
+      ╭─[ test.sus:1072:18 ]
+      │
+ 1072 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
+      │                     ──────────────────────────┬─────────────────────────  
+      │                                               ╰─────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
+    MIN: /* Could not infer */
+    MAX: /* Could not infer */
+)[5]
+──────╯
 Error: Could not fully instantiate ::Slice #(
     T: type ::int #(
     MIN: /* Could not infer */
@@ -17917,32 +17943,6 @@ Error: Could not fully instantiate ::Slice #(
     OUT_SIZE: 5,
     FROM: 3,
 )
-──────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[20]
-      ╭─[ test.sus:1072:18 ]
-      │
- 1072 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
-      │                     ──────────────────────────┬─────────────────────────  
-      │                                               ╰─────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[20]
-──────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[5]
-      ╭─[ test.sus:1072:18 ]
-      │
- 1072 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
-      │                     ──────────────────────────┬─────────────────────────  
-      │                                               ╰─────────────────────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[5]
 ──────╯
 Error: For executing compile-time constants, all arguments must be fully specified. In this case, the arguments 'T' were not specified
       ╭─[ test.sus:1077:25 ]
