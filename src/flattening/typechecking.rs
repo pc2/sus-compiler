@@ -51,12 +51,12 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
 
         // Grab another mutable copy of md so it doesn't force a borrow conflict
         let working_on_mut = &mut linker.modules[module_uuid];
-        apply_types(
+        let finalize_ctx = FinalizationContext {
+            linker_types: &linker.types,
+            errors: &errs_and_globals.0,
             type_checker,
-            working_on_mut,
-            &errs_and_globals.0,
-            &linker.types,
-        );
+        };
+        finalize_ctx.apply_types(working_on_mut);
 
         working_on_mut
             .link_info
@@ -835,140 +835,204 @@ impl<'l> TypeCheckingContext<'l, '_> {
 
 // ====== Free functions for actually applying the result of type checking ======
 
-pub fn apply_types(
-    mut type_checker: FullTypeUnifier,
-    working_on: &mut Module,
-    errors: &ErrorCollector,
-    linker_types: &ArenaAllocator<StructType, TypeUUIDMarker>,
-) {
-    // Set the remaining domain variables that aren't associated with a module port.
-    // We just find domain IDs that haven't been
-    let mut leftover_domain_alloc =
-        UUIDAllocator::new_start_from(working_on.domains.get_next_alloc_id());
-    for (_, d) in type_checker.domain_substitutor.iter() {
-        if d.get().is_none() {
-            assert!(d
-                .set(DomainType::Physical(leftover_domain_alloc.alloc()))
-                .is_ok());
-        }
-    }
+struct FinalizationContext<'l, 'errs> {
+    linker_types: &'l ArenaAllocator<StructType, TypeUUIDMarker>,
+    errors: &'errs ErrorCollector<'l>,
+    type_checker: FullTypeUnifier,
+}
 
-    // Assign names to all of the domains in this module
-    working_on.domains = leftover_domain_alloc.as_range().map(|id| {
-        if let Some(work_on_domain) = working_on.domains.get(id) {
-            work_on_domain.clone()
-        } else {
-            DomainInfo {
-                name: format!("domain_{}", id.get_hidden_value()),
-                name_span: None,
+impl FinalizationContext<'_, '_> {
+    pub fn apply_types(mut self, working_on: &mut Module) {
+        // Set the remaining domain variables that aren't associated with a module port.
+        // We just find domain IDs that haven't been
+        let mut leftover_domain_alloc =
+            UUIDAllocator::new_start_from(working_on.domains.get_next_alloc_id());
+        for (_, d) in self.type_checker.domain_substitutor.iter() {
+            if d.get().is_none() {
+                assert!(d
+                    .set(DomainType::Physical(leftover_domain_alloc.alloc()))
+                    .is_ok());
             }
         }
-    });
 
-    // Post type application. Solidify types and flag any remaining AbstractType::Unknown
-    for (_id, inst) in working_on.link_info.instructions.iter_mut() {
-        match inst {
-            Instruction::Expression(expr) => {
-                type_checker.finalize_domain_type(&mut expr.domain);
-                match &mut expr.output {
-                    ExpressionOutput::SubExpression(expr_typ) => {
-                        type_checker.finalize_abstract_type(
-                            linker_types,
-                            expr_typ,
-                            expr.span,
-                            errors,
-                        );
-                    }
-                    ExpressionOutput::MultiWrite(write_tos) => {
-                        for wr in write_tos {
-                            type_checker.finalize_wire_ref(linker_types, &mut wr.to, errors);
+        // Assign names to all of the domains in this module
+        working_on.domains = leftover_domain_alloc.as_range().map(|id| {
+            if let Some(work_on_domain) = working_on.domains.get(id) {
+                work_on_domain.clone()
+            } else {
+                DomainInfo {
+                    name: format!("domain_{}", id.get_hidden_value()),
+                    name_span: None,
+                }
+            }
+        });
+
+        // Post type application. Solidify types and flag any remaining AbstractType::Unknown
+        for (_id, inst) in working_on.link_info.instructions.iter_mut() {
+            match inst {
+                Instruction::Expression(expr) => {
+                    self.finalize_domain_type(&mut expr.domain);
+                    match &mut expr.output {
+                        ExpressionOutput::SubExpression(expr_typ) => {
+                            self.finalize_abstract_type(expr_typ, expr.span);
+                        }
+                        ExpressionOutput::MultiWrite(write_tos) => {
+                            for wr in write_tos {
+                                self.finalize_wire_ref(&mut wr.to);
+                            }
                         }
                     }
-                }
-                match &mut expr.source {
-                    ExpressionSource::WireRef(wr) => {
-                        type_checker.finalize_wire_ref(linker_types, wr, errors);
+                    match &mut expr.source {
+                        ExpressionSource::WireRef(wr) => {
+                            self.finalize_wire_ref(wr);
+                        }
+                        ExpressionSource::UnaryOp { rank, .. }
+                        | ExpressionSource::BinaryOp { rank, .. } => {
+                            let _ = self
+                                .type_checker
+                                .abstract_type_substitutor
+                                .rank_substitutor
+                                .fully_substitute(rank); // No need to report incomplete peano error, as one of the ports would have reported it
+                        }
+                        _ => {}
                     }
-                    ExpressionSource::UnaryOp { rank, .. }
-                    | ExpressionSource::BinaryOp { rank, .. } => {
-                        let _ = type_checker
-                            .abstract_type_substitutor
-                            .rank_substitutor
-                            .fully_substitute(rank); // No need to report incomplete peano error, as one of the ports would have reported it
+                }
+                Instruction::Declaration(decl) => self.finalize_type(&mut decl.typ, decl.name_span),
+                // TODO Submodule domains may not be crossed either?
+                Instruction::SubModule(sm) => {
+                    for (_domain_id_in_submodule, domain_assigned_to_it_here) in
+                        &mut sm.local_interface_domains
+                    {
+                        self.finalize_domain_type(domain_assigned_to_it_here);
                     }
-                    _ => {}
+                    self.finalize_global_ref(&mut sm.module_ref);
                 }
+                _other => {}
             }
-            Instruction::Declaration(decl) => {
-                type_checker.finalize_type(linker_types, &mut decl.typ, decl.name_span, errors)
-            }
-            // TODO Submodule domains may not be crossed either?
-            Instruction::SubModule(sm) => {
-                for (_domain_id_in_submodule, domain_assigned_to_it_here) in
-                    &mut sm.local_interface_domains
-                {
-                    type_checker.finalize_domain_type(domain_assigned_to_it_here);
-                }
-                type_checker.finalize_global_ref(linker_types, &mut sm.module_ref, errors);
-            }
-            _other => {}
         }
-    }
 
-    // Print all errors
-    for FailedUnification {
-        mut found,
-        mut expected,
-        span,
-        context,
-        infos,
-    } in type_checker.abstract_type_substitutor.extract_errors()
-    {
-        // Not being able to fully substitute is not an issue. We just display partial types
-        let _ = type_checker
-            .abstract_type_substitutor
-            .fully_substitute(&mut found);
-        let _ = type_checker
-            .abstract_type_substitutor
-            .fully_substitute(&mut expected);
+        // Print all errors
+        for FailedUnification {
+            mut found,
+            mut expected,
+            span,
+            context,
+            infos,
+        } in self.type_checker.abstract_type_substitutor.extract_errors()
+        {
+            // Not being able to fully substitute is not an issue. We just display partial types
+            let _ = self
+                .type_checker
+                .abstract_type_substitutor
+                .fully_substitute(&mut found);
+            let _ = self
+                .type_checker
+                .abstract_type_substitutor
+                .fully_substitute(&mut expected);
 
-        let expected_name = expected
-            .display(linker_types, &type_checker.template_type_names)
-            .to_string();
-        let found_name = found
-            .display(linker_types, &type_checker.template_type_names)
-            .to_string();
-        errors
+            let expected_name = expected
+                .display(self.linker_types, &self.type_checker.template_type_names)
+                .to_string();
+            let found_name = found
+                .display(self.linker_types, &self.type_checker.template_type_names)
+                .to_string();
+            self.errors
             .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
             .add_info_list(infos);
 
-        assert!(
-            expected_name != found_name,
-            "{expected_name} != {found_name}"
-        );
-    }
-    for FailedUnification {
-        mut found,
-        mut expected,
-        span,
-        context,
-        infos,
-    } in type_checker.domain_substitutor.extract_errors()
-    {
-        assert!(type_checker.domain_substitutor.fully_substitute(&mut found));
-        assert!(type_checker
-            .domain_substitutor
-            .fully_substitute(&mut expected));
+            assert!(
+                expected_name != found_name,
+                "{expected_name} != {found_name}"
+            );
+        }
+        for FailedUnification {
+            mut found,
+            mut expected,
+            span,
+            context,
+            infos,
+        } in self.type_checker.domain_substitutor.extract_errors()
+        {
+            assert!(self
+                .type_checker
+                .domain_substitutor
+                .fully_substitute(&mut found));
+            assert!(self
+                .type_checker
+                .domain_substitutor
+                .fully_substitute(&mut expected));
 
-        let expected_name = format!("{expected:?}");
-        let found_name = format!("{found:?}");
-        errors
+            let expected_name = format!("{expected:?}");
+            let found_name = format!("{found:?}");
+            self.errors
             .error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"))
             .add_info_list(infos);
 
-        assert!(
-            expected_name != found_name,
-            "{expected_name} != {found_name}"
-        );
+            assert!(
+                expected_name != found_name,
+                "{expected_name} != {found_name}"
+            );
+        }
+    }
+
+    pub fn finalize_abstract_type(&self, typ: &mut AbstractRankedType, span: Span) {
+        if !self
+            .type_checker
+            .abstract_type_substitutor
+            .fully_substitute(typ)
+        {
+            self.errors.error(
+                span,
+                format!(
+                    "Could not fully figure out the type of this object. {}",
+                    typ.display(self.linker_types, &self.type_checker.template_type_names)
+                ),
+            );
+
+            if crate::debug::is_enabled("TEST") {
+                println!("COULD_NOT_FULLY_FIGURE_OUT")
+            }
+        }
+    }
+
+    pub fn finalize_domain_type(&self, typ_domain: &mut DomainType) {
+        assert!(self
+            .type_checker
+            .domain_substitutor
+            .fully_substitute(typ_domain));
+    }
+
+    pub fn finalize_type(&self, typ: &mut FullType, span: Span) {
+        self.finalize_domain_type(&mut typ.domain);
+        self.finalize_abstract_type(&mut typ.typ, span);
+    }
+
+    pub fn finalize_global_ref<ID>(&self, global_ref: &mut GlobalReference<ID>) {
+        let global_ref_span = global_ref.get_total_span();
+        for (_template_id, arg) in &mut global_ref.template_args {
+            let template_typ = match arg {
+                TemplateKind::Type(t) => t.get_abstract_typ_mut(),
+                TemplateKind::Value(v) => v.get_abstract_typ_mut(),
+            };
+            self.finalize_abstract_type(template_typ, global_ref_span);
+        }
+    }
+
+    pub fn finalize_wire_ref(&self, wire_ref: &mut WireReference) {
+        if let WireReferenceRoot::NamedConstant(cst) = &mut wire_ref.root {
+            self.finalize_global_ref(cst);
+        }
+        self.finalize_type(&mut wire_ref.root_typ, wire_ref.root_span);
+        for path_elem in &mut wire_ref.path {
+            match path_elem {
+                WireReferencePathElement::ArrayAccess {
+                    output_typ,
+                    bracket_span,
+                    ..
+                } => {
+                    self.finalize_abstract_type(output_typ, bracket_span.outer_span());
+                }
+            }
+        }
     }
 }

@@ -1,17 +1,13 @@
 use sus_proc_macro::get_builtin_type;
 
-use crate::alloc::ArenaAllocator;
 use crate::prelude::*;
 
-use super::template::{GlobalReference, Parameter, TVec, TemplateKind};
+use super::template::{Parameter, TVec};
 use super::type_inference::{
     AbstractTypeSubstitutor, DomainVariableID, InnerTypeVariableID, PeanoVariableID, Substitutor,
     TypeSubstitutor, TypeUnifier, UnifyErrorReport,
 };
-use crate::flattening::{
-    BinaryOperator, StructType, UnaryOperator, WireReference, WireReferencePathElement,
-    WireReferenceRoot,
-};
+use crate::flattening::{BinaryOperator, UnaryOperator};
 use crate::to_string::map_to_type_names;
 
 /// This contains only the information that can be type-checked before template instantiation.
@@ -337,89 +333,5 @@ impl FullTypeUnifier {
     ) {
         self.unify_write_to_abstract(found_typ, &expected.typ, span, context.clone());
         self.unify_domains(found_domain, &expected.domain, span, context);
-    }
-
-    pub fn finalize_domain_type(&self, typ_domain: &mut DomainType) {
-        assert!(self.domain_substitutor.fully_substitute(typ_domain));
-    }
-
-    pub fn finalize_abstract_type(
-        &self,
-        linker_types: &ArenaAllocator<StructType, TypeUUIDMarker>,
-        typ: &mut AbstractRankedType,
-        span: Span,
-        errors: &ErrorCollector,
-    ) {
-        if !self.abstract_type_substitutor.fully_substitute(typ) {
-            let typ_as_string = typ.display(linker_types, &self.template_type_names);
-            errors.error(
-                span,
-                format!("Could not fully figure out the type of this object. {typ_as_string}"),
-            );
-
-            if crate::debug::is_enabled("TEST") {
-                println!("COULD_NOT_FULLY_FIGURE_OUT")
-            }
-        }
-    }
-
-    pub fn finalize_type(
-        &mut self,
-        linker_types: &ArenaAllocator<StructType, TypeUUIDMarker>,
-        typ: &mut FullType,
-        span: Span,
-        errors: &ErrorCollector,
-    ) {
-        self.finalize_domain_type(&mut typ.domain);
-        self.finalize_abstract_type(linker_types, &mut typ.typ, span, errors);
-    }
-
-    pub fn finalize_global_ref<ID>(
-        &mut self,
-        linker_types: &ArenaAllocator<StructType, TypeUUIDMarker>,
-        global_ref: &mut GlobalReference<ID>,
-        errors: &ErrorCollector,
-    ) {
-        let global_ref_span = global_ref.get_total_span();
-        for (_template_id, arg) in &mut global_ref.template_args {
-            let template_typ = match arg {
-                TemplateKind::Type(t) => t.get_abstract_typ_mut(),
-                TemplateKind::Value(v) => v.get_abstract_typ_mut(),
-            };
-            self.finalize_abstract_type(linker_types, template_typ, global_ref_span, errors);
-        }
-    }
-
-    pub fn finalize_wire_ref(
-        &mut self,
-        linker_types: &ArenaAllocator<StructType, TypeUUIDMarker>,
-        wire_ref: &mut WireReference,
-        errors: &ErrorCollector,
-    ) {
-        if let WireReferenceRoot::NamedConstant(cst) = &mut wire_ref.root {
-            self.finalize_global_ref(linker_types, cst, errors);
-        }
-        self.finalize_type(
-            linker_types,
-            &mut wire_ref.root_typ,
-            wire_ref.root_span,
-            errors,
-        );
-        for path_elem in &mut wire_ref.path {
-            match path_elem {
-                WireReferencePathElement::ArrayAccess {
-                    output_typ,
-                    bracket_span,
-                    ..
-                } => {
-                    self.finalize_abstract_type(
-                        linker_types,
-                        output_typ,
-                        bracket_span.outer_span(),
-                        errors,
-                    );
-                }
-            }
-        }
     }
 }
