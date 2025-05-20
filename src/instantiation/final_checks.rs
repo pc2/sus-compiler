@@ -1,6 +1,9 @@
 //! After instantiation, we preform a few final checks of each module.
 
-use crate::{typing::concrete_type::ConcreteType, value::Value};
+use crate::{
+    let_unwrap,
+    typing::{concrete_type::ConcreteType, type_inference::Unifyable},
+};
 
 use super::{InstantiationContext, RealWireDataSource, RealWirePathElem};
 impl InstantiationContext<'_, '_> {
@@ -8,10 +11,8 @@ impl InstantiationContext<'_, '_> {
         for elem in path {
             match elem {
                 RealWirePathElem::ArrayAccess { span, idx_wire } => {
-                    let ConcreteType::Array(arr) = arr_typ else {
-                        break;
-                    }; // May still contain unknowns
-                    let ConcreteType::Value(Value::Integer(arr_sz)) = &arr.1 else {
+                    let_unwrap!(ConcreteType::Array(arr), arr_typ);
+                    let Unifyable::Set(arr_sz) = &arr.1 else {
                         break;
                     }; // May still contain unknowns
                     arr_typ = &arr.0;
@@ -20,7 +21,9 @@ impl InstantiationContext<'_, '_> {
                     if let RealWireDataSource::Constant { value } = &idx_wire_wire.source {
                         // Constant access into array! We can check.
                         let integer_value = value.unwrap_integer();
-                        if integer_value >= arr_sz || integer_value < &ibig::ibig!(0) {
+                        if integer_value >= arr_sz.unwrap_integer()
+                            || integer_value < &ibig::ibig!(0)
+                        {
                             self.errors
                                 .error(span.inner_span(), format!("Index out of bounds. Array is of size {arr_sz}, but the index is {integer_value}."));
                         }

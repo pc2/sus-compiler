@@ -9,7 +9,8 @@ use crate::flattening::{DeclarationKind, Instruction, Module, Port};
 use crate::instantiation::{
     InstantiatedModule, MultiplexerSource, RealWire, RealWireDataSource, RealWirePathElem,
 };
-use crate::typing::template::TVec;
+use crate::typing::concrete_type::ConcreteTemplateArg;
+use crate::typing::template::{TVec, TemplateKind};
 use crate::{typing::concrete_type::ConcreteType, value::Value};
 
 use super::shared::*;
@@ -43,7 +44,7 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
     let mut array_string = String::new();
     while let ConcreteType::Array(arr) = typ {
         let (content_typ, size) = arr.deref();
-        let sz = size.unwrap_value().unwrap_integer();
+        let sz = size.unwrap_integer();
         write!(array_string, "[{}:0]", sz - 1).unwrap();
         typ = content_typ;
     }
@@ -57,7 +58,6 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
             }
         }
         ConcreteType::Array(_) => unreachable!("All arrays have been used up already"),
-        ConcreteType::Value(_) | ConcreteType::Unknown(_) => unreachable!(),
     }
 }
 
@@ -251,7 +251,7 @@ impl<'g> CodeGenerationContext<'g> {
             idx += 1;
             let (new_typ, sz) = arr_box.deref();
             typ = new_typ;
-            let sz = sz.unwrap_value().unwrap_integer();
+            let sz = sz.unwrap_integer();
             write!(
                 for_stack,
                 "for({for_should_declare_var}{var_name} = 0; {var_name} < {sz}; {var_name} = {var_name} + 1) "
@@ -488,7 +488,7 @@ impl<'g> CodeGenerationContext<'g> {
     fn write_template_args(
         &mut self,
         link_info: &LinkInfo,
-        concrete_template_args: &TVec<ConcreteType>,
+        concrete_template_args: &TVec<ConcreteTemplateArg>,
     ) {
         self.program_text.write_str(&link_info.name).unwrap();
         self.program_text.write_str(" #(").unwrap();
@@ -496,11 +496,12 @@ impl<'g> CodeGenerationContext<'g> {
         concrete_template_args.iter().for_each(|(arg_id, arg)| {
             let arg_name = &link_info.template_parameters[arg_id].name;
             let arg_value = match arg {
-                ConcreteType::Named(..) | ConcreteType::Array(..) => {
-                    unreachable!("No extern module type arguments. Should have been caught by Lint")
+                TemplateKind::Type(_) => {
+                    unreachable!(
+                        "No extern module type arguments. Should have been caught by Lint"
+                    );
                 }
-                ConcreteType::Value(value) => value.inline_constant_to_string(),
-                ConcreteType::Unknown(_) => unreachable!("All args are known at codegen"),
+                TemplateKind::Value(value) => value.inline_constant_to_string(),
             };
             if first {
                 self.program_text.write_char(',').unwrap();
@@ -593,8 +594,8 @@ impl<'g> CodeGenerationContext<'g> {
                 self.program_text.write_str("\tassign out = in;\n").unwrap();
             }
             "IntToBits" => {
-                let [num_bits] = self.instance.global_ref.template_args.cast_to_array();
-                let num_bits: usize = num_bits.unwrap_value().unwrap_int();
+                let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
+                let num_bits: usize = num_bits.try_into().unwrap();
 
                 let _value_port = self
                     .md
@@ -607,8 +608,8 @@ impl<'g> CodeGenerationContext<'g> {
                 }
             }
             "BitsToInt" => {
-                let [num_bits] = self.instance.global_ref.template_args.cast_to_array();
-                let num_bits: usize = num_bits.unwrap_value().unwrap_int();
+                let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
+                let num_bits: usize = num_bits.try_into().unwrap();
 
                 let _bits_port = self
                     .md

@@ -42,7 +42,7 @@ fn typ_to_declaration(mut typ: &ConcreteType) -> String {
     let mut array_string = String::new();
     while let ConcreteType::Array(arr) = typ {
         let (content_typ, size) = arr.deref();
-        let sz = size.unwrap_value().unwrap_integer();
+        let sz = size.unwrap_integer();
         write!(array_string, "array (0 to {}) of", sz - 1).unwrap();
         typ = content_typ;
     }
@@ -56,7 +56,6 @@ fn typ_to_declaration(mut typ: &ConcreteType) -> String {
             }
         }
         ConcreteType::Array(_) => unreachable!("All arrays have been used up already"),
-        ConcreteType::Value(_) | ConcreteType::Unknown(_) => unreachable!(),
     }
 }
 

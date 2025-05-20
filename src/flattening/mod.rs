@@ -8,7 +8,7 @@ mod walk;
 
 use crate::alloc::{UUIDAllocator, UUIDRange};
 use crate::prelude::*;
-use crate::typing::abstract_type::{DomainType, PeanoType};
+use crate::typing::abstract_type::{AbstractRankedType, DomainType, PeanoType};
 use crate::typing::written_type::WrittenType;
 
 use std::cell::OnceCell;
@@ -308,11 +308,12 @@ impl Interface {
 /// An element in a [WireReference] path. Could be array accesses, slice accesses, field accesses, etc
 ///
 /// When executing, this turns into [crate::instantiation::RealWirePathElem]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum WireReferencePathElement {
     ArrayAccess {
         idx: FlatID,
         bracket_span: BracketSpan,
+        output_typ: AbstractRankedType,
     },
 }
 
@@ -327,7 +328,7 @@ pub enum WireReferenceRoot {
     /// ```
     ///
     /// [FlatID] points to [Instruction::Declaration]
-    LocalDecl(FlatID, Span),
+    LocalDecl(FlatID),
     /// ```sus
     /// bool b = true // root is global constant `true`
     /// ```
@@ -344,7 +345,7 @@ pub enum WireReferenceRoot {
 impl WireReferenceRoot {
     pub fn get_root_flat(&self) -> Option<FlatID> {
         match self {
-            WireReferenceRoot::LocalDecl(f, _) => Some(*f),
+            WireReferenceRoot::LocalDecl(f) => Some(*f),
             WireReferenceRoot::NamedConstant(_) => None,
             WireReferenceRoot::SubModulePort(port) => Some(port.submodule_decl),
             WireReferenceRoot::Error => None,
@@ -352,20 +353,10 @@ impl WireReferenceRoot {
     }
     #[track_caller]
     pub fn unwrap_local_decl(&self) -> FlatID {
-        let Self::LocalDecl(decl, _) = self else {
+        let Self::LocalDecl(decl) = self else {
             unreachable!()
         };
         *decl
-    }
-    pub fn get_span(&self) -> Option<Span> {
-        match self {
-            WireReferenceRoot::LocalDecl(_uuid, span) => Some(*span),
-            WireReferenceRoot::NamedConstant(global_reference) => {
-                Some(global_reference.get_total_span())
-            }
-            WireReferenceRoot::SubModulePort(port_reference) => port_reference.port_name_span,
-            WireReferenceRoot::Error => None,
-        }
     }
 }
 
@@ -380,20 +371,21 @@ impl WireReferenceRoot {
 pub struct WireReference {
     pub root: WireReferenceRoot,
     pub path: Vec<WireReferencePathElement>,
+    pub root_typ: FullType,
+    pub root_span: Span,
 }
 
 impl WireReference {
-    const ERROR: Self = WireReference {
-        root: WireReferenceRoot::Error,
-        path: Vec::new(),
-    };
     pub fn is_error(&self) -> bool {
         matches!(&self.root, WireReferenceRoot::Error)
     }
-    fn simple_var_read(id: FlatID, name_span: Span) -> WireReference {
-        WireReference {
-            root: WireReferenceRoot::LocalDecl(id, name_span),
-            path: Vec::new(),
+    pub fn get_output_typ(&self) -> &AbstractRankedType {
+        if let Some(last) = self.path.last() {
+            match last {
+                WireReferencePathElement::ArrayAccess { output_typ, .. } => output_typ,
+            }
+        } else {
+            &self.root_typ.typ
         }
     }
 }
@@ -438,13 +430,6 @@ pub struct WriteTo {
     /// Invalid [WireReference] is possible.
     pub to: WireReference,
     pub to_span: Span,
-    /// The type and domain to which will be written.
-    ///
-    /// The output_typ domain should be generative when to.root is generative, or a generative value is required such as with "initial"
-    /// When this is not the case, it should be initialized with an unknown Domain Variable
-    ///
-    /// In short, this should be the type and domain *to which* the read type must be unified.
-    pub to_type: FullType,
     pub write_modifiers: WriteModifiers,
 }
 
@@ -537,7 +522,7 @@ pub enum ExpressionSource {
 /// - We refuse to have tuple types
 #[derive(Debug)]
 pub enum ExpressionOutput {
-    SubExpression(FullType),
+    SubExpression(AbstractRankedType),
     MultiWrite(Vec<WriteTo>),
 }
 /// An [Instruction] that represents a single expression in the program. Like ((3) + (x))
@@ -565,11 +550,12 @@ impl Expression {
                 let [single_write] = write_tos.as_slice() else {
                     return None;
                 };
-                &single_write.to_type
+                single_write.to.get_output_typ()
             }
         };
         Some(SingleOutputExpression {
             typ,
+            domain: self.domain,
             span: self.span,
             source: &self.source,
         })
@@ -789,7 +775,8 @@ pub enum Instruction {
 /// Used as a convenient shorthand for [ExpressionOutput::SubExpression], to replace old uses of [Expression]
 #[derive(Debug, Clone, Copy)]
 pub struct SingleOutputExpression<'e> {
-    pub typ: &'e FullType,
+    pub typ: &'e AbstractRankedType,
+    pub domain: DomainType,
     pub span: Span,
     pub source: &'e ExpressionSource,
 }
@@ -810,6 +797,7 @@ impl Instruction {
         };
         SingleOutputExpression {
             typ,
+            domain: expr.domain,
             span: expr.span,
             source: &expr.source,
         }
