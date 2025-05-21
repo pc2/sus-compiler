@@ -18,7 +18,7 @@ pub mod dot_graphs {
             crate::prelude::WireIDMarker,
         >,
         _submodules: &crate::alloc::FlatAlloc<
-            crate::instantiation::SubModule,
+            crate::instantiation::ConcreteSubModule,
             crate::prelude::SubModuleIDMarker,
         >,
         _linker: &crate::linker::Linker,

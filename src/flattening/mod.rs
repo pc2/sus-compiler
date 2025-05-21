@@ -654,7 +654,7 @@ pub struct Declaration {
 ///
 /// When instantiating, creates a [crate::instantiation::SubModule]
 #[derive(Debug)]
-pub struct SubModuleInstance {
+pub struct SubModuleInstruction {
     pub module_ref: GlobalReference<ModuleUUID>,
     /// Name is not always present in source code. Such as in inline function call syntax: my_mod(a, b, c)
     pub name: Option<(String, Span)>,
@@ -663,9 +663,10 @@ pub struct SubModuleInstance {
     /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::DomainVariable] before typing)
     pub local_interface_domains: FlatAlloc<DomainType, DomainIDMarker>,
     pub documentation: Documentation,
+    pub rank: PeanoType,
 }
 
-impl SubModuleInstance {
+impl SubModuleInstruction {
     pub fn get_name<'o, 's: 'o, 'l: 'o>(&'s self, corresponding_module: &'l Module) -> &'o str {
         if let Some((n, _span)) = &self.name {
             n
@@ -779,7 +780,7 @@ pub struct ForStatement {
 /// When executing, the instructions are processed in order. Control flow instructions like [IfStatement] and [ForStatement] can cause the executor to repeat or skip sections.
 #[derive(Debug)]
 pub enum Instruction {
-    SubModule(SubModuleInstance),
+    SubModule(SubModuleInstruction),
     Declaration(Declaration),
     Expression(Expression),
     IfStatement(IfStatement),
@@ -822,7 +823,7 @@ impl Instruction {
         decl
     }
     #[track_caller]
-    pub fn unwrap_submodule(&self) -> &SubModuleInstance {
+    pub fn unwrap_submodule(&self) -> &SubModuleInstruction {
         let Self::SubModule(sm) = self else {
             panic!("unwrap_submodule on not a SubModule! Found {self:?}")
         };
