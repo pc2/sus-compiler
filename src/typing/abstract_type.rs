@@ -72,6 +72,12 @@ impl AbstractRankedType {
             rank: PeanoType::Succ(Box::new(self.rank)),
         }
     }
+    pub fn with_replaced_rank(&self, rank: PeanoType) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            rank,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -385,6 +391,23 @@ impl FullTypeUnifier {
 
     pub fn finalize_domain_type(&self, typ_domain: &mut DomainType) {
         assert!(self.domain_substitutor.fully_substitute(typ_domain));
+    }
+
+    pub fn finalize_peano_type(&self, typ: &mut PeanoType, span: Span, errors: &ErrorCollector) {
+        if !self
+            .abstract_type_substitutor
+            .rank_substitutor
+            .fully_substitute(typ)
+        {
+            errors.error(
+                span,
+                "Could not fully figure out submodule instantiation rank (are you attempting to infer a module type parameter?)",
+            );
+
+            if crate::debug::is_enabled("TEST") {
+                println!("COULD_NOT_FULLY_FIGURE_OUT")
+            }
+        }
     }
 
     pub fn finalize_abstract_type(

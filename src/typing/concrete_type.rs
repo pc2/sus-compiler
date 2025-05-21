@@ -134,6 +134,14 @@ impl ConcreteType {
         }
     }
 
+    pub fn wrap_in_arrays(&self, dimensions: Vec<ConcreteType>) -> ConcreteType {
+        let mut working = self.clone();
+        for d in dimensions {
+            working = ConcreteType::Array(Box::new((working, d)));
+        }
+        working
+    }
+
     /// TODO #50 Ranged Int work should be integrated
     pub fn sizeof_named(type_ref: &ConcreteGlobalReference<TypeUUID>) -> u64 {
         match type_ref.id {

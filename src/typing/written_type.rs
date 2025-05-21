@@ -7,7 +7,7 @@ use crate::{
 };
 
 use super::{
-    abstract_type::{AbstractInnerType, AbstractRankedType},
+    abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType},
     concrete_type::{ConcreteGlobalReference, ConcreteType},
     template::{
         for_each_generative_input_in_template_args, GlobalReference, TVec, TemplateArgKind,
@@ -87,20 +87,36 @@ impl AbstractTypeSubstitutor {
         wr_typ: &WrittenType,
         template_type_args: &TVec<AbstractRankedType>,
     ) -> AbstractRankedType {
+        self.written_to_abstract_type_around_rank_substitute_templates(
+            wr_typ,
+            PeanoType::Zero,
+            template_type_args,
+        )
+    }
+
+    pub fn written_to_abstract_type_around_rank_substitute_templates(
+        &mut self,
+        wr_typ: &WrittenType,
+        rank: PeanoType,
+        template_type_args: &TVec<AbstractRankedType>,
+    ) -> AbstractRankedType {
         match wr_typ {
             WrittenType::Error(_span) => self.alloc_unknown(),
             WrittenType::TemplateVariable(_span, argument_id) => {
-                template_type_args[*argument_id].clone()
+                // this is the major flaw in this approach - rank polymorphism erases template variable
+                // types (assumes they are scalar)
+                template_type_args[*argument_id].with_replaced_rank(rank)
             }
             WrittenType::Named(global_reference) => {
-                AbstractInnerType::Named(global_reference.id).scalar()
+                AbstractInnerType::Named(global_reference.id).with_rank(rank)
             }
             WrittenType::Array(_span, array_content_and_size) => {
                 let (arr_content_type, _size_flat, _array_bracket_span) =
                     array_content_and_size.deref();
 
-                let content_typ = self.written_to_abstract_type_substitute_templates(
+                let content_typ = self.written_to_abstract_type_around_rank_substitute_templates(
                     arr_content_type,
+                    rank,
                     template_type_args,
                 );
 

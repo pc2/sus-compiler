@@ -1008,12 +1008,20 @@ impl InstantiationContext<'_, '_> {
 
                     let concrete_ref = self.execute_global_ref(&submodule.module_ref)?;
 
-                    SubModuleOrWire::SubModule(self.submodules.alloc(SubModule {
+                    let rank = submodule.rank.count_unwrap();
+
+                    let dimensions: Vec<ConcreteType> =
+                        std::iter::repeat_with(|| self.type_substitutor.alloc_unknown())
+                            .take(rank)
+                            .collect();
+
+                    SubModuleOrWire::SubModule(self.submodules.alloc(ConcreteSubModule {
                         original_instruction,
                         instance: OnceCell::new(),
                         refers_to: Rc::new(concrete_ref),
                         port_map,
                         interface_call_sites,
+                        dimensions: RankDimensions::InProgress(dimensions),
                         name: self.unique_name_producer.get_unique_name(name_origin),
                     }))
                 }

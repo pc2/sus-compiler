@@ -15,7 +15,7 @@ use crate::typing::written_type::WrittenType;
 #[derive(Clone, Copy, Debug)]
 pub enum InGlobal<'linker> {
     NamedLocal(&'linker Declaration),
-    NamedSubmodule(&'linker SubModuleInstance),
+    NamedSubmodule(&'linker SubModuleInstruction),
     Temporary(SingleOutputExpression<'linker>),
 }
 
@@ -33,7 +33,7 @@ pub enum LocationInfo<'linker> {
     Global(GlobalUUID),
     /// The contained module only refers to the module on which the port is defined
     /// No reference to the module in which the reference was found is provided
-    Port(&'linker SubModuleInstance, &'linker Module, PortID),
+    Port(&'linker SubModuleInstruction, &'linker Module, PortID),
     Interface(ModuleUUID, &'linker Module, InterfaceID, &'linker Interface),
 }
 

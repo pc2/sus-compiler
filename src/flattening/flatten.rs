@@ -639,12 +639,14 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             .domains
             .map(|_| self.type_alloc.domain_alloc.alloc_unknown());
 
+        let rank = self.type_alloc.type_alloc.rank_substitutor.alloc_unknown();
         self.instructions
-            .alloc(Instruction::SubModule(SubModuleInstance {
+            .alloc(Instruction::SubModule(SubModuleInstruction {
                 name,
                 module_ref,
                 local_interface_domains,
                 documentation,
+                rank,
             }))
     }
 

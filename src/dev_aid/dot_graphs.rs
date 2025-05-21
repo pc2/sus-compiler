@@ -5,7 +5,7 @@ use dot::{render, Edges, GraphWalk, Id, LabelText, Labeller, Nodes, Style};
 use crate::{
     alloc::FlatAlloc,
     instantiation::{
-        ForEachContainedWire, InstantiatedModule, RealWire, RealWireDataSource, SubModule,
+        ConcreteSubModule, ForEachContainedWire, InstantiatedModule, RealWire, RealWireDataSource,
     },
     latency::LatencyCountingProblem,
     linker::Linker,
@@ -131,7 +131,7 @@ impl<'inst> GraphWalk<'inst, NodeType, EdgeType> for (&'inst InstantiatedModule,
 pub fn display_latency_count_graph(
     lc_problem: &LatencyCountingProblem,
     wires: &FlatAlloc<RealWire, WireIDMarker>,
-    submodules: &FlatAlloc<SubModule, SubModuleIDMarker>,
+    submodules: &FlatAlloc<ConcreteSubModule, SubModuleIDMarker>,
     linker: &Linker,
     solution: Option<&[i64]>,
     filename: &str,
@@ -183,7 +183,7 @@ type LatencyEdge<'a> = (usize, usize, LCEdgeType<'a>);
 struct Problem<'a> {
     lc_problem: &'a LatencyCountingProblem,
     wires: &'a FlatAlloc<RealWire, WireIDMarker>,
-    submodules: &'a FlatAlloc<SubModule, SubModuleIDMarker>,
+    submodules: &'a FlatAlloc<ConcreteSubModule, SubModuleIDMarker>,
     linker: &'a Linker,
     solution: Option<&'a [i64]>,
     extra_node_info: Vec<(Option<bool>, Option<i64>)>,

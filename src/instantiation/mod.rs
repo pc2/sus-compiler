@@ -106,13 +106,20 @@ pub struct SubModulePort {
 ///
 /// Generated from a [crate::flattening::SubModuleInstance] instruction
 #[derive(Debug)]
-pub struct SubModule {
+pub struct ConcreteSubModule {
     pub original_instruction: FlatID,
     pub instance: OnceCell<Rc<InstantiatedModule>>,
     pub refers_to: Rc<ConcreteGlobalReference<ModuleUUID>>,
     pub port_map: FlatAlloc<Option<SubModulePort>, PortIDMarker>,
     pub interface_call_sites: FlatAlloc<Vec<Span>, InterfaceIDMarker>,
+    pub dimensions: RankDimensions,
     pub name: String,
+}
+
+#[derive(Debug)]
+pub enum RankDimensions {
+    InProgress(Vec<ConcreteType>),
+    Finished(Vec<usize>),
 }
 
 /// Generated from [Module::ports]
@@ -142,7 +149,7 @@ pub struct InstantiatedModule {
     /// This matches the ports in [Module::ports]. Ports are not `None` when they are not part of this instantiation.
     pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
-    pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+    pub submodules: FlatAlloc<ConcreteSubModule, SubModuleIDMarker>,
     /// See [GenerationState]
     pub generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
 }
@@ -278,7 +285,7 @@ impl ForEachContainedWire for RealWireDataSource {
 pub struct InstantiationContext<'fl, 'l> {
     pub name: String,
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
-    pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+    pub submodules: FlatAlloc<ConcreteSubModule, SubModuleIDMarker>,
 
     pub type_substitutor: TypeUnifier<TypeSubstitutor<ConcreteType>>,
 

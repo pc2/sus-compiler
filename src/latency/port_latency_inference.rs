@@ -1,7 +1,7 @@
 use crate::{
     alloc::zip_eq,
     flattening::{DeclarationKind, ExpressionSource},
-    instantiation::{SubModule, SubModulePort},
+    instantiation::{ConcreteSubModule, SubModulePort},
     prelude::*,
     typing::{
         abstract_type::PeanoType,
@@ -362,7 +362,7 @@ fn add_cycle_to_extra_fanin(
     }
 }
 
-impl SubModule {
+impl ConcreteSubModule {
     pub fn get_interface_relative_latencies(
         &self,
         linker: &Linker,

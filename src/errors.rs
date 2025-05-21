@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use crate::{alloc::ArenaAllocator, typing::template::Parameter};
 
 use crate::flattening::{
-    Declaration, DomainInfo, Instruction, Interface, Module, Port, SubModuleInstance,
+    Declaration, DomainInfo, Instruction, Interface, Module, Port, SubModuleInstruction,
 };
 use crate::linker::{checkpoint::ErrorCheckpoint, FileData, LinkInfo};
 
@@ -314,7 +314,7 @@ impl ErrorInfoObject for Declaration {
     }
 }
 
-impl ErrorInfoObject for SubModuleInstance {
+impl ErrorInfoObject for SubModuleInstruction {
     fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
         let (position, info) = if let Some((name, span)) = &self.name {
             (*span, format!("{name} declared here"))
