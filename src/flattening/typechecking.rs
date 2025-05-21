@@ -109,13 +109,26 @@ impl<'l> TypeCheckingContext<'l, '_> {
         let decl = submodule_module.get_port_decl(port);
         let port_interface = submodule_module.ports[port].domain;
         let port_local_domain = submodule_inst.local_interface_domains[port_interface];
+        let rank = self
+            .type_checker
+            .abstract_type_substitutor
+            .rank_substitutor
+            .alloc_unknown();
+
+        self.type_checker
+            .abstract_type_substitutor
+            .rank_substitutor
+            .unify_must_succeed(&rank, &submodule_inst.rank);
+
         let typ = self
             .type_checker
             .abstract_type_substitutor
-            .written_to_abstract_type_substitute_templates(
+            .written_to_abstract_type_around_rank_substitute_templates(
                 &decl.typ_expr,
+                rank,
                 &submodule_inst.module_ref.template_arg_types,
             );
+
         FullType {
             typ,
             domain: port_local_domain,
@@ -904,6 +917,8 @@ pub fn apply_types(
                     type_checker.finalize_domain_type(domain_assigned_to_it_here);
                 }
                 type_checker.finalize_global_ref(linker_types, &mut sm.module_ref, errors);
+                let span = sm.get_most_relevant_span();
+                type_checker.finalize_peano_type(&mut sm.rank, span, errors);
             }
             _other => {}
         }

@@ -312,6 +312,15 @@ impl InstantiationContext<'_, '_> {
         for (sm_id, sm) in &self.submodules {
             let sub_module = &self.linker.modules[sm.refers_to.id];
 
+            let RankDimensions::InProgress(dimension_variables) = &sm.dimensions else {
+                unreachable!("Submodule rank should be in progress at this point")
+            };
+
+            print!(
+                "Got dimension variables {:?} for module {}",
+                dimension_variables, sm.name
+            );
+
             for (port_id, p) in sm.port_map.iter_valids() {
                 let wire = &self.wires[p.maps_to_wire];
 
@@ -325,7 +334,8 @@ impl InstantiationContext<'_, '_> {
                         &port_decl.typ_expr,
                         &sm.refers_to.template_args,
                         &sub_module.link_info,
-                    );
+                    )
+                    .wrap_in_arrays(dimension_variables.clone());
 
                 self.type_substitutor
                     .unify_must_succeed(&wire.typ, &typ_for_inference);
@@ -351,6 +361,10 @@ struct SubmoduleTypecheckConstraint {
 impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConstraint {
     fn try_apply(&mut self, context: &mut InstantiationContext) -> DelayedConstraintStatus {
         let sm = &mut context.submodules[self.sm_id];
+
+        let RankDimensions::InProgress(dimension_variables) = &sm.dimensions else {
+            unreachable!("Submodule rank should be in progress at this point")
+        };
         assert!(sm.instance.get().is_none());
 
         let submod_instr =
@@ -402,7 +416,9 @@ impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConst
                         let wire = &context.wires[connecting_wire.maps_to_wire];
                         context.type_substitutor.unify_report_error(
                             &wire.typ,
-                            &concrete_port.typ,
+                            &concrete_port
+                                .typ
+                                .wrap_in_arrays(dimension_variables.clone()),
                             submod_instr.module_ref.get_total_span(),
                             || {
                                 use crate::errors::ErrorInfoObject;
