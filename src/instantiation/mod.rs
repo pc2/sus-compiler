@@ -31,6 +31,16 @@ pub enum RealWirePathElem {
         idx_a_wire: WireID,
         idx_b_wire: WireID,
     },
+    ArrayPartSelectUp {
+        span: BracketSpan,
+        idx_a_wire: WireID,
+        width_wire: WireID,
+    },
+    ArrayPartSelectDown {
+        span: BracketSpan,
+        idx_a_wire: WireID,
+        width_wire: WireID,
+    },
 }
 
 /// One arm of a multiplexer. Each arm has an attached condition that is also stored here.
@@ -244,6 +254,16 @@ impl ForEachContainedWire for RealWirePathElem {
                 span: _,
                 idx_a_wire,
                 idx_b_wire,
+            }
+            | RealWirePathElem::ArrayPartSelectDown {
+                span: _,
+                idx_a_wire,
+                width_wire: idx_b_wire,
+            }
+            | RealWirePathElem::ArrayPartSelectUp {
+                span: _,
+                idx_a_wire,
+                width_wire: idx_b_wire,
             } => {
                 f(*idx_a_wire);
                 f(*idx_b_wire);

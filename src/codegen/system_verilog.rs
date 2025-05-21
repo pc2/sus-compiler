@@ -121,6 +121,30 @@ impl<'g> CodeGenerationContext<'g> {
                     let idx_wire_name_b = self.wire_name(wire_b, absolute_latency);
                     write!(result, "[{idx_wire_name_a}:{idx_wire_name_b}]").unwrap();
                 }
+                RealWirePathElem::ArrayPartSelectDown {
+                    span: _,
+                    idx_a_wire,
+                    width_wire,
+                }
+                | RealWirePathElem::ArrayPartSelectUp {
+                    span: _,
+                    idx_a_wire,
+                    width_wire,
+                } => {
+                    let wire_a = &self.instance.wires[*idx_a_wire];
+                    let idx_wire_name_a = self.wire_name(wire_a, absolute_latency);
+                    let wire_width = &self.instance.wires[*width_wire];
+                    let idx_wire_width_name = self.wire_name(wire_width, absolute_latency);
+                    match path_elem {
+                        RealWirePathElem::ArrayPartSelectDown { .. } => {
+                            write!(result, "[{idx_wire_name_a}-:{idx_wire_width_name}]").unwrap();
+                        }
+                        RealWirePathElem::ArrayPartSelectUp { .. } => {
+                            write!(result, "[{idx_wire_name_a}+:{idx_wire_width_name}]").unwrap();
+                        }
+                        _ => unreachable!(),
+                    }
+                }
             }
         }
         result

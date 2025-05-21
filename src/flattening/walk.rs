@@ -58,7 +58,17 @@ impl WireReferencePathElement {
         for p in path {
             match p {
                 WireReferencePathElement::ArrayAccess { idx, .. } => f(*idx),
-                WireReferencePathElement::ArraySlice { idx_a, idx_b, .. } => {
+                WireReferencePathElement::ArraySlice { idx_a, idx_b, .. }
+                | WireReferencePathElement::ArrayPartSelectDown {
+                    idx_a,
+                    width: idx_b,
+                    ..
+                }
+                | WireReferencePathElement::ArrayPartSelectUp {
+                    idx_a,
+                    width: idx_b,
+                    ..
+                } => {
                     f(*idx_a);
                     f(*idx_b);
                 }

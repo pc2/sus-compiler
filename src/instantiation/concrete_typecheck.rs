@@ -53,11 +53,9 @@ impl InstantiationContext<'_, '_> {
                     );
                     current_type_in_progress = typ_after_applying_array;
                 }
-                RealWirePathElem::ArraySlice {
-                    span: _,
-                    idx_a_wire: _,
-                    idx_b_wire: _,
-                } => {
+                RealWirePathElem::ArraySlice { .. }
+                | RealWirePathElem::ArrayPartSelectDown { .. }
+                | RealWirePathElem::ArrayPartSelectUp { .. } => {
                     let inner_of_array_being_sliced = type_substitutor.alloc_unknown();
 
                     let array_being_sliced = Box::new((

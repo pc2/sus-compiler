@@ -320,6 +320,16 @@ pub enum WireReferencePathElement {
         idx_b: FlatID,
         bracket_span: BracketSpan,
     },
+    ArrayPartSelectUp {
+        idx_a: FlatID,
+        width: FlatID,
+        bracket_span: BracketSpan,
+    },
+    ArrayPartSelectDown {
+        idx_a: FlatID,
+        width: FlatID,
+        bracket_span: BracketSpan,
+    },
 }
 
 /// The root of a [WireReference]. Basically where the wire reference starts.
@@ -496,6 +506,13 @@ pub enum BinaryOperator {
     GreaterEq,
     Lesser,
     LesserEq,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SliceType {
+    Normal,
+    PartSelectUp,   // +:
+    PartSelectDown, // -:
 }
 
 /// A reference to a port within a submodule.

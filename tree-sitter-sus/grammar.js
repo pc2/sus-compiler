@@ -41,15 +41,16 @@ function commaSepSeq($, rule) {
 }
 
 const PREC = {
-    compare : 2,
-    range: 3,
-    xor: 4,
-    or: 5,
-    and: 6,
-    additive: 7,
-    multiplicative: 8,
-    unary: 9,
-    postscript_op : 10
+    part_select: 2,
+    compare : 3,
+    range: 4,
+    xor: 5,
+    or: 6,
+    and: 7,
+    additive: 8,
+    multiplicative: 9,
+    unary: 10,
+    postscript_op : 11
 }
 
 module.exports = grammar({
@@ -315,7 +316,7 @@ module.exports = grammar({
         
         slice: $ => seq(
             field('index_a', $._expression),
-            ':',
+            prec(PREC.part_select, field('type', choice(':', '+:', '-:'))),
             field('index_b', $._expression)
         ),
 

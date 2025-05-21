@@ -199,6 +199,29 @@ impl core::fmt::Display for BinaryOperator {
     }
 }
 
+impl SliceType {
+    pub fn from_kind_id(kind_id: u16) -> Self {
+        match kind_id {
+            kw!(":") => SliceType::Normal,
+            kw!("+:") => SliceType::PartSelectUp,
+            kw!("-:") => SliceType::PartSelectDown,
+            _ => unreachable!(),
+        }
+    }
+    pub fn op_text(&self) -> &'static str {
+        match self {
+            SliceType::Normal => ":",
+            SliceType::PartSelectUp => "+:",
+            SliceType::PartSelectDown => "-:",
+        }
+    }
+}
+impl core::fmt::Display for SliceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.op_text())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GenerativeKind {
     PlainGenerative,
@@ -840,17 +863,37 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 cursor.field(field!("slice"));
                 cursor.go_down(kind!("slice"), |cursor| {
                     cursor.field(field!("index_a"));
-                    let (expr_a, a_generative) = self.flatten_subexpr(cursor);
+                    let (idx_a, a_generative) = self.flatten_subexpr(cursor);
+
+                    cursor.field(field!("type"));
+                    let typ: SliceType = SliceType::from_kind_id(cursor.kind());
+
                     cursor.field(field!("index_b"));
-                    let (expr_b, b_generative) = self.flatten_subexpr(cursor);
+                    let (idx_b, b_generative) = self.flatten_subexpr(cursor);
                     let mut generative = a_generative;
                     generative.combine_with(b_generative);
 
                     (
-                        WireReferencePathElement::ArraySlice {
-                            idx_a: expr_a,
-                            idx_b: expr_b,
-                            bracket_span,
+                        match typ {
+                            SliceType::Normal => WireReferencePathElement::ArraySlice {
+                                idx_a,
+                                idx_b,
+                                bracket_span,
+                            },
+                            SliceType::PartSelectUp => {
+                                WireReferencePathElement::ArrayPartSelectUp {
+                                    idx_a,
+                                    width: idx_b,
+                                    bracket_span,
+                                }
+                            }
+                            SliceType::PartSelectDown => {
+                                WireReferencePathElement::ArrayPartSelectDown {
+                                    idx_a,
+                                    width: idx_b,
+                                    bracket_span,
+                                }
+                            }
                         },
                         generative,
                         bracket_span,
@@ -1091,6 +1134,16 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         WireReferencePathElement::ArraySlice {
                             idx_a,
                             idx_b,
+                            bracket_span: _,
+                        }
+                        | WireReferencePathElement::ArrayPartSelectDown {
+                            idx_a,
+                            width: idx_b,
+                            bracket_span: _,
+                        }
+                        | WireReferencePathElement::ArrayPartSelectUp {
+                            idx_a,
+                            width: idx_b,
                             bracket_span: _,
                         } => {
                             let idx_a_expr = self.instructions[*idx_a].unwrap_subexpression();

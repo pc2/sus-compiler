@@ -237,6 +237,16 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     idx_a,
                     idx_b,
                     bracket_span,
+                }
+                | WireReferencePathElement::ArrayPartSelectDown {
+                    idx_a,
+                    width: idx_b,
+                    bracket_span,
+                }
+                | WireReferencePathElement::ArrayPartSelectUp {
+                    idx_a,
+                    width: idx_b,
+                    bracket_span,
                 } => {
                     let idx_expr_a = self.working_on.instructions[*idx_a].unwrap_subexpression();
                     let idx_expr_b = self.working_on.instructions[*idx_b].unwrap_subexpression();

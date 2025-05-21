@@ -92,8 +92,25 @@ impl GenerationState<'_> {
                     idx_a,
                     idx_b,
                     bracket_span,
+                }
+                | WireReferencePathElement::ArrayPartSelectDown {
+                    idx_a,
+                    width: idx_b,
+                    bracket_span,
+                }
+                | WireReferencePathElement::ArrayPartSelectUp {
+                    idx_a,
+                    width: idx_b,
+                    bracket_span,
                 } => {
-                    let end = self.get_generation_integer(*idx_a)?;
+                    let start = self.get_generation_integer(*idx_a)?;
+                    let idx_b = self.get_generation_integer(*idx_b)?;
+                    let end = match path_elem {
+                        WireReferencePathElement::ArraySlice { .. } => idx_b,
+                        WireReferencePathElement::ArrayPartSelectDown { .. } => &(start - idx_b),
+                        WireReferencePathElement::ArrayPartSelectUp { .. } => &(start + idx_b),
+                        _ => unreachable!(),
+                    };
                     let Some(end) = usize::try_from(end).ok() else {
                         return Err((
                             bracket_span.inner_span(),
@@ -101,7 +118,6 @@ impl GenerationState<'_> {
                         ));
                     };
 
-                    let start = self.get_generation_integer(*idx_b)?;
                     let Some(start) = usize::try_from(start).ok() else {
                         return Err((
                             bracket_span.inner_span(),
@@ -250,7 +266,7 @@ fn array_slice(
             return Err((
                 span.inner_span(),
                 format!(
-                    "Index {idx} is out of bounds for this array of size {}",
+                    "Index {idx} would be out of bounds for this array of size {}",
                     array_len
                 ),
             ));
@@ -538,6 +554,16 @@ impl InstantiationContext<'_, '_> {
                     idx_a,
                     idx_b,
                     bracket_span,
+                }
+                | WireReferencePathElement::ArrayPartSelectDown {
+                    idx_a,
+                    width: idx_b,
+                    bracket_span,
+                }
+                | WireReferencePathElement::ArrayPartSelectUp {
+                    idx_a,
+                    width: idx_b,
+                    bracket_span,
                 } => {
                     let idx_wire_a = self.get_wire_or_constant_as_wire(*idx_a, domain)?;
                     self.type_substitutor.unify_report_error(
@@ -554,10 +580,29 @@ impl InstantiationContext<'_, '_> {
                         bracket_span.inner_span(),
                         "Caught by typecheck",
                     );
-                    preamble.push(RealWirePathElem::ArraySlice {
-                        span: *bracket_span,
-                        idx_a_wire: idx_wire_a,
-                        idx_b_wire: idx_wire_b,
+                    preamble.push(match v {
+                        WireReferencePathElement::ArraySlice { .. } => {
+                            RealWirePathElem::ArraySlice {
+                                span: *bracket_span,
+                                idx_a_wire: idx_wire_a,
+                                idx_b_wire: idx_wire_b,
+                            }
+                        }
+                        WireReferencePathElement::ArrayPartSelectDown { .. } => {
+                            RealWirePathElem::ArrayPartSelectDown {
+                                span: *bracket_span,
+                                idx_a_wire: idx_wire_a,
+                                width_wire: idx_wire_b,
+                            }
+                        }
+                        WireReferencePathElement::ArrayPartSelectUp { .. } => {
+                            RealWirePathElem::ArrayPartSelectUp {
+                                span: *bracket_span,
+                                idx_a_wire: idx_wire_a,
+                                width_wire: idx_wire_b,
+                            }
+                        }
+                        _ => unreachable!(),
                     });
                 }
             }
@@ -1045,12 +1090,39 @@ impl InstantiationContext<'_, '_> {
                     idx_a,
                     idx_b,
                     bracket_span,
+                }
+                | &WireReferencePathElement::ArrayPartSelectDown {
+                    idx_a,
+                    width: idx_b,
+                    bracket_span,
+                }
+                | &WireReferencePathElement::ArrayPartSelectUp {
+                    idx_a,
+                    width: idx_b,
+                    bracket_span,
                 } => {
                     let idx_a = self.generation_state.get_generation_integer(idx_a)?;
                     let idx_b = self.generation_state.get_generation_integer(idx_b)?;
-
+                    let idx_end = match path_elem {
+                        &WireReferencePathElement::ArraySlice {
+                            idx_a: _,
+                            idx_b: _,
+                            bracket_span: _,
+                        } => idx_b,
+                        &WireReferencePathElement::ArrayPartSelectDown {
+                            idx_a: _,
+                            width: _,
+                            bracket_span: _,
+                        } => &(idx_a - idx_b),
+                        &WireReferencePathElement::ArrayPartSelectUp {
+                            idx_a: _,
+                            width: _,
+                            bracket_span: _,
+                        } => &(idx_a + idx_b),
+                        _ => unreachable!(),
+                    };
                     Value::Array(
-                        array_slice(&mut work_on_value, idx_a, idx_b, bracket_span)?.clone(),
+                        array_slice(&mut work_on_value, idx_a, idx_end, bracket_span)?.clone(),
                     )
                 }
             }
