@@ -31,7 +31,9 @@ pub enum TargetLanguage {
 #[derive(Debug)]
 pub struct ConfigStruct {
     pub use_lsp: bool,
+    #[allow(unused)]
     pub lsp_debug_mode: bool,
+    #[allow(unused)]
     pub lsp_port: u16,
     pub codegen: bool,
     /// Enable debugging printouts and figures

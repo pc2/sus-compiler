@@ -303,6 +303,10 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
             PhantomData,
         )
     }
+    pub fn free_reservation(&mut self, UUID(uuid, _): UUID<IndexMarker>) {
+        assert!(self.data[uuid].is_none());
+        self.free_slots.push(uuid);
+    }
     pub fn revert_to_reservation(&mut self, UUID(uuid, _): UUID<IndexMarker>) {
         assert!(self.data[uuid].is_some());
         self.data[uuid] = None;
@@ -352,6 +356,15 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
         self.iter()
             .find(|(id, v)| predicate(*id, v))
             .map(|(id, _)| id)
+    }
+    #[track_caller]
+    pub fn get2_mut(
+        &mut self,
+        UUID(uuid_a, _): UUID<IndexMarker>,
+        UUID(uuid_b, _): UUID<IndexMarker>,
+    ) -> Option<(&mut T, &mut T)> {
+        get2_mut(&mut self.data, uuid_a, uuid_b)
+            .map(|(a, b)| (a.as_mut().unwrap(), b.as_mut().unwrap()))
     }
 }
 

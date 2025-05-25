@@ -135,11 +135,6 @@ impl ConcreteType {
             _other => todo!("Other Named Structs are not implemented yet"),
         }
     }
-    /// Returns the inclusive bounds of an int. An int #(MIN: 0, MAX: 15) will return (0, 14)
-    pub fn unwrap_integer_bounds(&self) -> (IBig, IBig) {
-        let [min, max] = self.unwrap_named().template_args.cast_to_int_array();
-        (min.clone(), max - 1)
-    }
 }
 
 fn bits_negative(value: &IBig) -> u64 {

@@ -4,7 +4,7 @@ use std::{collections::HashMap, rc::Rc};
 use crate::debug::SpanDebugger;
 use crate::errors::CompileError;
 use crate::instantiation::unique_names::UniqueNames;
-use crate::instantiation::{GenerationState, InstantiationContext, SubModuleOrWire};
+use crate::instantiation::{InstantiationContext, SubModuleOrWire};
 use crate::typing::concrete_type::ConcreteGlobalReference;
 
 use crate::prelude::*;

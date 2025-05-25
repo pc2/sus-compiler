@@ -4,7 +4,8 @@ use ibig::IBig;
 
 use crate::flattening::{BinaryOperator, UnaryOperator};
 
-use crate::typing::concrete_type::ConcreteType;
+use crate::typing::concrete_type::{ConcreteTemplateArg, ConcreteType};
+use crate::typing::set_unifier::Unifyable;
 
 /// Top type for any kind of compiletime value while executing.
 ///
@@ -188,5 +189,41 @@ impl ConcreteType {
                 Value::Array(arr)
             }
         }
+    }
+}
+
+impl From<IBig> for Value {
+    fn from(value: IBig) -> Self {
+        Value::Integer(value)
+    }
+}
+
+impl From<bool> for Value {
+    fn from(value: bool) -> Self {
+        Value::Bool(value)
+    }
+}
+
+impl From<Vec<Value>> for Value {
+    fn from(value: Vec<Value>) -> Self {
+        Value::Array(value)
+    }
+}
+
+impl From<IBig> for ConcreteTemplateArg {
+    fn from(value: IBig) -> Self {
+        ConcreteTemplateArg::Value(Unifyable::Set(Value::Integer(value)))
+    }
+}
+
+impl From<bool> for ConcreteTemplateArg {
+    fn from(value: bool) -> Self {
+        ConcreteTemplateArg::Value(Unifyable::Set(Value::Bool(value)))
+    }
+}
+
+impl From<Vec<Value>> for ConcreteTemplateArg {
+    fn from(value: Vec<Value>) -> Self {
+        ConcreteTemplateArg::Value(Unifyable::Set(Value::Array(value)))
     }
 }

@@ -407,7 +407,7 @@ impl SubModule {
                     return None;
                 };
 
-                if let Some(Value::Integer(num)) = v.get_substitution(unifier) {
+                if let Some(Value::Integer(num)) = unifier.get_substitution(v) {
                     i64::try_from(num).ok()
                 } else {
                     None

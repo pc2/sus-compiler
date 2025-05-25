@@ -3,8 +3,8 @@ use crate::prelude::*;
 
 use crate::typing::abstract_type::{AbstractInnerType, PeanoType};
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg};
+use crate::typing::set_unifier::Unifyable;
 use crate::typing::template::{Parameter, TVec, TemplateKind};
-use crate::typing::type_inference::Unifyable;
 use crate::typing::written_type::WrittenType;
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
@@ -298,7 +298,7 @@ impl Module {
         let mut spans_print = Vec::new();
         for (id, inst) in &self.link_info.instructions {
             println!("    {id:?}: {inst:?}");
-            let span = self.get_instruction_span(id);
+            let span = self.link_info.get_instruction_span(id);
             spans_print.push((format!("{id:?}"), span.as_range()));
         }
         pretty_print_many_spans(file_data, &spans_print);

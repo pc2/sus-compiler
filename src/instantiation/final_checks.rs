@@ -2,7 +2,7 @@
 
 use crate::{
     let_unwrap,
-    typing::{concrete_type::ConcreteType, type_inference::Unifyable},
+    typing::{concrete_type::ConcreteType, set_unifier::Unifyable},
 };
 
 use super::{InstantiationContext, RealWireDataSource, RealWirePathElem};
@@ -33,7 +33,7 @@ impl InstantiationContext<'_, '_> {
         }
     }
     pub fn check_array_accesses(&self) {
-        for (_id, w) in &self.wires {
+        for (_id, w) in &*self.wires {
             match &w.source {
                 RealWireDataSource::Select { root, path } => {
                     let from = &self.wires[*root];

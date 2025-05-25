@@ -2,9 +2,9 @@ use ibig::IBig;
 
 use super::{
     abstract_type::AbstractRankedType, concrete_type::ConcreteTemplateArg,
-    written_type::WrittenType,
+    value_unifier::UnifyableValue, written_type::WrittenType,
 };
-use crate::{let_unwrap, prelude::*, typing::type_inference::Unifyable, value::Value};
+use crate::{let_unwrap, prelude::*, typing::set_unifier::Unifyable, value::Value};
 
 /// See [TVec]. All circumstances handling Templates need to handle both Types and Values.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -196,6 +196,9 @@ pub fn for_each_generative_input_in_template_args(
 }
 
 impl TVec<ConcreteTemplateArg> {
+    pub fn cast_to_unifyable_array<const N: usize>(&self) -> [&UnifyableValue; N] {
+        self.cast_to_array().map(|v| v.unwrap_value())
+    }
     pub fn cast_to_int_array<const N: usize>(&self) -> [&IBig; N] {
         self.cast_to_array().map(|v| {
             let_unwrap!(TemplateKind::Value(Unifyable::Set(Value::Integer(i))), v);

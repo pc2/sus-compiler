@@ -6,13 +6,15 @@ mod unique_names;
 
 use unique_names::UniqueNames;
 
+use crate::latency::CALCULATE_LATENCY_LATER;
+use crate::linker::LinkInfo;
 use crate::prelude::*;
-use crate::typing::value_unifier::{UnifyableValue, ValueUnifier};
+use crate::typing::value_unifier::{UnifyableValue, UnifyableValueAlloc};
 
 use std::cell::OnceCell;
 use std::rc::Rc;
 
-use crate::flattening::{BinaryOperator, Module, UnaryOperator};
+use crate::flattening::{BinaryOperator, Module, Port, UnaryOperator};
 use crate::{errors::ErrorStore, value::Value};
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
@@ -49,12 +51,12 @@ pub enum RealWireDataSource {
     },
     UnaryOp {
         op: UnaryOperator,
-        rank: usize,
+        rank: Vec<UnifyableValue>,
         right: WireID,
     },
     BinaryOp {
         op: BinaryOperator,
-        rank: usize,
+        rank: Vec<UnifyableValue>,
         left: WireID,
         right: WireID,
     },
@@ -87,6 +89,11 @@ pub struct RealWire {
     pub specified_latency: i64,
     /// The computed latencies after latency counting
     pub absolute_latency: i64,
+}
+impl RealWire {
+    fn get_span(&self, link_info: &LinkInfo) -> Span {
+        link_info.instructions[self.original_instruction].get_span()
+    }
 }
 
 /// See [SubModule]
@@ -181,15 +188,6 @@ impl SubModuleOrWire {
     }
 }
 
-/// Every [crate::flattening::Instruction] has an associated value (See [SubModuleOrWire]).
-/// They are either what this local name is currently referencing (either a wire instance or a submodule instance).
-/// Or in the case of Generative values, the current value in the generative variable.
-#[derive(Debug)]
-struct GenerationState<'fl> {
-    generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
-    md: &'fl Module,
-}
-
 /// Runtime conditions applied to a [crate::flattening::Write]
 ///
 /// ```sus
@@ -274,24 +272,63 @@ impl ForEachContainedWire for RealWireDataSource {
     }
 }
 
-/// As with other contexts, this is the shared state we're lugging around while executing & typechecking a module.
-pub struct InstantiationContext<'fl, 'l> {
-    pub name: String,
-    pub wires: FlatAlloc<RealWire, WireIDMarker>,
-    pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+struct Executed {
+    wires: FlatAlloc<RealWire, WireIDMarker>,
+    submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+    type_substitutor: UnifyableValueAlloc,
+    generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
+    execution_status: Result<(), (Span, String)>,
+}
 
-    pub type_substitutor: ValueUnifier,
-    /// Used for Execution
-    generation_state: GenerationState<'fl>,
-    unique_name_producer: UniqueNames,
-    condition_stack: Vec<ConditionStackElem>,
+struct Typechecked {
+    wires: FlatAlloc<RealWire, WireIDMarker>,
+    submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+    generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
+    errors: ErrorStore,
+}
 
-    pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
-    pub errors: ErrorCollector<'l>,
+impl Typechecked {
+    fn make_interface(
+        &self,
+        ports: &FlatAlloc<Port, PortIDMarker>,
+    ) -> FlatAlloc<Option<InstantiatedPort>, PortIDMarker> {
+        ports.map(|(_, port)| {
+            let port_decl_id = port.declaration_instruction;
+            if let SubModuleOrWire::Wire(wire_id) = &self.generation_state[port_decl_id] {
+                let wire = &self.wires[*wire_id];
+                Some(InstantiatedPort {
+                    wire: *wire_id,
+                    is_input: port.is_input,
+                    absolute_latency: CALCULATE_LATENCY_LATER,
+                    typ: wire.typ.clone(),
+                    domain: wire.domain,
+                })
+            } else {
+                None
+            }
+        })
+    }
 
-    pub working_on_global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
-    pub md: &'fl Module,
-    pub linker: &'l Linker,
+    fn to_instantiated_module(
+        self,
+        md: &Module,
+        linker: &Linker,
+        global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
+    ) -> InstantiatedModule {
+        let interface_ports = self.make_interface(&md.ports);
+        let name = global_ref.display(linker, false).to_string();
+        let mangled_name = mangle_name(&name);
+        InstantiatedModule {
+            global_ref,
+            name,
+            mangled_name,
+            errors: self.errors,
+            interface_ports,
+            wires: self.wires,
+            submodules: self.submodules,
+            generation_state: self.generation_state,
+        }
+    }
 }
 
 /// Mangle the module name for use in code generation
@@ -304,19 +341,4 @@ fn mangle_name(str: &str) -> String {
         result.push(if c.is_alphanumeric() { c } else { '_' });
     }
     result.trim_matches('_').to_owned()
-}
-
-impl InstantiationContext<'_, '_> {
-    fn extract(self) -> InstantiatedModule {
-        InstantiatedModule {
-            global_ref: self.working_on_global_ref,
-            mangled_name: mangle_name(&self.name),
-            name: self.name,
-            wires: self.wires,
-            submodules: self.submodules,
-            interface_ports: self.interface_ports,
-            generation_state: self.generation_state.generation_state,
-            errors: self.errors.into_storage(),
-        }
-    }
 }
