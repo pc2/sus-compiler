@@ -9,6 +9,8 @@ pub use crate::file_position::{BracketSpan, Span, SpanFile};
 pub use crate::linker::Linker;
 
 #[allow(unused_imports)]
+pub use crate::__debug_span;
+#[allow(unused_imports)]
 pub use crate::let_unwrap;
 #[allow(unused_imports)]
 pub use sus_proc_macro::__debug_breakpoint;

@@ -1,14 +1,20 @@
 use std::{
     cell::RefCell,
     ops::Range,
-    sync::{atomic::AtomicBool, Arc, LazyLock, Mutex},
+    sync::{
+        atomic::{AtomicBool, AtomicPtr},
+        Arc, LazyLock, Mutex,
+    },
     thread,
     time::{Duration, Instant},
 };
 
 use circular_buffer::CircularBuffer;
 
-use crate::{config::config, linker::FileData, prelude::Span, pretty_print_spans_in_reverse_order};
+use crate::{
+    config::config, linker::FileData, prelude::Span, pretty_print_span,
+    pretty_print_spans_in_reverse_order,
+};
 
 /// Many duplicates will be produced, and filtering them out in the code itself is inefficient. Therefore just keep a big buffer and deduplicate as needed
 const SPAN_TOUCH_HISTORY_SIZE: usize = 256;
@@ -28,6 +34,7 @@ struct SpanDebuggerStackElement {
 
 thread_local! {
     static DEBUG_STACK : RefCell<PerThreadDebugInfo> = const { RefCell::new(PerThreadDebugInfo{debug_stack: Vec::new(), recent_debug_options: CircularBuffer::new()}) };
+    static MOST_RECENT_FILE_DATA: std::sync::atomic::AtomicPtr<FileData> = const {AtomicPtr::new(std::ptr::null_mut())}
 }
 
 /// Register a [crate::file_position::Span] for potential printing by [PanicGuardSpanPrinter] on panic.
@@ -63,6 +70,19 @@ fn print_most_recent_spans(file_data: &FileData) {
         println!("Panic unwinding. Printing the last {} spans. BEWARE: These spans may not correspond to this file, thus incorrect spans are possible!", spans_to_print.len());
         pretty_print_spans_in_reverse_order(file_data, spans_to_print);
     });
+}
+
+#[allow(unused)]
+pub fn debug_print_span(span: Span) {
+    MOST_RECENT_FILE_DATA.with(|ptr| {
+        let ptr = ptr.load(std::sync::atomic::Ordering::SeqCst);
+        if ptr.is_null() {
+            eprintln!("No FileData registered!");
+        } else {
+            let fd: &FileData = unsafe { &*ptr };
+            pretty_print_span(fd, span.as_range());
+        }
+    })
 }
 
 /// Print the last [NUM_SPANS_TO_PRINT] touched spans on panic to aid in debugging
@@ -106,6 +126,13 @@ fn print_stack_top(enter_exit: &str) {
 
 impl<'text> SpanDebugger<'text> {
     pub fn new(stage: &'static str, global_obj_name: &str, file_data: &'text FileData) -> Self {
+        MOST_RECENT_FILE_DATA.with(|ptr| {
+            let file_data = file_data as *const FileData;
+            ptr.store(
+                file_data as *mut FileData,
+                std::sync::atomic::Ordering::SeqCst,
+            )
+        });
         let context = format!("{stage} {global_obj_name}");
         let config = config();
 
@@ -252,4 +279,20 @@ impl Drop for OutOfTimeKiller {
     fn drop(&mut self) {
         self.alive.store(false, std::sync::atomic::Ordering::SeqCst);
     }
+}
+
+#[macro_export]
+macro_rules! __debug_span {
+    ($val:expr $(,)?) => {
+        if $crate::debug::debugging_enabled() {
+            let tmp = $val;
+            std::eprintln!("[{}:{}:{}] {}:",
+                std::file!(), std::line!(), std::column!(), std::stringify!($val));
+
+            $crate::debug::debug_print_span(tmp);
+        }
+    };
+    ($($val:expr),+ $(,)?) => {
+        ($($crate::__debug_span!($val)),+,)
+    };
 }
