@@ -11,7 +11,6 @@ use crate::prelude::*;
 use crate::typing::value_unifier::ValueUnifierStore;
 use crate::{alloc::zip_eq, typing::value_unifier::ValueUnifier};
 
-use crate::typing::type_inference::DelayedConstraintStatus;
 use crate::value::Value;
 
 use ibig::IBig;
@@ -347,10 +346,7 @@ impl ModuleTypingContext<'_> {
         }
     }
 
-    pub fn infer_parameters_for_latencies<'inst>(
-        &'inst self,
-        unifier: &mut ValueUnifier<'inst>,
-    ) -> DelayedConstraintStatus {
+    pub fn infer_parameters_for_latencies<'inst>(&'inst self, unifier: &mut ValueUnifier<'inst>) {
         let mut problem = LatencyCountingProblem::new(self, &unifier.store);
         let fanins = problem.make_fanins();
 
@@ -370,8 +366,6 @@ impl ModuleTypingContext<'_> {
             &mut problem.inference_variables,
         );
 
-        let mut any_new_values = false;
-        let mut all_new_values = true;
         for (_, var) in problem.inference_variables.into_iter() {
             if let Some(inferred_value) = var.get() {
                 let (submod_id, arg_id) = var.back_reference;
@@ -382,17 +376,7 @@ impl ModuleTypingContext<'_> {
                         Value::Integer(IBig::from(inferred_value)),
                     )
                     .is_ok());
-
-                any_new_values = true;
-            } else {
-                all_new_values = false;
             }
-        }
-
-        match (any_new_values, all_new_values) {
-            (_, true) => DelayedConstraintStatus::Resolved,
-            (true, false) => DelayedConstraintStatus::Progress,
-            (false, false) => DelayedConstraintStatus::NoProgress,
         }
     }
 
