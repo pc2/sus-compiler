@@ -418,7 +418,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     span,
                     format!(
                         "Could not finalize this type, some parameters were still unknown: {}",
-                        w.typ.display(&self.linker.types)
+                        w.typ.display(&self.linker.types, true)
                     ),
                 );
             }

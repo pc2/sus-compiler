@@ -151,6 +151,7 @@ impl Display for PeanoType {
 pub struct ConcreteTypeDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
     inner: &'a ConcreteType,
     linker_types: &'a T,
+    use_newlines: bool,
 }
 
 impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_, T> {
@@ -160,12 +161,16 @@ impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_
                 target_link_info: &self.linker_types[global_ref.id].link_info,
                 template_args: &global_ref.template_args,
                 linker_types: self.linker_types,
-                use_newlines: true,
+                use_newlines: self.use_newlines,
             }
             .fmt(f),
             ConcreteType::Array(arr_box) => {
                 let (elem_typ, arr_size) = arr_box.deref();
-                write!(f, "{}[{arr_size}]", elem_typ.display(self.linker_types))
+                write!(
+                    f,
+                    "{}[{arr_size}]",
+                    elem_typ.display(self.linker_types, self.use_newlines)
+                )
             }
         }
     }
@@ -175,10 +180,12 @@ impl ConcreteType {
     pub fn display<'a>(
         &'a self,
         linker_types: &'a impl Index<TypeUUID, Output = StructType>,
+        use_newlines: bool,
     ) -> impl Display + 'a {
         ConcreteTypeDisplay {
             inner: self,
             linker_types,
+            use_newlines,
         }
     }
 }
@@ -334,13 +341,16 @@ impl<'a, T: Index<TypeUUID, Output = StructType>> Display
             &self.target_link_info.template_parameters,
         ) {
             if !is_first {
-                f.write_char(',')?;
+                f.write_str(", ")?;
             }
             is_first = false;
             f.write_fmt(format_args!("{nl}{}: ", arg_in_target.name))?;
             match arg {
                 TemplateKind::Type(typ_arg) => {
-                    f.write_fmt(format_args!("type {}", typ_arg.display(self.linker_types)))?;
+                    f.write_fmt(format_args!(
+                        "type {}",
+                        typ_arg.display(self.linker_types, self.use_newlines)
+                    ))?;
                 }
                 TemplateKind::Value(v) => match v {
                     Unifyable::Set(value) => f.write_fmt(format_args!("{value}"))?,

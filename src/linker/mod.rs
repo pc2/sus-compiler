@@ -120,7 +120,9 @@ pub struct LinkInfo {
 
 impl LinkInfo {
     pub fn get_full_name(&self) -> String {
-        format!("::{}", self.name)
+        // Feelin iffy about namespaces, so just return self.name
+        self.name.clone()
+        // format!("::{}", self.name)
     }
     pub fn get_span_file(&self) -> SpanFile {
         (self.name_span, self.file)

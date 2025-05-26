@@ -20,8 +20,8 @@ impl<'l> ModuleTypingContext<'l> {
                 span,
                 format!(
                     "Typecheck error: Found {}, which is not a subtype of the expected type {}",
-                    found.display(&self.linker.types),
-                    expected.display(&self.linker.types)
+                    found.display(&self.linker.types, true),
+                    expected.display(&self.linker.types, true)
                 ),
             ))
         } else {
