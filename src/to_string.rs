@@ -160,7 +160,7 @@ impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_
                 target_link_info: &self.linker_types[global_ref.id].link_info,
                 template_args: &global_ref.template_args,
                 linker_types: self.linker_types,
-                newline: "\n",
+                use_newlines: true,
             }
             .fmt(f),
             ConcreteType::Array(arr_box) => {
@@ -310,39 +310,47 @@ pub struct ConcreteGlobalReferenceDisplay<'a, T: Index<TypeUUID, Output = Struct
     target_link_info: &'a LinkInfo,
     linker_types: &'a T,
     /// If there should be newlines: "\n", otherwise ""
-    newline: &'static str,
+    use_newlines: bool,
 }
 
 impl<'a, T: Index<TypeUUID, Output = StructType>> Display
     for ConcreteGlobalReferenceDisplay<'a, T>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let nl = self.newline;
+        let nl = if self.use_newlines { "\n    " } else { "" };
         assert!(self.template_args.len() == self.target_link_info.template_parameters.len());
         let object_full_name = self.target_link_info.get_full_name();
         f.write_str(&object_full_name)?;
         if self.template_args.is_empty() {
-            return f.write_str(" #()");
+            //return f.write_str(" #()");
+            return Ok(());
         } else {
             f.write_str(" #(")?;
         }
 
+        let mut is_first = true;
         for (_id, arg, arg_in_target) in zip_eq(
             self.template_args,
             &self.target_link_info.template_parameters,
         ) {
-            f.write_fmt(format_args!("{nl}    {}: ", arg_in_target.name))?;
+            if !is_first {
+                f.write_char(',')?;
+            }
+            is_first = false;
+            f.write_fmt(format_args!("{nl}{}: ", arg_in_target.name))?;
             match arg {
                 TemplateKind::Type(typ_arg) => {
-                    f.write_fmt(format_args!("type {},", typ_arg.display(self.linker_types)))?;
+                    f.write_fmt(format_args!("type {}", typ_arg.display(self.linker_types)))?;
                 }
                 TemplateKind::Value(v) => match v {
-                    Unifyable::Set(value) => f.write_fmt(format_args!("{value},"))?,
+                    Unifyable::Set(value) => f.write_fmt(format_args!("{value}"))?,
                     Unifyable::Unknown(_) => f.write_str("/* Could not infer */")?,
                 },
             }
         }
-        f.write_str(nl)?;
+        if self.use_newlines {
+            f.write_str("\n")?;
+        }
         f.write_char(')')
     }
 }
@@ -357,7 +365,7 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
             template_args: &self.template_args,
             target_link_info,
             linker_types: &linker.types,
-            newline: if use_newlines { "\n" } else { "" },
+            use_newlines,
         }
     }
 }

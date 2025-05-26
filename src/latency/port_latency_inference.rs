@@ -6,7 +6,7 @@ use crate::{
     typing::{
         abstract_type::PeanoType,
         template::{TVec, TemplateKind},
-        value_unifier::ValueUnifier,
+        value_unifier::ValueUnifierStore,
     },
     value::Value,
 };
@@ -368,7 +368,7 @@ impl SubModule {
         &self,
         linker: &Linker,
         sm_id: SubModuleID,
-        unifier: &ValueUnifier,
+        unifier: &ValueUnifierStore,
         latency_inference_variables: &mut FlatAlloc<
             ValueToInfer<(SubModuleID, TemplateID)>,
             InferenceVarIDMarker,

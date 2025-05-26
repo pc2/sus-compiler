@@ -56,6 +56,12 @@ impl ErrorStore {
             did_error: false,
         }
     }
+    pub fn new_did_error() -> ErrorStore {
+        ErrorStore {
+            errors: Vec::new(),
+            did_error: true,
+        }
+    }
 
     pub fn take(&mut self) -> Self {
         std::mem::replace(self, ErrorStore::new())

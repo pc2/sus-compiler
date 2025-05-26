@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use ibig::IBig;
+use sus_proc_macro::get_builtin_type;
 
 use crate::flattening::{BinaryOperator, UnaryOperator};
 
@@ -120,6 +121,25 @@ impl Value {
             panic!("{:?} is not an array!", self)
         };
         arr
+    }
+
+    /// Requires `typ` to be fully substituted
+    ///
+    /// Allows the existense of [Value::Unset]
+    pub fn is_of_type(&self, typ: &ConcreteType) -> bool {
+        match self {
+            Value::Bool(_) => typ.unwrap_named().id == get_builtin_type!("bool"),
+            Value::Integer(v) => {
+                let (min, max) = typ.unwrap_integer_bounds();
+                min <= v && max >= v
+            }
+            Value::Array(values) => {
+                let (content, sz) = typ.unwrap_array();
+                values.len() == sz.unwrap_int::<usize>()
+                    && values.iter().all(|v| v.is_of_type(content))
+            }
+            Value::Unset => true,
+        }
     }
 }
 

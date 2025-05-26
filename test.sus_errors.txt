@@ -1053,6 +1053,25 @@ Error: Typing Error: write wire access expects a ::int #(
     MAX: 1,
 )
 ────╯
+Error: Typing Error: binary output expects a ::int #(
+    MIN: 0,
+    MAX: 100,
+) but was given a ::int #(
+    MIN: 1,
+    MAX: 2,
+)
+    ╭─[ test.sus:45:8 ]
+    │
+ 45 │     num = (cur + prev) % 100
+    │           ─────────┬────────  
+    │                    ╰────────── Typing Error: binary output expects a ::int #(
+    MIN: 0,
+    MAX: 100,
+) but was given a ::int #(
+    MIN: 1,
+    MAX: 2,
+)
+────╯
 Error: This compile-time constant contains Unset
     ╭─[ test.sus:53:8 ]
     │
@@ -1081,30 +1100,23 @@ Warning: Unused Variable: This variable does not affect the output ports of this
     │              ─┬  
     │               ╰── Unused Variable: This variable does not affect the output ports of this module
 ────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
+Error: Typing Error: binary output expects a ::int #(
+    MIN: 0,
+    MAX: 100,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
 )
-    ╭─[ test.sus:81:70 ]
-    │
- 81 │     interface Accumulator : int#(MIN:0, MAX: 100) term, bool done -> int total
-    │                                                                      ────┬────  
-    │                                                                          ╰────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-    ╭─[ test.sus:85:5 ]
+    ╭─[ test.sus:85:19 ]
     │
  85 │     int new_tot = (tot + term) % 100
-    │     ─────┬─────  
-    │          ╰─────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
+    │                   ─────────┬────────  
+    │                            ╰────────── Typing Error: binary output expects a ::int #(
+    MIN: 0,
+    MAX: 100,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
 )
 ────╯
 Error: This compile-time constant contains Unset
@@ -2006,83 +2018,6 @@ Try specifying an explicit latency or rework the module to remove this ambiguity
      │                                                                                                              ╰── Cannot determine port latency. Options are 0 and -1
 Try specifying an explicit latency or rework the module to remove this ambiguity
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:315:87 ]
-     │
- 315 │     interface determinable_because_no_input_output_ports : int#(MIN:0, MAX: 100) a -> int x
-     │                                                                                       ──┬──  
-     │                                                                                         ╰──── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:317:5 ]
-     │
- 317 │     int t = a_d
-     │     ──┬──  
-     │       ╰──── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:319:6 ]
-     │
- 319 │     reg int t_d = t
-     │         ───┬───  
-     │            ╰───── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:320:9 ]
-     │
- 320 │     x = t_d + a_dd
-     │         ─────┬────  
-     │              ╰────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) + ::int #(
-    MIN: 0,
-    MAX: 100,
-)
-     ╭─[ test.sus:320:9 ]
-     │
- 320 │     x = t_d + a_dd
-     │         ─────┬────  
-     │              ╰────── Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) + ::int #(
-    MIN: 0,
-    MAX: 100,
-)
-─────╯
 Error: Conflicting specified latency
 
 a'0
@@ -2120,6 +2055,25 @@ state_reg'1
 -> state_reg'2 (+1)
 
 Which conflicts with the starting latency
+─────╯
+Error: Typing Error: binary output expects a ::int #(
+    MIN: 0,
+    MAX: 100,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:337:18 ]
+     │
+ 337 │     reg state_reg = state_reg + a
+     │                     ──────┬──────  
+     │                           ╰──────── Typing Error: binary output expects a ::int #(
+    MIN: 0,
+    MAX: 100,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
 ─────╯
 Error: Index out of bounds. Array is of size 20, but the index is 20.
      ╭─[ test.sus:352:28 ]
@@ -3540,19 +3494,6 @@ _1_i'0
 
 Which conflicts with the starting latency
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:363:9 ]
-     │
- 363 │     test = module_taking_time(test+a)
-     │            ─────────┬────────  
-     │                     ╰────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
 Error: This instruction is part of a net-positive latency cycle of +5
 
 _1_i'0
@@ -3592,30 +3533,23 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
+Error: Typing Error: binary output expects a ::int #(
+    MIN: 0,
+    MAX: 100,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
 )
-     ╭─[ test.sus:382:55 ]
-     │
- 382 │     interface good_cycle : int#(MIN:0, MAX: 100) a -> int r
-     │                                                       ──┬──  
-     │                                                         ╰──── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:386:2 ]
+     ╭─[ test.sus:386:17 ]
      │
  386 │     int new_test = test + a
-     │     ──────┬─────  
-     │           ╰─────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
+     │                    ────┬───  
+     │                        ╰───── Typing Error: binary output expects a ::int #(
+    MIN: 0,
+    MAX: 100,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
 )
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
@@ -3631,6 +3565,25 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  394 │     state int loop
      │               ──┬─  
      │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Typing Error: binary output expects a ::int #(
+    MIN: 0,
+    MAX: 100,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:396:9 ]
+     │
+ 396 │     loop = loop + i
+     │            ────┬───  
+     │                ╰───── Typing Error: binary output expects a ::int #(
+    MIN: 0,
+    MAX: 100,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:400:60 ]
@@ -3668,6 +3621,44 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │               ──┬─  
      │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
+Error: Typing Error: binary output expects a ::int #(
+    MIN: 0,
+    MAX: 199,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:403:9 ]
+     │
+ 403 │     loop = loop + i + i2
+     │            ──────┬──────  
+     │                  ╰──────── Typing Error: binary output expects a ::int #(
+    MIN: 0,
+    MAX: 199,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
+Error: Typing Error: binary output expects a ::int #(
+    MIN: 1,
+    MAX: 2,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:410:9 ]
+     │
+ 410 │     loop = loop + 1
+     │            ────┬───  
+     │                ╰───── Typing Error: binary output expects a ::int #(
+    MIN: 1,
+    MAX: 2,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+─────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'o'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
@@ -3682,6 +3673,25 @@ If you do not wish to change your design, then 'virtually' connect this port to 
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
+─────╯
+Error: Typing Error: binary output expects a ::int #(
+    MIN: 1,
+    MAX: 2,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
+     ╭─[ test.sus:418:9 ]
+     │
+ 418 │     loop = loop + 1
+     │            ────┬───  
+     │                ╰───── Typing Error: binary output expects a ::int #(
+    MIN: 1,
+    MAX: 2,
+) but was given a ::int #(
+    MIN: 0,
+    MAX: 1,
+)
 ─────╯
 Error: 'contains_submodule_submodule' conflicts with other declarations:
      ╭─[ test.sus:441:8 ]
@@ -3721,19 +3731,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │          ┬  
      │          ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:466:27 ]
-     │
- 466 │     interface fizz_buzz : int v -> int fb
-     │                           ──┬──  
-     │                             ╰──── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
 Error: Typing Error: write wire access expects a ::int #(
     MIN: 555,
     MAX: 556,
@@ -3770,82 +3767,6 @@ Error: Typing Error: write wire access expects a ::int #(
 ) but was given a ::int #(
     MIN: 888555,
     MAX: 888556,
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:471:14 ]
-     │
- 471 │     bool fizz = v % 3 == 0
-     │                 ──┬──  
-     │                   ╰──── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) % ::int #(
-    MIN: 3,
-    MAX: 4,
-)
-     ╭─[ test.sus:471:14 ]
-     │
- 471 │     bool fizz = v % 3 == 0
-     │                 ──┬──  
-     │                   ╰──── Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) % ::int #(
-    MIN: 3,
-    MAX: 4,
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:472:14 ]
-     │
- 472 │     bool buzz = v % 5 == 0
-     │                 ──┬──  
-     │                   ╰──── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) % ::int #(
-    MIN: 5,
-    MAX: 6,
-)
-     ╭─[ test.sus:472:14 ]
-     │
- 472 │     bool buzz = v % 5 == 0
-     │                 ──┬──  
-     │                   ╰──── Failed to Typecheck ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) = ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-) % ::int #(
-    MIN: 5,
-    MAX: 6,
 )
 ─────╯
 Error: Typing Error: write wire access expects a ::int #(
@@ -17142,19 +17063,6 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MAX: /* Could not infer */
 )
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[255]
-     ╭─[ test.sus:831:2 ]
-     │
- 831 │     tree_add #(WIDTH: SIZE) tr
-     │     ───────────┬───────────  
-     │                ╰───────────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[255]
-─────╯
 Error: Error instantiating submodule
      ╭─[ test.sus:831:2 ]
      │
@@ -17194,70 +17102,12 @@ Error: Could not fully instantiate ::replicate #(
     NUM_REPLS: 20,
 )
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:852:2 ]
-     │
- 852 │     replicate c
-     │     ────┬────  
-     │         ╰────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[30]
-     ╭─[ test.sus:852:2 ]
-     │
- 852 │     replicate c
-     │     ────┬────  
-     │         ╰────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[30]
-─────╯
-Error: Could not fully instantiate ::replicate #(
-    T: type ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-),
-    NUM_REPLS: /* Could not infer */
-)
-     ╭─[ test.sus:852:12 ]
-     │
- 852 │     replicate c
-     │               ┬  
-     │               ╰── Could not fully instantiate ::replicate #(
-    T: type ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-),
-    NUM_REPLS: /* Could not infer */
-)
-─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:854:6 ]
      │
  854 │     int val = 3
      │         ─┬─  
      │          ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[30]
-     ╭─[ test.sus:857:2 ]
-     │
- 857 │     int[30] out = c.result
-     │     ─────┬─────  
-     │          ╰─────── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[30]
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:857:10 ]
@@ -17645,19 +17495,6 @@ Error: Could not finalize this type, some parameters were still unknown: ::int #
     MIN: /* Could not infer */
     MAX: /* Could not infer */
 )
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[5]
-     ╭─[ test.sus:973:2 ]
-     │
- 973 │     TreeAdd adder
-     │     ───┬───  
-     │        ╰───── Could not finalize this type, some parameters were still unknown: ::int #(
-    MIN: /* Could not infer */
-    MAX: /* Could not infer */
-)[5]
 ─────╯
 Error: Error instantiating submodule
      ╭─[ test.sus:973:2 ]

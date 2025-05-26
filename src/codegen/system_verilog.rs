@@ -348,7 +348,7 @@ impl<'g> CodeGenerationContext<'g> {
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
 
                     let mut path = String::new();
-                    for n in 0_usize..*rank {
+                    for n in 0..rank.len() {
                         path.push_str(&format!("[_i{n}]"));
                         writeln!(self.program_text, "foreach ({wire_name}{path}) begin").unwrap();
                     }
@@ -361,7 +361,7 @@ impl<'g> CodeGenerationContext<'g> {
                     )
                     .unwrap();
 
-                    for _n in 0_usize..*rank {
+                    for _n in rank {
                         writeln!(self.program_text, "end").unwrap();
                     }
                 }
@@ -387,7 +387,7 @@ impl<'g> CodeGenerationContext<'g> {
 
                     let mut path = String::new();
 
-                    for n in 0_usize..*rank {
+                    for n in 0..rank.len() {
                         path.push_str(&format!("[_i{n}]"));
                         writeln!(self.program_text, "foreach ({wire_name}{path}) begin").unwrap();
                     }
@@ -401,7 +401,7 @@ impl<'g> CodeGenerationContext<'g> {
                     )
                     .unwrap();
 
-                    for _n in 0_usize..*rank {
+                    for _n in rank {
                         writeln!(self.program_text, "end").unwrap();
                     }
                 }

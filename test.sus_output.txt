@@ -582,6 +582,10 @@ Latency Counting make_tree_add
 Checking array accesses make_tree_add
 Instantiating use_replicate
 Concrete Typechecking use_replicate
+Instantiating replicate
+Concrete Typechecking replicate
+Latency Counting replicate
+Checking array accesses replicate
 Latency Counting use_replicate
 Checking array accesses use_replicate
 Instantiating use_permute

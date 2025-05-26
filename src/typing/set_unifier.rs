@@ -137,13 +137,25 @@ pub struct SetUnifierStore<T: Clone, IDMarker> {
     known_values: ArenaAllocator<KnownValue<T, UUID<IDMarker>>, KnownIDMarker>,
 }
 
+impl<T: Clone, IDMarker> SetUnifierStore<T, IDMarker> {
+    pub fn get_substitution<'v>(&'v self, val: &'v Unifyable<T, IDMarker>) -> Option<&'v T> {
+        match val {
+            Unifyable::Set(v) => Some(v),
+            Unifyable::Unknown(id) => match &self.known_values[self.ptrs[*id]] {
+                KnownValue::Unknown { .. } => None,
+                KnownValue::Known(new_v) => Some(new_v),
+            },
+        }
+    }
+}
+
 pub struct SetUnifier<'inst, T: Eq + Clone, IDMarker> {
     pub store: SetUnifierStore<T, IDMarker>,
     constraints: ArenaAllocator<Constraint<'inst, T, IDMarker>, ConstraintIDMarker>,
     constraints_ready_for_unification: Vec<Box<dyn FnOnce(&mut SetUnifier<T, IDMarker>) + 'inst>>,
 }
 impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, IDMarker> {
-    pub fn from_alloc<'l>(alloc: UnifyableAlloc<T, IDMarker>) -> Self {
+    pub fn from_alloc(alloc: UnifyableAlloc<T, IDMarker>) -> Self {
         let mut known_values = ArenaAllocator::new();
         let ptrs = alloc.ptrs.as_range().map(|id| {
             known_values.alloc(KnownValue::Unknown {
@@ -157,16 +169,20 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
             constraints_ready_for_unification: Vec::new(),
         }
     }
-    /// Executes all constraints (that become ready), then
-    /// Reports all errors that have built up to the 'inst ErrorCollector, and substitutes all values
-    pub fn execute(mut self) -> SetUnifierStore<T, IDMarker> {
+    /// Executes all constraints (that become ready). Returns `false` if no constraints were ready
+    pub fn execute_ready_constraints(&mut self) -> bool {
+        let at_least_one = !self.constraints_ready_for_unification.is_empty();
         while let Some(cstr) = self.constraints_ready_for_unification.pop() {
-            cstr(&mut self);
+            cstr(self);
         }
+        at_least_one
+    }
+
+    pub fn decomission(self) -> SetUnifierStore<T, IDMarker> {
         self.store
     }
 
-    pub fn notify_constraints(
+    fn notify_constraints(
         constraints: &mut ArenaAllocator<Constraint<'inst, T, IDMarker>, ConstraintIDMarker>,
         constraints_ready_for_unification: &mut Vec<
             Box<dyn FnOnce(&mut SetUnifier<T, IDMarker>) + 'inst>,
@@ -273,13 +289,13 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
     }
 
     /// If unification is with an incompatible target, then
-    pub fn set<'u>(&'u mut self, a: &'u Unifyable<T, IDMarker>, v: T) -> Result<(), &'u T> {
+    pub fn set(&mut self, a: &Unifyable<T, IDMarker>, v: T) -> Result<(), T> {
         match a {
             Unifyable::Set(k) => {
                 if k == &v {
                     Ok(())
                 } else {
-                    Err(k)
+                    Err(k.clone())
                 }
             }
             Unifyable::Unknown(var) => {
@@ -302,7 +318,7 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
                         if k == &v {
                             Ok(())
                         } else {
-                            Err(k)
+                            Err(k.clone())
                         }
                     }
                 }
@@ -314,7 +330,7 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
     pub fn add_constraint<'a>(
         &mut self,
         dependencies: impl IntoIterator<Item = &'a Unifyable<T, IDMarker>>,
-        f: impl FnOnce(&mut SetUnifier<T, IDMarker>) + 'inst,
+        f: impl FnOnce(&mut SetUnifier<'_, T, IDMarker>) + 'inst,
     ) where
         T: 'a,
         IDMarker: 'a,
@@ -368,16 +384,9 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
             f(self);
         }
     }
-
     /// To be used by [Self::add_constraint]
     pub fn unwrap_known<'v>(&'v self, val: &'v Unifyable<T, IDMarker>) -> &'v T {
-        match val {
-            Unifyable::Set(v) => v,
-            Unifyable::Unknown(id) => match &self.store.known_values[self.store.ptrs[*id]] {
-                KnownValue::Unknown { .. } => panic!("unwrap_known "),
-                KnownValue::Known(new_v) => new_v,
-            },
-        }
+        self.store.get_substitution(val).unwrap()
     }
 }
 
@@ -393,18 +402,28 @@ macro_rules! unifier_constraint {
 #[macro_export]
 macro_rules! unifier_constraint_ints {
     ($unifier:ident, [$($var:ident),+], $body:block) => {
-        $unifier.add_constraint([$($var),+], move |unifier| {
-            $(let $var = unifier.unwrap_known($var).unwrap_integer();)+
+        $unifier.add_constraint([$($var),+], move |$unifier| {
+            $(let $var = $unifier.unwrap_known($var).unwrap_integer();)+
             $body
         })
     };
 }
 
 pub trait FullySubstitutable<T: Clone, IDMarker> {
+    fn gather_all_substitutables<'slf>(
+        &'slf self,
+        gather_here: &mut Vec<&'slf Unifyable<T, IDMarker>>,
+    );
     fn fully_substitute(&mut self, substitutor: &SetUnifierStore<T, IDMarker>) -> bool;
 }
 
 impl<T: Clone, IDMarker> FullySubstitutable<T, IDMarker> for Unifyable<T, IDMarker> {
+    fn gather_all_substitutables<'slf>(
+        &'slf self,
+        gather_here: &mut Vec<&'slf Unifyable<T, IDMarker>>,
+    ) {
+        gather_here.push(self);
+    }
     fn fully_substitute(&mut self, substitutor: &SetUnifierStore<T, IDMarker>) -> bool {
         match self {
             Unifyable::Set(_) => true,
@@ -420,9 +439,7 @@ impl<T: Clone, IDMarker> FullySubstitutable<T, IDMarker> for Unifyable<T, IDMark
 }
 
 pub struct DelayedErrorCollector<'inst, T: Clone, IDMarker> {
-    failures: AppendOnlyVec<
-        Box<dyn FnOnce(&SetUnifierStore<T, IDMarker>, &ErrorCollector, &Linker) + 'inst>,
-    >,
+    failures: AppendOnlyVec<Box<dyn FnOnce(&SetUnifierStore<T, IDMarker>) + 'inst>>,
 }
 
 impl<'inst, T: Clone, IDMarker> Default for DelayedErrorCollector<'inst, T, IDMarker> {
@@ -437,22 +454,12 @@ impl<'inst, T: Clone, IDMarker> DelayedErrorCollector<'inst, T, IDMarker> {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn report<'l>(
-        self,
-        store: &SetUnifierStore<T, IDMarker>,
-        file: FileUUID,
-        linker: &'l Linker,
-    ) -> ErrorCollector<'l> {
-        let errors = ErrorCollector::new_empty(file, &linker.files);
+    pub fn report(self, store: &SetUnifierStore<T, IDMarker>) {
         for f in self.failures {
-            f(store, &errors, linker)
+            f(store)
         }
-        errors
     }
-    pub fn error(
-        &self,
-        f: impl FnOnce(&SetUnifierStore<T, IDMarker>, &ErrorCollector, &Linker) + 'inst,
-    ) {
+    pub fn error(&self, f: impl FnOnce(&SetUnifierStore<T, IDMarker>) + 'inst) {
         self.failures.push(Box::new(f));
     }
 }

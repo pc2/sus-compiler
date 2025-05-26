@@ -56,7 +56,7 @@ pub fn execute(
     Executed {
         wires: context.wires,
         submodules: context.submodules,
-        type_substitutor: context.type_substitutor,
+        type_var_alloc: context.type_substitutor,
         generation_state: context.generation_state.generation_state,
         execution_status,
     }
@@ -66,7 +66,7 @@ pub fn execute(
 struct ExecutionContext<'l> {
     wires: FlatAlloc<RealWire, WireIDMarker>,
     submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
-    type_substitutor: UnifyableValueAlloc,
+    type_substitutor: ValueUnifierAlloc,
 
     /// Used for Execution
     generation_state: GenerationState<'l>,
@@ -262,7 +262,7 @@ trait Concretizer {
 struct LocalTypeConcretizer<'substitutor, 'linker> {
     template_args: &'linker TVec<ConcreteTemplateArg>,
     generation_state: &'linker GenerationState<'linker>,
-    type_substitutor: &'substitutor mut UnifyableValueAlloc,
+    type_substitutor: &'substitutor mut ValueUnifierAlloc,
 }
 impl Concretizer for LocalTypeConcretizer<'_, '_> {
     fn get_type(&mut self, id: TemplateID) -> ConcreteType {
@@ -283,7 +283,7 @@ impl Concretizer for LocalTypeConcretizer<'_, '_> {
 struct SubModuleTypeConcretizer<'substitutor, 'linker> {
     submodule_template_args: &'linker TVec<ConcreteTemplateArg>,
     instructions: &'linker FlatAlloc<Instruction, FlatIDMarker>,
-    type_substitutor: &'substitutor mut UnifyableValueAlloc,
+    type_substitutor: &'substitutor mut ValueUnifierAlloc,
 }
 impl Concretizer for SubModuleTypeConcretizer<'_, '_> {
     fn get_type(&mut self, id: TemplateID) -> ConcreteType {
@@ -411,7 +411,7 @@ impl<'l> ExecutionContext<'l> {
         wr_typ: &WrittenType,
     ) -> ExecutionResult<ConcreteType> {
         let mut concretizer = LocalTypeConcretizer {
-            template_args: &self.working_on_template_args,
+            template_args: self.working_on_template_args,
             generation_state: &self.generation_state,
             type_substitutor: &mut self.type_substitutor,
         };
@@ -428,7 +428,7 @@ impl<'l> ExecutionContext<'l> {
     /// Failures as impossible as we don't need to read from [Self::generation_state]
     fn concretize_type_no_written_reference(&mut self, abs: &AbstractRankedType) -> ConcreteType {
         let mut concretizer = LocalTypeConcretizer {
-            template_args: &self.working_on_template_args,
+            template_args: self.working_on_template_args,
             generation_state: &self.generation_state,
             type_substitutor: &mut self.type_substitutor,
         };
@@ -438,7 +438,7 @@ impl<'l> ExecutionContext<'l> {
     ///
     /// Cannot fail, since we're not using [Self::generation_state]
     fn concretize_submodule_port_type(
-        type_substitutor: &mut UnifyableValueAlloc,
+        type_substitutor: &mut ValueUnifierAlloc,
         linker: &Linker,
         submodule_port: &Port,
         submodule_template_args: &TVec<ConcreteTemplateArg>,
@@ -813,7 +813,7 @@ impl<'l> ExecutionContext<'l> {
                 .concretize_type(
                     self.linker,
                     abs_typ,
-                    &self.working_on_template_args,
+                    self.working_on_template_args,
                     &mut self.type_substitutor,
                 )
                 .map_err(|msg| (const_span, msg))?,
@@ -1281,12 +1281,12 @@ impl<'l> ExecutionContext<'l> {
                     let port_map = sub_module.ports.map(|_| None);
                     let interface_call_sites = sub_module.interfaces.map(|_| Vec::new());
 
-                    let concrete_ref = self.execute_global_ref(&submodule.module_ref)?;
+                    let refers_to = self.execute_global_ref(&submodule.module_ref)?;
 
                     SubModuleOrWire::SubModule(self.submodules.alloc(SubModule {
                         original_instruction,
                         instance: OnceCell::new(),
-                        refers_to: Rc::new(concrete_ref),
+                        refers_to,
                         port_map,
                         interface_call_sites,
                         name: self.unique_name_producer.get_unique_name(name_origin),

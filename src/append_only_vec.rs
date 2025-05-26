@@ -34,9 +34,9 @@ impl<T> AppendOnlyVec<T> {
     }
 }
 
-impl<T> Into<Vec<T>> for AppendOnlyVec<T> {
-    fn into(self) -> Vec<T> {
-        self.v.into_inner()
+impl<T> From<AppendOnlyVec<T>> for Vec<T> {
+    fn from(val: AppendOnlyVec<T>) -> Self {
+        val.v.into_inner()
     }
 }
 

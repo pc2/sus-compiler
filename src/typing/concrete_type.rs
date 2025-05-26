@@ -4,7 +4,9 @@ use ibig::IBig;
 use ibig::UBig;
 use sus_proc_macro::get_builtin_type;
 
+use crate::instantiation::RealWirePathElem;
 use crate::prelude::*;
+use crate::util::all_equal;
 use std::ops::Deref;
 
 use crate::value::Value;
@@ -13,11 +15,6 @@ use super::template::TVec;
 
 use super::template::TemplateKind;
 use super::value_unifier::UnifyableValue;
-
-pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
-    id: get_builtin_type!("bool"),
-    template_args: FlatAlloc::new(),
-});
 
 pub type ConcreteTemplateArg = TemplateKind<ConcreteType, UnifyableValue>;
 
@@ -87,6 +84,15 @@ impl ConcreteType {
         };
         arr_box
     }
+    #[track_caller]
+    pub fn unwrap_integer_bounds(&self) -> (&IBig, &IBig) {
+        let ConcreteType::Named(v) = self else {
+            unreachable!("unwrap_integer_bounds")
+        };
+        assert_eq!(v.id, get_builtin_type!("int"));
+        let [min, max] = v.template_args.cast_to_int_array();
+        (min, max)
+    }
     pub fn down_array(&self) -> &ConcreteType {
         let ConcreteType::Array(arr_box) = self else {
             unreachable!("Must be an array!")
@@ -104,6 +110,39 @@ impl ConcreteType {
                 let (arr_arr, arr_size) = arr_box.deref();
                 arr_arr.contains_unknown() || arr_size.is_unknown()
             }
+        }
+    }
+    /// Requires all parameters to be known and already substituted!
+    ///
+    /// a return value of true means that `self` can be assigned to `other`
+    pub fn is_subtype_of(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ConcreteType::Named(a), ConcreteType::Named(b)) => {
+                assert_eq!(a.id, b.id);
+                match all_equal([a.id, b.id]) {
+                    get_builtin_type!("int") => {
+                        let [a_min, a_max] = a.template_args.cast_to_int_array();
+                        let [b_min, b_max] = b.template_args.cast_to_int_array();
+
+                        (a_min >= b_min) && (a_max <= b_max)
+                    }
+                    _ => {
+                        crate::alloc::zip_eq(&a.template_args, &b.template_args).all(|(_, a, b)| {
+                            match a.and_by_ref(b) {
+                                TemplateKind::Type((a, b)) => a.is_subtype_of(b),
+                                TemplateKind::Value((a, b)) => a.unwrap_set() == b.unwrap_set(),
+                            }
+                        })
+                    }
+                }
+            }
+            (ConcreteType::Array(arr_a), ConcreteType::Array(arr_b)) => {
+                let (a, sz_a) = arr_a.deref();
+                let (b, sz_b) = arr_b.deref();
+
+                a.is_subtype_of(b) && (sz_a.unwrap_integer() == sz_b.unwrap_integer())
+            }
+            _ => unreachable!(),
         }
     }
     /// Returns the size of this type in *wires*. So int #(MAX: 255) would return '8'
@@ -134,6 +173,26 @@ impl ConcreteType {
             get_builtin_type!("float") => 32,
             _other => todo!("Other Named Structs are not implemented yet"),
         }
+    }
+
+    pub fn walk_rank(&self, rank: usize) -> &ConcreteType {
+        let mut typ = self;
+        for _ in 0..rank {
+            typ = &typ.unwrap_array().0;
+        }
+        typ
+    }
+    pub fn walk_path(&self, path: &[RealWirePathElem]) -> &ConcreteType {
+        let mut cur_typ = self;
+        for p in path {
+            match p {
+                RealWirePathElem::ArrayAccess { .. } => {
+                    cur_typ = &cur_typ.unwrap_array().0;
+                }
+            }
+        }
+
+        cur_typ
     }
 }
 

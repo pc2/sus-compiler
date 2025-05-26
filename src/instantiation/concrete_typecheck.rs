@@ -1,31 +1,13 @@
-use std::fmt::Display;
-use std::ops::{Deref, DerefMut};
-
 use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
 
-use crate::alloc::{zip_eq, zip_eq3, ArenaAllocator, UUID};
-use crate::flattening::StructType;
-use crate::typing::value_unifier::{ValueErrorReporter, ValueUnificationRelation};
-use crate::{let_unwrap, unifier_constraint, unifier_constraint_ints};
-use crate::linker::LinkInfo;
-use crate::to_string::ConcreteTypeDisplay;
-use crate::typing::concrete_type;
-use crate::typing::set_unifier::{DelayedErrorCollector, FullySubstitutable, Unifyable};
-use crate::typing::{
-    concrete_type::ConcreteTemplateArg,
-    concrete_type::{ConcreteType, BOOL_CONCRETE_TYPE},
-    set_unifier::SetUnifierStore,
-    template::TVec,
-    type_inference::{
-        DelayedConstraint, DelayedConstraintStatus, DelayedConstraintsList, FailedUnification,
-    },
-    value_unifier::ValueUnifier,
-};
+use crate::alloc::{zip_eq, zip_eq3};
+use crate::typing::set_unifier::{DelayedErrorCollector, FullySubstitutable};
+use crate::typing::value_unifier::{ValueErrorReporter, ValueUnifierStore};
+use crate::typing::{concrete_type::ConcreteType, value_unifier::ValueUnifier};
+use crate::{let_unwrap, unifier_constraint_ints};
 
 use super::*;
-
-use crate::typing::type_inference::{ConcreteTypeVariableIDMarker, Substitutor};
 
 macro_rules! assert_due_to_variable_clones {
     ($cond:expr) => {
@@ -33,153 +15,78 @@ macro_rules! assert_due_to_variable_clones {
     };
 }
 
-fn typecheck(
-    exec: Executed,
-    link_info: &LinkInfo,
-    linker: &Linker,
-    working_on_template_args: Rc<TVec<ConcreteTemplateArg>>,
-) -> Typechecked {
-    let mut ctx = TypingContext {
-        wires: exec.wires,
-        submodules: exec.submodules,
-        working_on_template_args,
-        link_info,
-    };
-    let error_reporter = DelayedErrorCollector::new();
-
-    let mut unifier = ValueUnifier::from_alloc(exec.type_substitutor);
-
-    ctx.typecheck_all_wires(&mut unifier, &error_reporter);
-
-    // Reports all the delayed errors that have built up
-    let substitutor = unifier.execute();
-
-    let errors = error_reporter.report(&substitutor, link_info.file, linker);
-    
-    for (_id, w) in &mut ctx.wires {
-        if !w.typ.fully_substitute(&substitutor) {
-            let typ_as_str = w.typ.display(&linker.types);
-
-            let span = w.get_span(link_info);
-            span.debug();
-            errors.error(span, format!("Could not finalize this type, some parameters were still unknown: {typ_as_str}"));
-        }
-    }
-
-    Typechecked {
-        wires: ctx.wires,
-        submodules: ctx.submodules,
-        generation_state: exec.generation_state,
-        errors: errors.into_storage(),
-    }
+fn unify_rank<'inst>(
+    rank: &'inst [UnifyableValue],
+    mut typ: &'inst ConcreteType,
+    unifier: &mut ValueUnifier<'inst>,
+) -> bool {
+    rank.iter().all(|r| {
+        let_unwrap!(ConcreteType::Array(arr), typ);
+        typ = &arr.0;
+        unifier.unify(r, &arr.1)
+    })
 }
 
-/// As with other contexts, this is the shared state we're lugging around while executing & typechecking a module.
-struct TypingContext<'l> {
-    wires: FlatAlloc<RealWire, WireIDMarker>,
-    submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
-    working_on_template_args: Rc<TVec<ConcreteTemplateArg>>,
-    link_info: &'l LinkInfo,
-}
+impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
+    pub fn typecheck(&mut self, type_substitutor_alloc: ValueUnifierAlloc) {
+        let error_reporter = DelayedErrorCollector::new();
 
-impl<'inst, 'errs> TypingContext<'_> {
-    fn walk_type_along_path(
-        &'inst self,
-        root_wire: &'inst RealWire,
-        path: &'inst [RealWirePathElem],
-        unifier: &mut ValueUnifier<'inst>,
-        errors: &'errs ValueErrorReporter<'inst>
-    ) -> &'inst ConcreteType {
-        let mut cur_type = &root_wire.typ;
-        for p in path {
-            match p {
-                RealWirePathElem::ArrayAccess {
-                    span,
-                    idx_wire,
-                } => {
-                    let_unwrap!(ConcreteType::Array(arr_box), cur_type);
-                    let (arr_content, arr_size) = arr_box.deref();
-                    let idx_wire = &self.wires[*idx_wire];
-                    let [min, max] = idx_wire.typ.get_value_args(get_builtin_type!("int"));
-                    unifier_constraint_ints!(unifier, [min, max, arr_size], {
-                        if min < &IBig::from(0) || max >= arr_size {
-                            let min = min.clone();
-                            let max = max.clone();
-                            let arr_size = arr_size.clone();
-                            let span = span.inner_span();
-                            errors.error(move |substitutor, errors, linker| {
-                                errors.error(span, format!("Array access out of bounds! The index bounds are {min}:{max}, but this array is of size {arr_size}."))
-                                    .info_same_file(root_wire.get_span(self.link_info), format!("{} of type {} declared here", root_wire.name, root_wire.typ.display_substitute(linker, substitutor)));
-                            });
-                        }
-                    });
-                    cur_type = arr_content;
-                }
+        let mut unifier = ValueUnifier::from_alloc(type_substitutor_alloc);
+
+        self.typecheck_all_wires(&mut unifier, &error_reporter);
+        self.typecheck_all_submodules(&mut unifier);
+
+        unifier.execute_ready_constraints();
+
+        loop {
+            self.infer_parameters_for_latencies(&mut unifier);
+            if !unifier.execute_ready_constraints() {
+                break;
             }
         }
 
-        cur_type
-    }
+        let substitutor = unifier.decomission();
 
-    fn walk_rank(
-        rank: &[UnifyableValue],
-        mut typ: &'inst ConcreteType,
+        error_reporter.report(&substitutor);
+
+        self.finalize(&substitutor);
+
+        self.compute_latencies(&substitutor);
+    }
+    fn typecheck_all_wires(
+        &'inst self,
         unifier: &mut ValueUnifier<'inst>,
-    ) -> (&'inst ConcreteType, bool) {
-        let rank_unify_success = rank.iter().all(|r| {
-            let_unwrap!(ConcreteType::Array(arr), typ);
-            typ = &arr.0;
-            unifier.unify(r, &arr.1)
-        });
-        (typ, rank_unify_success)
-    }
-
-    fn typecheck_all_wires(&'inst self, unifier: &mut ValueUnifier<'inst>, errors: &'errs ValueErrorReporter<'inst>) {
-        for this_wire_id in self.wires.id_range() {
-            let out = &self.wires[this_wire_id];
+        errors: &ValueErrorReporter<'inst>,
+    ) {
+        for (_, out) in &self.wires {
             let original_instr = &self.link_info.instructions[out.original_instruction];
             let span = original_instr.get_span();
             span.debug();
 
             match &out.source {
                 RealWireDataSource::ReadOnly => {}
-                RealWireDataSource::Multiplexer { is_state, sources } => {
-                    if let Some(is_state) = is_state {
-                        match is_state.concretize_type(
-                            self.linker,
-                            &original_instr.unwrap_declaration().typ.typ,
-                            &self.working_on_template_args,
-                            &mut self.type_substitutor,
-                        ) {
-                            Ok(value_typ) => self.type_substitutor.unify_report_error(
-                                &value_typ,
-                                &out.typ,
-                                span,
-                                "initial value of state",
-                            ),
-                            Err(reason) => {
-                                self.errors.error(span, reason);
-                            }
-                        }
-                    }
-                    unifier.create_subtype_constraint(errors, sources.iter().map(|s| {
+                RealWireDataSource::Multiplexer {
+                    is_state: _,
+                    sources,
+                } => {
+                    unifier.create_subtype_constraint(sources.iter().map(|s| {
                         let source_wire = &self.wires[s.from];
-                        let destination_typ = self.walk_type_along_path(out, &s.to_path, unifier, errors);
-                        (destination_typ, &source_wire.typ, source_wire.get_span(self.link_info))
+                        let destination_typ = out.typ.walk_path(&s.to_path);
+                        (destination_typ, &source_wire.typ)
                     }));
                 }
                 RealWireDataSource::UnaryOp { op, rank, right } => {
                     // TODO overloading
                     let right = &self.wires[*right];
-                    let (out_root, out_success) = Self::walk_rank(rank, &out.typ, unifier);
-                    assert_due_to_variable_clones!(out_success);
-                    let (right_root, right_success) = Self::walk_rank(rank, &right.typ, unifier);
-                    if !right_success {
-                        errors.error(|substitutor, errors, linker| {
-                            errors
-                                .error(right.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}", 
-                                right.typ.display_substitute(linker, substitutor), 
-                                out.typ.display_substitute(linker, substitutor))
+                    let out_root = out.typ.walk_rank(rank.len());
+                    let right_root = right.typ.walk_rank(rank.len());
+                    assert_due_to_variable_clones!(unify_rank(rank, &out.typ, unifier));
+                    if !unify_rank(rank, &right.typ, unifier) {
+                        errors.error(|substitutor| {
+                            self.errors
+                                .error(right.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}",
+                                right.typ.display_substitute(self.linker, substitutor),
+                                out.typ.display_substitute(self.linker, substitutor))
                             );
                         });
                     }
@@ -199,7 +106,11 @@ impl<'inst, 'errs> TypingContext<'_> {
                             let [min, max] = right_root.get_value_args(get_builtin_type!("int"));
 
                             unifier_constraint_ints!(unifier, [min, max], {
-                                assert!(right_root.unify_named_template_args(get_builtin_type!("int"), unifier, [-(max.clone()), -(min.clone())]));
+                                assert!(right_root.set_named_template_args(
+                                    get_builtin_type!("int"),
+                                    unifier,
+                                    [-(max.clone()), -(min.clone())]
+                                ));
                             });
                         }
                         UnaryOperator::Sum => {
@@ -207,7 +118,11 @@ impl<'inst, 'errs> TypingContext<'_> {
                             let [min, max] = content.get_value_args(get_builtin_type!("int"));
 
                             unifier_constraint_ints!(unifier, [min, max, sz], {
-                                assert!(out_root.unify_named_template_args(get_builtin_type!("int"), unifier, [min * sz, max * sz]));
+                                assert!(out_root.set_named_template_args(
+                                    get_builtin_type!("int"),
+                                    unifier,
+                                    [min * sz, max * sz]
+                                ));
                             });
                         }
                         UnaryOperator::Product => {
@@ -216,7 +131,11 @@ impl<'inst, 'errs> TypingContext<'_> {
 
                             unifier_constraint_ints!(unifier, [min, max, sz], {
                                 let sz = usize::try_from(sz).unwrap();
-                                assert!(out_root.unify_named_template_args(get_builtin_type!("int"), unifier, [min.pow(sz), max.pow(sz)]));
+                                assert!(out_root.set_named_template_args(
+                                    get_builtin_type!("int"),
+                                    unifier,
+                                    [min.pow(sz), max.pow(sz)]
+                                ));
                             });
                         }
                     }
@@ -229,26 +148,26 @@ impl<'inst, 'errs> TypingContext<'_> {
                 } => {
                     let left = &self.wires[*left];
                     let right = &self.wires[*right];
-                    let (out_root, out_success) = Self::walk_rank(rank, &out.typ, unifier);
-                    assert_due_to_variable_clones!(out_success);
-                    let (left_root, left_success) = Self::walk_rank(rank, &left.typ, unifier);
-                    if !left_success {
-                        errors.error(|substitutor, errors, linker| {
-                            errors
-                                .error(left.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}", 
-                                left.typ.display_substitute(linker, substitutor), 
-                                out.typ.display_substitute(linker, substitutor))
-                            ).info_same_file(right.get_span(self.link_info), format!("Right argument has type {}", right.typ.display_substitute(linker, substitutor)));
+                    let out_root = out.typ.walk_rank(rank.len());
+                    let left_root = left.typ.walk_rank(rank.len());
+                    let right_root = right.typ.walk_rank(rank.len());
+                    assert_due_to_variable_clones!(unify_rank(rank, &out.typ, unifier));
+                    if !unify_rank(rank, &left.typ, unifier) {
+                        errors.error(|substitutor| {
+                            self.errors
+                                .error(left.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}",
+                                left.typ.display_substitute(self.linker, substitutor),
+                                out.typ.display_substitute(self.linker, substitutor))
+                            ).info_same_file(right.get_span(self.link_info), format!("Right argument has type {}", right.typ.display_substitute(self.linker, substitutor)));
                         });
                     }
-                    let (right_root, right_success) = Self::walk_rank(rank, &right.typ, unifier);
-                    if !right_success {
-                        errors.error(|substitutor, errors, linker| {
-                            errors
-                                .error(right.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}", 
-                                right.typ.display_substitute(linker, substitutor),
-                                out.typ.display_substitute(linker, substitutor))
-                            ).info_same_file(left.get_span(self.link_info), format!("Left argument has type {}", left.typ.display_substitute(linker, substitutor)));
+                    if !unify_rank(rank, &right.typ, unifier) {
+                        errors.error(|substitutor| {
+                            self.errors
+                                .error(right.get_span(self.link_info), format!("Incompatible multi-rank for higher-rank operator: Found {} but output is {}",
+                                right.typ.display_substitute(self.linker, substitutor),
+                                out.typ.display_substitute(self.linker, substitutor))
+                            ).info_same_file(left.get_span(self.link_info), format!("Left argument has type {}", left.typ.display_substitute(self.linker, substitutor)));
                         });
                     }
                     // TODO overloading
@@ -264,79 +183,88 @@ impl<'inst, 'errs> TypingContext<'_> {
                         | BinaryOperator::Multiply
                         | BinaryOperator::Divide
                         | BinaryOperator::Modulo => {
-                            let [left_min, left_max] = left_root.get_value_args(get_builtin_type!("int"));
-                            let [right_min, right_max] = right_root.get_value_args(get_builtin_type!("int"));
-                            unifier_constraint_ints!(unifier, [left_min, left_max, right_min, right_max], {
-                                let (out_min, out_max) = match op {
-                                    BinaryOperator::Add => (
-                                        right_min + left_min,
-                                        right_max + left_max,
-                                    ),
-                                    BinaryOperator::Subtract => (
-                                        left_min - right_max,
-                                        left_max - right_min,
-                                    ),
-                                    BinaryOperator::Multiply => {
-                                        let potentials = [
-                                            left_min * right_min,
-                                            left_min * right_max,
-                                            left_max * right_min,
-                                            left_max * right_max,
-                                        ];
-                                        (
-                                            potentials.iter().min().unwrap().clone(),
-                                            potentials.iter().max().unwrap().clone(),
-                                        )
-                                    }
-                                    BinaryOperator::Divide => {
-                                        if right_min == &IBig::from(0) {
+                            let [left_min, left_max] =
+                                left_root.get_value_args(get_builtin_type!("int"));
+                            let [right_min, right_max] =
+                                right_root.get_value_args(get_builtin_type!("int"));
+                            unifier_constraint_ints!(
+                                unifier,
+                                [left_min, left_max, right_min, right_max],
+                                {
+                                    let (out_min, out_max) = match op {
+                                        BinaryOperator::Add => {
+                                            (right_min + left_min, right_max + left_max)
+                                        }
+                                        BinaryOperator::Subtract => {
+                                            (left_min - right_max, left_max - right_min)
+                                        }
+                                        BinaryOperator::Multiply => {
                                             let potentials = [
-                                                left_min / right_max,
-                                                left_max / right_max,
-                                            ];
-                                            (
-                                                potentials.iter().min().unwrap().clone(),
-                                                potentials.iter().max().unwrap().clone(),
-                                            )
-                                        } else {
-                                            let potentials = [
-                                                left_min / right_max,
-                                                left_min / right_min,
-                                                left_max / right_max,
-                                                left_max / right_min,
+                                                left_min * right_min,
+                                                left_min * right_max,
+                                                left_max * right_min,
+                                                left_max * right_max,
                                             ];
                                             (
                                                 potentials.iter().min().unwrap().clone(),
                                                 potentials.iter().max().unwrap().clone(),
                                             )
                                         }
-                                    }
-                                    BinaryOperator::Modulo => {
-                                        if !right_min > IBig::from(0) {
-                                            errors.error(|substitutor, errors, linker| {
-                                                errors.error(right.get_span(self.link_info), format!("Modulo divisor must be > 0, but its range is {}", 
-                                                    right.typ.display_substitute(linker, substitutor)
-                                                ));
-                                            });
-                                            return;
+                                        BinaryOperator::Divide => {
+                                            if right_min <= &IBig::from(0)
+                                                && right_max >= &IBig::from(0)
+                                            {
+                                                self.errors.error(right.get_span(self.link_info), format!("Divisor may not possibly be == 0, but its range is {right_min}..{right_max}"));
+                                                (IBig::from(0), IBig::from(0))
+                                            } else {
+                                                let potentials = [
+                                                    left_min / right_max,
+                                                    left_min / right_min,
+                                                    left_max / right_max,
+                                                    left_max / right_min,
+                                                ];
+                                                (
+                                                    potentials.iter().min().unwrap().clone(),
+                                                    potentials.iter().max().unwrap().clone(),
+                                                )
+                                            }
                                         }
-                                        (IBig::from(0), right_max - IBig::from(1))
-                                    }
-                                    _ => {
-                                        unreachable!("The BinaryOpTypecheckConstraint should only check arithmetic operations but got {}", op);
-                                    }
-                                };
-                                assert!(out.typ.unify_named_template_args(get_builtin_type!("int"), unifier, [out_min, out_max]))
-                            });
+                                        BinaryOperator::Modulo => {
+                                            if !right_min > IBig::from(0) {
+                                                self.errors.error(right.get_span(self.link_info), format!("Modulo divisor must be > 0, but its range is {right_min}..{right_max}"));
+                                                (IBig::from(0), IBig::from(0))
+                                            } else {
+                                                (IBig::from(0), right_max - IBig::from(1))
+                                            }
+                                        }
+                                        _ => {
+                                            unreachable!("The BinaryOpTypecheckConstraint should only check arithmetic operations but got {}", op);
+                                        }
+                                    };
+                                    assert!(out.typ.set_named_template_args(
+                                        get_builtin_type!("int"),
+                                        unifier,
+                                        [out_min, out_max]
+                                    ))
+                                }
+                            );
                         }
-                        BinaryOperator::Equals
-                        | BinaryOperator::NotEquals => {
+                        BinaryOperator::Equals | BinaryOperator::NotEquals => {
                             if !unifier.unify_concrete::<false>(left_root, right_root) {
-                                errors.error_bad_unify(&right.typ, &left.typ, right.get_span(self.link_info));
+                                errors.error(move |substitutor| {
+                                    self.errors.error(
+                                        span,
+                                        format!(
+                                            "Typecheck error: Found {}, but expected {}",
+                                            right_root.display_substitute(self.linker, substitutor),
+                                            left_root.display_substitute(self.linker, substitutor)
+                                        ),
+                                    );
+                                });
                             }
                             assert_eq!(out_root.unwrap_named().id, get_builtin_type!("bool"));
                         }
-                        | BinaryOperator::GreaterEq
+                        BinaryOperator::GreaterEq
                         | BinaryOperator::Greater
                         | BinaryOperator::LesserEq
                         | BinaryOperator::Lesser => {
@@ -347,23 +275,20 @@ impl<'inst, 'errs> TypingContext<'_> {
                     }
                 }
                 RealWireDataSource::Select { root, path } => {
-                    let found_typ = self.walk_type_along_path(&self.wires[*root], path, unifier, errors);
-                    self.set_wire_typ(unifier, errors, out, found_typ);
+                    let found_typ = self.wires[*root].typ.walk_path(path);
+                    // Errors are reported by final_checks
+                    let _ = unifier.unify_concrete::<true>(&out.typ, found_typ);
                 }
                 RealWireDataSource::ConstructArray { array_wires } => {
                     let (array_content_supertyp, array_size) = out.typ.unwrap_array();
 
-                    unifier.create_subtype_constraint(errors, array_wires.iter().map(|w_id| {
+                    unifier.create_subtype_constraint(array_wires.iter().map(|w_id| {
                         let w = &self.wires[*w_id];
-                        (array_content_supertyp, &w.typ, w.get_span(self.link_info))
+                        (array_content_supertyp, &w.typ)
                     }));
 
-                    let array_wires_len = array_wires.len();
-                    if let Err(expected_array_size) = unifier.set(array_size, Value::Integer(IBig::from(array_wires_len))) {
-                        errors.error(|substitutor, errors, linker| {
-                            errors.error(span, format!("This construct creates an array of size {array_wires_len}, but the expected size is {expected_array_size}"));
-                        });
-                    }
+                    // Error is reported in final_checks
+                    let _ = unifier.set(array_size, Value::Integer(IBig::from(array_wires.len())));
                 }
                 // type is already set when the wire was created
                 RealWireDataSource::Constant { value: _ } => {}
@@ -371,173 +296,165 @@ impl<'inst, 'errs> TypingContext<'_> {
         }
     }
 
-    fn set_wire_typ(&'inst self, unifier: &mut ValueUnifier<'inst>, errors: &'errs ValueErrorReporter<'inst>, out: &'inst RealWire, found_typ: &'inst ConcreteType) {
-        if !unifier.unify_concrete::<true>(&out.typ, found_typ) {
-            errors.error_bad_unify(found_typ, &out.typ, out.get_span(self.link_info));
-        }
-    }
-}
+    fn typecheck_all_submodules(&'inst self, unifier: &mut ValueUnifier<'inst>) {
+        for (_, sm) in &self.submodules {
+            assert!(sm.instance.get().is_none());
 
-struct SubmoduleTypecheckConstraint {
-    sm_id: SubModuleID,
-}
+            // Check if there's any argument that isn't known
+            let mut substitutables = Vec::new();
+            sm.refers_to
+                .template_args
+                .gather_all_substitutables(&mut substitutables);
 
-impl DelayedConstraint<InstantiationContext<'_, '_>> for SubmoduleTypecheckConstraint {
-    fn try_apply(&mut self, context: &mut InstantiationContext) -> DelayedConstraintStatus {
-        let sm = &mut context.submodules[self.sm_id];
-        assert!(sm.instance.get().is_none());
+            unifier.add_constraint(substitutables, |unifier| {
+                let submod_instr =
+                    self.link_info.instructions[sm.original_instruction].unwrap_submodule();
 
-        let submod_instr =
-            context.link_info.instructions[sm.original_instruction].unwrap_submodule();
+                let mut refers_to_clone = sm.refers_to.clone();
+                refers_to_clone.template_args.fully_substitute(&unifier.store);
 
-        let sub_module = &context.linker.modules[sm.refers_to.id];
+                if let Some(instance) = self
+                    .linker
+                    .instantiator
+                    .instantiate(self.linker, refers_to_clone)
+                {
+                    let sub_module = &self.linker.modules[sm.refers_to.id];
 
-        // Check if there's any argument that isn't known
-        for (_id, arg) in &mut Rc::get_mut(&mut sm.refers_to).unwrap().template_args {
-            if !arg.fully_substitute(&context.type_substitutor) {
-                // We don't actually *need* to already fully_substitute here, but it's convenient and saves some work
-                return DelayedConstraintStatus::NoProgress;
-            }
-        }
-
-        if let Some(instance) = context
-            .linker
-            .instantiator
-            .instantiate(context.linker, sm.refers_to.clone())
-        {
-            for (_port_id, concrete_port, source_code_port, connecting_wire) in
-                zip_eq3(&instance.interface_ports, &sub_module.ports, &sm.port_map)
-            {
-                match (concrete_port, connecting_wire) {
-                    (None, None) => {} // Invalid port not connected, good!
-                    (None, Some(connecting_wire)) => {
-                        // Port is not enabled, but attempted to be used
-                        // A question may be "What if no port was in the source code? There would be no error reported"
-                        // But this is okay, because nonvisible ports are only possible for function calls
-                        // We have a second routine that reports invalid interfaces.
-                        for span in &connecting_wire.name_refs {
-                            context.errors.error(*span, format!("Port '{}' is used, but the instantiated module has this port disabled", source_code_port.name))
-                                .info_obj_different_file(source_code_port, sub_module.link_info.file)
-                                .info_obj_same_file(submod_instr);
-                        }
-                    }
-                    (Some(_concrete_port), None) => {
-                        // Port is enabled, but not used
-                        context
-                            .errors
-                            .warn(
-                                submod_instr.module_ref.get_total_span(),
-                                format!("Unused port '{}'", source_code_port.name),
-                            )
-                            .info_obj_different_file(source_code_port, sub_module.link_info.file)
-                            .info_obj_same_file(submod_instr);
-                    }
-                    (Some(concrete_port), Some(connecting_wire)) => {
-                        let wire = &context.wires[connecting_wire.maps_to_wire];
-                        context.type_substitutor.unify_report_error(
-                            &wire.typ,
-                            &concrete_port.typ,
-                            submod_instr.module_ref.get_total_span(),
-                            || {
-                                use crate::errors::ErrorInfoObject;
-                                let port_declared_here = source_code_port
-                                    .make_info(sub_module.link_info.file)
-                                    .unwrap();
-
-                                (
-                                    format!("Port '{}'", source_code_port.name),
-                                    vec![port_declared_here],
-                                )
-                            },
-                        );
-                    }
-                }
-            }
-            for (_interface_id, interface_references, sm_interface) in
-                zip_eq(&sm.interface_call_sites, &sub_module.interfaces)
-            {
-                if !interface_references.is_empty() {
-                    let interface_name = &sm_interface.name;
-                    if let Some(representative_port) = sm_interface
-                        .func_call_inputs
-                        .first()
-                        .or(sm_interface.func_call_outputs.first())
+                    for (_port_id, concrete_port, source_code_port, connecting_wire) in
+                        zip_eq3(&instance.interface_ports, &sub_module.ports, &sm.port_map)
                     {
-                        if instance.interface_ports[representative_port].is_none() {
-                            for span in interface_references {
-                                context.errors.error(*span, format!("The interface '{interface_name}' is disabled in this submodule instance"))
-                                    .info_obj_same_file(submod_instr)
-                                    .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
+                        match (concrete_port, connecting_wire) {
+                            (None, None) => {} // Invalid port not connected, good!
+                            (None, Some(connecting_wire)) => {
+                                // Port is not enabled, but attempted to be used
+                                // A question may be "What if no port was in the source code? There would be no error reported"
+                                // But this is okay, because nonvisible ports are only possible for function calls
+                                // We have a second routine that reports invalid interfaces.
+                                for span in &connecting_wire.name_refs {
+                                    self.errors.error(*span, format!("Port '{}' is used, but the instantiated module has this port disabled", source_code_port.name))
+                                    .info_obj_different_file(source_code_port, sub_module.link_info.file)
+                                    .info_obj_same_file(submod_instr);
+                                }
+                            }
+                            (Some(_concrete_port), None) => {
+                                // Port is enabled, but not used
+                                self.errors
+                                    .warn(
+                                        submod_instr.module_ref.get_total_span(),
+                                        format!("Unused port '{}'", source_code_port.name),
+                                    )
+                                    .info_obj_different_file(
+                                        source_code_port,
+                                        sub_module.link_info.file,
+                                    )
+                                    .info_obj_same_file(submod_instr);
+                            }
+                            (Some(concrete_port), Some(connecting_wire)) => {
+                                let wire = &self.wires[connecting_wire.maps_to_wire];
+                                if source_code_port.is_input {
+                                    // Subtype relations always flow FORWARD.
+                                    unifier.unify_concrete::<false>(&wire.typ, &concrete_port.typ);
+                                } else {
+                                    unifier.unify_concrete::<true>(&wire.typ, &concrete_port.typ);
+                                }
                             }
                         }
-                    } else {
-                        for span in interface_references {
-                            context.errors.todo(*span, format!("Using empty interface '{interface_name}' (This is a TODO with Actions etc)"))
-                                .info_obj_same_file(submod_instr)
-                                .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
+                    }
+                    for (_interface_id, interface_references, sm_interface) in
+                        zip_eq(&sm.interface_call_sites, &sub_module.interfaces)
+                    {
+                        if !interface_references.is_empty() {
+                            let interface_name = &sm_interface.name;
+                            if let Some(representative_port) = sm_interface
+                                .func_call_inputs
+                                .first()
+                                .or(sm_interface.func_call_outputs.first())
+                            {
+                                if instance.interface_ports[representative_port].is_none() {
+                                    for span in interface_references {
+                                        self.errors.error(*span, format!("The interface '{interface_name}' is disabled in this submodule instance"))
+                                        .info_obj_same_file(submod_instr)
+                                        .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
+                                    }
+                                }
+                            } else {
+                                for span in interface_references {
+                                    self.errors.todo(*span, format!("Using empty interface '{interface_name}' (This is a TODO with Actions etc)"))
+                                    .info_obj_same_file(submod_instr)
+                                    .info((sm_interface.name_span, sub_module.link_info.file), format!("Interface '{interface_name}' declared here"));
+                                }
+                            }
+                            if sm_interface
+                                .all_ports()
+                                .iter()
+                                .any(|port_id| instance.interface_ports[port_id].is_none())
+                            {
+                                // We say an interface is invalid if it has an invalid port.
+                                todo!("Invalid Interfaces");
+                            }
                         }
                     }
-                    if sm_interface
-                        .all_ports()
-                        .iter()
-                        .any(|port_id| instance.interface_ports[port_id].is_none())
-                    {
-                        // We say an interface is invalid if it has an invalid port.
-                        todo!("Invalid Interfaces");
-                    }
+
+                    sm.instance
+                        .set(instance)
+                        .expect("Can only set an InstantiatedModule once");
+                } else {
+                    self.errors.error(
+                        submod_instr.module_ref.get_total_span(),
+                        "Error instantiating submodule",
+                    );
                 }
-            }
-
-            // Overwrite the refers_to with the identical instance.global_ref
-            assert!(sm.refers_to == instance.global_ref);
-            sm.refers_to = instance.global_ref.clone();
-
-            sm.instance
-                .set(instance)
-                .expect("Can only set an InstantiatedModule once");
-
-            DelayedConstraintStatus::Resolved
-        } else {
-            context.errors.error(
-                submod_instr.module_ref.get_total_span(),
-                "Error instantiating submodule",
-            );
-            DelayedConstraintStatus::Resolved
+            });
         }
     }
 
-    fn report_could_not_resolve_error(&self, context: &InstantiationContext) {
-        let sm = &context.submodules[self.sm_id];
+    /// Calls [FullySubstitutable::fully_substitute] on everything. From this point on the substitutor is unneccesary
+    fn finalize(&mut self, substitutor: &ValueUnifierStore) {
+        for (_id, w) in &mut self.wires {
+            if !w.typ.fully_substitute(substitutor) {
+                let span = w.get_span(self.link_info);
+                span.debug();
+                self.errors.error(
+                    span,
+                    format!(
+                        "Could not finalize this type, some parameters were still unknown: {}",
+                        w.typ.display(&self.linker.types)
+                    ),
+                );
+            }
+            match &mut w.source {
+                RealWireDataSource::UnaryOp { rank, .. }
+                | RealWireDataSource::BinaryOp { rank, .. } => {
+                    for r in rank {
+                        // Rank not fully substituting is caught by the fully_substitute calls on w
+                        let _ = r.fully_substitute(substitutor);
+                    }
+                }
+                _ => {}
+            }
+        }
 
-        let submod_instr =
-            context.link_info.instructions[sm.original_instruction].unwrap_submodule();
+        for (_, sm) in &mut self.submodules {
+            if !sm.refers_to.template_args.fully_substitute(substitutor) {
+                self.errors.error(sm.get_span(self.link_info), format!("Could not infer the parameters of this submodule, some parameters were still unknown: {}", 
+                sm.refers_to.display(self.linker, true)
+            ));
+            }
+            if let Some(instance) = sm.instance.get() {
+                for (_port_id, concrete_port, connecting_wire) in
+                    zip_eq(&instance.interface_ports, &sm.port_map)
+                {
+                    let (Some(concrete_port), Some(connecting_wire)) =
+                        (concrete_port, connecting_wire)
+                    else {
+                        continue;
+                    };
 
-        let submodule_template_args_string = sm.refers_to.display(context.linker, true);
-        let message = format!("Could not fully instantiate {submodule_template_args_string}");
-
-        context
-            .errors
-            .error(submod_instr.get_most_relevant_span(), message);
+                    // We overwrite the ports, to have the Multiplexer inputs correctly call type errors on submodule inputs
+                    let connecting_wire = &mut self.wires[connecting_wire.maps_to_wire];
+                    connecting_wire.typ.clone_from(&concrete_port.typ);
+                }
+            }
+        }
     }
-}
-
-pub struct LatencyInferenceDelayedConstraint {}
-impl DelayedConstraint<InstantiationContext<'_, '_>> for LatencyInferenceDelayedConstraint {
-    fn try_apply(&mut self, context: &mut InstantiationContext<'_, '_>) -> DelayedConstraintStatus {
-        context.infer_parameters_for_latencies()
-    }
-
-    fn report_could_not_resolve_error(&self, _context: &InstantiationContext<'_, '_>) {} // Handled by incomplete submodules themselves
-}
-
-/// As with other contexts, this is the shared state we're lugging around while executing & typechecking a module.
-struct TypingFinalizationContext<'l> {
-    pub wires: FlatAlloc<RealWire, WireIDMarker>,
-    pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
-    pub type_substitutor: SetUnifierStore<Value, ConcreteTypeVariableIDMarker>,
-
-    pub errors: ErrorCollector<'l>,
-
-    pub link_info: &'l LinkInfo,
-    pub linker: &'l Linker,
 }

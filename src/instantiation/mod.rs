@@ -6,10 +6,11 @@ mod unique_names;
 
 use unique_names::UniqueNames;
 
+use crate::debug::SpanDebugger;
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::LinkInfo;
 use crate::prelude::*;
-use crate::typing::value_unifier::{UnifyableValue, UnifyableValueAlloc};
+use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 
 use std::cell::OnceCell;
 use std::rc::Rc;
@@ -116,10 +117,17 @@ pub struct SubModulePort {
 pub struct SubModule {
     pub original_instruction: FlatID,
     pub instance: OnceCell<Rc<InstantiatedModule>>,
-    pub refers_to: Rc<ConcreteGlobalReference<ModuleUUID>>,
+    pub refers_to: ConcreteGlobalReference<ModuleUUID>,
     pub port_map: FlatAlloc<Option<SubModulePort>, PortIDMarker>,
     pub interface_call_sites: FlatAlloc<Vec<Span>, InterfaceIDMarker>,
     pub name: String,
+}
+impl SubModule {
+    fn get_span(&self, link_info: &LinkInfo) -> Span {
+        link_info.instructions[self.original_instruction]
+            .unwrap_submodule()
+            .get_most_relevant_span()
+    }
 }
 
 /// Generated from [Module::ports]
@@ -275,19 +283,12 @@ impl ForEachContainedWire for RealWireDataSource {
 struct Executed {
     wires: FlatAlloc<RealWire, WireIDMarker>,
     submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
-    type_substitutor: UnifyableValueAlloc,
+    type_var_alloc: ValueUnifierAlloc,
     generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
     execution_status: Result<(), (Span, String)>,
 }
 
-struct Typechecked {
-    wires: FlatAlloc<RealWire, WireIDMarker>,
-    submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
-    generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
-    errors: ErrorStore,
-}
-
-impl Typechecked {
+impl Executed {
     fn make_interface(
         &self,
         ports: &FlatAlloc<Port, PortIDMarker>,
@@ -309,21 +310,54 @@ impl Typechecked {
         })
     }
 
-    fn to_instantiated_module(
+    pub fn into_module_typing_context<'l>(
         self,
-        md: &Module,
-        linker: &Linker,
+        linker: &'l Linker,
+        md: &'l Module,
         global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
-    ) -> InstantiatedModule {
+    ) -> (ModuleTypingContext<'l>, ValueUnifierAlloc) {
         let interface_ports = self.make_interface(&md.ports);
-        let name = global_ref.display(linker, false).to_string();
+        let errors = ErrorCollector::new_empty(md.link_info.file, &linker.files);
+        if let Err((position, reason)) = self.execution_status {
+            errors.error(position, reason);
+        }
+        let ctx = ModuleTypingContext {
+            global_ref,
+            wires: self.wires,
+            submodules: self.submodules,
+            generation_state: self.generation_state,
+            md,
+            link_info: &md.link_info,
+            linker,
+            errors,
+            interface_ports,
+        };
+        (ctx, self.type_var_alloc)
+    }
+}
+
+pub struct ModuleTypingContext<'l> {
+    pub global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
+    pub wires: FlatAlloc<RealWire, WireIDMarker>,
+    pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+    pub generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
+    pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
+    pub link_info: &'l LinkInfo,
+    /// Yes I know it's redundant, but it's easier to both have link_info and md
+    pub linker: &'l Linker,
+    pub md: &'l Module,
+    pub errors: ErrorCollector<'l>,
+}
+
+impl<'l> ModuleTypingContext<'l> {
+    fn into_instantiated_module(self, name: String) -> InstantiatedModule {
         let mangled_name = mangle_name(&name);
         InstantiatedModule {
-            global_ref,
+            global_ref: self.global_ref,
             name,
             mangled_name,
-            errors: self.errors,
-            interface_ports,
+            errors: self.errors.into_storage(),
+            interface_ports: self.interface_ports,
             wires: self.wires,
             submodules: self.submodules,
             generation_state: self.generation_state,
@@ -341,4 +375,71 @@ fn mangle_name(str: &str) -> String {
         result.push(if c.is_alphanumeric() { c } else { '_' });
     }
     result.trim_matches('_').to_owned()
+}
+
+fn perform_instantiation(
+    linker: &Linker,
+    global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
+) -> InstantiatedModule {
+    let md = &linker.modules[global_ref.id];
+
+    let name = global_ref.display(linker, false).to_string();
+
+    let _panic_guard = SpanDebugger::new("instantiating", &name, &linker.files[md.link_info.file]);
+
+    // Don't instantiate modules that already errored. Otherwise instantiator may crash
+    if md.link_info.errors.did_error {
+        println!("Not Instantiating {name} due to flattening errors");
+        return InstantiatedModule {
+            global_ref,
+            mangled_name: mangle_name(&name),
+            name,
+            errors: ErrorStore::new_did_error(),
+            interface_ports: Default::default(),
+            wires: Default::default(),
+            submodules: Default::default(),
+            generation_state: Default::default(),
+        };
+    }
+
+    println!("Instantiating {name}");
+    let exec = execute::execute(&md.link_info, linker, &global_ref.template_args);
+
+    let (mut typed, type_var_alloc) = exec.into_module_typing_context(linker, md, global_ref);
+
+    if typed.errors.did_error() {
+        return typed.into_instantiated_module(name);
+    }
+
+    if crate::debug::is_enabled("print-instantiated-modules-pre-concrete-typecheck") {
+        println!("[[Executed {name}]]");
+        for (id, w) in &typed.wires {
+            println!("{id:?} -> {w:?}");
+        }
+        for (id, sm) in &typed.submodules {
+            println!("SubModule {id:?}: {sm:?}");
+        }
+    }
+
+    println!("Concrete Typechecking {name}");
+    typed.typecheck(type_var_alloc);
+
+    if typed.errors.did_error() {
+        return typed.into_instantiated_module(name);
+    }
+
+    println!("Checking array accesses {name}");
+    typed.check_subtypes();
+
+    if crate::debug::is_enabled("print-instantiated-modules") {
+        println!("[[Instantiated {name}]]");
+        for (id, w) in &typed.wires {
+            println!("{id:?} -> {w:?}");
+        }
+        for (id, sm) in &typed.submodules {
+            println!("SubModule {id:?}: {sm:?}");
+        }
+    }
+
+    typed.into_instantiated_module(name)
 }
