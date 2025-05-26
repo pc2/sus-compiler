@@ -283,7 +283,22 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     }
                 }
                 RealWireDataSource::Select { root, path } => {
+                    let root_wire = &self.wires[*root];
+                    __debug_span!(
+                        root_wire.get_span(self.link_info),
+                        "{}",
+                        root_wire
+                            .typ
+                            .display_substitute(self.linker, &unifier.store)
+                    );
+                    __debug_span!(
+                        span,
+                        "{}",
+                        out.typ.display_substitute(self.linker, &unifier.store)
+                    );
+                    __debug_breakpoint!();
                     let found_typ = self.wires[*root].typ.walk_path(path);
+                    dbg!(&path, &found_typ, &out.typ);
                     // Errors are reported by final_checks
                     let _ = unifier.unify_concrete::<true>(&out.typ, found_typ);
                 }

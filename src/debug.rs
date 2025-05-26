@@ -73,14 +73,14 @@ fn print_most_recent_spans(file_data: &FileData) {
 }
 
 #[allow(unused)]
-pub fn debug_print_span(span: Span) {
+pub fn debug_print_span(span: Span, label: String) {
     MOST_RECENT_FILE_DATA.with(|ptr| {
         let ptr = ptr.load(std::sync::atomic::Ordering::SeqCst);
         if ptr.is_null() {
             eprintln!("No FileData registered!");
         } else {
             let fd: &FileData = unsafe { &*ptr };
-            pretty_print_span(fd, span.as_range());
+            pretty_print_span(fd, span.as_range(), label);
         }
     })
 }
@@ -283,16 +283,32 @@ impl Drop for OutOfTimeKiller {
 
 #[macro_export]
 macro_rules! __debug_span {
-    ($val:expr $(,)?) => {
+    ($span:expr) => {
         if $crate::debug::debugging_enabled() {
-            let tmp = $val;
-            std::eprintln!("[{}:{}:{}] {}:",
-                std::file!(), std::line!(), std::column!(), std::stringify!($val));
+            let tmp = $span;
+            std::eprintln!(
+                "[{}:{}:{}] {}:",
+                std::file!(),
+                std::line!(),
+                std::column!(),
+                std::stringify!($span)
+            );
 
-            $crate::debug::debug_print_span(tmp);
+            $crate::debug::debug_print_span(tmp, String::new());
         }
     };
-    ($($val:expr),+ $(,)?) => {
-        ($($crate::__debug_span!($val)),+,)
+    ($span:expr, $($arg:tt)*) => {
+        if $crate::debug::debugging_enabled() {
+            let tmp = $span;
+            std::eprintln!(
+                "[{}:{}:{}] {}:",
+                std::file!(),
+                std::line!(),
+                std::column!(),
+                std::stringify!($span)
+            );
+
+            $crate::debug::debug_print_span(tmp, format!($($arg)*));
+        }
     };
 }

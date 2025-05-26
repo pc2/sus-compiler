@@ -25,6 +25,27 @@ impl<'l> ModuleTypingContext<'l> {
             )
         })
     }
+    fn check_wire_ref_bounds<'c>(
+        &self,
+        mut typ: &'c ConcreteType,
+        path: &[RealWirePathElem],
+    ) -> &'c ConcreteType {
+        for path_elem in path {
+            match path_elem {
+                RealWirePathElem::ArrayAccess { span, idx_wire } => {
+                    let (content, arr_sz) = typ.unwrap_array();
+                    let arr_sz = arr_sz.unwrap_integer();
+                    typ = content;
+                    let idx_wire = &self.wires[*idx_wire];
+                    let (min, max) = idx_wire.typ.unwrap_integer_bounds();
+                    if min < &IBig::from(0) || max >= arr_sz {
+                        self.errors.error(span.inner_span(), format!("Out of bounds! The array is of size {arr_sz}, but the index has bounds {min}..{max}"));
+                    }
+                }
+            }
+        }
+        typ
+    }
     fn check_all_subtypes_in_wires(&self) {
         for (_, w) in &self.wires {
             match &w.source {
@@ -39,28 +60,15 @@ impl<'l> ModuleTypingContext<'l> {
                         }
                     }
                     for s in sources {
-                        let mut target = &w.typ;
-                        for path_elem in &s.to_path {
-                            match path_elem {
-                                RealWirePathElem::ArrayAccess { span, idx_wire } => {
-                                    let (content, arr_sz) = target.unwrap_array();
-                                    let arr_sz = arr_sz.unwrap_integer();
-                                    target = content;
-                                    let idx_wire = &self.wires[*idx_wire];
-                                    let (min, max) = idx_wire.typ.unwrap_integer_bounds();
-                                    if min < &IBig::from(0) || max >= arr_sz {
-                                        self.errors.error(span.inner_span(), format!("Out of bounds! The array is of size {arr_sz}, but the index has bounds {min}..{max}"));
-                                    }
-                                }
-                            }
-                        }
-                        if let Some(e) = self.wire_must_be_subtype(&self.wires[s.from], target) {
+                        let target_typ = self.check_wire_ref_bounds(&w.typ, &s.to_path);
+                        if let Some(e) = self.wire_must_be_subtype(&self.wires[s.from], target_typ)
+                        {
                             if let Some(write_to) = s.wr_ref.get(self.link_info) {
                                 e.info_same_file(
                                     write_to.to_span,
                                     format!(
                                         "Writing to this, which has type {}",
-                                        target.display(&self.linker.types, true)
+                                        target_typ.display(&self.linker.types, true)
                                     ),
                                 );
                             }
@@ -80,6 +88,11 @@ impl<'l> ModuleTypingContext<'l> {
                     for arr_wire in array_wires {
                         self.wire_must_be_subtype(&self.wires[*arr_wire], arr_content);
                     }
+                }
+                RealWireDataSource::Select { root, path } => {
+                    let root_wire = &self.wires[*root];
+                    let result_typ = self.check_wire_ref_bounds(&root_wire.typ, path);
+                    assert_eq!(&w.typ, result_typ);
                 }
                 _ => {}
             }
