@@ -4,7 +4,7 @@ use super::{
     abstract_type::AbstractRankedType, concrete_type::ConcreteTemplateArg,
     value_unifier::UnifyableValue, written_type::WrittenType,
 };
-use crate::{let_unwrap, prelude::*, typing::set_unifier::Unifyable, value::Value};
+use crate::{prelude::*, typing::set_unifier::Unifyable, value::Value};
 
 /// See [TVec]. All circumstances handling Templates need to handle both Types and Values.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

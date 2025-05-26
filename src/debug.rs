@@ -165,6 +165,16 @@ pub fn is_enabled(path_id: &'static str) -> bool {
     })
 }
 
+#[allow(unused)]
+pub fn debugging_enabled() -> bool {
+    DEBUG_STACK.with_borrow_mut(|stack| {
+        let Some(last) = stack.debug_stack.last() else {
+            return false;
+        };
+        last.debugging_enabled
+    })
+}
+
 pub fn setup_panic_handler() {
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {

@@ -8,12 +8,12 @@ use std::ops::{Deref, Index, IndexMut};
 
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::{GlobalUUID, IsExtern, LinkInfo};
+use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType};
 use crate::typing::concrete_type::ConcreteTemplateArg;
 use crate::typing::template::{GlobalReference, TVec, TemplateArg};
 use crate::typing::written_type::WrittenType;
 use crate::util::{unwrap_single_element, zip_eq};
-use crate::{let_unwrap, prelude::*};
 
 use ibig::{IBig, UBig};
 

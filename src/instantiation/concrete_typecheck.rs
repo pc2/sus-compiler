@@ -5,9 +5,17 @@ use crate::alloc::{zip_eq, zip_eq3};
 use crate::typing::set_unifier::{DelayedErrorCollector, FullySubstitutable};
 use crate::typing::value_unifier::{ValueErrorReporter, ValueUnifierStore};
 use crate::typing::{concrete_type::ConcreteType, value_unifier::ValueUnifier};
-use crate::{let_unwrap, unifier_constraint_ints};
 
 use super::*;
+
+macro_rules! unifier_constraint_ints {
+    ($unifier:ident, [$($var:ident),+], $body:block) => {
+        $unifier.add_constraint([$($var),+], move |$unifier| {
+            $(let $var = $unifier.unwrap_known($var).unwrap_integer();)+
+            $body
+        })
+    };
+}
 
 macro_rules! assert_due_to_variable_clones {
     ($cond:expr) => {

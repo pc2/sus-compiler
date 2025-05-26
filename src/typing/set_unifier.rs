@@ -8,7 +8,7 @@ use crate::alloc::{ArenaAllocator, UUIDAllocator, UUIDMarker, UUID};
 use crate::append_only_vec::AppendOnlyVec;
 use crate::prelude::*;
 
-use crate::{let_unwrap, util::merge_vec_into};
+use crate::util::merge_vec_into;
 
 #[derive(Debug)]
 enum KnownValue<T, ID> {
@@ -388,25 +388,6 @@ impl<'inst, T: Eq + Clone + Debug, IDMarker: UUIDMarker> SetUnifier<'inst, T, ID
     pub fn unwrap_known<'v>(&'v self, val: &'v Unifyable<T, IDMarker>) -> &'v T {
         self.store.get_substitution(val).unwrap()
     }
-}
-
-#[macro_export]
-macro_rules! unifier_constraint {
-    ($unifier:ident, [$($var:ident),+], $body:block) => {
-        $unifier.add_constraint([$($var),+], |unifier| {
-            $(let $var = unifier.unwrap_known($var);)+
-            $body
-        })
-    };
-}
-#[macro_export]
-macro_rules! unifier_constraint_ints {
-    ($unifier:ident, [$($var:ident),+], $body:block) => {
-        $unifier.add_constraint([$($var),+], move |$unifier| {
-            $(let $var = $unifier.unwrap_known($var).unwrap_integer();)+
-            $body
-        })
-    };
 }
 
 pub trait FullySubstitutable<T: Clone, IDMarker> {

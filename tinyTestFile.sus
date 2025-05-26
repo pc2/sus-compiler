@@ -2,7 +2,7 @@
 // DO NOT COMMIT
 // To use with VSCode debugger, name the module "TEST", and in the code use `if crate::debug::is_enabled("TEST") {}` to enable breakpoint code
 
-module testOperators {
+module TEST {
 	interface testOperators : int#(MIN: 0, MAX:9) a'0, int#(MIN: 1, MAX:3) b'0 -> bool out
 
 	bool[25] bb
@@ -15,7 +15,7 @@ module testOperators {
 	x = a % b + 1
 	x = 4 + 7
 
-	int a, int b = 3 + 7
+	//int a, int b = 3 + 7
 
 	out = bb[x]
 }
