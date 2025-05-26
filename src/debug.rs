@@ -1,4 +1,10 @@
-use std::{cell::RefCell, ops::Range};
+use std::{
+    cell::RefCell,
+    ops::Range,
+    sync::{atomic::AtomicBool, Arc, LazyLock, Mutex},
+    thread,
+    time::{Duration, Instant},
+};
 
 use circular_buffer::CircularBuffer;
 
@@ -70,6 +76,10 @@ fn print_most_recent_spans(file_data: &FileData) {
 /// Maybe future work can remove dependency on Linker lifetime with some unsafe code.
 pub struct SpanDebugger<'text> {
     file_data: &'text FileData,
+    started_at: std::time::Instant,
+    /// Kills the process if a SpanDebugger lives longer than config.kill_timeout
+    #[allow(unused)]
+    out_of_time_killer: OutOfTimeKiller,
 }
 
 fn print_stack_top(enter_exit: &str) {
@@ -97,9 +107,9 @@ fn print_stack_top(enter_exit: &str) {
 impl<'text> SpanDebugger<'text> {
     pub fn new(stage: &'static str, global_obj_name: &str, file_data: &'text FileData) -> Self {
         let context = format!("{stage} {global_obj_name}");
-        DEBUG_STACK.with_borrow_mut(|history| {
-            let config = config();
+        let config = config();
 
+        DEBUG_STACK.with_borrow_mut(|history| {
             let debugging_enabled = config.debug_whitelist.is_empty()
                 && !config.enabled_debug_paths.is_empty()
                 || config
@@ -108,20 +118,28 @@ impl<'text> SpanDebugger<'text> {
                     .any(|v| global_obj_name.contains(v));
 
             history.debug_stack.push(SpanDebuggerStackElement {
-                context,
+                context: context.clone(),
                 debugging_enabled,
                 span_history: CircularBuffer::new(),
             });
         });
         print_stack_top("Enter ");
 
-        Self { file_data }
+        Self {
+            file_data,
+            started_at: std::time::Instant::now(),
+            out_of_time_killer: OutOfTimeKiller::new(context),
+        }
     }
 }
 
 impl Drop for SpanDebugger<'_> {
     fn drop(&mut self) {
-        print_stack_top("Exit ");
+        let time_taken = std::time::Instant::now() - self.started_at;
+        print_stack_top(&format!(
+            "Exit (Took {})",
+            humantime::format_duration(time_taken)
+        ));
         DEBUG_STACK.with_borrow_mut(|stack| stack.debug_stack.pop());
         print_stack_top("");
 
@@ -159,4 +177,69 @@ pub fn setup_panic_handler() {
             }
         })
     }));
+}
+
+struct TimerEntry {
+    started_at: Instant,
+    info: String,
+    alive: Arc<AtomicBool>,
+}
+
+static WATCHDOG: LazyLock<Mutex<Vec<TimerEntry>>> = LazyLock::new(|| {
+    let list = Mutex::new(Vec::new());
+    spawn_watchdog_thread();
+    list
+});
+
+fn spawn_watchdog_thread() {
+    let duration = config().kill_timeout;
+    if duration.is_zero() {
+        return; // No watchdog
+    }
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_millis(50));
+
+        let mut timers = WATCHDOG.lock().unwrap();
+        let now = Instant::now();
+        timers.retain(|entry| {
+            let deadline = entry.started_at + duration;
+            if deadline <= now && entry.alive.load(std::sync::atomic::Ordering::SeqCst) {
+                eprintln!(
+                    "⏰ OutOfTimeKiller triggered in {} after it took more than {} to execute ⏰",
+                    entry.info,
+                    humantime::format_duration(now - entry.started_at)
+                );
+                eprintln!("Process will now be terminated.");
+                std::process::exit(1);
+            } else {
+                deadline > now
+            }
+        });
+    });
+}
+
+pub struct OutOfTimeKiller {
+    alive: Arc<AtomicBool>,
+}
+
+impl OutOfTimeKiller {
+    pub fn new(info: String) -> Self {
+        let timeout = config().kill_timeout;
+        let alive = Arc::new(AtomicBool::new(true));
+        if !timeout.is_zero() {
+            WATCHDOG.lock().unwrap().push(TimerEntry {
+                started_at: Instant::now(),
+                alive: alive.clone(),
+                info,
+            });
+        }
+
+        OutOfTimeKiller { alive }
+    }
+}
+
+impl Drop for OutOfTimeKiller {
+    fn drop(&mut self) {
+        self.alive.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
 }
