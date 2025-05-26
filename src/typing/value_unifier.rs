@@ -250,14 +250,13 @@ impl Value {
                                 if v < min {
                                     *min = v.clone();
                                 }
-                                let vp = v + 1;
-                                if vp > *max {
-                                    *max = vp;
+                                if v > max {
+                                    *max = v.clone();
                                 }
                             } else {
                                 result_args = Some(TVec::from_vec(vec![
                                     TemplateKind::Value(Value::Integer(v.clone()).into()),
-                                    TemplateKind::Value(Value::Integer(v + 1).into()),
+                                    TemplateKind::Value(Value::Integer(v.clone()).into()),
                                 ]))
                             }
                         }

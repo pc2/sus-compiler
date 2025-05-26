@@ -667,7 +667,7 @@ impl<'l> ExecutionContext<'l> {
         to_path: Vec<RealWirePathElem>,
         from: WireID,
         num_regs: i64,
-        original_instruction: FlatID,
+        wr_ref: WriteReference,
     ) {
         let RealWireDataSource::Multiplexer {
             is_state: _,
@@ -682,7 +682,7 @@ impl<'l> ExecutionContext<'l> {
             num_regs,
             from,
             condition: self.condition_stack.clone().into_boxed_slice(),
-            original_connection: original_instruction,
+            wr_ref,
         });
     }
 
@@ -690,7 +690,7 @@ impl<'l> ExecutionContext<'l> {
         &mut self,
         write_to: &'l WriteTo,
         from: WireID,
-        original_connection: FlatID,
+        wr_ref: WriteReference,
     ) -> ExecutionResult<()> {
         let_unwrap!(
             WriteModifiers::Connection {
@@ -709,13 +709,7 @@ impl<'l> ExecutionContext<'l> {
         let domain = self.wires[target_wire].domain;
         let instantiated_path =
             self.instantiate_wire_ref_path(preamble, &write_to.to.path, domain)?;
-        self.instantiate_write_to_wire(
-            target_wire,
-            instantiated_path,
-            from,
-            *num_regs,
-            original_connection,
-        );
+        self.instantiate_write_to_wire(target_wire, instantiated_path, from, *num_regs, wr_ref);
         Ok(())
     }
 
@@ -723,7 +717,7 @@ impl<'l> ExecutionContext<'l> {
         &mut self,
         write_to: &'l WriteTo,
         value: Value,
-        original_connection: FlatID,
+        original_expression: FlatID,
     ) -> ExecutionResult<()> {
         match &write_to.write_modifiers {
             WriteModifiers::Connection {
@@ -738,9 +732,9 @@ impl<'l> ExecutionContext<'l> {
                     let from = self.alloc_wire_for_const(
                         value,
                         write_to.to.get_output_typ(),
-                        original_connection,
+                        original_expression,
                         domain,
-                        self.link_info.instructions[original_connection]
+                        self.link_info.instructions[original_expression]
                             .unwrap_expression()
                             .span,
                     )?;
@@ -751,7 +745,10 @@ impl<'l> ExecutionContext<'l> {
                         instantiated_path,
                         from,
                         *num_regs,
-                        original_connection,
+                        WriteReference {
+                            original_expression,
+                            write_idx: 0,
+                        },
                     );
                 }
                 RealWireRefRoot::Generative(target_decl) => {
@@ -1014,7 +1011,9 @@ impl<'l> ExecutionContext<'l> {
                     fc.interface_reference.interface_span,
                 );
 
-                for (port, arg) in zip_eq(interface.func_call_inputs, &fc.arguments) {
+                for (write_idx, (port, arg)) in
+                    zip_eq(interface.func_call_inputs, &fc.arguments).enumerate()
+                {
                     let from = self.get_wire_or_constant_as_wire(*arg, domain)?;
                     let port_wire = self.get_submodule_port(submod_id, port, None);
                     self.instantiate_write_to_wire(
@@ -1022,7 +1021,10 @@ impl<'l> ExecutionContext<'l> {
                         Vec::new(),
                         from,
                         0,
-                        original_instruction,
+                        WriteReference {
+                            original_expression: original_instruction,
+                            write_idx,
+                        },
                     );
                 }
 
@@ -1325,11 +1327,16 @@ impl<'l> ExecutionContext<'l> {
                                     if write_tos.is_empty() {
                                         continue; // See no errors on zero outputs (#79)
                                     }
-                                    for (expr_output, write) in zip_eq(output_wires, write_tos) {
+                                    for (write_idx, (expr_output, write)) in
+                                        zip_eq(output_wires, write_tos).enumerate()
+                                    {
                                         self.write_non_generative(
                                             write,
                                             expr_output,
-                                            original_instruction,
+                                            WriteReference {
+                                                original_expression: original_instruction,
+                                                write_idx,
+                                            },
                                         )?;
                                     }
                                     continue;

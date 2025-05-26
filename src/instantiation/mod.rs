@@ -15,7 +15,7 @@ use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 use std::cell::OnceCell;
 use std::rc::Rc;
 
-use crate::flattening::{BinaryOperator, Module, Port, UnaryOperator};
+use crate::flattening::{BinaryOperator, ExpressionOutput, Module, Port, UnaryOperator, WriteTo};
 use crate::{errors::ErrorStore, value::Value};
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
@@ -28,6 +28,25 @@ pub enum RealWirePathElem {
     ArrayAccess { span: BracketSpan, idx_wire: WireID },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WriteReference {
+    /// The [crate::flattening::Instruction::Expression] that created this write
+    pub original_expression: FlatID,
+    /// Which write in a [crate::flattening::ExpressionOutput::MultiWrite] corresponds to [Self::to_path]
+    pub write_idx: usize,
+}
+
+impl WriteReference {
+    pub fn get<'l>(&self, link_info: &'l LinkInfo) -> Option<&'l WriteTo> {
+        let expr = link_info.instructions[self.original_expression].unwrap_expression();
+        if let ExpressionOutput::MultiWrite(writes) = &expr.output {
+            Some(&writes[self.write_idx])
+        } else {
+            None
+        }
+    }
+}
+
 /// One arm of a multiplexer. Each arm has an attached condition that is also stored here.
 ///
 /// See [RealWireDataSource::Multiplexer]
@@ -37,7 +56,7 @@ pub struct MultiplexerSource {
     pub num_regs: i64,
     pub from: WireID,
     pub condition: Box<[ConditionStackElem]>,
-    pub original_connection: FlatID,
+    pub wr_ref: WriteReference,
 }
 
 /// Where a [RealWire] gets its data, be it an operator, read-only value, constant, etc.
@@ -398,7 +417,10 @@ fn perform_instantiation(
             interface_ports: Default::default(),
             wires: Default::default(),
             submodules: Default::default(),
-            generation_state: Default::default(),
+            generation_state: md
+                .link_info
+                .instructions
+                .map(|_| SubModuleOrWire::Unnasigned),
         };
     }
 

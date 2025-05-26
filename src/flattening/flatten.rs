@@ -884,11 +884,19 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             }
         }
 
+        let output = match (&source, writes.is_empty()) {
+            (ExpressionSource::FuncCall(_), _) | (_, false) => ExpressionOutput::MultiWrite(writes),
+            (_, true) => {
+                self.errors.warn(span, "The result of this expression is not used. Only function calls can return nothing. ");
+                ExpressionOutput::SubExpression(self.type_alloc.type_alloc.alloc_unknown())
+            }
+        };
+
         let wire_instance = Expression {
             span,
             domain,
             source,
-            output: ExpressionOutput::MultiWrite(writes),
+            output,
         };
         self.instructions
             .alloc(Instruction::Expression(wire_instance));

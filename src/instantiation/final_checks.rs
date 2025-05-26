@@ -1,55 +1,51 @@
 //! After instantiation, we preform a few final checks of each module.
+//! - Check all subtype relations
+//! - Check array bounds
 
 use ibig::IBig;
 
-use crate::prelude::*;
-
 use crate::{errors::ErrorReference, typing::concrete_type::ConcreteType};
 
-use super::{ModuleTypingContext, RealWireDataSource, RealWirePathElem};
+use super::{ModuleTypingContext, RealWire, RealWireDataSource, RealWirePathElem};
 
 impl<'l> ModuleTypingContext<'l> {
-    fn must_be_subtype_of(
+    fn wire_must_be_subtype(
         &self,
-        found: &ConcreteType,
+        wire: &RealWire,
         expected: &ConcreteType,
-        span: Span,
     ) -> Option<ErrorReference<'_>> {
-        if !found.is_subtype_of(expected) {
-            Some(self.errors.error(
-                span,
+        (!wire.typ.is_subtype_of(expected)).then(|| {
+            self.errors.error(
+                wire.get_span(self.link_info),
                 format!(
                     "Typecheck error: Found {}, which is not a subtype of the expected type {}",
-                    found.display(&self.linker.types, true),
+                    wire.typ.display(&self.linker.types, true),
                     expected.display(&self.linker.types, true)
                 ),
-            ))
-        } else {
-            None
-        }
+            )
+        })
     }
     fn check_all_subtypes_in_wires(&self) {
         for (_, w) in &self.wires {
-            let span = w.get_span(self.link_info);
             match &w.source {
                 RealWireDataSource::ReadOnly => {}
                 RealWireDataSource::Multiplexer { is_state, sources } => {
                     if let Some(is_state) = is_state {
                         if !is_state.is_of_type(&w.typ) {
                             self.errors.error(
-                                span,
+                                w.get_span(self.link_info),
                                 "Wire's initial value is not a subtype of the wire's type!",
                             );
                         }
                     }
                     for s in sources {
-                        let mut target_typ = &w.typ;
+                        let mut target = &w.typ;
                         for path_elem in &s.to_path {
                             match path_elem {
                                 RealWirePathElem::ArrayAccess { span, idx_wire } => {
-                                    let (content, arr_sz) = target_typ.unwrap_array();
+                                    let (content, arr_sz) = target.unwrap_array();
                                     let arr_sz = arr_sz.unwrap_integer();
-                                    target_typ = content;
+                                    target = content;
                                     let idx_wire = &self.wires[*idx_wire];
                                     let (min, max) = idx_wire.typ.unwrap_integer_bounds();
                                     if min < &IBig::from(0) || max >= arr_sz {
@@ -58,31 +54,31 @@ impl<'l> ModuleTypingContext<'l> {
                                 }
                             }
                         }
-                        let from_wire = &self.wires[s.from];
-                        self.must_be_subtype_of(
-                            &from_wire.typ,
-                            target_typ,
-                            from_wire.get_span(self.link_info),
-                        );
+                        if let Some(e) = self.wire_must_be_subtype(&self.wires[s.from], target) {
+                            if let Some(write_to) = s.wr_ref.get(self.link_info) {
+                                e.info_same_file(
+                                    write_to.to_span,
+                                    format!(
+                                        "Writing to this, which has type {}",
+                                        target.display(&self.linker.types, true)
+                                    ),
+                                );
+                            }
+                        }
                     }
                 }
                 RealWireDataSource::ConstructArray { array_wires } => {
-                    let (array_content_supertyp, array_size) = w.typ.unwrap_array();
+                    let (arr_content, array_size) = w.typ.unwrap_array();
 
                     let array_wires_len = array_wires.len();
                     let expected_array_size: usize = array_size.unwrap_int();
 
                     if array_wires_len != expected_array_size {
-                        self.errors.error(span, format!("This construct creates an array of size {array_wires_len}, but the expected size is {expected_array_size}"));
+                        self.errors.error(w.get_span(self.link_info), format!("This construct creates an array of size {array_wires_len}, but the expected size is {expected_array_size}"));
                     }
 
                     for arr_wire in array_wires {
-                        let arr_wire = &self.wires[*arr_wire];
-                        self.must_be_subtype_of(
-                            &arr_wire.typ,
-                            array_content_supertyp,
-                            arr_wire.get_span(self.link_info),
-                        );
+                        self.wire_must_be_subtype(&self.wires[*arr_wire], arr_content);
                     }
                 }
                 _ => {}

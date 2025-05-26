@@ -38,8 +38,8 @@ module pow17 {
 
 module fibonnaci {
     interface fibonnaci : -> int num 
-	state int cur = 1
-	state int prev = 0
+	state int #(MIN: 0, MAX: 100) cur = 1
+	state int #(MIN: 0, MAX: 100) prev = 0
 
 	
 	num = (cur + prev) % 100
