@@ -241,6 +241,7 @@ fn spawn_watchdog_thread() {
         timers.retain(|entry| {
             let deadline = entry.started_at + duration;
             if deadline <= now && entry.alive.load(std::sync::atomic::Ordering::SeqCst) {
+                println!("⏰⏰⏰⏰⏰⏰⏰⏰⏰"); // To show in stdout when this happens too
                 eprintln!(
                     "⏰ OutOfTimeKiller triggered in {} after it took more than {} to execute ⏰",
                     entry.info,

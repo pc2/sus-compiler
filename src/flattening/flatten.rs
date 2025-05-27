@@ -1218,7 +1218,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         }
                     }
                     PartialWireReference::WireReference(_) => {
-                        println!("TODO: Struct fields");
+                        self.errors.error(port_name_span, "TODO: Struct fields");
                         PartialWireReference::WireReference(self.new_error(expr_span))
                     }
                 }
@@ -1607,7 +1607,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         let (name_span, module_name) = cursor.field_span(field!("name"), kind!("identifier"));
         self.flatten_parameters(cursor);
-        println!("TREE SITTER module! {module_name}");
 
         if let Some(mut const_type_cursor) = const_type_cursor {
             let decl_span = const_type_cursor.span();
@@ -1681,7 +1680,9 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
     let obj_link_info = linker.get_link_info(global_obj);
     let globals = GlobalResolver::new(linker, obj_link_info, errors_globals);
 
-    let _panic_guard = SpanDebugger::new("flatten_global", &obj_link_info.name, cursor.file_data);
+    let obj_name = &obj_link_info.name;
+    println!("Flattening {obj_name}");
+    let _panic_guard = SpanDebugger::new("flatten_global", obj_name, cursor.file_data);
 
     let mut local_variable_context = LocalVariableContext::new_initial();
 
@@ -1694,7 +1695,6 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
     ) = match global_obj {
         GlobalUUID::Module(module_uuid) => {
             let md = &globals[module_uuid];
-
             for (id, domain) in &md.domains {
                 if let Err(conflict) =
                     local_variable_context.add_declaration(&domain.name, NamedLocal::DomainDecl(id))

@@ -855,18 +855,6 @@ impl FinalizationContext<'_, '_> {
             }
         }
 
-        // Assign names to all of the domains in this module
-        working_on.domains = leftover_domain_alloc.as_range().map(|id| {
-            if let Some(work_on_domain) = working_on.domains.get(id) {
-                work_on_domain.clone()
-            } else {
-                DomainInfo {
-                    name: format!("domain_{}", id.get_hidden_value()),
-                    name_span: None,
-                }
-            }
-        });
-
         // Post type application. Solidify types and flag any remaining AbstractType::Unknown
         for (_id, inst) in working_on.link_info.instructions.iter_mut() {
             match inst {

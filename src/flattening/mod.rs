@@ -6,7 +6,7 @@ mod parser;
 mod typechecking;
 mod walk;
 
-use crate::alloc::{UUIDAllocator, UUIDRange};
+use crate::alloc::UUIDAllocator;
 use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractRankedType, DomainType, PeanoType};
 use crate::typing::written_type::WrittenType;
@@ -61,7 +61,6 @@ pub struct Module {
     ///
     /// [Self::domains] is then extended during abstract typechecking to add unnamed domains
     pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,
-    pub named_domains: UUIDRange<DomainIDMarker>,
     pub implicit_clk_domain: bool,
 
     /// Created in Stage 1: Initialization
@@ -191,6 +190,7 @@ pub enum PortOrInterface {
 #[derive(Debug, Clone)]
 pub struct DomainInfo {
     pub name: String,
+    /// May be [None] for the default `clk` domain
     pub name_span: Option<Span>,
 }
 

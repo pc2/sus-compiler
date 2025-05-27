@@ -1,161 +1,161 @@
-TREE SITTER module! LatencyOffset
-TREE SITTER module! CrossDomain
-TREE SITTER module! IntToBits
-TREE SITTER module! BitsToInt
-TREE SITTER module! bool
-TREE SITTER module! int
-TREE SITTER module! float
-TREE SITTER module! __crash_compiler
-TREE SITTER module! true
-TREE SITTER module! false
-TREE SITTER module! assert
-TREE SITTER module! sizeof
-TREE SITTER module! clog2
-TREE SITTER module! pow2
-TREE SITTER module! pow
-TREE SITTER module! factorial
-TREE SITTER module! falling_factorial
-TREE SITTER module! comb
-TREE SITTER module! DualPortMem
-TREE SITTER module! FIFO
-TREE SITTER module! JoinDomains
-TREE SITTER module! Iterator
-TREE SITTER module! FixedSizeIterator
-TREE SITTER module! SlowClockGenerator
-TREE SITTER module! SplitAt
-TREE SITTER module! Abs
-TREE SITTER module! Slice
-TREE SITTER module! BitSelect
-TREE SITTER module! PopCount
-TREE SITTER module! TreeAdd
-TREE SITTER module! example_md
-TREE SITTER module! multiply_add
-TREE SITTER module! test_pow17
-TREE SITTER module! pow17
-TREE SITTER module! fibonnaci
-TREE SITTER module! blur2
-TREE SITTER module! Tree_Multiply
-TREE SITTER module! Accumulator
-TREE SITTER module! blur
-TREE SITTER module! Unpack4
-TREE SITTER module! generative
-TREE SITTER module! add_indices_to_array
-TREE SITTER module! assignment_producer
-TREE SITTER module! test_various_assignments
-TREE SITTER module! first_bit_idx_6
-TREE SITTER module! multiply_add_with_latencies
-TREE SITTER module! first_bit_idx_24
-TREE SITTER module! permute
-TREE SITTER module! permute24
-TREE SITTER module! test_single_wire
-TREE SITTER module! disjoint_ports
-TREE SITTER module! undeteriminable_input_latency
-TREE SITTER module! specified_input_latency
-TREE SITTER module! determinable_input_latency
-TREE SITTER module! determinable_because_no_input_output_ports
-TREE SITTER module! conflicting_latency_declarations
-TREE SITTER module! bad_cycle
-TREE SITTER module! module_taking_time
-TREE SITTER module! matrix_vector_mul
-TREE SITTER module! bad_cycle2
-TREE SITTER module! module_taking_a_lot_of_time
-TREE SITTER module! offset_latency
-TREE SITTER module! good_cycle
-TREE SITTER module! input_only
-TREE SITTER module! multiple_inputs_only
-TREE SITTER module! output_only
-TREE SITTER module! multiple_outputs_only
-TREE SITTER module! submodule
-TREE SITTER module! doNothing
-TREE SITTER module! contains_submodule_submodule
-TREE SITTER module! xor
-TREE SITTER module! use_xor
-TREE SITTER module! fizz_buzz
-TREE SITTER module! fizz_buzz_gen
-TREE SITTER module! mbf_dual
-TREE SITTER module! monotonize_down
-TREE SITTER module! my_mod
-TREE SITTER module! use_my_mod
-TREE SITTER module! submodule_named_ports
-TREE SITTER module! use_submodule_named_ports
-TREE SITTER module! contains_submodule_submodule
-TREE SITTER module! cross_bool
-TREE SITTER module! cross_int
-TREE SITTER module! cross_memory
-TREE SITTER module! offset_backwards
-TREE SITTER module! dual_port_mem
-TREE SITTER module! use_fifo
-TREE SITTER module! test_separated_domain
-TREE SITTER module! no_port_module
-TREE SITTER module! use_no_input_module
-TREE SITTER module! mod_with_unused_interface
-TREE SITTER module! test_write_to_gen_var
-TREE SITTER module! use_bad_interface
-TREE SITTER module! sequenceDownFrom
-TREE SITTER module! sumUpTo
-TREE SITTER module! test
-TREE SITTER module! use_test
-TREE SITTER module! tinyTestMod
-TREE SITTER module! testTinyTestMod
-TREE SITTER module! tree_add
-TREE SITTER module! make_tree_add
-TREE SITTER module! replicate
-TREE SITTER module! use_replicate
-TREE SITTER module! permute_t
-TREE SITTER module! use_permute
-TREE SITTER module! instruction_decoder
-TREE SITTER module! run_instruction
-TREE SITTER module! no_main_interface
-TREE SITTER module! use_no_main_interface
-TREE SITTER module! moduleWithBadDeclaration
-TREE SITTER module! moduleWithBadInterface
-TREE SITTER module! useModuleWithBadInterface
-TREE SITTER module! SUM_UP
-TREE SITTER module! dont_care
-TREE SITTER module! m
-TREE SITTER module! xyz
-TREE SITTER module! numbersToAddUp
-TREE SITTER module! sized_int_add
-TREE SITTER module! use_sized_int_add
-TREE SITTER module! implicit_domain_forbidden
-TREE SITTER module! conflicting_domain_with_port_name
-TREE SITTER module! make_infinite_type_help
-TREE SITTER module! make_infinite_type
-TREE SITTER module! UseDualPortMem
-TREE SITTER module! example_FIFO
-TREE SITTER module! use_Iterator
-TREE SITTER module! UseSlice
-TREE SITTER module! UseBuiltinConstants
-TREE SITTER module! FailingAssert
-TREE SITTER module! IfTesting
-TREE SITTER module! latency_counting_disjoint_blocks
-TREE SITTER module! latency_counting_disjoint_blocks_merge_error
-TREE SITTER module! use_infer_me
-TREE SITTER module! infer_me
-TREE SITTER module! infer_from_local_context
-TREE SITTER module! instantiate_fifo
-TREE SITTER module! inference_edge_case
-TREE SITTER module! specified_latencies_not_ports_edge_case
-TREE SITTER module! testArrayWrite
-TREE SITTER module! infer_me_with_poison_output
-TREE SITTER module! instantiate_infer_me_with_poison_output
-TREE SITTER module! __add__
-TREE SITTER module! ShiftReg
-TREE SITTER module! MultiStateLoop
-TREE SITTER module! use_MultiStateLoop
-TREE SITTER module! CombineArray
-TREE SITTER module! unknownLatency
-TREE SITTER module! useUnknownLatency
-TREE SITTER module! infer_me_conflicting_directions
-TREE SITTER module! use_infer_me_conflicting_directions
-TREE SITTER module! infer_me_with_delta
-TREE SITTER module! use_infer_me_with_delta
-TREE SITTER module! infer_me_with_negative_delta
-TREE SITTER module! use_infer_me_with_negative_delta
-TREE SITTER module! infer_me_inputs_only
-TREE SITTER module! use_infer_me_inputs_only
-TREE SITTER module! use_ranks
-TREE SITTER module! testInts
+Flattening LatencyOffset
+Flattening CrossDomain
+Flattening IntToBits
+Flattening BitsToInt
+Flattening bool
+Flattening int
+Flattening float
+Flattening __crash_compiler
+Flattening true
+Flattening false
+Flattening assert
+Flattening sizeof
+Flattening clog2
+Flattening pow2
+Flattening pow
+Flattening factorial
+Flattening falling_factorial
+Flattening comb
+Flattening DualPortMem
+Flattening FIFO
+Flattening JoinDomains
+Flattening Iterator
+Flattening FixedSizeIterator
+Flattening SlowClockGenerator
+Flattening SplitAt
+Flattening Abs
+Flattening Slice
+Flattening BitSelect
+Flattening PopCount
+Flattening TreeAdd
+Flattening example_md
+Flattening multiply_add
+Flattening test_pow17
+Flattening pow17
+Flattening fibonnaci
+Flattening blur2
+Flattening Tree_Multiply
+Flattening Accumulator
+Flattening blur
+Flattening Unpack4
+Flattening generative
+Flattening add_indices_to_array
+Flattening assignment_producer
+Flattening test_various_assignments
+Flattening first_bit_idx_6
+Flattening multiply_add_with_latencies
+Flattening first_bit_idx_24
+Flattening permute
+Flattening permute24
+Flattening test_single_wire
+Flattening disjoint_ports
+Flattening undeteriminable_input_latency
+Flattening specified_input_latency
+Flattening determinable_input_latency
+Flattening determinable_because_no_input_output_ports
+Flattening conflicting_latency_declarations
+Flattening bad_cycle
+Flattening module_taking_time
+Flattening matrix_vector_mul
+Flattening bad_cycle2
+Flattening module_taking_a_lot_of_time
+Flattening offset_latency
+Flattening good_cycle
+Flattening input_only
+Flattening multiple_inputs_only
+Flattening output_only
+Flattening multiple_outputs_only
+Flattening submodule
+Flattening doNothing
+Flattening contains_submodule_submodule
+Flattening xor
+Flattening use_xor
+Flattening fizz_buzz
+Flattening fizz_buzz_gen
+Flattening mbf_dual
+Flattening monotonize_down
+Flattening my_mod
+Flattening use_my_mod
+Flattening submodule_named_ports
+Flattening use_submodule_named_ports
+Flattening contains_submodule_submodule
+Flattening cross_bool
+Flattening cross_int
+Flattening cross_memory
+Flattening offset_backwards
+Flattening dual_port_mem
+Flattening use_fifo
+Flattening test_separated_domain
+Flattening no_port_module
+Flattening use_no_input_module
+Flattening mod_with_unused_interface
+Flattening test_write_to_gen_var
+Flattening use_bad_interface
+Flattening sequenceDownFrom
+Flattening sumUpTo
+Flattening test
+Flattening use_test
+Flattening tinyTestMod
+Flattening testTinyTestMod
+Flattening tree_add
+Flattening make_tree_add
+Flattening replicate
+Flattening use_replicate
+Flattening permute_t
+Flattening use_permute
+Flattening instruction_decoder
+Flattening run_instruction
+Flattening no_main_interface
+Flattening use_no_main_interface
+Flattening moduleWithBadDeclaration
+Flattening moduleWithBadInterface
+Flattening useModuleWithBadInterface
+Flattening SUM_UP
+Flattening dont_care
+Flattening m
+Flattening xyz
+Flattening numbersToAddUp
+Flattening sized_int_add
+Flattening use_sized_int_add
+Flattening implicit_domain_forbidden
+Flattening conflicting_domain_with_port_name
+Flattening make_infinite_type_help
+Flattening make_infinite_type
+Flattening UseDualPortMem
+Flattening example_FIFO
+Flattening use_Iterator
+Flattening UseSlice
+Flattening UseBuiltinConstants
+Flattening FailingAssert
+Flattening IfTesting
+Flattening latency_counting_disjoint_blocks
+Flattening latency_counting_disjoint_blocks_merge_error
+Flattening use_infer_me
+Flattening infer_me
+Flattening infer_from_local_context
+Flattening instantiate_fifo
+Flattening inference_edge_case
+Flattening specified_latencies_not_ports_edge_case
+Flattening testArrayWrite
+Flattening infer_me_with_poison_output
+Flattening instantiate_infer_me_with_poison_output
+Flattening __add__
+Flattening ShiftReg
+Flattening MultiStateLoop
+Flattening use_MultiStateLoop
+Flattening CombineArray
+Flattening unknownLatency
+Flattening useUnknownLatency
+Flattening infer_me_conflicting_directions
+Flattening use_infer_me_conflicting_directions
+Flattening infer_me_with_delta
+Flattening use_infer_me_with_delta
+Flattening infer_me_with_negative_delta
+Flattening use_infer_me_with_negative_delta
+Flattening infer_me_inputs_only
+Flattening use_infer_me_inputs_only
+Flattening use_ranks
+Flattening testInts
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
