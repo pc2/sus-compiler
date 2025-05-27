@@ -888,11 +888,9 @@ impl FinalizationContext<'_, '_> {
                         }
                         ExpressionSource::UnaryOp { rank, .. }
                         | ExpressionSource::BinaryOp { rank, .. } => {
-                            let _ = self
-                                .type_checker
-                                .abstract_type_substitutor
-                                .rank_substitutor
-                                .fully_substitute(rank); // No need to report incomplete peano error, as one of the ports would have reported it
+                            let _ = rank.fully_substitute(
+                                &self.type_checker.abstract_type_substitutor.rank_substitutor,
+                            ); // No need to report incomplete peano error, as one of the ports would have reported it
                         }
                         _ => {}
                     }
@@ -921,14 +919,8 @@ impl FinalizationContext<'_, '_> {
         } in self.type_checker.abstract_type_substitutor.extract_errors()
         {
             // Not being able to fully substitute is not an issue. We just display partial types
-            let _ = self
-                .type_checker
-                .abstract_type_substitutor
-                .fully_substitute(&mut found);
-            let _ = self
-                .type_checker
-                .abstract_type_substitutor
-                .fully_substitute(&mut expected);
+            let _ = found.fully_substitute(&self.type_checker.abstract_type_substitutor);
+            let _ = expected.fully_substitute(&self.type_checker.abstract_type_substitutor);
 
             let expected_name = expected
                 .display(self.linker_types, &self.type_checker.template_type_names)
@@ -940,10 +932,12 @@ impl FinalizationContext<'_, '_> {
             .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
             .add_info_list(infos);
 
-            assert!(
+            assert_ne!(found, expected);
+
+            /*assert!(
                 expected_name != found_name,
                 "{expected_name} != {found_name}"
-            );
+            );*/
         }
         for FailedUnification {
             mut found,
@@ -953,14 +947,8 @@ impl FinalizationContext<'_, '_> {
             infos,
         } in self.type_checker.domain_substitutor.extract_errors()
         {
-            assert!(self
-                .type_checker
-                .domain_substitutor
-                .fully_substitute(&mut found));
-            assert!(self
-                .type_checker
-                .domain_substitutor
-                .fully_substitute(&mut expected));
+            let _ = found.fully_substitute(&self.type_checker.domain_substitutor);
+            let _ = expected.fully_substitute(&self.type_checker.domain_substitutor);
 
             let expected_name = format!("{expected:?}");
             let found_name = format!("{found:?}");
@@ -968,19 +956,17 @@ impl FinalizationContext<'_, '_> {
             .error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"))
             .add_info_list(infos);
 
-            assert!(
+            assert_ne!(found, expected);
+
+            /*assert!(
                 expected_name != found_name,
                 "{expected_name} != {found_name}"
-            );
+            );*/
         }
     }
 
     pub fn finalize_abstract_type(&self, typ: &mut AbstractRankedType, span: Span) {
-        if !self
-            .type_checker
-            .abstract_type_substitutor
-            .fully_substitute(typ)
-        {
+        if !typ.fully_substitute(&self.type_checker.abstract_type_substitutor) {
             self.errors.error(
                 span,
                 format!(
@@ -996,10 +982,7 @@ impl FinalizationContext<'_, '_> {
     }
 
     pub fn finalize_domain_type(&self, typ_domain: &mut DomainType) {
-        assert!(self
-            .type_checker
-            .domain_substitutor
-            .fully_substitute(typ_domain));
+        assert!(typ_domain.fully_substitute(&self.type_checker.domain_substitutor));
     }
 
     pub fn finalize_type(&self, typ: &mut FullType, span: Span) {

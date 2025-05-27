@@ -432,25 +432,10 @@ pub trait Substitutor {
             "This unification cannot fail. Usually because we're unifying with a Written Type: {a:?} <-> {b:?}"
         );
     }
-
-    /// Has to be implemented separately per type
-    ///
-    /// Returns true when no Unknowns remain
-    fn fully_substitute(&self, typ: &mut Self::MyType) -> bool;
 }
 
 impl Substitutor for TypeSubstitutor<DomainType> {
     type MyType = DomainType;
-
-    fn fully_substitute(&self, typ: &mut DomainType) -> bool {
-        match typ {
-            DomainType::Generative | DomainType::Physical(_) => true, // Do nothing, These are done already
-            DomainType::Unknown(var) => {
-                *typ = *self[*var].get().expect("It's impossible for domain variables to remain, as any unset domain variable would have been replaced with a new physical domain");
-                self.fully_substitute(typ)
-            }
-        }
-    }
 
     fn unify_total(&mut self, from: &DomainType, to: &DomainType) -> UnifyResult {
         self.unify(from, to)
@@ -475,21 +460,6 @@ impl Substitutor for TypeSubstitutor<PeanoType> {
     fn unify_total(&mut self, from: &PeanoType, to: &PeanoType) -> UnifyResult {
         self.unify(from, to)
     }
-
-    fn fully_substitute(&self, typ: &mut PeanoType) -> bool {
-        match typ {
-            PeanoType::Succ(t) => self.fully_substitute(t),
-            PeanoType::Zero => true,
-            PeanoType::Unknown(var) => {
-                let Some(replacement) = self[*var].get() else {
-                    return false;
-                };
-                assert!(!std::ptr::eq(typ, replacement));
-                *typ = replacement.clone();
-                self.fully_substitute(typ)
-            }
-        }
-    }
 }
 impl TypeSubstitutor<PeanoType> {
     pub fn alloc_unknown(&mut self) -> PeanoType {
@@ -499,23 +469,6 @@ impl TypeSubstitutor<PeanoType> {
 
 impl Substitutor for AbstractTypeSubstitutor {
     type MyType = AbstractRankedType;
-
-    fn fully_substitute(&self, typ: &mut AbstractRankedType) -> bool {
-        let inner_success = match &mut typ.inner {
-            AbstractInnerType::Named(_) | AbstractInnerType::Template(_) => true, // Template Name & Name is included in get_hm_info
-            AbstractInnerType::Unknown(var) => {
-                if let Some(replacement) = self.inner_substitutor[*var].get() {
-                    assert!(!std::ptr::eq(&typ.inner, replacement));
-                    typ.inner = replacement.clone();
-                    self.fully_substitute(typ)
-                } else {
-                    false
-                }
-            }
-        };
-        let rank_success = self.rank_substitutor.fully_substitute(&mut typ.rank);
-        inner_success & rank_success
-    }
 
     fn unify_total(&mut self, from: &AbstractRankedType, to: &AbstractRankedType) -> UnifyResult {
         self.inner_substitutor.unify(&from.inner, &to.inner)
@@ -529,6 +482,54 @@ impl AbstractTypeSubstitutor {
             inner: AbstractInnerType::Unknown(self.inner_substitutor.alloc(OnceCell::new())),
             rank: PeanoType::Unknown(self.rank_substitutor.alloc(OnceCell::new())),
         }
+    }
+}
+
+impl DomainType {
+    pub fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self>) -> bool {
+        match self {
+            DomainType::Generative | DomainType::Physical(_) => true, // Do nothing, These are done already
+            DomainType::Unknown(var) => {
+                *self = *substitutor[*var].get().expect("It's impossible for domain variables to remain, as any unset domain variable would have been replaced with a new physical domain");
+                self.fully_substitute(substitutor)
+            }
+        }
+    }
+}
+
+impl PeanoType {
+    pub fn fully_substitute(&mut self, substitutor: &TypeSubstitutor<Self>) -> bool {
+        match self {
+            PeanoType::Succ(t) => t.fully_substitute(substitutor),
+            PeanoType::Zero => true,
+            PeanoType::Unknown(var) => {
+                let Some(replacement) = substitutor[*var].get() else {
+                    return false;
+                };
+                assert!(!std::ptr::eq(self, replacement));
+                *self = replacement.clone();
+                self.fully_substitute(substitutor)
+            }
+        }
+    }
+}
+
+impl AbstractRankedType {
+    pub fn fully_substitute(&mut self, substitutor: &AbstractTypeSubstitutor) -> bool {
+        let inner_success = match &mut self.inner {
+            AbstractInnerType::Named(_) | AbstractInnerType::Template(_) => true, // Template Name & Name is included in get_hm_info
+            AbstractInnerType::Unknown(var) => {
+                if let Some(replacement) = substitutor.inner_substitutor[*var].get() {
+                    assert!(!std::ptr::eq(&self.inner, replacement));
+                    self.inner = replacement.clone();
+                    self.fully_substitute(substitutor)
+                } else {
+                    false
+                }
+            }
+        };
+        let rank_success = self.rank.fully_substitute(&substitutor.rank_substitutor);
+        inner_success & rank_success
     }
 }
 

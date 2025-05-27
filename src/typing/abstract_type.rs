@@ -25,7 +25,7 @@ use crate::to_string::map_to_type_names;
 ///
 /// [AbstractType]s don't actually get converted to [crate::typing::concrete_type::ConcreteType]s.
 /// Instead [crate::typing::concrete_type::ConcreteType] gets created from [WrittenType] directly.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AbstractInnerType {
     Template(TemplateID),
     Named(TypeUUID),
@@ -48,7 +48,7 @@ impl AbstractInnerType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AbstractRankedType {
     pub inner: AbstractInnerType,
     pub rank: PeanoType,
@@ -69,7 +69,7 @@ impl AbstractRankedType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PeanoType {
     Zero,
     Succ(Box<PeanoType>),

@@ -58,7 +58,7 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner {
-            WrittenType::Error(_) => f.write_str("{error"),
+            WrittenType::Error(_) => f.write_str("{error}"),
             WrittenType::TemplateVariable(_, id) => {
                 f.write_str(self.template_names.get_template_name(*id))
             }
