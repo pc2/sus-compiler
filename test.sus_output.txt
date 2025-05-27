@@ -300,6 +300,7 @@ Typechecking use_ranks
 Typechecking testInts
 Instantiating example_md
 Concrete Typechecking example_md
+Checking array accesses example_md
 Instantiating multiply_add
 Concrete Typechecking multiply_add
 Checking array accesses multiply_add
@@ -310,11 +311,13 @@ Concrete Typechecking pow17
 Checking array accesses pow17
 Instantiating fibonnaci
 Concrete Typechecking fibonnaci
+Checking array accesses fibonnaci
 Instantiating blur2
 Concrete Typechecking blur2
 Checking array accesses blur2
 Instantiating Tree_Multiply
 Concrete Typechecking Tree_Multiply
+Checking array accesses Tree_Multiply
 Instantiating Accumulator
 Concrete Typechecking Accumulator
 Instantiating blur
@@ -322,9 +325,11 @@ Concrete Typechecking blur
 Checking array accesses blur
 Instantiating Unpack4
 Concrete Typechecking Unpack4
+Checking array accesses Unpack4
 Not Instantiating generative due to flattening errors
 Instantiating add_indices_to_array
 Concrete Typechecking add_indices_to_array
+Checking array accesses add_indices_to_array
 Instantiating assignment_producer
 Concrete Typechecking assignment_producer
 Instantiating test_various_assignments
@@ -363,6 +368,7 @@ Concrete Typechecking module_taking_time
 Checking array accesses module_taking_time
 Instantiating matrix_vector_mul
 Concrete Typechecking matrix_vector_mul
+Checking array accesses matrix_vector_mul
 Instantiating bad_cycle2
 Concrete Typechecking bad_cycle2
 Instantiating module_taking_a_lot_of_time
@@ -403,8 +409,10 @@ Concrete Typechecking monotonize_down
 Checking array accesses monotonize_down
 Instantiating my_mod
 Concrete Typechecking my_mod
+Checking array accesses my_mod
 Instantiating use_my_mod
 Concrete Typechecking use_my_mod
+Checking array accesses use_my_mod
 Instantiating submodule_named_ports
 Concrete Typechecking submodule_named_ports
 Checking array accesses submodule_named_ports
@@ -473,14 +481,15 @@ Instantiating tree_add #(WIDTH: 1)
 Concrete Typechecking tree_add #(WIDTH: 1)
 Instantiating use_replicate
 Concrete Typechecking use_replicate
-Instantiating replicate #(T: type int #(MIN: 3, MAX: 4), NUM_REPLS: 30)
-Concrete Typechecking replicate #(T: type int #(MIN: 3, MAX: 4), NUM_REPLS: 30)
-Checking array accesses replicate #(T: type int #(MIN: 3, MAX: 4), NUM_REPLS: 30)
+Instantiating replicate #(T: type int #(MIN: 3, MAX: 3), NUM_REPLS: 30)
+Concrete Typechecking replicate #(T: type int #(MIN: 3, MAX: 3), NUM_REPLS: 30)
+Checking array accesses replicate #(T: type int #(MIN: 3, MAX: 3), NUM_REPLS: 30)
 Instantiating use_permute
 Concrete Typechecking use_permute
-Instantiating permute_t #(T: type int #(MIN: 1, MAX: 8), SIZE: 8, SOURCES: [3, 2, 4, 5, 1, 2, 7, 6])
-Concrete Typechecking permute_t #(T: type int #(MIN: 1, MAX: 8), SIZE: 8, SOURCES: [3, 2, 4, 5, 1, 2, 7, 6])
-Checking array accesses permute_t #(T: type int #(MIN: 1, MAX: 8), SIZE: 8, SOURCES: [3, 2, 4, 5, 1, 2, 7, 6])
+Instantiating permute_t #(T: type int #(MIN: 1, MAX: 7), SIZE: 8, SOURCES: [3, 2, 4, 5, 1, 2, 7, 6])
+Concrete Typechecking permute_t #(T: type int #(MIN: 1, MAX: 7), SIZE: 8, SOURCES: [3, 2, 4, 5, 1, 2, 7, 6])
+Checking array accesses permute_t #(T: type int #(MIN: 1, MAX: 7), SIZE: 8, SOURCES: [3, 2, 4, 5, 1, 2, 7, 6])
+Checking array accesses use_permute
 Instantiating instruction_decoder
 Concrete Typechecking instruction_decoder
 Checking array accesses instruction_decoder

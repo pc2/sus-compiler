@@ -54,7 +54,7 @@ impl<'inst> ValueUnifier<'inst> {
         match (from, to) {
             (ConcreteType::Named(a), ConcreteType::Named(b)) => {
                 assert_eq!(a.id, b.id);
-                if UNIFY_EVERYTHING && a.id == get_builtin_type!("int") {
+                if !UNIFY_EVERYTHING && a.id == get_builtin_type!("int") {
                     // Int args are part of subtyping.
                     return true;
                 }
