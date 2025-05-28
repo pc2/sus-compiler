@@ -31,7 +31,9 @@ pub enum TargetLanguage {
 #[derive(Debug)]
 pub struct ConfigStruct {
     pub use_lsp: bool,
+    #[allow(unused)]
     pub lsp_debug_mode: bool,
+    #[allow(unused)]
     pub lsp_port: u16,
     pub codegen: bool,
     /// Enable debugging printouts and figures
@@ -42,6 +44,7 @@ pub struct ConfigStruct {
     ///
     /// See also [Self::enabled_debug_paths]
     pub debug_whitelist: Vec<String>,
+    pub kill_timeout: std::time::Duration,
     pub enabled_debug_paths: HashSet<String>,
     pub codegen_module_and_dependencies_one_file: Option<String>,
     pub early_exit: EarlyExitUpTo,
@@ -87,6 +90,15 @@ fn command_builder() -> Command {
             .hide(true)
             .help("Enable debug prints and figures for specific modules.\nDebugging checks if the current debug stage print has one of the debug-whitelist arguments as a substring. So passing 'FIFO' debugs all FIFO stuff, but passing 'Typechecking FIFO' only shows debug prints during typechecking. To show everything, pass --debug-whitelist-is-blacklist")
             .action(clap::ArgAction::Append))
+        .arg(Arg::new("kill-timeout")
+            .long("kill-timeout")
+            .hide(true)
+            .help("Sets how long an individual part of the compiler can take, before terminating. Set to 0 to disable")
+            .action(clap::ArgAction::Set)
+            .default_value("0s")
+            .value_parser(|duration : &str| {
+                humantime::parse_duration(duration)
+            }))
         .arg(Arg::new("codegen")
             .long("codegen")
             .help("Enable code generation for all modules. This creates a file named [ModuleName].sv per module.")
@@ -147,7 +159,6 @@ where
         .unwrap_or_default()
         .cloned()
         .collect();
-
     let use_color = !matches.get_flag("nocolor") && !matches.get_flag("lsp");
     let files: Vec<PathBuf> = match matches.get_many("files") {
         Some(files) => files.cloned().collect(),
@@ -167,6 +178,9 @@ where
         codegen,
         debug_whitelist,
         enabled_debug_paths,
+        kill_timeout: *matches
+            .get_one::<std::time::Duration>("kill-timeout")
+            .unwrap(),
         codegen_module_and_dependencies_one_file: matches.get_one("standalone").cloned(),
         early_exit: *matches.get_one("upto").unwrap(),
         use_color,

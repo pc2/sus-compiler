@@ -5,9 +5,8 @@ use crate::{
     prelude::*,
     typing::{
         abstract_type::PeanoType,
-        concrete_type::ConcreteType,
-        template::TVec,
-        type_inference::{Substitutor, TypeSubstitutor, TypeUnifier},
+        template::{TVec, TemplateKind},
+        value_unifier::ValueUnifierStore,
     },
     value::Value,
 };
@@ -108,7 +107,7 @@ fn recurse_down_expression(
     num_template_args: usize,
 ) -> Option<PortLatencyLinearity> {
     let expr = instructions[cur_instr].unwrap_subexpression();
-    if !expr.typ.domain.is_generative() {
+    if !expr.domain.is_generative() {
         return None; // Early exit, the user can create an invalid interface, we just don't handle it
     }
     match &expr.source {
@@ -185,7 +184,9 @@ fn recurse_down_expression(
             arg_linear_factor: TVec::with_size(num_template_args, 0),
         }),
         ExpressionSource::WireRef(WireReference {
-            root: WireReferenceRoot::LocalDecl(decl_id, _span),
+            root: WireReferenceRoot::LocalDecl(decl_id),
+            root_typ: _,
+            root_span: _,
             path,
         }) => {
             if !path.is_empty() {
@@ -367,7 +368,7 @@ impl SubModule {
         &self,
         linker: &Linker,
         sm_id: SubModuleID,
-        type_substitutor: &TypeUnifier<TypeSubstitutor<ConcreteType>>,
+        unifier: &ValueUnifierStore,
         latency_inference_variables: &mut FlatAlloc<
             ValueToInfer<(SubModuleID, TemplateID)>,
             InferenceVarIDMarker,
@@ -401,10 +402,12 @@ impl SubModule {
 
             InferenceEdgesForDomain { edges }
         } else {
-            let known_template_args = self.refers_to.template_args.map(|(_, t)| {
-                let mut t_copy = t.clone();
-                type_substitutor.fully_substitute(&mut t_copy);
-                if let ConcreteType::Value(Value::Integer(num)) = &t_copy {
+            let known_template_args = self.refers_to.template_args.map(|(_, arg)| {
+                let TemplateKind::Value(v) = arg else {
+                    return None;
+                };
+
+                if let Some(Value::Integer(num)) = unifier.get_substitution(v) {
                     i64::try_from(num).ok()
                 } else {
                     None
@@ -667,7 +670,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            values_to_infer.map_to_array(|_, v| v.get()),
+            values_to_infer.cast_to_array().map(|v| v.get()),
             [Some(6), Some(1), Some(9)] // C 3 smaller due to offset on port 4
         );
     }

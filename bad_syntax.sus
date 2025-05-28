@@ -2,14 +2,14 @@
 // This is there to check for ICEs
 
 
-module multiply {
-    interface multiply : int a, int b -> int r 
+module multiply#(int MIN1, int MAX1, int MIN2, int MAX2) {
+    interface multiply : int#(MIN: MIN1, MAX: MAX1) a, int#(MIN: MIN2, MAX: MAX2) b -> int r 
 	r = a * b
 }
 
 // test
 module contains_submodule {
-    interface contains_submodule : int a, int b, int c -> int r 
+    interface contains_submodule : int#(MIN: 0, MAX: 1) a, int b, int c -> int r 
     int tmp = multiply(a, b)
 	reg r = tmp + c
 }

@@ -2,7 +2,7 @@ use sus_proc_macro::get_builtin_const;
 
 use crate::linker::{IsExtern, LinkInfo, AFTER_LINTS_CP};
 use crate::prelude::*;
-use crate::typing::template::{for_each_generative_input_in_template_args, ParameterKind};
+use crate::typing::template::{for_each_generative_input_in_template_args, TemplateKind};
 
 use super::{
     Expression, ExpressionOutput, ExpressionSource, Instruction, Module, WireReferencePathElement,
@@ -30,7 +30,7 @@ pub fn perform_lints(linker: &mut Linker) {
 fn extern_objects_may_not_have_type_template_args(link_info: &LinkInfo, errors: &ErrorCollector) {
     if link_info.is_extern == IsExtern::Extern {
         for (_id, arg) in &link_info.template_parameters {
-            if let ParameterKind::Type(..) = &arg.kind {
+            if let TemplateKind::Type(_) = &arg.kind {
                 errors.error(
                     arg.name_span,
                     "'extern' modules may not have 'type' arguments. Convert to bool[] first",
