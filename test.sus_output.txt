@@ -382,11 +382,13 @@ Concrete Typechecking input_only
 Checking array accesses input_only
 Instantiating multiple_inputs_only
 Concrete Typechecking multiple_inputs_only
+Checking array accesses multiple_inputs_only
 Instantiating output_only
 Concrete Typechecking output_only
 Checking array accesses output_only
 Instantiating multiple_outputs_only
 Concrete Typechecking multiple_outputs_only
+Checking array accesses multiple_outputs_only
 Instantiating submodule
 Concrete Typechecking submodule
 Checking array accesses submodule

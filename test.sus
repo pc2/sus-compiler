@@ -397,7 +397,7 @@ module input_only {
 }
 
 module multiple_inputs_only {
-    interface multiple_inputs_only : bool i, bool i2 
+    interface multiple_inputs_only : bool i'0, bool i2'0 
 	state bool loop
 	initial loop = false
 	loop = loop ^ i ^ i2
@@ -412,7 +412,7 @@ module output_only {
 }
 
 module multiple_outputs_only {
-    interface multiple_outputs_only : -> bool o, bool o2
+    interface multiple_outputs_only : -> bool o'0, bool o2'0
 	state bool loop
 	initial loop = false
 	loop = !loop
