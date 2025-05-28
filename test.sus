@@ -357,7 +357,7 @@ module matrix_vector_mul {
 
 module bad_cycle2 {
     interface bad_cycle2 : int#(MIN: 0, MAX: 100) a -> int r 
-	state int test
+	state int#(MIN: 0, MAX: 7) test
 	initial test = 0
 
 	test = module_taking_time(test+a)
@@ -371,51 +371,51 @@ module module_taking_a_lot_of_time {
 }
 
 
-/*extern*/ module offset_latency {
-    interface offset_latency : int#(MIN: 0, MAX: 100) i'0 -> int o'-5 
+/*extern*/ module offset_latency #(T) {
+    interface offset_latency : T i'0 -> T o'-5 
 
 }
 
 
 
 module good_cycle {
-    interface good_cycle : int#(MIN: 0, MAX: 100) a -> int r 
-	state int test
-	initial test = 0
+    interface good_cycle : bool a -> bool r 
+	state bool test
+	initial test = false
 	
-	int new_test = test + a
+	bool new_test = test ^ a
 	test = new_test
 
 	r = new_test
 }
 
 module input_only {
-    interface input_only : int#(MIN: 0, MAX: 100) i 
-	state int loop
-	initial loop = 0
-	loop = loop + i
+    interface input_only : bool i 
+	state bool loop
+	initial loop = false
+	loop = loop ^ i
 }
 
 module multiple_inputs_only {
-    interface multiple_inputs_only : int#(MIN: 0, MAX: 100) i, int#(MIN: 0, MAX: 100) i2 
-	state int loop
-	initial loop = 0
-	loop = loop + i + i2
+    interface multiple_inputs_only : bool i, bool i2 
+	state bool loop
+	initial loop = false
+	loop = loop ^ i ^ i2
 }
 
 module output_only {
-    interface output_only : -> int o 
-	state int loop
-	initial loop = 0
-	loop = loop + 1
+    interface output_only : -> bool o 
+	state bool loop
+	initial loop = false
+	loop = !loop
 	reg o = loop
 }
 
 module multiple_outputs_only {
-    interface multiple_outputs_only : -> int o, int o2 
-	state int loop
-	initial loop = 0
-	loop = loop + 1
+    interface multiple_outputs_only : -> bool o, bool o2
+	state bool loop
+	initial loop = false
+	loop = !loop
 	reg o = loop
 	reg reg o2 = loop
 }
@@ -629,9 +629,9 @@ module offset_backwards {
 module dual_port_mem {
 	state bool[20][512] mem
 
-	interface write : bool write, bool[20] wr_data, int wr_addr
+	interface write : bool write, bool[20] wr_data, int#(MIN:0, MAX: 511) wr_addr
 
-	interface read : bool read, int rd_addr -> bool[20] rd_data
+	interface read : bool read, int#(MIN:0, MAX: 511) rd_addr -> bool[20] rd_data
 
 	when write {
 		mem[wr_addr] = wr_data
@@ -656,18 +656,18 @@ module use_fifo {
 }
 
 module test_separated_domain {
-    interface test_separated_domain : int#(MIN: 0, MAX: 100) main 
-	int domain2
+    interface test_separated_domain : bool main 
+	bool domain2
 
-	int domain3
+	bool domain3
 
-	int domain4
+	bool domain4
 
-	cross_int ci
+	cross_bool ci
 	ci.i = domain3
 	domain4 = ci.o
 
-	int domain5
+	bool domain5
 
 	int #(MIN: 0, MAX: 199) my_int
 }

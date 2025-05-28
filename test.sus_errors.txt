@@ -3030,32 +3030,6 @@ Error: Out of bounds! The array is of size 20, but the index has bounds 29..29
      │                                  ─┬─  
      │                                   ╰─── Out of bounds! The array is of size 20, but the index has bounds 29..29
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:359:56 ]
-     │
- 359 │     interface bad_cycle2 : int#(MIN: 0, MAX: 100) a -> int r
-     │                                                        ──┬──  
-     │                                                          ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:360:8 ]
-     │
- 360 │     state int test
-     │           ────┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
 Error: This instruction is part of a net-positive latency cycle of +5
 
 _1_i'0
@@ -3065,28 +3039,15 @@ _1_i'0
 Which conflicts with the starting latency
      ╭─[ test.sus:360:8 ]
      │
- 360 │     state int test
-     │           ────┬───  
-     │               ╰───── This instruction is part of a net-positive latency cycle of +5
+ 360 │     state int#(MIN: 0, MAX: 7) test
+     │           ────────────┬────────────  
+     │                       ╰────────────── This instruction is part of a net-positive latency cycle of +5
 
 _1_i'0
 -> test'5 (+5)
 -> _1_i'5 (+0)
 
 Which conflicts with the starting latency
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:363:9 ]
-     │
- 363 │     test = module_taking_time(test+a)
-     │            ─────────┬────────  
-     │                     ╰────────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
 ─────╯
 Error: This instruction is part of a net-positive latency cycle of +5
 
@@ -3107,311 +3068,77 @@ _1_i'0
 
 Which conflicts with the starting latency
 ─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:363:28 ]
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:375:34 ]
      │
- 363 │     test = module_taking_time(test+a)
-     │                               ───┬──  
-     │                                  ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+ 375 │     interface offset_latency : T i'0 -> T o'-5
+     │                                  ┬  
+     │                                  ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:375:55 ]
+     ╭─[ test.sus:393:33 ]
      │
- 375 │     interface offset_latency : int#(MIN: 0, MAX: 100) i'0 -> int o'-5
-     │                                                       ┬  
-     │                                                       ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:375:62 ]
-     │
- 375 │     interface offset_latency : int#(MIN: 0, MAX: 100) i'0 -> int o'-5
-     │                                                              ────┬───  
-     │                                                                  ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:382:56 ]
-     │
- 382 │     interface good_cycle : int#(MIN: 0, MAX: 100) a -> int r
-     │                                                        ──┬──  
-     │                                                          ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:383:8 ]
-     │
- 383 │     state int test
-     │           ────┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:386:2 ]
-     │
- 386 │     int new_test = test + a
-     │     ──────┬─────  
-     │           ╰─────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:386:17 ]
-     │
- 386 │     int new_test = test + a
-     │                    ────┬───  
-     │                        ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+ 393 │     interface input_only : bool i
+     │                                 ┬  
+     │                                 ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:393:51 ]
+     ╭─[ test.sus:394:13 ]
      │
- 393 │     interface input_only : int#(MIN: 0, MAX: 100) i
-     │                                                   ┬  
-     │                                                   ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:394:8 ]
-     │
- 394 │     state int loop
-     │           ────┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+ 394 │     state bool loop
+     │                ──┬─  
+     │                  ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:394:12 ]
+     ╭─[ test.sus:400:43 ]
      │
- 394 │     state int loop
-     │               ──┬─  
-     │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:396:9 ]
-     │
- 396 │     loop = loop + i
-     │            ────┬───  
-     │                ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:400:61 ]
-     │
- 400 │     interface multiple_inputs_only : int#(MIN: 0, MAX: 100) i, int#(MIN: 0, MAX: 100) i2
-     │                                                             ┬  
-     │                                                             ╰── Unused Variable: This variable does not affect the output ports of this module
+ 400 │     interface multiple_inputs_only : bool i, bool i2
+     │                                           ┬  
+     │                                           ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'i'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-     ╭─[ test.sus:400:87 ]
+     ╭─[ test.sus:400:51 ]
      │
- 400 │     interface multiple_inputs_only : int#(MIN: 0, MAX: 100) i, int#(MIN: 0, MAX: 100) i2
-     │                                                             ┬                         ─┬  
-     │                                                             ╰───────────────────────────── 'i' declared here
-     │                                                                                        │  
-     │                                                                                        ╰── This port is not strongly connected to the strongly connected port cluster 'i'.
+ 400 │     interface multiple_inputs_only : bool i, bool i2
+     │                                           ┬       ─┬  
+     │                                           ╰─────────── 'i' declared here
+     │                                                    │  
+     │                                                    ╰── This port is not strongly connected to the strongly connected port cluster 'i'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:400:87 ]
+     ╭─[ test.sus:400:51 ]
      │
- 400 │     interface multiple_inputs_only : int#(MIN: 0, MAX: 100) i, int#(MIN: 0, MAX: 100) i2
-     │                                                                                       ─┬  
-     │                                                                                        ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:401:8 ]
-     │
- 401 │     state int loop
-     │           ────┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+ 400 │     interface multiple_inputs_only : bool i, bool i2
+     │                                                   ─┬  
+     │                                                    ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:401:12 ]
+     ╭─[ test.sus:401:13 ]
      │
- 401 │     state int loop
-     │               ──┬─  
-     │                 ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:403:9 ]
-     │
- 403 │     loop = loop + i + i2
-     │            ────┬───  
-     │                ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:403:9 ]
-     │
- 403 │     loop = loop + i + i2
-     │            ──────┬──────  
-     │                  ╰──────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:407:32 ]
-     │
- 407 │     interface output_only : -> int o
-     │                                ──┬──  
-     │                                  ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:408:8 ]
-     │
- 408 │     state int loop
-     │           ────┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:410:9 ]
-     │
- 410 │     loop = loop + 1
-     │            ────┬───  
-     │                ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:415:42 ]
-     │
- 415 │     interface multiple_outputs_only : -> int o, int o2
-     │                                          ──┬──  
-     │                                            ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:415:49 ]
-     │
- 415 │     interface multiple_outputs_only : -> int o, int o2
-     │                                                 ───┬──  
-     │                                                    ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+ 401 │     state bool loop
+     │                ──┬─  
+     │                  ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'o'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-     ╭─[ test.sus:415:53 ]
+     ╭─[ test.sus:415:55 ]
      │
- 415 │     interface multiple_outputs_only : -> int o, int o2
-     │                                              ┬      ─┬  
-     │                                              ╰────────── 'o' declared here
-     │                                                      │  
-     │                                                      ╰── This port is not strongly connected to the strongly connected port cluster 'o'.
+ 415 │     interface multiple_outputs_only : -> bool o, bool o2
+     │                                               ┬       ─┬  
+     │                                               ╰─────────── 'o' declared here
+     │                                                        │  
+     │                                                        ╰── This port is not strongly connected to the strongly connected port cluster 'o'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
 If you do not wish to change your design, then 'virtually' connect this port to the strongly connected cluster by explicitly annotating its absolute latency.
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:416:8 ]
-     │
- 416 │     state int loop
-     │           ────┬───  
-     │               ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:418:9 ]
-     │
- 418 │     loop = loop + 1
-     │            ────┬───  
-     │                ╰───── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
 ─────╯
 Error: 'contains_submodule_submodule' conflicts with other declarations:
      ╭─[ test.sus:441:8 ]
@@ -3464,58 +3191,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  462 │     bool b = xor(true, false)
      │          ┬  
      │          ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:466:27 ]
-     │
- 466 │     interface fizz_buzz : int v -> int fb
-     │                           ──┬──  
-     │                             ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:466:36 ]
-     │
- 466 │     interface fizz_buzz : int v -> int fb
-     │                                    ───┬──  
-     │                                       ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:471:14 ]
-     │
- 471 │     bool fizz = v % 3 == 0
-     │                 ──┬──  
-     │                   ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:472:14 ]
-     │
- 472 │     bool buzz = v % 5 == 0
-     │                 ──┬──  
-     │                   ╰──── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
@@ -3620,32 +3295,6 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
-     ╭─[ test.sus:632:50 ]
-     │
- 632 │     interface write : bool write, bool[20] wr_data, int wr_addr
-     │                                                     ─────┬─────  
-     │                                                          ╰─────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:634:30 ]
-     │
- 634 │     interface read : bool read, int rd_addr -> bool[20] rd_data
-     │                                 ─────┬─────  
-     │                                      ╰─────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
      ╭─[ test.sus:648:29 ]
      │
  648 │     interface use_fifo : -> int o
@@ -3701,104 +3350,39 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                            ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:659:62 ]
+     ╭─[ test.sus:659:44 ]
      │
- 659 │     interface test_separated_domain : int#(MIN: 0, MAX: 100) main
-     │                                                              ──┬─  
-     │                                                                ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:660:2 ]
-     │
- 660 │     int domain2
-     │     ─────┬─────  
-     │          ╰─────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+ 659 │     interface test_separated_domain : bool main
+     │                                            ──┬─  
+     │                                              ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:660:6 ]
+     ╭─[ test.sus:660:7 ]
      │
- 660 │     int domain2
-     │         ───┬───  
-     │            ╰───── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:662:2 ]
-     │
- 662 │     int domain3
-     │     ─────┬─────  
-     │          ╰─────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+ 660 │     bool domain2
+     │          ───┬───  
+     │             ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:662:6 ]
+     ╭─[ test.sus:662:7 ]
      │
- 662 │     int domain3
-     │         ───┬───  
-     │            ╰───── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:664:2 ]
-     │
- 664 │     int domain4
-     │     ─────┬─────  
-     │          ╰─────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+ 662 │     bool domain3
+     │          ───┬───  
+     │             ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:664:6 ]
+     ╭─[ test.sus:664:7 ]
      │
- 664 │     int domain4
-     │         ───┬───  
-     │            ╰───── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:666:12 ]
-     │
- 666 │     cross_int ci
-     │               ─┬  
-     │                ╰── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:670:2 ]
-     │
- 670 │     int domain5
-     │     ─────┬─────  
-     │          ╰─────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
+ 664 │     bool domain4
+     │          ───┬───  
+     │             ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:670:6 ]
+     ╭─[ test.sus:670:7 ]
      │
- 670 │     int domain5
-     │         ───┬───  
-     │            ╰───── Unused Variable: This variable does not affect the output ports of this module
+ 670 │     bool domain5
+     │          ───┬───  
+     │             ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:672:26 ]

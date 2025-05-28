@@ -374,16 +374,17 @@ Concrete Typechecking bad_cycle2
 Instantiating module_taking_a_lot_of_time
 Concrete Typechecking module_taking_a_lot_of_time
 Checking array accesses module_taking_a_lot_of_time
-Instantiating offset_latency
-Concrete Typechecking offset_latency
 Instantiating good_cycle
 Concrete Typechecking good_cycle
+Checking array accesses good_cycle
 Instantiating input_only
 Concrete Typechecking input_only
+Checking array accesses input_only
 Instantiating multiple_inputs_only
 Concrete Typechecking multiple_inputs_only
 Instantiating output_only
 Concrete Typechecking output_only
+Checking array accesses output_only
 Instantiating multiple_outputs_only
 Concrete Typechecking multiple_outputs_only
 Instantiating submodule
@@ -401,6 +402,7 @@ Concrete Typechecking use_xor
 Checking array accesses use_xor
 Instantiating fizz_buzz
 Concrete Typechecking fizz_buzz
+Checking array accesses fizz_buzz
 Instantiating mbf_dual
 Concrete Typechecking mbf_dual
 Checking array accesses mbf_dual
@@ -433,10 +435,12 @@ Concrete Typechecking offset_backwards
 Checking array accesses offset_backwards
 Instantiating dual_port_mem
 Concrete Typechecking dual_port_mem
+Checking array accesses dual_port_mem
 Instantiating use_fifo
 Concrete Typechecking use_fifo
 Instantiating test_separated_domain
 Concrete Typechecking test_separated_domain
+Checking array accesses test_separated_domain
 Instantiating no_port_module
 Concrete Typechecking no_port_module
 Checking array accesses no_port_module
