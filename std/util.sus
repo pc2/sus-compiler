@@ -1,19 +1,19 @@
 
-module DualPortMem #(T, int SIZE) {
+module DualPortMem #(T, int MAX) {
 
-	state T[SIZE] mem
+	state T[MAX+1] mem
 
 	domain write_clk
-	interface write : bool write'0, int addr'0, T data'0
+	interface write : bool write'0, int#(MIN: 0, MAX) addr'0, T data'0
 
 	when write {
 		mem[addr] = data
 	}
 
 	domain read_clk
-	interface read : int read_addr'0 -> T read_data'0
+	interface read : int#(MIN: 0, MAX)  read_addr'0 -> T read_data'0
 
-	CrossDomain #(T: type T[SIZE]) cross_mem
+	CrossDomain #(T: type T[MAX+1]) cross_mem
 	cross_mem.in = mem
 	
 	read_data = cross_mem.out[read_addr]
@@ -26,8 +26,8 @@ module FIFO #(
 	int READY_SLACK
 ) {
 	state T[DEPTH] mem
-	state int read_addr
-	state int write_addr
+	state int#(MIN: 0, MAX: DEPTH - 1) read_addr
+	state int#(MIN: 0, MAX: DEPTH - 1) write_addr
 
 	initial read_addr = 0
 	initial write_addr = 0
@@ -72,15 +72,18 @@ module FIFO #(
 module JoinDomains #(T1, T2, int OFFSET) {
 	interface identity1 : T1 i1'0 -> T1 o1'0
 	interface identity2 : T2 i2'OFFSET -> T2 o2'OFFSET
+
+	o1 = i1
+	o2 = i2
 }
 
 module Iterator #(int MAX) {
 	// action
-	interface start : bool start, int #(MAX) up_to
+	interface start : bool start, int #(MIN: 0, MAX) up_to
 	// trigger
-	interface iter : -> bool valid, state int #(MAX) value
+	interface iter : -> bool valid, state int #(MIN: 0, MAX) value
 
-	state int #(MAX) current_limit
+	state int #(MIN: 0, MAX) current_limit
 
 	valid = value != current_limit
 
@@ -92,8 +95,8 @@ module Iterator #(int MAX) {
 	}
 }
 
-module FixedSizeIterator #(int UP_TO) {
-	interface iter : -> bool valid, state int value
+module FixedSizeIterator #(int MAX) {
+	interface iter : -> bool valid, state int#(MIN: 0, MAX) value
 
 	output bool last
 
@@ -101,8 +104,8 @@ module FixedSizeIterator #(int UP_TO) {
 
 	interface start : bool start
 
-	last = value == UP_TO - 1
-	valid = value != UP_TO
+	last = value == MAX - 1
+	valid = value != MAX
 
 	when start {
 		value = 0
@@ -137,7 +140,7 @@ module SplitAt #(T, int SIZE, int SPLIT_POINT) {
 }
 
 module Abs #(int MAX) {
-	interface Abs : int #(MAX) a -> int #(MAX) o
+	interface Abs : int #(MIN: -MAX, MAX) a -> int #(MIN: 0, MAX) o
 
 	when a < 0 {
 		o = -a
@@ -169,7 +172,7 @@ module PopCount #(int WIDTH) {
 	// Should be chosen based on what's most efficient for the target architecture
 	gen int BASE_CASE_SIZE = 5
 
-	interface PopCount : bool[WIDTH] bits -> int popcount
+	interface PopCount : bool[WIDTH] bits -> int#(MIN: 0, MAX: WIDTH) popcount
 
 
 	if WIDTH <= BASE_CASE_SIZE {
@@ -194,8 +197,8 @@ module PopCount #(int WIDTH) {
 
 
 // Recursive Tree Add module recurses smaller copies of itself. 
-module TreeAdd #(int WIDTH) {
-	interface TreeAdd : int[WIDTH] values'0 -> int total
+module TreeAdd #(int WIDTH, int MIN, int MAX) {
+	interface TreeAdd : int#(MIN, MAX)[WIDTH] values'0 -> int#(MIN: MIN*WIDTH, MAX: MAX*WIDTH) total
 
 	if WIDTH == 0 {
 		// Have to explicitly give zero a latency count. 

@@ -1,21 +1,3 @@
 // USE THIS FILE TO TEST SMALL SAMPLES OF SUS CODE IN ISOLATION. 
 // DO NOT COMMIT
 // To use with VSCode debugger, name the module "TEST", and in the code use `if crate::debug::is_enabled("TEST") {}` to enable breakpoint code
-
-module TEST {
-	interface testOperators : int#(MIN: 0, MAX:9) a'0, int#(MIN: 1, MAX:3) b'0 -> bool out
-
-	bool[25] bb
-
-	int#(MIN: 0) x
-	x = a + b
-	x = a - b + 3
-	x = a * b + 3
-	x = a / b + 1
-	x = a % b + 1
-	x = 4 + 7
-
-	//int a, int b = 3 + 7
-
-	out = bb[x]
-}

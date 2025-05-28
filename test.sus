@@ -1038,7 +1038,7 @@ module UseDualPortMem {
 		bool[500] data'0 ->
 		bool[500] read_data'0
 		
-	DualPortMem #(SIZE: 128, T: type bool[500]) mem
+	DualPortMem #(MAX: 128, T: type bool[500]) mem
 
 	mem.write(do_write, addr, data)
 
@@ -1370,4 +1370,8 @@ module testInts {
 
 }
 
+module use_FIFO {
+    FIFO #(DEPTH: 53, READY_SLACK: 3) f
 
+    f.push(true, 3)
+}

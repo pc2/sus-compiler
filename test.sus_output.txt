@@ -2,6 +2,8 @@ Flattening LatencyOffset
 Flattening CrossDomain
 Flattening IntToBits
 Flattening BitsToInt
+Flattening UIntToBits
+Flattening BitsToUInt
 Flattening bool
 Flattening int
 Flattening float
@@ -156,10 +158,13 @@ Flattening infer_me_inputs_only
 Flattening use_infer_me_inputs_only
 Flattening use_ranks
 Flattening testInts
+Flattening use_FIFO
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
 Typechecking BitsToInt
+Typechecking UIntToBits
+Typechecking BitsToUInt
 Typechecking DualPortMem
 Typechecking FIFO
 Typechecking JoinDomains
@@ -298,6 +303,7 @@ Typechecking infer_me_inputs_only
 Typechecking use_infer_me_inputs_only
 Typechecking use_ranks
 Typechecking testInts
+Typechecking use_FIFO
 Instantiating example_md
 Concrete Typechecking example_md
 Checking array accesses example_md
@@ -512,14 +518,28 @@ Instantiating xyz
 Concrete Typechecking xyz
 Instantiating numbersToAddUp
 Concrete Typechecking numbersToAddUp
-Instantiating TreeAdd #(WIDTH: 5)
-Concrete Typechecking TreeAdd #(WIDTH: 5)
-Instantiating TreeAdd #(WIDTH: 2)
-Concrete Typechecking TreeAdd #(WIDTH: 2)
-Instantiating TreeAdd #(WIDTH: 1)
-Concrete Typechecking TreeAdd #(WIDTH: 1)
-Instantiating TreeAdd #(WIDTH: 3)
-Concrete Typechecking TreeAdd #(WIDTH: 3)
+Instantiating TreeAdd #(WIDTH: 5, MIN: 3, MAX: 3)
+Concrete Typechecking TreeAdd #(WIDTH: 5, MIN: 3, MAX: 3)
+Instantiating SplitAt #(T: type int #(MIN: 3, MAX: 3), SIZE: 5, SPLIT_POINT: 2)
+Concrete Typechecking SplitAt #(T: type int #(MIN: 3, MAX: 3), SIZE: 5, SPLIT_POINT: 2)
+Checking array accesses SplitAt #(T: type int #(MIN: 3, MAX: 3), SIZE: 5, SPLIT_POINT: 2)
+Instantiating TreeAdd #(WIDTH: 3, MIN: 3, MAX: 3)
+Concrete Typechecking TreeAdd #(WIDTH: 3, MIN: 3, MAX: 3)
+Instantiating SplitAt #(T: type int #(MIN: 3, MAX: 3), SIZE: 3, SPLIT_POINT: 1)
+Concrete Typechecking SplitAt #(T: type int #(MIN: 3, MAX: 3), SIZE: 3, SPLIT_POINT: 1)
+Checking array accesses SplitAt #(T: type int #(MIN: 3, MAX: 3), SIZE: 3, SPLIT_POINT: 1)
+Instantiating TreeAdd #(WIDTH: 2, MIN: 3, MAX: 3)
+Concrete Typechecking TreeAdd #(WIDTH: 2, MIN: 3, MAX: 3)
+Instantiating SplitAt #(T: type int #(MIN: 3, MAX: 3), SIZE: 2, SPLIT_POINT: 1)
+Concrete Typechecking SplitAt #(T: type int #(MIN: 3, MAX: 3), SIZE: 2, SPLIT_POINT: 1)
+Checking array accesses SplitAt #(T: type int #(MIN: 3, MAX: 3), SIZE: 2, SPLIT_POINT: 1)
+Instantiating TreeAdd #(WIDTH: 1, MIN: 3, MAX: 3)
+Concrete Typechecking TreeAdd #(WIDTH: 1, MIN: 3, MAX: 3)
+Checking array accesses TreeAdd #(WIDTH: 1, MIN: 3, MAX: 3)
+Checking array accesses TreeAdd #(WIDTH: 2, MIN: 3, MAX: 3)
+Checking array accesses TreeAdd #(WIDTH: 3, MIN: 3, MAX: 3)
+Checking array accesses TreeAdd #(WIDTH: 5, MIN: 3, MAX: 3)
+Checking array accesses numbersToAddUp
 Instantiating use_sized_int_add
 Concrete Typechecking use_sized_int_add
 Instantiating sized_int_add #(LEFT_SIZE: 4, RIGHT_SIZE: 3, OUTPUT_SIZE: 5)
@@ -531,11 +551,12 @@ Not Instantiating conflicting_domain_with_port_name due to flattening errors
 Not Instantiating make_infinite_type due to flattening errors
 Instantiating UseDualPortMem
 Concrete Typechecking UseDualPortMem
-Instantiating DualPortMem #(T: type bool[500], SIZE: 128)
-Concrete Typechecking DualPortMem #(T: type bool[500], SIZE: 128)
-Instantiating CrossDomain #(T: type bool[500][128])
-Concrete Typechecking CrossDomain #(T: type bool[500][128])
-Checking array accesses CrossDomain #(T: type bool[500][128])
+Instantiating DualPortMem #(T: type bool[500], MAX: 128)
+Concrete Typechecking DualPortMem #(T: type bool[500], MAX: 128)
+Instantiating CrossDomain #(T: type bool[500][129])
+Concrete Typechecking CrossDomain #(T: type bool[500][129])
+Checking array accesses CrossDomain #(T: type bool[500][129])
+Checking array accesses DualPortMem #(T: type bool[500], MAX: 128)
 Instantiating example_FIFO
 Concrete Typechecking example_FIFO
 Not Instantiating use_Iterator due to flattening errors
@@ -590,3 +611,18 @@ Instantiating use_ranks
 Instantiating testInts
 Concrete Typechecking testInts
 Checking array accesses testInts
+Instantiating use_FIFO
+Concrete Typechecking use_FIFO
+Instantiating FIFO #(T: type int #(MIN: 3, MAX: 3), DEPTH: 53, READY_SLACK: 3)
+Concrete Typechecking FIFO #(T: type int #(MIN: 3, MAX: 3), DEPTH: 53, READY_SLACK: 3)
+Instantiating CrossDomain #(T: type int #(MIN: 0, MAX: 52))
+Concrete Typechecking CrossDomain #(T: type int #(MIN: 0, MAX: 52))
+Checking array accesses CrossDomain #(T: type int #(MIN: 0, MAX: 52))
+Instantiating CrossDomain #(T: type int #(MIN: 3, MAX: 3)[53])
+Concrete Typechecking CrossDomain #(T: type int #(MIN: 3, MAX: 3)[53])
+Checking array accesses CrossDomain #(T: type int #(MIN: 3, MAX: 3)[53])
+Instantiating LatencyOffset #(T: type bool, OFFSET: -4)
+Concrete Typechecking LatencyOffset #(T: type bool, OFFSET: -4)
+Checking array accesses LatencyOffset #(T: type bool, OFFSET: -4)
+Checking array accesses FIFO #(T: type int #(MIN: 3, MAX: 3), DEPTH: 53, READY_SLACK: 3)
+Checking array accesses use_FIFO
