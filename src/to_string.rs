@@ -262,22 +262,21 @@ impl Module {
     pub fn make_all_ports_info_string(
         &self,
         file_text: &FileText,
-        local_domains: Option<InterfaceToDomainMap>,
+        local_domains_used_in_parent_module: Option<InterfaceToDomainMap>,
     ) -> String {
         let full_name_with_args = self.link_info.get_full_name_and_template_args(file_text);
         let mut result = format!("module {full_name_with_args}:\n");
 
         for (domain_id, domain) in &self.domains {
-            if let Some(domain_map) = &local_domains {
-                writeln!(
-                    result,
-                    "domain {}: {{{}}}",
-                    &domain.name,
-                    domain_map.local_domain_to_global_domain(domain_id).name
-                )
-                .unwrap();
+            let name = &domain.name;
+            if let Some(domain_map) = &local_domains_used_in_parent_module {
+                let submod_name = &self.link_info.name;
+                let domain_id_in_parent = domain_map.local_domain_map[domain_id].unwrap_physical();
+                let name_in_parent =
+                    DomainType::physical_to_string(domain_id_in_parent, domain_map.domains);
+                writeln!(result, "domain {submod_name}.{name} = {name_in_parent}").unwrap();
             } else {
-                writeln!(result, "domain {}:", &domain.name).unwrap();
+                writeln!(result, "domain {name}:").unwrap();
             }
 
             // TODO interfaces

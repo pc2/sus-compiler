@@ -198,13 +198,6 @@ pub struct InterfaceToDomainMap<'linker> {
     pub domains: &'linker FlatAlloc<DomainInfo, DomainIDMarker>,
 }
 
-impl<'linker> InterfaceToDomainMap<'linker> {
-    pub fn local_domain_to_global_domain(&self, domain: DomainID) -> &'linker DomainInfo {
-        let local_domain = self.local_domain_map[domain].unwrap_physical();
-        &self.domains[local_domain]
-    }
-}
-
 /// What kind of wire/value does this identifier represent?
 ///
 /// We already know it's not a submodule
@@ -645,7 +638,7 @@ pub struct SubModuleInstance {
     pub name: Option<(String, Span)>,
     /// Maps each of the module's local domains to the domain that it is used in.
     ///
-    /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::DomainVariable] before typing)
+    /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::Unknown] before typing)
     pub local_interface_domains: FlatAlloc<DomainType, DomainIDMarker>,
     pub documentation: Documentation,
 }

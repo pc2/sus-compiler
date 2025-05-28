@@ -463,7 +463,7 @@ module use_xor {
 }
 
 module fizz_buzz {
-    interface fizz_buzz : int v -> int fb 
+    interface fizz_buzz : int#(MIN: 0, MAX: 99) v -> int fb 
 	gen int FIZZ = 888
 	gen int BUZZ = 555
 	gen int FIZZ_BUZZ = 888555
