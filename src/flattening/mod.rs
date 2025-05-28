@@ -58,10 +58,7 @@ pub struct Module {
     pub latency_inference_info: PortLatencyInferenceInfo,
 
     /// Created in Stage 1: Initialization
-    ///
-    /// [Self::domains] is then extended during abstract typechecking to add unnamed domains
     pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,
-    pub implicit_clk_domain: bool,
 
     /// Created in Stage 1: Initialization
     pub interfaces: FlatAlloc<Interface, InterfaceIDMarker>,

@@ -113,10 +113,8 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             let mut details_vec: Vec<String> = Vec::with_capacity(5);
 
             if let Some(md) = try_get_module(&linker.modules, obj_id) {
-                if md.implicit_clk_domain {
-                    if let DomainType::Physical(ph) = decl.typ.domain {
-                        details_vec.push(DomainType::physical_to_string(ph, &md.domains));
-                    }
+                if let DomainType::Physical(ph) = decl.typ.domain {
+                    details_vec.push(DomainType::physical_to_string(ph, &md.domains));
                 }
             }
 
@@ -167,15 +165,12 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     .0
             ));
 
-            let show_interfaces = submodule
-                .implicit_clk_domain
-                .then_some(InterfaceToDomainMap {
-                    local_domain_map: &submod.local_interface_domains,
-                    domains: &md.domains,
-                });
             hover.sus_code(submodule.make_all_ports_info_string(
                 &linker.files[submodule.link_info.file].file_text,
-                show_interfaces,
+                Some(InterfaceToDomainMap {
+                    local_domain_map: &submod.local_interface_domains,
+                    domains: &md.domains,
+                }),
             ));
 
             // Module documentation
@@ -188,10 +183,8 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                 DomainType::Generative => details_vec.push(Cow::Borrowed("gen")),
                 DomainType::Physical(ph) => {
                     if let Some(md) = try_get_module(&linker.modules, obj_id) {
-                        if md.implicit_clk_domain {
-                            details_vec
-                                .push(Cow::Owned(DomainType::physical_to_string(ph, &md.domains)))
-                        }
+                        details_vec
+                            .push(Cow::Owned(DomainType::physical_to_string(ph, &md.domains)))
                     }
                 }
                 DomainType::Unknown(_) => {

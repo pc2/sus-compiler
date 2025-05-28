@@ -91,9 +91,6 @@ impl<IndexMarker> UUIDAllocator<IndexMarker> {
         self.cur.0 += 1;
         allocated_id
     }
-    pub fn peek(&self) -> UUID<IndexMarker> {
-        self.cur
-    }
     pub fn to_flat_alloc<T: Default>(&self) -> FlatAlloc<T, IndexMarker> {
         let mut result = FlatAlloc::with_capacity(self.cur.0);
         for _ in 0..self.cur.0 {

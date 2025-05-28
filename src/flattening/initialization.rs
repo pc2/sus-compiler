@@ -375,7 +375,6 @@ fn initialize_global_object(
                 ports: ctx.ports,
                 latency_inference_info: PortLatencyInferenceInfo::default(),
                 domains: ctx.domains,
-                implicit_clk_domain: ctx.implicit_clk_domain,
                 interfaces: ctx.interfaces,
             });
         }

@@ -195,7 +195,7 @@ struct FlatteningContext<'l, 'errs> {
     instructions: FlatAlloc<Instruction, FlatIDMarker>,
     type_alloc: TypingAllocator,
     named_domain_alloc: UUIDAllocator<DomainIDMarker>,
-    is_implicit_clk_domain: bool,
+    current_domain: DomainID,
 
     fields_to_visit: UUIDRangeIter<FieldIDMarker>,
     ports_to_visit: UUIDRangeIter<PortIDMarker>,
@@ -716,7 +716,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 },
                 DeclarationKind::GenerativeInput(_template_id) => {DomainType::Generative}
                 DeclarationKind::StructField { field_id } => {*field_id = self.fields_to_visit.next().unwrap(); DomainType::Physical(UUID::PLACEHOLDER)}
-                DeclarationKind::RegularPort { is_input:_, port_id } => {*port_id = self.ports_to_visit.next().unwrap(); DomainType::Physical(self.named_domain_alloc.peek())}
+                DeclarationKind::RegularPort { is_input:_, port_id } => {*port_id = self.ports_to_visit.next().unwrap(); DomainType::Physical(self.current_domain)}
             };
 
             cursor.field(field!("type"));
@@ -1408,11 +1408,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     // Skip, because we already covered domains in initialization.
                     // TODO synchronous & async clocks
 
-                    if self.is_implicit_clk_domain {
-                        self.is_implicit_clk_domain = false;
-                    } else {
-                        self.named_domain_alloc.alloc();
-                    }
+                    self.current_domain = self.named_domain_alloc.alloc();
                 }
                 _other => cursor.could_not_match(),
             }
@@ -1686,13 +1682,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
 
     let mut local_variable_context = LocalVariableContext::new_initial();
 
-    let (
-        ports_to_visit,
-        fields_to_visit,
-        default_declaration_context,
-        domains,
-        is_implicit_clk_domain,
-    ) = match global_obj {
+    let (ports_to_visit, fields_to_visit, default_declaration_context, domains) = match global_obj {
         GlobalUUID::Module(module_uuid) => {
             let md = &globals[module_uuid];
             for (id, domain) in &md.domains {
@@ -1713,7 +1703,6 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
                 UUIDRange::empty().into_iter(),
                 DeclarationContext::PlainWire,
                 &md.domains,
-                !md.implicit_clk_domain,
             )
         }
         GlobalUUID::Type(type_uuid) => {
@@ -1723,7 +1712,6 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
                 typ.fields.id_range().into_iter(),
                 DeclarationContext::StructField,
                 &FlatAlloc::EMPTY_FLAT_ALLOC,
-                true,
             )
         }
         GlobalUUID::Constant(_const_uuid) => (
@@ -1731,7 +1719,6 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
             UUIDRange::empty().into_iter(),
             DeclarationContext::Generative(GenerativeKind::PlainGenerative),
             &FlatAlloc::EMPTY_FLAT_ALLOC,
-            true,
         ),
     };
 
@@ -1740,13 +1727,13 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         ports_to_visit,
         fields_to_visit,
         domains,
-        is_implicit_clk_domain,
         default_declaration_context,
         errors: &globals.errors,
         working_on_link_info: linker.get_link_info(global_obj),
         instructions: FlatAlloc::new(),
         type_alloc: Default::default(),
         named_domain_alloc: UUIDAllocator::new(),
+        current_domain: UUID::from_hidden_value(0),
         local_variable_context,
     };
 
