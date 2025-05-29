@@ -1,14 +1,22 @@
-#[allow(unused)]
-pub fn all_equal<T, O: Eq + std::fmt::Debug>(
-    iter: impl IntoIterator<Item = T>,
-    mut f: impl FnMut(T) -> O,
-) -> Option<O> {
+use std::fmt::Debug;
+
+/*pub fn all_equal_in_iter<T: Eq + Debug>(iter: impl IntoIterator<Item = T>) -> Option<T> {
     let mut iter = iter.into_iter();
-    let first = f(iter.next()?);
+    let first = iter.next()?;
     for v in iter {
-        assert_eq!(first, f(v));
+        assert_eq!(first, v);
     }
     Some(first)
+}*/
+
+pub fn all_equal<T: Eq + Debug, const N: usize>(vs: [T; N]) -> T {
+    // const _: () = const { assert!(N > 0) };
+    let mut iter = vs.into_iter();
+    let first = iter.next().unwrap();
+    for v in iter {
+        assert_eq!(first, v);
+    }
+    first
 }
 
 #[track_caller]
@@ -27,6 +35,14 @@ pub fn zip_eq<OA, OB>(
         iter_a: iter_a.into_iter(),
         iter_b: iter_b.into_iter(),
     }
+}
+
+/// Merges a and b, order is unimportant
+pub fn merge_vec_into<T>(a: &mut Vec<T>, mut b: Vec<T>) {
+    if a.len() < b.len() {
+        std::mem::swap(a, &mut b);
+    }
+    a.append(&mut b);
 }
 
 #[derive(Debug)]

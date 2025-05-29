@@ -4,9 +4,7 @@ use std::cell::RefCell;
 
 use crate::{alloc::ArenaAllocator, typing::template::Parameter};
 
-use crate::flattening::{
-    Declaration, DomainInfo, Instruction, Interface, Module, Port, SubModuleInstance,
-};
+use crate::flattening::{Declaration, DomainInfo, Instruction, Module, Port, SubModuleInstance};
 use crate::linker::{checkpoint::ErrorCheckpoint, FileData, LinkInfo};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,6 +56,12 @@ impl ErrorStore {
             did_error: false,
         }
     }
+    pub fn new_did_error() -> ErrorStore {
+        ErrorStore {
+            errors: Vec::new(),
+            did_error: true,
+        }
+    }
 
     pub fn take(&mut self) -> Self {
         std::mem::replace(self, ErrorStore::new())
@@ -90,7 +94,13 @@ impl ErrorStore {
     }
 
     pub fn sort(&mut self) {
-        self.errors.sort_by_key(|a| a.position.as_range().start);
+        self.errors.sort_by(|a, b| {
+            a.position
+                .as_range()
+                .start
+                .cmp(&b.position.as_range().start)
+                .then_with(|| a.reason.cmp(&b.reason))
+        });
     }
 }
 
@@ -375,18 +385,6 @@ impl FileKnowingErrorInfoObject for LinkInfo {
             position: self.name_span,
             file: self.file,
             info: format!("'{}' defined here", &self.name),
-        }
-    }
-}
-
-/// For interfaces of this module
-impl FileKnowingErrorInfoObject for (&'_ Module, &'_ Interface) {
-    fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
-        let (md, interface) = *self;
-        ErrorInfo {
-            position: interface.name_span,
-            file: md.link_info.file,
-            info: format!("Interface '{}' defined here", &interface.name),
         }
     }
 }

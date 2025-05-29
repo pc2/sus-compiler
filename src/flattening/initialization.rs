@@ -8,7 +8,7 @@ use crate::flattening::Module;
 use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
 
 use crate::typing::template::{
-    GenerativeParameterKind, Parameter, ParameterKind, TVec, TypeParameterKind,
+    GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind,
 };
 
 use super::parser::Cursor;
@@ -47,7 +47,7 @@ impl InitializationContext<'_> {
                         self.parameters.alloc(Parameter {
                             name,
                             name_span,
-                            kind: ParameterKind::Type(TypeParameterKind {}),
+                            kind: TemplateKind::Type(TypeParameterKind {}),
                         });
                     }),
                     kind!("declaration") => cursor.go_down_no_check(|cursor| {
@@ -60,7 +60,7 @@ impl InitializationContext<'_> {
                         self.parameters.alloc(Parameter {
                             name,
                             name_span,
-                            kind: ParameterKind::Generative(GenerativeParameterKind {
+                            kind: TemplateKind::Value(GenerativeParameterKind {
                                 decl_span,
                                 declaration_instruction: FlatID::PLACEHOLDER,
                             }),
@@ -374,9 +374,7 @@ fn initialize_global_object(
                 link_info,
                 ports: ctx.ports,
                 latency_inference_info: PortLatencyInferenceInfo::default(),
-                named_domains: ctx.domains.id_range(),
                 domains: ctx.domains,
-                implicit_clk_domain: ctx.implicit_clk_domain,
                 interfaces: ctx.interfaces,
             });
         }

@@ -14,14 +14,20 @@ __builtin__ module CrossDomain #(T) {
     interface out_domain : -> T out'0
 }
 
-/// Convert an `int` to a 2s complement bit vector
 __builtin__ module IntToBits #(int NUM_BITS) {
-    interface IntToBits : int value'0 -> bool[NUM_BITS] bits'0
+    interface IntToBits : int #(MIN: -pow2 #(E: NUM_BITS - 1), MAX: pow2 #(E: NUM_BITS - 1) - 1) value'0 -> bool[NUM_BITS] bits'0
 }
 
-/// Convert a 2s complement bit vector to an `int`
 __builtin__ module BitsToInt #(int NUM_BITS) {
-    interface BitsToInt : bool[NUM_BITS] bits'0 -> int value'0
+    interface IntToBits : bool[NUM_BITS] bits'0 -> int #(MIN: -pow2 #(E: NUM_BITS - 1), MAX: pow2 #(E: NUM_BITS - 1) - 1) value'0
+}
+
+__builtin__ module UIntToBits #(int NUM_BITS) {
+    interface UIntToBits : int #(MIN: 0, MAX: pow2 #(E: NUM_BITS) - 1) value'0 -> bool[NUM_BITS] bits'0
+}
+
+__builtin__ module BitsToUInt #(int NUM_BITS) {
+    interface BitsToUInt : bool[NUM_BITS] bits'0 -> int #(MIN: 0, MAX: pow2 #(E: NUM_BITS) - 1) value'0
 }
 
 // For now these builtin declarations must be in this order, because they're constants in the code. 
@@ -29,8 +35,8 @@ __builtin__ module BitsToInt #(int NUM_BITS) {
 
 /// The decider of truth and falsity
 __builtin__ struct bool {}
-/// An integer of variable size. Right now it's not implemented yet, so this is just a 32-bit int. 
-__builtin__ struct int {}
+// An integer of variable size.
+__builtin__ struct int #(int MIN, int MAX) {}
 
 /// Single precision IEEE 32-bit float. Operators are definted externally, but it's defined here for convenience. 
 __builtin__ struct float {}

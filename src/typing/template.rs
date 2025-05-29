@@ -1,5 +1,74 @@
 use super::{abstract_type::AbstractRankedType, written_type::WrittenType};
 use crate::prelude::*;
+use ibig::IBig;
+
+use super::{concrete_type::ConcreteTemplateArg, value_unifier::UnifyableValue};
+use crate::{typing::set_unifier::Unifyable, value::Value};
+
+/// See [TVec]. All circumstances handling Templates need to handle both Types and Values.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TemplateKind<T, V> {
+    Type(T),
+    Value(V),
+}
+
+impl<T: std::fmt::Debug, V: std::fmt::Debug> TemplateKind<T, V> {
+    #[track_caller]
+    pub fn unwrap_type(&self) -> &T {
+        let_unwrap!(Self::Type(t), self);
+        t
+    }
+    #[track_caller]
+    pub fn unwrap_value(&self) -> &V {
+        let_unwrap!(Self::Value(t), self);
+        t
+    }
+}
+impl<T, V> TemplateKind<T, V> {
+    pub fn as_ref(&self) -> TemplateKind<&T, &V> {
+        match self {
+            TemplateKind::Type(t) => TemplateKind::Type(t),
+            TemplateKind::Value(v) => TemplateKind::Value(v),
+        }
+    }
+    pub fn as_mut(&mut self) -> TemplateKind<&mut T, &mut V> {
+        match self {
+            TemplateKind::Type(t) => TemplateKind::Type(t),
+            TemplateKind::Value(v) => TemplateKind::Value(v),
+        }
+    }
+    pub fn and<T2, V2>(self, other: TemplateKind<T2, V2>) -> TemplateKind<(T, T2), (V, V2)> {
+        match (self, other) {
+            (TemplateKind::Type(t1), TemplateKind::Type(t2)) => TemplateKind::Type((t1, t2)),
+            (TemplateKind::Value(v1), TemplateKind::Value(v2)) => TemplateKind::Value((v1, v2)),
+            (TemplateKind::Type(_), TemplateKind::Value(_))
+            | (TemplateKind::Value(_), TemplateKind::Type(_)) => {
+                unreachable!("Cannot combine Type and Value template args!")
+            }
+        }
+    }
+    pub fn and_by_ref<'s, T2, V2>(
+        &'s self,
+        other: &'s TemplateKind<T2, V2>,
+    ) -> TemplateKind<(&'s T, &'s T2), (&'s V, &'s V2)> {
+        match (self, other) {
+            (TemplateKind::Type(t1), TemplateKind::Type(t2)) => TemplateKind::Type((t1, t2)),
+            (TemplateKind::Value(v1), TemplateKind::Value(v2)) => TemplateKind::Value((v1, v2)),
+            (TemplateKind::Type(_), TemplateKind::Value(_))
+            | (TemplateKind::Value(_), TemplateKind::Type(_)) => {
+                unreachable!("Cannot combine Type and Value template args!")
+            }
+        }
+    }
+}
+
+impl<T> TemplateKind<T, T> {
+    pub fn unwrap_identical(self) -> T {
+        match self {
+            TemplateKind::Type(t) | TemplateKind::Value(t) => t,
+        }
+    }
+}
 
 /// References any [crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant],
 /// and includes any template arguments.
@@ -12,8 +81,7 @@ use crate::prelude::*;
 pub struct GlobalReference<ID> {
     pub name_span: Span,
     pub id: ID,
-    pub template_args: TVec<Option<TemplateArg>>,
-    pub template_arg_types: TVec<AbstractRankedType>,
+    pub template_args: TVec<AbstractTemplateArg>,
     pub template_span: Option<BracketSpan>,
 }
 
@@ -27,6 +95,29 @@ impl<ID> GlobalReference<ID> {
     }
 }
 
+pub type AbstractTemplateArg = TemplateKind<TemplateArg<WrittenType>, TemplateArg<FlatID>>;
+
+impl AbstractTemplateArg {
+    pub fn map_is_provided(&self) -> Option<(Span, Span, TemplateKind<&WrittenType, &FlatID>)> {
+        match self {
+            TemplateKind::Type(TemplateArg::Provided {
+                name_span,
+                value_span,
+                arg,
+                ..
+            }) => Some((*name_span, *value_span, TemplateKind::Type(arg))),
+            TemplateKind::Value(TemplateArg::Provided {
+                name_span,
+                value_span,
+                arg,
+                ..
+            }) => Some((*name_span, *value_span, TemplateKind::Value(arg))),
+            TemplateKind::Type(TemplateArg::NotProvided { .. }) => None,
+            TemplateKind::Value(TemplateArg::NotProvided { .. }) => None,
+        }
+    }
+}
+
 /// The template parameters of an object ([crate::flattening::Module], [crate::flattening::StructType], or [crate::flattening::NamedConstant])
 ///
 /// See [crate::linker::LinkInfo]
@@ -36,7 +127,7 @@ impl<ID> GlobalReference<ID> {
 pub struct Parameter {
     pub name: String,
     pub name_span: Span,
-    pub kind: ParameterKind,
+    pub kind: TemplateKind<TypeParameterKind, GenerativeParameterKind>,
 }
 
 /// See [Parameter]
@@ -51,32 +142,6 @@ pub struct GenerativeParameterKind {
 #[derive(Debug)]
 pub struct TypeParameterKind {}
 
-/// See [Parameter]
-///
-/// Must match the [TemplateArgKind] that is passed
-#[derive(Debug)]
-pub enum ParameterKind {
-    Type(TypeParameterKind),
-    Generative(GenerativeParameterKind),
-}
-
-impl ParameterKind {
-    #[track_caller]
-    pub fn unwrap_type(&self) -> &TypeParameterKind {
-        let Self::Type(t) = self else {
-            unreachable!("ParameterKind::unwrap_type on {self:?}")
-        };
-        t
-    }
-    #[track_caller]
-    pub fn unwrap_value(&self) -> &GenerativeParameterKind {
-        let Self::Generative(v) = self else {
-            unreachable!("ParameterKind::unwrap_value on {self:?}")
-        };
-        v
-    }
-}
-
 /// An argument passed to a template parameter.
 ///
 /// See [GlobalReference]
@@ -85,35 +150,28 @@ impl ParameterKind {
 ///
 /// When instantiated, this becomes a [ConcreteTemplateArg]
 #[derive(Debug)]
-pub struct TemplateArg {
-    pub name_span: Span,
-    pub value_span: Span,
-    pub kind: TemplateArgKind,
+pub enum TemplateArg<T> {
+    Provided {
+        name_span: Span,
+        value_span: Span,
+        arg: T,
+        abs_typ: AbstractRankedType,
+    },
+    NotProvided {
+        abs_typ: AbstractRankedType,
+    },
 }
 
-/// See [TemplateArg]
-///
-/// The argument kind passed to [ParameterKind], which it must match
-#[derive(Debug)]
-pub enum TemplateArgKind {
-    Type(WrittenType),
-    Value(FlatID),
-}
-
-impl TemplateArgKind {
-    #[track_caller]
-    pub fn unwrap_type(&self) -> &WrittenType {
-        let Self::Type(t) = self else {
-            unreachable!("TemplateArgKind::unwrap_type on {self:?}")
-        };
-        t
+impl<T> TemplateArg<T> {
+    pub fn get_abstract_typ(&self) -> &AbstractRankedType {
+        match self {
+            TemplateArg::Provided { abs_typ, .. } | TemplateArg::NotProvided { abs_typ } => abs_typ,
+        }
     }
-    #[track_caller]
-    pub fn unwrap_value(&self) -> FlatID {
-        let Self::Value(v) = self else {
-            unreachable!("TemplateArgKind::unwrap_value on {self:?}")
-        };
-        *v
+    pub fn get_abstract_typ_mut(&mut self) -> &mut AbstractRankedType {
+        match self {
+            TemplateArg::Provided { abs_typ, .. } | TemplateArg::NotProvided { abs_typ } => abs_typ,
+        }
     }
 }
 
@@ -121,13 +179,35 @@ impl TemplateArgKind {
 pub type TVec<T> = FlatAlloc<T, TemplateIDMarker>;
 
 pub fn for_each_generative_input_in_template_args(
-    template_args: &TVec<Option<TemplateArg>>,
+    template_args: &TVec<AbstractTemplateArg>,
     f: &mut impl FnMut(FlatID),
 ) {
-    for (_id, t_arg) in template_args.iter_valids() {
-        match &t_arg.kind {
-            TemplateArgKind::Type(typ) => typ.for_each_generative_input(f),
-            TemplateArgKind::Value(val) => f(*val),
+    for (_id, t_arg) in template_args {
+        match t_arg {
+            TemplateKind::Type(TemplateArg::Provided { arg: wr_typ, .. }) => {
+                wr_typ.for_each_generative_input(f)
+            }
+            TemplateKind::Value(TemplateArg::Provided { arg: val, .. }) => f(*val),
+            TemplateKind::Type(TemplateArg::NotProvided { .. })
+            | TemplateKind::Value(TemplateArg::NotProvided { .. }) => {}
         }
+    }
+}
+
+impl TVec<ConcreteTemplateArg> {
+    pub fn cast_to_unifyable_array<const N: usize>(&self) -> [&UnifyableValue; N] {
+        self.cast_to_array().map(|v| v.unwrap_value())
+    }
+    pub fn cast_to_int_array<const N: usize>(&self) -> [&IBig; N] {
+        self.cast_to_array().map(|v| {
+            let_unwrap!(TemplateKind::Value(Unifyable::Set(Value::Integer(i))), v);
+            i
+        })
+    }
+    pub fn cast_to_int_array_mut<const N: usize>(&mut self) -> [&mut IBig; N] {
+        self.cast_to_array_mut().map(|v| {
+            let_unwrap!(TemplateKind::Value(Unifyable::Set(Value::Integer(i))), v);
+            i
+        })
     }
 }

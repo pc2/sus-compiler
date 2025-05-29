@@ -124,3 +124,31 @@ pub fn get_builtin_const(token_stream: TokenStream) -> TokenStream {
     )
     .into()
 }
+
+#[proc_macro]
+pub fn __debug_breakpoint(_input: TokenStream) -> TokenStream {
+    let expanded = quote! {
+        if crate::debug::debugging_enabled() {
+            #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+            unsafe {
+                core::arch::asm!("int3");
+            }
+
+            #[cfg(all(target_arch = "x86_64", target_os = "windows"))]
+            unsafe {
+                core::arch::asm!("int3");
+            }
+
+            #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+            unsafe {
+                core::arch::asm!("brk #0");
+            }
+
+            #[cfg(all(target_arch = "aarch64", target_os = "windows"))]
+            unsafe {
+                core::arch::asm!("brk #0");
+            }
+        }
+    };
+    TokenStream::from(expanded)
+}

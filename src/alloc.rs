@@ -91,9 +91,6 @@ impl<IndexMarker> UUIDAllocator<IndexMarker> {
         self.cur.0 += 1;
         allocated_id
     }
-    pub fn peek(&self) -> UUID<IndexMarker> {
-        self.cur
-    }
     pub fn to_flat_alloc<T: Default>(&self) -> FlatAlloc<T, IndexMarker> {
         let mut result = FlatAlloc::with_capacity(self.cur.0);
         for _ in 0..self.cur.0 {
@@ -303,6 +300,10 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
             PhantomData,
         )
     }
+    pub fn free_reservation(&mut self, UUID(uuid, _): UUID<IndexMarker>) {
+        assert!(self.data[uuid].is_none());
+        self.free_slots.push(uuid);
+    }
     pub fn revert_to_reservation(&mut self, UUID(uuid, _): UUID<IndexMarker>) {
         assert!(self.data[uuid].is_some());
         self.data[uuid] = None;
@@ -352,6 +353,15 @@ impl<T, IndexMarker> ArenaAllocator<T, IndexMarker> {
         self.iter()
             .find(|(id, v)| predicate(*id, v))
             .map(|(id, _)| id)
+    }
+    #[track_caller]
+    pub fn get2_mut(
+        &mut self,
+        UUID(uuid_a, _): UUID<IndexMarker>,
+        UUID(uuid_b, _): UUID<IndexMarker>,
+    ) -> Option<(&mut T, &mut T)> {
+        get2_mut(&mut self.data, uuid_a, uuid_b)
+            .map(|(a, b)| (a.as_mut().unwrap(), b.as_mut().unwrap()))
     }
 }
 
@@ -614,8 +624,6 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
             _ph: PhantomData,
         }
     }
-    #[cfg(test)]
-    // Only for testing, so only enabled with test flag
     pub fn from_vec(data: Vec<T>) -> Self {
         Self {
             data,
@@ -678,17 +686,6 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
             _ph: PhantomData,
         }
     }
-    pub fn cast_to_array<const N: usize>(&self) -> &[T; N] {
-        assert!(self.len() == N);
-        self.data.as_slice().try_into().unwrap()
-    }
-    pub fn map_to_array<O, const N: usize>(
-        &self,
-        mut f: impl FnMut(UUID<IndexMarker>, &T) -> O,
-    ) -> [O; N] {
-        assert!(self.len() == N);
-        std::array::from_fn(|i| f(UUID::from_hidden_value(i), &self.data[i]))
-    }
     pub fn try_map<OT, ErrT>(
         &self,
         mut f: impl FnMut((UUID<IndexMarker>, &T)) -> Result<OT, ErrT>,
@@ -700,6 +697,47 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
         Ok(FlatAlloc {
             data,
             _ph: PhantomData,
+        })
+    }
+    pub fn try_map2<T2, OT, ET>(
+        &self,
+        second: &FlatAlloc<T2, IndexMarker>,
+        mut f: impl FnMut((UUID<IndexMarker>, &T, &T2)) -> Result<OT, ET>,
+    ) -> Result<FlatAlloc<OT, IndexMarker>, ET> {
+        let mut data = Vec::with_capacity(self.len());
+        for v in zip_eq(self.iter(), second.iter()) {
+            data.push(f(v)?);
+        }
+        Ok(FlatAlloc {
+            data,
+            _ph: PhantomData,
+        })
+    }
+    pub fn try_map3<T2, T3, OT, ET>(
+        &self,
+        second: &FlatAlloc<T2, IndexMarker>,
+        third: &FlatAlloc<T3, IndexMarker>,
+        mut f: impl FnMut((UUID<IndexMarker>, &T, &T2, &T3)) -> Result<OT, ET>,
+    ) -> Result<FlatAlloc<OT, IndexMarker>, ET> {
+        let mut data = Vec::with_capacity(self.len());
+        for v in zip_eq3(self.iter(), second.iter(), third.iter()) {
+            data.push(f(v)?);
+        }
+        Ok(FlatAlloc {
+            data,
+            _ph: PhantomData,
+        })
+    }
+    pub fn cast_to_array<const N: usize>(&self) -> [&T; N] {
+        assert_eq!(self.len(), N);
+        std::array::from_fn(|i| &self.data[i])
+    }
+    pub fn cast_to_array_mut<const N: usize>(&mut self) -> [&mut T; N] {
+        assert_eq!(self.len(), N);
+        std::array::from_fn(|i| {
+            let ptr: *mut T = &mut self.data[i];
+            // SAFETY: Of course, the data[i] accesses are all disjoint
+            unsafe { &mut *ptr }
         })
     }
     pub fn find(
