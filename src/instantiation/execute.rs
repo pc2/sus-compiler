@@ -7,11 +7,15 @@
 use std::ops::{Deref, Index, IndexMut};
 
 use crate::latency::CALCULATE_LATENCY_LATER;
-use crate::linker::{GlobalUUID, IsExtern, LinkInfo};
+use crate::let_unwrap;
+use crate::linker::IsExtern;
+use crate::linker::{GlobalUUID, LinkInfo};
 use crate::prelude::*;
+use crate::typing::abstract_type::DomainType;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType};
 use crate::typing::concrete_type::ConcreteTemplateArg;
-use crate::typing::template::{GlobalReference, TVec, TemplateArg};
+use crate::typing::template::GlobalReference;
+use crate::typing::template::{TVec, TemplateArg};
 use crate::typing::written_type::WrittenType;
 use crate::util::{unwrap_single_element, zip_eq};
 
@@ -22,9 +26,7 @@ use sus_proc_macro::get_builtin_const;
 use crate::flattening::*;
 use crate::value::{compute_binary_op, compute_unary_op, Value};
 
-use crate::typing::{
-    abstract_type::DomainType, concrete_type::ConcreteType, template::TemplateKind,
-};
+use crate::typing::{concrete_type::ConcreteType, template::TemplateKind};
 
 use super::*;
 

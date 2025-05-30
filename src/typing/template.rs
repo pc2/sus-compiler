@@ -1,10 +1,9 @@
+use super::{abstract_type::AbstractRankedType, written_type::WrittenType};
+use crate::prelude::*;
 use ibig::IBig;
 
-use super::{
-    abstract_type::AbstractRankedType, concrete_type::ConcreteTemplateArg,
-    value_unifier::UnifyableValue, written_type::WrittenType,
-};
-use crate::{prelude::*, typing::set_unifier::Unifyable, value::Value};
+use super::{concrete_type::ConcreteTemplateArg, value_unifier::UnifyableValue};
+use crate::{typing::set_unifier::Unifyable, value::Value};
 
 /// See [TVec]. All circumstances handling Templates need to handle both Types and Values.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

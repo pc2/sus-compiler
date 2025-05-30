@@ -108,6 +108,18 @@ impl Module {
         None
     }
 
+    pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
+        match &self.link_info.instructions[instr_id] {
+            Instruction::SubModule(sm) => sm.module_ref.get_total_span(),
+            Instruction::Declaration(decl) => decl.decl_span,
+            Instruction::Expression(w) => w.span,
+            Instruction::IfStatement(if_stmt) => self.get_instruction_span(if_stmt.condition),
+            Instruction::ForStatement(for_stmt) => {
+                self.get_instruction_span(for_stmt.loop_var_decl)
+            }
+        }
+    }
+
     /// Temporary upgrade such that we can name the singular clock of the module, such that weirdly-named external module clocks can be used
     ///
     /// See #7
