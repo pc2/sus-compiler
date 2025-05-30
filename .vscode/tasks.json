@@ -12,6 +12,16 @@
 			"args": ["--release", "--features", "lsp"]
 		},
 		{
+			"type": "cargo",
+			"command": "build",
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": "build",
+			"label": "Build for Debugging",
+			"args": []
+		},
+		{
 			"label": "Rebuild and restart LSP",
 			"command": "${command:sus.restartServer}",
 			"group": "build",
