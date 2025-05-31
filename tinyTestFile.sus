@@ -1,8 +1,3 @@
 // USE THIS FILE TO TEST SMALL SAMPLES OF SUS CODE IN ISOLATION. 
 // DO NOT COMMIT
 // To use with VSCode debugger, name the module "TEST", and in the code use `if crate::debug::is_enabled("TEST") {}` to enable breakpoint code
-
-
-module TEST {
-	assert #(C: 15 + 3 == 19)
-}

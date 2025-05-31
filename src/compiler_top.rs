@@ -1,6 +1,5 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
@@ -236,10 +235,10 @@ impl Linker {
             if md.link_info.template_parameters.is_empty() {
                 let _inst = self.instantiator.instantiate(
                     self,
-                    Rc::new(ConcreteGlobalReference {
+                    ConcreteGlobalReference {
                         id,
                         template_args: FlatAlloc::new(),
-                    }),
+                    },
                 );
             }
         }

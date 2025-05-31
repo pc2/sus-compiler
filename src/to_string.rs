@@ -1,12 +1,15 @@
+use crate::alloc::{zip_eq, ArenaAllocator};
 use crate::prelude::*;
 
 use crate::typing::abstract_type::{AbstractInnerType, PeanoType};
-use crate::typing::template::{Parameter, TVec};
+use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg};
+use crate::typing::set_unifier::Unifyable;
+use crate::typing::template::{Parameter, TVec, TemplateKind};
 use crate::typing::written_type::WrittenType;
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
 use crate::flattening::{DomainInfo, Interface, InterfaceToDomainMap, Module, StructType};
-use crate::linker::FileData;
+use crate::linker::{FileData, GlobalUUID, LinkInfo};
 use crate::typing::{
     abstract_type::{AbstractRankedType, DomainType},
     concrete_type::ConcreteType,
@@ -40,7 +43,6 @@ impl TemplateNameGetter for TVec<Parameter> {
     }
 }
 
-#[derive(Debug)]
 pub struct WrittenTypeDisplay<
     'a,
     TypVec: Index<TypeUUID, Output = StructType>,
@@ -56,7 +58,7 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner {
-            WrittenType::Error(_) => f.write_str("{error"),
+            WrittenType::Error(_) => f.write_str("{error}"),
             WrittenType::TemplateVariable(_, id) => {
                 f.write_str(self.template_names.get_template_name(*id))
             }
@@ -90,7 +92,6 @@ impl WrittenType {
     }
 }
 
-#[derive(Debug)]
 pub struct AbstractRankedTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
     typ: &'a AbstractRankedType,
     linker_types: &'a TypVec,
@@ -147,29 +148,30 @@ impl Display for PeanoType {
     }
 }
 
-#[derive(Debug)]
 pub struct ConcreteTypeDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
     inner: &'a ConcreteType,
     linker_types: &'a T,
+    use_newlines: bool,
 }
 
 impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner {
-            ConcreteType::Named(name) => {
-                f.write_str(&self.linker_types[name.id].link_info.get_full_name())
+            ConcreteType::Named(global_ref) => ConcreteGlobalReferenceDisplay {
+                target_link_info: &self.linker_types[global_ref.id].link_info,
+                template_args: &global_ref.template_args,
+                linker_types: self.linker_types,
+                use_newlines: self.use_newlines,
             }
+            .fmt(f),
             ConcreteType::Array(arr_box) => {
                 let (elem_typ, arr_size) = arr_box.deref();
                 write!(
                     f,
-                    "{}[{}]",
-                    elem_typ.display(self.linker_types),
-                    arr_size.display(self.linker_types)
+                    "{}[{arr_size}]",
+                    elem_typ.display(self.linker_types, self.use_newlines)
                 )
             }
-            ConcreteType::Value(v) => write!(f, "{v}"),
-            ConcreteType::Unknown(u) => write!(f, "{{{u:?}}}"),
         }
     }
 }
@@ -178,10 +180,12 @@ impl ConcreteType {
     pub fn display<'a>(
         &'a self,
         linker_types: &'a impl Index<TypeUUID, Output = StructType>,
+        use_newlines: bool,
     ) -> impl Display + 'a {
         ConcreteTypeDisplay {
             inner: self,
             linker_types,
+            use_newlines,
         }
     }
 }
@@ -258,22 +262,21 @@ impl Module {
     pub fn make_all_ports_info_string(
         &self,
         file_text: &FileText,
-        local_domains: Option<InterfaceToDomainMap>,
+        local_domains_used_in_parent_module: Option<InterfaceToDomainMap>,
     ) -> String {
         let full_name_with_args = self.link_info.get_full_name_and_template_args(file_text);
         let mut result = format!("module {full_name_with_args}:\n");
 
         for (domain_id, domain) in &self.domains {
-            if let Some(domain_map) = &local_domains {
-                writeln!(
-                    result,
-                    "domain {}: {{{}}}",
-                    &domain.name,
-                    domain_map.local_domain_to_global_domain(domain_id).name
-                )
-                .unwrap();
+            let name = &domain.name;
+            if let Some(domain_map) = &local_domains_used_in_parent_module {
+                let submod_name = &self.link_info.name;
+                let domain_id_in_parent = domain_map.local_domain_map[domain_id].unwrap_physical();
+                let name_in_parent =
+                    DomainType::physical_to_string(domain_id_in_parent, domain_map.domains);
+                writeln!(result, "domain {submod_name}.{name} = {name_in_parent}").unwrap();
             } else {
-                writeln!(result, "domain {}:", &domain.name).unwrap();
+                writeln!(result, "domain {name}:").unwrap();
             }
 
             // TODO interfaces
@@ -301,9 +304,77 @@ impl Module {
         let mut spans_print = Vec::new();
         for (id, inst) in &self.link_info.instructions {
             println!("    {id:?}: {inst:?}");
-            let span = self.get_instruction_span(id);
+            let span = self.link_info.get_instruction_span(id);
             spans_print.push((format!("{id:?}"), span.as_range()));
         }
         pretty_print_many_spans(file_data, &spans_print);
+    }
+}
+
+pub struct ConcreteGlobalReferenceDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
+    template_args: &'a TVec<ConcreteTemplateArg>,
+    target_link_info: &'a LinkInfo,
+    linker_types: &'a T,
+    /// If there should be newlines: "\n", otherwise ""
+    use_newlines: bool,
+}
+
+impl<'a, T: Index<TypeUUID, Output = StructType>> Display
+    for ConcreteGlobalReferenceDisplay<'a, T>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let nl = if self.use_newlines { "\n    " } else { "" };
+        assert!(self.template_args.len() == self.target_link_info.template_parameters.len());
+        let object_full_name = self.target_link_info.get_full_name();
+        f.write_str(&object_full_name)?;
+        if self.template_args.is_empty() {
+            //return f.write_str(" #()");
+            return Ok(());
+        } else {
+            f.write_str(" #(")?;
+        }
+
+        let mut is_first = true;
+        for (_id, arg, arg_in_target) in zip_eq(
+            self.template_args,
+            &self.target_link_info.template_parameters,
+        ) {
+            if !is_first {
+                f.write_str(", ")?;
+            }
+            is_first = false;
+            f.write_fmt(format_args!("{nl}{}: ", arg_in_target.name))?;
+            match arg {
+                TemplateKind::Type(typ_arg) => {
+                    f.write_fmt(format_args!(
+                        "type {}",
+                        typ_arg.display(self.linker_types, self.use_newlines)
+                    ))?;
+                }
+                TemplateKind::Value(v) => match v {
+                    Unifyable::Set(value) => f.write_fmt(format_args!("{value}"))?,
+                    Unifyable::Unknown(_) => f.write_str("/* Could not infer */")?,
+                },
+            }
+        }
+        if self.use_newlines {
+            f.write_str("\n")?;
+        }
+        f.write_char(')')
+    }
+}
+impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
+    pub fn display<'v>(
+        &'v self,
+        linker: &'v Linker,
+        use_newlines: bool,
+    ) -> ConcreteGlobalReferenceDisplay<'v, ArenaAllocator<StructType, TypeUUIDMarker>> {
+        let target_link_info = linker.get_link_info(self.id.into());
+        ConcreteGlobalReferenceDisplay {
+            template_args: &self.template_args,
+            target_link_info,
+            linker_types: &linker.types,
+            use_newlines,
+        }
     }
 }

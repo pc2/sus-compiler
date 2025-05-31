@@ -5,15 +5,15 @@ pub mod port_latency_inference;
 
 use std::{cmp::max, iter::zip};
 
-use crate::alloc::zip_eq;
 use crate::dev_aid::dot_graphs::display_latency_count_graph;
 use crate::errors::ErrorInfoObject;
 use crate::prelude::*;
+use crate::typing::value_unifier::ValueUnifierStore;
+use crate::{alloc::zip_eq, typing::value_unifier::ValueUnifier};
 
-use crate::typing::concrete_type::ConcreteType;
-use crate::typing::type_inference::{DelayedConstraintStatus, Substitutor};
 use crate::value::Value;
 
+use ibig::IBig;
 use latency_algorithm::{
     add_cycle_to_extra_fanin, infer_unknown_latency_edges, is_valid, solve_latencies, FanInOut,
     LatencyCountingError, LatencyCountingPorts, LatencyInferenceCandidate, SpecifiedLatency,
@@ -95,7 +95,7 @@ pub struct LatencyCountingProblem {
 }
 
 impl LatencyCountingProblem {
-    fn new(ctx: &InstantiationContext) -> Self {
+    fn new(ctx: &ModuleTypingContext, unifier: &ValueUnifierStore) -> Self {
         let mut map_latency_node_to_wire = Vec::new();
         let mut specified_latencies = Vec::new();
 
@@ -147,7 +147,7 @@ impl LatencyCountingProblem {
             let local_inference_edges = sm.get_interface_relative_latencies(
                 ctx.linker,
                 sm_id,
-                &ctx.type_substitutor,
+                unifier,
                 &mut inference_variables,
             );
 
@@ -173,7 +173,7 @@ impl LatencyCountingProblem {
         }
     }
 
-    fn make_ports_per_domain(&self, ctx: &InstantiationContext) -> Vec<Vec<usize>> {
+    fn make_ports_per_domain(&self, ctx: &ModuleTypingContext) -> Vec<Vec<usize>> {
         let mut ports_per_domain_flat = ctx.md.domains.map(|_| Vec::new());
         for (_id, port) in ctx.interface_ports.iter_valids() {
             ports_per_domain_flat[port.domain].push(self.map_wire_to_latency_node[port.wire]);
@@ -196,7 +196,7 @@ impl LatencyCountingProblem {
 
     fn debug(
         &self,
-        ctx: &InstantiationContext,
+        ctx: &ModuleTypingContext,
         solution: Option<&[i64]>,
         debug_flag: &'static str,
         file_name: &str,
@@ -266,10 +266,10 @@ impl InstantiatedModule {
     }
 }
 
-impl InstantiationContext<'_, '_> {
+impl ModuleTypingContext<'_> {
     // Returns a proper interface if all ports involved did not produce an error. If a port did produce an error then returns None.
     // Computes all latencies involved
-    pub fn compute_latencies(&mut self) {
+    pub fn compute_latencies(&mut self, unifier: &ValueUnifierStore) {
         let mut any_invalid_port = false;
         for (port_id, p) in self.interface_ports.iter_valids() {
             if !p.is_input {
@@ -292,7 +292,7 @@ impl InstantiationContext<'_, '_> {
             return; // Early exit so we don't flood WIP modules with "Node not reached by Latency Counting" errors
         }
 
-        let mut problem = LatencyCountingProblem::new(self);
+        let mut problem = LatencyCountingProblem::new(self, unifier);
         // Remove all poisoned edges as solve_latencies doesn't deal with them
         problem.remove_poison_edges();
 
@@ -323,8 +323,10 @@ impl InstantiationContext<'_, '_> {
                     if is_valid(*lat) {
                         wire.absolute_latency = *lat;
                     } else {
-                        let source_location =
-                            self.md.get_instruction_span(wire.original_instruction);
+                        let source_location = self
+                            .md
+                            .link_info
+                            .get_instruction_span(wire.original_instruction);
                         self.errors.error(
                             source_location,
                             "Latency Counting couldn't reach this node".to_string(),
@@ -344,8 +346,8 @@ impl InstantiationContext<'_, '_> {
         }
     }
 
-    pub fn infer_parameters_for_latencies(&mut self) -> DelayedConstraintStatus {
-        let mut problem = LatencyCountingProblem::new(self);
+    pub fn infer_parameters_for_latencies<'inst>(&'inst self, unifier: &mut ValueUnifier<'inst>) {
+        let mut problem = LatencyCountingProblem::new(self, &unifier.store);
         let fanins = problem.make_fanins();
 
         problem.debug(
@@ -364,27 +366,17 @@ impl InstantiationContext<'_, '_> {
             &mut problem.inference_variables,
         );
 
-        let mut any_new_values = false;
-        let mut all_new_values = true;
         for (_, var) in problem.inference_variables.into_iter() {
             if let Some(inferred_value) = var.get() {
                 let (submod_id, arg_id) = var.back_reference;
 
-                self.type_substitutor.unify_must_succeed(
-                    &self.submodules[submod_id].refers_to.template_args[arg_id],
-                    &ConcreteType::Value(Value::Integer(inferred_value.into())),
-                );
-
-                any_new_values = true;
-            } else {
-                all_new_values = false;
+                assert!(unifier
+                    .set(
+                        self.submodules[submod_id].refers_to.template_args[arg_id].unwrap_value(),
+                        Value::Integer(IBig::from(inferred_value)),
+                    )
+                    .is_ok());
             }
-        }
-
-        match (any_new_values, all_new_values) {
-            (_, true) => DelayedConstraintStatus::Resolved,
-            (true, false) => DelayedConstraintStatus::Progress,
-            (false, false) => DelayedConstraintStatus::NoProgress,
         }
     }
 

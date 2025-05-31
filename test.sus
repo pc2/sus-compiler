@@ -1,7 +1,7 @@
 
 module example_md {
-	interface example_md : int[4] factors,
-		int add_to ->
+	interface example_md : int#(MIN: 0, MAX: 100)[4] factors,
+		int#(MIN: 0, MAX: 100) add_to ->
 		int product, 
 		int total
 
@@ -15,7 +15,7 @@ module example_md {
 
 // (a*b) + c
 module multiply_add {
-	interface multiply_add : int a, int b, int c -> int total
+	interface multiply_add : int#(MIN: 0, MAX: 100) a, int#(MIN: 0, MAX: 100) b, int#(MIN: 0, MAX: 100) c -> int total
 
 	reg int tmp = a * b
 	total = tmp + c
@@ -27,7 +27,7 @@ module test_pow17 {
 }
 
 module pow17 {
-    interface pow17 : int i -> int o 
+    interface pow17 : int#(MIN: 0, MAX: 100) i -> int o 
 	    int i2  = i   * i
 	reg int i4  = i2  * i2
 	    int i8  = i4  * i4
@@ -38,22 +38,22 @@ module pow17 {
 
 module fibonnaci {
     interface fibonnaci : -> int num 
-	state int cur = 1
-	state int prev = 0
+	state int #(MIN: 0, MAX: 100) cur = 1
+	state int #(MIN: 0, MAX: 100) prev = 0
 
 	
-	num = cur + prev
+	num = (cur + prev) % 100
 	prev = cur
 	cur = num
 }
 
 module blur2 {
-	interface blur2 : int data, bool first -> int blurred
+	interface blur2 : int#(MIN: 0, MAX: 100) data, bool first -> int blurred
 	
 	state int prev
 
 	when !first {
-		blurred = data + prev
+		blurred = (data + prev) % 100
 	}
 	prev = data
 
@@ -71,18 +71,18 @@ module blur2 {
 
 
 module Tree_Multiply {
-    interface Tree_Multiply : int[4] values -> int total 
+    interface Tree_Multiply : int#(MIN: 0, MAX: 100)[4] values -> int total 
 	reg int a = values[0] * values[1]
 	reg int b = values[2] * values[3]
 	reg total = a * b
 }
 
 module Accumulator {
-    interface Accumulator : int term, bool done -> int total 
+    interface Accumulator : int#(MIN: 0, MAX: 100) term, bool done -> int total 
     state int tot
 	initial tot = 0
 
-    int new_tot = tot + term
+    int new_tot = (tot + term) % 100
     when done {
         reg total = new_tot
         tot = 0
@@ -94,7 +94,7 @@ module Accumulator {
 
 //timeline (a, true -> /) | (a, false -> /) .. (a, false -> r)* .. (a, true -> r)
 module blur {
-    interface blur : int a, bool done -> int result 
+    interface blur : int#(MIN: 0, MAX: 100) a, bool done -> int result 
 	state bool working
 	initial working = false
 	state int prev
@@ -110,7 +110,7 @@ module blur {
 
 //timeline (X -> X) .. (/ -> X) .. (/ -> X) .. (/ -> X)
 module Unpack4 {
-    interface Unpack4 : int[4] packed -> int out_stream 
+    interface Unpack4 : int#(MIN: 0, MAX: 100)[4] packed -> int out_stream 
 	gen int INITIAL = 0
 	gen int A = 1
 	
@@ -139,7 +139,7 @@ module Unpack4 {
 }
 
 module generative {
-    interface generative : int i -> int o, int o2 
+    interface generative : int#(MIN: 0, MAX: 100) i -> int o, int o2 
 	gen int x = 5
 	gen int[x] ys
 
@@ -163,7 +163,7 @@ module generative {
 }
 
 module add_indices_to_array {
-	interface add_indices_to_array : int[10] values -> int[10] added_values
+	interface add_indices_to_array : int#(MIN: 0, MAX: 100)[10] values -> int[10] added_values
 
 	for int i in 0..10 {
 		int t = values[i]
@@ -215,7 +215,7 @@ module first_bit_idx_6 {
 }
 
 module multiply_add_with_latencies {
-    interface multiply_add_with_latencies : int a'0, int b'0, int c'0 -> int r'0 
+    interface multiply_add_with_latencies : int#(MIN: 0, MAX: 100) a'0, int#(MIN: 0, MAX: 100) b'0, int#(MIN: 0, MAX: 100) c'0 -> int r'0 
     int tmp'1 = multiply(a, b)
 	reg r = tmp + c
 }
@@ -238,7 +238,7 @@ module first_bit_idx_24 {
 }
 
 module permute {
-    interface permute : bool[128] mbf, int selected_permutation -> bool[128] permuted_mbf 
+    interface permute : bool[128] mbf, int#(MIN: 0, MAX: 100) selected_permutation -> bool[128] permuted_mbf 
 	// cvt_to_double
 	permuted_mbf = mbf
 }
@@ -270,18 +270,18 @@ module permute24 {
 
 
 module test_single_wire {
-    interface test_single_wire : int a -> int o 
+    interface test_single_wire : int#(MIN: 0, MAX: 100) a -> int o 
 	o = a
 }
 
 module disjoint_ports {
-    interface disjoint_ports : int a, int b, int c -> int result 
+    interface disjoint_ports : int#(MIN: 0, MAX: 100) a, int#(MIN: 0, MAX: 100) b, int#(MIN: 0, MAX: 100) c -> int result 
 	reg result = a + b
 	// don't touch c
 }
 
 module undeteriminable_input_latency {
-    interface undeteriminable_input_latency : int a, int b -> int x, int y 
+    interface undeteriminable_input_latency : int#(MIN: 0, MAX: 100) a, int#(MIN: 0, MAX: 100) b -> int x, int y 
 	reg int a_d = a
 	int t = a_d + b
     reg reg reg int a_dd = a
@@ -291,7 +291,7 @@ module undeteriminable_input_latency {
 }
 
 module specified_input_latency {
-    interface specified_input_latency : int a'0, int b'1 -> int x, int y 
+    interface specified_input_latency : int#(MIN: 0, MAX: 100) a'0, int#(MIN: 0, MAX: 100) b'1 -> int x, int y 
 	reg int a_d = a
     int t = a_d + b
     reg reg reg int a_dd = a
@@ -301,7 +301,7 @@ module specified_input_latency {
 }
 
 module determinable_input_latency {
-    interface determinable_input_latency : int a, int b -> int x, int y 
+    interface determinable_input_latency : int#(MIN: 0, MAX: 100) a, int#(MIN: 0, MAX: 100) b -> int x, int y 
 	reg int a_d = a
     int t = a_d + b
     reg reg int a_dd = a
@@ -312,7 +312,7 @@ module determinable_input_latency {
 
 // This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible. 
 module determinable_because_no_input_output_ports {
-    interface determinable_because_no_input_output_ports : int a -> int x 
+    interface determinable_because_no_input_output_ports : int#(MIN: 0, MAX: 100) a -> int x 
 	reg int a_d = a
     int t = a_d
     reg reg reg int a_dd = a
@@ -322,13 +322,13 @@ module determinable_because_no_input_output_ports {
 
 // This module is a copy of ::undeteriminable_input_latency, but it doesn't have an error, because we just assume the latency of the inner nodes to be the earliest possible. 
 module conflicting_latency_declarations {
-    interface conflicting_latency_declarations : int a'0 -> int x'1 
+    interface conflicting_latency_declarations : int#(MIN: 0, MAX: 100) a'0 -> int x'1 
 	reg int nio = a
 	reg x = nio
 }
 
 module bad_cycle {
-    interface bad_cycle : int a -> int r 
+    interface bad_cycle : int#(MIN: 0, MAX: 100) a -> int r 
 	state int state_reg
 	initial state_reg = 0
 
@@ -338,13 +338,13 @@ module bad_cycle {
 }
 
 module module_taking_time {
-	interface module_taking_time : int i'0 -> int o'5
+	interface module_taking_time : int#(MIN: 0, MAX: 100) i'0 -> int o'5
 	o = i
 }
 
 module matrix_vector_mul {
 	interface matrix_vector_mul : 
-		int[30][20] mat, int[20] vec -> int[30] result
+		int#(MIN: 0, MAX: 100)[30][20] mat, int#(MIN: 0, MAX: 100)[20] vec -> int[30] result
 	
 	for int row in 0..30 {
 		int[20] row_products
@@ -356,8 +356,8 @@ module matrix_vector_mul {
 }
 
 module bad_cycle2 {
-    interface bad_cycle2 : int a -> int r 
-	state int test
+    interface bad_cycle2 : int#(MIN: 0, MAX: 100) a -> int r 
+	state int#(MIN: 0, MAX: 7) test
 	initial test = 0
 
 	test = module_taking_time(test+a)
@@ -366,56 +366,56 @@ module bad_cycle2 {
 }
 
 module module_taking_a_lot_of_time {
-    interface module_taking_a_lot_of_time : int data_in'0 -> int data_out'200 
+    interface module_taking_a_lot_of_time : int#(MIN: 0, MAX: 100) data_in'0 -> int data_out'200 
 	data_out = data_in
 }
 
 
-/*extern*/ module offset_latency {
-    interface offset_latency : int i'0 -> int o'-5 
+/*extern*/ module offset_latency #(T) {
+    interface offset_latency : T i'0 -> T o'-5 
 
 }
 
 
 
 module good_cycle {
-    interface good_cycle : int a -> int r 
-	state int test
-	initial test = 0
+    interface good_cycle : bool a -> bool r 
+	state bool test
+	initial test = false
 	
-	int new_test = test + a
+	bool new_test = test ^ a
 	test = new_test
 
 	r = new_test
 }
 
 module input_only {
-    interface input_only : int i 
-	state int loop
-	initial loop = 0
-	loop = loop + i
+    interface input_only : bool i 
+	state bool loop
+	initial loop = false
+	loop = loop ^ i
 }
 
 module multiple_inputs_only {
-    interface multiple_inputs_only : int i, int i2 
-	state int loop
-	initial loop = 0
-	loop = loop + i + i2
+    interface multiple_inputs_only : bool i'0, bool i2'0 
+	state bool loop
+	initial loop = false
+	loop = loop ^ i ^ i2
 }
 
 module output_only {
-    interface output_only : -> int o 
-	state int loop
-	initial loop = 0
-	loop = loop + 1
+    interface output_only : -> bool o 
+	state bool loop
+	initial loop = false
+	loop = !loop
 	reg o = loop
 }
 
 module multiple_outputs_only {
-    interface multiple_outputs_only : -> int o, int o2 
-	state int loop
-	initial loop = 0
-	loop = loop + 1
+    interface multiple_outputs_only : -> bool o'0, bool o2'0
+	state bool loop
+	initial loop = false
+	loop = !loop
 	reg o = loop
 	reg reg o2 = loop
 }
@@ -423,7 +423,7 @@ module multiple_outputs_only {
 
 // Test submodule comment
 module submodule {
-    interface submodule : int a, int b -> int r 
+    interface submodule : int#(MIN: 0, MAX: 100) a, int#(MIN: 0, MAX: 100) b -> int r 
 	r = a * b
 }
 
@@ -439,7 +439,7 @@ comment
 
 */
 module contains_submodule_submodule {
-    interface contains_submodule_submodule : int a, int b, int c -> int r 
+    interface contains_submodule_submodule : int#(MIN: 0, MAX: 100) a, int#(MIN: 0, MAX: 100) b, int#(MIN: 0, MAX: 100) c -> int r 
 	// Temp val
     int tmp = submodule(a, b)
 	doNothing()
@@ -463,7 +463,7 @@ module use_xor {
 }
 
 module fizz_buzz {
-    interface fizz_buzz : int v -> int fb 
+    interface fizz_buzz : int#(MIN: 0, MAX: 99) v -> int fb 
 	gen int FIZZ = 888
 	gen int BUZZ = 555
 	gen int FIZZ_BUZZ = 888555
@@ -482,12 +482,12 @@ module fizz_buzz {
 	}
 }
 
-module fizz_buzz_gen {
-    interface fizz_buzz_gen : int v -> int fb 
+module fizz_buzz_gen #(int TABLE_SIZE) {
+    interface fizz_buzz_gen : int#(MIN: 0, MAX: TABLE_SIZE) v -> int fb 
 	gen int FIZZ = 888
 	gen int BUZZ = 555
 	gen int FIZZ_BUZZ = 888555
-	gen int TABLE_SIZE = 256
+
 
 	gen int[TABLE_SIZE] lut
 	
@@ -560,7 +560,7 @@ module monotonize_down {
 }
 
 module my_mod {
-    interface my_mod : int i -> bool a, bool b 
+    interface my_mod : int#(MIN: 0, MAX: 100) i -> bool a, bool b 
 	a = i == 3
 	b = i == 5
 }
@@ -574,14 +574,14 @@ module use_my_mod {
 
 // Main module documentation
 module submodule_named_ports {
-    interface submodule_named_ports : int port_a, int port_b -> int port_c 
+    interface submodule_named_ports : int#(MIN: 0, MAX: 100) port_a, int#(MIN: 0, MAX: 100) port_b -> int port_c 
 	port_c = port_a + port_b
 
 	
 }
 
 module use_submodule_named_ports {
-    interface use_submodule_named_ports : int i -> int o 
+    interface use_submodule_named_ports : int#(MIN: 0, MAX: 100) i -> int o 
 // Test submodule documentation
 	submodule_named_ports sm
 
@@ -595,7 +595,7 @@ module use_submodule_named_ports {
 }
 
 module contains_submodule_submodule {
-    interface contains_submodule_submodule : int a, int b, int c -> int r 
+    interface contains_submodule_submodule : int#(MIN: 0, MAX: 100) a, int#(MIN: 0, MAX: 100) b, int#(MIN: 0, MAX: 100) c -> int r 
 	// Temp val
     int tmp = submodule(a, b)
 	doNothing()
@@ -610,7 +610,7 @@ module cross_bool {
 	o = true
 }
 module cross_int {
-	interface in : int i'0
+	interface in : int#(MIN: 0, MAX: 100) i'0
 	interface out : -> int o'0
 	o = 1
 }
@@ -629,9 +629,9 @@ module offset_backwards {
 module dual_port_mem {
 	state bool[20][512] mem
 
-	interface write : bool write, bool[20] wr_data, int wr_addr
+	interface write : bool write, bool[20] wr_data, int#(MIN:0, MAX: 511) wr_addr
 
-	interface read : bool read, int rd_addr -> bool[20] rd_data
+	interface read : bool read, int#(MIN:0, MAX: 511) rd_addr -> bool[20] rd_data
 
 	when write {
 		mem[wr_addr] = wr_data
@@ -656,18 +656,18 @@ module use_fifo {
 }
 
 module test_separated_domain {
-    interface test_separated_domain : int main 
-	int domain2
+    interface test_separated_domain : bool main 
+	bool domain2
 
-	int domain3
+	bool domain3
 
-	int domain4
+	bool domain4
 
-	cross_int ci
+	cross_bool ci
 	ci.i = domain3
 	domain4 = ci.o
 
-	int domain5
+	bool domain5
 
 	int #(MIN: 0, MAX: 199) my_int
 }
@@ -683,7 +683,7 @@ module use_no_input_module {
 
 module mod_with_unused_interface {
 	if false {
-		interface v : int a -> int b
+		interface v : int#(MIN: 0, MAX: 100) a -> int b
 	}
 }
 
@@ -720,7 +720,7 @@ module use_bad_interface {
 module sequenceDownFrom {
 	//interface sequence : -> 
 
-	interface start : bool start'0, int upTo'0
+	interface start : bool start'0, int#(MIN: 0, MAX: 100) upTo'0
 
 	output bool ready'0
 
@@ -1038,7 +1038,7 @@ module UseDualPortMem {
 		bool[500] data'0 ->
 		bool[500] read_data'0
 		
-	DualPortMem #(SIZE: 128, T: type bool[500]) mem
+	DualPortMem #(MAX: 128, T: type bool[500]) mem
 
 	mem.write(do_write, addr, data)
 
@@ -1363,3 +1363,15 @@ module use_ranks {
 	wire_v = wire_v + vv
 }
 
+
+module testInts {
+
+	int[5] vs = [1, 2, 3, 4, 5]
+
+}
+
+module use_FIFO {
+    FIFO #(DEPTH: 53, READY_SLACK: 3) f
+
+    f.push(true, 3)
+}

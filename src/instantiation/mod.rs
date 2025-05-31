@@ -6,13 +6,16 @@ mod unique_names;
 
 use unique_names::UniqueNames;
 
+use crate::debug::SpanDebugger;
+use crate::latency::CALCULATE_LATENCY_LATER;
+use crate::linker::LinkInfo;
 use crate::prelude::*;
-use crate::typing::type_inference::{TypeSubstitutor, TypeUnifier};
+use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 
 use std::cell::OnceCell;
 use std::rc::Rc;
 
-use crate::flattening::{BinaryOperator, Module, UnaryOperator};
+use crate::flattening::{BinaryOperator, ExpressionOutput, Module, Port, UnaryOperator, WriteTo};
 use crate::{errors::ErrorStore, value::Value};
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
@@ -43,6 +46,25 @@ pub enum RealWirePathElem {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WriteReference {
+    /// The [crate::flattening::Instruction::Expression] that created this write
+    pub original_expression: FlatID,
+    /// Which write in a [crate::flattening::ExpressionOutput::MultiWrite] corresponds to [Self::to_path]
+    pub write_idx: usize,
+}
+
+impl WriteReference {
+    pub fn get<'l>(&self, link_info: &'l LinkInfo) -> Option<&'l WriteTo> {
+        let expr = link_info.instructions[self.original_expression].unwrap_expression();
+        if let ExpressionOutput::MultiWrite(writes) = &expr.output {
+            Some(&writes[self.write_idx])
+        } else {
+            None
+        }
+    }
+}
+
 /// One arm of a multiplexer. Each arm has an attached condition that is also stored here.
 ///
 /// See [RealWireDataSource::Multiplexer]
@@ -52,7 +74,7 @@ pub struct MultiplexerSource {
     pub num_regs: i64,
     pub from: WireID,
     pub condition: Box<[ConditionStackElem]>,
-    pub original_connection: FlatID,
+    pub wr_ref: WriteReference,
 }
 
 /// Where a [RealWire] gets its data, be it an operator, read-only value, constant, etc.
@@ -67,12 +89,12 @@ pub enum RealWireDataSource {
     },
     UnaryOp {
         op: UnaryOperator,
-        rank: usize,
+        rank: Vec<UnifyableValue>,
         right: WireID,
     },
     BinaryOp {
         op: BinaryOperator,
-        rank: usize,
+        rank: Vec<UnifyableValue>,
         left: WireID,
         right: WireID,
     },
@@ -106,6 +128,11 @@ pub struct RealWire {
     /// The computed latencies after latency counting
     pub absolute_latency: i64,
 }
+impl RealWire {
+    fn get_span(&self, link_info: &LinkInfo) -> Span {
+        link_info.instructions[self.original_instruction].get_span()
+    }
+}
 
 /// See [SubModule]
 ///
@@ -127,10 +154,17 @@ pub struct SubModulePort {
 pub struct SubModule {
     pub original_instruction: FlatID,
     pub instance: OnceCell<Rc<InstantiatedModule>>,
-    pub refers_to: Rc<ConcreteGlobalReference<ModuleUUID>>,
+    pub refers_to: ConcreteGlobalReference<ModuleUUID>,
     pub port_map: FlatAlloc<Option<SubModulePort>, PortIDMarker>,
     pub interface_call_sites: FlatAlloc<Vec<Span>, InterfaceIDMarker>,
     pub name: String,
+}
+impl SubModule {
+    fn get_span(&self, link_info: &LinkInfo) -> Span {
+        link_info.instructions[self.original_instruction]
+            .unwrap_submodule()
+            .get_most_relevant_span()
+    }
 }
 
 /// Generated from [Module::ports]
@@ -197,15 +231,6 @@ impl SubModuleOrWire {
         };
         *result
     }
-}
-
-/// Every [crate::flattening::Instruction] has an associated value (See [SubModuleOrWire]).
-/// They are either what this local name is currently referencing (either a wire instance or a submodule instance).
-/// Or in the case of Generative values, the current value in the generative variable.
-#[derive(Debug)]
-struct GenerationState<'fl> {
-    generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
-    md: &'fl Module,
 }
 
 /// Runtime conditions applied to a [crate::flattening::Write]
@@ -310,25 +335,89 @@ impl ForEachContainedWire for RealWireDataSource {
     }
 }
 
-/// As with other contexts, this is the shared state we're lugging around while executing & typechecking a module.
-pub struct InstantiationContext<'fl, 'l> {
-    pub name: String,
+struct Executed {
+    wires: FlatAlloc<RealWire, WireIDMarker>,
+    submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
+    type_var_alloc: ValueUnifierAlloc,
+    generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
+    execution_status: Result<(), (Span, String)>,
+}
+
+impl Executed {
+    fn make_interface(
+        &self,
+        ports: &FlatAlloc<Port, PortIDMarker>,
+    ) -> FlatAlloc<Option<InstantiatedPort>, PortIDMarker> {
+        ports.map(|(_, port)| {
+            let port_decl_id = port.declaration_instruction;
+            if let SubModuleOrWire::Wire(wire_id) = &self.generation_state[port_decl_id] {
+                let wire = &self.wires[*wire_id];
+                Some(InstantiatedPort {
+                    wire: *wire_id,
+                    is_input: port.is_input,
+                    absolute_latency: CALCULATE_LATENCY_LATER,
+                    typ: wire.typ.clone(),
+                    domain: wire.domain,
+                })
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn into_module_typing_context<'l>(
+        self,
+        linker: &'l Linker,
+        md: &'l Module,
+        global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
+    ) -> (ModuleTypingContext<'l>, ValueUnifierAlloc) {
+        let interface_ports = self.make_interface(&md.ports);
+        let errors = ErrorCollector::new_empty(md.link_info.file, &linker.files);
+        if let Err((position, reason)) = self.execution_status {
+            errors.error(position, reason);
+        }
+        let ctx = ModuleTypingContext {
+            global_ref,
+            wires: self.wires,
+            submodules: self.submodules,
+            generation_state: self.generation_state,
+            md,
+            link_info: &md.link_info,
+            linker,
+            errors,
+            interface_ports,
+        };
+        (ctx, self.type_var_alloc)
+    }
+}
+
+pub struct ModuleTypingContext<'l> {
+    pub global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
-
-    pub type_substitutor: TypeUnifier<TypeSubstitutor<ConcreteType>>,
-
-    /// Used for Execution
-    generation_state: GenerationState<'fl>,
-    unique_name_producer: UniqueNames,
-    condition_stack: Vec<ConditionStackElem>,
-
+    pub generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
     pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
-    pub errors: ErrorCollector<'l>,
-
-    pub working_on_global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
-    pub md: &'fl Module,
+    pub link_info: &'l LinkInfo,
+    /// Yes I know it's redundant, but it's easier to both have link_info and md
     pub linker: &'l Linker,
+    pub md: &'l Module,
+    pub errors: ErrorCollector<'l>,
+}
+
+impl<'l> ModuleTypingContext<'l> {
+    fn into_instantiated_module(self, name: String) -> InstantiatedModule {
+        let mangled_name = mangle_name(&name);
+        InstantiatedModule {
+            global_ref: self.global_ref,
+            name,
+            mangled_name,
+            errors: self.errors.into_storage(),
+            interface_ports: self.interface_ports,
+            wires: self.wires,
+            submodules: self.submodules,
+            generation_state: self.generation_state,
+        }
+    }
 }
 
 /// Mangle the module name for use in code generation
@@ -343,17 +432,72 @@ fn mangle_name(str: &str) -> String {
     result.trim_matches('_').to_owned()
 }
 
-impl InstantiationContext<'_, '_> {
-    fn extract(self) -> InstantiatedModule {
-        InstantiatedModule {
-            global_ref: self.working_on_global_ref,
-            mangled_name: mangle_name(&self.name),
-            name: self.name,
-            wires: self.wires,
-            submodules: self.submodules,
-            interface_ports: self.interface_ports,
-            generation_state: self.generation_state.generation_state,
-            errors: self.errors.into_storage(),
+fn perform_instantiation(
+    linker: &Linker,
+    global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
+) -> InstantiatedModule {
+    let md = &linker.modules[global_ref.id];
+
+    let name = global_ref.display(linker, false).to_string();
+
+    let _panic_guard = SpanDebugger::new("instantiating", &name, &linker.files[md.link_info.file]);
+
+    // Don't instantiate modules that already errored. Otherwise instantiator may crash
+    if md.link_info.errors.did_error {
+        println!("Not Instantiating {name} due to flattening errors");
+        return InstantiatedModule {
+            global_ref,
+            mangled_name: mangle_name(&name),
+            name,
+            errors: ErrorStore::new_did_error(),
+            interface_ports: Default::default(),
+            wires: Default::default(),
+            submodules: Default::default(),
+            generation_state: md
+                .link_info
+                .instructions
+                .map(|_| SubModuleOrWire::Unnasigned),
+        };
+    }
+
+    println!("Instantiating {name}");
+    let exec = execute::execute(&md.link_info, linker, &global_ref.template_args);
+
+    let (mut typed, type_var_alloc) = exec.into_module_typing_context(linker, md, global_ref);
+
+    if typed.errors.did_error() {
+        return typed.into_instantiated_module(name);
+    }
+
+    if crate::debug::is_enabled("print-instantiated-modules-pre-concrete-typecheck") {
+        println!("[[Executed {name}]]");
+        for (id, w) in &typed.wires {
+            println!("{id:?} -> {w:?}");
+        }
+        for (id, sm) in &typed.submodules {
+            println!("SubModule {id:?}: {sm:?}");
         }
     }
+
+    println!("Concrete Typechecking {name}");
+    typed.typecheck(type_var_alloc);
+
+    if typed.errors.did_error() {
+        return typed.into_instantiated_module(name);
+    }
+
+    println!("Checking array accesses {name}");
+    typed.check_subtypes();
+
+    if crate::debug::is_enabled("print-instantiated-modules") {
+        println!("[[Instantiated {name}]]");
+        for (id, w) in &typed.wires {
+            println!("{id:?} -> {w:?}");
+        }
+        for (id, sm) in &typed.submodules {
+            println!("SubModule {id:?}: {sm:?}");
+        }
+    }
+
+    typed.into_instantiated_module(name)
 }

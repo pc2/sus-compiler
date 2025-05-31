@@ -42,23 +42,6 @@ impl SpecifiedLatency {
         list.iter()
             .find_map(|spec_lat| (spec_lat.node == node).then_some(spec_lat.latency))
     }
-    fn get_latency(list: &[SpecifiedLatency], node: usize) -> Option<i64> {
-        for elem in list {
-            if elem.node == node {
-                return Some(elem.latency);
-            }
-        }
-        None
-    }
-    fn has_duplicates(mut list: &[SpecifiedLatency]) -> bool {
-        while let Some((fst, rest)) = list.split_first() {
-            if rest.iter().any(|e| e.node == fst.node) {
-                return true;
-            }
-            list = rest;
-        }
-        false
-    }
 }
 
 /// All the ways [solve_latencies] can go wrong
@@ -163,7 +146,7 @@ impl SolutionMemory {
         &'s mut self,
         specified_latencies: &[SpecifiedLatency],
     ) -> Solution<'s> {
-        assert!(self.to_explore_queue.is_empty());
+        self.to_explore_queue.clear();
         self.solution.fill(UNSET);
         for spec in specified_latencies {
             let target_node = &mut self.solution[spec.node];
@@ -252,29 +235,57 @@ impl<'mem> Solution<'mem> {
         }
     }
 
-    fn get_minimal_node(&self) -> usize {
-        *self
-            .to_explore_queue
-            .iter()
-            .min_by_key(|n| self.solution[**n])
-            .unwrap()
-    }
-
     fn offset_to_pin_node_to(&mut self, spec_lat: SpecifiedLatency) {
         let existing_latency_of_node = self.solution[spec_lat.node];
         assert!(is_valid(existing_latency_of_node));
-
         let offset = spec_lat.latency - existing_latency_of_node;
         if offset == 0 {
             return; // Early exit, no change needed
         }
-
         for n in self.to_explore_queue.iter() {
             let lat = &mut self.solution[*n];
             assert!(*lat != POISON);
             if *lat != UNSET {
                 *lat += offset;
             }
+        }
+    }
+
+    fn merge_port_groups(
+        &mut self,
+        disjoint_groups: &mut Vec<Vec<SpecifiedLatency>>,
+        ports: &LatencyCountingPorts,
+        bad_ports: &mut Vec<(usize, i64, i64)>,
+    ) {
+        disjoint_groups.retain_mut(|existing_set| {
+            if let Some(offset) = existing_set.iter().find_map(|v| {
+                is_valid(self.solution[v.node]).then(|| self.solution[v.node] - v.latency)
+            }) {
+                for v in existing_set {
+                    let latency = v.latency + offset;
+                    if self.solution[v.node] == UNSET {
+                        self.solution[v.node] = latency;
+                    } else if self.solution[v.node] != latency {
+                        bad_ports.push((v.node, self.solution[v.node], latency));
+                    } else {
+                        // The node's already in the set, and the latencies + offset are identical
+                    }
+                }
+                false
+            } else {
+                true
+            }
+        });
+
+        let mut new_group = Vec::new();
+        for n in &ports.port_nodes {
+            let latency = self.solution[*n];
+            if is_valid(latency) {
+                new_group.push(SpecifiedLatency { node: *n, latency });
+            }
+        }
+        if !new_group.is_empty() {
+            disjoint_groups.push(new_group);
         }
     }
 
@@ -623,6 +634,7 @@ fn print_inference_test_case<ID>(
     println!("==== END INFERENCE TEST CASE ====");
 }
 
+/// Guarantees that if `specified_latencies` is non-empty, it'll be the first element in the result vector,
 fn solve_port_latencies(
     fanouts: &ListOfLists<FanInOut>,
     ports: &LatencyCountingPorts,
@@ -630,7 +642,14 @@ fn solve_port_latencies(
 ) -> Result<Vec<Vec<SpecifiedLatency>>, LatencyCountingError> {
     let mut bad_ports: Vec<(usize, i64, i64)> = Vec::new();
 
-    let port_groups_iter = ports.inputs().iter().map(|input_port| {
+    let mut port_groups = ports
+        .outputs()
+        .iter()
+        .copied()
+        .map(|node| vec![SpecifiedLatency { node, latency: 0 }])
+        .collect();
+
+    for input_port in ports.inputs() {
         let start_node = SpecifiedLatency {
             node: *input_port,
             latency: 0,
@@ -640,61 +659,15 @@ fn solve_port_latencies(
             solution_memory.make_solution_with_initial_values(&[start_node]);
         working_latencies.latency_count_bellman_ford(fanouts);
 
-        let result: Vec<SpecifiedLatency> = std::iter::once(start_node)
-            .chain(ports.outputs().iter().filter_map(|output| {
-                let latency = working_latencies.solution[*output];
-                is_valid(latency).then_some(SpecifiedLatency {
-                    node: *output,
-                    latency,
-                })
-            }))
-            .collect();
-
-        debug_assert!(!SpecifiedLatency::has_duplicates(&result));
-
-        result
-    });
-
-    let mut port_groups =
-        merge_iter_into_disjoint_groups(port_groups_iter, |merge_to, merge_from| {
-            debug_assert!(!SpecifiedLatency::has_duplicates(merge_to));
-            debug_assert!(!SpecifiedLatency::has_duplicates(merge_from));
-
-            let Some(offset) = merge_to.iter().find_map(|to| {
-                SpecifiedLatency::get_latency(merge_from, to.node)
-                    .map(|from_latency| to.latency - from_latency)
-            }) else {
-                return false;
-            };
-
-            for from_node in merge_from {
-                from_node.latency += offset;
-
-                if let Some(to_node_latency) =
-                    SpecifiedLatency::get_latency(merge_to, from_node.node)
-                {
-                    if to_node_latency != from_node.latency {
-                        bad_ports.push((from_node.node, to_node_latency, from_node.latency));
-                    }
-                } else {
-                    merge_to.push(*from_node);
-                }
+        // We have to now remove all other inputs from the solution
+        // (inputs that happened to be in the fanout of this input)
+        for input_to_remove in ports.inputs() {
+            if *input_to_remove != *input_port {
+                working_latencies.solution[*input_to_remove] = UNSET;
             }
-
-            debug_assert!(!SpecifiedLatency::has_duplicates(merge_to));
-            true
-        });
-
-    for output_port in ports.outputs() {
-        if !port_groups
-            .iter()
-            .any(|pg| SpecifiedLatency::get_latency(pg, *output_port).is_some())
-        {
-            port_groups.push(vec![SpecifiedLatency {
-                node: *output_port,
-                latency: 0,
-            }]);
         }
+
+        working_latencies.merge_port_groups(&mut port_groups, ports, &mut bad_ports);
     }
 
     if bad_ports.is_empty() {
@@ -733,24 +706,25 @@ pub fn solve_latencies(
     debug_assert!(!has_poison_edge(&fanouts)); // Equivalent
 
     let mut mem = SolutionMemory::new(fanouts.len());
-    let solution_seeds = solve_port_latencies(&fanouts, ports, &mut mem)?;
+    let mut solution_seeds = solve_port_latencies(&fanouts, ports, &mut mem)?;
+
+    if !specified_latencies.is_empty() {
+        let mut working_latencies = mem.make_solution_with_initial_values(specified_latencies);
+        let mut no_bad_port_errors = Vec::new();
+        working_latencies.merge_port_groups(&mut solution_seeds, ports, &mut no_bad_port_errors);
+        assert!(no_bad_port_errors.is_empty(), "Adding the specified latencies cannot create new bad port errors, because it only applies in the edge case that all specified ports are disjoint inputs, or outputs");
+    }
 
     let mut final_solution = vec![UNSET; fanouts.len()];
 
     let mut hit_and_not_hit: Vec<(usize, Vec<usize>)> = Vec::new();
 
-    let mut seed_start: i64 = 0;
-    if !specified_latencies.is_empty() {
-        seed_start += SEPARATE_SEED_OFFSET;
-    }
-    fn get_reference_node(seed_start: &mut i64, solution: &mut Solution) -> SpecifiedLatency {
-        let latency = *seed_start;
-        *seed_start += SEPARATE_SEED_OFFSET;
-        let node = solution.get_minimal_node();
-        SpecifiedLatency { node, latency }
-    }
-
-    for seed in &solution_seeds {
+    let mut seed_start: i64 = if specified_latencies.is_empty() {
+        0
+    } else {
+        SEPARATE_SEED_OFFSET
+    };
+    for mut seed in solution_seeds {
         let num_seed_nodes_already_present = seed
             .iter()
             .filter(|s| final_solution[s.node] != UNSET)
@@ -760,7 +734,13 @@ pub fn solve_latencies(
             continue; // Skip this seed, as it's because of an earlier error, so we don't conflict on specified latencies
         }
 
-        let mut solution = mem.make_solution_with_initial_values(seed);
+        let offset = seed_start - seed[0].latency;
+        for s in &mut seed {
+            s.latency += offset;
+        }
+        seed_start += SEPARATE_SEED_OFFSET;
+
+        let mut solution = mem.make_solution_with_initial_values(&seed);
 
         ports_per_domain.retain_mut(|cur_node_set| {
             let num_hit = cur_node_set.partition_point(|n| solution.solution[*n] != i64::MIN);
@@ -774,14 +754,13 @@ pub fn solve_latencies(
 
         solution.explore_all_connected_nodes(&fanins, &fanouts);
 
-        let specified_node = specified_latencies
-            .first()
-            .and_then(|first_spec| {
-                (solution.solution[first_spec.node] != UNSET).then_some(*first_spec)
-            })
-            .unwrap_or_else(|| get_reference_node(&mut seed_start, &mut solution));
-
-        solution.offset_to_pin_node_to(specified_node);
+        // Of course, all other specified latencies are in the exact same solution
+        if let Some(representative) = specified_latencies.first() {
+            if is_valid(solution.solution[representative.node]) {
+                solution.offset_to_pin_node_to(*representative);
+                seed_start -= SEPARATE_SEED_OFFSET;
+            }
+        }
 
         solution.copy_to(&mut final_solution);
     }
@@ -794,32 +773,16 @@ pub fn solve_latencies(
         if final_solution[potential_start] == UNSET {
             let seed = SpecifiedLatency {
                 node: potential_start,
-                latency: 0,
+                latency: seed_start,
             };
+            seed_start += SEPARATE_SEED_OFFSET;
             let mut solution = mem.make_solution_with_initial_values(&[seed]);
             solution.explore_all_connected_nodes(&fanins, &fanouts);
-            let spec = get_reference_node(&mut seed_start, &mut solution);
-            solution.offset_to_pin_node_to(spec);
             solution.copy_to(&mut final_solution);
         }
     }
 
     Ok(final_solution)
-}
-
-/// [try_merge] should return true if the second argument was merged into the first argument.
-fn merge_iter_into_disjoint_groups<T>(
-    iter: impl Iterator<Item = T>,
-    mut try_merge: impl FnMut(&mut T, &mut T) -> bool,
-) -> Vec<T> {
-    let mut result = Vec::new();
-
-    for mut new_node in iter {
-        result.retain_mut(|existing_elem| !try_merge(&mut new_node, existing_elem));
-        result.push(new_node);
-    }
-
-    result
 }
 
 /// A candidate for latency inference. Passed to [try_infer_value_for] as a list of possibilities.
@@ -1091,7 +1054,7 @@ mod tests {
         normalize_specified_latency_lists(left);
         normalize_specified_latency_lists(right);
 
-        assert!(left == right);
+        assert_eq!(left, right);
     }
 
     #[test]

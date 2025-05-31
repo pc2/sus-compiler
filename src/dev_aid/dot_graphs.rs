@@ -245,7 +245,7 @@ impl<'a> GraphWalk<'a, usize, LatencyEdge<'a>> for Problem<'a> {
         (0..self.lc_problem.map_latency_node_to_wire.len()).collect()
     }
 
-    fn edges(&'a self) -> Edges<'a, LatencyEdge> {
+    fn edges(&'a self) -> Edges<'a, LatencyEdge<'a>> {
         let mut result = Vec::with_capacity(self.lc_problem.edges.len());
 
         for (to, fan_from) in &self.lc_problem.edges {
