@@ -13,6 +13,8 @@ pub use crate::__debug_span;
 #[allow(unused_imports)]
 pub use crate::let_unwrap;
 #[allow(unused_imports)]
+pub use crate::unwrap_variant;
+#[allow(unused_imports)]
 pub use sus_proc_macro::__debug_breakpoint;
 
 // private imports, for the IDs
