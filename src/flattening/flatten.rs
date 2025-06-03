@@ -646,7 +646,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     if let Some((_, io_span)) = io_kw {
                         self.errors.error(io_span, "Cannot redeclare 'input' or 'output' on functional syntax IO");
                     }
-                    DeclarationKind::RegularPort { is_input, port_id: PortID::PLACEHOLDER }
+                    DeclarationKind::RegularPort { is_input, port_id: PortID::PLACEHOLDER, domain: self.current_domain }
                 }
                 DeclarationContext::Generative(_) => {
                     if let Some((_, io_span)) = io_kw {
@@ -662,7 +662,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 }
                 DeclarationContext::PlainWire => {
                     match io_kw {
-                        Some((is_input, _)) => DeclarationKind::RegularPort { is_input, port_id: PortID::PLACEHOLDER },
+                        Some((is_input, _)) => DeclarationKind::RegularPort { is_input, port_id: PortID::PLACEHOLDER, domain: self.current_domain },
                         None => DeclarationKind::NotPort,
                     }
                 }
@@ -686,7 +686,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         Some((kw!("gen"), modifier_span)) => {
                             match decl_kind {
                                 DeclarationKind::NotPort => {}
-                                DeclarationKind::RegularPort { is_input : _, port_id : _ } | DeclarationKind::StructField { field_id:_ } => {
+                                DeclarationKind::RegularPort { .. } | DeclarationKind::StructField { field_id:_ } => {
                                     self.errors.error(modifier_span, "Cannot declare `gen` on inputs and outputs. To declare template inputs write it between the #()");
                                     decl_kind = DeclarationKind::NotPort; // Make it not a port anymore, because it errored
                                 }
@@ -716,7 +716,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 },
                 DeclarationKind::GenerativeInput(_template_id) => {DomainType::Generative}
                 DeclarationKind::StructField { field_id } => {*field_id = self.fields_to_visit.next().unwrap(); DomainType::Physical(UUID::PLACEHOLDER)}
-                DeclarationKind::RegularPort { is_input:_, port_id } => {*port_id = self.ports_to_visit.next().unwrap(); DomainType::Physical(self.current_domain)}
+                DeclarationKind::RegularPort { is_input:_, port_id, domain } => {*port_id = self.ports_to_visit.next().unwrap(); DomainType::Physical(*domain)}
             };
 
             cursor.field(field!("type"));
@@ -1755,10 +1755,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
                 if let Instruction::Declaration(decl) = instr {
                     match decl.decl_kind {
                         DeclarationKind::NotPort => {}
-                        DeclarationKind::RegularPort {
-                            is_input: _,
-                            port_id,
-                        } => {
+                        DeclarationKind::RegularPort { port_id, .. } => {
                             let port = &mut md.ports[port_id];
                             assert_eq!(port.name_span, decl.name_span);
                             port.declaration_instruction = decl_id;
@@ -1803,10 +1800,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
                             assert_eq!(field.name_span, decl.name_span);
                             field.declaration_instruction = decl_id;
                         }
-                        DeclarationKind::RegularPort {
-                            is_input: _,
-                            port_id: _,
-                        } => {
+                        DeclarationKind::RegularPort { .. } => {
                             unreachable!("No ports in structs")
                         }
                         DeclarationKind::GenerativeInput(_) => {}

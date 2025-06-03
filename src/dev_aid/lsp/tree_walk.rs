@@ -63,10 +63,7 @@ impl From<LocationInfo<'_>> for RefersTo {
                     match decl.decl_kind {
                         DeclarationKind::NotPort => {}
                         DeclarationKind::StructField { field_id: _ } => {}
-                        DeclarationKind::RegularPort {
-                            is_input: _,
-                            port_id,
-                        } => {
+                        DeclarationKind::RegularPort { port_id, .. } => {
                             result.port = Some((obj_id.unwrap_module(), port_id));
                         }
                         DeclarationKind::GenerativeInput(template_id) => {

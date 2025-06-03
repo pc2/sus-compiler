@@ -119,10 +119,9 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             }
 
             match decl.decl_kind {
-                DeclarationKind::RegularPort {
-                    is_input,
-                    port_id: _,
-                } => details_vec.push(if is_input { "input" } else { "output" }.to_owned()),
+                DeclarationKind::RegularPort { is_input, .. } => {
+                    details_vec.push(if is_input { "input" } else { "output" }.to_owned())
+                }
                 DeclarationKind::NotPort | DeclarationKind::StructField { field_id: _ } => {}
                 DeclarationKind::GenerativeInput(_) => details_vec.push("param".to_owned()),
             }

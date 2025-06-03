@@ -580,19 +580,21 @@ impl Expression {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeclarationKind {
     NotPort,
-    StructField { field_id: FieldID },
-    RegularPort { is_input: bool, port_id: PortID },
+    StructField {
+        field_id: FieldID,
+    },
+    RegularPort {
+        is_input: bool,
+        port_id: PortID,
+        domain: DomainID,
+    },
     GenerativeInput(TemplateID),
 }
 
 impl DeclarationKind {
     /// Basically an unwrap to see if this [Declaration] refers to a [Port], and returns `Some(is_input)` if so.
     pub fn is_io_port(&self) -> Option<bool> {
-        if let DeclarationKind::RegularPort {
-            is_input,
-            port_id: _,
-        } = self
-        {
+        if let DeclarationKind::RegularPort { is_input, .. } = self {
             Some(*is_input)
         } else {
             None
@@ -602,10 +604,7 @@ impl DeclarationKind {
         match self {
             DeclarationKind::NotPort => false,
             DeclarationKind::StructField { field_id: _ } => false,
-            DeclarationKind::RegularPort {
-                is_input,
-                port_id: _,
-            } => *is_input,
+            DeclarationKind::RegularPort { is_input, .. } => *is_input,
             DeclarationKind::GenerativeInput(_) => true,
         }
     }
