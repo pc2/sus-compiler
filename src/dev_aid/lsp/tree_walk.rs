@@ -5,7 +5,6 @@ use crate::prelude::*;
 
 use crate::linker::{FileData, GlobalUUID, LinkInfo};
 
-use crate::typing::template::TemplateArg;
 use crate::typing::template::{
     GenerativeParameterKind, GlobalReference, Parameter, TemplateKind, TypeParameterKind,
 };
@@ -216,37 +215,24 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
         let target_name_elem = GlobalUUID::from(global.id);
         self.visit(global.name_span, LocationInfo::Global(target_name_elem));
         let target_link_info = self.linker.get_link_info(target_name_elem);
-        for (id, arg) in &global.template_args {
-            match arg {
-                TemplateKind::Type(TemplateArg::Provided {
-                    name_span,
-                    arg: typ_expr,
-                    ..
-                }) => {
-                    self.visit(
-                        *name_span,
-                        LocationInfo::Parameter(
-                            target_name_elem,
-                            target_link_info,
-                            id,
-                            &target_link_info.template_parameters[id],
-                        ),
-                    );
-                    self.walk_type(parent, link_info, typ_expr);
+        for arg in &global.template_args {
+            if let Some(refers_to) = arg.refers_to {
+                self.visit(
+                    arg.name_span,
+                    LocationInfo::Parameter(
+                        target_name_elem,
+                        target_link_info,
+                        refers_to,
+                        &target_link_info.template_parameters[refers_to],
+                    ),
+                );
+            }
+            match &arg.kind {
+                Some(TemplateKind::Type(wr_typ)) => {
+                    self.walk_type(parent, link_info, wr_typ);
                 }
-                TemplateKind::Value(TemplateArg::Provided { name_span, .. }) => {
-                    self.visit(
-                        *name_span,
-                        LocationInfo::Parameter(
-                            target_name_elem,
-                            target_link_info,
-                            id,
-                            &target_link_info.template_parameters[id],
-                        ),
-                    );
-                }
-                TemplateKind::Type(TemplateArg::NotProvided { .. })
-                | TemplateKind::Value(TemplateArg::NotProvided { .. }) => {}
+                Some(TemplateKind::Value(_val)) => {}
+                None => {}
             }
         }
     }

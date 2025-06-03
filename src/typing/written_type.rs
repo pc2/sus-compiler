@@ -5,7 +5,7 @@ use crate::prelude::*;
 use super::{
     abstract_type::{AbstractInnerType, AbstractRankedType},
     template::{
-        for_each_generative_input_in_template_args, AbstractTemplateArg, GlobalReference, TVec,
+        get_type_arg_for, GlobalReference, Parameter, TVec, TemplateKind, WrittenTemplateArg,
     },
     type_inference::AbstractTypeSubstitutor,
 };
@@ -29,18 +29,6 @@ impl WrittenType {
             | WrittenType::TemplateVariable(total_span, ..)
             | WrittenType::Array(total_span, _) => *total_span,
             WrittenType::Named(global_ref) => global_ref.get_total_span(),
-        }
-    }
-    pub fn for_each_generative_input(&self, f: &mut impl FnMut(FlatID)) {
-        match self {
-            WrittenType::Error(_) | WrittenType::TemplateVariable(_, _) => {}
-            WrittenType::Named(name) => {
-                for_each_generative_input_in_template_args(&name.template_args, f)
-            }
-            WrittenType::Array(_span, arr_box) => {
-                use std::ops::Deref;
-                f(arr_box.deref().1)
-            }
         }
     }
 }
@@ -80,14 +68,13 @@ impl AbstractTypeSubstitutor {
     pub fn written_to_abstract_type_substitute_templates(
         &mut self,
         wr_typ: &WrittenType,
-        template_args: &TVec<AbstractTemplateArg>,
+        template_args: &TVec<AbstractRankedType>,
     ) -> AbstractRankedType {
         match wr_typ {
             WrittenType::Error(_span) => self.alloc_unknown(),
-            WrittenType::TemplateVariable(_span, argument_id) => template_args[*argument_id]
-                .unwrap_type()
-                .get_abstract_typ()
-                .clone(),
+            WrittenType::TemplateVariable(_span, argument_id) => {
+                template_args[*argument_id].clone()
+            }
             WrittenType::Named(global_reference) => {
                 AbstractInnerType::Named(global_reference.id).scalar()
             }
@@ -101,5 +88,22 @@ impl AbstractTypeSubstitutor {
                 content_typ.rank_up()
             }
         }
+    }
+
+    pub fn written_template_args_to_abstract(
+        &mut self,
+        params: &TVec<Parameter>,
+        written_args: &[WrittenTemplateArg],
+    ) -> TVec<AbstractRankedType> {
+        params.map(|(id, param)| match &param.kind {
+            TemplateKind::Type(_) => {
+                if let Some(wr_typ) = get_type_arg_for(written_args, id) {
+                    self.written_to_abstract_type(wr_typ)
+                } else {
+                    self.alloc_unknown()
+                }
+            }
+            TemplateKind::Value(_) => self.alloc_unknown(),
+        })
     }
 }

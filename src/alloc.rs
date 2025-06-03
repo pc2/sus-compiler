@@ -1049,11 +1049,7 @@ impl<'buffer, ID: Copy + Eq, T: 'buffer, Buffer: Index<ID, Output = T>> Clone
     for IndexExcept<'buffer, ID, T, Buffer>
 {
     fn clone(&self) -> Self {
-        Self {
-            buf_ptr: self.buf_ptr,
-            except: self.except,
-            _ph: PhantomData,
-        }
+        *self
     }
 }
 impl<'buffer, ID: Copy + Eq, T: 'buffer, Buffer: Index<ID, Output = T>> Copy

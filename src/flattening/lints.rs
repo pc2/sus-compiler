@@ -2,11 +2,10 @@ use sus_proc_macro::get_builtin_const;
 
 use crate::linker::{IsExtern, LinkInfo, AFTER_LINTS_CP};
 use crate::prelude::*;
-use crate::typing::template::{for_each_generative_input_in_template_args, TemplateKind};
+use crate::typing::template::TemplateKind;
 
 use super::{
-    Expression, ExpressionOutput, ExpressionSource, Instruction, Module, WireReferencePathElement,
-    WireReferenceRoot,
+    Expression, ExpressionOutput, ExpressionSource, Instruction, Module, WireReferenceRoot,
 };
 
 pub fn perform_lints(linker: &mut Linker) {
@@ -107,12 +106,10 @@ fn make_fanins(
     for (inst_id, inst) in instructions.iter() {
         match inst {
             Instruction::SubModule(sm) => {
-                for_each_generative_input_in_template_args(
-                    &sm.module_ref.template_args,
-                    &mut |id| {
+                sm.module_ref
+                    .for_each_generative_input_in_template_args(&mut |id| {
                         instruction_fanins[inst_id].push(id);
-                    },
-                );
+                    });
             }
             Instruction::Declaration(decl) => {
                 if let Some(lat_spec) = decl.latency_specifier {
@@ -131,10 +128,9 @@ fn make_fanins(
                         for wr in writes {
                             if let Some(flat_root) = wr.to.root.get_root_flat() {
                                 instruction_fanins[flat_root].push(inst_id);
-                                WireReferencePathElement::for_each_dependency(
-                                    &wr.to.path,
-                                    |idx_wire| instruction_fanins[flat_root].push(idx_wire),
-                                );
+                                wr.to.for_each_input_wire_in_path(&mut |idx_wire| {
+                                    instruction_fanins[flat_root].push(idx_wire)
+                                });
                             }
                         }
                     }

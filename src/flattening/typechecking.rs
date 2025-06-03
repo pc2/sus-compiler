@@ -2,7 +2,6 @@ use crate::alloc::{zip_eq, ArenaAllocator};
 use crate::errors::{ErrorInfo, ErrorInfoObject, FileKnowingErrorInfoObject};
 use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType};
-use crate::typing::template::TemplateArg;
 use crate::typing::type_inference::{AbstractTypeSubstitutor, FailedUnification, Substitutor};
 
 use crate::debug::SpanDebugger;
@@ -138,7 +137,7 @@ impl<'l> RemoteDeclaration<'l> {
             self.submodule.local_interface_domains[self.remote_decl.typ.domain.unwrap_physical()];
         let typ = type_checker.written_to_abstract_type_substitute_templates(
             &self.remote_decl.typ_expr,
-            &self.submodule.module_ref.template_args,
+            &self.submodule.module_ref.template_arg_types,
         );
         FullType {
             typ,
@@ -211,7 +210,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     .abstract_type_substitutor
                     .written_to_abstract_type_substitute_templates(
                         &decl.typ_expr,
-                        &cst.template_args,
+                        &cst.template_arg_types,
                     );
                 self.type_checker
                     .abstract_type_substitutor
@@ -399,13 +398,13 @@ impl<'l> TypeCheckingContext<'l, '_> {
         let global_obj: GlobalUUID = global_ref.id.into();
         let target_link_info = self.globals.get_link_info(global_obj);
 
-        for (_parameter_id, arg, parameter) in zip_eq(
-            &global_ref.template_args,
+        for (_parameter_id, arg_typ, parameter) in zip_eq(
+            &global_ref.template_arg_types,
             &target_link_info.template_parameters,
         ) {
-            match arg.and_by_ref(&parameter.kind) {
+            match &parameter.kind {
                 TemplateKind::Type(_) => {} // Do nothing, nothing to unify with. Maybe in the future traits?
-                TemplateKind::Value((arg, parameter)) => {
+                TemplateKind::Value(parameter) => {
                     let decl = target_link_info.instructions[parameter.declaration_instruction]
                         .unwrap_declaration();
 
@@ -414,30 +413,12 @@ impl<'l> TypeCheckingContext<'l, '_> {
                         .abstract_type_substitutor
                         .written_to_abstract_type_substitute_templates(
                             &decl.typ_expr,
-                            &global_ref.template_args, // Yes that's right. We already must substitute the templates for type variables here
+                            &global_ref.template_arg_types, // Yes that's right. We already must substitute the templates for type variables here
                         );
 
-                    match arg {
-                        TemplateArg::Provided {
-                            value_span,
-                            abs_typ,
-                            ..
-                        } => {
-                            self.type_checker
-                                .abstract_type_substitutor
-                                .unify_report_error(
-                                    abs_typ,
-                                    &param_required_typ,
-                                    *value_span,
-                                    "template value parameter",
-                                );
-                        }
-                        TemplateArg::NotProvided { abs_typ } => {
-                            self.type_checker
-                                .abstract_type_substitutor
-                                .unify_must_succeed(abs_typ, &param_required_typ);
-                        }
-                    }
+                    self.type_checker
+                        .abstract_type_substitutor
+                        .unify_must_succeed(arg_typ, &param_required_typ);
                 }
             }
         }
@@ -980,12 +961,8 @@ impl FinalizationContext<'_, '_> {
 
     pub fn finalize_global_ref<ID>(&self, global_ref: &mut GlobalReference<ID>) {
         let global_ref_span = global_ref.get_total_span();
-        for (_template_id, arg) in &mut global_ref.template_args {
-            let template_typ = match arg {
-                TemplateKind::Type(t) => t.get_abstract_typ_mut(),
-                TemplateKind::Value(v) => v.get_abstract_typ_mut(),
-            };
-            self.finalize_abstract_type(template_typ, global_ref_span);
+        for (_template_id, arg) in &mut global_ref.template_arg_types {
+            self.finalize_abstract_type(arg, global_ref_span);
         }
     }
 

@@ -2196,19 +2196,19 @@ Error: 'contains_submodule_submodule' conflicts with other declarations:
      │        ──────────────┬─────────────  
      │                      ╰─────────────── Conflicts with
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_12[...peano_variable_12]
+Error: Could not fully figure out the type of this object. type_variable_18[...peano_variable_18]
      ╭─[ test.sus:445:2 ]
      │
  445 │     doNothing()
      │     ─────┬─────  
-     │          ╰─────── Could not fully figure out the type of this object. type_variable_12[...peano_variable_12]
+     │          ╰─────── Could not fully figure out the type of this object. type_variable_18[...peano_variable_18]
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_12[...peano_variable_12]
+Error: Could not fully figure out the type of this object. type_variable_18[...peano_variable_18]
      ╭─[ test.sus:445:2 ]
      │
  445 │     doNothing()
      │     ─────┬─────  
-     │          ╰─────── Could not fully figure out the type of this object. type_variable_12[...peano_variable_12]
+     │          ╰─────── Could not fully figure out the type of this object. type_variable_18[...peano_variable_18]
 ─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ test.sus:445:2 ]
@@ -2274,19 +2274,19 @@ Error: 'contains_submodule_submodule' conflicts with other declarations:
      │        ──────────────┬─────────────  
      │                      ╰─────────────── 'contains_submodule_submodule' conflicts with other declarations:
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_12[...peano_variable_12]
+Error: Could not fully figure out the type of this object. type_variable_18[...peano_variable_18]
      ╭─[ test.sus:601:2 ]
      │
  601 │     doNothing()
      │     ─────┬─────  
-     │          ╰─────── Could not fully figure out the type of this object. type_variable_12[...peano_variable_12]
+     │          ╰─────── Could not fully figure out the type of this object. type_variable_18[...peano_variable_18]
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_12[...peano_variable_12]
+Error: Could not fully figure out the type of this object. type_variable_18[...peano_variable_18]
      ╭─[ test.sus:601:2 ]
      │
  601 │     doNothing()
      │     ─────┬─────  
-     │          ╰─────── Could not fully figure out the type of this object. type_variable_12[...peano_variable_12]
+     │          ╰─────── Could not fully figure out the type of this object. type_variable_18[...peano_variable_18]
 ─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ test.sus:601:2 ]
@@ -2689,12 +2689,12 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                      ────┬───  
      │                          ╰───── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: beep is not a valid template argument of int
+Error: 'beep' is not a valid template argument of int
      ╭─[ test.sus:767:30 ]
      │
  767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
      │                              ──┬─  
-     │                                ╰─── beep is not a valid template argument of int
+     │                                ╰─── 'beep' is not a valid template argument of int
      │
      ├─[ core.sus:39:20 ]
      │
@@ -2702,12 +2702,12 @@ Error: beep is not a valid template argument of int
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
-Error: BEEP is not a valid template argument of int
+Error: 'BEEP' is not a valid template argument of int
      ╭─[ test.sus:767:44 ]
      │
  767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
      │                                            ──┬─  
-     │                                              ╰─── BEEP is not a valid template argument of int
+     │                                              ╰─── 'BEEP' is not a valid template argument of int
      │
      ├─[ core.sus:39:20 ]
      │
@@ -2785,12 +2785,12 @@ Error: Could not fully figure out the type of this object. type_variable_14[...p
      │     ─────────┬─────────  
      │              ╰─────────── Could not fully figure out the type of this object. type_variable_14[...peano_variable_15]
 ─────╯
-Error: BITWIDTH is not a valid template argument of FIFO
+Error: 'BITWIDTH' is not a valid template argument of FIFO
      ╭─[ test.sus:775:9 ]
      │
  775 │     FIFO #(BITWIDTH: 4) badoop
      │            ────┬───  
-     │                ╰───── BITWIDTH is not a valid template argument of FIFO
+     │                ╰───── 'BITWIDTH' is not a valid template argument of FIFO
      │
      ├─[ util.sus:22:8 ]
      │
@@ -10508,7 +10508,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ┬  
      │             ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: BEEEP is not a valid template argument of SUM_UP
+Error: 'BEEEP' is not a valid template argument of SUM_UP
      ╭─[ test.sus:950:38 ]
      │
  933 │ const int SUM_UP #(int SIZE, int[SIZE] DATA) {
@@ -10517,7 +10517,20 @@ Error: BEEEP is not a valid template argument of SUM_UP
      │ 
  950 │     gen int X = SUM_UP #(SIZE: 4, DATA, BEEEP: 3)
      │                                         ──┬──  
-     │                                           ╰──── BEEEP is not a valid template argument of SUM_UP
+     │                                           ╰──── 'BEEEP' is not a valid template argument of SUM_UP
+─────╯
+Error: 'ABC' is not a valid template argument of int
+     ╭─[ test.sus:952:8 ]
+     │
+ 952 │     int #(ABC) x
+     │           ─┬─  
+     │            ╰─── 'ABC' is not a valid template argument of int
+     │
+     ├─[ core.sus:39:20 ]
+     │
+  39 │ __builtin__ struct int #(int MIN, int MAX) {}
+     │                    ─┬─  
+     │                     ╰─── 'int' defined here
 ─────╯
 Error: ABC does not name a Type or a Value.
      ╭─[ test.sus:952:8 ]
@@ -10525,19 +10538,6 @@ Error: ABC does not name a Type or a Value.
  952 │     int #(ABC) x
      │           ─┬─  
      │            ╰─── ABC does not name a Type or a Value.
-─────╯
-Error: ABC is not a valid template argument of int
-     ╭─[ test.sus:952:8 ]
-     │
- 952 │     int #(ABC) x
-     │           ─┬─  
-     │            ╰─── ABC is not a valid template argument of int
-     │
-     ├─[ core.sus:39:20 ]
-     │
-  39 │ __builtin__ struct int #(int MIN, int MAX) {}
-     │                    ─┬─  
-     │                     ╰─── 'int' defined here
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:952:13 ]

@@ -1,6 +1,9 @@
-use crate::typing::template::{TemplateArg, TemplateKind};
+use crate::typing::{
+    template::{GlobalReference, TemplateKind},
+    written_type::WrittenType,
+};
 
-use super::{ExpressionSource, WireReferencePathElement, WireReferenceRoot};
+use super::{ExpressionSource, WireReference, WireReferencePathElement, WireReferenceRoot};
 use crate::prelude::*;
 
 impl ExpressionSource {
@@ -11,26 +14,14 @@ impl ExpressionSource {
                 match &wire_ref.root {
                     WireReferenceRoot::LocalDecl(decl_id) => collect(*decl_id),
                     WireReferenceRoot::NamedConstant(cst) => {
-                        for (_id, arg) in &cst.template_args {
-                            match arg {
-                                TemplateKind::Type(TemplateArg::Provided {
-                                    arg: wr_typ, ..
-                                }) => wr_typ.for_each_generative_input(collect),
-                                TemplateKind::Value(TemplateArg::Provided {
-                                    arg: value_id,
-                                    ..
-                                }) => collect(*value_id),
-                                TemplateKind::Type(TemplateArg::NotProvided { .. })
-                                | TemplateKind::Value(TemplateArg::NotProvided { .. }) => {}
-                            }
-                        }
+                        cst.for_each_generative_input(collect);
                     }
                     WireReferenceRoot::SubModulePort(submod_port) => {
                         collect(submod_port.submodule_decl)
                     }
                     WireReferenceRoot::Error => {}
                 }
-                WireReferencePathElement::for_each_dependency(&wire_ref.path, collect);
+                wire_ref.for_each_input_wire_in_path(collect);
             }
             &ExpressionSource::UnaryOp { right, .. } => collect(right),
             &ExpressionSource::BinaryOp { left, right, .. } => {
@@ -53,11 +44,49 @@ impl ExpressionSource {
     }
 }
 
-impl WireReferencePathElement {
-    pub fn for_each_dependency(path: &[WireReferencePathElement], mut f: impl FnMut(FlatID)) {
-        for p in path {
+impl WireReference {
+    pub fn for_each_generative_input(&self, collect: &mut impl FnMut(FlatID)) {
+        match &self.root {
+            WireReferenceRoot::LocalDecl(decl_id) => collect(*decl_id),
+            WireReferenceRoot::NamedConstant(cst) => {
+                cst.for_each_generative_input(collect);
+            }
+            WireReferenceRoot::SubModulePort(submod_port) => collect(submod_port.submodule_decl),
+            WireReferenceRoot::Error => {}
+        }
+        self.for_each_input_wire_in_path(collect);
+    }
+    pub fn for_each_input_wire_in_path(&self, collect: &mut impl FnMut(FlatID)) {
+        for p in &self.path {
             match p {
-                WireReferencePathElement::ArrayAccess { idx, .. } => f(*idx),
+                WireReferencePathElement::ArrayAccess { idx, .. } => collect(*idx),
+            }
+        }
+    }
+}
+
+impl WrittenType {
+    pub fn for_each_generative_input(&self, f: &mut impl FnMut(FlatID)) {
+        match self {
+            WrittenType::Error(_) | WrittenType::TemplateVariable(_, _) => {}
+            WrittenType::Named(name) => name.for_each_generative_input(f),
+            WrittenType::Array(_span, arr_box) => {
+                use std::ops::Deref;
+                f(arr_box.deref().1)
+            }
+        }
+    }
+}
+
+impl<ID> GlobalReference<ID> {
+    pub fn for_each_generative_input(&self, f: &mut impl FnMut(FlatID)) {
+        for t_arg in &self.template_args {
+            match &t_arg.kind {
+                None => {}
+                Some(TemplateKind::Type(t)) => {
+                    t.for_each_generative_input(f);
+                }
+                Some(TemplateKind::Value(v)) => f(*v),
             }
         }
     }

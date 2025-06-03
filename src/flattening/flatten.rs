@@ -14,7 +14,7 @@ use super::parser::Cursor;
 use super::*;
 
 use crate::typing::template::{
-    AbstractTemplateArg, GenerativeParameterKind, TVec, TemplateArg, TemplateKind,
+    resolve_template_args, GenerativeParameterKind, TemplateKind, WrittenTemplateArg,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,13 +179,6 @@ enum InterfacePortsInfo {
     ConditionalBindings,
 }
 
-struct WrittenTemplateArg<'a> {
-    name: &'a str,
-    name_span: Span,
-    value_span: Span,
-    kind: Option<TemplateKind<WrittenType, FlatID>>,
-}
-
 struct FlatteningContext<'l, 'errs> {
     globals: &'l GlobalResolver<'l>,
     errors: &'errs ErrorCollector<'l>,
@@ -264,7 +257,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         })
     }
 
-    fn flatten_template_args(&mut self, cursor: &mut Cursor<'c>) -> Vec<WrittenTemplateArg<'c>> {
+    fn flatten_template_args(&mut self, cursor: &mut Cursor<'c>) -> Vec<WrittenTemplateArg> {
         cursor.collect_list(kind!("template_args"), |cursor| {
             cursor.go_down(kind!("template_arg"), |cursor| {
                 let (name_span, name) =
@@ -317,87 +310,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     }, name_span)
                 };
 
-                WrittenTemplateArg{ name, name_span, value_span, kind }
+                WrittenTemplateArg{ name: name.to_owned(), name_span, value_span, kind, refers_to: None }
             })
         })
-    }
-
-    fn apply_template_args_to_global(
-        &mut self,
-        found_global: GlobalUUID,
-        mut template_args: Vec<WrittenTemplateArg<'c>>,
-    ) -> TVec<AbstractTemplateArg> {
-        let link_info = self.globals.get_link_info(found_global);
-        let full_object_name = link_info.get_full_name();
-        let result = link_info.template_parameters.map(|(_, param)| {
-            let mut found_arg : Option<WrittenTemplateArg> = None;
-
-            template_args.retain_mut(|arg| {
-                if arg.name == param.name {
-                    if let Some(prev) = &found_arg {
-                        self.errors.error(arg.name_span, format!("'{}' has already been defined previously", arg.name))
-                            .info_same_file(prev.name_span, "Defined here previously");
-                    } else {
-                        found_arg = Some(WrittenTemplateArg{ name: arg.name, name_span: arg.name_span, value_span: arg.value_span, kind: arg.kind.take() });
-                    }
-                    false
-                } else {
-                    true
-                }
-            });
-
-            if let Some(WrittenTemplateArg { name, name_span, value_span, kind: Some(arg) }) = found_arg {
-                match (&param.kind, arg) {
-                        // Correct pairing
-                        (TemplateKind::Type(_), TemplateKind::Type(arg)) => {
-                            let abs_typ = self.type_alloc.type_alloc.written_to_abstract_type(&arg);
-                            TemplateKind::Type(TemplateArg::Provided { name_span, value_span, arg, abs_typ })
-                        }
-                        // Correct pairing
-                        (TemplateKind::Value(_), TemplateKind::Value(arg)) => {
-                            let abs_typ = self.instructions[arg].unwrap_subexpression().typ.clone();
-                            TemplateKind::Value(TemplateArg::Provided { name_span, value_span, arg, abs_typ })
-                        }
-                        (TemplateKind::Type(_), TemplateKind::Value(_)) => {
-                            self.errors.error(name_span, format!("'{name}' is not a value. `type` keyword cannot be used for values"))
-                                .info((param.name_span, link_info.file), "Declared here");
-                            TemplateKind::Type(TemplateArg::NotProvided {
-                                abs_typ: self.type_alloc.type_alloc.alloc_unknown(),
-                            })
-                        }
-                        (TemplateKind::Value(_), TemplateKind::Type(_)) => {
-                            self.errors.error(name_span, format!("'{name}' is not a type. To use template type arguments use the `type` keyword like `T: type int[123]`"))
-                                .info((param.name_span, link_info.file), "Declared here");
-                            TemplateKind::Value(TemplateArg::NotProvided {
-                                abs_typ: self.type_alloc.type_alloc.alloc_unknown(),
-                            })
-                        }
-                    }
-            } else {
-                match &param.kind {
-                    TemplateKind::Type(_) => TemplateKind::Type(TemplateArg::NotProvided {
-                        abs_typ: self.type_alloc.type_alloc.alloc_unknown(),
-                    }),
-                    TemplateKind::Value(_) => TemplateKind::Value(TemplateArg::NotProvided {
-                        abs_typ: self.type_alloc.type_alloc.alloc_unknown(),
-                    }),
-                }
-            }
-        });
-
-        for remaining_arg in template_args {
-            self.errors
-                .error(
-                    remaining_arg.name_span,
-                    format!(
-                        "{} is not a valid template argument of {full_object_name}",
-                        remaining_arg.name
-                    ),
-                )
-                .info_obj(link_info);
-        }
-
-        result
     }
 
     fn flatten_local_or_template_global(&mut self, cursor: &mut Cursor<'c>) -> LocalOrGlobal {
@@ -415,16 +330,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 must_be_global = true;
             }
 
-            let (template_args, template_span) = if cursor.optional_field(field!("template_args")) {
-                must_be_global = true;
-                let bracket_span = BracketSpan::from_outer(cursor.span());
+            let (mut template_args, template_span) =
+                if cursor.optional_field(field!("template_args")) {
+                    must_be_global = true;
+                    let bracket_span = BracketSpan::from_outer(cursor.span());
 
-                let args = self.flatten_template_args(cursor);
+                    let args = self.flatten_template_args(cursor);
 
-                (args, Some(bracket_span))
-            } else {
-                (Vec::new(), None)
-            };
+                    (args, Some(bracket_span))
+                } else {
+                    (Vec::new(), None)
+                };
 
             // Possibly local
             if !must_be_global {
@@ -446,25 +362,35 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 .globals
                 .resolve_global(name_span, &cursor.file_data.file_text[name_span])
             {
-                let template_args = self.apply_template_args_to_global(global_id, template_args);
+                let target = self.globals.get_link_info(global_id);
+
+                resolve_template_args(self.errors, target, &mut template_args);
+
+                let template_arg_types = self
+                    .type_alloc
+                    .type_alloc
+                    .written_template_args_to_abstract(&target.template_parameters, &template_args);
 
                 match global_id {
                     GlobalUUID::Module(id) => LocalOrGlobal::Module(GlobalReference {
                         id,
                         name_span,
                         template_args,
+                        template_arg_types,
                         template_span,
                     }),
                     GlobalUUID::Type(id) => LocalOrGlobal::Type(GlobalReference {
                         id,
                         name_span,
                         template_args,
+                        template_arg_types,
                         template_span,
                     }),
                     GlobalUUID::Constant(id) => LocalOrGlobal::Constant(GlobalReference {
                         id,
                         name_span,
                         template_args,
+                        template_arg_types,
                         template_span,
                     }),
                 }
