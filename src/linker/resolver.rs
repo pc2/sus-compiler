@@ -69,13 +69,11 @@ impl<'linker> GlobalResolver<'linker> {
         }
     }
     /// Get the [ErrorCollector] and [ResolvedGlobals] out of this
-    pub fn decommission(
-        self,
-        linker_files: &ArenaAllocator<FileData, FileUUIDMarker>,
-    ) -> (ErrorCollector<'_>, ResolvedGlobals) {
-        let errors = self.errors.re_attach(linker_files);
-        let resolved_globals = self.resolved_globals.into_inner();
-        (errors, resolved_globals)
+    pub fn decommission(self) -> (ErrorStore, ResolvedGlobals) {
+        (
+            self.errors.into_storage(),
+            self.resolved_globals.into_inner(),
+        )
     }
 
     fn get_linking_error_location(&self, global: GlobalUUID) -> LinkingErrorLocation {
@@ -203,7 +201,7 @@ impl LinkInfo {
     }
     pub fn reabsorb_errors_globals(
         &mut self,
-        (errors, resolved_globals): (ErrorCollector, ResolvedGlobals),
+        (errors, resolved_globals): (ErrorStore, ResolvedGlobals),
         checkpoint_id: usize,
     ) {
         // Store errors and resolved_globals back into module
@@ -213,7 +211,7 @@ impl LinkInfo {
         assert!(expected_checkpoint == checkpoint_id, "In {}: The new checkpoint is not what was expected. The new checkpoint was {checkpoint_id}, whereas the expected next checkpoint is {expected_checkpoint}", self.get_full_name());
 
         self.resolved_globals = resolved_globals;
-        self.errors = errors.into_storage();
+        self.errors = errors;
         self.checkpoints
             .push(CheckPoint::new(&self.errors, &self.resolved_globals));
     }

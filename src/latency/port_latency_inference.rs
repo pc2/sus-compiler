@@ -185,9 +185,8 @@ fn recurse_down_expression(
         }),
         ExpressionSource::WireRef(WireReference {
             root: WireReferenceRoot::LocalDecl(decl_id),
-            root_typ: _,
-            root_span: _,
             path,
+            ..
         }) => {
             if !path.is_empty() {
                 return None;

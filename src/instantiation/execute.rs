@@ -11,9 +11,9 @@ use crate::let_unwrap;
 use crate::linker::IsExtern;
 use crate::linker::{GlobalUUID, LinkInfo};
 use crate::prelude::*;
-use crate::typing::abstract_type::DomainType;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType};
 use crate::typing::concrete_type::ConcreteTemplateArg;
+use crate::typing::domain_type::DomainType;
 use crate::typing::template::TVec;
 use crate::typing::template::{get_type_arg_for, get_value_arg_for, GlobalReference};
 use crate::typing::written_type::WrittenType;
@@ -493,8 +493,8 @@ impl<'l> ExecutionContext<'l> {
         };
         concretize_type_recurse(
             linker,
-            &submodule_decl.typ.typ.inner,
-            &submodule_decl.typ.typ.rank,
+            &submodule_decl.typ.inner,
+            &submodule_decl.typ.rank,
             Some(&submodule_decl.typ_expr),
             &mut concretizer,
         )
@@ -659,10 +659,9 @@ impl<'l> ExecutionContext<'l> {
                 SubModuleOrWire::SubModule(_) => unreachable!(),
                 SubModuleOrWire::Unnasigned => unreachable!(),
             },
-            WireReferenceRoot::NamedConstant(cst) => RealWireRefRoot::Constant(
-                self.get_named_constant_value(cst)?,
-                &wire_ref.root_typ.typ,
-            ),
+            WireReferenceRoot::NamedConstant(cst) => {
+                RealWireRefRoot::Constant(self.get_named_constant_value(cst)?, &wire_ref.root_typ)
+            }
             WireReferenceRoot::SubModulePort(port) => {
                 return Ok(self.instantiate_port_wire_ref_root(
                     port.port,
@@ -966,7 +965,7 @@ impl<'l> ExecutionContext<'l> {
                 (
                     self.alloc_wire_for_const(
                         value,
-                        &decl.typ.typ,
+                        &decl.typ,
                         decl_id,
                         domain,
                         wire_ref.root_span,
@@ -1111,7 +1110,7 @@ impl<'l> ExecutionContext<'l> {
         wire_decl: &Declaration,
         original_instruction: FlatID,
     ) -> ExecutionResult<SubModuleOrWire> {
-        let typ = self.concretize_type(&wire_decl.typ.typ, &wire_decl.typ_expr)?;
+        let typ = self.concretize_type(&wire_decl.typ, &wire_decl.typ_expr)?;
 
         Ok(if wire_decl.identifier_type == IdentifierType::Generative {
             let value: Value =
@@ -1146,7 +1145,7 @@ impl<'l> ExecutionContext<'l> {
                 name: self.unique_name_producer.get_unique_name(&wire_decl.name),
                 typ,
                 original_instruction,
-                domain: wire_decl.typ.domain.unwrap_physical(),
+                domain: wire_decl.domain.unwrap_physical(),
                 source,
                 specified_latency,
                 absolute_latency: CALCULATE_LATENCY_LATER,

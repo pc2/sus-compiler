@@ -16,7 +16,8 @@ use crate::{
 };
 
 use crate::flattening::{
-    flatten_all_globals, gather_initial_file_data, perform_lints, typecheck_all_modules, Module,
+    domain_check_all, flatten_all_globals, gather_initial_file_data, perform_lints,
+    typecheck_all_modules, Module,
 };
 
 const STD_LIB_PATH: &str = env!("SUS_COMPILER_STD_LIB_PATH");
@@ -216,6 +217,8 @@ impl Linker {
         }
 
         typecheck_all_modules(self);
+
+        domain_check_all(self);
 
         if config.early_exit == EarlyExitUpTo::AbstractTypecheck {
             return;

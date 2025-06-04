@@ -4,8 +4,7 @@ use crate::prelude::*;
 
 use super::template::{Parameter, TVec};
 use super::type_inference::{
-    AbstractTypeSubstitutor, DomainVariableID, InnerTypeVariableID, PeanoVariableID, Substitutor,
-    TypeSubstitutor, TypeUnifier, UnifyErrorReport,
+    AbstractTypeSubstitutor, InnerTypeVariableID, PeanoVariableID, TypeUnifier, UnifyErrorReport,
 };
 use crate::flattening::{BinaryOperator, UnaryOperator};
 use crate::to_string::map_to_type_names;
@@ -89,65 +88,6 @@ impl PeanoType {
 pub const BOOL_TYPE: AbstractInnerType = AbstractInnerType::Named(get_builtin_type!("bool"));
 pub const INT_TYPE: AbstractInnerType = AbstractInnerType::Named(get_builtin_type!("int"));
 
-/// These represent (clock) domains. While clock domains are included under this umbrella, domains can use the same clock.
-/// The use case for non-clock-domains is to separate Latency Counting domains. So different pipelines where it doesn't
-/// necessarily make sense that their values are related by a fixed number of clock cycles.
-///
-/// Domains are resolved pre-instantiation, because dynamic domain merging doesn't seem like a valuable use case.
-///
-/// As a convenience, we make [DomainType::Generative] a special case for a domain.
-///
-/// The fun thing is that we can now use this domain info for syntax highlighting, giving wires in different domains a different color.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DomainType {
-    /// Generative conflicts with nothing
-    Generative,
-    /// This object is a real wire. It corresponds to a certain (clock) domain. It can only affect wires in the same domain.
-    Physical(DomainID),
-
-    /// These are unified by Hindley-Milner unification
-    ///
-    /// They always point to non-generative domains.
-    ///
-    /// Referencing [DomainType::Unknown] is a strong code smell.
-    /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
-    ///
-    /// It should only occur in creation `DomainType::Unknown(self.domain_substitutor.alloc())`
-    Unknown(DomainVariableID),
-}
-
-impl DomainType {
-    pub fn unwrap_physical(&self) -> DomainID {
-        let Self::Physical(w) = self else {
-            unreachable!()
-        };
-        *w
-    }
-    pub fn is_generative(&self) -> bool {
-        match self {
-            DomainType::Generative => true,
-            DomainType::Physical(_) => false,
-            DomainType::Unknown(_) => false,
-        }
-    }
-    /// Used to quickly combine domains with each other. NOT A SUBSTITUTE FOR UNIFICATION.
-    pub fn combine_with(&mut self, other: DomainType) {
-        if *self == DomainType::Generative {
-            *self = other;
-        }
-    }
-}
-
-/// Represents all typing information needed in the Flattening Stage.
-///
-/// At the time being, this consists of the structural type ([AbstractType]), IE, if it's an `int`, `bool`, or `int[]`
-/// And the domain ([DomainType]), which tracks part of what (clock) domain this wire is.
-#[derive(Debug, Clone)]
-pub struct FullType {
-    pub typ: AbstractRankedType,
-    pub domain: DomainType,
-}
-
 /// Performs Hindley-Milner typing during Flattening. (See [TypeSubstitutor])
 ///
 /// 'A U 'x -> Substitute 'x = 'A
@@ -156,28 +96,13 @@ pub struct FullType {
 pub struct FullTypeUnifier {
     pub template_type_names: FlatAlloc<String, TemplateIDMarker>,
     pub abstract_type_substitutor: TypeUnifier<AbstractTypeSubstitutor>,
-    pub domain_substitutor: TypeUnifier<TypeSubstitutor<DomainType>>,
 }
 
 impl FullTypeUnifier {
-    pub fn new(
-        parameters: &TVec<Parameter>,
-        typing_alloc: (AbstractTypeSubstitutor, TypeSubstitutor<DomainType>),
-    ) -> Self {
+    pub fn new(parameters: &TVec<Parameter>, typing_alloc: AbstractTypeSubstitutor) -> Self {
         Self {
             template_type_names: map_to_type_names(parameters),
-            abstract_type_substitutor: typing_alloc.0.into(),
-            domain_substitutor: typing_alloc.1.into(),
-        }
-    }
-
-    pub fn unify_must_succeed(&mut self, ta: &FullType, tb: &FullType) {
-        self.abstract_type_substitutor
-            .unify_must_succeed(&ta.typ, &tb.typ);
-
-        if !ta.domain.is_generative() && !tb.domain.is_generative() {
-            self.domain_substitutor
-                .unify_must_succeed(&ta.domain, &tb.domain);
+            abstract_type_substitutor: typing_alloc.into(),
         }
     }
 
@@ -296,22 +221,6 @@ impl FullTypeUnifier {
         );
     }
 
-    // ===== Both =====
-
-    pub fn unify_domains<Context: UnifyErrorReport>(
-        &mut self,
-        from_domain: &DomainType,
-        to_domain: &DomainType,
-        span: Span,
-        context: Context,
-    ) {
-        // The case of writes to generatives from non-generatives should be fully covered by flattening
-        if !from_domain.is_generative() && !to_domain.is_generative() {
-            self.domain_substitutor
-                .unify_report_error(from_domain, to_domain, span, context);
-        }
-    }
-
     pub fn unify_write_to_abstract<Context: UnifyErrorReport>(
         &mut self,
         found: &AbstractRankedType,
@@ -321,17 +230,5 @@ impl FullTypeUnifier {
     ) {
         self.abstract_type_substitutor
             .unify_report_error(found, expected, span, context);
-    }
-
-    pub fn unify_write_to<Context: UnifyErrorReport + Clone>(
-        &mut self,
-        found_typ: &AbstractRankedType,
-        found_domain: &DomainType,
-        expected: &FullType,
-        span: Span,
-        context: Context,
-    ) {
-        self.unify_write_to_abstract(found_typ, &expected.typ, span, context.clone());
-        self.unify_domains(found_domain, &expected.domain, span, context);
     }
 }

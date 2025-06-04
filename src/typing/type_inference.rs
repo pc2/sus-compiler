@@ -8,9 +8,10 @@ use crate::errors::ErrorInfo;
 use crate::prelude::*;
 
 use crate::alloc::{UUIDMarker, UUID};
+use crate::typing::domain_type::DomainType;
 
+use super::abstract_type::AbstractRankedType;
 use super::abstract_type::{AbstractInnerType, PeanoType};
-use super::abstract_type::{AbstractRankedType, DomainType};
 
 pub struct InnerTypeVariableIDMarker;
 impl UUIDMarker for InnerTypeVariableIDMarker {

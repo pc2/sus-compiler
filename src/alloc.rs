@@ -670,7 +670,10 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub fn iter_mut_convenient(
         &mut self,
     ) -> ConvenientMutableIterator<'_, UUID<IndexMarker>, T, Self> {
-        ConvenientMutableIterator::new(self)
+        ConvenientMutableIterator {
+            buf_ptr: self as *const FlatAlloc<T, IndexMarker>,
+            buf_iter: self.iter_mut(),
+        }
     }
     pub fn map<OT>(
         &self,

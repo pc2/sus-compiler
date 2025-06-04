@@ -1,4 +1,7 @@
-use crate::{prelude::*, typing::template::TemplateKind};
+use crate::{
+    prelude::*,
+    typing::{domain_type::DomainType, template::TemplateKind},
+};
 
 use lsp_types::{
     Position, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions,
@@ -11,8 +14,6 @@ use crate::{
     flattening::IdentifierType,
     linker::{FileData, GlobalUUID},
 };
-
-use crate::typing::abstract_type::DomainType;
 
 use super::tree_walk::{self, InGlobal, LocationInfo};
 
@@ -147,7 +148,7 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
             span,
             match item {
                 LocationInfo::InGlobal(_md_id, _md, _, InGlobal::NamedLocal(decl)) => {
-                    IDEIdentifierType::from_identifier_typ(decl.identifier_type, decl.typ.domain)
+                    IDEIdentifierType::from_identifier_typ(decl.identifier_type, decl.domain)
                 }
                 LocationInfo::InGlobal(_md_id, _, _, InGlobal::NamedSubmodule(_)) => {
                     IDEIdentifierType::Interface

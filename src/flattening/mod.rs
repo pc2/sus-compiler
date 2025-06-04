@@ -1,3 +1,4 @@
+mod domain_check;
 mod flatten;
 mod initialization;
 mod lints;
@@ -6,14 +7,15 @@ mod parser;
 mod typechecking;
 mod walk;
 
-use crate::alloc::UUIDAllocator;
 use crate::prelude::*;
-use crate::typing::abstract_type::{AbstractRankedType, DomainType, PeanoType};
+use crate::typing::abstract_type::{AbstractRankedType, PeanoType};
+use crate::typing::domain_type::DomainType;
 use crate::typing::written_type::WrittenType;
 
 use std::ops::Deref;
 
 use crate::latency::port_latency_inference::PortLatencyInferenceInfo;
+pub use domain_check::domain_check_all;
 pub use flatten::flatten_all_globals;
 pub use initialization::gather_initial_file_data;
 pub use lints::perform_lints;
@@ -22,7 +24,7 @@ pub use typechecking::typecheck_all_modules;
 use crate::linker::{Documentation, LinkInfo};
 use crate::value::Value;
 
-use crate::typing::{abstract_type::FullType, template::GlobalReference};
+use crate::typing::template::GlobalReference;
 
 /// Modules are compiled in 4 stages. All modules must pass through each stage before advancing to the next stage.
 ///
@@ -374,7 +376,7 @@ impl WireReferenceRoot {
 pub struct WireReference {
     pub root: WireReferenceRoot,
     pub path: Vec<WireReferencePathElement>,
-    pub root_typ: FullType,
+    pub root_typ: AbstractRankedType,
     pub root_span: Span,
 }
 
@@ -388,7 +390,7 @@ impl WireReference {
                 WireReferencePathElement::ArrayAccess { output_typ, .. } => output_typ,
             }
         } else {
-            &self.root_typ.typ
+            &self.root_typ
         }
     }
 }
@@ -619,7 +621,8 @@ impl DeclarationKind {
 pub struct Declaration {
     pub parent_condition: Option<ParentCondition>,
     pub typ_expr: WrittenType,
-    pub typ: FullType,
+    pub typ: AbstractRankedType,
+    pub domain: DomainType,
     pub decl_span: Span,
     pub name_span: Span,
     pub name: String,

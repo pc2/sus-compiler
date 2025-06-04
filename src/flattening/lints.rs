@@ -1,7 +1,10 @@
 use sus_proc_macro::get_builtin_const;
 
+use crate::flattening::typechecking::RemoteSubModule;
+use crate::flattening::{IdentifierType, WriteModifiers};
 use crate::linker::{IsExtern, LinkInfo, AFTER_LINTS_CP};
 use crate::prelude::*;
+use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
 
 use super::{
@@ -9,17 +12,134 @@ use super::{
 };
 
 pub fn perform_lints(linker: &mut Linker) {
-    for (_, md) in &mut linker.modules {
+    let module_uuids: Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
+    for id in module_uuids {
+        let md = &mut linker.modules[id];
         let errors = ErrorCollector::from_storage(
             md.link_info.errors.take(),
             md.link_info.file,
             &linker.files,
         );
         let resolved_globals = md.link_info.resolved_globals.take();
+
+        let md = &linker.modules[id];
+
         find_unused_variables(md, &errors);
         extern_objects_may_not_have_type_template_args(&md.link_info, &errors);
+
+        lint_instructions(&md.link_info.instructions, &errors, linker);
+
+        let md = &mut linker.modules[id];
         md.link_info
-            .reabsorb_errors_globals((errors, resolved_globals), AFTER_LINTS_CP);
+            .reabsorb_errors_globals((errors.into_storage(), resolved_globals), AFTER_LINTS_CP);
+    }
+}
+
+fn lint_instructions(
+    instructions: &FlatAlloc<Instruction, FlatIDMarker>,
+    errors: &ErrorCollector,
+    linker: &Linker,
+) {
+    for (_, instr) in instructions {
+        match instr {
+            Instruction::SubModule(_) => {}
+            Instruction::Declaration(_) => {}
+            Instruction::Expression(Expression {
+                output: ExpressionOutput::SubExpression(_),
+                ..
+            }) => {}
+            Instruction::Expression(Expression {
+                output: ExpressionOutput::MultiWrite(writes),
+                parent_condition,
+                ..
+            }) => {
+                for wr in writes {
+                    match &wr.to.root {
+                        WireReferenceRoot::LocalDecl(decl_id) => {
+                            let decl = instructions[*decl_id].unwrap_declaration();
+                            if decl.read_only {
+                                errors
+                                    .error(wr.to_span, format!("'{}' is read-only", decl.name))
+                                    .info_obj_same_file(decl);
+                            }
+
+                            match wr.write_modifiers {
+                                WriteModifiers::Connection { .. } => {
+                                    if decl.identifier_type.is_generative() {
+                                        // Check that this generative declaration isn't used in a non-compiletime if
+                                        if let Some(root_flat) = wr.to.root.get_root_flat() {
+                                            let to_decl =
+                                                instructions[root_flat].unwrap_declaration();
+
+                                            if *parent_condition != to_decl.parent_condition {
+                                                let err_ref = errors.error(wr.to_span, "Cannot write to compiletime variable through runtime 'when' blocks");
+                                                err_ref.info_obj_same_file(decl);
+
+                                                let mut cur_parent = *parent_condition;
+
+                                                while cur_parent != decl.parent_condition {
+                                                    let parent_when = instructions
+                                                        [parent_condition.unwrap().parent_when]
+                                                        .unwrap_if();
+
+                                                    err_ref.info_same_file(
+                                                        parent_when.if_keyword_span,
+                                                        "Assignment passes through this 'when'",
+                                                    );
+
+                                                    cur_parent = parent_when.parent_condition;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                WriteModifiers::Initial { initial_kw_span } => {
+                                    if decl.domain == DomainType::Generative {
+                                        errors
+                                            .error(
+                                                initial_kw_span,
+                                                "'initial' cannot be used with generative variables! Just assign a generative value as normal",
+                                            )
+                                            .info_obj_same_file(decl);
+                                    }
+
+                                    if decl.identifier_type != IdentifierType::State {
+                                        errors
+                                            .error(
+                                                initial_kw_span,
+                                                "Initial values can only be given to state registers",
+                                            )
+                                            .info_obj_same_file(decl);
+                                    }
+                                }
+                            }
+                        }
+                        WireReferenceRoot::NamedConstant(cst) => {
+                            errors
+                                .error(cst.name_span, "Cannot write to a global constant!")
+                                .info_obj(&linker.constants[cst.id].link_info);
+                        }
+                        WireReferenceRoot::SubModulePort(port) => {
+                            let module_port_decl = RemoteSubModule::make(
+                                port.submodule_decl,
+                                instructions,
+                                &linker.modules,
+                            )
+                            .get_port(port.port);
+
+                            if !module_port_decl.is_input() {
+                                errors
+                                    .error(wr.to_span, "Cannot assign to a submodule output port")
+                                    .info_obj(&module_port_decl);
+                            }
+                        }
+                        WireReferenceRoot::Error => {}
+                    }
+                }
+            }
+            Instruction::IfStatement(_) => {}
+            Instruction::ForStatement(_) => {}
+        }
     }
 }
 

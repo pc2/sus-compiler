@@ -3,9 +3,8 @@ use crate::{
     instantiation::instantiation_cache::Instantiator,
     prelude::*,
     typing::{
-        abstract_type::DomainType,
         template::{GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind},
-        type_inference::{AbstractTypeSubstitutor, TypeSubstitutor},
+        type_inference::AbstractTypeSubstitutor,
     },
 };
 
@@ -82,7 +81,8 @@ pub enum IsExtern {
 pub const AFTER_INITIAL_PARSE_CP: usize = 0;
 pub const AFTER_FLATTEN_CP: usize = 1;
 pub const AFTER_TYPECHECK_CP: usize = 2;
-pub const AFTER_LINTS_CP: usize = 3;
+pub const AFTER_DOMAINCHECK_CP: usize = 3;
+pub const AFTER_LINTS_CP: usize = 4;
 
 /// Represents any global. Stored in [Linker] and each is uniquely indexed by [GlobalUUID]
 ///
@@ -103,7 +103,7 @@ pub struct LinkInfo {
     /// Removed in Stage 3: Typechecking
     ///
     /// Is only temporary. It's used during typechecking to allocate the type unification block
-    pub type_variable_alloc: Option<Box<(AbstractTypeSubstitutor, TypeSubstitutor<DomainType>)>>,
+    pub type_variable_alloc: Option<Box<AbstractTypeSubstitutor>>,
 
     pub template_parameters: TVec<Parameter>,
 
