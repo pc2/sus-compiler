@@ -11,7 +11,6 @@ use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractRankedType, DomainType, PeanoType};
 use crate::typing::written_type::WrittenType;
 
-use std::cell::OnceCell;
 use std::ops::Deref;
 
 use crate::latency::port_latency_inference::PortLatencyInferenceInfo;
@@ -537,6 +536,7 @@ pub enum ExpressionOutput {
 #[derive(Debug)]
 pub struct Expression {
     pub span: Span,
+    pub parent_condition: Option<ParentCondition>,
     pub source: ExpressionSource,
     /// Means [Self::source] can be computed at compiletime, not that [Self::output] neccesarily requires a generative result
     pub domain: DomainType,
@@ -617,12 +617,12 @@ impl DeclarationKind {
 /// A Declaration Instruction always corresponds to a new entry in the [self::name_context::LocalVariableContext].
 #[derive(Debug)]
 pub struct Declaration {
+    pub parent_condition: Option<ParentCondition>,
     pub typ_expr: WrittenType,
     pub typ: FullType,
     pub decl_span: Span,
     pub name_span: Span,
     pub name: String,
-    pub declaration_runtime_depth: OnceCell<usize>,
     /// Variables are read_only when they may not be controlled by the current block of code.
     /// This is for example, the inputs of the current module, or the outputs of nested modules.
     /// But could also be the iterator of a for loop.
@@ -644,6 +644,7 @@ pub struct Declaration {
 /// When instantiating, creates a [crate::instantiation::SubModule]
 #[derive(Debug)]
 pub struct SubModuleInstance {
+    pub parent_condition: Option<ParentCondition>,
     pub module_ref: GlobalReference<ModuleUUID>,
     /// Name is not always present in source code. Such as in inline function call syntax: my_mod(a, b, c)
     pub name: Option<(String, Span)>,
@@ -741,6 +742,8 @@ impl FuncCall {
 /// A control-flow altering [Instruction] to represent compiletime and runtime if & when statements.
 #[derive(Debug)]
 pub struct IfStatement {
+    pub if_keyword_span: Span,
+    pub parent_condition: Option<ParentCondition>,
     pub condition: FlatID,
     pub is_generative: bool,
     pub then_block: FlatIDRange,
@@ -750,10 +753,17 @@ pub struct IfStatement {
 /// A control-flow altering [Instruction] to represent compiletime looping on a generative index
 #[derive(Debug)]
 pub struct ForStatement {
+    pub parent_condition: Option<ParentCondition>,
     pub loop_var_decl: FlatID,
     pub start: FlatID,
     pub end: FlatID,
     pub loop_body: FlatIDRange,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParentCondition {
+    parent_when: FlatID,
+    is_else_branch: bool,
 }
 
 /// When a module has been parsed and flattened, it is turned into a large list of instructions,
@@ -819,7 +829,33 @@ impl Instruction {
         };
         sm
     }
+    #[track_caller]
+    pub fn unwrap_if(&self) -> &IfStatement {
+        let Self::IfStatement(ii) = self else {
+            panic!("unwrap_if on not a IfStatement! Found {self:?}")
+        };
+        ii
+    }
 
+    pub fn get_parent_condition(&self) -> Option<ParentCondition> {
+        match self {
+            Instruction::SubModule(SubModuleInstance {
+                parent_condition, ..
+            })
+            | Instruction::Declaration(Declaration {
+                parent_condition, ..
+            })
+            | Instruction::Expression(Expression {
+                parent_condition, ..
+            })
+            | Instruction::IfStatement(IfStatement {
+                parent_condition, ..
+            })
+            | Instruction::ForStatement(ForStatement {
+                parent_condition, ..
+            }) => *parent_condition,
+        }
+    }
     pub fn get_span(&self) -> Span {
         match self {
             Instruction::SubModule(sub_module_instance) => {

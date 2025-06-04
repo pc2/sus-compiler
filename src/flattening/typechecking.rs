@@ -39,7 +39,6 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
                 &working_on.link_info.template_parameters,
                 type_alloc,
             ),
-            runtime_condition_stack: Vec::new(),
             working_on: &working_on.link_info,
         };
 
@@ -72,12 +71,6 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
             working_on_mut.print_flattened_module(&linker.files[working_on_mut.link_info.file]);
         }
     }
-}
-
-struct ConditionStackElem {
-    ends_at: FlatID,
-    span: Span,
-    domain: DomainType,
 }
 
 struct RemoteSubModule<'l> {
@@ -162,7 +155,6 @@ struct TypeCheckingContext<'l, 'errs> {
     errors: &'errs ErrorCollector<'l>,
     working_on: &'l LinkInfo,
     type_checker: FullTypeUnifier,
-    runtime_condition_stack: Vec<ConditionStackElem>,
 }
 
 impl<'l> TypeCheckingContext<'l, '_> {
@@ -236,7 +228,6 @@ impl<'l> TypeCheckingContext<'l, '_> {
             WireReferenceRoot::Error => {}
         }
 
-        self.join_with_condition(&result_domain, whole_span);
         self.type_checker.unify_domains(
             &wire_ref.root_typ.domain,
             &result_domain,
@@ -286,28 +277,18 @@ impl<'l> TypeCheckingContext<'l, '_> {
     }
 
     fn control_flow_visit_instruction(&mut self, inst_id: FlatID) {
-        while let Some(parent_block) = self.runtime_condition_stack.last() {
-            if parent_block.ends_at != inst_id {
-                break;
-            }
-            self.runtime_condition_stack.pop().unwrap();
-        }
         match &self.working_on.instructions[inst_id] {
             Instruction::SubModule(sm) => {
                 self.typecheck_template_global(&sm.module_ref);
             }
-            Instruction::Declaration(decl) => {
-                // For both runtime, and compiletime declarations.
-                decl.declaration_runtime_depth
-                    .set(self.runtime_condition_stack.len())
-                    .unwrap();
-            }
+            Instruction::Declaration(_) => {}
             Instruction::Expression(Expression {
                 output: ExpressionOutput::SubExpression(_),
                 ..
             }) => {}
             Instruction::Expression(Expression {
                 output: ExpressionOutput::MultiWrite(writes),
+                parent_condition,
                 ..
             }) => {
                 for wr in writes {
@@ -328,19 +309,23 @@ impl<'l> TypeCheckingContext<'l, '_> {
                                             let to_decl = self.working_on.instructions[root_flat]
                                                 .unwrap_declaration();
 
-                                            let found_decl_depth =
-                                                *to_decl.declaration_runtime_depth.get().unwrap();
-                                            if self.runtime_condition_stack.len() > found_decl_depth
-                                            {
-                                                let err_ref = self.errors.error(wr.to_span, "Cannot write to generative variables in runtime conditional block");
+                                            if *parent_condition != to_decl.parent_condition {
+                                                let err_ref = self.errors.error(wr.to_span, "Cannot write to compiletime variable through runtime 'when' blocks");
                                                 err_ref.info_obj_same_file(decl);
-                                                for elem in &self.runtime_condition_stack
-                                                    [found_decl_depth..]
-                                                {
+
+                                                let mut cur_parent = *parent_condition;
+
+                                                while cur_parent != decl.parent_condition {
+                                                    let parent_when = self.working_on.instructions
+                                                        [parent_condition.unwrap().parent_when]
+                                                        .unwrap_if();
+
                                                     err_ref.info_same_file(
-                                                        elem.span,
-                                                        "Runtime condition here",
+                                                        parent_when.if_keyword_span,
+                                                        "Assignment passes through this 'when'",
                                                     );
+
+                                                    cur_parent = parent_when.parent_condition;
                                                 }
                                             }
                                         }
@@ -376,17 +361,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     }
                 }
             }
-            Instruction::IfStatement(if_stmt) => {
-                let condition_expr =
-                    self.working_on.instructions[if_stmt.condition].unwrap_subexpression();
-                if !if_stmt.is_generative {
-                    self.runtime_condition_stack.push(ConditionStackElem {
-                        ends_at: if_stmt.else_block.1,
-                        span: condition_expr.span,
-                        domain: condition_expr.domain,
-                    });
-                }
-            }
+            Instruction::IfStatement(_) => {}
             Instruction::ForStatement(_) => {}
         }
     }
@@ -448,25 +423,6 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     "array size",
                 );
             }
-        }
-    }
-
-    /// TODO: writes to declarations that are in same scope need not be checked as such.
-    ///
-    /// This allows to work with temporaries of a different domain within an if statement
-    ///
-    /// Which could allow for a little more encapsulation in certain circumstances
-    ///
-    /// Also, this meshes with the thing where we only add condition wires to writes that go
-    /// outside of a condition block
-    fn join_with_condition(&mut self, ref_domain: &DomainType, span: Span) {
-        if let Some(condition_domain) = self.get_current_condition_domain() {
-            self.type_checker.unify_domains(
-                ref_domain,
-                &condition_domain.0,
-                span,
-                "condition join",
-            );
         }
     }
 
@@ -553,7 +509,6 @@ impl<'l> TypeCheckingContext<'l, '_> {
             // Typecheck the value with target type
             let from = self.working_on.instructions[*arg].unwrap_subexpression();
 
-            self.join_with_condition(&port_type.domain, from.span);
             self.type_checker
                 .unify_write_to(from.typ, &from.domain, &port_type, from.span, || {
                     ("function argument".to_string(), vec![port_decl.make_info()])
@@ -798,11 +753,6 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 }
             },
         }
-    }
-
-    fn get_current_condition_domain(&self) -> Option<(DomainType, Span)> {
-        let last = self.runtime_condition_stack.last()?;
-        Some((last.domain, last.span))
     }
 
     /// Should be followed up by a [apply_types] call to actually apply all the checked types.

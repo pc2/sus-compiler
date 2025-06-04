@@ -12100,7 +12100,7 @@ Error: While parsing 'source_file', parser found a syntax error in a node of typ
       │ │       ─────────────────────────────┬────────────────────────────  
       │ │                                    ╰────────────────────────────── While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
       ┆ ┆   
- 1377 │ ├─▶ }
+ 1387 │ ├─▶ }
       │ │       
       │ ╰─────── Parent node 'source_file'
 ──────╯
@@ -12113,7 +12113,7 @@ Error: While parsing 'source_file', parser found a syntax error in a node of typ
       │ │   ┬  
       │ │   ╰── While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
       ┆ ┆   
- 1377 │ ├─▶ }
+ 1387 │ ├─▶ }
       │ │       
       │ ╰─────── Parent node 'source_file'
 ──────╯
@@ -12548,4 +12548,32 @@ Warning: Unused port 'ready'
    36 │     output bool ready'0
       │                 ──┬──  
       │                   ╰──── Port 'ready' declared here
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1380:11 ]
+      │
+ 1380 │     gen bool a
+      │              ┬  
+      │              ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1382:7 ]
+      │
+ 1382 │     bool b
+      │          ┬  
+      │          ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Cannot write to compiletime variable through runtime 'when' blocks
+      ╭─[ test.sus:1385:3 ]
+      │
+ 1380 │     gen bool a
+      │              ┬  
+      │              ╰── 'a' declared here
+      │ 
+ 1384 │     when b {
+      │     ──┬─  
+      │       ╰─── Assignment passes through this 'when'
+ 1385 │        a = true
+      │        ┬  
+      │        ╰── Cannot write to compiletime variable through runtime 'when' blocks
 ──────╯

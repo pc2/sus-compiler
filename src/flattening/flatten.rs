@@ -196,6 +196,8 @@ struct FlatteningContext<'l, 'errs> {
     local_variable_context: LocalVariableContext<'l, NamedLocal>,
 
     default_declaration_context: DeclarationContext,
+
+    current_parent_condition: Option<ParentCondition>,
 }
 
 impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
@@ -281,6 +283,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             // Insert extra Expression, to support named template arg syntax #(MY_VAR, OTHER_VAR: BEEP)
                             let decl = self.instructions[decl_id].unwrap_declaration();
                             let wire_read_id = self.instructions.alloc(Instruction::Expression(Expression {
+                                parent_condition: self.current_parent_condition,
                                 output: ExpressionOutput::SubExpression(self.type_alloc.type_alloc.alloc_unknown()),
                                 span: name_span,
                                 domain: DomainType::Generative,
@@ -537,6 +540,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         self.instructions
             .alloc(Instruction::SubModule(SubModuleInstance {
+                parent_condition: self.current_parent_condition,
                 name,
                 module_ref,
                 local_interface_domains,
@@ -680,6 +684,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             }
 
             let decl_id = self.instructions.alloc(Instruction::Declaration(Declaration{
+                parent_condition: self.current_parent_condition,
                 typ_expr,
                 typ : FullType {
                     typ,
@@ -692,7 +697,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 name : name.to_owned(),
                 name_span,
                 decl_span,
-                declaration_runtime_depth : OnceCell::new(),
                 latency_specifier : span_latency_specifier.map(|(ls, _)| ls),
                 documentation
             }));
@@ -787,6 +791,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         let typ = self.type_alloc.type_alloc.alloc_unknown();
         let wire_instance = Expression {
+            parent_condition: self.current_parent_condition,
             domain,
             span,
             source,
@@ -819,6 +824,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         };
 
         let wire_instance = Expression {
+            parent_condition: self.current_parent_condition,
             span,
             domain,
             source,
@@ -1177,25 +1183,25 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn flatten_if_statement(&mut self, cursor: &mut Cursor<'c>) {
         cursor.go_down(kind!("if_statement"), |cursor| {
             cursor.field(field!("statement_type"));
-            let expects_generative = match cursor.kind() {
+            let (if_typ, if_keyword_span) = cursor.kind_span();
+            let expects_generative = match if_typ {
                 kw!("if") => true,
                 kw!("when") => false,
                 _ => unreachable!(),
             };
-            let position_statement_keyword = cursor.span();
             cursor.field(field!("condition"));
 
             let (condition, condition_is_generative) = self.flatten_subexpr(cursor);
             match (expects_generative, condition_is_generative.is_generative()) {
                 (true, false) => {
                     self.errors.error(
-                        position_statement_keyword,
+                        if_keyword_span,
                         "Used 'if' in a non generative context, use 'when' instead",
                     );
                 }
                 (false, true) => {
                     self.errors.warn(
-                        position_statement_keyword,
+                        if_keyword_span,
                         "Used 'when' in a generative context, use 'if' instead",
                     );
                 }
@@ -1205,26 +1211,44 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             let if_id = self
                 .instructions
                 .alloc(Instruction::IfStatement(IfStatement {
+                    if_keyword_span,
+                    parent_condition: self.current_parent_condition,
                     condition,
                     is_generative: expects_generative,
                     then_block: FlatIDRange::PLACEHOLDER,
                     else_block: FlatIDRange::PLACEHOLDER,
                 }));
 
+            let prev_parent_condition = self.current_parent_condition;
+            if !expects_generative {
+                self.current_parent_condition = Some(ParentCondition {
+                    parent_when: if_id,
+                    is_else_branch: false,
+                });
+            }
+
             cursor.field(field!("then_block"));
-            let (then_block, else_block) = self.flatten_then_else_blocks(cursor);
+            let then_block = self.flatten_code(cursor);
+
+            if !expects_generative {
+                self.current_parent_condition = Some(ParentCondition {
+                    parent_when: if_id,
+                    is_else_branch: true,
+                });
+            }
+            let else_block = self.flatten_else_block(cursor);
 
             let Instruction::IfStatement(if_stmt) = &mut self.instructions[if_id] else {
                 unreachable!()
             };
             if_stmt.then_block = then_block;
             if_stmt.else_block = else_block;
+
+            self.current_parent_condition = prev_parent_condition;
         })
     }
 
-    fn flatten_then_else_blocks(&mut self, cursor: &mut Cursor<'c>) -> (FlatIDRange, FlatIDRange) {
-        let then_block = self.flatten_code(cursor);
-
+    fn flatten_else_block(&mut self, cursor: &mut Cursor<'c>) -> FlatIDRange {
         let else_start = self.instructions.get_next_alloc_id();
         if cursor.optional_field(field!("else_block")) {
             cursor.go_down(kind!("else_block"), |cursor| {
@@ -1237,8 +1261,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             })
         };
         let else_end = self.instructions.get_next_alloc_id();
-        let else_block = FlatIDRange::new(else_start, else_end);
-        (then_block, else_block)
+        FlatIDRange::new(else_start, else_end)
     }
 
     fn flatten_code(&mut self, cursor: &mut Cursor<'c>) -> FlatIDRange {
@@ -1297,6 +1320,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         let for_id =
                             self.instructions
                                 .alloc(Instruction::ForStatement(ForStatement {
+                                    parent_condition: self.current_parent_condition,
                                     loop_var_decl,
                                     start,
                                     end,
@@ -1538,12 +1562,12 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 let module_output_decl =
                     self.instructions
                         .alloc(Instruction::Declaration(Declaration {
+                            parent_condition: self.current_parent_condition,
                             typ_expr,
                             typ: self.type_alloc.alloc_unset_type(DomainType::Generative),
                             decl_span,
                             name_span,
                             name: module_name.to_string(),
-                            declaration_runtime_depth: OnceCell::new(),
                             read_only: false,
                             declaration_itself_is_not_written_to: true,
                             decl_kind: DeclarationKind::NotPort,
@@ -1649,6 +1673,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
     };
 
     let mut context = FlatteningContext {
+        current_parent_condition: None,
         globals: &globals,
         ports_to_visit,
         fields_to_visit,

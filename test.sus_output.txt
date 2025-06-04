@@ -159,6 +159,7 @@ Flattening use_infer_me_inputs_only
 Flattening use_ranks
 Flattening testInts
 Flattening use_FIFO
+Flattening write_to_generative_through_when
 Typechecking LatencyOffset
 Typechecking CrossDomain
 Typechecking IntToBits
@@ -304,6 +305,7 @@ Typechecking use_infer_me_inputs_only
 Typechecking use_ranks
 Typechecking testInts
 Typechecking use_FIFO
+Typechecking write_to_generative_through_when
 Instantiating example_md
 Concrete Typechecking example_md
 Checking array accesses example_md
@@ -626,3 +628,4 @@ Concrete Typechecking LatencyOffset #(T: type bool, OFFSET: -4)
 Checking array accesses LatencyOffset #(T: type bool, OFFSET: -4)
 Checking array accesses FIFO #(T: type int #(MIN: 3, MAX: 3), DEPTH: 53, READY_SLACK: 3)
 Checking array accesses use_FIFO
+Not Instantiating write_to_generative_through_when due to flattening errors
