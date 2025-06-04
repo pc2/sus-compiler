@@ -72,8 +72,8 @@ fn lint_instructions(
                                                 instructions[root_flat].unwrap_declaration();
 
                                             if *parent_condition != to_decl.parent_condition {
-                                                let err_ref = errors.error(wr.to_span, "Cannot write to compiletime variable through runtime 'when' blocks");
-                                                err_ref.info_obj_same_file(decl);
+                                                let mut err_ref = errors.error(wr.to_span, "Cannot write to compiletime variable through runtime 'when' blocks");
+                                                err_ref = err_ref.info_obj_same_file(decl);
 
                                                 let mut cur_parent = *parent_condition;
 
@@ -82,7 +82,7 @@ fn lint_instructions(
                                                         [parent_condition.unwrap().parent_when]
                                                         .unwrap_if();
 
-                                                    err_ref.info_same_file(
+                                                    err_ref = err_ref.info_same_file(
                                                         parent_when.if_keyword_span,
                                                         "Assignment passes through this 'when'",
                                                     );

@@ -436,7 +436,7 @@ impl<'inst, T: Clone, IDMarker> DelayedErrorCollector<'inst, T, IDMarker> {
         Self::default()
     }
     pub fn report(self, store: &SetUnifierStore<T, IDMarker>) {
-        for f in self.failures {
+        for f in Vec::from(self.failures) {
             f(store)
         }
     }

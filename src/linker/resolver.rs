@@ -101,11 +101,11 @@ impl<'linker> GlobalResolver<'linker> {
             Some(NamespaceElement::Colission(coll)) => {
                 resolved_globals.all_resolved = false;
 
-                let err_ref = self.errors.error(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."));
+                let mut err_ref = self.errors.error(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."));
 
                 for collider_global in coll.iter() {
                     let err_loc = self.get_linking_error_location(*collider_global);
-                    err_ref.info(
+                    err_ref = err_ref.info(
                         err_loc.location,
                         format!("{} {} declared here", err_loc.named_type, err_loc.full_name),
                     );

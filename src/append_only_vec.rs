@@ -23,28 +23,25 @@ impl<T> From<Vec<T>> for AppendOnlyVec<T> {
 }
 
 impl<T> AppendOnlyVec<T> {
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn push(&self, data: T) {
         // SAFETY: AppendOnlyVec is made such that references to the content can only be made from exclusive references. Hence, no reference can be taken and then invalidated by a push
         unsafe {
             (*self.v.get()).push(data);
         }
     }
-    pub fn new() -> Self {
-        Self::default()
+    pub fn len(&self) -> usize {
+        unsafe { (*self.v.get()).len() }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
 impl<T> From<AppendOnlyVec<T>> for Vec<T> {
     fn from(val: AppendOnlyVec<T>) -> Self {
         val.v.into_inner()
-    }
-}
-
-impl<T> IntoIterator for AppendOnlyVec<T> {
-    type Item = T;
-    type IntoIter = std::vec::IntoIter<T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.v.into_inner().into_iter()
     }
 }
