@@ -111,7 +111,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             let mut details_vec: Vec<String> = Vec::with_capacity(5);
 
             if let Some(md) = try_get_module(&linker.modules, obj_id) {
-                if let DomainType::Physical(ph) = decl.domain {
+                if let DomainType::Physical(ph) = decl.domain.get() {
                     details_vec.push(DomainType::physical_to_string(ph, &md.domains));
                 }
             }
@@ -164,7 +164,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.sus_code(submodule.make_all_ports_info_string(
                 &linker.files[submodule.link_info.file].file_text,
                 Some(InterfaceToDomainMap {
-                    local_domain_map: &submod.local_interface_domains,
+                    local_domain_map: submod.local_interface_domains.get().unwrap(),
                     domains: &md.domains,
                 }),
             ));
@@ -193,7 +193,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     .to_string(),
             ));
             hover.sus_code(details_vec.join(" "));
-            hover.gather_hover_infos(obj_id, id, expr.domain.is_generative());
+            hover.gather_hover_infos(obj_id, id, expr.domain == DomainType::Generative);
         }
         LocationInfo::Type(typ, link_info) => {
             hover.sus_code(

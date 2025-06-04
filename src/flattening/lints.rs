@@ -94,7 +94,7 @@ fn lint_instructions(
                                     }
                                 }
                                 WriteModifiers::Initial { initial_kw_span } => {
-                                    if decl.domain == DomainType::Generative {
+                                    if decl.domain.get() == DomainType::Generative {
                                         errors
                                             .error(
                                                 initial_kw_span,

@@ -914,7 +914,8 @@ impl<'l> ExecutionContext<'l> {
             } else {
                 RealWireDataSource::ReadOnly
             };
-            let domain = submodule_instruction.local_interface_domains[port_data.domain];
+            let domain =
+                submodule_instruction.local_interface_domains.get().unwrap()[port_data.domain];
             let typ = Self::concretize_submodule_port_type(
                 &mut self.type_substitutor,
                 self.linker,
@@ -1040,7 +1041,8 @@ impl<'l> ExecutionContext<'l> {
                 let submod_md = &self.linker.modules[original_submod_instr.module_ref.id];
                 let interface = &submod_md.interfaces[fc.interface_reference.submodule_interface];
                 let submod_interface_domain = interface.domain;
-                let domain = original_submod_instr.local_interface_domains[submod_interface_domain]
+                let domain = original_submod_instr.local_interface_domains.get().unwrap()
+                    [submod_interface_domain]
                     .unwrap_physical();
 
                 add_to_small_set(
@@ -1145,7 +1147,7 @@ impl<'l> ExecutionContext<'l> {
                 name: self.unique_name_producer.get_unique_name(&wire_decl.name),
                 typ,
                 original_instruction,
-                domain: wire_decl.domain.unwrap_physical(),
+                domain: wire_decl.domain.get().unwrap_physical(),
                 source,
                 specified_latency,
                 absolute_latency: CALCULATE_LATENCY_LATER,
@@ -1300,7 +1302,7 @@ impl<'l> ExecutionContext<'l> {
                     self.instantiate_declaration(wire_decl, original_instruction)?
                 }
                 Instruction::Expression(expr) => {
-                    match expr.domain {
+                    match expr.domain.get() {
                         DomainType::Generative => {
                             let value_computed = self.compute_compile_time(expr)?;
                             match &expr.output {

@@ -269,7 +269,7 @@ impl<'l> RemoteInterface<'l> {
         self.parent.get_port(port_id)
     }
     pub fn get_local_domain(self) -> DomainType {
-        self.parent.submodule.local_interface_domains[self.interface.domain]
+        self.parent.submodule.local_interface_domains.get().unwrap()[self.interface.domain]
     }
 }
 /// For interfaces of this module
@@ -298,7 +298,7 @@ impl<'l> RemotePort<'l> {
         )
     }
     pub fn get_local_domain(&self) -> DomainType {
-        self.parent.submodule.local_interface_domains[self.port.domain]
+        self.parent.submodule.local_interface_domains.get().unwrap()[self.port.domain]
     }
     pub fn make_info(&self) -> ErrorInfo {
         self.remote_decl.make_info(self.file).unwrap()
@@ -350,7 +350,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     self.globals,
                 )
                 .get_port(port.port);
-                if submod_port.remote_decl.domain.is_generative() {
+                if submod_port.remote_decl.domain.get() == DomainType::Generative {
                     self.errors
                         .error(
                             wire_ref.root_span,
@@ -685,7 +685,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 if let Some(first_write) = multi_write.first() {
                     self.typecheck_single_output_expr(SingleOutputExpression {
                         typ: first_write.to.get_output_typ(),
-                        domain: expr.domain,
+                        domain: expr.domain.get(),
                         span: expr.span,
                         source: &expr.source,
                     });
@@ -694,7 +694,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
 
                     self.typecheck_single_output_expr(SingleOutputExpression {
                         typ: &sentinel,
-                        domain: expr.domain,
+                        domain: expr.domain.get(),
                         span: expr.span,
                         source: &expr.source,
                     });
@@ -756,7 +756,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 ExpressionOutput::SubExpression(typ) => {
                     self.typecheck_single_output_expr(SingleOutputExpression {
                         typ,
-                        domain: expr.domain,
+                        domain: expr.domain.get(),
                         span: expr.span,
                         source: &expr.source,
                     });

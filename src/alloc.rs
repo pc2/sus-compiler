@@ -667,14 +667,6 @@ impl<T, IndexMarker> FlatAlloc<T, IndexMarker> {
     pub fn iter_mut(&mut self) -> FlatAllocIterMut<'_, T, IndexMarker> {
         self.into_iter()
     }
-    pub fn iter_mut_convenient(
-        &mut self,
-    ) -> ConvenientMutableIterator<'_, UUID<IndexMarker>, T, Self> {
-        ConvenientMutableIterator {
-            buf_ptr: self as *const FlatAlloc<T, IndexMarker>,
-            buf_iter: self.iter_mut(),
-        }
-    }
     pub fn map<OT>(
         &self,
         f: impl FnMut((UUID<IndexMarker>, &T)) -> OT,
@@ -1038,81 +1030,5 @@ pub fn zip_eq3<IDMarker, OA, OB, OC>(
         iter_a: iter_a.into_iter(),
         iter_b: iter_b.into_iter(),
         iter_c: iter_c.into_iter(),
-    }
-}
-
-#[derive(Debug)]
-pub struct IndexExcept<'buffer, ID: Copy + Eq, T: 'buffer, Buffer: Index<ID, Output = T>> {
-    buf_ptr: *const Buffer,
-    except: ID,
-    _ph: PhantomData<&'buffer ()>,
-}
-
-impl<'buffer, ID: Copy + Eq, T: 'buffer, Buffer: Index<ID, Output = T>> Clone
-    for IndexExcept<'buffer, ID, T, Buffer>
-{
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-impl<'buffer, ID: Copy + Eq, T: 'buffer, Buffer: Index<ID, Output = T>> Copy
-    for IndexExcept<'buffer, ID, T, Buffer>
-{
-}
-
-impl<'buffer, ID: Copy + Eq, T: 'buffer, Buffer: Index<ID, Output = T>> Index<ID>
-    for IndexExcept<'buffer, ID, T, Buffer>
-{
-    type Output = T;
-
-    fn index(&self, index: ID) -> &T {
-        assert!(index != self.except);
-        unsafe { &(*self.buf_ptr)[index] }
-    }
-}
-
-pub struct ConvenientMutableIterator<
-    'buffer,
-    ID: Copy + Eq,
-    T: 'buffer,
-    Buffer: Index<ID, Output = T>,
-> where
-    for<'b> &'b mut Buffer: IntoIterator<Item = (ID, &'b mut T)>,
-{
-    buf_ptr: *const Buffer,
-    buf_iter: <&'buffer mut Buffer as IntoIterator>::IntoIter,
-}
-
-impl<'buffer, ID: Copy + Eq, T: 'buffer, Buffer: Index<ID, Output = T>>
-    ConvenientMutableIterator<'buffer, ID, T, Buffer>
-where
-    for<'b> &'b mut Buffer: IntoIterator<Item = (ID, &'b mut T)>,
-{
-    pub fn new(buf: &'buffer mut Buffer) -> Self {
-        Self {
-            buf_ptr: buf as *const Buffer,
-            buf_iter: buf.into_iter(),
-        }
-    }
-}
-
-impl<'buffer, ID: Copy + Eq, T: 'buffer, Buffer: Index<ID, Output = T>> Iterator
-    for ConvenientMutableIterator<'buffer, ID, T, Buffer>
-where
-    for<'b> &'b mut Buffer: IntoIterator<Item = (ID, &'b mut T)>,
-{
-    type Item = (&'buffer mut T, IndexExcept<'buffer, ID, T, Buffer>);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.buf_iter.next().map(|(idx, v)| {
-            (
-                v,
-                IndexExcept {
-                    buf_ptr: self.buf_ptr,
-                    except: idx,
-                    _ph: PhantomData,
-                },
-            )
-        })
     }
 }

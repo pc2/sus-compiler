@@ -36,11 +36,4 @@ impl DomainType {
         };
         *w
     }
-    pub fn is_generative(&self) -> bool {
-        match self {
-            DomainType::Generative => true,
-            DomainType::Physical(_) => false,
-            DomainType::Unknown(_) => false,
-        }
-    }
 }

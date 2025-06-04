@@ -5,6 +5,7 @@ use crate::{
     prelude::*,
     typing::{
         abstract_type::PeanoType,
+        domain_type::DomainType,
         template::{TVec, TemplateKind},
         value_unifier::ValueUnifierStore,
     },
@@ -107,7 +108,7 @@ fn recurse_down_expression(
     num_template_args: usize,
 ) -> Option<PortLatencyLinearity> {
     let expr = instructions[cur_instr].unwrap_subexpression();
-    if !expr.domain.is_generative() {
+    if expr.domain != DomainType::Generative {
         return None; // Early exit, the user can create an invalid interface, we just don't handle it
     }
     match &expr.source {

@@ -255,7 +255,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 parent_condition: self.current_parent_condition,
                                 output: ExpressionOutput::SubExpression(self.type_alloc.alloc_unknown()),
                                 span: name_span,
-                                domain: DomainType::Generative,
+                                domain: Cell::new(DomainType::PLACEHOLDER),
                                 source: ExpressionSource::WireRef(WireReference {
                                     root: WireReferenceRoot::LocalDecl(decl_id),
                                     root_span: name_span,
@@ -505,7 +505,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 parent_condition: self.current_parent_condition,
                 name,
                 module_ref,
-                local_interface_domains: FlatAlloc::new(),
+                local_interface_domains: OnceCell::new(),
                 documentation,
             }))
     }
@@ -645,7 +645,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 parent_condition: self.current_parent_condition,
                 typ_expr,
                 typ,
-                domain: DomainType::PLACEHOLDER,
+                domain: Cell::new(DomainType::PLACEHOLDER),
                 read_only,
                 declaration_itself_is_not_written_to,
                 decl_kind,
@@ -745,7 +745,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let typ = self.type_alloc.alloc_unknown();
         let wire_instance = Expression {
             parent_condition: self.current_parent_condition,
-            domain: DomainType::PLACEHOLDER,
+            domain: Cell::new(DomainType::PLACEHOLDER),
             span,
             source,
             output: ExpressionOutput::SubExpression(typ),
@@ -769,7 +769,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let wire_instance = Expression {
             parent_condition: self.current_parent_condition,
             span,
-            domain: DomainType::PLACEHOLDER,
+            domain: Cell::new(DomainType::PLACEHOLDER),
             source,
             output,
         };
@@ -1434,7 +1434,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             parent_condition: self.current_parent_condition,
                             typ_expr,
                             typ: self.type_alloc.alloc_unknown(),
-                            domain: DomainType::PLACEHOLDER,
+                            domain: Cell::new(DomainType::PLACEHOLDER),
                             decl_span,
                             name_span,
                             name: module_name.to_string(),

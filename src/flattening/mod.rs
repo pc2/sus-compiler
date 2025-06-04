@@ -12,6 +12,7 @@ use crate::typing::abstract_type::{AbstractRankedType, PeanoType};
 use crate::typing::domain_type::DomainType;
 use crate::typing::written_type::WrittenType;
 
+use std::cell::{Cell, OnceCell};
 use std::ops::Deref;
 
 use crate::latency::port_latency_inference::PortLatencyInferenceInfo;
@@ -541,7 +542,7 @@ pub struct Expression {
     pub parent_condition: Option<ParentCondition>,
     pub source: ExpressionSource,
     /// Means [Self::source] can be computed at compiletime, not that [Self::output] neccesarily requires a generative result
-    pub domain: DomainType,
+    pub domain: Cell<DomainType>,
 
     /// If [None], then this function returns a single result like a normal expression
     /// If Some(outputs), then this function is a dead-end expression, and does it's outputs manually
@@ -561,7 +562,7 @@ impl Expression {
         };
         Some(SingleOutputExpression {
             typ,
-            domain: self.domain,
+            domain: self.domain.get(),
             span: self.span,
             source: &self.source,
         })
@@ -622,7 +623,7 @@ pub struct Declaration {
     pub parent_condition: Option<ParentCondition>,
     pub typ_expr: WrittenType,
     pub typ: AbstractRankedType,
-    pub domain: DomainType,
+    pub domain: Cell<DomainType>,
     pub decl_span: Span,
     pub name_span: Span,
     pub name: String,
@@ -654,7 +655,7 @@ pub struct SubModuleInstance {
     /// Maps each of the module's local domains to the domain that it is used in.
     ///
     /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::Unknown] before typing)
-    pub local_interface_domains: FlatAlloc<DomainType, DomainIDMarker>,
+    pub local_interface_domains: OnceCell<FlatAlloc<DomainType, DomainIDMarker>>,
     pub documentation: Documentation,
 }
 
@@ -813,7 +814,7 @@ impl Instruction {
         };
         SingleOutputExpression {
             typ,
-            domain: expr.domain,
+            domain: expr.domain.get(),
             span: expr.span,
             source: &expr.source,
         }

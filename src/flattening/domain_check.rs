@@ -1,5 +1,5 @@
-use crate::alloc::{IndexExcept, UUIDAllocator};
-use crate::errors::{ErrorInfo, ErrorStore};
+use crate::alloc::UUIDAllocator;
+use crate::errors::ErrorInfo;
 use crate::flattening::typechecking::RemoteSubModule;
 use crate::linker::AFTER_DOMAINCHECK_CP;
 use crate::prelude::*;
@@ -17,67 +17,82 @@ pub fn domain_check_all(linker: &mut Linker) {
             &linker.files,
         );
         let resolved_globals = md.link_info.resolved_globals.take();
-        let instructions =
-            &mut md.link_info.instructions as *mut FlatAlloc<Instruction, FlatIDMarker>;
 
         let md = &linker.modules[id];
 
-        let errors = domain_check_link_info(
-            linker,
-            errors,
-            unsafe { &mut *instructions },
-            md.domains.get_next_alloc_id(),
-        );
+        let domain_substitutor =
+            domain_check_link_info(linker, &errors, &md.link_info.instructions);
+
+        // Set the remaining domain variables that aren't associated with a module port.
+        // We just find domain IDs that haven't been
+        let mut leftover_domain_alloc =
+            UUIDAllocator::new_start_from(md.domains.get_next_alloc_id());
+        for (_, d) in domain_substitutor.iter() {
+            if d.get().is_none() {
+                assert!(d
+                    .set(DomainType::Physical(leftover_domain_alloc.alloc()))
+                    .is_ok());
+            }
+        }
 
         let md = &mut linker.modules[id];
-        md.link_info
-            .reabsorb_errors_globals((errors, resolved_globals), AFTER_DOMAINCHECK_CP);
+        finalize_domains(&errors, &mut md.link_info.instructions, domain_substitutor);
+        md.link_info.reabsorb_errors_globals(
+            (errors.into_storage(), resolved_globals),
+            AFTER_DOMAINCHECK_CP,
+        );
     }
+}
+
+struct DomainCheckingContext<'l> {
+    linker: &'l Linker,
+    errors: &'l ErrorCollector<'l>,
+    domain_substitutor: TypeUnifier<TypeSubstitutor<DomainType>>,
+    instructions: &'l FlatAlloc<Instruction, FlatIDMarker>,
 }
 
 fn domain_check_link_info<'l>(
     linker: &'l Linker,
-    mut errors: ErrorCollector<'l>,
-    instructions: &mut FlatAlloc<Instruction, FlatIDMarker>,
-    domains_next_alloc_id: DomainID,
-) -> ErrorStore {
-    let mut domain_substitutor = TypeUnifier::default();
+    errors: &ErrorCollector<'l>,
+    instructions: &FlatAlloc<Instruction, FlatIDMarker>,
+) -> TypeUnifier<TypeSubstitutor<DomainType>> {
+    let mut ctx = DomainCheckingContext {
+        linker,
+        errors,
+        domain_substitutor: TypeUnifier::default(),
+        instructions,
+    };
 
-    for (instr, instructions) in instructions.iter_mut_convenient() {
-        let mut ctx = DomainCheckingContext {
-            linker,
-            errors,
-            domain_substitutor,
-            instructions,
-        };
+    for (_, instr) in instructions {
         ctx.check_instr(instr);
-        errors = ctx.errors;
-        domain_substitutor = ctx.domain_substitutor;
     }
 
-    // Set the remaining domain variables that aren't associated with a module port.
-    // We just find domain IDs that haven't been
-    let mut leftover_domain_alloc = UUIDAllocator::new_start_from(domains_next_alloc_id);
-    for (_, d) in domain_substitutor.iter() {
-        if d.get().is_none() {
-            assert!(d
-                .set(DomainType::Physical(leftover_domain_alloc.alloc()))
-                .is_ok());
-        }
-    }
+    ctx.domain_substitutor
+}
 
+fn finalize_domains(
+    errors: &ErrorCollector,
+    instructions: &mut FlatAlloc<Instruction, FlatIDMarker>,
+    mut domain_substitutor: TypeUnifier<TypeSubstitutor<DomainType>>,
+) {
     for (_, instr) in instructions {
         match instr {
             Instruction::SubModule(sm) => {
-                for (_, d) in &mut sm.local_interface_domains {
+                for (_, d) in sm.local_interface_domains.get_mut().unwrap() {
                     assert!(d.fully_substitute(&domain_substitutor));
                 }
             }
             Instruction::Declaration(declaration) => {
-                assert!(declaration.domain.fully_substitute(&domain_substitutor));
+                assert!(declaration
+                    .domain
+                    .get_mut()
+                    .fully_substitute(&domain_substitutor));
             }
             Instruction::Expression(expression) => {
-                assert!(expression.domain.fully_substitute(&domain_substitutor));
+                assert!(expression
+                    .domain
+                    .get_mut()
+                    .fully_substitute(&domain_substitutor));
             }
             Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
         }
@@ -107,46 +122,41 @@ fn domain_check_link_info<'l>(
             "{expected_name} != {found_name}"
         );*/
     }
-
-    errors.into_storage()
 }
 
-struct DomainCheckingContext<'l, 'instrs> {
-    linker: &'l Linker,
-    errors: ErrorCollector<'l>,
-    domain_substitutor: TypeUnifier<TypeSubstitutor<DomainType>>,
-    instructions: IndexExcept<'instrs, FlatID, Instruction, FlatAlloc<Instruction, FlatIDMarker>>,
-}
-
-impl<'l, 'instrs> DomainCheckingContext<'l, 'instrs> {
-    fn check_instr(&mut self, instr: &mut Instruction) {
+impl<'l> DomainCheckingContext<'l> {
+    fn check_instr(&mut self, instr: &Instruction) {
         match instr {
             Instruction::SubModule(sub_module_instance) => {
-                sub_module_instance.local_interface_domains = self.linker.modules
-                    [sub_module_instance.module_ref.id]
-                    .domains
-                    .map(|_| self.domain_substitutor.alloc_unknown());
+                sub_module_instance
+                    .local_interface_domains
+                    .set(
+                        self.linker.modules[sub_module_instance.module_ref.id]
+                            .domains
+                            .map(|_| self.domain_substitutor.alloc_unknown()),
+                    )
+                    .unwrap();
             }
             Instruction::Declaration(declaration) => {
                 self.written_type_must_be_generative(&declaration.typ_expr);
-                declaration.domain = match declaration.identifier_type {
+                declaration.domain.set(match declaration.identifier_type {
                     IdentifierType::Local | IdentifierType::State => match declaration.decl_kind {
                         DeclarationKind::RegularPort { domain, .. } => DomainType::Physical(domain),
                         _ => self.domain_substitutor.alloc_unknown(),
                     },
                     IdentifierType::Generative => DomainType::Generative,
-                };
+                });
                 if let Some(latency_spec) = declaration.latency_specifier {
                     self.must_be_generative(latency_spec, "Latency Specifier");
                 }
             }
             Instruction::Expression(expression) => {
-                let mut total_domain = match &mut expression.source {
+                let mut total_domain = match &expression.source {
                     ExpressionSource::WireRef(wire_ref) => self.get_wireref_root_domain(wire_ref),
                     ExpressionSource::FuncCall(func_call) => {
                         let sm = RemoteSubModule::make(
                             func_call.interface_reference.submodule_decl,
-                            &self.instructions,
+                            self.instructions,
                             &self.linker.modules,
                         );
                         let interface = sm.get_interface_reference(
@@ -171,11 +181,11 @@ impl<'l, 'instrs> DomainCheckingContext<'l, 'instrs> {
                     }
                 });
 
-                expression.domain = total_domain.0;
+                expression.domain.set(total_domain.0);
 
-                if let ExpressionOutput::MultiWrite(writes) = &mut expression.output {
+                if let ExpressionOutput::MultiWrite(writes) = &expression.output {
                     for wr in writes {
-                        let mut target_domain = self.get_wireref_root_domain(&mut wr.to);
+                        let mut target_domain = self.get_wireref_root_domain(&wr.to);
 
                         match wr.write_modifiers {
                             WriteModifiers::Connection { .. } => {
@@ -207,7 +217,7 @@ impl<'l, 'instrs> DomainCheckingContext<'l, 'instrs> {
                                 }
                             }
                         });
-                        let expr_domain = (expression.domain, expression.span);
+                        let expr_domain = (expression.domain.get(), expression.span);
                         if expr_domain.0 != DomainType::Generative {
                             if target_domain.0 == DomainType::Generative {
                                 self.errors.error(expr_domain.1, "Attempting to write from a non-generative value to a generative value").info_same_file(target_domain.1, "This is a generative value");
@@ -221,7 +231,10 @@ impl<'l, 'instrs> DomainCheckingContext<'l, 'instrs> {
             Instruction::IfStatement(if_statement) => {
                 let condition = self.instructions[if_statement.condition].unwrap_subexpression();
 
-                match (if_statement.is_generative, condition.domain.is_generative()) {
+                match (
+                    if_statement.is_generative,
+                    condition.domain == DomainType::Generative,
+                ) {
                     (true, false) => {
                         self.errors.error(
                             if_statement.if_keyword_span,
@@ -275,9 +288,11 @@ impl<'l, 'instrs> DomainCheckingContext<'l, 'instrs> {
     /// - Writing:
     ///     The output_typ domain should be generative when wire_ref.root is generative, or a generative value is required such as with "initial"
     ///     When wire_ref.root is not generative, it should be an unknown domain variable
-    fn get_wireref_root_domain(&mut self, wire_ref: &mut WireReference) -> (DomainType, Span) {
-        let root_domain = match &mut wire_ref.root {
-            WireReferenceRoot::LocalDecl(id) => self.instructions[*id].unwrap_declaration().domain,
+    fn get_wireref_root_domain(&mut self, wire_ref: &WireReference) -> (DomainType, Span) {
+        let root_domain = match &wire_ref.root {
+            WireReferenceRoot::LocalDecl(id) => {
+                self.instructions[*id].unwrap_declaration().domain.get()
+            }
             WireReferenceRoot::NamedConstant(global_ref) => {
                 self.global_ref_must_be_generative(global_ref);
                 DomainType::Generative
@@ -285,7 +300,7 @@ impl<'l, 'instrs> DomainCheckingContext<'l, 'instrs> {
             WireReferenceRoot::SubModulePort(port_ref) => {
                 let sm = RemoteSubModule::make(
                     port_ref.submodule_decl,
-                    &self.instructions,
+                    self.instructions,
                     &self.linker.modules,
                 );
                 sm.get_port(port_ref.port).get_local_domain()
@@ -326,7 +341,7 @@ impl<'l, 'instrs> DomainCheckingContext<'l, 'instrs> {
     /// `expr_id` must point to a [SingleOutputExpression]
     fn must_be_generative(&self, expr_id: FlatID, context: &str) {
         let expr = self.instructions[expr_id].unwrap_subexpression();
-        if !expr.domain.is_generative() {
+        if expr.domain != DomainType::Generative {
             self.errors.error(
                 expr.span,
                 format!("{context} must be a compile-time expression"),
