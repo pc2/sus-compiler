@@ -1,10 +1,8 @@
-mod domain_check;
 mod flatten;
 mod initialization;
-mod lints;
 mod name_context;
 mod parser;
-mod typechecking;
+mod typecheck;
 mod walk;
 
 use crate::prelude::*;
@@ -13,14 +11,13 @@ use crate::typing::domain_type::DomainType;
 use crate::typing::ty_cell::TyCell;
 
 use std::cell::Cell;
-use std::ops::Deref;
 
 use crate::latency::port_latency_inference::PortLatencyInferenceInfo;
-pub use domain_check::domain_check_all;
 pub use flatten::flatten_all_globals;
 pub use initialization::gather_initial_file_data;
-pub use lints::perform_lints;
-pub use typechecking::typecheck_all_modules;
+pub use typecheck::domain_check::domain_check_all;
+pub use typecheck::lints::perform_lints;
+pub use typecheck::type_check::typecheck_all_modules;
 
 use crate::linker::{Documentation, LinkInfo};
 use crate::value::Value;

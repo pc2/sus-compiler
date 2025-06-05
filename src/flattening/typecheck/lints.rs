@@ -1,6 +1,6 @@
 use sus_proc_macro::get_builtin_const;
 
-use crate::flattening::typechecking::RemoteSubModule;
+use super::type_check::RemoteSubModule;
 use crate::flattening::{IdentifierType, WriteModifiers};
 use crate::linker::{IsExtern, LinkInfo, AFTER_LINTS_CP};
 use crate::prelude::*;

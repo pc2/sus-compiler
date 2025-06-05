@@ -1,6 +1,6 @@
+use super::type_check::RemoteSubModule;
 use crate::alloc::UUIDAllocator;
 use crate::errors::ErrorInfo;
-use crate::flattening::typechecking::RemoteSubModule;
 use crate::linker::AFTER_DOMAINCHECK_CP;
 use crate::prelude::*;
 use crate::typing::type_inference::{FailedUnification, TypeSubstitutor, TypeUnifier};
