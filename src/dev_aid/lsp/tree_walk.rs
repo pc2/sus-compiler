@@ -8,7 +8,6 @@ use crate::linker::{FileData, GlobalUUID, LinkInfo};
 use crate::typing::template::{
     GenerativeParameterKind, GlobalReference, Parameter, TemplateKind, TypeParameterKind,
 };
-use crate::typing::written_type::WrittenType;
 
 /// See [LocationInfo]
 #[derive(Clone, Copy, Debug)]
@@ -216,7 +215,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
         self.visit(global.name_span, LocationInfo::Global(target_name_elem));
         let target_link_info = self.linker.get_link_info(target_name_elem);
         for arg in &global.template_args {
-            if let Some(refers_to) = arg.refers_to {
+            if let Some(&refers_to) = arg.refers_to.get() {
                 self.visit(
                     arg.name_span,
                     LocationInfo::Parameter(

@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::{
     alloc::zip_eq,
     flattening::{DeclarationKind, ExpressionSource},
@@ -114,9 +116,9 @@ fn recurse_down_expression(
     match &expr.source {
         ExpressionSource::UnaryOp {
             op: UnaryOperator::Negate,
-            rank: PeanoType::Zero,
+            rank,
             right,
-        } => {
+        } if rank.deref() == &PeanoType::Zero => {
             let mut right_v = recurse_down_expression(instructions, *right, num_template_args)?;
             right_v.const_factor = -right_v.const_factor;
             for (_, v) in &mut right_v.arg_linear_factor {
@@ -126,10 +128,10 @@ fn recurse_down_expression(
         }
         ExpressionSource::BinaryOp {
             op,
-            rank: PeanoType::Zero,
+            rank,
             left,
             right,
-        } => {
+        } if rank.deref() == &PeanoType::Zero => {
             let mut left_v = recurse_down_expression(instructions, *left, num_template_args)?;
             let mut right_v = recurse_down_expression(instructions, *right, num_template_args)?;
             match op {
@@ -180,7 +182,7 @@ fn recurse_down_expression(
                 _other => None,
             }
         }
-        ExpressionSource::Constant(Value::Integer(i)) => Some(PortLatencyLinearity {
+        ExpressionSource::Literal(Value::Integer(i)) => Some(PortLatencyLinearity {
             const_factor: i.try_into().ok()?,
             arg_linear_factor: TVec::with_size(num_template_args, 0),
         }),

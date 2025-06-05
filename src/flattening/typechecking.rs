@@ -1,15 +1,15 @@
 use std::ops::Index;
 
-use crate::alloc::{zip_eq, ArenaAllocator};
+use crate::alloc::{ArenaAllocator, UUID};
 use crate::errors::{ErrorInfo, ErrorInfoObject, FileKnowingErrorInfoObject};
 use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType};
-use crate::typing::type_inference::{AbstractTypeSubstitutor, FailedUnification, Substitutor};
+use crate::typing::template::TVec;
+use crate::typing::type_inference::{AbstractTypeSubstitutor, FailedUnification};
 
 use crate::debug::SpanDebugger;
 use crate::linker::{FileData, GlobalResolver, GlobalUUID, AFTER_TYPECHECK_CP};
 
-use crate::typing::written_type::WrittenType;
 use crate::typing::{
     abstract_type::{FullTypeUnifier, BOOL_TYPE, INT_TYPE},
     template::TemplateKind,
@@ -22,7 +22,6 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
     for module_uuid in module_uuids {
         let working_on_mut = &mut linker.modules[module_uuid];
         let errs_globals = working_on_mut.link_info.take_errors_globals();
-        let type_alloc = *working_on_mut.link_info.type_variable_alloc.take().unwrap();
 
         let working_on: &Module = &linker.modules[module_uuid];
         let globals = GlobalResolver::new(linker, &working_on.link_info, errs_globals);
@@ -39,7 +38,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
             errors: &globals.errors,
             type_checker: FullTypeUnifier::new(
                 &working_on.link_info.template_parameters,
-                type_alloc,
+                AbstractTypeSubstitutor::default(),
             ),
             working_on: &working_on.link_info,
         };
@@ -75,155 +74,6 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
         }
     }
 }
-
-/*struct TypeCheckInitializationContext<'l, 'instrs> {
-    linker: &'l Linker,
-    errors: ErrorCollector<'l>,
-    type_substitutor: TypeUnifier<AbstractTypeSubstitutor>,
-    domain_substitutor: TypeUnifier<TypeSubstitutor<DomainType>>,
-    instructions: IndexExcept<'instrs, FlatID, Instruction, FlatAlloc<Instruction, FlatIDMarker>>,
-}
-
-type InstructionList<'i> =
-    IndexExcept<'i, FlatID, Instruction, FlatAlloc<Instruction, FlatIDMarker>>;
-
-fn initialize_typecheck<'l>(
-    linker: &'l Linker,
-    mut errors: ErrorCollector<'l>,
-    instructions: &mut FlatAlloc<Instruction, FlatIDMarker>,
-) -> (ErrorCollector<'l>, TypeUnifier<AbstractTypeSubstitutor>) {
-    let mut type_substitutor = TypeUnifier::default();
-    let mut domain_substitutor = TypeUnifier::default();
-
-    for (instr, instructions) in instructions.iter_mut_convenient() {
-        let mut ctx = TypeCheckInitializationContext {
-            linker,
-            errors,
-            type_substitutor,
-            domain_substitutor,
-            instructions,
-        };
-        ctx.initialize_instr(instr);
-        errors = ctx.errors;
-        type_substitutor = ctx.type_substitutor;
-        domain_substitutor = ctx.domain_substitutor;
-    }
-
-    (errors, type_substitutor)
-}
-
-impl<'l, 'instrs> TypeCheckInitializationContext<'l, 'instrs> {
-    fn initialize_instr(&mut self, instr: &mut Instruction) {
-        match instr {
-            Instruction::Declaration(declaration) => {
-                declaration.typ_expr.for_each_generative_input(&mut |id| {
-                    self.must_be_generative(id, "Type Parameter")
-                });
-
-                self.written_type_must_be_generative(&declaration.typ_expr);
-                let (inner, rank) =
-                    self.written_to_abstract_type_allow_modules(&declaration.typ_expr);
-
-                declaration.meaning = match inner {
-                    SubModuleOrWire::SubModule(submodule_info) => {
-                        let md = &self.linker.modules[submodule_info.id];
-                        SubModuleOrWire::SubModule(SubModuleDeclaration {
-                            local_interface_domains: md
-                                .domains
-                                .map(|_| self.domain_substitutor.alloc_unknown()),
-                            submodule_info,
-                        })
-                    }
-                    SubModuleOrWire::Wire(inner) => {
-                        let domain = match declaration.identifier_type {
-                            IdentifierType::Local | IdentifierType::State => {
-                                if let DeclarationKind::RegularPort { domain, .. } =
-                                    declaration.decl_kind
-                                {
-                                    DomainType::Physical(domain)
-                                } else {
-                                    self.domain_substitutor.alloc_unknown()
-                                }
-                            }
-                            IdentifierType::Generative => DomainType::Generative,
-                        };
-                        SubModuleOrWire::Wire(FullType {
-                            typ: AbstractRankedType { inner, rank },
-                            domain,
-                        })
-                    }
-                }
-            }
-            Instruction::Expression(expression) => {
-                let mut total_domain = DomainType::Generative;
-
-                let mut total_domain = match &mut expression.source {
-                    ExpressionSource::FuncCall(FuncCall {
-                        interface_reference: wire_ref,
-                        ..
-                    })
-                    | ExpressionSource::WireRef(wire_ref) => {
-                        self.initialize_wire_ref(wire_ref);
-                    }
-                    _ => DomainType::Generative,
-                };
-
-                expression.source.for_each_input_wire(&mut |id| {
-                    self.instructions[id].unwrap_subexpression().domain
-                });
-
-                total_domain.combine_with(other);
-            }
-        }
-    }
-
-    fn initialize_wire_ref(&mut self, wire_ref: &mut WireReference) {}
-
-    pub fn written_to_abstract_type(&mut self, wr_typ: &WrittenType) -> AbstractRankedType {
-        match wr_typ {
-            WrittenType::Error(_span) => self.type_substitutor.alloc_unknown(),
-            WrittenType::TemplateVariable(_span, argument_id) => {
-                AbstractInnerType::Template(*argument_id).scalar()
-            }
-            WrittenType::Named(global_reference) => {
-                AbstractInnerType::Named(global_reference.id).scalar()
-            }
-            WrittenType::Array(_span, array_content_and_size) => {
-                let (arr_content_type, _size_flat, _array_bracket_span) =
-                    array_content_and_size.deref();
-
-                let content = self.written_to_abstract_type(arr_content_type);
-
-                content.rank_up()
-            }
-        }
-    }
-    fn written_template_args_to_abstract_type(
-        &mut self,
-        link_info: &LinkInfo,
-        args: &[WrittenTemplateArg],
-    ) -> TVec<AbstractRankedType> {
-        link_info.template_parameters.map(|(template_id, param)| {
-            let found_arg = args
-                .iter()
-                .find_map(|arg| (arg.refers_to == Some(template_id)).then_some(arg));
-            match found_arg {
-                Some(WrittenTemplateArg {
-                    kind: Some(TemplateKind::Type(wr_typ)),
-                    ..
-                }) => self.written_to_abstract_type(wr_typ),
-                Some(WrittenTemplateArg {
-                    kind: Some(TemplateKind::Value(sub_expr)),
-                    ..
-                }) => self.instructions[*sub_expr]
-                    .unwrap_subexpression()
-                    .typ
-                    .clone(),
-                _ => self.type_substitutor.alloc_unknown(),
-            }
-        })
-    }
-}*/
 
 #[derive(Clone, Copy)]
 pub struct RemoteSubModule<'l> {
@@ -322,9 +172,10 @@ struct TypeCheckingContext<'l, 'errs> {
 
 impl<'l> TypeCheckingContext<'l, '_> {
     fn typecheck_wire_reference(&mut self, wire_ref: &WireReference) {
-        match &wire_ref.root {
-            WireReferenceRoot::LocalDecl(_uuid) => {
-                // When the decl was flattened, we set wire_ref.root_typ to decl.typ
+        let root_typ = match &wire_ref.root {
+            WireReferenceRoot::LocalDecl(decl_id) => {
+                let decl = self.working_on.instructions[*decl_id].unwrap_declaration();
+                decl.typ.clone()
             }
             WireReferenceRoot::NamedConstant(cst) => {
                 self.typecheck_template_global(cst);
@@ -332,16 +183,12 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 let linker_cst = &self.globals[cst.id];
                 let decl =
                     linker_cst.link_info.instructions[linker_cst.output_decl].unwrap_declaration();
-                let typ = self
-                    .type_checker
+                self.type_checker
                     .abstract_type_substitutor
                     .written_to_abstract_type_substitute_templates(
                         &decl.typ_expr,
                         &cst.template_arg_types,
-                    );
-                self.type_checker
-                    .abstract_type_substitutor
-                    .unify_must_succeed(&wire_ref.root_typ, &typ);
+                    )
             }
             WireReferenceRoot::SubModulePort(port) => {
                 let submod_port = RemoteSubModule::make(
@@ -358,16 +205,14 @@ impl<'l> TypeCheckingContext<'l, '_> {
                         )
                         .info_obj(&submod_port);
                 }
-                let submod_port_typ =
-                    submod_port.get_local_type(&mut self.type_checker.abstract_type_substitutor);
-                self.type_checker
-                    .abstract_type_substitutor
-                    .unify_must_succeed(&wire_ref.root_typ, &submod_port_typ);
-            }
-            WireReferenceRoot::Error => {}
-        }
 
-        let mut current_type_in_progress = &wire_ref.root_typ;
+                submod_port.get_local_type(&mut self.type_checker.abstract_type_substitutor)
+            }
+            WireReferenceRoot::Error => self.type_checker.abstract_type_substitutor.alloc_unknown(),
+        };
+        wire_ref.root_typ.set(root_typ);
+
+        let mut walking_typ: &AbstractRankedType = &wire_ref.root_typ;
         for p in &wire_ref.path {
             match p {
                 WireReferencePathElement::ArrayAccess {
@@ -377,7 +222,6 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 } => {
                     let idx_expr = self.working_on.instructions[*idx].unwrap_subexpression();
 
-                    let arr_span = bracket_span.outer_span();
                     self.type_checker
                         .abstract_type_substitutor
                         .unify_report_error(
@@ -387,16 +231,13 @@ impl<'l> TypeCheckingContext<'l, '_> {
                             "array index",
                         );
 
-                    self.type_checker
-                        .abstract_type_substitutor
-                        .unify_report_error(
-                            current_type_in_progress,
-                            &output_typ.clone().rank_up(),
-                            arr_span,
-                            "array access",
-                        );
+                    output_typ.set(self.type_checker.rank_down(
+                        walking_typ,
+                        bracket_span.outer_span(),
+                        "array access",
+                    ));
 
-                    current_type_in_progress = output_typ;
+                    walking_typ = output_typ;
                 }
             }
         }
@@ -409,55 +250,91 @@ impl<'l> TypeCheckingContext<'l, '_> {
         let global_obj: GlobalUUID = global_ref.id.into();
         let target_link_info = self.globals.get_link_info(global_obj);
 
-        for (_parameter_id, arg_typ, parameter) in zip_eq(
-            &global_ref.template_arg_types,
-            &target_link_info.template_parameters,
-        ) {
-            match &parameter.kind {
-                TemplateKind::Type(_) => {} // Do nothing, nothing to unify with. Maybe in the future traits?
-                TemplateKind::Value(parameter) => {
-                    let decl = target_link_info.instructions[parameter.declaration_instruction]
+        global_ref.resolve_template_args(self.errors, target_link_info);
+
+        // This iteration has to split into two parts, because we first have to set all the type
+        // parameters for use by creating the types to compare against the value parameters
+        let mut abs_types =
+            target_link_info
+                .template_parameters
+                .map(|(id, param)| match &param.kind {
+                    TemplateKind::Type(_) => {
+                        if let Some(wr_typ) = global_ref.get_type_arg_for(id) {
+                            self.typecheck_written_type(wr_typ)
+                        } else {
+                            self.type_checker.abstract_type_substitutor.alloc_unknown()
+                        }
+                    }
+                    TemplateKind::Value(_) => {
+                        AbstractRankedType {
+                            // Will immediately get overwritten
+                            inner: AbstractInnerType::Unknown(UUID::PLACEHOLDER),
+                            rank: PeanoType::Unknown(UUID::PLACEHOLDER),
+                        }
+                    }
+                });
+
+        for (id, param) in &target_link_info.template_parameters {
+            match &param.kind {
+                TemplateKind::Type(_) => {}
+                TemplateKind::Value(v) => {
+                    let target_decl = target_link_info.instructions[v.declaration_instruction]
                         .unwrap_declaration();
 
                     let param_required_typ = self
                         .type_checker
                         .abstract_type_substitutor
                         .written_to_abstract_type_substitute_templates(
-                            &decl.typ_expr,
-                            &global_ref.template_arg_types, // Yes that's right. We already must substitute the templates for type variables here
+                            &target_decl.typ_expr,
+                            &abs_types, // We substitute the templates for type variables here
                         );
 
-                    self.type_checker
-                        .abstract_type_substitutor
-                        .unify_must_succeed(arg_typ, &param_required_typ);
+                    if let Some(from_expr) = global_ref.get_value_arg_for(id) {
+                        let from_expr =
+                            self.working_on.instructions[from_expr].unwrap_subexpression();
+
+                        self.type_checker
+                            .abstract_type_substitutor
+                            .unify_report_error(
+                                from_expr.typ,
+                                &param_required_typ,
+                                from_expr.span,
+                                "Template argument",
+                            );
+                    }
+                    abs_types[id] = param_required_typ;
                 }
             }
         }
+
+        global_ref.template_arg_types.set(abs_types);
     }
 
-    /// Critically, this is different from [TypeUnifier::unify_with_written_type].
-    /// That one unifies a given typ with the written type, without checking the written type.
-    ///
-    /// This function checks the written type itself.
-    fn typecheck_written_type(&mut self, wr_typ: &WrittenType) {
+    fn typecheck_written_type(&mut self, wr_typ: &WrittenType) -> AbstractRankedType {
         match wr_typ {
-            WrittenType::Error(_) => {}
-            WrittenType::TemplateVariable(_, _) => {}
+            WrittenType::Error(_) => self.type_checker.abstract_type_substitutor.alloc_unknown(),
+            WrittenType::TemplateVariable(_, var) => AbstractInnerType::Template(*var).scalar(),
             WrittenType::Named(global_ref) => {
                 self.typecheck_template_global(global_ref);
+
+                AbstractInnerType::Named(global_ref.id).scalar()
             }
             WrittenType::Array(_, arr_box) => {
                 let (content_typ, arr_idx, _bracket_span) = arr_box.deref();
 
-                self.typecheck_written_type(content_typ);
+                let content_typ = self.typecheck_written_type(content_typ);
 
                 let idx_expr = self.working_on.instructions[*arr_idx].unwrap_subexpression();
-                self.type_checker.unify_write_to_abstract(
-                    idx_expr.typ,
-                    &INT_TYPE.scalar(),
-                    idx_expr.span,
-                    "array size",
-                );
+                self.type_checker
+                    .abstract_type_substitutor
+                    .unify_report_error(
+                        idx_expr.typ,
+                        &INT_TYPE.scalar(),
+                        idx_expr.span,
+                        "array size",
+                    );
+
+                content_typ.rank_up()
             }
         }
     }
@@ -466,12 +343,14 @@ impl<'l> TypeCheckingContext<'l, '_> {
         if let Some(latency_spec) = lat_spec {
             let latency_specifier_expr =
                 self.working_on.instructions[latency_spec].unwrap_subexpression();
-            self.type_checker.unify_write_to_abstract(
-                latency_specifier_expr.typ,
-                &INT_TYPE.scalar(),
-                latency_specifier_expr.span,
-                "latency specifier",
-            );
+            self.type_checker
+                .abstract_type_substitutor
+                .unify_report_error(
+                    latency_specifier_expr.typ,
+                    &INT_TYPE.scalar(),
+                    latency_specifier_expr.span,
+                    "latency specifier",
+                );
         }
     }
 
@@ -549,7 +428,8 @@ impl<'l> TypeCheckingContext<'l, '_> {
             let from = self.working_on.instructions[*arg].unwrap_subexpression();
 
             self.type_checker
-                .unify_write_to_abstract(from.typ, &port_type, from.span, || {
+                .abstract_type_substitutor
+                .unify_report_error(from.typ, &port_type, from.span, || {
                     ("function argument".to_string(), vec![port_decl.make_info()])
                 });
         }
@@ -557,29 +437,21 @@ impl<'l> TypeCheckingContext<'l, '_> {
         interface
     }
 
-    fn typecheck_single_output_expr(&mut self, expr: SingleOutputExpression) {
-        match expr.source {
+    fn typecheck_single_output_expr(&mut self, expr: &Expression) -> AbstractRankedType {
+        match &expr.source {
             ExpressionSource::WireRef(wire_ref) => {
                 self.typecheck_wire_reference(wire_ref);
-
-                self.type_checker
-                    .abstract_type_substitutor
-                    .unify_report_error(
-                        expr.typ,
-                        wire_ref.get_output_typ(),
-                        expr.span,
-                        "reading from wire reference",
-                    );
+                wire_ref.get_output_typ().clone()
             }
             ExpressionSource::UnaryOp { op, rank, right } => {
                 let right_expr = self.working_on.instructions[*right].unwrap_subexpression();
-                self.type_checker.typecheck_unary_operator_abstr(
+                let out_typ = self.type_checker.typecheck_unary_operator_abstr(
                     *op,
-                    rank,
                     right_expr.typ,
                     right_expr.span,
-                    expr.typ,
                 );
+                rank.set(out_typ.rank.clone());
+                out_typ
             }
             ExpressionSource::BinaryOp {
                 op,
@@ -589,17 +461,15 @@ impl<'l> TypeCheckingContext<'l, '_> {
             } => {
                 let left_expr = self.working_on.instructions[*left].unwrap_subexpression();
                 let right_expr = self.working_on.instructions[*right].unwrap_subexpression();
-                {
-                    self.type_checker.typecheck_binary_operator_abstr(
-                        *op,
-                        rank,
-                        left_expr.typ,
-                        right_expr.typ,
-                        left_expr.span,
-                        right_expr.span,
-                        expr.typ,
-                    );
-                }
+                let out_typ = self.type_checker.typecheck_binary_operator_abstr(
+                    *op,
+                    left_expr.typ,
+                    right_expr.typ,
+                    left_expr.span,
+                    right_expr.span,
+                );
+                rank.set(out_typ.rank.clone());
+                out_typ
             }
             ExpressionSource::FuncCall(func_call) => {
                 let interface = self.typecheck_func_call(func_call);
@@ -613,40 +483,46 @@ impl<'l> TypeCheckingContext<'l, '_> {
 
                 if let Some(first_output) = interface.interface.func_call_outputs.first() {
                     let port_decl = interface.get_port(first_output);
-                    let port_type =
-                        port_decl.get_local_type(&mut self.type_checker.abstract_type_substitutor);
 
-                    self.type_checker.unify_write_to_abstract(
-                        expr.typ,
-                        &port_type,
-                        expr.span,
-                        "function call as expression",
-                    );
+                    port_decl.get_local_type(&mut self.type_checker.abstract_type_substitutor)
+                } else {
+                    self.type_checker.abstract_type_substitutor.alloc_unknown()
                 }
             }
-            ExpressionSource::Constant(value) => {
-                let var_typ = AbstractRankedType {
-                    inner: AbstractInnerType::Named(value.get_type_id()),
-                    rank: PeanoType::Zero,
-                };
-                self.type_checker
-                    .unify_write_to_abstract(expr.typ, &var_typ, expr.span, "Constant");
-            }
+            ExpressionSource::Literal(value) => AbstractRankedType {
+                inner: AbstractInnerType::Named(value.get_type_id()),
+                rank: PeanoType::Zero,
+            },
             ExpressionSource::ArrayConstruct(arr) => {
-                for elem_id in arr {
-                    let elem_expr = self.working_on.instructions[*elem_id].unwrap_subexpression();
+                let mut arr_iter = arr.iter();
+                let arr_elem_typ = if let Some(first_elem) = arr_iter.next() {
+                    let first_elem_expr =
+                        self.working_on.instructions[*first_elem].unwrap_subexpression();
+                    let elem_typ = first_elem_expr.typ.clone();
 
-                    self.type_checker
-                        .abstract_type_substitutor
-                        .unify_report_error(
-                            expr.typ,
-                            &elem_expr.typ.clone().rank_up(),
-                            elem_expr.span,
-                            "array access",
-                        );
-                }
+                    for elem_id in arr_iter {
+                        let elem_expr =
+                            self.working_on.instructions[*elem_id].unwrap_subexpression();
+
+                        self.type_checker
+                            .abstract_type_substitutor
+                            .unify_report_error(elem_expr.typ, &elem_typ, elem_expr.span, || {
+                                let first_elem_info = ErrorInfo {
+                                    position: first_elem_expr.span,
+                                    file: self.errors.file,
+                                    info: "First array element defined here".to_owned(),
+                                };
+                                ("array construction types".to_owned(), vec![first_elem_info])
+                            });
+                    }
+
+                    elem_typ
+                } else {
+                    self.type_checker.abstract_type_substitutor.alloc_unknown()
+                };
+                arr_elem_typ.rank_up()
             }
-        };
+        }
     }
     fn typecheck_multi_output_expr(&mut self, expr: &Expression, multi_write: &[WriteTo]) {
         for wr in multi_write {
@@ -669,35 +545,28 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     let port_type =
                         port_decl.get_local_type(&mut self.type_checker.abstract_type_substitutor);
 
-                    self.type_checker.unify_write_to_abstract(
-                        to.to.get_output_typ(),
-                        &port_type,
-                        to.to_span,
-                        || ("function output".to_string(), vec![port_decl.make_info()]),
-                    );
+                    self.type_checker
+                        .abstract_type_substitutor
+                        .unify_report_error(to.to.get_output_typ(), &port_type, to.to_span, || {
+                            ("function output".to_string(), vec![port_decl.make_info()])
+                        });
                 }
             }
             ExpressionSource::WireRef(..)
             | ExpressionSource::UnaryOp { .. }
             | ExpressionSource::BinaryOp { .. }
             | ExpressionSource::ArrayConstruct(..)
-            | ExpressionSource::Constant(..) => {
+            | ExpressionSource::Literal(..) => {
+                let expr_out_typ = self.typecheck_single_output_expr(expr);
                 if let Some(first_write) = multi_write.first() {
-                    self.typecheck_single_output_expr(SingleOutputExpression {
-                        typ: first_write.to.get_output_typ(),
-                        domain: expr.domain.get(),
-                        span: expr.span,
-                        source: &expr.source,
-                    });
-                } else {
-                    let sentinel = self.type_checker.abstract_type_substitutor.alloc_unknown();
-
-                    self.typecheck_single_output_expr(SingleOutputExpression {
-                        typ: &sentinel,
-                        domain: expr.domain.get(),
-                        span: expr.span,
-                        source: &expr.source,
-                    });
+                    self.type_checker
+                        .abstract_type_substitutor
+                        .unify_report_error(
+                            &expr_out_typ,
+                            first_write.to.get_output_typ(),
+                            first_write.to_span,
+                            "writing the output of this expression",
+                        );
                 }
 
                 // Don't output errors for 0 outputs. See no errors on zero outputs (#79)
@@ -722,44 +591,35 @@ impl<'l> TypeCheckingContext<'l, '_> {
             Instruction::Declaration(decl) => {
                 self.typecheck_visit_latency_specifier(decl.latency_specifier);
 
-                self.typecheck_written_type(&decl.typ_expr);
+                decl.typ.set(self.typecheck_written_type(&decl.typ_expr));
             }
             Instruction::IfStatement(stm) => {
                 let condition_expr =
                     &self.working_on.instructions[stm.condition].unwrap_subexpression();
-                self.type_checker.unify_write_to_abstract(
-                    condition_expr.typ,
-                    &BOOL_TYPE.scalar(),
-                    condition_expr.span,
-                    "if statement condition",
-                );
+                self.type_checker
+                    .abstract_type_substitutor
+                    .unify_report_error(
+                        condition_expr.typ,
+                        &BOOL_TYPE.scalar(),
+                        condition_expr.span,
+                        "if statement condition",
+                    );
             }
             Instruction::ForStatement(stm) => {
                 let loop_var = self.working_on.instructions[stm.loop_var_decl].unwrap_declaration();
                 let start = self.working_on.instructions[stm.start].unwrap_subexpression();
                 let end = self.working_on.instructions[stm.end].unwrap_subexpression();
 
-                self.type_checker.unify_write_to_abstract(
-                    start.typ,
-                    &loop_var.typ,
-                    start.span,
-                    "for loop start",
-                );
-                self.type_checker.unify_write_to_abstract(
-                    end.typ,
-                    &loop_var.typ,
-                    end.span,
-                    "for loop end",
-                );
+                self.type_checker
+                    .abstract_type_substitutor
+                    .unify_report_error(start.typ, &loop_var.typ, start.span, "for loop start");
+                self.type_checker
+                    .abstract_type_substitutor
+                    .unify_report_error(end.typ, &loop_var.typ, end.span, "for loop end");
             }
             Instruction::Expression(expr) => match &expr.output {
                 ExpressionOutput::SubExpression(typ) => {
-                    self.typecheck_single_output_expr(SingleOutputExpression {
-                        typ,
-                        domain: expr.domain.get(),
-                        span: expr.span,
-                        source: &expr.source,
-                    });
+                    typ.set(self.typecheck_single_output_expr(expr));
                 }
                 ExpressionOutput::MultiWrite(write_tos) => {
                     self.typecheck_multi_output_expr(expr, write_tos);
@@ -772,6 +632,40 @@ impl<'l> TypeCheckingContext<'l, '_> {
     fn typecheck(&mut self) {
         for elem_id in self.working_on.instructions.id_range() {
             self.typecheck_visit_instruction(elem_id);
+        }
+    }
+}
+
+impl AbstractTypeSubstitutor {
+    /// This should always be what happens first to a given variable.
+    ///
+    /// Therefore it should be impossible that one of the internal unifications ever fails
+    ///
+    /// template_type_args applies to both Template Type args and Template Value args.
+    ///
+    /// For Types this is the Type, for Values this is unified with the parameter declaration type
+    pub fn written_to_abstract_type_substitute_templates(
+        &mut self,
+        wr_typ: &WrittenType,
+        template_args: &TVec<AbstractRankedType>,
+    ) -> AbstractRankedType {
+        match wr_typ {
+            WrittenType::Error(_span) => self.alloc_unknown(),
+            WrittenType::TemplateVariable(_span, argument_id) => {
+                template_args[*argument_id].clone()
+            }
+            WrittenType::Named(global_reference) => {
+                AbstractInnerType::Named(global_reference.id).scalar()
+            }
+            WrittenType::Array(_span, array_content_and_size) => {
+                let (arr_content_type, _size_flat, _array_bracket_span) =
+                    array_content_and_size.deref();
+
+                let content_typ = self
+                    .written_to_abstract_type_substitute_templates(arr_content_type, template_args);
+
+                content_typ.rank_up()
+            }
         }
     }
 }
@@ -792,7 +686,7 @@ impl FinalizationContext<'_, '_> {
                 Instruction::Expression(expr) => {
                     match &mut expr.output {
                         ExpressionOutput::SubExpression(expr_typ) => {
-                            self.finalize_abstract_type(expr_typ, expr.span);
+                            self.finalize_abstract_type(expr_typ.get_mut(), expr.span);
                         }
                         ExpressionOutput::MultiWrite(write_tos) => {
                             for wr in write_tos {
@@ -806,7 +700,7 @@ impl FinalizationContext<'_, '_> {
                         }
                         ExpressionSource::UnaryOp { rank, .. }
                         | ExpressionSource::BinaryOp { rank, .. } => {
-                            let _ = rank.fully_substitute(
+                            let _ = rank.get_mut().fully_substitute(
                                 &self.type_checker.abstract_type_substitutor.rank_substitutor,
                             ); // No need to report incomplete peano error, as one of the ports would have reported it
                         }
@@ -814,7 +708,7 @@ impl FinalizationContext<'_, '_> {
                     }
                 }
                 Instruction::Declaration(decl) => {
-                    self.finalize_abstract_type(&mut decl.typ, decl.name_span)
+                    self.finalize_abstract_type(decl.typ.get_mut(), decl.name_span)
                 }
                 // TODO Submodule domains may not be crossed either?
                 Instruction::SubModule(sm) => {
@@ -865,16 +759,12 @@ impl FinalizationContext<'_, '_> {
                     typ.display(self.linker_types, &self.type_checker.template_type_names)
                 ),
             );
-
-            if crate::debug::is_enabled("TEST") {
-                println!("COULD_NOT_FULLY_FIGURE_OUT")
-            }
         }
     }
 
     pub fn finalize_global_ref<ID>(&self, global_ref: &mut GlobalReference<ID>) {
         let global_ref_span = global_ref.get_total_span();
-        for (_template_id, arg) in &mut global_ref.template_arg_types {
+        for (_template_id, arg) in global_ref.template_arg_types.get_mut() {
             self.finalize_abstract_type(arg, global_ref_span);
         }
     }
@@ -883,7 +773,7 @@ impl FinalizationContext<'_, '_> {
         if let WireReferenceRoot::NamedConstant(cst) = &mut wire_ref.root {
             self.finalize_global_ref(cst);
         }
-        self.finalize_abstract_type(&mut wire_ref.root_typ, wire_ref.root_span);
+        self.finalize_abstract_type(wire_ref.root_typ.get_mut(), wire_ref.root_span);
         for path_elem in &mut wire_ref.path {
             match path_elem {
                 WireReferencePathElement::ArrayAccess {
@@ -891,7 +781,7 @@ impl FinalizationContext<'_, '_> {
                     bracket_span,
                     ..
                 } => {
-                    self.finalize_abstract_type(output_typ, bracket_span.outer_span());
+                    self.finalize_abstract_type(output_typ.get_mut(), bracket_span.outer_span());
                 }
             }
         }

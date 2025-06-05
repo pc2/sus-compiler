@@ -1,6 +1,6 @@
-use crate::typing::{
-    template::{GlobalReference, TemplateKind},
-    written_type::WrittenType,
+use crate::{
+    flattening::WrittenType,
+    typing::template::{GlobalReference, TemplateKind},
 };
 
 use super::{ExpressionSource, WireReference, WireReferencePathElement, WireReferenceRoot};
@@ -48,7 +48,7 @@ impl ExpressionSource {
                     collect(*arg)
                 }
             }
-            ExpressionSource::Constant(_) => {}
+            ExpressionSource::Literal(_) => {}
             ExpressionSource::ArrayConstruct(arr) => {
                 for v in arr {
                     collect(*v);

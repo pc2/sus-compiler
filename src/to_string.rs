@@ -6,10 +6,11 @@ use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg}
 use crate::typing::domain_type::DomainType;
 use crate::typing::set_unifier::Unifyable;
 use crate::typing::template::{Parameter, TVec, TemplateKind};
-use crate::typing::written_type::WrittenType;
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
-use crate::flattening::{DomainInfo, Interface, InterfaceToDomainMap, Module, StructType};
+use crate::flattening::{
+    DomainInfo, Interface, InterfaceToDomainMap, Module, StructType, WrittenType,
+};
 use crate::linker::{FileData, GlobalUUID, LinkInfo};
 use crate::typing::{abstract_type::AbstractRankedType, concrete_type::ConcreteType};
 

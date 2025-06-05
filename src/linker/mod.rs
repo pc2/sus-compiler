@@ -2,10 +2,7 @@ use crate::{
     flattening::{Instruction, NamedConstant},
     instantiation::instantiation_cache::Instantiator,
     prelude::*,
-    typing::{
-        template::{GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind},
-        type_inference::AbstractTypeSubstitutor,
-    },
+    typing::template::{GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind},
 };
 
 pub mod checkpoint;
@@ -97,13 +94,6 @@ pub struct LinkInfo {
     pub errors: ErrorStore,
     pub resolved_globals: ResolvedGlobals,
     pub is_extern: IsExtern,
-
-    /// Created in Stage 2: Flattening
-    ///
-    /// Removed in Stage 3: Typechecking
-    ///
-    /// Is only temporary. It's used during typechecking to allocate the type unification block
-    pub type_variable_alloc: Option<Box<AbstractTypeSubstitutor>>,
 
     pub template_parameters: TVec<Parameter>,
 

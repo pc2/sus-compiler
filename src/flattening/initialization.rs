@@ -349,7 +349,6 @@ fn initialize_global_object(
     let (name_span, name) = ctx.gather_initial_global_object(cursor);
 
     let mut link_info = LinkInfo {
-        type_variable_alloc: None,
         template_parameters: ctx.parameters,
         instructions: FlatAlloc::new(),
         documentation: cursor.extract_gathered_comments(),

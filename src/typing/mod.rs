@@ -6,4 +6,3 @@ pub mod template;
 pub mod ty_cell;
 pub mod type_inference;
 pub mod value_unifier;
-pub mod written_type;

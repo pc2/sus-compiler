@@ -14,9 +14,8 @@ use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType};
 use crate::typing::concrete_type::ConcreteTemplateArg;
 use crate::typing::domain_type::DomainType;
+use crate::typing::template::GlobalReference;
 use crate::typing::template::TVec;
-use crate::typing::template::{get_type_arg_for, get_value_arg_for, GlobalReference};
-use crate::typing::written_type::WrittenType;
 use crate::util::{unwrap_single_element, zip_eq};
 
 use ibig::{IBig, UBig};
@@ -321,7 +320,7 @@ impl Concretizer for SubModuleTypeConcretizer<'_, '_> {
                     .unwrap_value()
                     .clone()
             }
-            ExpressionSource::Constant(cst) => cst.clone().into(),
+            ExpressionSource::Literal(cst) => cst.clone().into(),
             _ => self.type_substitutor.alloc_unknown(),
         })
     }
@@ -342,7 +341,7 @@ fn concretize_global_ref<ID: Copy + Into<GlobalUUID>>(
         |(param_id, param, abs_typ)| -> ExecutionResult<ConcreteTemplateArg> {
             Ok(match &param.kind {
                 TemplateKind::Type(_) => {
-                    let wr_typ = get_type_arg_for(&global_ref.template_args, param_id);
+                    let wr_typ = global_ref.get_type_arg_for(param_id);
                     TemplateKind::Type(concretize_type_recurse(
                         linker,
                         &abs_typ.inner,
@@ -351,13 +350,13 @@ fn concretize_global_ref<ID: Copy + Into<GlobalUUID>>(
                         concretizer,
                     )?)
                 }
-                TemplateKind::Value(_) => TemplateKind::Value(
-                    if let Some(v) = get_value_arg_for(&global_ref.template_args, param_id) {
+                TemplateKind::Value(_) => {
+                    TemplateKind::Value(if let Some(v) = global_ref.get_value_arg_for(param_id) {
                         concretizer.get_value(v)?
                     } else {
                         concretizer.alloc_unknown()
-                    },
-                ),
+                    })
+                }
             })
         },
     )?;
@@ -1080,7 +1079,7 @@ impl<'l> ExecutionContext<'l> {
                 }
                 RealWireDataSource::ConstructArray { array_wires }
             }
-            ExpressionSource::Constant(_) => {
+            ExpressionSource::Literal(_) => {
                 unreachable!("Constant cannot be non-compile-time");
             }
         };
@@ -1262,7 +1261,7 @@ impl<'l> ExecutionContext<'l> {
                 }
                 Value::Array(result)
             }
-            ExpressionSource::Constant(value) => value.clone(),
+            ExpressionSource::Literal(value) => value.clone(),
         })
     }
 

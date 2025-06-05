@@ -426,13 +426,6 @@ impl HindleyMilner for DomainType {
 pub trait Substitutor {
     type MyType: Clone + Debug;
     fn unify_total(&mut self, from: &Self::MyType, to: &Self::MyType) -> UnifyResult;
-
-    fn unify_must_succeed(&mut self, a: &Self::MyType, b: &Self::MyType) {
-        assert!(
-            self.unify_total(a, b) == UnifyResult::Success,
-            "This unification cannot fail. Usually because we're unifying with a Written Type: {a:?} <-> {b:?}"
-        );
-    }
 }
 
 impl Substitutor for TypeSubstitutor<DomainType> {

@@ -11,7 +11,6 @@ use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractRankedType, PeanoType};
 use crate::typing::domain_type::DomainType;
 use crate::typing::ty_cell::TyCell;
-use crate::typing::written_type::WrittenType;
 
 use std::cell::Cell;
 use std::ops::Deref;
@@ -301,12 +300,12 @@ impl Interface {
 /// An element in a [WireReference] path. Could be array accesses, slice accesses, field accesses, etc
 ///
 /// When executing, this turns into [crate::instantiation::RealWirePathElem]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum WireReferencePathElement {
     ArrayAccess {
         idx: FlatID,
         bracket_span: BracketSpan,
-        output_typ: AbstractRankedType,
+        output_typ: TyCell<AbstractRankedType>,
     },
 }
 
@@ -364,7 +363,7 @@ impl WireReferenceRoot {
 pub struct WireReference {
     pub root: WireReferenceRoot,
     pub path: Vec<WireReferencePathElement>,
-    pub root_typ: AbstractRankedType,
+    pub root_typ: TyCell<AbstractRankedType>,
     pub root_span: Span,
 }
 
@@ -493,18 +492,18 @@ pub enum ExpressionSource {
     UnaryOp {
         op: UnaryOperator,
         /// Operators automatically parallelize across arrays
-        rank: PeanoType,
+        rank: TyCell<PeanoType>,
         right: FlatID,
     },
     BinaryOp {
         op: BinaryOperator,
         /// Operators automatically parallelize across arrays
-        rank: PeanoType,
+        rank: TyCell<PeanoType>,
         left: FlatID,
         right: FlatID,
     },
     ArrayConstruct(Vec<FlatID>),
-    Constant(Value),
+    Literal(Value),
 }
 /// [FuncCall]s (and potentially, in the future, other things) can have multiple outputs.
 /// We make the distinction between [SubExpression] that can only represent one output, and [MultiWrite], which can represent multiple outputs.
@@ -515,7 +514,7 @@ pub enum ExpressionSource {
 /// - We refuse to have tuple types
 #[derive(Debug)]
 pub enum ExpressionOutput {
-    SubExpression(AbstractRankedType),
+    SubExpression(TyCell<AbstractRankedType>),
     MultiWrite(Vec<WriteTo>),
 }
 /// An [Instruction] that represents a single expression in the program. Like ((3) + (x))
@@ -609,7 +608,7 @@ impl DeclarationKind {
 pub struct Declaration {
     pub parent_condition: Option<ParentCondition>,
     pub typ_expr: WrittenType,
-    pub typ: AbstractRankedType,
+    pub typ: TyCell<AbstractRankedType>,
     pub domain: Cell<DomainType>,
     pub decl_span: Span,
     pub name_span: Span,
@@ -727,6 +726,29 @@ pub struct FuncCall {
 impl FuncCall {
     pub fn could_be_at_compile_time(&self) -> bool {
         todo!("self.name_span.is_none() but also other requirements, like if the module is a function")
+    }
+}
+
+/// The textual representation of a type expression in the source code.
+///
+/// Not to be confused with [crate::typing::abstract_type::AbstractType] which is for working with types in the flattening stage,
+/// or [crate::typing::concrete_type::ConcreteType], which is for working with types post instantiation.
+#[derive(Debug)]
+pub enum WrittenType {
+    Error(Span),
+    TemplateVariable(Span, TemplateID),
+    Named(GlobalReference<TypeUUID>),
+    Array(Span, Box<(WrittenType, FlatID, BracketSpan)>),
+}
+
+impl WrittenType {
+    pub fn get_span(&self) -> Span {
+        match self {
+            WrittenType::Error(total_span)
+            | WrittenType::TemplateVariable(total_span, ..)
+            | WrittenType::Array(total_span, _) => *total_span,
+            WrittenType::Named(global_ref) => global_ref.get_total_span(),
+        }
     }
 }
 

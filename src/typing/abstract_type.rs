@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use sus_proc_macro::get_builtin_type;
 
 use crate::prelude::*;
@@ -106,41 +108,59 @@ impl FullTypeUnifier {
         }
     }
 
+    /// Returns the type of the content of the array
+    pub fn rank_down<Report: UnifyErrorReport>(
+        &mut self,
+        arr_typ: &AbstractRankedType,
+        span: Span,
+        context: Report,
+    ) -> AbstractRankedType {
+        if let PeanoType::Succ(content_rank) = &arr_typ.rank {
+            AbstractRankedType {
+                inner: arr_typ.inner.clone(),
+                rank: content_rank.deref().clone(),
+            }
+        } else {
+            let content_rank = self
+                .abstract_type_substitutor
+                .rank_substitutor
+                .alloc_unknown();
+            let mut content_typ = AbstractRankedType {
+                inner: arr_typ.inner.clone(),
+                rank: PeanoType::Succ(Box::new(content_rank.clone())),
+            };
+            self.abstract_type_substitutor
+                .unify_report_error(arr_typ, &content_typ, span, context);
+            content_typ.rank = content_rank;
+            content_typ
+        }
+    }
+
+    /// Returns the output type. It happens that the operator rank is the output type's rank
     pub fn typecheck_unary_operator_abstr(
         &mut self,
         op: UnaryOperator,
-        op_rank: &PeanoType,
         input_typ: &AbstractRankedType,
         span: Span,
-        output_typ: &AbstractRankedType,
-    ) {
+    ) -> AbstractRankedType {
+        let input_rank = input_typ.rank.clone();
         if op == UnaryOperator::Not {
             self.abstract_type_substitutor.unify_report_error(
                 input_typ,
-                &BOOL_TYPE.with_rank(op_rank.clone()),
+                &BOOL_TYPE.with_rank(input_rank.clone()),
                 span,
                 "! input",
             );
 
-            self.abstract_type_substitutor.unify_report_error(
-                output_typ,
-                &BOOL_TYPE.with_rank(op_rank.clone()),
-                span,
-                "! output",
-            );
+            BOOL_TYPE.with_rank(input_rank)
         } else if op == UnaryOperator::Negate {
             self.abstract_type_substitutor.unify_report_error(
                 input_typ,
-                &INT_TYPE.with_rank(op_rank.clone()),
+                &INT_TYPE.with_rank(input_rank.clone()),
                 span,
                 "unary - input",
             );
-            self.abstract_type_substitutor.unify_report_error(
-                output_typ,
-                &INT_TYPE.with_rank(op_rank.clone()),
-                span,
-                "unary - output",
-            );
+            INT_TYPE.with_rank(input_rank)
         } else {
             let reduction_type = match op {
                 UnaryOperator::And => BOOL_TYPE,
@@ -150,36 +170,25 @@ impl FullTypeUnifier {
                 UnaryOperator::Product => INT_TYPE,
                 _ => unreachable!(),
             };
+            let reduction_type = reduction_type.with_rank(input_rank.clone());
             self.abstract_type_substitutor.unify_report_error(
-                output_typ,
-                &reduction_type.with_rank(op_rank.clone()),
+                input_typ,
+                &reduction_type,
                 span,
                 "array reduction",
             );
-            {
-                let this = &mut *self;
-                let output_typ = output_typ.clone();
-                this.abstract_type_substitutor.unify_report_error(
-                    input_typ,
-                    &output_typ.rank_up(),
-                    span,
-                    "array access",
-                );
-            };
+            self.rank_down(&reduction_type, span, "array reduction")
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn typecheck_binary_operator_abstr(
         &mut self,
         op: BinaryOperator,
-        op_rank: &PeanoType,
         left_typ: &AbstractRankedType,
         right_typ: &AbstractRankedType,
         left_span: Span,
         right_span: Span,
-        output_typ: &AbstractRankedType,
-    ) {
+    ) -> AbstractRankedType {
         let (exp_left, exp_right, out_typ) = match op {
             BinaryOperator::And => (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
             BinaryOperator::Or => (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
@@ -196,9 +205,10 @@ impl FullTypeUnifier {
             BinaryOperator::LesserEq => (INT_TYPE, INT_TYPE, BOOL_TYPE),
             BinaryOperator::Lesser => (INT_TYPE, INT_TYPE, BOOL_TYPE),
         };
-        let exp_left = exp_left.with_rank(op_rank.clone());
-        let exp_right = exp_right.with_rank(op_rank.clone());
-        let out_typ = out_typ.with_rank(op_rank.clone());
+        let input_rank = left_typ.rank.clone();
+        let exp_left = exp_left.with_rank(input_rank.clone());
+        let exp_right = exp_right.with_rank(input_rank.clone());
+        let out_typ = out_typ.with_rank(input_rank.clone());
 
         self.abstract_type_substitutor.unify_report_error(
             left_typ,
@@ -212,23 +222,6 @@ impl FullTypeUnifier {
             right_span,
             "binop right side",
         );
-
-        self.abstract_type_substitutor.unify_report_error(
-            output_typ,
-            &out_typ,
-            Span::new_overarching(left_span, right_span),
-            "binop output",
-        );
-    }
-
-    pub fn unify_write_to_abstract<Context: UnifyErrorReport>(
-        &mut self,
-        found: &AbstractRankedType,
-        expected: &AbstractRankedType,
-        span: Span,
-        context: Context,
-    ) {
-        self.abstract_type_substitutor
-            .unify_report_error(found, expected, span, context);
+        out_typ
     }
 }
