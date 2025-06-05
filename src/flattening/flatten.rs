@@ -325,10 +325,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 self.errors.todo(name_path[1], "Namespaces");
                 return LocalOrGlobal::NotFound(name_path[0]);
             };
-            if let Some(global_id) = self
-                .globals
-                .resolve_global(name_span, &cursor.file_data.file_text[name_span])
-            {
+            if let Some(global_id) = self.globals.resolve_global(
+                name_span,
+                &cursor.file_data.file_text[name_span],
+                self.errors,
+            ) {
                 match global_id {
                     GlobalUUID::Module(id) => LocalOrGlobal::Module(GlobalReference {
                         id,
@@ -431,13 +432,19 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         ModuleOrWrittenType::Module(module_ref)
                     }
                     LocalOrGlobal::Module(module_ref) => {
-                        self.globals
-                            .not_expected_global_error(&module_ref, accepted_text);
+                        self.globals.not_expected_global_error(
+                            &module_ref,
+                            accepted_text,
+                            self.errors,
+                        );
                         ModuleOrWrittenType::WrittenType(WrittenType::Error(module_ref.name_span))
                     }
                     LocalOrGlobal::Constant(constant_ref) => {
-                        self.globals
-                            .not_expected_global_error(&constant_ref, accepted_text);
+                        self.globals.not_expected_global_error(
+                            &constant_ref,
+                            accepted_text,
+                            self.errors,
+                        );
                         ModuleOrWrittenType::WrittenType(WrittenType::Error(constant_ref.name_span))
                     }
                     LocalOrGlobal::NotFound(name_span) => {
@@ -961,7 +968,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 LocalOrGlobal::Module(md_ref) => PartialWireReference::GlobalModuleName(md_ref),
                 LocalOrGlobal::Type(type_ref) => {
                     self.globals
-                        .not_expected_global_error(&type_ref, "named wire: local or constant");
+                        .not_expected_global_error(&type_ref, "named wire: local or constant", self.errors);
                     PartialWireReference::WireReference(self.new_error(expr_span))
                 }
                 LocalOrGlobal::NotFound(_) => PartialWireReference::WireReference(self.new_error(expr_span)), // Error handled by [flatten_local_or_template_global]
@@ -1470,9 +1477,10 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         &mut linker.constants,
         global_obj,
     );
-    let errors_globals = obj_link_info_mut.take_errors_globals();
+    let (errors, globals) = obj_link_info_mut.take_errors_globals();
     let obj_link_info = linker.get_link_info(global_obj);
-    let globals = GlobalResolver::new(linker, obj_link_info, errors_globals);
+    let globals = GlobalResolver::new(linker, globals);
+    let errors = ErrorCollector::from_storage(errors, obj_link_info.file, &linker.files);
 
     let obj_name = &obj_link_info.name;
     println!("Flattening {obj_name}");
@@ -1491,7 +1499,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
                         unreachable!()
                     };
 
-                    globals.errors.error(domain.name_span.unwrap(), format!("Conflicting domain declaration. Domain '{}' was already declared earlier", domain.name))
+                    errors.error(domain.name_span.unwrap(), format!("Conflicting domain declaration. Domain '{}' was already declared earlier", domain.name))
                     .info_obj_same_file(&md.domains[conflict]);
                 }
             }
@@ -1527,7 +1535,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         fields_to_visit,
         domains,
         default_declaration_context,
-        errors: &globals.errors,
+        errors: &errors,
         working_on_link_info: linker.get_link_info(global_obj),
         instructions: FlatAlloc::new(),
         named_domain_alloc: UUIDAllocator::new(),
@@ -1542,7 +1550,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
 
     let mut instructions = context.instructions;
 
-    let errors_globals = globals.decommission();
+    let globals = globals.decommission();
 
     let link_info: &mut LinkInfo = match global_obj {
         GlobalUUID::Module(module_uuid) => {
@@ -1634,6 +1642,6 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         }
     }
 
-    link_info.reabsorb_errors_globals(errors_globals, AFTER_FLATTEN_CP);
+    link_info.reabsorb_errors_globals(errors.into_storage(), globals, AFTER_FLATTEN_CP);
     link_info.instructions = instructions;
 }

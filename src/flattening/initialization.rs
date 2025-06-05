@@ -363,7 +363,8 @@ fn initialize_global_object(
     };
 
     link_info.reabsorb_errors_globals(
-        (ctx.errors.into_storage(), ResolvedGlobals::empty()),
+        ctx.errors.into_storage(),
+        ResolvedGlobals::empty(),
         AFTER_INITIAL_PARSE_CP,
     );
 

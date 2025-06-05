@@ -10,12 +10,14 @@ pub fn domain_check_all(linker: &mut Linker) {
     let module_uuids: Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
     for module_uuid in module_uuids {
         let working_on_mut = &mut linker.modules[module_uuid];
-        let errs_globals = working_on_mut.link_info.take_errors_globals();
+        let (errors, globals) = working_on_mut.link_info.take_errors_globals();
 
         let md: &Module = &linker.modules[module_uuid];
-        let globals = GlobalResolver::new(linker, &md.link_info, errs_globals);
+        let globals = GlobalResolver::new(linker, globals);
+        let errors = ErrorCollector::from_storage(errors, md.link_info.file, &linker.files);
 
-        let domain_substitutor = domain_check_link_info(&globals, &md.link_info.instructions);
+        let domain_substitutor =
+            domain_check_link_info(&globals, &errors, &md.link_info.instructions);
 
         // Set the remaining domain variables that aren't associated with a module port.
         // We just find domain IDs that haven't been
@@ -29,22 +31,22 @@ pub fn domain_check_all(linker: &mut Linker) {
             }
         }
 
-        let (errs, globals) = globals.decommission();
-        let errors = ErrorCollector::from_storage(errs, md.link_info.file, &linker.files);
+        let globals = globals.decommission();
         let md = &mut linker.modules[module_uuid];
         finalize_domains(&errors, &mut md.link_info.instructions, domain_substitutor);
         md.link_info
-            .reabsorb_errors_globals((errors.into_storage(), globals), AFTER_DOMAIN_CHECK_CP);
+            .reabsorb_errors_globals(errors.into_storage(), globals, AFTER_DOMAIN_CHECK_CP);
     }
 }
 
 fn domain_check_link_info<'l>(
     globals: &'l GlobalResolver<'l>,
+    errors: &'l ErrorCollector<'l>,
     instructions: &FlatAlloc<Instruction, FlatIDMarker>,
 ) -> TypeUnifier<TypeSubstitutor<DomainType>> {
     let mut ctx = DomainCheckingContext {
         globals,
-        errors: &globals.errors,
+        errors,
         domain_checker: TypeUnifier::default(),
         instructions,
     };

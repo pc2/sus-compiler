@@ -47,33 +47,19 @@ struct LinkingErrorLocation {
 /// and remembers all of the requested globals in preparation for #49
 pub struct GlobalResolver<'linker> {
     linker: &'linker Linker,
-
-    pub errors: ErrorCollector<'linker>,
     resolved_globals: RefCell<ResolvedGlobals>,
 }
 
 impl<'linker> GlobalResolver<'linker> {
-    pub fn new(
-        linker: &'linker Linker,
-        obj_link_info: &'linker LinkInfo,
-        errors_globals: (ErrorStore, ResolvedGlobals),
-    ) -> Self {
+    pub fn new(linker: &'linker Linker, resolved_globals: ResolvedGlobals) -> Self {
         GlobalResolver {
             linker,
-            errors: ErrorCollector::from_storage(
-                errors_globals.0,
-                obj_link_info.file,
-                &linker.files,
-            ),
-            resolved_globals: RefCell::new(errors_globals.1),
+            resolved_globals: RefCell::new(resolved_globals),
         }
     }
     /// Get the [ErrorCollector] and [ResolvedGlobals] out of this
-    pub fn decommission(self) -> (ErrorStore, ResolvedGlobals) {
-        (
-            self.errors.into_storage(),
-            self.resolved_globals.into_inner(),
-        )
+    pub fn decommission(self) -> ResolvedGlobals {
+        self.resolved_globals.into_inner()
     }
 
     fn get_linking_error_location(&self, global: GlobalUUID) -> LinkingErrorLocation {
@@ -91,7 +77,12 @@ impl<'linker> GlobalResolver<'linker> {
     }
 
     /// SAFETY: Files are never touched, and as long as this object is managed properly linker will also exist long enough.
-    pub fn resolve_global(&self, name_span: Span, name: &str) -> Option<GlobalUUID> {
+    pub fn resolve_global(
+        &self,
+        name_span: Span,
+        name: &str,
+        errors: &ErrorCollector,
+    ) -> Option<GlobalUUID> {
         let mut resolved_globals = self.resolved_globals.borrow_mut();
         match self.linker.global_namespace.get(name) {
             Some(NamespaceElement::Global(found)) => {
@@ -101,7 +92,7 @@ impl<'linker> GlobalResolver<'linker> {
             Some(NamespaceElement::Colission(coll)) => {
                 resolved_globals.all_resolved = false;
 
-                let mut err_ref = self.errors.error(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."));
+                let mut err_ref = errors.error(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."));
 
                 for collider_global in coll.iter() {
                     let err_loc = self.get_linking_error_location(*collider_global);
@@ -116,7 +107,7 @@ impl<'linker> GlobalResolver<'linker> {
             None => {
                 resolved_globals.all_resolved = false;
 
-                self.errors.error(
+                errors.error(
                     name_span,
                     format!(
                         "No Global of the name '{name}' was found. Did you forget to import it?"
@@ -132,6 +123,7 @@ impl<'linker> GlobalResolver<'linker> {
         &self,
         global_ref: &GlobalReference<ID>,
         expected: &str,
+        errors: &ErrorCollector,
     ) where
         GlobalUUID: From<ID>,
     {
@@ -139,7 +131,7 @@ impl<'linker> GlobalResolver<'linker> {
         let info = self.get_linking_error_location(GlobalUUID::from(global_ref.id));
         let name = &info.full_name;
         let global_type = info.named_type;
-        let err_ref = self.errors.error(
+        let err_ref = errors.error(
             global_ref.name_span,
             format!("{name} is not a {expected}, it is a {global_type} instead!"),
         );
@@ -201,7 +193,8 @@ impl LinkInfo {
     }
     pub fn reabsorb_errors_globals(
         &mut self,
-        (errors, resolved_globals): (ErrorStore, ResolvedGlobals),
+        errors: ErrorStore,
+        resolved_globals: ResolvedGlobals,
         checkpoint_id: usize,
     ) {
         // Store errors and resolved_globals back into module

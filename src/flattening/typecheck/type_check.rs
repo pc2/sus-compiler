@@ -23,10 +23,11 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
     let module_uuids: Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
     for module_uuid in module_uuids {
         let working_on_mut = &mut linker.modules[module_uuid];
-        let errs_globals = working_on_mut.link_info.take_errors_globals();
+        let (errors, globals) = working_on_mut.link_info.take_errors_globals();
 
         let working_on: &Module = &linker.modules[module_uuid];
-        let globals = GlobalResolver::new(linker, &working_on.link_info, errs_globals);
+        let globals = GlobalResolver::new(linker, globals);
+        let errors = ErrorCollector::from_storage(errors, working_on.link_info.file, &linker.files);
 
         println!("Typechecking {}", &working_on.link_info.name);
         let _panic_guard = SpanDebugger::new(
@@ -37,7 +38,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
 
         let mut context = TypeCheckingContext {
             globals: &globals,
-            errors: &globals.errors,
+            errors: &errors,
             type_checker: TypeUnifier::from(AbstractTypeSubstitutor::default()),
             instructions: &working_on.link_info.instructions,
         };
@@ -45,8 +46,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
         context.typecheck();
 
         let type_checker = context.type_checker;
-        let (errs, globals) = globals.decommission();
-        let errors = ErrorCollector::from_storage(errs, working_on.link_info.file, &linker.files);
+        let globals = globals.decommission();
 
         // Grab another mutable copy of md so it doesn't force a borrow conflict
         let working_on_mut = &mut linker.modules[module_uuid];
@@ -58,9 +58,11 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
         };
         finalize_ctx.apply_types(&mut working_on_mut.link_info.instructions);
 
-        working_on_mut
-            .link_info
-            .reabsorb_errors_globals((errors.into_storage(), globals), AFTER_TYPE_CHECK_CP);
+        working_on_mut.link_info.reabsorb_errors_globals(
+            errors.into_storage(),
+            globals,
+            AFTER_TYPE_CHECK_CP,
+        );
 
         // Also create the inference info now.
         working_on_mut.latency_inference_info = PortLatencyInferenceInfo::make(

@@ -30,8 +30,11 @@ pub fn perform_lints(linker: &mut Linker) {
         lint_instructions(&md.link_info.instructions, &errors, linker);
 
         let md = &mut linker.modules[id];
-        md.link_info
-            .reabsorb_errors_globals((errors.into_storage(), resolved_globals), AFTER_LINTS_CP);
+        md.link_info.reabsorb_errors_globals(
+            errors.into_storage(),
+            resolved_globals,
+            AFTER_LINTS_CP,
+        );
     }
 }
 
