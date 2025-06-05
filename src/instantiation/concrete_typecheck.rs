@@ -2,6 +2,7 @@ use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::alloc::{zip_eq, zip_eq3};
+use crate::typing::abstract_type::PeanoType;
 use crate::typing::set_unifier::{DelayedErrorCollector, FullySubstitutable};
 use crate::typing::value_unifier::{ValueErrorReporter, ValueUnifierStore};
 use crate::typing::{concrete_type::ConcreteType, value_unifier::ValueUnifier};
@@ -35,6 +36,8 @@ fn unify_rank<'inst>(
     })
 }
 
+use crate::typing::type_inference::{Substitutor, TypeSubstitutor, TypeUnifier};
+
 impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
     pub fn typecheck(&mut self, type_substitutor_alloc: ValueUnifierAlloc) {
         let error_reporter = DelayedErrorCollector::new();
@@ -61,6 +64,74 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
 
         self.compute_latencies(&substitutor);
     }
+    /*fn peano_to_nested_array_of(
+        &mut self,
+        p: &PeanoType,
+        c: ConcreteType,
+        dims: &mut Vec<ConcreteType>,
+    ) -> ConcreteType {
+        let substitutor: TypeSubstitutor<ConcreteType> = 0;
+        match p {
+            PeanoType::Zero => c,
+            PeanoType::Succ(p) => {
+                let this_dim_var = substitutor.alloc_unknown();
+                let arr = ConcreteType::Array(Box::new((c, this_dim_var.clone())));
+                let typ = self.peano_to_nested_array_of(p, arr, dims);
+                dims.push(this_dim_var.clone());
+                typ
+            }
+            _ => unreachable!("Peano abstract ranks being used at concrete type-checking time should never be anything other than Zero, Succ or Named ({p:?})"),
+        }
+    }*/
+    /*fn walk_type_along_path(
+        type_substitutor: &mut TypeUnifier<TypeSubstitutor<ConcreteType>>,
+        mut current_type_in_progress: ConcreteType,
+        path: &[RealWirePathElem],
+    ) -> ConcreteType {
+        for p in path {
+            let typ_after_applying_array = type_substitutor.alloc_unknown();
+            match p {
+                RealWirePathElem::ArrayAccess {
+                    span: _,
+                    idx_wire: _,
+                } => {
+                    // TODO #28 integer size <-> array bound check
+                    let arr_size = type_substitutor.alloc_unknown();
+                    let arr_box = Box::new((typ_after_applying_array.clone(), arr_size));
+                    type_substitutor.unify_must_succeed(
+                        &current_type_in_progress,
+                        &ConcreteType::Array(arr_box),
+                    );
+                    current_type_in_progress = typ_after_applying_array;
+                }
+                RealWirePathElem::ArraySlice { .. }
+                | RealWirePathElem::ArrayPartSelectDown { .. }
+                | RealWirePathElem::ArrayPartSelectUp { .. } => {
+                    let inner_of_array_being_sliced = type_substitutor.alloc_unknown();
+
+                    let array_being_sliced = Box::new((
+                        inner_of_array_being_sliced.clone(),
+                        type_substitutor.alloc_unknown(),
+                    ));
+
+                    let slice_size = type_substitutor.alloc_unknown();
+                    type_substitutor.unify_must_succeed(
+                        &current_type_in_progress,
+                        &ConcreteType::Array(array_being_sliced),
+                    );
+                    type_substitutor.unify_must_succeed(
+                        &typ_after_applying_array,
+                        &ConcreteType::Array(Box::new((inner_of_array_being_sliced, slice_size))),
+                    );
+
+                    current_type_in_progress = typ_after_applying_array;
+                }
+            }
+        }
+
+        current_type_in_progress
+    }*/
+
     fn typecheck_all_wires(
         &'inst self,
         unifier: &mut ValueUnifier<'inst>,

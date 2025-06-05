@@ -131,6 +131,29 @@ impl core::fmt::Display for BinaryOperator {
     }
 }
 
+impl SliceType {
+    pub fn from_kind_id(kind_id: u16) -> Self {
+        match kind_id {
+            kw!(":") => SliceType::Normal,
+            kw!("+:") => SliceType::PartSelectUp,
+            kw!("-:") => SliceType::PartSelectDown,
+            _ => unreachable!(),
+        }
+    }
+    pub fn op_text(&self) -> &'static str {
+        match self {
+            SliceType::Normal => ":",
+            SliceType::PartSelectUp => "+:",
+            SliceType::PartSelectDown => "-:",
+        }
+    }
+}
+impl core::fmt::Display for SliceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.op_text())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GenerativeKind {
     PlainGenerative,
@@ -480,7 +503,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             let array_element_type = self.flatten_type(cursor);
 
             cursor.field(field!("arr_idx"));
-            let (array_size_wire_id, domain, bracket_span) = self.flatten_array_bracket(cursor);
+            let (array_size_wire_id, domain, bracket_span) =
+                self.flatten_array_type_bracket(cursor);
             self.must_be_generative(domain, "Array Size", span);
 
             WrittenType::Array(
@@ -777,14 +801,100 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         })
     }
 
-    fn flatten_array_bracket(
+    // function to flatten a straightforward xxx[size] array type expression (no slicing)
+    fn flatten_array_type_bracket(
         &mut self,
         cursor: &mut Cursor<'c>,
     ) -> (FlatID, DomainType, BracketSpan) {
         let bracket_span = BracketSpan::from_outer(cursor.span());
-        cursor.go_down_content(kind!("array_bracket_expression"), |cursor| {
+        cursor.go_down_content(kind!("array_type_bracket"), |cursor| {
             let (expr, is_generative) = self.flatten_subexpr(cursor);
             (expr, is_generative, bracket_span)
+        })
+    }
+
+    fn flatten_array_access_bracket(
+        &mut self,
+        cursor: &mut Cursor<'c>,
+        output_typ: AbstractRankedType
+    ) -> (WireReferencePathElement, DomainType, BracketSpan) {
+        let bracket_span = BracketSpan::from_outer(cursor.span());
+        cursor.go_down(kind!("array_access_bracket_expression"), |cursor| {
+            if cursor.optional_field(field!("index")) {
+                let (expr, is_generative) = self.flatten_subexpr(cursor);
+                (
+                    WireReferencePathElement::ArrayAccess {
+                        idx: expr,
+                        bracket_span,
+                        output_typ
+                    },
+                    is_generative,
+                    bracket_span,
+                )
+            } else {
+                cursor.field(field!("slice"));
+                cursor.go_down(kind!("slice"), |cursor| {
+                    let mut generative = DomainType::Generative;
+                    let idx_a = if cursor.optional_field(field!("index_a")) {
+                        let (idx_a, a_generative) = self.flatten_subexpr(cursor);
+                        generative.combine_with(a_generative);
+                        Some(idx_a)
+                    } else {None};
+                    cursor.field(field!("type"));
+                    let typ: SliceType = SliceType::from_kind_id(cursor.kind());
+                    
+                    let idx_b = if cursor.optional_field(field!("index_b")) {
+                        let (idx_b, b_generative) = self.flatten_subexpr(cursor);
+                        generative.combine_with(b_generative);
+                        Some(idx_b)
+                    } else {
+                        None
+                    };
+
+                    (match typ {
+                        SliceType::PartSelectDown | SliceType::PartSelectUp => {
+                            if idx_a.is_none() {
+                                self.errors.error(bracket_span.inner_span(), "Missing indexed part-select slices start index");
+                            };
+                            if idx_b.is_none() {
+                                self.errors.error(bracket_span.inner_span(), "Missing indexed part-select slice width");
+                            };
+                            match (idx_a, idx_b) {
+                                (Some(idx_a), Some(idx_b)) => match typ {
+                                    SliceType::PartSelectUp => {
+                                        WireReferencePathElement::ArrayPartSelectUp {
+                                            idx_a,
+                                            width: idx_b,
+                                            bracket_span,
+                                            output_typ
+                                        }
+                                    }
+                                    SliceType::PartSelectDown => {
+                                        WireReferencePathElement::ArrayPartSelectDown {
+                                            idx_a,
+                                            width: idx_b,
+                                            bracket_span,
+                                            output_typ
+                                        }
+                                    }
+                                    _ => unreachable!()
+                                }
+                                (_,_) => WireReferencePathElement::Error
+                            }
+                            
+                        }
+                        SliceType::Normal => WireReferencePathElement::ArraySlice {
+                                idx_a,
+                                idx_b,
+                                bracket_span,
+                                output_typ
+                        }
+                    },
+                        generative,
+                        bracket_span,
+                    )
+                })
+            }
         })
     }
 
@@ -956,6 +1066,29 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     right,
                 }
             }),
+            kind!("range") => cursor.go_down_no_check(|cursor| {
+                cursor.field(field!("start"));
+                let (start, start_domain) = self.flatten_subexpr(cursor);
+                resulting_domain.combine_with(start_domain);
+                if !resulting_domain.is_generative() {
+                    self.errors.error(
+                        cursor.span(),
+                        "Used non-generative expression in range start",
+                    );
+                    return ExpressionSource::WireRef(self.new_error(cursor.span()));
+                }
+
+                cursor.field(field!("end"));
+                let (end, end_domain) = self.flatten_subexpr(cursor);
+                resulting_domain.combine_with(end_domain);
+                if !resulting_domain.is_generative() {
+                    self.errors
+                        .error(cursor.span(), "Used non-generative expression in range end");
+                    return ExpressionSource::WireRef(self.new_error(cursor.span()));
+                }
+
+                ExpressionSource::Range { start, end }
+            }),
             kind!("func_call") => cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("name"));
                 let interface_reference = self.get_or_alloc_module(cursor);
@@ -1008,6 +1141,33 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             let idx_expr = self.instructions[*idx].unwrap_subexpression();
                             resulting_domain.combine_with(idx_expr.domain);
                         }
+                        WireReferencePathElement::ArraySlice { idx_a, idx_b, .. } => {
+                            if let Some(idx_a) = idx_a {
+                                let idx_a_expr = self.instructions[*idx_a].unwrap_subexpression();
+                                resulting_domain.combine_with(idx_a_expr.domain);
+                            }
+                            if let Some(idx_b) = idx_b {
+                                let idx_b_expr = self.instructions[*idx_b].unwrap_subexpression();
+                                resulting_domain.combine_with(idx_b_expr.domain);
+                            }
+                        }
+                        WireReferencePathElement::ArrayPartSelectDown {
+                            idx_a,
+                            width: idx_b,
+                            ..
+                        }
+                        | WireReferencePathElement::ArrayPartSelectUp {
+                            idx_a,
+                            width: idx_b,
+                            ..
+                        } => {
+                            let idx_a_expr = self.instructions[*idx_a].unwrap_subexpression();
+                            resulting_domain.combine_with(idx_a_expr.domain);
+
+                            let idx_b_expr = self.instructions[*idx_b].unwrap_subexpression();
+                            resulting_domain.combine_with(idx_b_expr.domain);
+                        }
+                        WireReferencePathElement::Error => {}
                     }
                 }
                 ExpressionSource::WireRef(wr)
@@ -1144,7 +1304,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
                 cursor.field(field!("arr_idx"));
                 let arr_idx_span = cursor.span();
-                let (idx, _is_generative, bracket_span) = self.flatten_array_bracket(cursor);
+                
 
                 // only unpack the subexpr after flattening the idx, so we catch all errors
                 match &mut flattened_arr_expr {
@@ -1164,8 +1324,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             inner: current_typ.inner.clone(),
                             rank: self.type_alloc.type_alloc.rank_substitutor.alloc_unknown()
                         };
+
+                        let (access, _is_generative, _) = self.flatten_array_access_bracket(cursor, output_typ);
+
                         wire_ref.path
-                            .push(WireReferencePathElement::ArrayAccess { idx, bracket_span, output_typ });
+                            .push(access);
                     }
                 }
 

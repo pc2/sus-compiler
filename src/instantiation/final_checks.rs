@@ -4,10 +4,10 @@
 
 use ibig::IBig;
 
+use crate::instantiation::SliceIndex;
 use crate::{errors::ErrorReference, typing::concrete_type::ConcreteType};
 
 use super::{ModuleTypingContext, RealWire, RealWireDataSource, RealWirePathElem};
-
 impl<'l> ModuleTypingContext<'l> {
     fn wire_must_be_subtype(
         &self,
@@ -30,16 +30,77 @@ impl<'l> ModuleTypingContext<'l> {
         mut typ: &'c ConcreteType,
         path: &[RealWirePathElem],
     ) -> &'c ConcreteType {
-        for path_elem in path {
-            match path_elem {
+        for elem in path {
+            let (content, arr_sz) = typ.unwrap_array();
+            let arr_sz = arr_sz.unwrap_integer();
+            typ = content;
+            match elem {
                 RealWirePathElem::ArrayAccess { span, idx_wire } => {
-                    let (content, arr_sz) = typ.unwrap_array();
-                    let arr_sz = arr_sz.unwrap_integer();
-                    typ = content;
                     let idx_wire = &self.wires[*idx_wire];
                     let (min, max) = idx_wire.typ.unwrap_integer_bounds();
                     if min < &IBig::from(0) || max >= arr_sz {
                         self.errors.error(span.inner_span(), format!("Out of bounds! The array is of size {arr_sz}, but the index has bounds {min}..{max}"));
+                    }
+                }
+                RealWirePathElem::ArraySlice {
+                    span,
+                    idx_a_wire,
+                    idx_b_wire,
+                } => {
+                    if let SliceIndex::Wire(idx_a_wire) = idx_a_wire {
+                        let idx_a_wire = &self.wires[*idx_a_wire];
+
+                        let (min_a, max_a) = idx_a_wire.typ.unwrap_integer_bounds();
+                        if min_a < &IBig::from(0) || max_a >= arr_sz {
+                            self.errors.error(span.inner_span(), format!("Out of bounds! The array is of size {arr_sz}, but the start index has bounds {min_a}..{max_a}"));
+                        }
+                    }
+
+                    if let SliceIndex::Wire(idx_b_wire) = idx_b_wire {
+                        let idx_b_wire = &self.wires[*idx_b_wire];
+                        let (min_b, max_b) = idx_b_wire.typ.unwrap_integer_bounds();
+                        if min_b < &IBig::from(0) || max_b >= arr_sz {
+                            self.errors.error(span.inner_span(), format!("Out of bounds! The array is of size {arr_sz}, but the end index has bounds {min_b}..{max_b}"));
+                        }
+                    }
+                }
+                RealWirePathElem::ArrayPartSelectDown {
+                    span,
+                    idx_a_wire,
+                    width_wire,
+                }
+                | RealWirePathElem::ArrayPartSelectUp {
+                    span,
+                    idx_a_wire,
+                    width_wire,
+                } => {
+                    let idx_a_wire = &self.wires[*idx_a_wire];
+
+                    let (min_a, max_a) = idx_a_wire.typ.unwrap_integer_bounds();
+                    if min_a < &IBig::from(0) || max_a >= arr_sz {
+                        self.errors.error(span.inner_span(), format!("Out of bounds! The array is of size {arr_sz}, but the indexed part-select start index has bounds {min_a}..{max_a}"));
+                    }
+
+                    let width_wire = &self.wires[*width_wire];
+                    let (min_width, max_width) = width_wire.typ.unwrap_integer_bounds();
+                    if min_width < &IBig::from(0) || max_width >= arr_sz {
+                        self.errors.error(span.inner_span(), format!("Out of bounds! The array is of size {arr_sz}, but the indexed part-select width has bounds {min_width}..{max_width}"));
+                    }
+
+                    match elem {
+                        RealWirePathElem::ArrayPartSelectDown { .. } => {
+                            let lower_bound = min_a - max_width;
+                            if lower_bound < IBig::from(0) {
+                                self.errors.error(span.inner_span(), format!("Out of bounds! The array is of size {arr_sz}, but the indexed part-select goes down to {lower_bound}"));
+                            }
+                        }
+                        RealWirePathElem::ArrayPartSelectUp { .. } => {
+                            let upper_bound = min_a + max_width;
+                            if upper_bound >= *arr_sz {
+                                self.errors.error(span.inner_span(), format!("Out of bounds! The array is of size {arr_sz}, but the indexed part-select goes up to {upper_bound}"));
+                            }
+                        }
+                        _ => unreachable!(),
                     }
                 }
             }

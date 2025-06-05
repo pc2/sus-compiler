@@ -302,11 +302,31 @@ impl Interface {
 /// When executing, this turns into [crate::instantiation::RealWirePathElem]
 #[derive(Debug, Clone)]
 pub enum WireReferencePathElement {
+    // todo: redundancy
     ArrayAccess {
         idx: FlatID,
         bracket_span: BracketSpan,
         output_typ: AbstractRankedType,
     },
+    ArraySlice {
+        idx_a: Option<FlatID>,
+        idx_b: Option<FlatID>,
+        bracket_span: BracketSpan,
+        output_typ: AbstractRankedType,
+    },
+    ArrayPartSelectUp {
+        idx_a: FlatID,
+        width: FlatID,
+        bracket_span: BracketSpan,
+        output_typ: AbstractRankedType,
+    },
+    ArrayPartSelectDown {
+        idx_a: FlatID,
+        width: FlatID,
+        bracket_span: BracketSpan,
+        output_typ: AbstractRankedType,
+    },
+    Error,
 }
 
 /// The root of a [WireReference]. Basically where the wire reference starts.
@@ -374,7 +394,11 @@ impl WireReference {
     pub fn get_output_typ(&self) -> &AbstractRankedType {
         if let Some(last) = self.path.last() {
             match last {
-                WireReferencePathElement::ArrayAccess { output_typ, .. } => output_typ,
+                WireReferencePathElement::ArrayAccess { output_typ, .. }
+                | WireReferencePathElement::ArrayPartSelectDown { output_typ, .. }
+                | WireReferencePathElement::ArrayPartSelectUp { output_typ, .. }
+                | WireReferencePathElement::ArraySlice { output_typ, .. } => output_typ,
+                WireReferencePathElement::Error => &self.root_typ.typ,
             }
         } else {
             &self.root_typ.typ
@@ -469,6 +493,13 @@ pub enum BinaryOperator {
     LesserEq,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SliceType {
+    Normal,
+    PartSelectUp,   // +:
+    PartSelectDown, // -:
+}
+
 /// A reference to a port within a submodule.
 /// Not to be confused with [Port], which is the declaration of the port itself in the [Module]
 #[derive(Debug, Clone, Copy)]
@@ -501,6 +532,10 @@ pub enum ExpressionSource {
         rank: PeanoType,
         left: FlatID,
         right: FlatID,
+    },
+    Range {
+        start: FlatID,
+        end: FlatID,
     },
     ArrayConstruct(Vec<FlatID>),
     Constant(Value),

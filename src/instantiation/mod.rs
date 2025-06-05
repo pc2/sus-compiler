@@ -20,12 +20,36 @@ use crate::{errors::ErrorStore, value::Value};
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
 
+#[derive(Debug, Clone)]
+pub enum SliceIndex {
+    Wire(WireID),
+    Unknown(UnifyableValue),
+}
+
 /// See [MultiplexerSource]
 ///
 /// This is the post-instantiation equivalent of [crate::flattening::WireReferencePathElement]
 #[derive(Debug, Clone)]
 pub enum RealWirePathElem {
-    ArrayAccess { span: BracketSpan, idx_wire: WireID },
+    ArrayAccess {
+        span: BracketSpan,
+        idx_wire: WireID,
+    },
+    ArraySlice {
+        span: BracketSpan,
+        idx_a_wire: SliceIndex,
+        idx_b_wire: SliceIndex,
+    },
+    ArrayPartSelectUp {
+        span: BracketSpan,
+        idx_a_wire: WireID,
+        width_wire: WireID,
+    },
+    ArrayPartSelectDown {
+        span: BracketSpan,
+        idx_a_wire: WireID,
+        width_wire: WireID,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -256,6 +280,33 @@ impl ForEachContainedWire for RealWirePathElem {
         match self {
             RealWirePathElem::ArrayAccess { span: _, idx_wire } => {
                 f(*idx_wire);
+            }
+            RealWirePathElem::ArraySlice {
+                span: _,
+                idx_a_wire,
+                idx_b_wire,
+            } => {
+                match idx_a_wire {
+                    SliceIndex::Wire(w) => f(*w),
+                    _ => {}
+                }
+                match idx_b_wire {
+                    SliceIndex::Wire(w) => f(*w),
+                    _ => {}
+                }
+            }
+            RealWirePathElem::ArrayPartSelectDown {
+                span: _,
+                idx_a_wire,
+                width_wire: idx_b_wire,
+            }
+            | RealWirePathElem::ArrayPartSelectUp {
+                span: _,
+                idx_a_wire,
+                width_wire: idx_b_wire,
+            } => {
+                f(*idx_a_wire);
+                f(*idx_b_wire);
             }
         }
     }
