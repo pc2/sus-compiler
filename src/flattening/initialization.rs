@@ -280,7 +280,7 @@ impl InitializationContext<'_> {
 pub fn gather_initial_file_data(mut builder: FileBuilder) {
     assert!(builder.file_data.associated_values.is_empty());
 
-    let mut cursor = match Cursor::new_at_root(builder.tree, builder.file_data) {
+    let mut cursor = match Cursor::new_at_root(builder.file_data) {
         Ok(cursor) => cursor,
         Err(file_span) => {
             builder
@@ -349,7 +349,6 @@ fn initialize_global_object(
     let (name_span, name) = ctx.gather_initial_global_object(cursor);
 
     let mut link_info = LinkInfo {
-        type_variable_alloc: None,
         template_parameters: ctx.parameters,
         instructions: FlatAlloc::new(),
         documentation: cursor.extract_gathered_comments(),
@@ -364,7 +363,7 @@ fn initialize_global_object(
     };
 
     link_info.reabsorb_errors_globals(
-        (ctx.errors, ResolvedGlobals::empty()),
+        (ctx.errors.into_storage(), ResolvedGlobals::empty()),
         AFTER_INITIAL_PARSE_CP,
     );
 

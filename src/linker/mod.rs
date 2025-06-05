@@ -2,11 +2,7 @@ use crate::{
     flattening::{Instruction, NamedConstant},
     instantiation::instantiation_cache::Instantiator,
     prelude::*,
-    typing::{
-        abstract_type::DomainType,
-        template::{GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind},
-        type_inference::{AbstractTypeSubstitutor, TypeSubstitutor},
-    },
+    typing::template::{GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind},
 };
 
 pub mod checkpoint;
@@ -81,8 +77,9 @@ pub enum IsExtern {
 
 pub const AFTER_INITIAL_PARSE_CP: usize = 0;
 pub const AFTER_FLATTEN_CP: usize = 1;
-pub const AFTER_TYPECHECK_CP: usize = 2;
-pub const AFTER_LINTS_CP: usize = 3;
+pub const AFTER_TYPE_CHECK_CP: usize = 2;
+pub const AFTER_DOMAIN_CHECK_CP: usize = 3;
+pub const AFTER_LINTS_CP: usize = 4;
 
 /// Represents any global. Stored in [Linker] and each is uniquely indexed by [GlobalUUID]
 ///
@@ -97,13 +94,6 @@ pub struct LinkInfo {
     pub errors: ErrorStore,
     pub resolved_globals: ResolvedGlobals,
     pub is_extern: IsExtern,
-
-    /// Created in Stage 2: Flattening
-    ///
-    /// Removed in Stage 3: Typechecking
-    ///
-    /// Is only temporary. It's used during typechecking to allocate the type unification block
-    pub type_variable_alloc: Option<Box<(AbstractTypeSubstitutor, TypeSubstitutor<DomainType>)>>,
 
     pub template_parameters: TVec<Parameter>,
 
@@ -140,6 +130,17 @@ impl LinkInfo {
         }
 
         format!("{} #({})", self.get_full_name(), template_args.join(", "))
+    }
+    pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
+        match &self.instructions[instr_id] {
+            Instruction::SubModule(sm) => sm.module_ref.get_total_span(),
+            Instruction::Declaration(decl) => decl.decl_span,
+            Instruction::Expression(w) => w.span,
+            Instruction::IfStatement(if_stmt) => self.get_instruction_span(if_stmt.condition),
+            Instruction::ForStatement(for_stmt) => {
+                self.get_instruction_span(for_stmt.loop_var_decl)
+            }
+        }
     }
 }
 

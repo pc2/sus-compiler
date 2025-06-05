@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use crate::alloc::ArenaAllocator;
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::prelude::*;
+use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
 
 use lsp_types::{LanguageString, MarkedString};
@@ -11,10 +12,7 @@ use crate::flattening::{DeclarationKind, IdentifierType, InterfaceToDomainMap, M
 use crate::instantiation::SubModuleOrWire;
 use crate::linker::{Documentation, FileData, GlobalUUID, LinkInfo};
 
-use crate::typing::{
-    abstract_type::DomainType,
-    template::{GenerativeParameterKind, TypeParameterKind},
-};
+use crate::typing::template::{GenerativeParameterKind, TypeParameterKind};
 
 use super::tree_walk::{InGlobal, LocationInfo};
 
@@ -113,16 +111,15 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             let mut details_vec: Vec<String> = Vec::with_capacity(5);
 
             if let Some(md) = try_get_module(&linker.modules, obj_id) {
-                if let DomainType::Physical(ph) = decl.typ.domain {
+                if let DomainType::Physical(ph) = decl.domain.get() {
                     details_vec.push(DomainType::physical_to_string(ph, &md.domains));
                 }
             }
 
             match decl.decl_kind {
-                DeclarationKind::RegularPort {
-                    is_input,
-                    port_id: _,
-                } => details_vec.push(if is_input { "input" } else { "output" }.to_owned()),
+                DeclarationKind::RegularPort { is_input, .. } => {
+                    details_vec.push(if is_input { "input" } else { "output" }.to_owned())
+                }
                 DeclarationKind::NotPort | DeclarationKind::StructField { field_id: _ } => {}
                 DeclarationKind::GenerativeInput(_) => details_vec.push("param".to_owned()),
             }
@@ -134,7 +131,6 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             }
 
             let typ_str = decl
-                .typ
                 .typ
                 .display(&linker.types, &link_info.template_parameters)
                 .to_string();
@@ -197,7 +193,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     .to_string(),
             ));
             hover.sus_code(details_vec.join(" "));
-            hover.gather_hover_infos(obj_id, id, expr.domain.is_generative());
+            hover.gather_hover_infos(obj_id, id, expr.domain == DomainType::Generative);
         }
         LocationInfo::Type(typ, link_info) => {
             hover.sus_code(

@@ -1375,3 +1375,13 @@ module use_FIFO {
 
     f.push(true, 3)
 }
+
+module write_to_generative_through_when {
+	gen bool a
+
+	bool b
+
+	when b {
+		a = true
+	}
+}

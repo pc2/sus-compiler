@@ -3,17 +3,16 @@ use crate::prelude::*;
 
 use crate::typing::abstract_type::{AbstractInnerType, PeanoType};
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg};
+use crate::typing::domain_type::DomainType;
 use crate::typing::set_unifier::Unifyable;
 use crate::typing::template::{Parameter, TVec, TemplateKind};
-use crate::typing::written_type::WrittenType;
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
-use crate::flattening::{DomainInfo, Interface, InterfaceToDomainMap, Module, StructType};
-use crate::linker::{FileData, GlobalUUID, LinkInfo};
-use crate::typing::{
-    abstract_type::{AbstractRankedType, DomainType},
-    concrete_type::ConcreteType,
+use crate::flattening::{
+    DomainInfo, Interface, InterfaceToDomainMap, Module, StructType, WrittenType,
 };
+use crate::linker::{FileData, GlobalUUID, LinkInfo};
+use crate::typing::{abstract_type::AbstractRankedType, concrete_type::ConcreteType};
 
 use std::{
     fmt::{Display, Formatter},
@@ -22,10 +21,6 @@ use std::{
 
 use std::fmt::Write;
 use std::ops::Deref;
-
-pub fn map_to_type_names(parameters: &TVec<Parameter>) -> FlatAlloc<String, TemplateIDMarker> {
-    parameters.map(|(_id, v)| v.name.clone())
-}
 
 /// For [Display::fmt] implementations on types: [ConcreteType], [WrittenType], [AbstractType]
 pub trait TemplateNameGetter {
@@ -103,7 +98,7 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.typ.inner {
-            AbstractInnerType::Unknown(id) => write!(f, "{id:?}"),
+            AbstractInnerType::Unknown(_) => write!(f, "?"),
             AbstractInnerType::Template(id) => {
                 f.write_str(self.template_names.get_template_name(*id))
             }
@@ -139,8 +134,8 @@ impl Display for PeanoType {
                     f.write_str("[]")?;
                     cur = inner;
                 }
-                PeanoType::Unknown(var) => {
-                    write!(f, "[...{var:?}]")?;
+                PeanoType::Unknown(_) => {
+                    write!(f, "[...]")?;
                     return Ok(());
                 }
             }
