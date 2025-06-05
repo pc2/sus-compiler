@@ -2,7 +2,7 @@
 
 use std::ops::Index;
 
-use crate::typing::template::GlobalReference;
+use crate::flattening::GlobalReference;
 
 use self::checkpoint::ResolvedGlobalsCheckpoint;
 

@@ -1,6 +1,6 @@
 use crate::{
-    flattening::WrittenType,
-    typing::template::{GlobalReference, TemplateKind},
+    flattening::{GlobalReference, WrittenType},
+    typing::template::TemplateKind,
 };
 
 use super::{ExpressionSource, WireReference, WireReferencePathElement, WireReferenceRoot};

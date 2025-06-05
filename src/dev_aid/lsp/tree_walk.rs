@@ -6,7 +6,7 @@ use crate::prelude::*;
 use crate::linker::{FileData, GlobalUUID, LinkInfo};
 
 use crate::typing::template::{
-    GenerativeParameterKind, GlobalReference, Parameter, TemplateKind, TypeParameterKind,
+    GenerativeParameterKind, Parameter, TemplateKind, TypeParameterKind,
 };
 
 /// See [LocationInfo]

@@ -226,10 +226,9 @@ fn make_fanins(
     for (inst_id, inst) in instructions.iter() {
         match inst {
             Instruction::SubModule(sm) => {
-                sm.module_ref
-                    .for_each_generative_input_in_template_args(&mut |id| {
-                        instruction_fanins[inst_id].push(id);
-                    });
+                sm.module_ref.for_each_generative_input(&mut |id| {
+                    instruction_fanins[inst_id].push(id);
+                });
             }
             Instruction::Declaration(decl) => {
                 if let Some(lat_spec) = decl.latency_specifier {

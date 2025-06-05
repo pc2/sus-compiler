@@ -13,7 +13,7 @@ use super::name_context::LocalVariableContext;
 use super::parser::Cursor;
 use super::*;
 
-use crate::typing::template::{GenerativeParameterKind, TemplateKind, WrittenTemplateArg};
+use crate::typing::template::{GenerativeParameterKind, TemplateKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NamedLocal {

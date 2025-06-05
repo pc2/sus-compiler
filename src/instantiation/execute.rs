@@ -14,7 +14,6 @@ use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType};
 use crate::typing::concrete_type::ConcreteTemplateArg;
 use crate::typing::domain_type::DomainType;
-use crate::typing::template::GlobalReference;
 use crate::typing::template::TVec;
 use crate::util::{unwrap_single_element, zip_eq};
 
