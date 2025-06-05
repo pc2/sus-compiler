@@ -550,19 +550,19 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │             ──┬──  
      │               ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:267:2 ]
      │
  267 │     aaaaa()
      │     ───┬───  
-     │        ╰───── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+     │        ╰───── Could not fully figure out the type of this object. ?[...]
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:267:2 ]
      │
  267 │     aaaaa()
      │     ───┬───  
-     │        ╰───── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+     │        ╰───── Could not fully figure out the type of this object. ?[...]
 ─────╯
 Error: Function call syntax is only possible on modules or interfaces of modules
      ╭─[ test.sus:267:2 ]
@@ -2196,19 +2196,19 @@ Error: 'contains_submodule_submodule' conflicts with other declarations:
      │        ──────────────┬─────────────  
      │                      ╰─────────────── Conflicts with
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:445:2 ]
      │
  445 │     doNothing()
      │     ─────┬─────  
-     │          ╰─────── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+     │          ╰─────── Could not fully figure out the type of this object. ?[...]
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:445:2 ]
      │
  445 │     doNothing()
      │     ─────┬─────  
-     │          ╰─────── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+     │          ╰─────── Could not fully figure out the type of this object. ?[...]
 ─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ test.sus:445:2 ]
@@ -2274,19 +2274,19 @@ Error: 'contains_submodule_submodule' conflicts with other declarations:
      │        ──────────────┬─────────────  
      │                      ╰─────────────── 'contains_submodule_submodule' conflicts with other declarations:
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:601:2 ]
      │
  601 │     doNothing()
      │     ─────┬─────  
-     │          ╰─────── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+     │          ╰─────── Could not fully figure out the type of this object. ?[...]
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:601:2 ]
      │
  601 │     doNothing()
      │     ─────┬─────  
-     │          ╰─────── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+     │          ╰─────── Could not fully figure out the type of this object. ?[...]
 ─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ test.sus:601:2 ]
@@ -2436,19 +2436,19 @@ Warning: Unused Variable: This variable does not affect the output ports of this
      │                             ───┬──  
      │                                ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:678:2 ]
      │
  678 │     no_port_module()
      │     ────────┬───────  
-     │             ╰───────── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+     │             ╰───────── Could not fully figure out the type of this object. ?[...]
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:678:2 ]
      │
  678 │     no_port_module()
      │     ────────┬───────  
-     │             ╰───────── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+     │             ╰───────── Could not fully figure out the type of this object. ?[...]
 ─────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
      ╭─[ test.sus:678:2 ]
@@ -2715,19 +2715,19 @@ Error: 'BEEP' is not a valid template argument of int
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:767:50 ]
      │
  767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
      │                                                  ─┬─  
-     │                                                   ╰─── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+     │                                                   ╰─── Could not fully figure out the type of this object. ?[...]
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:767:50 ]
      │
  767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
      │                                                  ─┬─  
-     │                                                   ╰─── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+     │                                                   ╰─── Could not fully figure out the type of this object. ?[...]
 ─────╯
 Error: int is not a named wire: local or constant, it is a Struct instead!
      ╭─[ test.sus:767:50 ]
@@ -2778,12 +2778,12 @@ Error: 'beep' is read-only
      │     ──┬─  
      │       ╰─── 'beep' is read-only
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_1[...peano_variable_1]
+Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:775:2 ]
      │
  775 │     FIFO #(BITWIDTH: 4) badoop
      │     ─────────┬─────────  
-     │              ╰─────────── Could not fully figure out the type of this object. type_variable_1[...peano_variable_1]
+     │              ╰─────────── Could not fully figure out the type of this object. ?[...]
 ─────╯
 Error: 'BITWIDTH' is not a valid template argument of FIFO
      ╭─[ test.sus:775:9 ]
@@ -2798,12 +2798,12 @@ Error: 'BITWIDTH' is not a valid template argument of FIFO
      │        ──┬─  
      │          ╰─── 'FIFO' defined here
 ─────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:779:2 ]
      │
  779 │     test #(MY_INPUT: 3) test_mod
      │     ─────────┬─────────  
-     │              ╰─────────── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+     │              ╰─────────── Could not fully figure out the type of this object. ?[...]
 ─────╯
 Warning: Unused port 'o'
      ╭─[ test.sus:791:2 ]
@@ -10689,33 +10689,33 @@ Error: Conflicting domain declaration. Domain 'my_domain' was already declared e
       │            ────┬────  
       │                ╰────── Conflicting domain declaration. Domain 'my_domain' was already declared earlier
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
       ╭─[ test.sus:1027:2 ]
       │
  1027 │     make_infinite_type_help mtinf
       │     ───────────┬───────────  
-      │                ╰───────────── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+      │                ╰───────────── Could not fully figure out the type of this object. ?[...]
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_0[][...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[][...]
       ╭─[ test.sus:1029:2 ]
       │
  1029 │     mtinf.a = mtinf.b
       │     ───┬───  
-      │        ╰───── Could not fully figure out the type of this object. type_variable_0[][...peano_variable_0]
+      │        ╰───── Could not fully figure out the type of this object. ?[][...]
 ──────╯
-Error: Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects a type_variable_0[][...peano_variable_0] but was given a type_variable_0[...peano_variable_0]
+Error: Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects a ?[][...] but was given a ?[...]
       ╭─[ test.sus:1029:2 ]
       │
  1029 │     mtinf.a = mtinf.b
       │     ───┬───  
-      │        ╰───── Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects a type_variable_0[][...peano_variable_0] but was given a type_variable_0[...peano_variable_0]
+      │        ╰───── Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects a ?[][...] but was given a ?[...]
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
       ╭─[ test.sus:1029:12 ]
       │
  1029 │     mtinf.a = mtinf.b
       │               ───┬───  
-      │                  ╰───── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+      │                  ╰───── Could not fully figure out the type of this object. ?[...]
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1036:8 ]
@@ -12027,12 +12027,12 @@ Error: No Global of the name 'trigger' was found. Did you forget to import it?
       │     ───┬───  
       │        ╰───── No Global of the name 'trigger' was found. Did you forget to import it?
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_1[...peano_variable_1]
+Error: Could not fully figure out the type of this object. ?[...]
       ╭─[ test.sus:1246:10 ]
       │
  1246 │     trigger may_process'0 : T cur_state {
       │             ─────┬─────  
-      │                  ╰─────── Could not fully figure out the type of this object. type_variable_1[...peano_variable_1]
+      │                  ╰─────── Could not fully figure out the type of this object. ?[...]
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1246:10 ]
@@ -12076,12 +12076,12 @@ Error: No Global of the name 'action' was found. Did you forget to import it?
       │        ───┬──  
       │           ╰──── No Global of the name 'action' was found. Did you forget to import it?
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_2[...peano_variable_2]
+Error: Could not fully figure out the type of this object. ?[...]
       ╭─[ test.sus:1247:10 ]
       │
  1247 │        action next_state'II : T next_state_value
       │               ─────┬────  
-      │                    ╰────── Could not fully figure out the type of this object. type_variable_2[...peano_variable_2]
+      │                    ╰────── Could not fully figure out the type of this object. ?[...]
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1247:10 ]
@@ -12128,12 +12128,12 @@ Error: While parsing 'source_file', parser found a syntax error in a node of typ
       │ │       
       │ ╰─────── Parent node 'source_file'
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+Error: Could not fully figure out the type of this object. ?[...]
       ╭─[ test.sus:1254:2 ]
       │
  1254 │     MultiStateLoop loop
       │     ───────┬──────  
-      │            ╰──────── Could not fully figure out the type of this object. type_variable_0[...peano_variable_0]
+      │            ╰──────── Could not fully figure out the type of this object. ?[...]
 ──────╯
 Error: No Global of the name 'trigger' was found. Did you forget to import it?
       ╭─[ test.sus:1256:2 ]
@@ -12142,12 +12142,12 @@ Error: No Global of the name 'trigger' was found. Did you forget to import it?
       │     ───┬───  
       │        ╰───── No Global of the name 'trigger' was found. Did you forget to import it?
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_1[...peano_variable_1]
+Error: Could not fully figure out the type of this object. ?[...]
       ╭─[ test.sus:1256:10 ]
       │
  1256 │     trigger request_input
       │             ──────┬──────  
-      │                   ╰──────── Could not fully figure out the type of this object. type_variable_1[...peano_variable_1]
+      │                   ╰──────── Could not fully figure out the type of this object. ?[...]
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1256:10 ]
@@ -12163,12 +12163,12 @@ Error: No Global of the name 'action' was found. Did you forget to import it?
       │        ───┬──  
       │           ╰──── No Global of the name 'action' was found. Did you forget to import it?
 ──────╯
-Error: Could not fully figure out the type of this object. type_variable_2[...peano_variable_2]
+Error: Could not fully figure out the type of this object. ?[...]
       ╭─[ test.sus:1257:10 ]
       │
  1257 │        action input_valid : float new_input
       │               ─────┬─────  
-      │                    ╰─────── Could not fully figure out the type of this object. type_variable_2[...peano_variable_2]
+      │                    ╰─────── Could not fully figure out the type of this object. ?[...]
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1257:10 ]

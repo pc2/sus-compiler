@@ -102,7 +102,7 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.typ.inner {
-            AbstractInnerType::Unknown(id) => write!(f, "{id:?}"),
+            AbstractInnerType::Unknown(_) => write!(f, "?"),
             AbstractInnerType::Template(id) => {
                 f.write_str(self.template_names.get_template_name(*id))
             }
@@ -138,8 +138,8 @@ impl Display for PeanoType {
                     f.write_str("[]")?;
                     cur = inner;
                 }
-                PeanoType::Unknown(var) => {
-                    write!(f, "[...{var:?}]")?;
+                PeanoType::Unknown(_) => {
+                    write!(f, "[...]")?;
                     return Ok(());
                 }
             }
