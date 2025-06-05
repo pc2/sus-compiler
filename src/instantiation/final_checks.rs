@@ -4,6 +4,7 @@
 
 use ibig::IBig;
 
+use crate::instantiation::SliceIndex;
 use crate::{errors::ErrorReference, typing::concrete_type::ConcreteType};
 
 use super::{ModuleTypingContext, RealWire, RealWireDataSource, RealWirePathElem};
@@ -46,17 +47,21 @@ impl<'l> ModuleTypingContext<'l> {
                     idx_a_wire,
                     idx_b_wire,
                 } => {
-                    let idx_a_wire = &self.wires[*idx_a_wire];
+                    if let SliceIndex::Wire(idx_a_wire) = idx_a_wire {
+                        let idx_a_wire = &self.wires[*idx_a_wire];
 
-                    let (min_a, max_a) = idx_a_wire.typ.unwrap_integer_bounds();
-                    if min_a < &IBig::from(0) || max_a >= arr_sz {
-                        self.errors.error(span.inner_span(), format!("Out of bounds! The array is of size {arr_sz}, but the start index has bounds {min_a}..{max_a}"));
+                        let (min_a, max_a) = idx_a_wire.typ.unwrap_integer_bounds();
+                        if min_a < &IBig::from(0) || max_a >= arr_sz {
+                            self.errors.error(span.inner_span(), format!("Out of bounds! The array is of size {arr_sz}, but the start index has bounds {min_a}..{max_a}"));
+                        }
                     }
 
-                    let idx_b_wire = &self.wires[*idx_b_wire];
-                    let (min_b, max_b) = idx_b_wire.typ.unwrap_integer_bounds();
-                    if min_b < &IBig::from(0) || max_b >= arr_sz {
-                        self.errors.error(span.inner_span(), format!("Out of bounds! The array is of size {arr_sz}, but the end index has bounds {min_b}..{max_b}"));
+                    if let SliceIndex::Wire(idx_b_wire) = idx_b_wire {
+                        let idx_b_wire = &self.wires[*idx_b_wire];
+                        let (min_b, max_b) = idx_b_wire.typ.unwrap_integer_bounds();
+                        if min_b < &IBig::from(0) || max_b >= arr_sz {
+                            self.errors.error(span.inner_span(), format!("Out of bounds! The array is of size {arr_sz}, but the end index has bounds {min_b}..{max_b}"));
+                        }
                     }
                 }
                 RealWirePathElem::ArrayPartSelectDown {

@@ -20,6 +20,12 @@ use crate::{errors::ErrorStore, value::Value};
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
 
+#[derive(Debug, Clone)]
+pub enum SliceIndex {
+    Wire(WireID),
+    Unknown(UnifyableValue),
+}
+
 /// See [MultiplexerSource]
 ///
 /// This is the post-instantiation equivalent of [crate::flattening::WireReferencePathElement]
@@ -31,8 +37,8 @@ pub enum RealWirePathElem {
     },
     ArraySlice {
         span: BracketSpan,
-        idx_a_wire: WireID,
-        idx_b_wire: WireID,
+        idx_a_wire: SliceIndex,
+        idx_b_wire: SliceIndex,
     },
     ArrayPartSelectUp {
         span: BracketSpan,
@@ -279,8 +285,17 @@ impl ForEachContainedWire for RealWirePathElem {
                 span: _,
                 idx_a_wire,
                 idx_b_wire,
+            } => {
+                match idx_a_wire {
+                    SliceIndex::Wire(w) => f(*w),
+                    _ => {}
+                }
+                match idx_b_wire {
+                    SliceIndex::Wire(w) => f(*w),
+                    _ => {}
+                }
             }
-            | RealWirePathElem::ArrayPartSelectDown {
+            RealWirePathElem::ArrayPartSelectDown {
                 span: _,
                 idx_a_wire,
                 width_wire: idx_b_wire,

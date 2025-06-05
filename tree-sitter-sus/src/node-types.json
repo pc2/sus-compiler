@@ -1465,7 +1465,7 @@
     "fields": {
       "index_a": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "array_list_expression",
@@ -1511,7 +1511,7 @@
       },
       "index_b": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "array_list_expression",

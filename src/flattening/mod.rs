@@ -309,8 +309,8 @@ pub enum WireReferencePathElement {
         output_typ: AbstractRankedType,
     },
     ArraySlice {
-        idx_a: FlatID,
-        idx_b: FlatID,
+        idx_a: Option<FlatID>,
+        idx_b: Option<FlatID>,
         bracket_span: BracketSpan,
         output_typ: AbstractRankedType,
     },
@@ -326,6 +326,7 @@ pub enum WireReferencePathElement {
         bracket_span: BracketSpan,
         output_typ: AbstractRankedType,
     },
+    Error,
 }
 
 /// The root of a [WireReference]. Basically where the wire reference starts.
@@ -397,6 +398,7 @@ impl WireReference {
                 | WireReferencePathElement::ArrayPartSelectDown { output_typ, .. }
                 | WireReferencePathElement::ArrayPartSelectUp { output_typ, .. }
                 | WireReferencePathElement::ArraySlice { output_typ, .. } => output_typ,
+                WireReferencePathElement::Error => &self.root_typ.typ,
             }
         } else {
             &self.root_typ.typ

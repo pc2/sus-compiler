@@ -315,9 +315,9 @@ module.exports = grammar({
         ),
         
         slice: $ => seq(
-            field('index_a', $._expression),
+            optional(field('index_a', $._expression)),
             prec(PREC.part_select, field('type', choice(':', '+:', '-:'))),
-            field('index_b', $._expression)
+            optional(field('index_b', $._expression))
         ),
 
         array_list_expression: $ => seq(

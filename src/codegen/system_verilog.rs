@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::ops::Deref;
+use std::slice::SliceIndex;
 
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::{IsExtern, LinkInfo};
@@ -115,11 +116,30 @@ impl<'g> CodeGenerationContext<'g> {
                     idx_a_wire,
                     idx_b_wire,
                 } => {
-                    let wire_a = &self.instance.wires[*idx_a_wire];
-                    let idx_wire_name_a = self.wire_name(wire_a, absolute_latency);
-                    let wire_b = &self.instance.wires[*idx_b_wire];
-                    let idx_wire_name_b = self.wire_name(wire_b, absolute_latency);
-                    write!(result, "[{idx_wire_name_a}:{idx_wire_name_b}]").unwrap();
+                    write!(result, "[").unwrap();
+                    match idx_a_wire {
+                        crate::instantiation::SliceIndex::Wire(idx_a_wire) => {
+                            let wire_a = &self.instance.wires[*idx_a_wire];
+                            let idx_wire_name_a = self.wire_name(wire_a, absolute_latency);
+                            write!(result, "{idx_wire_name_a}").unwrap();
+                        }
+                        crate::instantiation::SliceIndex::Unknown(_) => {
+                            write!(result, "0").unwrap();
+                        }
+                    };
+                    write!(result, ":").unwrap();
+                    match idx_b_wire {
+                        crate::instantiation::SliceIndex::Wire(idx_b_wire) => {
+                            let wire_b = &self.instance.wires[*idx_b_wire];
+                            let idx_wire_name_b = self.wire_name(wire_b, absolute_latency);
+                            write!(result, "{idx_wire_name_b}").unwrap();
+                        }
+                        crate::instantiation::SliceIndex::Unknown(v) => {
+                            let v = v.unwrap_integer();
+                            write!(result, "{v}").unwrap();
+                        }
+                    }
+                    write!(result, "]").unwrap();
                 }
                 RealWirePathElem::ArrayPartSelectDown {
                     span: _,

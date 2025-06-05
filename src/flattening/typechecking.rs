@@ -287,8 +287,66 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     idx_b,
                     bracket_span,
                     output_typ,
+                } => {
+                    match idx_a {
+                        Some(idx_a) => {
+                            let idx_expr_a =
+                                self.working_on.instructions[*idx_a].unwrap_subexpression();
+                            self.type_checker
+                                .abstract_type_substitutor
+                                .unify_report_error(
+                                    idx_expr_a.typ,
+                                    &INT_TYPE.scalar(),
+                                    idx_expr_a.span,
+                                    "array slice start index",
+                                );
+                            self.type_checker.unify_domains(
+                                &idx_expr_a.domain,
+                                &result_domain,
+                                idx_expr_a.span,
+                                "array slice start index",
+                            );
+                        }
+                        None => {}
+                    }
+                    match idx_b {
+                        Some(idx_b) => {
+                            let idx_expr_b =
+                                self.working_on.instructions[*idx_b].unwrap_subexpression();
+                            self.type_checker
+                                .abstract_type_substitutor
+                                .unify_report_error(
+                                    idx_expr_b.typ,
+                                    &INT_TYPE.scalar(),
+                                    idx_expr_b.span,
+                                    "array slice end index",
+                                );
+                            self.type_checker.unify_domains(
+                                &idx_expr_b.domain,
+                                &result_domain,
+                                idx_expr_b.span,
+                                "array slice end index",
+                            );
+                        }
+                        None => {}
+                    }
+
+                    let new_resulting_variable =
+                        self.type_checker.abstract_type_substitutor.alloc_unknown();
+                    let arr_span = bracket_span.outer_span();
+
+                    self.type_checker
+                        .abstract_type_substitutor
+                        .unify_report_error(
+                            current_type_in_progress,
+                            &new_resulting_variable,
+                            arr_span,
+                            "array slice",
+                        );
+
+                    current_type_in_progress = output_typ;
                 }
-                | WireReferencePathElement::ArrayPartSelectDown {
+                WireReferencePathElement::ArrayPartSelectDown {
                     idx_a,
                     width: idx_b,
                     bracket_span,
@@ -313,7 +371,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                             idx_expr_a.typ,
                             &INT_TYPE.scalar(),
                             idx_expr_a.span,
-                            "array slice start index",
+                            "array indexed part-select start index",
                         );
 
                     self.type_checker
@@ -322,7 +380,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                             idx_expr_b.typ,
                             &INT_TYPE.scalar(),
                             idx_expr_b.span,
-                            "array slice end index",
+                            "array indexed part-select width",
                         );
 
                     self.type_checker
@@ -331,23 +389,24 @@ impl<'l> TypeCheckingContext<'l, '_> {
                             current_type_in_progress,
                             &new_resulting_variable,
                             arr_span,
-                            "array slice",
+                            "array indexed part-select",
                         );
 
                     self.type_checker.unify_domains(
                         &idx_expr_a.domain,
                         &result_domain,
                         idx_expr_a.span,
-                        "array slice start index",
+                        "array indexed part-select start index",
                     );
                     self.type_checker.unify_domains(
                         &idx_expr_b.domain,
                         &result_domain,
                         idx_expr_b.span,
-                        "array slice end index",
+                        "array indexed part-select width",
                     );
                     current_type_in_progress = output_typ;
                 }
+                WireReferencePathElement::Error => {}
             }
         }
     }
@@ -1128,6 +1187,7 @@ impl FinalizationContext<'_, '_> {
                 } => {
                     self.finalize_abstract_type(output_typ, bracket_span.outer_span());
                 }
+                WireReferencePathElement::Error => {}
             }
         }
     }

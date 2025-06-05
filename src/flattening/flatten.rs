@@ -834,42 +834,62 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             } else {
                 cursor.field(field!("slice"));
                 cursor.go_down(kind!("slice"), |cursor| {
-                    cursor.field(field!("index_a"));
-                    let (idx_a, a_generative) = self.flatten_subexpr(cursor);
-
+                    let mut generative = DomainType::Generative;
+                    let idx_a = if cursor.optional_field(field!("index_a")) {
+                        let (idx_a, a_generative) = self.flatten_subexpr(cursor);
+                        generative.combine_with(a_generative);
+                        Some(idx_a)
+                    } else {None};
                     cursor.field(field!("type"));
                     let typ: SliceType = SliceType::from_kind_id(cursor.kind());
+                    
+                    let idx_b = if cursor.optional_field(field!("index_b")) {
+                        let (idx_b, b_generative) = self.flatten_subexpr(cursor);
+                        generative.combine_with(b_generative);
+                        Some(idx_b)
+                    } else {
+                        None
+                    };
 
-                    cursor.field(field!("index_b"));
-                    let (idx_b, b_generative) = self.flatten_subexpr(cursor);
-                    let mut generative = a_generative;
-                    generative.combine_with(b_generative);
-
-                    (
-                        match typ {
-                            SliceType::Normal => WireReferencePathElement::ArraySlice {
+                    (match typ {
+                        SliceType::PartSelectDown | SliceType::PartSelectUp => {
+                            if idx_a.is_none() {
+                                self.errors.error(bracket_span.inner_span(), "Missing indexed part-select slices start index");
+                            };
+                            if idx_b.is_none() {
+                                self.errors.error(bracket_span.inner_span(), "Missing indexed part-select slice width");
+                            };
+                            match (idx_a, idx_b) {
+                                (Some(idx_a), Some(idx_b)) => match typ {
+                                    SliceType::PartSelectUp => {
+                                        WireReferencePathElement::ArrayPartSelectUp {
+                                            idx_a,
+                                            width: idx_b,
+                                            bracket_span,
+                                            output_typ
+                                        }
+                                    }
+                                    SliceType::PartSelectDown => {
+                                        WireReferencePathElement::ArrayPartSelectDown {
+                                            idx_a,
+                                            width: idx_b,
+                                            bracket_span,
+                                            output_typ
+                                        }
+                                    }
+                                    _ => unreachable!()
+                                }
+                                (_,_) => WireReferencePathElement::Error
+                            }
+                            
+                        }
+                        SliceType::Normal => WireReferencePathElement::ArraySlice {
                                 idx_a,
                                 idx_b,
                                 bracket_span,
                                 output_typ
-                            },
-                            SliceType::PartSelectUp => {
-                                WireReferencePathElement::ArrayPartSelectUp {
-                                    idx_a,
-                                    width: idx_b,
-                                    bracket_span,
-                                    output_typ
-                                }
-                            }
-                            SliceType::PartSelectDown => {
-                                WireReferencePathElement::ArrayPartSelectDown {
-                                    idx_a,
-                                    width: idx_b,
-                                    bracket_span,
-                                    output_typ
-                                }
-                            }
-                        },
+                        }
+                    },
                         generative,
                         bracket_span,
                     )
@@ -1121,8 +1141,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             let idx_expr = self.instructions[*idx].unwrap_subexpression();
                             resulting_domain.combine_with(idx_expr.domain);
                         }
-                        WireReferencePathElement::ArraySlice { idx_a, idx_b, .. }
-                        | WireReferencePathElement::ArrayPartSelectDown {
+                        WireReferencePathElement::ArraySlice { idx_a, idx_b, .. } => {
+                            if let Some(idx_a) = idx_a {
+                                let idx_a_expr = self.instructions[*idx_a].unwrap_subexpression();
+                                resulting_domain.combine_with(idx_a_expr.domain);
+                            }
+                            if let Some(idx_b) = idx_b {
+                                let idx_b_expr = self.instructions[*idx_b].unwrap_subexpression();
+                                resulting_domain.combine_with(idx_b_expr.domain);
+                            }
+                        }
+                        WireReferencePathElement::ArrayPartSelectDown {
                             idx_a,
                             width: idx_b,
                             ..
@@ -1138,6 +1167,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             let idx_b_expr = self.instructions[*idx_b].unwrap_subexpression();
                             resulting_domain.combine_with(idx_b_expr.domain);
                         }
+                        WireReferencePathElement::Error => {}
                     }
                 }
                 ExpressionSource::WireRef(wr)

@@ -16,7 +16,7 @@ use crate::typing::written_type::WrittenType;
 use crate::util::{unwrap_single_element, zip_eq};
 
 use ibig::ops::{Abs, UnsignedAbs};
-use ibig::{IBig, UBig};
+use ibig::{ibig, IBig, UBig};
 
 use sus_proc_macro::get_builtin_const;
 
@@ -155,8 +155,76 @@ impl GenerationState<'_> {
                     idx_b,
                     bracket_span,
                     output_typ: _,
+                } => {
+                    let start = match idx_a {
+                        Some(idx) => self.get_generation_integer(*idx)?,
+                        None => &ibig!(0),
+                    };
+                    let end = match idx_b {
+                        Some(idx) => {
+                            let end = self.get_generation_integer(*idx)?;
+                            let Some(end) = usize::try_from(end).ok() else {
+                                return Err((
+                                    bracket_span.inner_span(),
+                                    format!("End index {end} must be > 0"),
+                                ));
+                            };
+                            Some(end)
+                        }
+                        None => None,
+                    };
+
+                    let Some(start) = usize::try_from(start).ok() else {
+                        return Err((
+                            bracket_span.inner_span(),
+                            format!("Start index {start} must be > 0"),
+                        ));
+                    };
+                    let capacity_elements = match end {
+                        Some(end) => end - start,
+                        None => 0, // inefficient, but fiddly to manage lifetimes to figure out the size here
+                    };
+                    let old_targets = std::mem::replace(
+                        &mut cur_targets,
+                        Vec::with_capacity(capacity_elements * cur_targets_len),
+                    );
+                    for (t, f) in old_targets {
+                        // &mut [Value]
+                        let Value::Array(t_values) = t else {
+                            unreachable!()
+                        }; // must be an array, from earlier typechecking
+                           // Vec<Value>
+                        let Value::Array(f_values) = f else {
+                            unreachable!()
+                        }; // must be an array, from earlier typechecking
+                           //assert_eq!(end - start, f_values.len());
+                        let t_values_len = t_values.len();
+                        let p = match end {
+                            Some(end) => {
+                                let Some(g) = t_values.get_mut(start..end) else {
+                                    return Err((
+                                    bracket_span.inner_span(),
+                                    format!("Slice {start}:{end} is out of bounds for this array of length {t_values_len}"),
+                                ));
+                                };
+                                g
+                            }
+                            None => {
+                                let Some(g) = t_values.get_mut(start..) else {
+                                    return Err((
+                                    bracket_span.inner_span(),
+                                    format!("Slice {start}: is out of bounds for this array of length {t_values_len}"),
+                                ));
+                                };
+                                g
+                            }
+                        };
+                        for (tt, ff) in p.iter_mut().zip(f_values.iter()) {
+                            cur_targets.push((tt, ff.clone()));
+                        }
+                    }
                 }
-                | WireReferencePathElement::ArrayPartSelectDown {
+                WireReferencePathElement::ArrayPartSelectDown {
                     idx_a,
                     width: idx_b,
                     bracket_span,
@@ -215,6 +283,7 @@ impl GenerationState<'_> {
                         }
                     }
                 }
+                WireReferencePathElement::Error => {}
             }
         }
         for (t, f) in cur_targets.into_boxed_slice() {
@@ -294,7 +363,7 @@ fn array_access<'v>(
 fn array_slice(
     arr_val: &mut Value,
     idx_a: &IBig,
-    idx_b: &IBig,
+    idx_b: Option<&IBig>,
     span: BracketSpan,
 ) -> ExecutionResult<Vec<Value>> {
     let Value::Array(a_box) = arr_val else {
@@ -313,14 +382,20 @@ fn array_slice(
         ));
     };
 
-    let Some(idx_b) = usize::try_from(idx_b).ok() else {
-        return Err((
-            span.inner_span(),
-            format!(
-                "Index {idx_b} is out of bounds for this array of size {}",
-                array_len
-            ),
-        ));
+    let idx_b = match idx_b {
+        Some(idx_b) => {
+            let Some(g) = usize::try_from(idx_b).ok() else {
+                return Err((
+                    span.inner_span(),
+                    format!(
+                        "Index {idx_b} is out of bounds for this array of size {}",
+                        array_len
+                    ),
+                ));
+            };
+            g
+        }
+        None => array_len - 1,
     };
 
     // make right sized empty vector of values
@@ -791,8 +866,30 @@ impl<'l> ExecutionContext<'l> {
                     idx_b,
                     bracket_span,
                     output_typ: _,
+                } => {
+                    let idx_a = match idx_a {
+                        Some(idx_a) => {
+                            let idx_wire_a = self.get_wire_or_constant_as_wire(*idx_a, domain)?;
+                            SliceIndex::Wire(idx_wire_a)
+                        }
+                        None => SliceIndex::Unknown(self.type_substitutor.alloc_unknown()),
+                    };
+
+                    let idx_b = match idx_b {
+                        Some(idx_b) => {
+                            let idx_wire_b = self.get_wire_or_constant_as_wire(*idx_b, domain)?;
+                            SliceIndex::Wire(idx_wire_b)
+                        }
+                        None => SliceIndex::Unknown(self.type_substitutor.alloc_unknown()),
+                    };
+
+                    preamble.push(RealWirePathElem::ArraySlice {
+                        span: *bracket_span,
+                        idx_a_wire: idx_a,
+                        idx_b_wire: idx_b,
+                    });
                 }
-                | WireReferencePathElement::ArrayPartSelectDown {
+                WireReferencePathElement::ArrayPartSelectDown {
                     idx_a,
                     width: idx_b,
                     bracket_span,
@@ -809,13 +906,6 @@ impl<'l> ExecutionContext<'l> {
                     let idx_wire_b = self.get_wire_or_constant_as_wire(*idx_b, domain)?;
 
                     preamble.push(match v {
-                        WireReferencePathElement::ArraySlice { .. } => {
-                            RealWirePathElem::ArraySlice {
-                                span: *bracket_span,
-                                idx_a_wire: idx_wire_a,
-                                idx_b_wire: idx_wire_b,
-                            }
-                        }
                         WireReferencePathElement::ArrayPartSelectDown { .. } => {
                             RealWirePathElem::ArrayPartSelectDown {
                                 span: *bracket_span,
@@ -833,6 +923,7 @@ impl<'l> ExecutionContext<'l> {
                         _ => unreachable!(),
                     });
                 }
+                WireReferencePathElement::Error => {}
             }
         }
 
@@ -1361,8 +1452,20 @@ impl<'l> ExecutionContext<'l> {
                     idx_b,
                     bracket_span,
                     output_typ: _,
+                } => {
+                    let idx_a = match idx_a {
+                        Some(idx_a) => self.generation_state.get_generation_integer(idx_a)?,
+                        None => &ibig!(0),
+                    };
+                    let idx_b = match idx_b {
+                        Some(idx_b) => Some(self.generation_state.get_generation_integer(idx_b)?),
+                        None => None,
+                    };
+                    Value::Array(
+                        array_slice(&mut work_on_value, idx_a, idx_b, bracket_span)?.clone(),
+                    )
                 }
-                | &WireReferencePathElement::ArrayPartSelectDown {
+                &WireReferencePathElement::ArrayPartSelectDown {
                     idx_a,
                     width: idx_b,
                     bracket_span,
@@ -1377,14 +1480,17 @@ impl<'l> ExecutionContext<'l> {
                     let idx_a = self.generation_state.get_generation_integer(idx_a)?;
                     let idx_b = self.generation_state.get_generation_integer(idx_b)?;
                     let idx_end = match path_elem {
-                        &WireReferencePathElement::ArraySlice { .. } => idx_b,
                         &WireReferencePathElement::ArrayPartSelectDown { .. } => &(idx_a - idx_b),
                         &WireReferencePathElement::ArrayPartSelectUp { .. } => &(idx_a + idx_b),
                         _ => unreachable!(),
                     };
                     Value::Array(
-                        array_slice(&mut work_on_value, idx_a, idx_end, bracket_span)?.clone(),
+                        array_slice(&mut work_on_value, idx_a, Some(idx_end), bracket_span)?
+                            .clone(),
                     )
+                }
+                WireReferencePathElement::Error => {
+                    return Err((wire_ref.root_span, "todo".to_owned()))
                 }
             }
         }
