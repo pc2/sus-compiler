@@ -4,14 +4,16 @@ use crate::alloc::{ArenaAllocator, UUID};
 use crate::errors::{ErrorInfo, ErrorInfoObject, FileKnowingErrorInfoObject};
 use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType};
-use crate::typing::template::TVec;
-use crate::typing::type_inference::{AbstractTypeSubstitutor, FailedUnification};
+use crate::typing::template::{Parameter, TVec};
+use crate::typing::type_inference::{
+    AbstractTypeSubstitutor, FailedUnification, TypeUnifier, UnifyErrorReport,
+};
 
 use crate::debug::SpanDebugger;
 use crate::linker::{FileData, GlobalResolver, GlobalUUID, AFTER_TYPECHECK_CP};
 
 use crate::typing::{
-    abstract_type::{FullTypeUnifier, BOOL_TYPE, INT_TYPE},
+    abstract_type::{BOOL_TYPE, INT_TYPE},
     template::TemplateKind,
 };
 
@@ -36,10 +38,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
         let mut context = TypeCheckingContext {
             globals: &globals,
             errors: &globals.errors,
-            type_checker: FullTypeUnifier::new(
-                &working_on.link_info.template_parameters,
-                AbstractTypeSubstitutor::default(),
-            ),
+            type_checker: TypeUnifier::from(AbstractTypeSubstitutor::default()),
             working_on: &working_on.link_info,
         };
 
@@ -55,8 +54,9 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
             linker_types: &linker.types,
             errors: &errors,
             type_checker,
+            template_names: &working_on_mut.link_info.template_parameters,
         };
-        finalize_ctx.apply_types(working_on_mut);
+        finalize_ctx.apply_types(&mut working_on_mut.link_info.instructions);
 
         working_on_mut
             .link_info
@@ -167,7 +167,7 @@ struct TypeCheckingContext<'l, 'errs> {
     globals: &'l GlobalResolver<'l>,
     errors: &'errs ErrorCollector<'l>,
     working_on: &'l LinkInfo,
-    type_checker: FullTypeUnifier,
+    type_checker: TypeUnifier<AbstractTypeSubstitutor>,
 }
 
 impl<'l> TypeCheckingContext<'l, '_> {
@@ -184,7 +184,6 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 let decl =
                     linker_cst.link_info.instructions[linker_cst.output_decl].unwrap_declaration();
                 self.type_checker
-                    .abstract_type_substitutor
                     .written_to_abstract_type_substitute_templates(
                         &decl.typ_expr,
                         &cst.template_arg_types,
@@ -206,9 +205,9 @@ impl<'l> TypeCheckingContext<'l, '_> {
                         .info_obj(&submod_port);
                 }
 
-                submod_port.get_local_type(&mut self.type_checker.abstract_type_substitutor)
+                submod_port.get_local_type(&mut self.type_checker)
             }
-            WireReferenceRoot::Error => self.type_checker.abstract_type_substitutor.alloc_unknown(),
+            WireReferenceRoot::Error => self.type_checker.alloc_unknown(),
         };
         wire_ref.root_typ.set(root_typ);
 
@@ -222,14 +221,12 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 } => {
                     let idx_expr = self.working_on.instructions[*idx].unwrap_subexpression();
 
-                    self.type_checker
-                        .abstract_type_substitutor
-                        .unify_report_error(
-                            idx_expr.typ,
-                            &INT_TYPE.scalar(),
-                            idx_expr.span,
-                            "array index",
-                        );
+                    self.type_checker.unify_report_error(
+                        idx_expr.typ,
+                        &INT_TYPE.scalar(),
+                        idx_expr.span,
+                        "array index",
+                    );
 
                     output_typ.set(self.type_checker.rank_down(
                         walking_typ,
@@ -262,7 +259,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                         if let Some(wr_typ) = global_ref.get_type_arg_for(id) {
                             self.typecheck_written_type(wr_typ)
                         } else {
-                            self.type_checker.abstract_type_substitutor.alloc_unknown()
+                            self.type_checker.alloc_unknown()
                         }
                     }
                     TemplateKind::Value(_) => {
@@ -283,7 +280,6 @@ impl<'l> TypeCheckingContext<'l, '_> {
 
                     let param_required_typ = self
                         .type_checker
-                        .abstract_type_substitutor
                         .written_to_abstract_type_substitute_templates(
                             &target_decl.typ_expr,
                             &abs_types, // We substitute the templates for type variables here
@@ -293,14 +289,12 @@ impl<'l> TypeCheckingContext<'l, '_> {
                         let from_expr =
                             self.working_on.instructions[from_expr].unwrap_subexpression();
 
-                        self.type_checker
-                            .abstract_type_substitutor
-                            .unify_report_error(
-                                from_expr.typ,
-                                &param_required_typ,
-                                from_expr.span,
-                                "Template argument",
-                            );
+                        self.type_checker.unify_report_error(
+                            from_expr.typ,
+                            &param_required_typ,
+                            from_expr.span,
+                            "Template argument",
+                        );
                     }
                     abs_types[id] = param_required_typ;
                 }
@@ -312,7 +306,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
 
     fn typecheck_written_type(&mut self, wr_typ: &WrittenType) -> AbstractRankedType {
         match wr_typ {
-            WrittenType::Error(_) => self.type_checker.abstract_type_substitutor.alloc_unknown(),
+            WrittenType::Error(_) => self.type_checker.alloc_unknown(),
             WrittenType::TemplateVariable(_, var) => AbstractInnerType::Template(*var).scalar(),
             WrittenType::Named(global_ref) => {
                 self.typecheck_template_global(global_ref);
@@ -325,14 +319,12 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 let content_typ = self.typecheck_written_type(content_typ);
 
                 let idx_expr = self.working_on.instructions[*arr_idx].unwrap_subexpression();
-                self.type_checker
-                    .abstract_type_substitutor
-                    .unify_report_error(
-                        idx_expr.typ,
-                        &INT_TYPE.scalar(),
-                        idx_expr.span,
-                        "array size",
-                    );
+                self.type_checker.unify_report_error(
+                    idx_expr.typ,
+                    &INT_TYPE.scalar(),
+                    idx_expr.span,
+                    "array size",
+                );
 
                 content_typ.rank_up()
             }
@@ -343,14 +335,12 @@ impl<'l> TypeCheckingContext<'l, '_> {
         if let Some(latency_spec) = lat_spec {
             let latency_specifier_expr =
                 self.working_on.instructions[latency_spec].unwrap_subexpression();
-            self.type_checker
-                .abstract_type_substitutor
-                .unify_report_error(
-                    latency_specifier_expr.typ,
-                    &INT_TYPE.scalar(),
-                    latency_specifier_expr.span,
-                    "latency specifier",
-                );
+            self.type_checker.unify_report_error(
+                latency_specifier_expr.typ,
+                &INT_TYPE.scalar(),
+                latency_specifier_expr.span,
+                "latency specifier",
+            );
         }
     }
 
@@ -421,14 +411,12 @@ impl<'l> TypeCheckingContext<'l, '_> {
             std::iter::zip(interface.interface.func_call_inputs, &func_call.arguments)
         {
             let port_decl = interface.get_port(port);
-            let port_type =
-                port_decl.get_local_type(&mut self.type_checker.abstract_type_substitutor);
+            let port_type = port_decl.get_local_type(&mut self.type_checker);
 
             // Typecheck the value with target type
             let from = self.working_on.instructions[*arg].unwrap_subexpression();
 
             self.type_checker
-                .abstract_type_substitutor
                 .unify_report_error(from.typ, &port_type, from.span, || {
                     ("function argument".to_string(), vec![port_decl.make_info()])
                 });
@@ -484,9 +472,9 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 if let Some(first_output) = interface.interface.func_call_outputs.first() {
                     let port_decl = interface.get_port(first_output);
 
-                    port_decl.get_local_type(&mut self.type_checker.abstract_type_substitutor)
+                    port_decl.get_local_type(&mut self.type_checker)
                 } else {
-                    self.type_checker.abstract_type_substitutor.alloc_unknown()
+                    self.type_checker.alloc_unknown()
                 }
             }
             ExpressionSource::Literal(value) => AbstractRankedType {
@@ -504,21 +492,24 @@ impl<'l> TypeCheckingContext<'l, '_> {
                         let elem_expr =
                             self.working_on.instructions[*elem_id].unwrap_subexpression();
 
-                        self.type_checker
-                            .abstract_type_substitutor
-                            .unify_report_error(elem_expr.typ, &elem_typ, elem_expr.span, || {
+                        self.type_checker.unify_report_error(
+                            elem_expr.typ,
+                            &elem_typ,
+                            elem_expr.span,
+                            || {
                                 let first_elem_info = ErrorInfo {
                                     position: first_elem_expr.span,
                                     file: self.errors.file,
                                     info: "First array element defined here".to_owned(),
                                 };
                                 ("array construction types".to_owned(), vec![first_elem_info])
-                            });
+                            },
+                        );
                     }
 
                     elem_typ
                 } else {
-                    self.type_checker.abstract_type_substitutor.alloc_unknown()
+                    self.type_checker.alloc_unknown()
                 };
                 arr_elem_typ.rank_up()
             }
@@ -542,14 +533,14 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 for (port, to) in std::iter::zip(interface.interface.func_call_outputs, multi_write)
                 {
                     let port_decl = interface.get_port(port);
-                    let port_type =
-                        port_decl.get_local_type(&mut self.type_checker.abstract_type_substitutor);
+                    let port_type = port_decl.get_local_type(&mut self.type_checker);
 
-                    self.type_checker
-                        .abstract_type_substitutor
-                        .unify_report_error(to.to.get_output_typ(), &port_type, to.to_span, || {
-                            ("function output".to_string(), vec![port_decl.make_info()])
-                        });
+                    self.type_checker.unify_report_error(
+                        to.to.get_output_typ(),
+                        &port_type,
+                        to.to_span,
+                        || ("function output".to_string(), vec![port_decl.make_info()]),
+                    );
                 }
             }
             ExpressionSource::WireRef(..)
@@ -559,14 +550,12 @@ impl<'l> TypeCheckingContext<'l, '_> {
             | ExpressionSource::Literal(..) => {
                 let expr_out_typ = self.typecheck_single_output_expr(expr);
                 if let Some(first_write) = multi_write.first() {
-                    self.type_checker
-                        .abstract_type_substitutor
-                        .unify_report_error(
-                            &expr_out_typ,
-                            first_write.to.get_output_typ(),
-                            first_write.to_span,
-                            "writing the output of this expression",
-                        );
+                    self.type_checker.unify_report_error(
+                        &expr_out_typ,
+                        first_write.to.get_output_typ(),
+                        first_write.to_span,
+                        "writing the output of this expression",
+                    );
                 }
 
                 // Don't output errors for 0 outputs. See no errors on zero outputs (#79)
@@ -596,26 +585,30 @@ impl<'l> TypeCheckingContext<'l, '_> {
             Instruction::IfStatement(stm) => {
                 let condition_expr =
                     &self.working_on.instructions[stm.condition].unwrap_subexpression();
-                self.type_checker
-                    .abstract_type_substitutor
-                    .unify_report_error(
-                        condition_expr.typ,
-                        &BOOL_TYPE.scalar(),
-                        condition_expr.span,
-                        "if statement condition",
-                    );
+                self.type_checker.unify_report_error(
+                    condition_expr.typ,
+                    &BOOL_TYPE.scalar(),
+                    condition_expr.span,
+                    "if statement condition",
+                );
             }
             Instruction::ForStatement(stm) => {
                 let loop_var = self.working_on.instructions[stm.loop_var_decl].unwrap_declaration();
                 let start = self.working_on.instructions[stm.start].unwrap_subexpression();
                 let end = self.working_on.instructions[stm.end].unwrap_subexpression();
 
-                self.type_checker
-                    .abstract_type_substitutor
-                    .unify_report_error(start.typ, &loop_var.typ, start.span, "for loop start");
-                self.type_checker
-                    .abstract_type_substitutor
-                    .unify_report_error(end.typ, &loop_var.typ, end.span, "for loop end");
+                self.type_checker.unify_report_error(
+                    start.typ,
+                    &loop_var.typ,
+                    start.span,
+                    "for loop start",
+                );
+                self.type_checker.unify_report_error(
+                    end.typ,
+                    &loop_var.typ,
+                    end.span,
+                    "for loop end",
+                );
             }
             Instruction::Expression(expr) => match &expr.output {
                 ExpressionOutput::SubExpression(typ) => {
@@ -644,7 +637,7 @@ impl AbstractTypeSubstitutor {
     /// template_type_args applies to both Template Type args and Template Value args.
     ///
     /// For Types this is the Type, for Values this is unified with the parameter declaration type
-    pub fn written_to_abstract_type_substitute_templates(
+    fn written_to_abstract_type_substitute_templates(
         &mut self,
         wr_typ: &WrittenType,
         template_args: &TVec<AbstractRankedType>,
@@ -669,19 +662,119 @@ impl AbstractTypeSubstitutor {
         }
     }
 }
+impl TypeUnifier<AbstractTypeSubstitutor> {
+    /// Returns the type of the content of the array
+    fn rank_down<Report: UnifyErrorReport>(
+        &mut self,
+        arr_typ: &AbstractRankedType,
+        span: Span,
+        context: Report,
+    ) -> AbstractRankedType {
+        if let PeanoType::Succ(content_rank) = &arr_typ.rank {
+            AbstractRankedType {
+                inner: arr_typ.inner.clone(),
+                rank: content_rank.deref().clone(),
+            }
+        } else {
+            let content_rank = self.rank_substitutor.alloc_unknown();
+            let mut content_typ = AbstractRankedType {
+                inner: arr_typ.inner.clone(),
+                rank: PeanoType::Succ(Box::new(content_rank.clone())),
+            };
+            self.unify_report_error(arr_typ, &content_typ, span, context);
+            content_typ.rank = content_rank;
+            content_typ
+        }
+    }
+
+    /// Returns the output type. It happens that the operator rank is the output type's rank
+    fn typecheck_unary_operator_abstr(
+        &mut self,
+        op: UnaryOperator,
+        input_typ: &AbstractRankedType,
+        span: Span,
+    ) -> AbstractRankedType {
+        let input_rank = input_typ.rank.clone();
+        if op == UnaryOperator::Not {
+            self.unify_report_error(
+                input_typ,
+                &BOOL_TYPE.with_rank(input_rank.clone()),
+                span,
+                "! input",
+            );
+
+            BOOL_TYPE.with_rank(input_rank)
+        } else if op == UnaryOperator::Negate {
+            self.unify_report_error(
+                input_typ,
+                &INT_TYPE.with_rank(input_rank.clone()),
+                span,
+                "unary - input",
+            );
+            INT_TYPE.with_rank(input_rank)
+        } else {
+            let reduction_type = match op {
+                UnaryOperator::And => BOOL_TYPE,
+                UnaryOperator::Or => BOOL_TYPE,
+                UnaryOperator::Xor => BOOL_TYPE,
+                UnaryOperator::Sum => INT_TYPE,
+                UnaryOperator::Product => INT_TYPE,
+                _ => unreachable!(),
+            };
+            let reduction_type = reduction_type.with_rank(input_rank.clone());
+            self.unify_report_error(input_typ, &reduction_type, span, "array reduction");
+            self.rank_down(&reduction_type, span, "array reduction")
+        }
+    }
+
+    fn typecheck_binary_operator_abstr(
+        &mut self,
+        op: BinaryOperator,
+        left_typ: &AbstractRankedType,
+        right_typ: &AbstractRankedType,
+        left_span: Span,
+        right_span: Span,
+    ) -> AbstractRankedType {
+        let (exp_left, exp_right, out_typ) = match op {
+            BinaryOperator::And => (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
+            BinaryOperator::Or => (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
+            BinaryOperator::Xor => (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
+            BinaryOperator::Add => (INT_TYPE, INT_TYPE, INT_TYPE),
+            BinaryOperator::Subtract => (INT_TYPE, INT_TYPE, INT_TYPE),
+            BinaryOperator::Multiply => (INT_TYPE, INT_TYPE, INT_TYPE),
+            BinaryOperator::Divide => (INT_TYPE, INT_TYPE, INT_TYPE),
+            BinaryOperator::Modulo => (INT_TYPE, INT_TYPE, INT_TYPE),
+            BinaryOperator::Equals => (INT_TYPE, INT_TYPE, BOOL_TYPE),
+            BinaryOperator::NotEquals => (INT_TYPE, INT_TYPE, BOOL_TYPE),
+            BinaryOperator::GreaterEq => (INT_TYPE, INT_TYPE, BOOL_TYPE),
+            BinaryOperator::Greater => (INT_TYPE, INT_TYPE, BOOL_TYPE),
+            BinaryOperator::LesserEq => (INT_TYPE, INT_TYPE, BOOL_TYPE),
+            BinaryOperator::Lesser => (INT_TYPE, INT_TYPE, BOOL_TYPE),
+        };
+        let input_rank = left_typ.rank.clone();
+        let exp_left = exp_left.with_rank(input_rank.clone());
+        let exp_right = exp_right.with_rank(input_rank.clone());
+        let out_typ = out_typ.with_rank(input_rank.clone());
+
+        self.unify_report_error(left_typ, &exp_left, left_span, "binop left side");
+        self.unify_report_error(right_typ, &exp_right, right_span, "binop right side");
+        out_typ
+    }
+}
 
 // ====== Free functions for actually applying the result of type checking ======
 
 struct FinalizationContext<'l, 'errs> {
     linker_types: &'l ArenaAllocator<StructType, TypeUUIDMarker>,
     errors: &'errs ErrorCollector<'l>,
-    type_checker: FullTypeUnifier,
+    type_checker: TypeUnifier<AbstractTypeSubstitutor>,
+    template_names: &'l TVec<Parameter>,
 }
 
 impl FinalizationContext<'_, '_> {
-    pub fn apply_types(mut self, working_on: &mut Module) {
+    pub fn apply_types(mut self, instructions: &mut FlatAlloc<Instruction, FlatIDMarker>) {
         // Post type application. Solidify types and flag any remaining AbstractType::Unknown
-        for (_id, inst) in working_on.link_info.instructions.iter_mut() {
+        for (_id, inst) in instructions.iter_mut() {
             match inst {
                 Instruction::Expression(expr) => {
                     match &mut expr.output {
@@ -700,9 +793,10 @@ impl FinalizationContext<'_, '_> {
                         }
                         ExpressionSource::UnaryOp { rank, .. }
                         | ExpressionSource::BinaryOp { rank, .. } => {
-                            let _ = rank.get_mut().fully_substitute(
-                                &self.type_checker.abstract_type_substitutor.rank_substitutor,
-                            ); // No need to report incomplete peano error, as one of the ports would have reported it
+                            let _ = rank
+                                .get_mut()
+                                .fully_substitute(&self.type_checker.rank_substitutor);
+                            // No need to report incomplete peano error, as one of the ports would have reported it
                         }
                         _ => {}
                     }
@@ -725,17 +819,17 @@ impl FinalizationContext<'_, '_> {
             span,
             context,
             infos,
-        } in self.type_checker.abstract_type_substitutor.extract_errors()
+        } in self.type_checker.extract_errors()
         {
             // Not being able to fully substitute is not an issue. We just display partial types
-            let _ = found.fully_substitute(&self.type_checker.abstract_type_substitutor);
-            let _ = expected.fully_substitute(&self.type_checker.abstract_type_substitutor);
+            let _ = found.fully_substitute(&self.type_checker);
+            let _ = expected.fully_substitute(&self.type_checker);
 
             let expected_name = expected
-                .display(self.linker_types, &self.type_checker.template_type_names)
+                .display(self.linker_types, self.template_names)
                 .to_string();
             let found_name = found
-                .display(self.linker_types, &self.type_checker.template_type_names)
+                .display(self.linker_types, self.template_names)
                 .to_string();
             self.errors
             .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
@@ -751,12 +845,12 @@ impl FinalizationContext<'_, '_> {
     }
 
     pub fn finalize_abstract_type(&self, typ: &mut AbstractRankedType, span: Span) {
-        if !typ.fully_substitute(&self.type_checker.abstract_type_substitutor) {
+        if !typ.fully_substitute(&self.type_checker) {
             self.errors.error(
                 span,
                 format!(
                     "Could not fully figure out the type of this object. {}",
-                    typ.display(self.linker_types, &self.type_checker.template_type_names)
+                    typ.display(self.linker_types, self.template_names)
                 ),
             );
         }
