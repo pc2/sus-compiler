@@ -77,8 +77,8 @@ pub enum IsExtern {
 
 pub const AFTER_INITIAL_PARSE_CP: usize = 0;
 pub const AFTER_FLATTEN_CP: usize = 1;
-pub const AFTER_TYPECHECK_CP: usize = 2;
-pub const AFTER_DOMAINCHECK_CP: usize = 3;
+pub const AFTER_TYPE_CHECK_CP: usize = 2;
+pub const AFTER_DOMAIN_CHECK_CP: usize = 3;
 pub const AFTER_LINTS_CP: usize = 4;
 
 /// Represents any global. Stored in [Linker] and each is uniquely indexed by [GlobalUUID]

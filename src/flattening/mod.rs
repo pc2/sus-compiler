@@ -2,7 +2,7 @@ mod flatten;
 mod initialization;
 mod name_context;
 mod parser;
-mod typecheck;
+pub mod typecheck;
 mod walk;
 
 use crate::flattening::typecheck::TyCell;
@@ -15,9 +15,6 @@ use std::cell::{Cell, OnceCell};
 use crate::latency::port_latency_inference::PortLatencyInferenceInfo;
 pub use flatten::flatten_all_globals;
 pub use initialization::gather_initial_file_data;
-pub use typecheck::domain_check::domain_check_all;
-pub use typecheck::lints::perform_lints;
-pub use typecheck::type_check::typecheck_all_modules;
 
 use crate::linker::{Documentation, LinkInfo};
 use crate::value::Value;

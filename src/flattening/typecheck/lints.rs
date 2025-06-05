@@ -1,11 +1,12 @@
 use sus_proc_macro::get_builtin_const;
 
-use super::type_check::RemoteSubModule;
 use crate::flattening::{IdentifierType, WriteModifiers};
 use crate::linker::{IsExtern, LinkInfo, AFTER_LINTS_CP};
 use crate::prelude::*;
 use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
+
+use super::*;
 
 use super::{
     Expression, ExpressionOutput, ExpressionSource, Instruction, Module, WireReferenceRoot,
@@ -26,7 +27,6 @@ pub fn perform_lints(linker: &mut Linker) {
 
         find_unused_variables(md, &errors);
         extern_objects_may_not_have_type_template_args(&md.link_info, &errors);
-
         lint_instructions(&md.link_info.instructions, &errors, linker);
 
         let md = &mut linker.modules[id];

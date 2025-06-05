@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
+use crate::flattening::typecheck::{perform_lints, typecheck_all};
 use crate::linker::AFTER_INITIAL_PARSE_CP;
 use crate::prelude::*;
 use crate::typing::concrete_type::ConcreteGlobalReference;
@@ -15,10 +16,7 @@ use crate::{
     linker::FileData,
 };
 
-use crate::flattening::{
-    domain_check_all, flatten_all_globals, gather_initial_file_data, perform_lints,
-    typecheck_all_modules, Module,
-};
+use crate::flattening::{flatten_all_globals, gather_initial_file_data, Module};
 
 const STD_LIB_PATH: &str = env!("SUS_COMPILER_STD_LIB_PATH");
 
@@ -216,9 +214,7 @@ impl Linker {
             return;
         }
 
-        typecheck_all_modules(self);
-
-        domain_check_all(self);
+        typecheck_all(self);
 
         if config.early_exit == EarlyExitUpTo::AbstractTypecheck {
             return;

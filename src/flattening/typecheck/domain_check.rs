@@ -1,7 +1,6 @@
-use super::type_check::RemoteSubModule;
 use crate::alloc::UUIDAllocator;
 use crate::errors::ErrorInfo;
-use crate::linker::AFTER_DOMAINCHECK_CP;
+use crate::linker::AFTER_DOMAIN_CHECK_CP;
 use crate::prelude::*;
 use crate::typing::type_inference::{FailedUnification, TypeSubstitutor, TypeUnifier};
 
@@ -9,19 +8,14 @@ use super::*;
 
 pub fn domain_check_all(linker: &mut Linker) {
     let module_uuids: Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
-    for id in module_uuids {
-        let md = &mut linker.modules[id];
-        let errors = ErrorCollector::from_storage(
-            md.link_info.errors.take(),
-            md.link_info.file,
-            &linker.files,
-        );
-        let resolved_globals = md.link_info.resolved_globals.take();
+    for module_uuid in module_uuids {
+        let working_on_mut = &mut linker.modules[module_uuid];
+        let errs_globals = working_on_mut.link_info.take_errors_globals();
 
-        let md = &linker.modules[id];
+        let md: &Module = &linker.modules[module_uuid];
+        let globals = GlobalResolver::new(linker, &md.link_info, errs_globals);
 
-        let domain_substitutor =
-            domain_check_link_info(linker, &errors, &md.link_info.instructions);
+        let domain_substitutor = domain_check_link_info(&globals, &md.link_info.instructions);
 
         // Set the remaining domain variables that aren't associated with a module port.
         // We just find domain IDs that haven't been
@@ -35,31 +29,23 @@ pub fn domain_check_all(linker: &mut Linker) {
             }
         }
 
-        let md = &mut linker.modules[id];
+        let (errs, globals) = globals.decommission();
+        let errors = ErrorCollector::from_storage(errs, md.link_info.file, &linker.files);
+        let md = &mut linker.modules[module_uuid];
         finalize_domains(&errors, &mut md.link_info.instructions, domain_substitutor);
-        md.link_info.reabsorb_errors_globals(
-            (errors.into_storage(), resolved_globals),
-            AFTER_DOMAINCHECK_CP,
-        );
+        md.link_info
+            .reabsorb_errors_globals((errors.into_storage(), globals), AFTER_DOMAIN_CHECK_CP);
     }
 }
 
-struct DomainCheckingContext<'l> {
-    linker: &'l Linker,
-    errors: &'l ErrorCollector<'l>,
-    domain_substitutor: TypeUnifier<TypeSubstitutor<DomainType>>,
-    instructions: &'l FlatAlloc<Instruction, FlatIDMarker>,
-}
-
 fn domain_check_link_info<'l>(
-    linker: &'l Linker,
-    errors: &ErrorCollector<'l>,
+    globals: &'l GlobalResolver<'l>,
     instructions: &FlatAlloc<Instruction, FlatIDMarker>,
 ) -> TypeUnifier<TypeSubstitutor<DomainType>> {
     let mut ctx = DomainCheckingContext {
-        linker,
-        errors,
-        domain_substitutor: TypeUnifier::default(),
+        globals,
+        errors: &globals.errors,
+        domain_checker: TypeUnifier::default(),
         instructions,
     };
 
@@ -67,7 +53,7 @@ fn domain_check_link_info<'l>(
         ctx.check_instr(instr);
     }
 
-    ctx.domain_substitutor
+    ctx.domain_checker
 }
 
 fn finalize_domains(
@@ -129,9 +115,9 @@ impl<'l> DomainCheckingContext<'l> {
         match instr {
             Instruction::SubModule(sub_module_instance) => {
                 sub_module_instance.local_interface_domains.set(
-                    self.linker.modules[sub_module_instance.module_ref.id]
+                    self.globals[sub_module_instance.module_ref.id]
                         .domains
-                        .map(|_| self.domain_substitutor.alloc_unknown()),
+                        .map(|_| self.domain_checker.alloc_unknown()),
                 );
             }
             Instruction::Declaration(declaration) => {
@@ -139,7 +125,7 @@ impl<'l> DomainCheckingContext<'l> {
                 declaration.domain.set(match declaration.identifier_type {
                     IdentifierType::Local | IdentifierType::State => match declaration.decl_kind {
                         DeclarationKind::RegularPort { domain, .. } => DomainType::Physical(domain),
-                        _ => self.domain_substitutor.alloc_unknown(),
+                        _ => self.domain_checker.alloc_unknown(),
                     },
                     IdentifierType::Generative => DomainType::Generative,
                 });
@@ -154,7 +140,7 @@ impl<'l> DomainCheckingContext<'l> {
                         let sm = RemoteSubModule::make(
                             func_call.interface_reference.submodule_decl,
                             self.instructions,
-                            &self.linker.modules,
+                            self.globals,
                         );
                         let interface = sm.get_interface_reference(
                             func_call.interface_reference.submodule_interface,
@@ -295,11 +281,8 @@ impl<'l> DomainCheckingContext<'l> {
                 DomainType::Generative
             }
             WireReferenceRoot::SubModulePort(port_ref) => {
-                let sm = RemoteSubModule::make(
-                    port_ref.submodule_decl,
-                    self.instructions,
-                    &self.linker.modules,
-                );
+                let sm =
+                    RemoteSubModule::make(port_ref.submodule_decl, self.instructions, self.globals);
                 sm.get_port(port_ref.port).get_local_domain()
             }
             WireReferenceRoot::Error => DomainType::Generative,
@@ -312,17 +295,16 @@ impl<'l> DomainCheckingContext<'l> {
     pub fn unify_physicals(&mut self, a: (DomainType, Span), b: (DomainType, Span), context: &str) {
         assert!(a.0 != DomainType::Generative);
         assert!(b.0 != DomainType::Generative);
-        self.domain_substitutor
-            .unify_report_error(&b.0, &a.0, b.1, || {
-                (
-                    context.to_string(),
-                    vec![ErrorInfo {
-                        position: a.1,
-                        file: self.errors.file,
-                        info: "Conflicting with".to_string(),
-                    }],
-                )
-            });
+        self.domain_checker.unify_report_error(&b.0, &a.0, b.1, || {
+            (
+                context.to_string(),
+                vec![ErrorInfo {
+                    position: a.1,
+                    file: self.errors.file,
+                    info: "Conflicting with".to_string(),
+                }],
+            )
+        });
     }
 
     fn global_ref_must_be_generative<ID>(&mut self, global_ref: &GlobalReference<ID>) {

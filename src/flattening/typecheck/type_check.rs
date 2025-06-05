@@ -1,7 +1,7 @@
-use std::ops::{Deref, Index};
+use std::ops::Deref;
 
 use crate::alloc::{ArenaAllocator, UUID};
-use crate::errors::{ErrorInfo, ErrorInfoObject, FileKnowingErrorInfoObject};
+use crate::errors::ErrorInfo;
 use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType};
 use crate::typing::template::{Parameter, TVec};
@@ -10,7 +10,7 @@ use crate::typing::type_inference::{
 };
 
 use crate::debug::SpanDebugger;
-use crate::linker::{FileData, GlobalResolver, GlobalUUID, AFTER_TYPECHECK_CP};
+use crate::linker::{GlobalResolver, GlobalUUID, AFTER_TYPE_CHECK_CP};
 
 use crate::typing::{
     abstract_type::{BOOL_TYPE, INT_TYPE},
@@ -39,7 +39,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
             globals: &globals,
             errors: &globals.errors,
             type_checker: TypeUnifier::from(AbstractTypeSubstitutor::default()),
-            working_on: &working_on.link_info,
+            instructions: &working_on.link_info.instructions,
         };
 
         context.typecheck();
@@ -60,7 +60,7 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
 
         working_on_mut
             .link_info
-            .reabsorb_errors_globals((errors.into_storage(), globals), AFTER_TYPECHECK_CP);
+            .reabsorb_errors_globals((errors.into_storage(), globals), AFTER_TYPE_CHECK_CP);
 
         // Also create the inference info now.
         working_on_mut.latency_inference_info = PortLatencyInferenceInfo::make(
@@ -75,106 +75,20 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct RemoteSubModule<'l> {
-    pub submodule: &'l SubModuleInstance,
-    pub md: &'l Module,
-}
-impl<'l> RemoteSubModule<'l> {
-    pub fn make(
-        submodule_instr: FlatID,
-        instructions: &'l impl Index<FlatID, Output = Instruction>,
-        modules: &'l impl Index<ModuleUUID, Output = Module>,
-    ) -> Self {
-        let submodule = instructions[submodule_instr].unwrap_submodule();
-        Self {
-            submodule,
-            md: &modules[submodule.module_ref.id],
-        }
-    }
-
-    pub fn get_port(self, port_id: PortID) -> RemotePort<'l> {
-        RemotePort {
-            parent: self,
-            port: &self.md.ports[port_id],
-            remote_decl: self.md.get_port_decl(port_id),
-            file: self.md.link_info.file,
-        }
-    }
-    pub fn get_interface_reference(self, interface_id: InterfaceID) -> RemoteInterface<'l> {
-        let interface = &self.md.interfaces[interface_id];
-        RemoteInterface {
-            parent: self,
-            interface,
-        }
-    }
-}
-#[derive(Clone, Copy)]
-pub struct RemoteInterface<'l> {
-    parent: RemoteSubModule<'l>,
-    interface: &'l Interface,
-}
-impl<'l> RemoteInterface<'l> {
-    pub fn get_port(self, port_id: PortID) -> RemotePort<'l> {
-        self.parent.get_port(port_id)
-    }
-    pub fn get_local_domain(self) -> DomainType {
-        self.parent.submodule.local_interface_domains[self.interface.domain]
-    }
-}
-/// For interfaces of this module
-impl FileKnowingErrorInfoObject for RemoteInterface<'_> {
-    fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
-        ErrorInfo {
-            position: self.interface.name_span,
-            file: self.parent.md.link_info.file,
-            info: format!("Interface '{}' defined here", &self.interface.name),
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct RemotePort<'l> {
-    parent: RemoteSubModule<'l>,
-    port: &'l Port,
-    remote_decl: &'l Declaration,
-    file: FileUUID,
-}
 impl<'l> RemotePort<'l> {
-    pub fn get_local_type(&self, type_checker: &mut AbstractTypeSubstitutor) -> AbstractRankedType {
+    fn get_local_type(&self, type_checker: &mut AbstractTypeSubstitutor) -> AbstractRankedType {
         type_checker.written_to_abstract_type_substitute_templates(
             &self.remote_decl.typ_expr,
             &self.parent.submodule.module_ref.template_arg_types,
         )
     }
-    pub fn get_local_domain(&self) -> DomainType {
-        self.parent.submodule.local_interface_domains[self.port.domain]
-    }
-    pub fn make_info(&self) -> ErrorInfo {
-        self.remote_decl.make_info(self.file).unwrap()
-    }
-    pub fn is_input(&self) -> bool {
-        self.remote_decl.decl_kind.is_io_port().unwrap()
-    }
-}
-impl FileKnowingErrorInfoObject for RemotePort<'_> {
-    fn make_global_info(&self, _files: &ArenaAllocator<FileData, FileUUIDMarker>) -> ErrorInfo {
-        self.make_info()
-    }
 }
 
-struct TypeCheckingContext<'l, 'errs> {
-    globals: &'l GlobalResolver<'l>,
-    errors: &'errs ErrorCollector<'l>,
-    working_on: &'l LinkInfo,
-    type_checker: TypeUnifier<AbstractTypeSubstitutor>,
-}
-
-impl<'l> TypeCheckingContext<'l, '_> {
+impl<'l> TypeCheckingContext<'l> {
     fn typecheck_wire_reference(&mut self, wire_ref: &WireReference) {
         let root_typ = match &wire_ref.root {
             WireReferenceRoot::LocalDecl(decl_id) => {
-                let decl = self.working_on.instructions[*decl_id].unwrap_declaration();
+                let decl = self.instructions[*decl_id].unwrap_declaration();
                 decl.typ.clone()
             }
             WireReferenceRoot::NamedConstant(cst) => {
@@ -190,12 +104,9 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     )
             }
             WireReferenceRoot::SubModulePort(port) => {
-                let submod_port = RemoteSubModule::make(
-                    port.submodule_decl,
-                    &self.working_on.instructions,
-                    self.globals,
-                )
-                .get_port(port.port);
+                let submod_port =
+                    RemoteSubModule::make(port.submodule_decl, self.instructions, self.globals)
+                        .get_port(port.port);
                 if submod_port.remote_decl.domain.get() == DomainType::Generative {
                     self.errors
                         .error(
@@ -219,7 +130,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                     bracket_span,
                     output_typ,
                 } => {
-                    let idx_expr = self.working_on.instructions[*idx].unwrap_subexpression();
+                    let idx_expr = self.instructions[*idx].unwrap_subexpression();
 
                     self.type_checker.unify_report_error(
                         idx_expr.typ,
@@ -286,8 +197,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                         );
 
                     if let Some(from_expr) = global_ref.get_value_arg_for(id) {
-                        let from_expr =
-                            self.working_on.instructions[from_expr].unwrap_subexpression();
+                        let from_expr = self.instructions[from_expr].unwrap_subexpression();
 
                         self.type_checker.unify_report_error(
                             from_expr.typ,
@@ -318,7 +228,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
 
                 let content_typ = self.typecheck_written_type(content_typ);
 
-                let idx_expr = self.working_on.instructions[*arr_idx].unwrap_subexpression();
+                let idx_expr = self.instructions[*arr_idx].unwrap_subexpression();
                 self.type_checker.unify_report_error(
                     idx_expr.typ,
                     &INT_TYPE.scalar(),
@@ -333,8 +243,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
 
     fn typecheck_visit_latency_specifier(&mut self, lat_spec: Option<FlatID>) {
         if let Some(latency_spec) = lat_spec {
-            let latency_specifier_expr =
-                self.working_on.instructions[latency_spec].unwrap_subexpression();
+            let latency_specifier_expr = self.instructions[latency_spec].unwrap_subexpression();
             self.type_checker.unify_report_error(
                 latency_specifier_expr.typ,
                 &INT_TYPE.scalar(),
@@ -358,10 +267,10 @@ impl<'l> TypeCheckingContext<'l, '_> {
             if arg_count > expected_arg_count {
                 // Too many args, complain about excess args at the end
                 let excess_args_span = Span::new_overarching(
-                    self.working_on.instructions[func_call.arguments[expected_arg_count]]
+                    self.instructions[func_call.arguments[expected_arg_count]]
                         .unwrap_expression()
                         .span,
-                    self.working_on.instructions[*func_call.arguments.last().unwrap()]
+                    self.instructions[*func_call.arguments.last().unwrap()]
                         .unwrap_expression()
                         .span,
                 );
@@ -402,7 +311,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
     fn typecheck_func_call(&mut self, func_call: &FuncCall) -> RemoteInterface<'l> {
         let interface = RemoteSubModule::make(
             func_call.interface_reference.submodule_decl,
-            &self.working_on.instructions,
+            self.instructions,
             self.globals,
         )
         .get_interface_reference(func_call.interface_reference.submodule_interface);
@@ -414,7 +323,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
             let port_type = port_decl.get_local_type(&mut self.type_checker);
 
             // Typecheck the value with target type
-            let from = self.working_on.instructions[*arg].unwrap_subexpression();
+            let from = self.instructions[*arg].unwrap_subexpression();
 
             self.type_checker
                 .unify_report_error(from.typ, &port_type, from.span, || {
@@ -432,7 +341,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 wire_ref.get_output_typ().clone()
             }
             ExpressionSource::UnaryOp { op, rank, right } => {
-                let right_expr = self.working_on.instructions[*right].unwrap_subexpression();
+                let right_expr = self.instructions[*right].unwrap_subexpression();
                 let out_typ = self.type_checker.typecheck_unary_operator_abstr(
                     *op,
                     right_expr.typ,
@@ -447,8 +356,8 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 left,
                 right,
             } => {
-                let left_expr = self.working_on.instructions[*left].unwrap_subexpression();
-                let right_expr = self.working_on.instructions[*right].unwrap_subexpression();
+                let left_expr = self.instructions[*left].unwrap_subexpression();
+                let right_expr = self.instructions[*right].unwrap_subexpression();
                 let out_typ = self.type_checker.typecheck_binary_operator_abstr(
                     *op,
                     left_expr.typ,
@@ -484,13 +393,11 @@ impl<'l> TypeCheckingContext<'l, '_> {
             ExpressionSource::ArrayConstruct(arr) => {
                 let mut arr_iter = arr.iter();
                 let arr_elem_typ = if let Some(first_elem) = arr_iter.next() {
-                    let first_elem_expr =
-                        self.working_on.instructions[*first_elem].unwrap_subexpression();
+                    let first_elem_expr = self.instructions[*first_elem].unwrap_subexpression();
                     let elem_typ = first_elem_expr.typ.clone();
 
                     for elem_id in arr_iter {
-                        let elem_expr =
-                            self.working_on.instructions[*elem_id].unwrap_subexpression();
+                        let elem_expr = self.instructions[*elem_id].unwrap_subexpression();
 
                         self.type_checker.unify_report_error(
                             elem_expr.typ,
@@ -573,7 +480,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
     }
 
     fn typecheck_visit_instruction(&mut self, instr_id: FlatID) {
-        match &self.working_on.instructions[instr_id] {
+        match &self.instructions[instr_id] {
             Instruction::SubModule(sm) => {
                 self.typecheck_template_global(&sm.module_ref);
             }
@@ -583,8 +490,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 decl.typ.set(self.typecheck_written_type(&decl.typ_expr));
             }
             Instruction::IfStatement(stm) => {
-                let condition_expr =
-                    &self.working_on.instructions[stm.condition].unwrap_subexpression();
+                let condition_expr = &self.instructions[stm.condition].unwrap_subexpression();
                 self.type_checker.unify_report_error(
                     condition_expr.typ,
                     &BOOL_TYPE.scalar(),
@@ -593,9 +499,9 @@ impl<'l> TypeCheckingContext<'l, '_> {
                 );
             }
             Instruction::ForStatement(stm) => {
-                let loop_var = self.working_on.instructions[stm.loop_var_decl].unwrap_declaration();
-                let start = self.working_on.instructions[stm.start].unwrap_subexpression();
-                let end = self.working_on.instructions[stm.end].unwrap_subexpression();
+                let loop_var = self.instructions[stm.loop_var_decl].unwrap_declaration();
+                let start = self.instructions[stm.start].unwrap_subexpression();
+                let end = self.instructions[stm.end].unwrap_subexpression();
 
                 self.type_checker.unify_report_error(
                     start.typ,
@@ -623,7 +529,7 @@ impl<'l> TypeCheckingContext<'l, '_> {
 
     /// Should be followed up by a [apply_types] call to actually apply all the checked types.
     fn typecheck(&mut self) {
-        for elem_id in self.working_on.instructions.id_range() {
+        for elem_id in self.instructions.id_range() {
             self.typecheck_visit_instruction(elem_id);
         }
     }
@@ -761,8 +667,6 @@ impl TypeUnifier<AbstractTypeSubstitutor> {
         out_typ
     }
 }
-
-// ====== Free functions for actually applying the result of type checking ======
 
 struct FinalizationContext<'l, 'errs> {
     linker_types: &'l ArenaAllocator<StructType, TypeUUIDMarker>,
