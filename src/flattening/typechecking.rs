@@ -269,7 +269,7 @@ impl<'l> RemoteInterface<'l> {
         self.parent.get_port(port_id)
     }
     pub fn get_local_domain(self) -> DomainType {
-        self.parent.submodule.local_interface_domains.get().unwrap()[self.interface.domain]
+        self.parent.submodule.local_interface_domains[self.interface.domain]
     }
 }
 /// For interfaces of this module
@@ -298,7 +298,7 @@ impl<'l> RemotePort<'l> {
         )
     }
     pub fn get_local_domain(&self) -> DomainType {
-        self.parent.submodule.local_interface_domains.get().unwrap()[self.port.domain]
+        self.parent.submodule.local_interface_domains[self.port.domain]
     }
     pub fn make_info(&self) -> ErrorInfo {
         self.remote_decl.make_info(self.file).unwrap()

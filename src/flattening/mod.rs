@@ -10,9 +10,10 @@ mod walk;
 use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractRankedType, PeanoType};
 use crate::typing::domain_type::DomainType;
+use crate::typing::ty_cell::TyCell;
 use crate::typing::written_type::WrittenType;
 
-use std::cell::{Cell, OnceCell};
+use std::cell::Cell;
 use std::ops::Deref;
 
 use crate::latency::port_latency_inference::PortLatencyInferenceInfo;
@@ -130,20 +131,6 @@ impl Module {
     }
 }
 
-impl LinkInfo {
-    pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
-        match &self.instructions[instr_id] {
-            Instruction::SubModule(sm) => sm.module_ref.get_total_span(),
-            Instruction::Declaration(decl) => decl.decl_span,
-            Instruction::Expression(w) => w.span,
-            Instruction::IfStatement(if_stmt) => self.get_instruction_span(if_stmt.condition),
-            Instruction::ForStatement(for_stmt) => {
-                self.get_instruction_span(for_stmt.loop_var_decl)
-            }
-        }
-    }
-}
-
 /// Represents an opaque type in the compiler, like `int` or `bool`.
 ///
 /// TODO: Structs #8
@@ -160,15 +147,6 @@ pub struct StructType {
     fields: FlatAlloc<StructField, FieldIDMarker>,
 }
 
-/// Global constant, like `true`, `false`, or user-defined constants (TODO #19)
-///
-/// All Constants are stored in [Linker::constants] and indexed by [ConstantUUID]
-#[derive(Debug)]
-pub struct NamedConstant {
-    pub link_info: LinkInfo,
-    pub output_decl: FlatID,
-}
-
 /// Represents a field in a struct
 ///
 /// UNFINISHED
@@ -183,6 +161,15 @@ pub struct StructField {
     pub decl_span: Span,
     /// This is only set after flattening is done. Initially just [UUID::PLACEHOLDER]
     pub declaration_instruction: FlatID,
+}
+
+/// Global constant, like `true`, `false`, or user-defined constants (TODO #19)
+///
+/// All Constants are stored in [Linker::constants] and indexed by [ConstantUUID]
+#[derive(Debug)]
+pub struct NamedConstant {
+    pub link_info: LinkInfo,
+    pub output_decl: FlatID,
 }
 
 /// In SUS, when you write `my_submodule.abc`, `abc` could refer to an interface or to a port.
@@ -655,7 +642,7 @@ pub struct SubModuleInstance {
     /// Maps each of the module's local domains to the domain that it is used in.
     ///
     /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::Unknown] before typing)
-    pub local_interface_domains: OnceCell<FlatAlloc<DomainType, DomainIDMarker>>,
+    pub local_interface_domains: TyCell<FlatAlloc<DomainType, DomainIDMarker>>,
     pub documentation: Documentation,
 }
 

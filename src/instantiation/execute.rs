@@ -914,8 +914,7 @@ impl<'l> ExecutionContext<'l> {
             } else {
                 RealWireDataSource::ReadOnly
             };
-            let domain =
-                submodule_instruction.local_interface_domains.get().unwrap()[port_data.domain];
+            let domain = submodule_instruction.local_interface_domains[port_data.domain];
             let typ = Self::concretize_submodule_port_type(
                 &mut self.type_substitutor,
                 self.linker,
@@ -1041,8 +1040,7 @@ impl<'l> ExecutionContext<'l> {
                 let submod_md = &self.linker.modules[original_submod_instr.module_ref.id];
                 let interface = &submod_md.interfaces[fc.interface_reference.submodule_interface];
                 let submod_interface_domain = interface.domain;
-                let domain = original_submod_instr.local_interface_domains.get().unwrap()
-                    [submod_interface_domain]
+                let domain = original_submod_instr.local_interface_domains[submod_interface_domain]
                     .unwrap_physical();
 
                 add_to_small_set(

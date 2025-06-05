@@ -78,7 +78,7 @@ fn finalize_domains(
     for (_, instr) in instructions {
         match instr {
             Instruction::SubModule(sm) => {
-                for (_, d) in sm.local_interface_domains.get_mut().unwrap() {
+                for (_, d) in sm.local_interface_domains.get_mut() {
                     assert!(d.fully_substitute(&domain_substitutor));
                 }
             }
@@ -128,14 +128,11 @@ impl<'l> DomainCheckingContext<'l> {
     fn check_instr(&mut self, instr: &Instruction) {
         match instr {
             Instruction::SubModule(sub_module_instance) => {
-                sub_module_instance
-                    .local_interface_domains
-                    .set(
-                        self.linker.modules[sub_module_instance.module_ref.id]
-                            .domains
-                            .map(|_| self.domain_substitutor.alloc_unknown()),
-                    )
-                    .unwrap();
+                sub_module_instance.local_interface_domains.set(
+                    self.linker.modules[sub_module_instance.module_ref.id]
+                        .domains
+                        .map(|_| self.domain_substitutor.alloc_unknown()),
+                );
             }
             Instruction::Declaration(declaration) => {
                 self.written_type_must_be_generative(&declaration.typ_expr);

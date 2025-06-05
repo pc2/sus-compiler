@@ -505,7 +505,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 parent_condition: self.current_parent_condition,
                 name,
                 module_ref,
-                local_interface_domains: OnceCell::new(),
+                local_interface_domains: TyCell::new(),
                 documentation,
             }))
     }
