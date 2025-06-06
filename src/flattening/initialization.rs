@@ -7,16 +7,10 @@ use crate::prelude::*;
 use crate::flattening::Module;
 use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
 
-use crate::typing::template::{
-    GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind,
-};
-
 use super::parser::Cursor;
 use super::*;
 
 struct InitializationContext<'linker> {
-    parameters: TVec<Parameter>,
-
     // module-only stuff
     ports: FlatAlloc<Port, PortIDMarker>,
     interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
@@ -37,39 +31,7 @@ impl InitializationContext<'_> {
             name: "clk".to_string(),
             name_span: None,
         });
-        if cursor.optional_field(field!("template_declaration_arguments")) {
-            cursor.list(kind!("template_declaration_arguments"), |cursor| {
-                let (kind, decl_span) = cursor.kind_span();
-                match kind {
-                    kind!("template_declaration_type") => cursor.go_down_no_check(|cursor| {
-                        let (name_span, name) =
-                            cursor.field_to_string(field!("name"), kind!("identifier"));
-                        self.parameters.alloc(Parameter {
-                            name,
-                            name_span,
-                            kind: TemplateKind::Type(TypeParameterKind {}),
-                        });
-                    }),
-                    kind!("declaration") => cursor.go_down_no_check(|cursor| {
-                        let _ = cursor.optional_field(field!("io_port_modifiers"));
-                        let _ = cursor.optional_field(field!("declaration_modifiers"));
-                        cursor.field(field!("type"));
-                        let (name_span, name) =
-                            cursor.field_to_string(field!("name"), kind!("identifier"));
-
-                        self.parameters.alloc(Parameter {
-                            name,
-                            name_span,
-                            kind: TemplateKind::Value(GenerativeParameterKind {
-                                decl_span,
-                                declaration_instruction: FlatID::PLACEHOLDER,
-                            }),
-                        });
-                    }),
-                    _other => cursor.could_not_match(),
-                }
-            });
-        }
+        let _ = cursor.optional_field(field!("template_declaration_arguments"));
 
         cursor.field(field!("block"));
         self.gather_all_ports_in_block(cursor);
@@ -341,7 +303,6 @@ fn initialize_global_object(
         interfaces: FlatAlloc::new(),
         domains: FlatAlloc::new(),
         implicit_clk_domain: true,
-        parameters: FlatAlloc::new(),
         fields: FlatAlloc::new(),
         errors: parsing_errors,
     };
@@ -349,7 +310,7 @@ fn initialize_global_object(
     let (name_span, name) = ctx.gather_initial_global_object(cursor);
 
     let mut link_info = LinkInfo {
-        template_parameters: ctx.parameters,
+        template_parameters: FlatAlloc::new(),
         instructions: FlatAlloc::new(),
         documentation: cursor.extract_gathered_comments(),
         file: builder.file_id,

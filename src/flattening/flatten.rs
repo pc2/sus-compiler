@@ -13,7 +13,9 @@ use super::name_context::LocalVariableContext;
 use super::parser::Cursor;
 use super::*;
 
-use crate::typing::template::{GenerativeParameterKind, TemplateKind};
+use crate::typing::template::{
+    GenerativeParameterKind, Parameter, TemplateKind, TypeParameterKind,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NamedLocal {
@@ -163,8 +165,9 @@ struct FlatteningContext<'l, 'errs> {
     errors: &'errs ErrorCollector<'l>,
 
     working_on_link_info: &'l LinkInfo,
-    domains: &'l FlatAlloc<DomainInfo, DomainIDMarker>,
+    parameters: TVec<Parameter>,
     instructions: FlatAlloc<Instruction, FlatIDMarker>,
+    domains: &'l FlatAlloc<DomainInfo, DomainIDMarker>,
     named_domain_alloc: UUIDAllocator<DomainIDMarker>,
     current_domain: DomainID,
 
@@ -179,46 +182,6 @@ struct FlatteningContext<'l, 'errs> {
 }
 
 impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
-    fn flatten_parameters(&mut self, cursor: &mut Cursor<'c>) {
-        let mut parameters_to_visit = self
-            .working_on_link_info
-            .template_parameters
-            .id_range()
-            .into_iter();
-        if cursor.optional_field(field!("template_declaration_arguments")) {
-            cursor.list(kind!("template_declaration_arguments"), |cursor| {
-                let claimed_type_id = parameters_to_visit.next().unwrap();
-                match cursor.kind() {
-                    kind!("template_declaration_type") => cursor.go_down_no_check(|cursor| {
-                        // Already covered in initialization
-                        cursor.field(field!("name"));
-
-                        let selected_arg =
-                            &self.working_on_link_info.template_parameters[claimed_type_id];
-
-                        let name_span = selected_arg.name_span;
-
-                        self.alloc_local_name(
-                            name_span,
-                            &cursor.file_data.file_text[name_span],
-                            NamedLocal::TemplateType(claimed_type_id),
-                        );
-                    }),
-                    kind!("declaration") => {
-                        let _ = self.flatten_declaration::<false>(
-                            DeclarationContext::TemplateGenerative(claimed_type_id),
-                            true,
-                            true,
-                            cursor,
-                        );
-                    }
-                    _other => cursor.could_not_match(),
-                }
-            })
-        }
-        assert!(parameters_to_visit.is_empty());
-    }
-
     fn flatten_latency_specifier(&mut self, cursor: &mut Cursor<'c>) -> Option<(FlatID, Span)> {
         cursor.optional_field(field!("latency_specifier")).then(|| {
             cursor.go_down_content(kind!("latency_specifier"), |cursor| {
@@ -1406,7 +1369,46 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         let const_type_cursor = (cursor.kind() == kind!("const_and_type")).then(|| cursor.clone());
 
         let (name_span, module_name) = cursor.field_span(field!("name"), kind!("identifier"));
-        self.flatten_parameters(cursor);
+        if cursor.optional_field(field!("template_declaration_arguments")) {
+            cursor.list(
+                kind!("template_declaration_arguments"),
+                |cursor| match cursor.kind() {
+                    kind!("template_declaration_type") => cursor.go_down_no_check(|cursor| {
+                        let (name_span, name) =
+                            cursor.field_to_string(field!("name"), kind!("identifier"));
+                        let type_param_id = self.parameters.alloc(Parameter {
+                            name,
+                            name_span,
+                            kind: TemplateKind::Type(TypeParameterKind {}),
+                        });
+                        self.alloc_local_name(
+                            name_span,
+                            &cursor.file_data.file_text[name_span],
+                            NamedLocal::TemplateType(type_param_id),
+                        );
+                    }),
+                    kind!("declaration") => {
+                        let next_param_id = self.parameters.get_next_alloc_id();
+                        let decl_id = self.flatten_declaration::<false>(
+                            DeclarationContext::TemplateGenerative(next_param_id),
+                            true,
+                            true,
+                            cursor,
+                        );
+                        let decl = self.instructions[decl_id].unwrap_declaration();
+                        self.parameters.alloc(Parameter {
+                            name: decl.name.clone(),
+                            name_span: decl.name_span,
+                            kind: TemplateKind::Value(GenerativeParameterKind {
+                                decl_span: decl.decl_span,
+                                declaration_instruction: decl_id,
+                            }),
+                        });
+                    }
+                    _other => cursor.could_not_match(),
+                },
+            );
+        }
 
         if let Some(mut const_type_cursor) = const_type_cursor {
             let decl_span = const_type_cursor.span();
@@ -1538,6 +1540,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         errors: &errors,
         working_on_link_info: linker.get_link_info(global_obj),
         instructions: FlatAlloc::new(),
+        parameters: FlatAlloc::new(),
         named_domain_alloc: UUIDAllocator::new(),
         current_domain: UUID::from_hidden_value(0),
         local_variable_context,
@@ -1548,7 +1551,8 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
     // Make sure all ports have been visited
     assert!(context.ports_to_visit.is_empty());
 
-    let mut instructions = context.instructions;
+    let instructions = context.instructions;
+    let parameters = context.parameters;
 
     let globals = globals.decommission();
 
@@ -1625,23 +1629,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         }
     };
 
-    // Make the template parameters point to the proper declaration instructions
-    for (decl_id, instr) in &mut instructions {
-        if let Instruction::Declaration(decl) = instr {
-            if let DeclarationKind::GenerativeInput(this_template_id) = decl.decl_kind {
-                let TemplateKind::Value(GenerativeParameterKind {
-                    decl_span: _,
-                    declaration_instruction,
-                }) = &mut link_info.template_parameters[this_template_id].kind
-                else {
-                    unreachable!()
-                };
-
-                *declaration_instruction = decl_id;
-            }
-        }
-    }
-
     link_info.reabsorb_errors_globals(errors.into_storage(), globals, AFTER_FLATTEN_CP);
     link_info.instructions = instructions;
+    link_info.template_parameters = parameters;
 }
