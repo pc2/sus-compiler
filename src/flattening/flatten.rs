@@ -1479,10 +1479,10 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         &mut linker.constants,
         global_obj,
     );
-    let (errors, globals) = obj_link_info_mut.take_errors_globals();
+    let errors = obj_link_info_mut.take_errors(&linker.files);
+    let globals = obj_link_info_mut.resolved_globals.take();
     let obj_link_info = linker.get_link_info(global_obj);
     let globals = GlobalResolver::new(linker, globals);
-    let errors = ErrorCollector::from_storage(errors, obj_link_info.file, &linker.files);
 
     let obj_name = &obj_link_info.name;
     println!("Flattening {obj_name}");
@@ -1577,6 +1577,13 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
                 }
             }
 
+            // Also create the inference info now.
+            md.latency_inference_info = PortLatencyInferenceInfo::make(
+                &md.ports,
+                &md.link_info.instructions,
+                md.link_info.template_parameters.len(),
+            );
+
             if crate::debug::is_enabled("print-flattened-pre-typecheck") {
                 md.print_flattened_module(&linker.files[md.link_info.file]);
             }
@@ -1629,7 +1636,9 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         }
     };
 
-    link_info.reabsorb_errors_globals(errors.into_storage(), globals, AFTER_FLATTEN_CP);
+    link_info.reabsorb_errors(errors.into_storage());
+    link_info.reabsorb_globals(globals);
+    link_info.checkpoint(AFTER_FLATTEN_CP);
     link_info.instructions = instructions;
     link_info.template_parameters = parameters;
 }

@@ -46,12 +46,12 @@ impl<'l> RemoteSubModule<'l> {
     fn make(
         submodule_instr: FlatID,
         instructions: &'l impl Index<FlatID, Output = Instruction>,
-        modules: &'l impl Index<ModuleUUID, Output = Module>,
+        globals: &'l impl Index<ModuleUUID, Output = Module>,
     ) -> Self {
         let submodule = instructions[submodule_instr].unwrap_submodule();
         Self {
             submodule,
-            md: &modules[submodule.module_ref.id],
+            md: &globals[submodule.module_ref.id],
         }
     }
 

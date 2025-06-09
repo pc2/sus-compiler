@@ -1,6 +1,6 @@
 use crate::alloc::UUIDAllocator;
 use crate::errors::ErrorInfo;
-use crate::linker::AFTER_DOMAIN_CHECK_CP;
+use crate::linker::{GlobalUUID, AFTER_DOMAIN_CHECK_CP};
 use crate::prelude::*;
 use crate::typing::type_inference::{FailedUnification, TypeSubstitutor, TypeUnifier};
 
@@ -9,16 +9,25 @@ use super::*;
 pub fn domain_check_all(linker: &mut Linker) {
     let module_uuids: Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
     for module_uuid in module_uuids {
-        let working_on_mut = &mut linker.modules[module_uuid];
-        let (errors, globals) = working_on_mut.link_info.take_errors_globals();
+        let domain_substitutor = linker.immutable_pass(
+            "Domain Check",
+            GlobalUUID::Module(module_uuid),
+            |link_info, errors, globals| {
+                let mut ctx = DomainCheckingContext {
+                    globals,
+                    errors,
+                    domain_checker: TypeUnifier::default(),
+                    instructions: &link_info.instructions,
+                };
 
-        let md: &Module = &linker.modules[module_uuid];
-        let globals = GlobalResolver::new(linker, globals);
-        let errors = ErrorCollector::from_storage(errors, md.link_info.file, &linker.files);
+                for (_, instr) in ctx.instructions {
+                    ctx.check_instr(instr);
+                }
 
-        let domain_substitutor =
-            domain_check_link_info(&globals, &errors, &md.link_info.instructions);
-
+                ctx.domain_checker
+            },
+        );
+        let md = &mut linker.modules[module_uuid];
         // Set the remaining domain variables that aren't associated with a module port.
         // We just find domain IDs that haven't been
         let mut leftover_domain_alloc =
@@ -31,31 +40,11 @@ pub fn domain_check_all(linker: &mut Linker) {
             }
         }
 
-        let globals = globals.decommission();
-        let md = &mut linker.modules[module_uuid];
+        let errors = md.link_info.take_errors(&linker.files);
         finalize_domains(&errors, &mut md.link_info.instructions, domain_substitutor);
-        md.link_info
-            .reabsorb_errors_globals(errors.into_storage(), globals, AFTER_DOMAIN_CHECK_CP);
+        md.link_info.reabsorb_errors(errors.into_storage());
+        md.link_info.checkpoint(AFTER_DOMAIN_CHECK_CP);
     }
-}
-
-fn domain_check_link_info<'l>(
-    globals: &'l GlobalResolver<'l>,
-    errors: &'l ErrorCollector<'l>,
-    instructions: &FlatAlloc<Instruction, FlatIDMarker>,
-) -> TypeUnifier<TypeSubstitutor<DomainType>> {
-    let mut ctx = DomainCheckingContext {
-        globals,
-        errors,
-        domain_checker: TypeUnifier::default(),
-        instructions,
-    };
-
-    for (_, instr) in instructions {
-        ctx.check_instr(instr);
-    }
-
-    ctx.domain_checker
 }
 
 fn finalize_domains(

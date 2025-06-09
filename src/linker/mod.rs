@@ -1,4 +1,5 @@
 use crate::{
+    debug::SpanDebugger,
     flattening::{Instruction, NamedConstant},
     instantiation::instantiation_cache::Instantiator,
     prelude::*,
@@ -421,6 +422,63 @@ impl Linker {
         let file_data = &mut self.files[file_id];
         file_data.parsing_errors = parsing_errors;
         file_data.associated_values = associated_values;
+    }
+
+    /// Pass over a Global Object immutably, thereby giving access to the rest of the context
+    pub fn immutable_pass<OT>(
+        &mut self,
+        pass_name: &'static str,
+        obj_id: GlobalUUID,
+        f: impl FnOnce(&LinkInfo, &ErrorCollector, &GlobalResolver) -> OT,
+    ) -> OT {
+        let working_on_mut = Self::get_link_info_mut(
+            &mut self.modules,
+            &mut self.types,
+            &mut self.constants,
+            obj_id,
+        );
+        let errors = working_on_mut.take_errors(&self.files);
+        let globals = working_on_mut.resolved_globals.take();
+
+        let working_on: &LinkInfo = &self.get_link_info(obj_id);
+
+        println!("{pass_name} {}", &working_on.name);
+        let _panic_guard =
+            SpanDebugger::new(pass_name, &working_on.name, &self.files[working_on.file]);
+
+        let globals = GlobalResolver::new(self, globals);
+
+        let result = f(working_on, &errors, &globals);
+
+        let errors = errors.into_storage();
+        let globals = globals.decommission();
+        let working_on_mut = Self::get_link_info_mut(
+            &mut self.modules,
+            &mut self.types,
+            &mut self.constants,
+            obj_id,
+        );
+        working_on_mut.reabsorb_errors(errors);
+        working_on_mut.reabsorb_globals(globals);
+
+        result
+    }
+    pub fn mutable_pass(
+        &mut self,
+        obj_id: GlobalUUID,
+        f: impl FnOnce(&mut LinkInfo, &ErrorCollector),
+    ) {
+        let working_on_mut = Self::get_link_info_mut(
+            &mut self.modules,
+            &mut self.types,
+            &mut self.constants,
+            obj_id,
+        );
+        let errors = working_on_mut.take_errors(&self.files);
+
+        f(working_on_mut, &errors);
+
+        working_on_mut.reabsorb_errors(errors.into_storage());
     }
 }
 

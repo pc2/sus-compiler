@@ -185,26 +185,27 @@ impl Index<ConstantUUID> for GlobalResolver<'_> {
 }
 
 impl LinkInfo {
-    pub fn take_errors_globals(&mut self) -> (ErrorStore, ResolvedGlobals) {
-        let errors = self.errors.take();
-        let resolved_globals = self.resolved_globals.take();
-
-        (errors, resolved_globals)
-    }
-    pub fn reabsorb_errors_globals(
+    pub fn take_errors<'files>(
         &mut self,
-        errors: ErrorStore,
-        resolved_globals: ResolvedGlobals,
-        checkpoint_id: usize,
-    ) {
+        files: &'files ArenaAllocator<FileData, FileUUIDMarker>,
+    ) -> ErrorCollector<'files> {
+        let error_store = self.errors.take();
+
+        ErrorCollector::from_storage(error_store, self.file, files)
+    }
+    pub fn reabsorb_errors(&mut self, errors: ErrorStore) {
+        assert!(self.errors.is_untouched());
+        self.errors = errors;
+    }
+    pub fn reabsorb_globals(&mut self, resolved_globals: ResolvedGlobals) {
         // Store errors and resolved_globals back into module
         assert!(self.resolved_globals.is_untouched());
-        assert!(self.errors.is_untouched());
+        self.resolved_globals = resolved_globals;
+    }
+    pub fn checkpoint(&mut self, checkpoint_id: usize) {
         let expected_checkpoint = self.checkpoints.len();
         assert!(expected_checkpoint == checkpoint_id, "In {}: The new checkpoint is not what was expected. The new checkpoint was {checkpoint_id}, whereas the expected next checkpoint is {expected_checkpoint}", self.get_full_name());
 
-        self.resolved_globals = resolved_globals;
-        self.errors = errors;
         self.checkpoints
             .push(CheckPoint::new(&self.errors, &self.resolved_globals));
     }

@@ -323,11 +323,8 @@ fn initialize_global_object(
         checkpoints: Vec::new(),
     };
 
-    link_info.reabsorb_errors_globals(
-        ctx.errors.into_storage(),
-        ResolvedGlobals::empty(),
-        AFTER_INITIAL_PARSE_CP,
-    );
+    link_info.reabsorb_errors(ctx.errors.into_storage());
+    link_info.checkpoint(AFTER_INITIAL_PARSE_CP);
 
     match global_obj_kind {
         GlobalObjectKind::Module => {

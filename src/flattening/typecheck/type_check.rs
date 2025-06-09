@@ -9,8 +9,7 @@ use crate::typing::type_inference::{
     AbstractTypeSubstitutor, FailedUnification, TypeUnifier, UnifyErrorReport,
 };
 
-use crate::debug::SpanDebugger;
-use crate::linker::{GlobalResolver, GlobalUUID, AFTER_TYPE_CHECK_CP};
+use crate::linker::GlobalUUID;
 
 use crate::typing::{
     abstract_type::{BOOL_TYPE, INT_TYPE},
@@ -22,34 +21,29 @@ use super::*;
 pub fn typecheck_all_modules(linker: &mut Linker) {
     let module_uuids: Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
     for module_uuid in module_uuids {
-        let working_on_mut = &mut linker.modules[module_uuid];
-        let (errors, globals) = working_on_mut.link_info.take_errors_globals();
-
-        let working_on: &Module = &linker.modules[module_uuid];
-        let globals = GlobalResolver::new(linker, globals);
-        let errors = ErrorCollector::from_storage(errors, working_on.link_info.file, &linker.files);
-
-        println!("Typechecking {}", &working_on.link_info.name);
-        let _panic_guard = SpanDebugger::new(
+        let type_checker = linker.immutable_pass(
             "Typechecking",
-            &working_on.link_info.name,
-            &linker.files[working_on.link_info.file],
+            GlobalUUID::Module(module_uuid),
+            |working_on, errors, globals| {
+                let mut context = TypeCheckingContext {
+                    globals,
+                    errors,
+                    type_checker: TypeUnifier::from(AbstractTypeSubstitutor::default()),
+                    instructions: &working_on.instructions,
+                };
+
+                context.typecheck();
+
+                context.type_checker
+            },
         );
-
-        let mut context = TypeCheckingContext {
-            globals: &globals,
-            errors: &errors,
-            type_checker: TypeUnifier::from(AbstractTypeSubstitutor::default()),
-            instructions: &working_on.link_info.instructions,
-        };
-
-        context.typecheck();
-
-        let type_checker = context.type_checker;
-        let globals = globals.decommission();
-
         // Grab another mutable copy of md so it doesn't force a borrow conflict
         let working_on_mut = &mut linker.modules[module_uuid];
+        let errors = ErrorCollector::from_storage(
+            working_on_mut.link_info.errors.take(),
+            working_on_mut.link_info.file,
+            &linker.files,
+        );
         let finalize_ctx = FinalizationContext {
             linker_types: &linker.types,
             errors: &errors,
@@ -57,20 +51,8 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
             template_names: &working_on_mut.link_info.template_parameters,
         };
         finalize_ctx.apply_types(&mut working_on_mut.link_info.instructions);
-
-        working_on_mut.link_info.reabsorb_errors_globals(
-            errors.into_storage(),
-            globals,
-            AFTER_TYPE_CHECK_CP,
-        );
-
-        // Also create the inference info now.
-        working_on_mut.latency_inference_info = PortLatencyInferenceInfo::make(
-            &working_on_mut.ports,
-            &working_on_mut.link_info.instructions,
-            working_on_mut.link_info.template_parameters.len(),
-        );
-
+        assert!(working_on_mut.link_info.errors.is_untouched());
+        working_on_mut.link_info.errors = errors.into_storage();
         if crate::debug::is_enabled("print-flattened") {
             working_on_mut.print_flattened_module(&linker.files[working_on_mut.link_info.file]);
         }

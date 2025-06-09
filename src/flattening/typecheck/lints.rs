@@ -1,7 +1,7 @@
 use sus_proc_macro::get_builtin_const;
 
 use crate::flattening::{IdentifierType, WriteModifiers};
-use crate::linker::{IsExtern, LinkInfo, AFTER_LINTS_CP};
+use crate::linker::{GlobalUUID, IsExtern, LinkInfo};
 use crate::prelude::*;
 use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
@@ -15,25 +15,15 @@ use super::{
 pub fn perform_lints(linker: &mut Linker) {
     let module_uuids: Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
     for id in module_uuids {
-        let md = &mut linker.modules[id];
-        let errors = ErrorCollector::from_storage(
-            md.link_info.errors.take(),
-            md.link_info.file,
-            &linker.files,
-        );
-        let resolved_globals = md.link_info.resolved_globals.take();
-
-        let md = &linker.modules[id];
-
-        find_unused_variables(md, &errors);
-        extern_objects_may_not_have_type_template_args(&md.link_info, &errors);
-        lint_instructions(&md.link_info.instructions, &errors, linker);
-
-        let md = &mut linker.modules[id];
-        md.link_info.reabsorb_errors_globals(
-            errors.into_storage(),
-            resolved_globals,
-            AFTER_LINTS_CP,
+        linker.immutable_pass(
+            "Lints",
+            GlobalUUID::Module(id),
+            |link_info, errors, globals| {
+                let md = &globals[id];
+                find_unused_variables(md, errors);
+                extern_objects_may_not_have_type_template_args(link_info, errors);
+                lint_instructions(&link_info.instructions, errors, globals);
+            },
         );
     }
 }
@@ -41,7 +31,7 @@ pub fn perform_lints(linker: &mut Linker) {
 fn lint_instructions(
     instructions: &FlatAlloc<Instruction, FlatIDMarker>,
     errors: &ErrorCollector,
-    linker: &Linker,
+    globals: &GlobalResolver,
 ) {
     for (_, instr) in instructions {
         match instr {
@@ -120,15 +110,12 @@ fn lint_instructions(
                         WireReferenceRoot::NamedConstant(cst) => {
                             errors
                                 .error(cst.name_span, "Cannot write to a global constant!")
-                                .info_obj(&linker.constants[cst.id].link_info);
+                                .info_obj(&globals[cst.id].link_info);
                         }
                         WireReferenceRoot::SubModulePort(port) => {
-                            let module_port_decl = RemoteSubModule::make(
-                                port.submodule_decl,
-                                instructions,
-                                &linker.modules,
-                            )
-                            .get_port(port.port);
+                            let module_port_decl =
+                                RemoteSubModule::make(port.submodule_decl, instructions, globals)
+                                    .get_port(port.port);
 
                             if !module_port_decl.is_input() {
                                 errors
