@@ -1,7 +1,7 @@
 use sus_proc_macro::get_builtin_const;
 
 use crate::flattening::WriteModifiers;
-use crate::linker::{GlobalUUID, IsExtern, LinkInfo, AFTER_LINTS_CP};
+use crate::linker::{GlobalUUID, IsExtern, LinkInfo};
 use crate::prelude::*;
 use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
@@ -12,21 +12,15 @@ use super::{
     Expression, ExpressionOutput, ExpressionSource, Instruction, Module, WireReferenceRoot,
 };
 
-pub fn perform_lints(linker: &mut Linker) {
-    let module_uuids: Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
-    for id in module_uuids {
-        linker.immutable_pass(
-            "Lints",
-            GlobalUUID::Module(id),
-            |link_info, errors, globals| {
-                let md = &globals.globals[id];
-                find_unused_variables(md, errors);
-                extern_objects_may_not_have_type_template_args(link_info, errors);
-                lint_instructions(&link_info.instructions, errors, globals);
-            },
-        );
-        linker.mutable_pass(GlobalUUID::Module(id), |md, _| {
-            md.checkpoint(AFTER_LINTS_CP);
+pub fn perform_lints(linker: &mut Linker, global_ids: &[GlobalUUID]) {
+    for id in global_ids {
+        linker.immutable_pass("Lints", *id, |link_info, errors, globals| {
+            extern_objects_may_not_have_type_template_args(link_info, errors);
+            lint_instructions(&link_info.instructions, errors, globals);
+
+            if let GlobalUUID::Module(md_id) = *id {
+                find_unused_variables(&globals.globals[md_id], errors);
+            }
         });
     }
 }

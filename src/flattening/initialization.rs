@@ -1,7 +1,7 @@
 use sus_proc_macro::{field, kind, kw};
 
 use crate::errors::ErrorStore;
-use crate::linker::{IsExtern, AFTER_INITIAL_PARSE_CP};
+use crate::linker::IsExtern;
 use crate::prelude::*;
 
 use crate::flattening::Module;
@@ -353,7 +353,6 @@ fn initialize_global_object(
     };
 
     link_info.reabsorb_errors(ctx.errors.into_storage());
-    link_info.checkpoint(AFTER_INITIAL_PARSE_CP);
 
     match global_obj_kind {
         GlobalObjectKind::Module => {

@@ -1,18 +1,15 @@
 use crate::alloc::UUIDAllocator;
 use crate::errors::ErrorInfo;
-use crate::linker::{GlobalUUID, AFTER_DOMAIN_CHECK_CP};
+use crate::linker::GlobalUUID;
 use crate::prelude::*;
 use crate::typing::type_inference::{FailedUnification, TypeSubstitutor, TypeUnifier};
 
 use super::*;
 
-pub fn domain_check_all(linker: &mut Linker) {
-    let module_uuids: Vec<ModuleUUID> = linker.modules.iter().map(|(id, _md)| id).collect();
-    for module_uuid in module_uuids {
-        let domain_substitutor = linker.immutable_pass(
-            "Domain Check",
-            GlobalUUID::Module(module_uuid),
-            |link_info, errors, globals| {
+pub fn domain_check_all(linker: &mut Linker, global_ids: &[GlobalUUID]) {
+    for global_id in global_ids {
+        let domain_substitutor =
+            linker.immutable_pass("Domain Check", *global_id, |link_info, errors, globals| {
                 let mut ctx = DomainCheckingContext {
                     globals,
                     errors,
@@ -25,25 +22,32 @@ pub fn domain_check_all(linker: &mut Linker) {
                 }
 
                 ctx.domain_checker
-            },
-        );
-        let md = &mut linker.modules[module_uuid];
-        // Set the remaining domain variables that aren't associated with a module port.
-        // We just find domain IDs that haven't been
-        let mut leftover_domain_alloc =
-            UUIDAllocator::new_start_from(md.domains.get_next_alloc_id());
-        for (_, d) in domain_substitutor.iter() {
-            if d.get().is_none() {
-                assert!(d
-                    .set(DomainType::Physical(leftover_domain_alloc.alloc()))
-                    .is_ok());
+            });
+
+        if let GlobalUUID::Module(md_id) = *global_id {
+            let md = &mut linker.modules[md_id];
+            // Set the remaining domain variables that aren't associated with a module port.
+            // We just find domain IDs that haven't been
+            let mut leftover_domain_alloc =
+                UUIDAllocator::new_start_from(md.domains.get_next_alloc_id());
+            for (_, d) in domain_substitutor.iter() {
+                if d.get().is_none() {
+                    assert!(d
+                        .set(DomainType::Physical(leftover_domain_alloc.alloc()))
+                        .is_ok());
+                }
             }
         }
 
-        let errors = md.link_info.take_errors(&linker.files);
-        finalize_domains(&errors, &mut md.link_info.instructions, domain_substitutor);
-        md.link_info.reabsorb_errors(errors.into_storage());
-        md.link_info.checkpoint(AFTER_DOMAIN_CHECK_CP);
+        let link_info = Linker::get_link_info_mut(
+            &mut linker.modules,
+            &mut linker.types,
+            &mut linker.constants,
+            *global_id,
+        );
+        let errors = link_info.take_errors(&linker.files);
+        finalize_domains(&errors, &mut link_info.instructions, domain_substitutor);
+        link_info.reabsorb_errors(errors.into_storage());
     }
 }
 

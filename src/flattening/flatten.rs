@@ -6,7 +6,7 @@ use crate::{alloc::UUIDRangeIter, prelude::*};
 use ibig::IBig;
 use sus_proc_macro::{field, kind, kw};
 
-use crate::linker::{FileData, GlobalResolver, GlobalUUID, AFTER_FLATTEN_CP};
+use crate::linker::{FileData, GlobalResolver, GlobalUUID};
 use crate::{debug::SpanDebugger, value::Value};
 
 use super::name_context::LocalVariableContext;
@@ -1777,7 +1777,6 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
 
     link_info.reabsorb_errors(errors.into_storage());
     link_info.reabsorb_globals(globals);
-    link_info.checkpoint(AFTER_FLATTEN_CP);
     link_info.instructions = instructions;
     link_info.template_parameters = parameters;
 

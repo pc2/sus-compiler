@@ -202,11 +202,4 @@ impl LinkInfo {
         assert!(self.resolved_globals.is_untouched());
         self.resolved_globals = resolved_globals;
     }
-    pub fn checkpoint(&mut self, checkpoint_id: usize) {
-        let expected_checkpoint = self.checkpoints.len();
-        assert!(expected_checkpoint == checkpoint_id, "In {}: The new checkpoint is not what was expected. The new checkpoint was {checkpoint_id}, whereas the expected next checkpoint is {expected_checkpoint}", self.get_full_name());
-
-        self.checkpoints
-            .push(CheckPoint::new(&self.errors, &self.resolved_globals));
-    }
 }

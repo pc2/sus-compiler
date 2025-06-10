@@ -4,7 +4,7 @@ mod type_check;
 
 use crate::{
     flattening::typecheck::{domain_check::domain_check_all, type_check::typecheck_all_modules},
-    linker::passes::ImmutableContext,
+    linker::{passes::ImmutableContext, GlobalUUID},
     typing::type_inference::{AbstractTypeSubstitutor, TypeSubstitutor, TypeUnifier},
 };
 
@@ -13,9 +13,9 @@ use super::*;
 use std::{cell::OnceCell, ops::Deref};
 
 pub use lints::perform_lints;
-pub fn typecheck_all(linker: &mut Linker) {
-    typecheck_all_modules(linker);
-    domain_check_all(linker);
+pub fn typecheck_all(linker: &mut Linker, global_ids: &[GlobalUUID]) {
+    typecheck_all_modules(linker, global_ids);
+    domain_check_all(linker, global_ids);
 }
 
 struct DomainCheckingContext<'l> {

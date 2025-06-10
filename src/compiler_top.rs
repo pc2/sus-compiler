@@ -4,7 +4,9 @@ use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
 use crate::flattening::typecheck::{perform_lints, typecheck_all};
-use crate::linker::AFTER_INITIAL_PARSE_CP;
+use crate::linker::{
+    AFTER_FLATTEN_CP, AFTER_INITIAL_PARSE_CP, AFTER_LINTS_CP, AFTER_TYPE_CHECK_CP,
+};
 use crate::prelude::*;
 use crate::typing::concrete_type::ConcreteGlobalReference;
 
@@ -16,7 +18,7 @@ use crate::{
     linker::FileData,
 };
 
-use crate::flattening::{flatten_all_globals, gather_initial_file_data, Module};
+use crate::flattening::{flatten_all_globals, gather_initial_file_data};
 
 const STD_LIB_PATH: &str = env!("SUS_COMPILER_STD_LIB_PATH");
 
@@ -123,17 +125,13 @@ impl Linker {
         parser.set_language(&tree_sitter_sus::language()).unwrap();
         let tree = parser.parse(&text, None).unwrap();
 
-        let file_id = self.files.reserve();
-        self.files.alloc_reservation(
-            file_id,
-            FileData {
-                file_identifier,
-                file_text: FileText::new(text),
-                tree,
-                associated_values: Vec::new(),
-                parsing_errors: ErrorStore::new(),
-            },
-        );
+        let file_id = self.files.alloc(FileData {
+            file_identifier,
+            file_text: FileText::new(text),
+            tree,
+            associated_values: Vec::new(),
+            parsing_errors: ErrorStore::new(),
+        });
 
         self.with_file_builder(file_id, |builder| {
             let _panic_guard = SpanDebugger::new(
@@ -143,6 +141,8 @@ impl Linker {
             );
             gather_initial_file_data(builder);
         });
+        let assoc_vals = self.files[file_id].associated_values.clone();
+        self.checkpoint(&assoc_vals, AFTER_INITIAL_PARSE_CP);
 
         info_mngr.on_file_added(file_id, self);
 
@@ -193,34 +193,38 @@ impl Linker {
 
         self.instantiator.borrow_mut().clear_instances();
 
+        let global_ids = self.get_all_global_ids();
         // First reset all modules back to post-gather_initial_file_data
-        for (_, md) in &mut self.modules {
-            let Module { link_info, .. } = md;
+        for id in &global_ids {
+            let link_info = Self::get_link_info_mut(
+                &mut self.modules,
+                &mut self.types,
+                &mut self.constants,
+                *id,
+            );
+
             link_info.reset_to(AFTER_INITIAL_PARSE_CP);
             link_info.instructions.clear();
-        }
-        for (_, typ) in &mut self.types {
-            typ.link_info.reset_to(AFTER_INITIAL_PARSE_CP);
-        }
-        for (_, cst) in &mut self.constants {
-            cst.link_info.reset_to(AFTER_INITIAL_PARSE_CP);
         }
         if config.early_exit == EarlyExitUpTo::Initialize {
             return;
         }
 
         flatten_all_globals(self);
+        self.checkpoint(&global_ids, AFTER_FLATTEN_CP);
         if config.early_exit == EarlyExitUpTo::Flatten {
             return;
         }
 
-        typecheck_all(self);
+        typecheck_all(self, &global_ids);
+        self.checkpoint(&global_ids, AFTER_TYPE_CHECK_CP);
 
         if config.early_exit == EarlyExitUpTo::AbstractTypecheck {
             return;
         }
 
-        perform_lints(self);
+        perform_lints(self, &global_ids);
+        self.checkpoint(&global_ids, AFTER_LINTS_CP);
 
         if config.early_exit == EarlyExitUpTo::Lint {
             return;
