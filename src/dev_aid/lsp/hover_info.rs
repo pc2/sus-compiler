@@ -8,7 +8,7 @@ use crate::typing::template::TemplateKind;
 
 use lsp_types::{LanguageString, MarkedString};
 
-use crate::flattening::{DeclarationKind, IdentifierType, InterfaceToDomainMap, Module};
+use crate::flattening::{DeclarationKind, InterfaceToDomainMap, Module};
 use crate::instantiation::SubModuleOrWire;
 use crate::linker::{Documentation, FileData, GlobalUUID, LinkInfo};
 
@@ -117,17 +117,18 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             }
 
             match decl.decl_kind {
-                DeclarationKind::RegularPort { is_input, .. } => {
+                DeclarationKind::Port { is_input, .. } => {
                     details_vec.push(if is_input { "input" } else { "output" }.to_owned())
                 }
-                DeclarationKind::NotPort | DeclarationKind::StructField { field_id: _ } => {}
-                DeclarationKind::GenerativeInput(_) => details_vec.push("param".to_owned()),
+                DeclarationKind::TemplateParameter(_) => details_vec.push("param".to_owned()),
+                _ => {}
             }
 
-            match decl.identifier_type {
-                IdentifierType::Local => {}
-                IdentifierType::State => details_vec.push("state".to_owned()),
-                IdentifierType::Generative => details_vec.push("gen".to_owned()),
+            if decl.decl_kind.is_generative() {
+                details_vec.push("gen".to_owned());
+            }
+            if decl.decl_kind.is_state() {
+                details_vec.push("state".to_owned());
             }
 
             let typ_str = decl
@@ -141,7 +142,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.documentation(&decl.documentation);
             hover.sus_code(details_vec.join(" "));
 
-            hover.gather_hover_infos(obj_id, decl_id, decl.identifier_type.is_generative());
+            hover.gather_hover_infos(obj_id, decl_id, decl.decl_kind.is_generative());
         }
         LocationInfo::InGlobal(obj_id, _link_info, id, InGlobal::NamedSubmodule(submod)) => {
             let md_id = obj_id.unwrap_module();

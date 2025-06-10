@@ -194,7 +194,7 @@ fn recurse_down_expression(
             if !path.is_empty() {
                 return None;
             }
-            let DeclarationKind::GenerativeInput(decl_template_id) =
+            let DeclarationKind::TemplateParameter(template_id) =
                 instructions[*decl_id].unwrap_declaration().decl_kind
             else {
                 return None;
@@ -203,7 +203,7 @@ fn recurse_down_expression(
                 const_factor: 0,
                 arg_linear_factor: TVec::with_size(num_template_args, 0),
             };
-            result.arg_linear_factor[decl_template_id] = 1;
+            result.arg_linear_factor[template_id] = 1;
             Some(result)
         }
         _other => None,

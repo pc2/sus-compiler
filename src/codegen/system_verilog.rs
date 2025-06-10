@@ -309,7 +309,7 @@ impl<'g> CodeGenerationContext<'g> {
                 &self.md.link_info.instructions[w.original_instruction]
             {
                 // Don't print named inputs and outputs, already did that in interface
-                if let DeclarationKind::RegularPort { .. } = wire_decl.decl_kind {
+                if let DeclarationKind::Port { .. } = wire_decl.decl_kind {
                     continue;
                 }
             }

@@ -131,21 +131,6 @@ impl core::fmt::Display for BinaryOperator {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum GenerativeKind {
-    PlainGenerative,
-    ForLoopGenerative,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DeclarationContext {
-    IO { is_input: bool },
-    Generative(GenerativeKind),
-    TemplateGenerative(TemplateID),
-    PlainWire,
-    StructField,
-}
-
 #[derive(Debug)]
 enum ModuleOrWrittenType {
     WrittenType(WrittenType),
@@ -176,7 +161,7 @@ struct FlatteningContext<'l, 'errs> {
 
     local_variable_context: LocalVariableContext<'l, NamedLocal>,
 
-    default_declaration_context: DeclarationContext,
+    default_decl_kind: DeclarationKind,
 
     current_parent_condition: Option<ParentCondition>,
 }
@@ -467,105 +452,50 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             }))
     }
 
+    fn forbid_keyword(&self, kw_span: Option<Span>, context: &str) {
+        if let Some(kw_span) = kw_span {
+            self.errors
+                .error(kw_span, format!("This can't be used {context}"));
+        }
+    }
+
     fn flatten_declaration<const ALLOW_MODULES: bool>(
         &mut self,
-        declaration_context: DeclarationContext,
-        mut read_only: bool,
+        decl_context: DeclarationKind,
         declaration_itself_is_not_written_to: bool,
         cursor: &mut Cursor<'c>,
     ) -> FlatID {
         let whole_declaration_span = cursor.span();
         cursor.go_down(kind!("declaration"), |cursor| {
             // Extra inputs and outputs declared in the body of the module
-            let io_kw = cursor.optional_field(field!("io_port_modifiers")).then(|| {
-                let (k, span) = cursor.kind_span();
-                match k {
-                    kw!("input") => (true, span),
-                    kw!("output") => (false, span),
-                    _ => cursor.could_not_match(),
-                }
-            });
 
-            // State or Generative
-            let declaration_modifiers = cursor.optional_field(field!("declaration_modifiers")).then(|| cursor.kind_span());
+            let mut input_kw = None;
+            let mut output_kw = None;
+            let mut gen_kw = None;
+            let mut state_kw = None;
 
-            // Still gets overwritten 
-            let mut decl_kind = match declaration_context {
-                DeclarationContext::IO{is_input} => {
-                    if let Some((_, io_span)) = io_kw {
-                        self.errors.error(io_span, "Cannot redeclare 'input' or 'output' on functional syntax IO");
+            if cursor.optional_field(field!("declaration_modifiers")) {
+                cursor.list(kind!("declaration_modifiers"), |cursor| {
+                    let (kind, span) = cursor.kind_span();
+                    let selected_kw = match kind {
+                        kw!("input") => &mut input_kw,
+                        kw!("output") => &mut output_kw,
+                        kw!("gen") => &mut gen_kw,
+                        kw!("state") => &mut state_kw,
+                        _ => cursor.could_not_match(),
+                    };
+                    if let Some(prev_span) = *selected_kw {
+                        self.errors
+                            .error(span, "Duplicate keyword!")
+                            .info_same_file(prev_span, "Previously used here");
                     }
-                    DeclarationKind::RegularPort { is_input, port_id: PortID::PLACEHOLDER, domain: self.current_domain }
-                }
-                DeclarationContext::Generative(_) => {
-                    if let Some((_, io_span)) = io_kw {
-                        self.errors.error(io_span, "Cannot declare 'input' or 'output' to declarations in a generative context");
-                    }
-                    DeclarationKind::NotPort
-                }
-                DeclarationContext::TemplateGenerative(template_id) => {
-                    if let Some((_, io_span)) = io_kw {
-                        self.errors.error(io_span, "Cannot declare 'input' or 'output' on template values");
-                    }
-                    DeclarationKind::GenerativeInput(template_id)
-                }
-                DeclarationContext::PlainWire => {
-                    match io_kw {
-                        Some((is_input, _)) => DeclarationKind::RegularPort { is_input, port_id: PortID::PLACEHOLDER, domain: self.current_domain },
-                        None => DeclarationKind::NotPort,
-                    }
-                }
-                DeclarationContext::StructField => {
-                    if let Some((_, io_span)) = io_kw {
-                        self.errors.error(io_span, "Cannot declare 'input' or 'output' in a struct");
-                    }
-                    DeclarationKind::StructField { field_id: UUID::PLACEHOLDER }
-                }
-            };
-
-            let identifier_type = match declaration_context {
-                DeclarationContext::IO{is_input:_} | DeclarationContext::PlainWire | DeclarationContext::StructField => {
-                    match declaration_modifiers {
-                        Some((kw!("state"), modifier_span)) => {
-                            if decl_kind.is_io_port() == Some(true) {
-                                self.errors.error(modifier_span, "Inputs cannot be decorated with 'state'");
-                            }
-                            IdentifierType::State
-                        }
-                        Some((kw!("gen"), modifier_span)) => {
-                            match decl_kind {
-                                DeclarationKind::NotPort => {}
-                                DeclarationKind::RegularPort { .. } | DeclarationKind::StructField { field_id:_ } => {
-                                    self.errors.error(modifier_span, "Cannot declare `gen` on inputs and outputs. To declare template inputs write it between the #()");
-                                    decl_kind = DeclarationKind::NotPort; // Make it not a port anymore, because it errored
-                                }
-                                DeclarationKind::GenerativeInput(_) => unreachable!("Caught by DeclarationContext::ForLoopGenerative | DeclarationContext::TemplateGenerative(_)")
-                            }
-                            IdentifierType::Generative
-                        }
-                        Some(_) => cursor.could_not_match(),
-                        None => {
-                            IdentifierType::Local
-                        }
-                    }
-                }
-                DeclarationContext::Generative(_) | DeclarationContext::TemplateGenerative(_) => {
-                    if let Some((_, modifier_span)) = declaration_modifiers {
-                        self.errors.error(modifier_span, "Cannot add modifiers to implicitly generative declarations");
-                    }
-                    IdentifierType::Generative
-                }
-            };
-
-            match &mut decl_kind {
-                DeclarationKind::NotPort => {}
-                DeclarationKind::GenerativeInput(_template_id) => {}
-                DeclarationKind::StructField { field_id } => {*field_id = self.fields_to_visit.next().unwrap();}
-                DeclarationKind::RegularPort { port_id, .. } => {*port_id = self.ports_to_visit.next().unwrap();}
+                    *selected_kw = Some(span);
+                })
             };
 
             cursor.field(field!("type"));
-            let decl_span = Span::new_overarching(cursor.span(), whole_declaration_span.empty_span_at_end());
+            let decl_span =
+                Span::new_overarching(cursor.span(), whole_declaration_span.empty_span_at_end());
             let typ_or_module_expr = self.flatten_module_or_type::<ALLOW_MODULES>(cursor);
 
             let (name_span, name) = cursor.field_span(field!("name"), kind!("identifier"));
@@ -576,41 +506,135 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             let documentation = cursor.extract_gathered_comments();
 
             let typ_expr = match typ_or_module_expr {
-                ModuleOrWrittenType::WrittenType(typ) => {
-                    typ
-                }
+                ModuleOrWrittenType::WrittenType(typ) => typ,
                 ModuleOrWrittenType::Module(module_ref) => {
                     assert!(ALLOW_MODULES);
                     if let Some((_, span)) = span_latency_specifier {
-                        self.errors.error(span, "Cannot add latency specifier to module instances");
+                        self.errors
+                            .error(span, "Cannot add latency specifier to module instances");
                     }
-                    let submod_id = self.alloc_submodule_instruction(module_ref, Some((name.to_owned(), name_span)), documentation);
+                    let submod_id = self.alloc_submodule_instruction(
+                        module_ref,
+                        Some((name.to_owned(), name_span)),
+                        documentation,
+                    );
 
                     self.alloc_local_name(name_span, name, NamedLocal::SubModule(submod_id));
 
-                    return submod_id
+                    return submod_id;
                 }
             };
 
-            if decl_kind.implies_read_only() {
-                read_only = true;
-            }
+            let decl_kind = match decl_context {
+                DeclarationKind::RegularWire { .. } => {
+                    if gen_kw.is_some() {
+                        self.forbid_keyword(input_kw, "on a generative declaration.");
+                        self.forbid_keyword(output_kw, "on a generative declaration.");
+                        self.forbid_keyword(state_kw, "on a generative declaration.");
+                        DeclarationKind::RegularGenerative { read_only: false }
+                    } else if input_kw.is_some() {
+                        self.forbid_keyword(
+                            output_kw,
+                            "on a port which has already been declared an input",
+                        );
+                        self.forbid_keyword(state_kw, "on an input port, because it is read-only");
+                        DeclarationKind::Port {
+                            is_input: true,
+                            is_state: false,
+                            port_id: self.ports_to_visit.next().unwrap(),
+                            domain: self.current_domain,
+                        }
+                    } else {
+                        let is_state = state_kw.is_some();
+                        if output_kw.is_some() {
+                            DeclarationKind::Port {
+                                is_input: false,
+                                is_state,
+                                port_id: self.ports_to_visit.next().unwrap(),
+                                domain: self.current_domain,
+                            }
+                        } else {
+                            DeclarationKind::RegularWire {
+                                is_state,
+                                read_only: false,
+                            }
+                        }
+                    }
+                }
+                DeclarationKind::StructField(_uuid) => {
+                    self.forbid_keyword(input_kw, "in struct fields");
+                    self.forbid_keyword(output_kw, "in struct fields");
+                    self.forbid_keyword(state_kw, "in struct fields");
+                    if gen_kw.is_some() {
+                        DeclarationKind::RegularGenerative { read_only: false }
+                    } else {
+                        DeclarationKind::StructField(self.fields_to_visit.next().unwrap())
+                    }
+                }
+                DeclarationKind::Port {
+                    is_input,
+                    is_state: _,
+                    port_id: _,
+                    domain,
+                } => {
+                    let port_ctx = if is_input {
+                        "here, it's already implicitly declared as an input port"
+                    } else {
+                        "here, it's already implicitly declared as an output port"
+                    };
+                    self.forbid_keyword(input_kw, port_ctx);
+                    self.forbid_keyword(output_kw, port_ctx);
+                    self.forbid_keyword(gen_kw, "on ports");
+                    let is_state = if is_input {
+                        self.forbid_keyword(state_kw, "on input ports, because they are read-only");
+                        false
+                    } else {
+                        state_kw.is_some()
+                    };
+                    DeclarationKind::Port {
+                        is_input,
+                        is_state,
+                        port_id: self.ports_to_visit.next().unwrap(),
+                        domain,
+                    }
+                }
+                d @ DeclarationKind::RegularGenerative { .. } => {
+                    self.forbid_keyword(input_kw, "in a generative context");
+                    self.forbid_keyword(output_kw, "in a generative context");
+                    self.forbid_keyword(
+                        gen_kw,
+                        "in a generative context, it is already generative!",
+                    );
+                    self.forbid_keyword(state_kw, "in a generative context");
+                    d
+                }
+                d @ DeclarationKind::TemplateParameter(_) => {
+                    self.forbid_keyword(input_kw, "in template parameters");
+                    self.forbid_keyword(output_kw, "in template parameters");
+                    self.forbid_keyword(
+                        gen_kw,
+                        "in a template parameter, it is already generative!",
+                    );
+                    self.forbid_keyword(state_kw, "in template parameters");
+                    d
+                }
+            };
 
-            let decl_id = self.instructions.alloc(Instruction::Declaration(Declaration{
-                parent_condition: self.current_parent_condition,
-                typ_expr,
-                typ: TyCell::new(),
-                domain: Cell::new(DomainType::PLACEHOLDER),
-                read_only,
-                declaration_itself_is_not_written_to,
-                decl_kind,
-                identifier_type,
-                name : name.to_owned(),
-                name_span,
-                decl_span,
-                latency_specifier : span_latency_specifier.map(|(ls, _)| ls),
-                documentation
-            }));
+            let decl_id = self
+                .instructions
+                .alloc(Instruction::Declaration(Declaration {
+                    parent_condition: self.current_parent_condition,
+                    typ_expr,
+                    typ: TyCell::new(),
+                    domain: Cell::new(DomainType::PLACEHOLDER),
+                    declaration_itself_is_not_written_to,
+                    decl_kind,
+                    name: name.to_owned(),
+                    name_span,
+                    decl_span,
+                    latency_specifier: span_latency_specifier.map(|(ls, _)| ls),
+                    documentation,
+                }));
 
             self.alloc_local_name(name_span, name, NamedLocal::Declaration(decl_id));
 
@@ -1149,8 +1173,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         let loop_var_decl_frame = self.local_variable_context.new_frame();
                         cursor.field(field!("for_decl"));
                         let loop_var_decl = self.flatten_declaration::<false>(
-                            DeclarationContext::Generative(GenerativeKind::ForLoopGenerative),
-                            true,
+                            DeclarationKind::RegularGenerative { read_only: true },
                             true,
                             cursor,
                         );
@@ -1258,12 +1281,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 cursor.field(field!("expr_or_decl"));
                 let (kind, to_span) = cursor.kind_span();
                 let to = if kind == kind!("declaration") {
-                    let root = self.flatten_declaration::<false>(
-                        self.default_declaration_context,
-                        false,
-                        true,
-                        cursor,
-                    );
+                    let root =
+                        self.flatten_declaration::<false>(self.default_decl_kind, true, cursor);
                     let flat_root_decl = self.instructions[root].unwrap_declaration();
                     WireReference {
                         root: WireReferenceRoot::LocalDecl(root),
@@ -1304,7 +1323,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 let kind = cursor.kind();
 
                 if kind == kind!("declaration") {
-                    let _ = self.flatten_declaration::<true>(self.default_declaration_context, false, true, cursor);
+                    let _ = self.flatten_declaration::<true>(self.default_decl_kind, true, cursor);
                 } else { // It's _expression
                     self.flatten_assign_to_expr(Vec::new(), cursor);
                 }
@@ -1314,12 +1333,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
     fn flatten_declaration_list(
         &mut self,
-        declaration_context: DeclarationContext,
-        read_only: bool,
+        default_decl_kind: DeclarationKind,
         cursor: &mut Cursor<'c>,
     ) -> Vec<FlatID> {
         cursor.collect_list(kind!("declaration_list"), |cursor| {
-            self.flatten_declaration::<false>(declaration_context, read_only, true, cursor)
+            self.flatten_declaration::<false>(default_decl_kind, true, cursor)
         })
     }
 
@@ -1330,27 +1348,54 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     ) -> (Vec<FlatID>, Vec<FlatID>) {
         let (inputs_ctx, outputs_ctx) = match ctx {
             InterfacePortsInfo::InputsThenOutputs => (
-                DeclarationContext::IO { is_input: true },
-                DeclarationContext::IO { is_input: false },
+                DeclarationKind::Port {
+                    is_input: true,
+                    is_state: false,
+                    port_id: UUID::PLACEHOLDER,
+                    domain: self.current_domain,
+                },
+                DeclarationKind::Port {
+                    is_input: false,
+                    is_state: false,
+                    port_id: UUID::PLACEHOLDER,
+                    domain: self.current_domain,
+                },
             ),
             InterfacePortsInfo::OutputsThenInputs => (
-                DeclarationContext::IO { is_input: false },
-                DeclarationContext::IO { is_input: true },
+                DeclarationKind::Port {
+                    is_input: false,
+                    is_state: false,
+                    port_id: UUID::PLACEHOLDER,
+                    domain: self.current_domain,
+                },
+                DeclarationKind::Port {
+                    is_input: true,
+                    is_state: false,
+                    port_id: UUID::PLACEHOLDER,
+                    domain: self.current_domain,
+                },
             ),
-            InterfacePortsInfo::ConditionalBindings => {
-                (DeclarationContext::PlainWire, DeclarationContext::PlainWire)
-            }
+            InterfacePortsInfo::ConditionalBindings => (
+                DeclarationKind::RegularWire {
+                    is_state: false,
+                    read_only: true,
+                },
+                DeclarationKind::RegularWire {
+                    is_state: false,
+                    read_only: false,
+                },
+            ),
         };
 
         cursor.go_down(kind!("interface_ports"), |cursor| {
             (
                 if cursor.optional_field(field!("inputs")) {
-                    self.flatten_declaration_list(inputs_ctx, true, cursor)
+                    self.flatten_declaration_list(inputs_ctx, cursor)
                 } else {
                     Vec::new()
                 },
                 if cursor.optional_field(field!("outputs")) {
-                    self.flatten_declaration_list(outputs_ctx, false, cursor)
+                    self.flatten_declaration_list(outputs_ctx, cursor)
                 } else {
                     Vec::new()
                 },
@@ -1390,8 +1435,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     kind!("declaration") => {
                         let next_param_id = self.parameters.get_next_alloc_id();
                         let decl_id = self.flatten_declaration::<false>(
-                            DeclarationContext::TemplateGenerative(next_param_id),
-                            true,
+                            DeclarationKind::TemplateParameter(next_param_id),
                             true,
                             cursor,
                         );
@@ -1425,10 +1469,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             decl_span,
                             name_span,
                             name: module_name.to_string(),
-                            read_only: false,
                             declaration_itself_is_not_written_to: true,
-                            decl_kind: DeclarationKind::NotPort,
-                            identifier_type: IdentifierType::Generative,
+                            decl_kind: DeclarationKind::RegularGenerative { read_only: false },
                             latency_specifier: None,
                             documentation: const_type_cursor.extract_gathered_comments(),
                         }));
@@ -1490,7 +1532,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
 
     let mut local_variable_context = LocalVariableContext::new_initial();
 
-    let (ports_to_visit, fields_to_visit, default_declaration_context, domains) = match global_obj {
+    let (ports_to_visit, fields_to_visit, default_decl_kind, domains) = match global_obj {
         GlobalUUID::Module(module_uuid) => {
             let md = &globals[module_uuid];
             for (id, domain) in &md.domains {
@@ -1509,7 +1551,10 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
             (
                 md.ports.id_range().into_iter(),
                 UUIDRange::empty().into_iter(),
-                DeclarationContext::PlainWire,
+                DeclarationKind::RegularWire {
+                    is_state: false,
+                    read_only: false,
+                },
                 &md.domains,
             )
         }
@@ -1518,14 +1563,14 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
             (
                 UUIDRange::empty().into_iter(),
                 typ.fields.id_range().into_iter(),
-                DeclarationContext::StructField,
+                DeclarationKind::StructField(UUID::PLACEHOLDER),
                 &FlatAlloc::EMPTY_FLAT_ALLOC,
             )
         }
         GlobalUUID::Constant(_const_uuid) => (
             UUIDRange::empty().into_iter(),
             UUIDRange::empty().into_iter(),
-            DeclarationContext::Generative(GenerativeKind::PlainGenerative),
+            DeclarationKind::RegularGenerative { read_only: false },
             &FlatAlloc::EMPTY_FLAT_ALLOC,
         ),
     };
@@ -1536,7 +1581,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         ports_to_visit,
         fields_to_visit,
         domains,
-        default_declaration_context,
+        default_decl_kind,
         errors: &errors,
         working_on_link_info: linker.get_link_info(global_obj),
         instructions: FlatAlloc::new(),
@@ -1563,26 +1608,20 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
             for (decl_id, instr) in &instructions {
                 if let Instruction::Declaration(decl) = instr {
                     match decl.decl_kind {
-                        DeclarationKind::NotPort => {}
-                        DeclarationKind::RegularPort { port_id, .. } => {
+                        DeclarationKind::Port { port_id, .. } => {
                             let port = &mut md.ports[port_id];
                             assert_eq!(port.name_span, decl.name_span);
                             port.declaration_instruction = decl_id;
                         }
-                        DeclarationKind::GenerativeInput(_) => {}
-                        DeclarationKind::StructField { field_id: _ } => {
+                        DeclarationKind::StructField(..) => {
                             unreachable!("No Struct fields in Modules")
                         }
+                        DeclarationKind::RegularWire { .. }
+                        | DeclarationKind::TemplateParameter(_)
+                        | DeclarationKind::RegularGenerative { .. } => {}
                     }
                 }
             }
-
-            // Also create the inference info now.
-            md.latency_inference_info = PortLatencyInferenceInfo::make(
-                &md.ports,
-                &md.link_info.instructions,
-                md.link_info.template_parameters.len(),
-            );
 
             if crate::debug::is_enabled("print-flattened-pre-typecheck") {
                 md.print_flattened_module(&linker.files[md.link_info.file]);
@@ -1597,21 +1636,21 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
             for (decl_id, instr) in &instructions {
                 if let Instruction::Declaration(decl) = instr {
                     match decl.decl_kind {
-                        DeclarationKind::NotPort => {
-                            assert!(
-                                decl.identifier_type == IdentifierType::Generative,
-                                "If a variable isn't generative, then it MUST be a struct field"
-                            )
-                        }
-                        DeclarationKind::StructField { field_id } => {
+                        DeclarationKind::StructField(field_id) => {
                             let field = &mut typ.fields[field_id];
                             assert_eq!(field.name_span, decl.name_span);
                             field.declaration_instruction = decl_id;
                         }
-                        DeclarationKind::RegularPort { .. } => {
+                        DeclarationKind::TemplateParameter(_)
+                        | DeclarationKind::RegularGenerative { .. } => {}
+                        DeclarationKind::RegularWire { .. } => {
+                            unreachable!(
+                                "If a declaration isn't generative, then it MUST be a struct field"
+                            )
+                        }
+                        DeclarationKind::Port { .. } => {
                             unreachable!("No ports in structs")
                         }
-                        DeclarationKind::GenerativeInput(_) => {}
                     }
                 }
             }

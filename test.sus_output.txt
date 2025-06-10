@@ -306,6 +306,298 @@ Typechecking use_ranks
 Typechecking testInts
 Typechecking use_FIFO
 Typechecking write_to_generative_through_when
+Domain Check LatencyOffset
+Domain Check CrossDomain
+Domain Check IntToBits
+Domain Check BitsToInt
+Domain Check UIntToBits
+Domain Check BitsToUInt
+Domain Check DualPortMem
+Domain Check FIFO
+Domain Check JoinDomains
+Domain Check Iterator
+Domain Check FixedSizeIterator
+Domain Check SlowClockGenerator
+Domain Check SplitAt
+Domain Check Abs
+Domain Check Slice
+Domain Check BitSelect
+Domain Check PopCount
+Domain Check TreeAdd
+Domain Check example_md
+Domain Check multiply_add
+Domain Check test_pow17
+Domain Check pow17
+Domain Check fibonnaci
+Domain Check blur2
+Domain Check Tree_Multiply
+Domain Check Accumulator
+Domain Check blur
+Domain Check Unpack4
+Domain Check generative
+Domain Check add_indices_to_array
+Domain Check assignment_producer
+Domain Check test_various_assignments
+Domain Check first_bit_idx_6
+Domain Check multiply_add_with_latencies
+Domain Check first_bit_idx_24
+Domain Check permute
+Domain Check permute24
+Domain Check test_single_wire
+Domain Check disjoint_ports
+Domain Check undeteriminable_input_latency
+Domain Check specified_input_latency
+Domain Check determinable_input_latency
+Domain Check determinable_because_no_input_output_ports
+Domain Check conflicting_latency_declarations
+Domain Check bad_cycle
+Domain Check module_taking_time
+Domain Check matrix_vector_mul
+Domain Check bad_cycle2
+Domain Check module_taking_a_lot_of_time
+Domain Check offset_latency
+Domain Check good_cycle
+Domain Check input_only
+Domain Check multiple_inputs_only
+Domain Check output_only
+Domain Check multiple_outputs_only
+Domain Check submodule
+Domain Check doNothing
+Domain Check contains_submodule_submodule
+Domain Check xor
+Domain Check use_xor
+Domain Check fizz_buzz
+Domain Check fizz_buzz_gen
+Domain Check mbf_dual
+Domain Check monotonize_down
+Domain Check my_mod
+Domain Check use_my_mod
+Domain Check submodule_named_ports
+Domain Check use_submodule_named_ports
+Domain Check contains_submodule_submodule
+Domain Check cross_bool
+Domain Check cross_int
+Domain Check cross_memory
+Domain Check offset_backwards
+Domain Check dual_port_mem
+Domain Check use_fifo
+Domain Check test_separated_domain
+Domain Check no_port_module
+Domain Check use_no_input_module
+Domain Check mod_with_unused_interface
+Domain Check test_write_to_gen_var
+Domain Check use_bad_interface
+Domain Check sequenceDownFrom
+Domain Check sumUpTo
+Domain Check test
+Domain Check use_test
+Domain Check tinyTestMod
+Domain Check testTinyTestMod
+Domain Check tree_add
+Domain Check make_tree_add
+Domain Check replicate
+Domain Check use_replicate
+Domain Check permute_t
+Domain Check use_permute
+Domain Check instruction_decoder
+Domain Check run_instruction
+Domain Check no_main_interface
+Domain Check use_no_main_interface
+Domain Check moduleWithBadDeclaration
+Domain Check moduleWithBadInterface
+Domain Check useModuleWithBadInterface
+Domain Check m
+Domain Check xyz
+Domain Check numbersToAddUp
+Domain Check sized_int_add
+Domain Check use_sized_int_add
+Domain Check implicit_domain_forbidden
+Domain Check conflicting_domain_with_port_name
+Domain Check make_infinite_type_help
+Domain Check make_infinite_type
+Domain Check UseDualPortMem
+Domain Check example_FIFO
+Domain Check use_Iterator
+Domain Check UseSlice
+Domain Check UseBuiltinConstants
+Domain Check FailingAssert
+Domain Check IfTesting
+Domain Check latency_counting_disjoint_blocks
+Domain Check latency_counting_disjoint_blocks_merge_error
+Domain Check use_infer_me
+Domain Check infer_me
+Domain Check infer_from_local_context
+Domain Check instantiate_fifo
+Domain Check inference_edge_case
+Domain Check specified_latencies_not_ports_edge_case
+Domain Check testArrayWrite
+Domain Check infer_me_with_poison_output
+Domain Check instantiate_infer_me_with_poison_output
+Domain Check __add__
+Domain Check ShiftReg
+Domain Check MultiStateLoop
+Domain Check use_MultiStateLoop
+Domain Check CombineArray
+Domain Check unknownLatency
+Domain Check useUnknownLatency
+Domain Check infer_me_conflicting_directions
+Domain Check use_infer_me_conflicting_directions
+Domain Check infer_me_with_delta
+Domain Check use_infer_me_with_delta
+Domain Check infer_me_with_negative_delta
+Domain Check use_infer_me_with_negative_delta
+Domain Check infer_me_inputs_only
+Domain Check use_infer_me_inputs_only
+Domain Check use_ranks
+Domain Check testInts
+Domain Check use_FIFO
+Domain Check write_to_generative_through_when
+Lints LatencyOffset
+Lints CrossDomain
+Lints IntToBits
+Lints BitsToInt
+Lints UIntToBits
+Lints BitsToUInt
+Lints DualPortMem
+Lints FIFO
+Lints JoinDomains
+Lints Iterator
+Lints FixedSizeIterator
+Lints SlowClockGenerator
+Lints SplitAt
+Lints Abs
+Lints Slice
+Lints BitSelect
+Lints PopCount
+Lints TreeAdd
+Lints example_md
+Lints multiply_add
+Lints test_pow17
+Lints pow17
+Lints fibonnaci
+Lints blur2
+Lints Tree_Multiply
+Lints Accumulator
+Lints blur
+Lints Unpack4
+Lints generative
+Lints add_indices_to_array
+Lints assignment_producer
+Lints test_various_assignments
+Lints first_bit_idx_6
+Lints multiply_add_with_latencies
+Lints first_bit_idx_24
+Lints permute
+Lints permute24
+Lints test_single_wire
+Lints disjoint_ports
+Lints undeteriminable_input_latency
+Lints specified_input_latency
+Lints determinable_input_latency
+Lints determinable_because_no_input_output_ports
+Lints conflicting_latency_declarations
+Lints bad_cycle
+Lints module_taking_time
+Lints matrix_vector_mul
+Lints bad_cycle2
+Lints module_taking_a_lot_of_time
+Lints offset_latency
+Lints good_cycle
+Lints input_only
+Lints multiple_inputs_only
+Lints output_only
+Lints multiple_outputs_only
+Lints submodule
+Lints doNothing
+Lints contains_submodule_submodule
+Lints xor
+Lints use_xor
+Lints fizz_buzz
+Lints fizz_buzz_gen
+Lints mbf_dual
+Lints monotonize_down
+Lints my_mod
+Lints use_my_mod
+Lints submodule_named_ports
+Lints use_submodule_named_ports
+Lints contains_submodule_submodule
+Lints cross_bool
+Lints cross_int
+Lints cross_memory
+Lints offset_backwards
+Lints dual_port_mem
+Lints use_fifo
+Lints test_separated_domain
+Lints no_port_module
+Lints use_no_input_module
+Lints mod_with_unused_interface
+Lints test_write_to_gen_var
+Lints use_bad_interface
+Lints sequenceDownFrom
+Lints sumUpTo
+Lints test
+Lints use_test
+Lints tinyTestMod
+Lints testTinyTestMod
+Lints tree_add
+Lints make_tree_add
+Lints replicate
+Lints use_replicate
+Lints permute_t
+Lints use_permute
+Lints instruction_decoder
+Lints run_instruction
+Lints no_main_interface
+Lints use_no_main_interface
+Lints moduleWithBadDeclaration
+Lints moduleWithBadInterface
+Lints useModuleWithBadInterface
+Lints m
+Lints xyz
+Lints numbersToAddUp
+Lints sized_int_add
+Lints use_sized_int_add
+Lints implicit_domain_forbidden
+Lints conflicting_domain_with_port_name
+Lints make_infinite_type_help
+Lints make_infinite_type
+Lints UseDualPortMem
+Lints example_FIFO
+Lints use_Iterator
+Lints UseSlice
+Lints UseBuiltinConstants
+Lints FailingAssert
+Lints IfTesting
+Lints latency_counting_disjoint_blocks
+Lints latency_counting_disjoint_blocks_merge_error
+Lints use_infer_me
+Lints infer_me
+Lints infer_from_local_context
+Lints instantiate_fifo
+Lints inference_edge_case
+Lints specified_latencies_not_ports_edge_case
+Lints testArrayWrite
+Lints infer_me_with_poison_output
+Lints instantiate_infer_me_with_poison_output
+Lints __add__
+Lints ShiftReg
+Lints MultiStateLoop
+Lints use_MultiStateLoop
+Lints CombineArray
+Lints unknownLatency
+Lints useUnknownLatency
+Lints infer_me_conflicting_directions
+Lints use_infer_me_conflicting_directions
+Lints infer_me_with_delta
+Lints use_infer_me_with_delta
+Lints infer_me_with_negative_delta
+Lints use_infer_me_with_negative_delta
+Lints infer_me_inputs_only
+Lints use_infer_me_inputs_only
+Lints use_ranks
+Lints testInts
+Lints use_FIFO
+Lints write_to_generative_through_when
 Instantiating example_md
 Concrete Typechecking example_md
 Checking array accesses example_md

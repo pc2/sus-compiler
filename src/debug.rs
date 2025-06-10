@@ -53,23 +53,21 @@ pub fn add_debug_span(sp: Span) {
     });
 }
 
-fn print_most_recent_spans(file_data: &FileData) {
-    DEBUG_STACK.with_borrow_mut(|history| {
-        let Some(history) = history.debug_stack.last_mut() else {return;}; // Exit because we can't know what context. TODO FIX AND SPAN + FileUUID
+fn print_most_recent_spans(file_data: &FileData, history: SpanDebuggerStackElement) {
+    let mut spans_to_print: Vec<Range<usize>> = Vec::with_capacity(NUM_SPANS_TO_PRINT);
 
-        let mut spans_to_print: Vec<Range<usize>> = Vec::with_capacity(NUM_SPANS_TO_PRINT);
-
-        for sp in history.span_history.iter().rev() {
-            let as_range = sp.as_range();
-            if !spans_to_print.contains(&as_range) {
-                spans_to_print.push(as_range);
-            }
-            if spans_to_print.len() >= NUM_SPANS_TO_PRINT {break;}
+    for sp in history.span_history.iter().rev() {
+        let as_range = sp.as_range();
+        if !spans_to_print.contains(&as_range) {
+            spans_to_print.push(as_range);
         }
+        if spans_to_print.len() >= NUM_SPANS_TO_PRINT {
+            break;
+        }
+    }
 
-        println!("Panic unwinding. Printing the last {} spans. BEWARE: These spans may not correspond to this file, thus incorrect spans are possible!", spans_to_print.len());
-        pretty_print_spans_in_reverse_order(file_data, spans_to_print);
-    });
+    println!("Panic unwinding. Printing the last {} spans. BEWARE: These spans may not correspond to this file, thus incorrect spans are possible!", spans_to_print.len());
+    pretty_print_spans_in_reverse_order(file_data, spans_to_print);
 }
 
 #[allow(unused)]
@@ -96,6 +94,7 @@ pub fn debug_print_span(span: Span, label: String) {
 /// Maybe future work can remove dependency on Linker lifetime with some unsafe code.
 pub struct SpanDebugger<'text> {
     file_data: &'text FileData,
+    stage: &'static str,
     started_at: std::time::Instant,
     /// Kills the process if a SpanDebugger lives longer than config.kill_timeout
     #[allow(unused)]
@@ -154,6 +153,7 @@ impl<'text> SpanDebugger<'text> {
 
         Self {
             file_data,
+            stage,
             started_at: std::time::Instant::now(),
             out_of_time_killer: OutOfTimeKiller::new(context),
         }
@@ -167,12 +167,18 @@ impl Drop for SpanDebugger<'_> {
             "Exit (Took {})",
             humantime::format_duration(time_taken)
         ));
-        DEBUG_STACK.with_borrow_mut(|stack| stack.debug_stack.pop());
-        print_stack_top("");
 
+        let last_stack_elem = DEBUG_STACK
+            .with_borrow_mut(|stack| stack.debug_stack.pop())
+            .unwrap();
+
+        print_stack_top("");
         if std::thread::panicking() {
-            eprintln!("Panic happened in Span-guarded context");
-            print_most_recent_spans(self.file_data)
+            eprintln!(
+                "Panic happened in Span-guarded context {} in {}",
+                self.stage, last_stack_elem.context
+            );
+            print_most_recent_spans(self.file_data, last_stack_elem)
         }
     }
 }

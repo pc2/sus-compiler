@@ -1,7 +1,7 @@
 use sus_proc_macro::get_builtin_const;
 
-use crate::flattening::{IdentifierType, WriteModifiers};
-use crate::linker::{GlobalUUID, IsExtern, LinkInfo};
+use crate::flattening::WriteModifiers;
+use crate::linker::{GlobalUUID, IsExtern, LinkInfo, AFTER_LINTS_CP};
 use crate::prelude::*;
 use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
@@ -25,6 +25,9 @@ pub fn perform_lints(linker: &mut Linker) {
                 lint_instructions(&link_info.instructions, errors, globals);
             },
         );
+        linker.mutable_pass(GlobalUUID::Module(id), |md, _| {
+            md.checkpoint(AFTER_LINTS_CP);
+        });
     }
 }
 
@@ -50,7 +53,7 @@ fn lint_instructions(
                     match &wr.to.root {
                         WireReferenceRoot::LocalDecl(decl_id) => {
                             let decl = instructions[*decl_id].unwrap_declaration();
-                            if decl.read_only {
+                            if decl.decl_kind.is_read_only() {
                                 errors
                                     .error(wr.to_span, format!("'{}' is read-only", decl.name))
                                     .info_obj_same_file(decl);
@@ -58,7 +61,7 @@ fn lint_instructions(
 
                             match wr.write_modifiers {
                                 WriteModifiers::Connection { .. } => {
-                                    if decl.identifier_type.is_generative() {
+                                    if decl.decl_kind.is_generative() {
                                         // Check that this generative declaration isn't used in a non-compiletime if
                                         if let Some(root_flat) = wr.to.root.get_root_flat() {
                                             let to_decl =
@@ -96,7 +99,7 @@ fn lint_instructions(
                                             .info_obj_same_file(decl);
                                     }
 
-                                    if decl.identifier_type != IdentifierType::State {
+                                    if !decl.decl_kind.is_state() {
                                         errors
                                             .error(
                                                 initial_kw_span,

@@ -192,39 +192,6 @@ pub struct InterfaceToDomainMap<'linker> {
     pub domains: &'linker FlatAlloc<DomainInfo, DomainIDMarker>,
 }
 
-/// What kind of wire/value does this identifier represent?
-///
-/// We already know it's not a submodule
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IdentifierType {
-    /// Local temporary
-    /// ```sus
-    /// int v = val
-    /// ```
-    Local,
-    /// ```sus
-    /// state int v
-    /// ```
-    State,
-    /// ```sus
-    /// gen int V = 3
-    /// ```
-    Generative,
-}
-
-impl IdentifierType {
-    pub fn get_keyword(&self) -> &'static str {
-        match self {
-            IdentifierType::Local => "",
-            IdentifierType::State => "state",
-            IdentifierType::Generative => "gen",
-        }
-    }
-    pub fn is_generative(&self) -> bool {
-        *self == IdentifierType::Generative
-    }
-}
-
 /// A port of a module. Not to be confused with [PortReference], which is a reference to a submodule port.
 ///
 /// All ports must have a name
@@ -562,33 +529,58 @@ impl Expression {
 /// Is it a Port, Template argument, A struct field, or just a regular temporary?
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeclarationKind {
-    NotPort,
-    StructField {
-        field_id: FieldID,
+    RegularWire {
+        is_state: bool,
+        read_only: bool,
     },
-    RegularPort {
+    StructField(FieldID),
+    Port {
         is_input: bool,
+        is_state: bool,
         port_id: PortID,
         domain: DomainID,
     },
-    GenerativeInput(TemplateID),
+    RegularGenerative {
+        read_only: bool,
+    },
+    TemplateParameter(TemplateID),
 }
 
 impl DeclarationKind {
     /// Basically an unwrap to see if this [Declaration] refers to a [Port], and returns `Some(is_input)` if so.
     pub fn is_io_port(&self) -> Option<bool> {
-        if let DeclarationKind::RegularPort { is_input, .. } = self {
+        if let DeclarationKind::Port { is_input, .. } = self {
             Some(*is_input)
         } else {
             None
         }
     }
-    pub fn implies_read_only(&self) -> bool {
+    pub fn is_read_only(&self) -> bool {
         match self {
-            DeclarationKind::NotPort => false,
-            DeclarationKind::StructField { field_id: _ } => false,
-            DeclarationKind::RegularPort { is_input, .. } => *is_input,
-            DeclarationKind::GenerativeInput(_) => true,
+            DeclarationKind::RegularWire { read_only, .. } => *read_only,
+            DeclarationKind::StructField(_) => false,
+            DeclarationKind::Port { is_input, .. } => *is_input,
+            DeclarationKind::RegularGenerative { read_only } => *read_only,
+            DeclarationKind::TemplateParameter(_) => true,
+        }
+    }
+    pub fn is_generative(&self) -> bool {
+        match self {
+            DeclarationKind::RegularWire { .. }
+            | DeclarationKind::StructField(_)
+            | DeclarationKind::Port { .. } => false,
+            DeclarationKind::RegularGenerative { .. } | DeclarationKind::TemplateParameter(..) => {
+                true
+            }
+        }
+    }
+    pub fn is_state(&self) -> bool {
+        match self {
+            DeclarationKind::RegularWire { is_state, .. }
+            | DeclarationKind::Port { is_state, .. } => *is_state,
+            DeclarationKind::StructField(_)
+            | DeclarationKind::RegularGenerative { .. }
+            | DeclarationKind::TemplateParameter(..) => false,
         }
     }
 }
@@ -607,14 +599,9 @@ pub struct Declaration {
     pub decl_span: Span,
     pub name_span: Span,
     pub name: String,
-    /// Variables are read_only when they may not be controlled by the current block of code.
-    /// This is for example, the inputs of the current module, or the outputs of nested modules.
-    /// But could also be the iterator of a for loop.
-    pub read_only: bool,
     /// If the program text already covers the write, then lsp stuff on this declaration shouldn't use it.
     pub declaration_itself_is_not_written_to: bool,
     pub decl_kind: DeclarationKind,
-    pub identifier_type: IdentifierType,
     pub latency_specifier: Option<FlatID>,
     pub documentation: Documentation,
 }

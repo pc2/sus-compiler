@@ -540,26 +540,8 @@
         "required": false,
         "types": [
           {
-            "type": "gen",
-            "named": false
-          },
-          {
-            "type": "state",
-            "named": false
-          }
-        ]
-      },
-      "io_port_modifiers": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "input",
-            "named": false
-          },
-          {
-            "type": "output",
-            "named": false
+            "type": "declaration_modifiers",
+            "named": true
           }
         ]
       },
@@ -610,6 +592,34 @@
           {
             "type": "declaration",
             "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "declaration_modifiers",
+    "named": true,
+    "fields": {
+      "item": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "gen",
+            "named": false
+          },
+          {
+            "type": "input",
+            "named": false
+          },
+          {
+            "type": "output",
+            "named": false
+          },
+          {
+            "type": "state",
+            "named": false
           }
         ]
       }

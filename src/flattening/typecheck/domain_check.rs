@@ -113,12 +113,13 @@ impl<'l> DomainCheckingContext<'l> {
             }
             Instruction::Declaration(declaration) => {
                 self.written_type_must_be_generative(&declaration.typ_expr);
-                declaration.domain.set(match declaration.identifier_type {
-                    IdentifierType::Local | IdentifierType::State => match declaration.decl_kind {
-                        DeclarationKind::RegularPort { domain, .. } => DomainType::Physical(domain),
-                        _ => self.domain_checker.alloc_unknown(),
-                    },
-                    IdentifierType::Generative => DomainType::Generative,
+                declaration.domain.set(match declaration.decl_kind {
+                    DeclarationKind::Port { domain, .. } => DomainType::Physical(domain),
+                    DeclarationKind::StructField(..) | DeclarationKind::RegularWire { .. } => {
+                        self.domain_checker.alloc_unknown()
+                    }
+                    DeclarationKind::RegularGenerative { .. }
+                    | DeclarationKind::TemplateParameter { .. } => DomainType::Generative,
                 });
                 if let Some(latency_spec) = declaration.latency_specifier {
                     self.must_be_generative(latency_spec, "Latency Specifier");

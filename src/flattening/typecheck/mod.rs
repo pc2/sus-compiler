@@ -152,7 +152,7 @@ impl<T> Deref for TyCell<T> {
 
     #[track_caller]
     fn deref(&self) -> &Self::Target {
-        self.0.get().unwrap()
+        self.0.get().expect("Deref on an unfinished TyCell!")
     }
 }
 

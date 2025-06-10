@@ -57,14 +57,7 @@ impl InitializationContext<'_> {
                 if cursor.kind() == kind!("declaration") {
                     let whole_decl_span = cursor.span();
                     cursor.go_down_no_check(|cursor| {
-                        let is_input = cursor.optional_field(field!("io_port_modifiers")).then(
-                            || match cursor.kind() {
-                                kw!("input") => true,
-                                kw!("output") => false,
-                                _ => cursor.could_not_match(),
-                            },
-                        );
-                        self.finish_gather_decl(is_input, whole_decl_span, cursor);
+                        self.gather_decl(None, whole_decl_span, cursor);
                     });
                 }
             });
@@ -189,26 +182,41 @@ impl InitializationContext<'_> {
         cursor.list(kind!("declaration_list"), |cursor| {
             let whole_decl_span = cursor.span();
             cursor.go_down(kind!("declaration"), |cursor| {
-                // Skip fields if they exist
-                let _ = cursor.optional_field(field!("io_port_modifiers"));
-                self.finish_gather_decl(Some(is_input), whole_decl_span, cursor);
+                self.gather_decl(Some(is_input), whole_decl_span, cursor);
             });
         });
         self.ports.range_since(list_start_at)
     }
 
-    fn finish_gather_decl(
+    fn gather_decl(
         &mut self,
-        is_input: Option<bool>,
+        mut is_input: Option<bool>,
         whole_decl_span: Span,
         cursor: &mut Cursor,
     ) {
         // If generative input it's a template arg
-        let is_generative = if cursor.optional_field(field!("declaration_modifiers")) {
-            cursor.kind() == kw!("gen")
-        } else {
-            false
-        };
+        let mut is_generative = false;
+        if cursor.optional_field(field!("declaration_modifiers")) {
+            cursor.list(kind!("declaration_modifiers"), |cursor| {
+                match cursor.kind() {
+                    kw!("gen") => {
+                        is_generative = true;
+                    }
+                    kw!("state") => {}
+                    kw!("input") => {
+                        is_input = Some(true);
+                    }
+                    kw!("output") => {
+                        is_input = Some(false);
+                    }
+                    _ => {}
+                }
+            });
+        }
+
+        if is_generative {
+            is_input = None;
+        }
 
         cursor.field(field!("type"));
         let type_span = cursor.span();

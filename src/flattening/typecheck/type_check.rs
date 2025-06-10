@@ -9,7 +9,7 @@ use crate::typing::type_inference::{
     AbstractTypeSubstitutor, FailedUnification, TypeUnifier, UnifyErrorReport,
 };
 
-use crate::linker::GlobalUUID;
+use crate::linker::{GlobalUUID, AFTER_TYPE_CHECK_CP};
 
 use crate::typing::{
     abstract_type::{BOOL_TYPE, INT_TYPE},
@@ -51,11 +51,20 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
             template_names: &working_on_mut.link_info.template_parameters,
         };
         finalize_ctx.apply_types(&mut working_on_mut.link_info.instructions);
+
+        // Also create the inference info now.
+        working_on_mut.latency_inference_info = PortLatencyInferenceInfo::make(
+            &working_on_mut.ports,
+            &working_on_mut.link_info.instructions,
+            working_on_mut.link_info.template_parameters.len(),
+        );
+
         assert!(working_on_mut.link_info.errors.is_untouched());
         working_on_mut.link_info.errors = errors.into_storage();
         if crate::debug::is_enabled("print-flattened") {
             working_on_mut.print_flattened_module(&linker.files[working_on_mut.link_info.file]);
         }
+        working_on_mut.link_info.checkpoint(AFTER_TYPE_CHECK_CP);
     }
 }
 

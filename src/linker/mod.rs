@@ -440,7 +440,7 @@ impl Linker {
         let errors = working_on_mut.take_errors(&self.files);
         let globals = working_on_mut.resolved_globals.take();
 
-        let working_on: &LinkInfo = &self.get_link_info(obj_id);
+        let working_on: &LinkInfo = self.get_link_info(obj_id);
 
         println!("{pass_name} {}", &working_on.name);
         let _panic_guard =

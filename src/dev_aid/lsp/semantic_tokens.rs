@@ -1,7 +1,4 @@
-use crate::{
-    prelude::*,
-    typing::{domain_type::DomainType, template::TemplateKind},
-};
+use crate::{prelude::*, typing::template::TemplateKind};
 
 use lsp_types::{
     Position, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions,
@@ -11,7 +8,6 @@ use lsp_types::{
 
 use crate::{
     dev_aid::lsp::to_position,
-    flattening::IdentifierType,
     linker::{FileData, GlobalUUID},
 };
 
@@ -131,13 +127,6 @@ impl IDEIdentifierType {
             domain: domain.get_hidden_value() as u32,
         }
     }
-    fn from_identifier_typ(t: IdentifierType, domain: DomainType) -> IDEIdentifierType {
-        match t {
-            IdentifierType::Local => Self::make_local(false, domain.unwrap_physical()),
-            IdentifierType::State => Self::make_local(true, domain.unwrap_physical()),
-            IdentifierType::Generative => IDEIdentifierType::Generative,
-        }
-    }
 }
 
 fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifierType)> {
@@ -148,7 +137,14 @@ fn walk_name_color(file: &FileData, linker: &Linker) -> Vec<(Span, IDEIdentifier
             span,
             match item {
                 LocationInfo::InGlobal(_md_id, _md, _, InGlobal::NamedLocal(decl)) => {
-                    IDEIdentifierType::from_identifier_typ(decl.identifier_type, decl.domain.get())
+                    if decl.decl_kind.is_generative() {
+                        IDEIdentifierType::Generative
+                    } else {
+                        IDEIdentifierType::make_local(
+                            decl.decl_kind.is_state(),
+                            decl.domain.get().unwrap_physical(),
+                        )
+                    }
                 }
                 LocationInfo::InGlobal(_md_id, _, _, InGlobal::NamedSubmodule(_)) => {
                     IDEIdentifierType::Interface

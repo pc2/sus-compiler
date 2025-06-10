@@ -59,12 +59,13 @@ impl From<LocationInfo<'_>> for RefersTo {
                 InGlobal::NamedLocal(_) => {
                     let decl = link_info.instructions[flat_id].unwrap_declaration();
                     match decl.decl_kind {
-                        DeclarationKind::NotPort => {}
-                        DeclarationKind::StructField { field_id: _ } => {}
-                        DeclarationKind::RegularPort { port_id, .. } => {
+                        DeclarationKind::RegularWire { .. }
+                        | DeclarationKind::RegularGenerative { .. }
+                        | DeclarationKind::StructField(..) => {}
+                        DeclarationKind::Port { port_id, .. } => {
                             result.port = Some((obj_id.unwrap_module(), port_id));
                         }
-                        DeclarationKind::GenerativeInput(template_id) => {
+                        DeclarationKind::TemplateParameter(template_id) => {
                             result.parameter = Some((obj_id, template_id))
                         }
                     }

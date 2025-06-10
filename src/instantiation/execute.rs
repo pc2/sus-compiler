@@ -311,7 +311,7 @@ impl Concretizer for SubModuleTypeConcretizer<'_, '_> {
                     return Ok(self.type_substitutor.alloc_unknown());
                 };
                 let template_arg_decl = self.instructions[*wire_declaration].unwrap_declaration();
-                let DeclarationKind::GenerativeInput(template_id) = &template_arg_decl.decl_kind
+                let DeclarationKind::TemplateParameter(template_id) = &template_arg_decl.decl_kind
                 else {
                     return Ok(self.type_substitutor.alloc_unknown());
                 };
@@ -1110,9 +1110,9 @@ impl<'l> ExecutionContext<'l> {
     ) -> ExecutionResult<SubModuleOrWire> {
         let typ = self.concretize_type(&wire_decl.typ, &wire_decl.typ_expr)?;
 
-        Ok(if wire_decl.identifier_type == IdentifierType::Generative {
+        Ok(if wire_decl.decl_kind.is_generative() {
             let value: Value =
-                if let DeclarationKind::GenerativeInput(template_id) = wire_decl.decl_kind {
+                if let DeclarationKind::TemplateParameter(template_id) = wire_decl.decl_kind {
                     // Only for template arguments, we must initialize their value to the value they've been assigned in the template instantiation
                     self.working_on_template_args[template_id]
                         .unwrap_value()
@@ -1124,10 +1124,10 @@ impl<'l> ExecutionContext<'l> {
                 };
             SubModuleOrWire::CompileTimeValue(value)
         } else {
-            let source = if wire_decl.read_only {
+            let source = if wire_decl.decl_kind.is_read_only() {
                 RealWireDataSource::ReadOnly
             } else {
-                let is_state = if wire_decl.identifier_type == IdentifierType::State {
+                let is_state = if wire_decl.decl_kind.is_state() {
                     Some(typ.get_initial_val())
                 } else {
                     None

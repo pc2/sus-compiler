@@ -852,44 +852,10 @@
           "members": [
             {
               "type": "FIELD",
-              "name": "io_port_modifiers",
-              "content": {
-                "type": "CHOICE",
-                "members": [
-                  {
-                    "type": "STRING",
-                    "value": "input"
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "output"
-                  }
-                ]
-              }
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "FIELD",
               "name": "declaration_modifiers",
               "content": {
-                "type": "CHOICE",
-                "members": [
-                  {
-                    "type": "STRING",
-                    "value": "state"
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "gen"
-                  }
-                ]
+                "type": "SYMBOL",
+                "name": "declaration_modifiers"
               }
             },
             {
@@ -930,6 +896,34 @@
           ]
         }
       ]
+    },
+    "declaration_modifiers": {
+      "type": "REPEAT1",
+      "content": {
+        "type": "FIELD",
+        "name": "item",
+        "content": {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "state"
+            },
+            {
+              "type": "STRING",
+              "value": "gen"
+            },
+            {
+              "type": "STRING",
+              "value": "input"
+            },
+            {
+              "type": "STRING",
+              "value": "output"
+            }
+          ]
+        }
+      }
     },
     "latency_specifier": {
       "type": "SEQ",

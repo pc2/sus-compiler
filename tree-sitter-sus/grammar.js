@@ -192,18 +192,17 @@ module.exports = grammar({
         declaration_list: $ => sepSeq1($.declaration, $._comma),
 
         declaration: $ => seq(
-            optional(field('io_port_modifiers', choice(
-                'input',
-                'output'
-            ))),
-            optional(field('declaration_modifiers', choice(
-                'state',
-                'gen'
-            ))),
+            optional(field('declaration_modifiers', $.declaration_modifiers)),
             field('type', $._type),
             field('name', $.identifier),
             optional(field('latency_specifier', $.latency_specifier))
         ),
+        declaration_modifiers: $ => repeat1(field('item', choice(
+            'state',
+            'gen',
+            'input',
+            'output'
+        ))),
 
         latency_specifier: $ => seq(
             '\'',

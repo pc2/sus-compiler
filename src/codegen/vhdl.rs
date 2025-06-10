@@ -138,7 +138,7 @@ impl<Stream: std::fmt::Write> CodeGenerationContext<'_, '_, Stream> {
                 if let Instruction::Declaration(wire_decl) =
                     &self.md.link_info.instructions[wire.original_instruction]
                 {
-                    if let DeclarationKind::RegularPort { .. } = wire_decl.decl_kind {
+                    if let DeclarationKind::Port { .. } = wire_decl.decl_kind {
                         return false;
                     }
                 }
