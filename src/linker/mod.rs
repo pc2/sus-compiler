@@ -77,11 +77,6 @@ pub enum IsExtern {
     Builtin,
 }
 
-pub const AFTER_INITIAL_PARSE_CP: usize = 0;
-pub const AFTER_FLATTEN_CP: usize = 1;
-pub const AFTER_TYPE_CHECK_CP: usize = 2;
-pub const AFTER_LINTS_CP: usize = 3;
-
 /// Represents any global. Stored in [Linker] and each is uniquely indexed by [GlobalUUID]
 ///
 /// Base class for [Module], [StructType], [NamedConstant]

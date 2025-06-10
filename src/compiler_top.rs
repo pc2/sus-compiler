@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
 use crate::flattening::typecheck::{perform_lints, typecheck_all};
-use crate::linker::{
+use crate::linker::checkpoint::{
     AFTER_FLATTEN_CP, AFTER_INITIAL_PARSE_CP, AFTER_LINTS_CP, AFTER_TYPE_CHECK_CP,
 };
 use crate::prelude::*;
@@ -176,6 +176,8 @@ impl Linker {
                 );
                 gather_initial_file_data(builder);
             });
+            let assoc_vals = self.files[file_id].associated_values.clone();
+            self.checkpoint(&assoc_vals, AFTER_INITIAL_PARSE_CP);
 
             info_mngr.on_file_updated(file_id, self);
         } else {

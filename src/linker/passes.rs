@@ -147,6 +147,12 @@ impl FileKnowingErrorInfoObject for RemoteDeclaration<'_> {
 
 impl Linker {
     pub fn get_all_global_ids(&self) -> Vec<GlobalUUID> {
+        /*self.files
+        .iter()
+        .map(|(_, f)| f.associated_values.iter().copied())
+        .flatten()
+        .collect()*/
+
         let m_iter = self.modules.iter().map(|(id, _)| id.into());
         let t_iter = self.types.iter().map(|(id, _)| id.into());
         let c_iter = self.constants.iter().map(|(id, _)| id.into());
@@ -213,23 +219,5 @@ impl Linker {
         f(working_on_mut, &errors);
 
         working_on_mut.reabsorb_errors(errors.into_storage());
-    }
-    pub fn checkpoint(&mut self, global_ids: &[GlobalUUID], checkpoint_id: usize) {
-        for id in global_ids {
-            let link_info = Self::get_link_info_mut(
-                &mut self.modules,
-                &mut self.types,
-                &mut self.constants,
-                *id,
-            );
-
-            let expected_checkpoint = link_info.checkpoints.len();
-            assert!(expected_checkpoint == checkpoint_id, "In {}: The new checkpoint is not what was expected. The new checkpoint was {checkpoint_id}, whereas the expected next checkpoint is {expected_checkpoint}", link_info.get_full_name());
-
-            link_info.checkpoints.push(CheckPoint::new(
-                &link_info.errors,
-                &link_info.resolved_globals,
-            ));
-        }
     }
 }
