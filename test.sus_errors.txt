@@ -52,35 +52,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
     │              ─┬  
     │               ╰── Unused Variable: This variable does not affect the output ports of this module
 ────╯
-Error: Cannot write to compiletime variable through runtime 'when' blocks
-    ╭─[ test.sus:66:3 ]
-    │
- 60 │     gen int a
-    │             ┬  
-    │             ╰── 'a' declared here
-    │ 
- 65 │     if bb {
-    │     ─┬  
-    │      ╰── Assignment passes through this 'when'
- 66 │        a = 5
-    │        ┬  
-    │        ╰── Cannot write to compiletime variable through runtime 'when' blocks
-────╯
-Error: Cannot write to compiletime variable through runtime 'when' blocks
-    ╭─[ test.sus:68:3 ]
-    │
- 60 │     gen int a
-    │             ┬  
-    │             ╰── 'a' declared here
-    │ 
- 65 │     if bb {
-    │     ─┬  
-    │      ╰── Assignment passes through this 'when'
-    │ 
- 68 │        a = 3
-    │        ┬  
-    │        ╰── Cannot write to compiletime variable through runtime 'when' blocks
-────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
@@ -2265,79 +2236,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  462 │     bool b = xor(true, false)
      │          ┬  
      │          ╰── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: Cannot write to compiletime variable through runtime 'when' blocks
-     ╭─[ test.sus:500:4 ]
-     │
- 498 │        gen int tbl_fb
-     │                ───┬──  
-     │                   ╰──── 'tbl_fb' declared here
- 499 │        if fizz & buzz {
-     │        ─┬  
-     │         ╰── Assignment passes through this 'when'
- 500 │          tbl_fb = FIZZ_BUZZ
-     │          ───┬──  
-     │             ╰──── Cannot write to compiletime variable through runtime 'when' blocks
-─────╯
-Error: Cannot write to compiletime variable through runtime 'when' blocks
-     ╭─[ test.sus:502:4 ]
-     │
- 498 │        gen int tbl_fb
-     │                ───┬──  
-     │                   ╰──── 'tbl_fb' declared here
- 499 │        if fizz & buzz {
-     │        ─┬  
-     │         ╰── Assignment passes through this 'when'
-     │ 
- 501 │        } else if fizz {
-     │               ─┬  
-     │                ╰── Assignment passes through this 'when'
- 502 │          tbl_fb = FIZZ
-     │          ───┬──  
-     │             ╰──── Cannot write to compiletime variable through runtime 'when' blocks
-─────╯
-Error: Cannot write to compiletime variable through runtime 'when' blocks
-     ╭─[ test.sus:504:4 ]
-     │
- 498 │        gen int tbl_fb
-     │                ───┬──  
-     │                   ╰──── 'tbl_fb' declared here
- 499 │        if fizz & buzz {
-     │        ─┬  
-     │         ╰── Assignment passes through this 'when'
-     │ 
- 501 │        } else if fizz {
-     │               ─┬  
-     │                ╰── Assignment passes through this 'when'
-     │ 
- 503 │        } else if buzz {
-     │               ─┬  
-     │                ╰── Assignment passes through this 'when'
- 504 │          tbl_fb = BUZZ
-     │          ───┬──  
-     │             ╰──── Cannot write to compiletime variable through runtime 'when' blocks
-─────╯
-Error: Cannot write to compiletime variable through runtime 'when' blocks
-     ╭─[ test.sus:506:4 ]
-     │
- 498 │        gen int tbl_fb
-     │                ───┬──  
-     │                   ╰──── 'tbl_fb' declared here
- 499 │        if fizz & buzz {
-     │        ─┬  
-     │         ╰── Assignment passes through this 'when'
-     │ 
- 501 │        } else if fizz {
-     │               ─┬  
-     │                ╰── Assignment passes through this 'when'
-     │ 
- 503 │        } else if buzz {
-     │               ─┬  
-     │                ╰── Assignment passes through this 'when'
-     │ 
- 506 │          tbl_fb = i
-     │          ───┬──  
-     │             ╰──── Cannot write to compiletime variable through runtime 'when' blocks
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
@@ -12612,4 +12510,18 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1382 │     bool b
       │          ┬  
       │          ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Cannot write to compiletime variable through runtime 'when' blocks
+      ╭─[ test.sus:1385:3 ]
+      │
+ 1380 │     gen bool a
+      │              ┬  
+      │              ╰── 'a' declared here
+      │ 
+ 1384 │     when b {
+      │     ──┬─  
+      │       ╰─── Assignment passes through this 'when'
+ 1385 │        a = true
+      │        ┬  
+      │        ╰── Cannot write to compiletime variable through runtime 'when' blocks
 ──────╯

@@ -822,7 +822,9 @@ Checking array accesses pow17
 Instantiating fibonnaci
 Concrete Typechecking fibonnaci
 Checking array accesses fibonnaci
-Not Instantiating blur2 due to flattening errors
+Instantiating blur2
+Concrete Typechecking blur2
+Checking array accesses blur2
 Instantiating Tree_Multiply
 Concrete Typechecking Tree_Multiply
 Checking array accesses Tree_Multiply
@@ -1116,6 +1118,4 @@ Concrete Typechecking LatencyOffset #(T: type bool, OFFSET: -4)
 Checking array accesses LatencyOffset #(T: type bool, OFFSET: -4)
 Checking array accesses FIFO #(T: type int #(MIN: 3, MAX: 3), DEPTH: 53, READY_SLACK: 3)
 Checking array accesses use_FIFO
-Instantiating write_to_generative_through_when
-Concrete Typechecking write_to_generative_through_when
-Checking array accesses write_to_generative_through_when
+Not Instantiating write_to_generative_through_when due to flattening errors

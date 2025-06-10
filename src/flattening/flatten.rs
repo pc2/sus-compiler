@@ -1160,7 +1160,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 };
 
             let (then_block, else_block) =
-                self.flatten_then_else_blocks(cursor, expects_generative.then_some(if_id));
+                self.flatten_then_else_blocks(cursor, (!expects_generative).then_some(if_id));
 
             let_unwrap!(
                 Instruction::IfStatement(if_stmt),
