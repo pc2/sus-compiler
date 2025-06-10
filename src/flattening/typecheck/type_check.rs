@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 use crate::alloc::{ArenaAllocator, UUID};
 use crate::errors::ErrorInfo;
+use crate::linker::passes::{RemoteDeclaration, RemoteInterface};
 use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType};
 use crate::typing::template::{Parameter, TVec};
@@ -68,15 +69,6 @@ pub fn typecheck_all_modules(linker: &mut Linker) {
     }
 }
 
-impl<'l> RemotePort<'l> {
-    fn get_local_type(&self, type_checker: &mut AbstractTypeSubstitutor) -> AbstractRankedType {
-        type_checker.written_to_abstract_type_substitute_templates(
-            &self.remote_decl.typ_expr,
-            &self.parent.submodule.module_ref.template_arg_types,
-        )
-    }
-}
-
 impl<'l> TypeCheckingContext<'l> {
     fn typecheck_wire_reference(&mut self, wire_ref: &WireReference) {
         let root_typ = match &wire_ref.root {
@@ -87,19 +79,17 @@ impl<'l> TypeCheckingContext<'l> {
             WireReferenceRoot::NamedConstant(cst) => {
                 self.typecheck_template_global(cst);
 
-                let linker_cst = &self.globals[cst.id];
-                let decl =
-                    linker_cst.link_info.instructions[linker_cst.output_decl].unwrap_declaration();
-                self.type_checker
-                    .written_to_abstract_type_substitute_templates(
-                        &decl.typ_expr,
-                        &cst.template_arg_types,
-                    )
+                self.globals
+                    .get_global_constant(cst)
+                    .get_target_decl()
+                    .get_local_type(&mut self.type_checker)
             }
             WireReferenceRoot::SubModulePort(port) => {
-                let submod_port =
-                    RemoteSubModule::make(port.submodule_decl, self.instructions, self.globals)
-                        .get_port(port.port);
+                let submod_port = self
+                    .globals
+                    .get_submodule(port.submodule_decl)
+                    .get_port(port.port)
+                    .get_decl();
                 if submod_port.remote_decl.domain.get() == DomainType::Generative {
                     self.errors
                         .error(
@@ -149,7 +139,7 @@ impl<'l> TypeCheckingContext<'l> {
         global_ref: &GlobalReference<ID>,
     ) {
         let global_obj: GlobalUUID = global_ref.id.into();
-        let target_link_info = self.globals.get_link_info(global_obj);
+        let target_link_info = self.globals.globals.get_link_info(global_obj);
 
         global_ref.resolve_template_args(self.errors, target_link_info);
 
@@ -179,15 +169,13 @@ impl<'l> TypeCheckingContext<'l> {
             match &param.kind {
                 TemplateKind::Type(_) => {}
                 TemplateKind::Value(v) => {
-                    let target_decl = target_link_info.instructions[v.declaration_instruction]
-                        .unwrap_declaration();
+                    let target_decl = RemoteDeclaration::new(
+                        target_link_info,
+                        v.declaration_instruction,
+                        &abs_types,
+                    );
 
-                    let param_required_typ = self
-                        .type_checker
-                        .written_to_abstract_type_substitute_templates(
-                            &target_decl.typ_expr,
-                            &abs_types, // We substitute the templates for type variables here
-                        );
+                    let param_required_typ = target_decl.get_local_type(&mut self.type_checker);
 
                     if let Some(from_expr) = global_ref.get_value_arg_for(id) {
                         let from_expr = self.instructions[from_expr].unwrap_subexpression();
@@ -302,17 +290,15 @@ impl<'l> TypeCheckingContext<'l> {
     }
 
     fn typecheck_func_call(&mut self, func_call: &FuncCall) -> RemoteInterface<'l> {
-        let interface = RemoteSubModule::make(
-            func_call.interface_reference.submodule_decl,
-            self.instructions,
-            self.globals,
-        )
-        .get_interface_reference(func_call.interface_reference.submodule_interface);
+        let interface = self
+            .globals
+            .get_submodule(func_call.interface_reference.submodule_decl)
+            .get_interface_reference(func_call.interface_reference.submodule_interface);
 
         for (port, arg) in
             std::iter::zip(interface.interface.func_call_inputs, &func_call.arguments)
         {
-            let port_decl = interface.get_port(port);
+            let port_decl = interface.get_port(port).get_decl();
             let port_type = port_decl.get_local_type(&mut self.type_checker);
 
             // Typecheck the value with target type
@@ -372,7 +358,7 @@ impl<'l> TypeCheckingContext<'l> {
                 );
 
                 if let Some(first_output) = interface.interface.func_call_outputs.first() {
-                    let port_decl = interface.get_port(first_output);
+                    let port_decl = interface.get_port(first_output).get_decl();
 
                     port_decl.get_local_type(&mut self.type_checker)
                 } else {
@@ -432,7 +418,7 @@ impl<'l> TypeCheckingContext<'l> {
 
                 for (port, to) in std::iter::zip(interface.interface.func_call_outputs, multi_write)
                 {
-                    let port_decl = interface.get_port(port);
+                    let port_decl = interface.get_port(port).get_decl();
                     let port_type = port_decl.get_local_type(&mut self.type_checker);
 
                     self.type_checker.unify_report_error(
@@ -526,6 +512,15 @@ impl<'l> TypeCheckingContext<'l> {
         for elem_id in self.instructions.id_range() {
             self.typecheck_visit_instruction(elem_id);
         }
+    }
+}
+
+impl<'l> RemoteDeclaration<'l> {
+    fn get_local_type(&self, type_checker: &mut AbstractTypeSubstitutor) -> AbstractRankedType {
+        type_checker.written_to_abstract_type_substitute_templates(
+            &self.remote_decl.typ_expr,
+            self.template_arguments,
+        )
     }
 }
 

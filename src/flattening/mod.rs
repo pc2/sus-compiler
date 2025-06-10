@@ -67,12 +67,6 @@ impl Module {
             .find(|(_, interf)| interf.name == self.link_info.name)
     }
 
-    pub fn get_port_decl(&self, port: PortID) -> &Declaration {
-        let flat_port = self.ports[port].declaration_instruction;
-
-        self.link_info.instructions[flat_port].unwrap_declaration()
-    }
-
     /// Get a port by the given name. Reports non existing ports errors
     ///
     /// Prefer interfaces over ports in name conflicts

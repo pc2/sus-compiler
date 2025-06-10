@@ -19,7 +19,7 @@ pub fn perform_lints(linker: &mut Linker) {
             "Lints",
             GlobalUUID::Module(id),
             |link_info, errors, globals| {
-                let md = &globals[id];
+                let md = &globals.globals[id];
                 find_unused_variables(md, errors);
                 extern_objects_may_not_have_type_template_args(link_info, errors);
                 lint_instructions(&link_info.instructions, errors, globals);
@@ -34,7 +34,7 @@ pub fn perform_lints(linker: &mut Linker) {
 fn lint_instructions(
     instructions: &FlatAlloc<Instruction, FlatIDMarker>,
     errors: &ErrorCollector,
-    globals: &GlobalResolver,
+    globals: ImmutableContext,
 ) {
     for (_, instr) in instructions {
         match instr {
@@ -113,12 +113,12 @@ fn lint_instructions(
                         WireReferenceRoot::NamedConstant(cst) => {
                             errors
                                 .error(cst.name_span, "Cannot write to a global constant!")
-                                .info_obj(&globals[cst.id].link_info);
+                                .info_obj(&globals.globals[cst.id].link_info);
                         }
                         WireReferenceRoot::SubModulePort(port) => {
-                            let module_port_decl =
-                                RemoteSubModule::make(port.submodule_decl, instructions, globals)
-                                    .get_port(port.port);
+                            let module_port_decl = globals
+                                .get_submodule(port.submodule_decl)
+                                .get_port(port.port);
 
                             if !module_port_decl.is_input() {
                                 errors

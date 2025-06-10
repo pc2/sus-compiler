@@ -108,7 +108,7 @@ impl<'l> DomainCheckingContext<'l> {
         match instr {
             Instruction::SubModule(sub_module_instance) => {
                 sub_module_instance.local_interface_domains.set(
-                    self.globals[sub_module_instance.module_ref.id]
+                    self.globals.globals[sub_module_instance.module_ref.id]
                         .domains
                         .map(|_| self.domain_checker.alloc_unknown()),
                 );
@@ -133,14 +133,12 @@ impl<'l> DomainCheckingContext<'l> {
                 let mut total_domain = match &expression.source {
                     ExpressionSource::WireRef(wire_ref) => self.get_wireref_root_domain(wire_ref),
                     ExpressionSource::FuncCall(func_call) => {
-                        let sm = RemoteSubModule::make(
-                            func_call.interface_reference.submodule_decl,
-                            self.instructions,
-                            self.globals,
-                        );
-                        let interface = sm.get_interface_reference(
-                            func_call.interface_reference.submodule_interface,
-                        );
+                        let interface = self
+                            .globals
+                            .get_submodule(func_call.interface_reference.submodule_decl)
+                            .get_interface_reference(
+                                func_call.interface_reference.submodule_interface,
+                            );
                         (
                             interface.get_local_domain(),
                             func_call.interface_reference.interface_span,
@@ -277,11 +275,11 @@ impl<'l> DomainCheckingContext<'l> {
                 self.global_ref_must_be_generative(global_ref);
                 DomainType::Generative
             }
-            WireReferenceRoot::SubModulePort(port_ref) => {
-                let sm =
-                    RemoteSubModule::make(port_ref.submodule_decl, self.instructions, self.globals);
-                sm.get_port(port_ref.port).get_local_domain()
-            }
+            WireReferenceRoot::SubModulePort(port_ref) => self
+                .globals
+                .get_submodule(port_ref.submodule_decl)
+                .get_port(port_ref.port)
+                .get_local_domain(),
             WireReferenceRoot::Error => DomainType::Generative,
         };
 
