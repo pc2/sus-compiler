@@ -121,7 +121,10 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
                     details_vec.push(if is_input { "input" } else { "output" }.to_owned())
                 }
                 DeclarationKind::TemplateParameter(_) => details_vec.push("param".to_owned()),
-                _ => {}
+                DeclarationKind::RegularWire { .. }
+                | DeclarationKind::RegularGenerative { .. }
+                | DeclarationKind::StructField(_)
+                | DeclarationKind::ConditionalBinding { .. } => {}
             }
 
             if decl.decl_kind.is_generative() {

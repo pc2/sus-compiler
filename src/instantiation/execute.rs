@@ -12,7 +12,7 @@ use crate::linker::IsExtern;
 use crate::linker::{GlobalUUID, LinkInfo};
 use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType};
-use crate::typing::concrete_type::ConcreteTemplateArg;
+use crate::typing::concrete_type::{ConcreteTemplateArg, BOOL_CONCRETE_TYPE};
 use crate::typing::domain_type::DomainType;
 use crate::typing::template::TVec;
 use crate::util::{unwrap_single_element, zip_eq};
@@ -1374,6 +1374,37 @@ impl<'l> ExecutionContext<'l> {
                     }
                     instruction_range.skip_to(stm.else_block.1);
                     continue;
+                }
+                Instruction::ActionTriggerDeclaration(act_trig) => {
+                    let specified_latency =
+                        self.get_specified_latency(act_trig.latency_specifier)?;
+                    let condition_wire = self.wires.alloc(RealWire {
+                        name: self.unique_name_producer.get_unique_name(&act_trig.name),
+                        typ: BOOL_CONCRETE_TYPE,
+                        original_instruction,
+                        domain: act_trig.domain.unwrap_physical(),
+                        source: RealWireDataSource::ReadOnly,
+                        specified_latency,
+                        absolute_latency: CALCULATE_LATENCY_LATER,
+                    });
+
+                    self.condition_stack.push(ConditionStackElem {
+                        condition_wire,
+                        inverse: false,
+                    });
+                    self.instantiate_code_block(act_trig.then_block)?;
+
+                    if !act_trig.else_block.is_empty() {
+                        self.condition_stack.last_mut().unwrap().inverse = true;
+                        self.instantiate_code_block(act_trig.else_block)?;
+                    }
+
+                    // Get rid of the condition
+                    let _ = self.condition_stack.pop().unwrap();
+
+                    instruction_range.skip_to(act_trig.else_block.1);
+
+                    SubModuleOrWire::Wire(condition_wire)
                 }
                 Instruction::ForStatement(stm) => {
                     // TODO Non integer for loops?

@@ -52,6 +52,35 @@ Warning: Unused Variable: This variable does not affect the output ports of this
     │              ─┬  
     │               ╰── Unused Variable: This variable does not affect the output ports of this module
 ────╯
+Error: Cannot write to compiletime variable through runtime 'when' blocks
+    ╭─[ test.sus:66:3 ]
+    │
+ 60 │     gen int a
+    │             ┬  
+    │             ╰── 'a' declared here
+    │ 
+ 65 │     if bb {
+    │     ─┬  
+    │      ╰── Assignment passes through this 'when'
+ 66 │        a = 5
+    │        ┬  
+    │        ╰── Cannot write to compiletime variable through runtime 'when' blocks
+────╯
+Error: Cannot write to compiletime variable through runtime 'when' blocks
+    ╭─[ test.sus:68:3 ]
+    │
+ 60 │     gen int a
+    │             ┬  
+    │             ╰── 'a' declared here
+    │ 
+ 65 │     if bb {
+    │     ─┬  
+    │      ╰── Assignment passes through this 'when'
+    │ 
+ 68 │        a = 3
+    │        ┬  
+    │        ╰── Cannot write to compiletime variable through runtime 'when' blocks
+────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
@@ -2236,6 +2265,79 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  462 │     bool b = xor(true, false)
      │          ┬  
      │          ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Cannot write to compiletime variable through runtime 'when' blocks
+     ╭─[ test.sus:500:4 ]
+     │
+ 498 │        gen int tbl_fb
+     │                ───┬──  
+     │                   ╰──── 'tbl_fb' declared here
+ 499 │        if fizz & buzz {
+     │        ─┬  
+     │         ╰── Assignment passes through this 'when'
+ 500 │          tbl_fb = FIZZ_BUZZ
+     │          ───┬──  
+     │             ╰──── Cannot write to compiletime variable through runtime 'when' blocks
+─────╯
+Error: Cannot write to compiletime variable through runtime 'when' blocks
+     ╭─[ test.sus:502:4 ]
+     │
+ 498 │        gen int tbl_fb
+     │                ───┬──  
+     │                   ╰──── 'tbl_fb' declared here
+ 499 │        if fizz & buzz {
+     │        ─┬  
+     │         ╰── Assignment passes through this 'when'
+     │ 
+ 501 │        } else if fizz {
+     │               ─┬  
+     │                ╰── Assignment passes through this 'when'
+ 502 │          tbl_fb = FIZZ
+     │          ───┬──  
+     │             ╰──── Cannot write to compiletime variable through runtime 'when' blocks
+─────╯
+Error: Cannot write to compiletime variable through runtime 'when' blocks
+     ╭─[ test.sus:504:4 ]
+     │
+ 498 │        gen int tbl_fb
+     │                ───┬──  
+     │                   ╰──── 'tbl_fb' declared here
+ 499 │        if fizz & buzz {
+     │        ─┬  
+     │         ╰── Assignment passes through this 'when'
+     │ 
+ 501 │        } else if fizz {
+     │               ─┬  
+     │                ╰── Assignment passes through this 'when'
+     │ 
+ 503 │        } else if buzz {
+     │               ─┬  
+     │                ╰── Assignment passes through this 'when'
+ 504 │          tbl_fb = BUZZ
+     │          ───┬──  
+     │             ╰──── Cannot write to compiletime variable through runtime 'when' blocks
+─────╯
+Error: Cannot write to compiletime variable through runtime 'when' blocks
+     ╭─[ test.sus:506:4 ]
+     │
+ 498 │        gen int tbl_fb
+     │                ───┬──  
+     │                   ╰──── 'tbl_fb' declared here
+ 499 │        if fizz & buzz {
+     │        ─┬  
+     │         ╰── Assignment passes through this 'when'
+     │ 
+ 501 │        } else if fizz {
+     │               ─┬  
+     │                ╰── Assignment passes through this 'when'
+     │ 
+ 503 │        } else if buzz {
+     │               ─┬  
+     │                ╰── Assignment passes through this 'when'
+     │ 
+ 506 │          tbl_fb = i
+     │          ───┬──  
+     │             ╰──── Cannot write to compiletime variable through runtime 'when' blocks
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
@@ -10334,16 +10436,12 @@ Error: Excess output targets. Function returns 0 results, but 1 targets were giv
      │          ────────┬────────  
      │                  ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
 ─────╯
-Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[ test.sus:894:25 ]
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:894:31 ]
      │
- 894 │ ╭─▶     when decoder.is_jump() : int target_addr {
-     │ │                              ────────┬────────  
-     │ │                                      ╰────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ┆ ┆   
- 896 │ ├─▶     }
-     │ │           
-     │ ╰─────────── Parent node 'if_statement'
+ 894 │     when decoder.is_jump() : int target_addr {
+     │                                  ─────┬─────  
+     │                                       ╰─────── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:897:7 ]
@@ -10356,41 +10454,65 @@ Error: Excess output targets. Function returns 0 results, but 1 targets were giv
      │          ────────┬────────  
      │                  ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
 ─────╯
-Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ╭─[ test.sus:897:25 ]
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:897:31 ]
      │
- 897 │ ╭─▶     when decoder.is_load() : int reg_to, int addr {
-     │ │                              ───────────┬──────────  
-     │ │                                         ╰──────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ┆ ┆   
- 899 │ ├─▶     }
-     │ │           
-     │ ╰─────────── Parent node 'if_statement'
+ 897 │     when decoder.is_load() : int reg_to, int addr {
+     │                                  ───┬──  
+     │                                     ╰──── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Warning: Used 'when' in a generative context, use 'if' instead
-     ╭─[ test.sus:900:2 ]
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:897:43 ]
      │
- 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │     ──┬─  
-     │       ╰─── Used 'when' in a generative context, use 'if' instead
+ 897 │     when decoder.is_load() : int reg_to, int addr {
+     │                                              ──┬─  
+     │                                                ╰─── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
-Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
+Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:900:7 ]
      │
- 900 │ ╭─▶     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │ │            ─────────────────────────┬─────────────────────────  
-     │ │                                     ╰─────────────────────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-     ┆ ┆   
- 902 │ ├─▶     }
-     │ │           
-     │ ╰─────────── Parent node 'if_statement'
+ 885 │     interface is_arith
+     │               ────┬───  
+     │                   ╰───── Interface 'is_arith' defined here
+     │ 
+ 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │          ─────────┬────────  
+     │                   ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
 ─────╯
-Error: No Global of the name 'op' was found. Did you forget to import it?
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:900:32 ]
+     │
+ 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │                                   ──┬──  
+     │                                     ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:900:43 ]
+     │
+ 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │                                              ──┬──  
+     │                                                ╰──── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: No Global of the name 'Operator' was found. Did you forget to import it?
+     ╭─[ test.sus:900:50 ]
+     │
+ 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │                                                     ────┬───  
+     │                                                         ╰───── No Global of the name 'Operator' was found. Did you forget to import it?
+─────╯
+Error: Could not fully figure out the type of this object. ?[...]
      ╭─[ test.sus:900:59 ]
      │
  900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
      │                                                              ─┬  
-     │                                                               ╰── No Global of the name 'op' was found. Did you forget to import it?
+     │                                                               ╰── Could not fully figure out the type of this object. ?[...]
+─────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+     ╭─[ test.sus:900:59 ]
+     │
+ 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
+     │                                                              ─┬  
+     │                                                               ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:913:6 ]
@@ -12020,113 +12142,35 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                                ─┬  
       │                                 ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: No Global of the name 'trigger' was found. Did you forget to import it?
-      ╭─[ test.sus:1246:2 ]
-      │
- 1246 │     trigger may_process'0 : T cur_state {
-      │     ───┬───  
-      │        ╰───── No Global of the name 'trigger' was found. Did you forget to import it?
-──────╯
-Error: Could not fully figure out the type of this object. ?[...]
-      ╭─[ test.sus:1246:10 ]
-      │
- 1246 │     trigger may_process'0 : T cur_state {
-      │             ─────┬─────  
-      │                  ╰─────── Could not fully figure out the type of this object. ?[...]
-──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1246:10 ]
-      │
- 1246 │     trigger may_process'0 : T cur_state {
-      │             ─────┬─────  
-      │                  ╰─────── Unused Variable: This variable does not affect the output ports of this module
-──────╯
-Error: While parsing 'latency_specifier', parser found a syntax error in a node of type 'ERROR'
-      ╭─[ test.sus:1246:22 ]
-      │
- 1246 │     trigger may_process'0 : T cur_state {
-      │                        ───┬────┬───────  
-      │                           ╰────────────── While parsing 'latency_specifier', parser found a syntax error in a node of type 'ERROR'
-      │                                │         
-      │                                ╰───────── Parent node 'latency_specifier'
-──────╯
-Error: No Global of the name 'cur_state' was found. Did you forget to import it?
       ╭─[ test.sus:1246:28 ]
       │
  1246 │     trigger may_process'0 : T cur_state {
       │                               ────┬────  
-      │                                   ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+      │                                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
-      ╭─[ test.sus:1246:38 ]
-      │
- 1245 │ ╭─▶ module MultiStateLoop #(T, int II) {
- 1246 │ │       trigger may_process'0 : T cur_state {
-      │ │                                           ┬  
-      │ │                                           ╰── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
-      ┆ ┆   
- 1248 │ ├─▶     }
-      │ │           
-      │ ╰─────────── Parent node 'block'
-──────╯
-Error: No Global of the name 'action' was found. Did you forget to import it?
       ╭─[ test.sus:1247:3 ]
       │
- 1247 │        action next_state'II : T next_state_value
-      │        ───┬──  
-      │           ╰──── No Global of the name 'action' was found. Did you forget to import it?
-──────╯
-Error: Could not fully figure out the type of this object. ?[...]
-      ╭─[ test.sus:1247:10 ]
-      │
- 1247 │        action next_state'II : T next_state_value
-      │               ─────┬────  
-      │                    ╰────── Could not fully figure out the type of this object. ?[...]
-──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1247:10 ]
-      │
- 1247 │        action next_state'II : T next_state_value
-      │               ─────┬────  
-      │                    ╰────── Unused Variable: This variable does not affect the output ports of this module
-──────╯
-Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
-      ╭─[ test.sus:1247:24 ]
-      │
- 1245 │ ╭─▶ module MultiStateLoop #(T, int II) {
-      ┆ ┆   
+ 1246 │ ╭─▶     trigger may_process'0 : T cur_state {
  1247 │ │          action next_state'II : T next_state_value
-      │ │                               ──────────┬─────────  
-      │ │                                         ╰─────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      │ │          ────────────────────┬────────────────────  
+      │ │                              ╰────────────────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
  1248 │ ├─▶     }
       │ │           
       │ ╰─────────── Parent node 'block'
 ──────╯
-Error: While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
+Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
       ╭─[ test.sus:1250:2 ]
       │
-    1 │ ╭─▶ 
+ 1245 │ ╭─▶ module MultiStateLoop #(T, int II) {
       ┆ ┆   
  1250 │ │       action request_output : -> trigger output_valid : T result
       │ │       ─────────────────────────────┬────────────────────────────  
-      │ │                                    ╰────────────────────────────── While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
-      ┆ ┆   
- 1387 │ ├─▶ }
+      │ │                                    ╰────────────────────────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+ 1251 │ ├─▶ }
       │ │       
-      │ ╰─────── Parent node 'source_file'
-──────╯
-Error: While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
-      ╭─[ test.sus:1251:1 ]
-      │
-    1 │ ╭─▶ 
-      ┆ ┆   
- 1251 │ │   }
-      │ │   ┬  
-      │ │   ╰── While parsing 'source_file', parser found a syntax error in a node of type 'ERROR'
-      ┆ ┆   
- 1387 │ ├─▶ }
-      │ │       
-      │ ╰─────── Parent node 'source_file'
+      │ ╰─────── Parent node 'block'
 ──────╯
 Error: Could not fully figure out the type of this object. ?[...]
       ╭─[ test.sus:1254:2 ]
@@ -12135,73 +12179,56 @@ Error: Could not fully figure out the type of this object. ?[...]
       │     ───────┬──────  
       │            ╰──────── Could not fully figure out the type of this object. ?[...]
 ──────╯
-Error: No Global of the name 'trigger' was found. Did you forget to import it?
+Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
       ╭─[ test.sus:1256:2 ]
       │
- 1256 │     trigger request_input
-      │     ───┬───  
-      │        ╰───── No Global of the name 'trigger' was found. Did you forget to import it?
-──────╯
-Error: Could not fully figure out the type of this object. ?[...]
-      ╭─[ test.sus:1256:10 ]
-      │
- 1256 │     trigger request_input
-      │             ──────┬──────  
-      │                   ╰──────── Could not fully figure out the type of this object. ?[...]
-──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1256:10 ]
-      │
- 1256 │     trigger request_input
-      │             ──────┬──────  
-      │                   ╰──────── Unused Variable: This variable does not affect the output ports of this module
-──────╯
-Error: No Global of the name 'action' was found. Did you forget to import it?
-      ╭─[ test.sus:1257:3 ]
-      │
- 1257 │        action input_valid : float new_input
-      │        ───┬──  
-      │           ╰──── No Global of the name 'action' was found. Did you forget to import it?
-──────╯
-Error: Could not fully figure out the type of this object. ?[...]
-      ╭─[ test.sus:1257:10 ]
-      │
- 1257 │        action input_valid : float new_input
-      │               ─────┬─────  
-      │                    ╰─────── Could not fully figure out the type of this object. ?[...]
-──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1257:10 ]
-      │
- 1257 │        action input_valid : float new_input
-      │               ─────┬─────  
-      │                    ╰─────── Unused Variable: This variable does not affect the output ports of this module
+ 1253 │ ╭─▶ module use_MultiStateLoop {
+      ┆ ┆   
+ 1256 │ │       trigger request_input
+      │ │       ──────────┬──────────  
+      │ │                 ╰──────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      ┆ ┆   
+ 1269 │ ├─▶ }
+      │ │       
+      │ ╰─────── Parent node 'block'
 ──────╯
 Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
-      ╭─[ test.sus:1257:22 ]
+      ╭─[ test.sus:1257:3 ]
       │
  1253 │ ╭─▶ module use_MultiStateLoop {
       ┆ ┆   
  1257 │ │          action input_valid : float new_input
-      │ │                             ────────┬────────  
-      │ │                                     ╰────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+      │ │          ──────────────────┬─────────────────  
+      │ │                            ╰─────────────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
       ┆ ┆   
  1269 │ ├─▶ }
       │ │       
       │ ╰─────── Parent node 'block'
 ──────╯
-Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
-      ╭─[ test.sus:1259:2 ]
+Error: No Global of the name 'trigger' was found. Did you forget to import it?
+      ╭─[ test.sus:1259:29 ]
       │
- 1253 │ ╭─▶ module use_MultiStateLoop {
+ 1259 │     action request_result : -> trigger result_valid : {
+      │                                ───┬───  
+      │                                   ╰───── No Global of the name 'trigger' was found. Did you forget to import it?
+──────╯
+Error: Could not fully figure out the type of this object. ?[...]
+      ╭─[ test.sus:1259:37 ]
+      │
+ 1259 │     action request_result : -> trigger result_valid : {
+      │                                        ──────┬─────  
+      │                                              ╰─────── Could not fully figure out the type of this object. ?[...]
+──────╯
+Error: While parsing 'action_trigger_statement', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1259:50 ]
+      │
+ 1259 │ ╭─▶     action request_result : -> trigger result_valid : {
+      │ │                                                       ┬  
+      │ │                                                       ╰── While parsing 'action_trigger_statement', parser found a syntax error in a node of type 'ERROR'
       ┆ ┆   
- 1259 │ │       action request_result : -> trigger result_valid : {
-      │ │       ────────────────────────┬────────────────────────  
-      │ │                               ╰────────────────────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
-      ┆ ┆   
- 1269 │ ├─▶ }
-      │ │       
-      │ ╰─────── Parent node 'block'
+ 1261 │ ├─▶     }
+      │ │           
+      │ ╰─────────── Parent node 'action_trigger_statement'
 ──────╯
 Warning: Used 'when' in a generative context, use 'if' instead
       ╭─[ test.sus:1263:2 ]
@@ -12217,22 +12244,19 @@ Error: There is no port or interface of name 'process' on module MultiStateLoop
       │        ───────┬──────  
       │               ╰──────── Module 'MultiStateLoop' defined here. module MultiStateLoop #(T, int II):
 domain clk:
+input T cur_state
 
       │ 
  1263 │     when loop.process : float cur_state {
       │               ───┬───  
       │                  ╰───── There is no port or interface of name 'process' on module MultiStateLoop
 ──────╯
-Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-      ╭─[ test.sus:1263:20 ]
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1263:28 ]
       │
- 1263 │ ╭─▶     when loop.process : float cur_state {
-      │ │                         ────────┬────────  
-      │ │                                 ╰────────── While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
-      ┆ ┆   
- 1268 │ ├─▶     }
-      │ │           
-      │ ╰─────────── Parent node 'if_statement'
+ 1263 │     when loop.process : float cur_state {
+      │                               ────┬────  
+      │                                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: Typing Error: writing the output of this expression expects a float but was given a int
       ╭─[ test.sus:1264:3 ]
@@ -12248,33 +12272,26 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │              ─────┬────  
       │                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+Error: Typing Error: binop left side expects a int but was given a float
       ╭─[ test.sus:1264:22 ]
       │
  1264 │        float next_state = cur_state * cur_state
       │                           ────┬────  
-      │                               ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+      │                               ╰────── Typing Error: binop left side expects a int but was given a float
 ──────╯
-Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+Error: Typing Error: binop right side expects a int but was given a float
       ╭─[ test.sus:1264:34 ]
       │
  1264 │        float next_state = cur_state * cur_state
       │                                       ────┬────  
-      │                                           ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+      │                                           ╰────── Typing Error: binop right side expects a int but was given a float
 ──────╯
-Warning: Used 'when' in a generative context, use 'if' instead
-      ╭─[ test.sus:1265:3 ]
-      │
- 1265 │        when cur_state >= 2.0 {
-      │        ──┬─  
-      │          ╰─── Used 'when' in a generative context, use 'if' instead
-──────╯
-Error: No Global of the name 'cur_state' was found. Did you forget to import it?
+Error: Typing Error: binop left side expects a int but was given a float
       ╭─[ test.sus:1265:8 ]
       │
  1265 │        when cur_state >= 2.0 {
       │             ────┬────  
-      │                 ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
+      │                 ╰────── Typing Error: binop left side expects a int but was given a float
 ──────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
       ╭─[ test.sus:1265:22 ]
@@ -12595,18 +12612,4 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1382 │     bool b
       │          ┬  
       │          ╰── Unused Variable: This variable does not affect the output ports of this module
-──────╯
-Error: Cannot write to compiletime variable through runtime 'when' blocks
-      ╭─[ test.sus:1385:3 ]
-      │
- 1380 │     gen bool a
-      │              ┬  
-      │              ╰── 'a' declared here
-      │ 
- 1384 │     when b {
-      │     ──┬─  
-      │       ╰─── Assignment passes through this 'when'
- 1385 │        a = true
-      │        ┬  
-      │        ╰── Cannot write to compiletime variable through runtime 'when' blocks
 ──────╯

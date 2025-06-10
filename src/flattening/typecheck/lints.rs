@@ -75,7 +75,7 @@ fn lint_instructions(
 
                                                 while cur_parent != decl.parent_condition {
                                                     let parent_when = instructions
-                                                        [parent_condition.unwrap().parent_when]
+                                                        [cur_parent.unwrap().parent_when]
                                                         .unwrap_if();
 
                                                     err_ref = err_ref.info_same_file(
@@ -130,8 +130,9 @@ fn lint_instructions(
                     }
                 }
             }
-            Instruction::IfStatement(_) => {}
-            Instruction::ForStatement(_) => {}
+            Instruction::IfStatement(_)
+            | Instruction::ForStatement(_)
+            | Instruction::ActionTriggerDeclaration(_) => {}
         }
     }
 }
@@ -216,30 +217,30 @@ fn make_fanins(
     let mut instruction_fanins: FlatAlloc<Vec<FlatID>, FlatIDMarker> =
         instructions.map(|_| Vec::new());
 
-    for (inst_id, inst) in instructions.iter() {
+    for (instr_id, inst) in instructions.iter() {
         match inst {
             Instruction::SubModule(sm) => {
                 sm.module_ref.for_each_generative_input(&mut |id| {
-                    instruction_fanins[inst_id].push(id);
+                    instruction_fanins[instr_id].push(id);
                 });
             }
             Instruction::Declaration(decl) => {
                 if let Some(lat_spec) = decl.latency_specifier {
-                    instruction_fanins[inst_id].push(lat_spec);
+                    instruction_fanins[instr_id].push(lat_spec);
                 }
                 decl.typ_expr.for_each_generative_input(&mut |id| {
-                    instruction_fanins[inst_id].push(id);
+                    instruction_fanins[instr_id].push(id);
                 });
             }
             Instruction::Expression(expr) => {
                 expr.source.for_each_dependency(&mut |id| {
-                    instruction_fanins[inst_id].push(id);
+                    instruction_fanins[instr_id].push(id);
                 });
                 match &expr.output {
                     ExpressionOutput::MultiWrite(writes) => {
                         for wr in writes {
                             if let Some(flat_root) = wr.to.root.get_root_flat() {
-                                instruction_fanins[flat_root].push(inst_id);
+                                instruction_fanins[flat_root].push(instr_id);
                                 wr.to.for_each_input_wire_in_path(&mut |idx_wire| {
                                     instruction_fanins[flat_root].push(idx_wire)
                                 });
@@ -259,6 +260,21 @@ fn make_fanins(
                         for wr in writes {
                             if let Some(flat_root) = wr.to.root.get_root_flat() {
                                 instruction_fanins[flat_root].push(stm.condition);
+                            }
+                        }
+                    }
+                }
+            }
+            Instruction::ActionTriggerDeclaration(stm) => {
+                for id in FlatIDRange::new(stm.then_block.0, stm.else_block.1) {
+                    if let Instruction::Expression(Expression {
+                        output: ExpressionOutput::MultiWrite(writes),
+                        ..
+                    }) = &instructions[id]
+                    {
+                        for wr in writes {
+                            if let Some(flat_root) = wr.to.root.get_root_flat() {
+                                instruction_fanins[flat_root].push(instr_id);
                             }
                         }
                     }

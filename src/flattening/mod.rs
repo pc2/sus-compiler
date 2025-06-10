@@ -104,18 +104,6 @@ impl Module {
         None
     }
 
-    pub fn get_instruction_span(&self, instr_id: FlatID) -> Span {
-        match &self.link_info.instructions[instr_id] {
-            Instruction::SubModule(sm) => sm.module_ref.get_total_span(),
-            Instruction::Declaration(decl) => decl.decl_span,
-            Instruction::Expression(w) => w.span,
-            Instruction::IfStatement(if_stmt) => self.get_instruction_span(if_stmt.condition),
-            Instruction::ForStatement(for_stmt) => {
-                self.get_instruction_span(for_stmt.loop_var_decl)
-            }
-        }
-    }
-
     /// Temporary upgrade such that we can name the singular clock of the module, such that weirdly-named external module clocks can be used
     ///
     /// See #7
@@ -224,6 +212,14 @@ pub struct Port {
     pub declaration_instruction: FlatID,
 }
 
+#[derive(Debug)]
+pub enum InterfaceKind {
+    RegularInterface,
+    Action,
+    Trigger,
+    LocalAction,
+}
+
 /// An interface, like:
 ///
 /// ```sus
@@ -245,6 +241,7 @@ pub struct Port {
 pub struct Interface {
     pub name_span: Span,
     pub name: String,
+    pub interface_kind: InterfaceKind,
     /// All the interface's ports have this domain too
     pub domain: DomainID,
     pub func_call_inputs: PortIDRange,
@@ -540,6 +537,11 @@ pub enum DeclarationKind {
         port_id: PortID,
         domain: DomainID,
     },
+    ConditionalBinding {
+        when_id: FlatID,
+        is_input: bool,
+        is_state: bool,
+    },
     RegularGenerative {
         read_only: bool,
     },
@@ -558,6 +560,7 @@ impl DeclarationKind {
     pub fn is_read_only(&self) -> bool {
         match self {
             DeclarationKind::RegularWire { read_only, .. } => *read_only,
+            DeclarationKind::ConditionalBinding { is_input, .. } => *is_input,
             DeclarationKind::StructField(_) => false,
             DeclarationKind::Port { is_input, .. } => *is_input,
             DeclarationKind::RegularGenerative { read_only } => *read_only,
@@ -567,6 +570,7 @@ impl DeclarationKind {
     pub fn is_generative(&self) -> bool {
         match self {
             DeclarationKind::RegularWire { .. }
+            | DeclarationKind::ConditionalBinding { .. }
             | DeclarationKind::StructField(_)
             | DeclarationKind::Port { .. } => false,
             DeclarationKind::RegularGenerative { .. } | DeclarationKind::TemplateParameter(..) => {
@@ -577,7 +581,8 @@ impl DeclarationKind {
     pub fn is_state(&self) -> bool {
         match self {
             DeclarationKind::RegularWire { is_state, .. }
-            | DeclarationKind::Port { is_state, .. } => *is_state,
+            | DeclarationKind::Port { is_state, .. }
+            | DeclarationKind::ConditionalBinding { is_state, .. } => *is_state,
             DeclarationKind::StructField(_)
             | DeclarationKind::RegularGenerative { .. }
             | DeclarationKind::TemplateParameter(..) => false,
@@ -894,6 +899,20 @@ pub struct ParentCondition {
     is_else_branch: bool,
 }
 
+#[derive(Debug)]
+pub struct ActionTriggerDeclaration {
+    pub parent_condition: Option<ParentCondition>,
+    pub name: String,
+    pub name_span: Span,
+    pub latency_specifier: Option<FlatID>,
+    pub is_local: bool,
+    pub inputs: Vec<FlatID>,
+    pub outputs: Vec<FlatID>,
+    pub then_block: FlatIDRange,
+    pub else_block: FlatIDRange,
+    pub domain: DomainType,
+}
+
 /// When a module has been parsed and flattened, it is turned into a large list of instructions,
 /// These are stored in [LinkInfo::instructions]`: FlatAlloc<Instruction, FlatIDMarker>`
 ///
@@ -908,6 +927,7 @@ pub struct ParentCondition {
 pub enum Instruction {
     SubModule(SubModuleInstance),
     Declaration(Declaration),
+    ActionTriggerDeclaration(ActionTriggerDeclaration),
     Expression(Expression),
     IfStatement(IfStatement),
     ForStatement(ForStatement),
@@ -981,6 +1001,10 @@ impl Instruction {
             })
             | Instruction::ForStatement(ForStatement {
                 parent_condition, ..
+            })
+            | Instruction::ActionTriggerDeclaration(ActionTriggerDeclaration {
+                parent_condition,
+                ..
             }) => *parent_condition,
         }
     }
@@ -990,6 +1014,7 @@ impl Instruction {
                 sub_module_instance.get_most_relevant_span()
             }
             Instruction::Declaration(declaration) => declaration.decl_span,
+            Instruction::ActionTriggerDeclaration(act_trig) => act_trig.name_span,
             Instruction::Expression(expression) => expression.span,
             Instruction::IfStatement(_) => unreachable!(),
             Instruction::ForStatement(_) => unreachable!(),

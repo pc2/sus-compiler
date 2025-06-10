@@ -348,6 +348,10 @@
                           {
                             "type": "SYMBOL",
                             "name": "interface_statement"
+                          },
+                          {
+                            "type": "SYMBOL",
+                            "name": "action_trigger_statement"
                           }
                         ]
                       }
@@ -394,6 +398,10 @@
                                 {
                                   "type": "SYMBOL",
                                   "name": "interface_statement"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "action_trigger_statement"
                                 }
                               ]
                             }
@@ -548,6 +556,35 @@
         }
       ]
     },
+    "_then_else_block": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "then_block",
+          "content": {
+            "type": "SYMBOL",
+            "name": "block"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "else_block",
+              "content": {
+                "type": "SYMBOL",
+                "name": "else_block"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
     "if_statement": {
       "type": "SEQ",
       "members": [
@@ -577,28 +614,24 @@
           }
         },
         {
-          "type": "FIELD",
-          "name": "then_block",
-          "content": {
-            "type": "SYMBOL",
-            "name": "block"
-          }
-        },
-        {
           "type": "CHOICE",
           "members": [
             {
               "type": "FIELD",
-              "name": "else_block",
+              "name": "conditional_bindings",
               "content": {
                 "type": "SYMBOL",
-                "name": "else_block"
+                "name": "interface_ports"
               }
             },
             {
               "type": "BLANK"
             }
           ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_then_else_block"
         }
       ]
     },
@@ -724,6 +757,88 @@
               "type": "BLANK"
             }
           ]
+        }
+      ]
+    },
+    "action_trigger_statement": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "local",
+              "content": {
+                "type": "STRING",
+                "value": "local"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "FIELD",
+          "name": "interface_kind",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "action"
+              },
+              {
+                "type": "STRING",
+                "value": "trigger"
+              }
+            ]
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "latency_specifier",
+              "content": {
+                "type": "SYMBOL",
+                "name": "latency_specifier"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "interface_ports",
+              "content": {
+                "type": "SYMBOL",
+                "name": "interface_ports"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_then_else_block"
         }
       ]
     },

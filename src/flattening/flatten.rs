@@ -142,7 +142,7 @@ enum ModuleOrWrittenType {
 enum InterfacePortsInfo {
     InputsThenOutputs,
     OutputsThenInputs,
-    ConditionalBindings,
+    ConditionalBinding { when_id: FlatID },
 }
 
 struct FlatteningContext<'l, 'errs> {
@@ -569,6 +569,24 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         DeclarationKind::RegularGenerative { read_only: false }
                     } else {
                         DeclarationKind::StructField(self.fields_to_visit.next().unwrap())
+                    }
+                }
+                DeclarationKind::ConditionalBinding {
+                    when_id, is_input, ..
+                } => {
+                    self.forbid_keyword(input_kw, "on a conditional binding");
+                    self.forbid_keyword(output_kw, "on a conditional binding");
+                    self.forbid_keyword(gen_kw, "on a conditional binding");
+                    let is_state = if is_input {
+                        self.forbid_keyword(state_kw, "on input ports, because they are read-only");
+                        false
+                    } else {
+                        state_kw.is_some()
+                    };
+                    DeclarationKind::ConditionalBinding {
+                        is_input,
+                        is_state,
+                        when_id,
                     }
                 }
                 DeclarationKind::Port {
@@ -1065,6 +1083,48 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         }
     }
 
+    fn flatten_then_else_blocks(
+        &mut self,
+        cursor: &mut Cursor<'c>,
+        parent_when: Option<FlatID>,
+    ) -> (FlatIDRange, FlatIDRange) {
+        let prev_parent_condition = self.current_parent_condition;
+        if let Some(parent_when) = parent_when {
+            self.current_parent_condition = Some(ParentCondition {
+                parent_when,
+                is_else_branch: false,
+            });
+        }
+
+        cursor.field(field!("then_block"));
+        let then_block = self.flatten_code(cursor);
+
+        if let Some(parent_when) = parent_when {
+            self.current_parent_condition = Some(ParentCondition {
+                parent_when,
+                is_else_branch: true,
+            });
+        }
+
+        let else_start = self.instructions.get_next_alloc_id();
+        if cursor.optional_field(field!("else_block")) {
+            cursor.go_down(kind!("else_block"), |cursor| {
+                cursor.field(field!("content"));
+                if cursor.kind() == kind!("if_statement") {
+                    self.flatten_if_statement(cursor); // Chained if statements
+                } else {
+                    self.flatten_code(cursor);
+                }
+            })
+        };
+        let else_end = self.instructions.get_next_alloc_id();
+        let else_block = FlatIDRange::new(else_start, else_end);
+
+        self.current_parent_condition = prev_parent_condition;
+
+        (then_block, else_block)
+    }
+
     fn flatten_if_statement(&mut self, cursor: &mut Cursor<'c>) {
         cursor.go_down(kind!("if_statement"), |cursor| {
             cursor.field(field!("statement_type"));
@@ -1089,49 +1149,26 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     else_block: FlatIDRange::PLACEHOLDER,
                 }));
 
-            let prev_parent_condition = self.current_parent_condition;
-            if !expects_generative {
-                self.current_parent_condition = Some(ParentCondition {
-                    parent_when: if_id,
-                    is_else_branch: false,
-                });
-            }
+            let (conditional_bindings_inputs, conditional_bindings_outputs) =
+                if cursor.optional_field(field!("conditional_bindings")) {
+                    self.flatten_interface_ports(
+                        cursor,
+                        InterfacePortsInfo::ConditionalBinding { when_id: if_id },
+                    )
+                } else {
+                    (Vec::new(), Vec::new())
+                };
 
-            cursor.field(field!("then_block"));
-            let then_block = self.flatten_code(cursor);
+            let (then_block, else_block) =
+                self.flatten_then_else_blocks(cursor, expects_generative.then_some(if_id));
 
-            if !expects_generative {
-                self.current_parent_condition = Some(ParentCondition {
-                    parent_when: if_id,
-                    is_else_branch: true,
-                });
-            }
-            let else_block = self.flatten_else_block(cursor);
-
-            let Instruction::IfStatement(if_stmt) = &mut self.instructions[if_id] else {
-                unreachable!()
-            };
+            let_unwrap!(
+                Instruction::IfStatement(if_stmt),
+                &mut self.instructions[if_id]
+            );
             if_stmt.then_block = then_block;
             if_stmt.else_block = else_block;
-
-            self.current_parent_condition = prev_parent_condition;
         })
-    }
-
-    fn flatten_else_block(&mut self, cursor: &mut Cursor<'c>) -> FlatIDRange {
-        let else_start = self.instructions.get_next_alloc_id();
-        if cursor.optional_field(field!("else_block")) {
-            cursor.go_down(kind!("else_block"), |cursor| {
-                cursor.field(field!("content"));
-                if cursor.kind() == kind!("if_statement") {
-                    self.flatten_if_statement(cursor); // Chained if statements
-                } else {
-                    self.flatten_code(cursor);
-                }
-            })
-        };
-        let else_end = self.instructions.get_next_alloc_id();
-        FlatIDRange::new(else_start, else_end)
     }
 
     fn flatten_code(&mut self, cursor: &mut Cursor<'c>) -> FlatIDRange {
@@ -1219,6 +1256,65 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 InterfacePortsInfo::InputsThenOutputs,
                             );
                         }
+                    });
+                }
+                kind!("action_trigger_statement") => {
+                    cursor.go_down_no_check(|cursor| {
+                        // Skip interface kind
+                        let is_local = cursor.optional_field(field!("local"));
+                        cursor.field(field!("interface_kind"));
+                        let ports_direction = match cursor.kind() {
+                            kw!("action") => InterfacePortsInfo::InputsThenOutputs,
+                            kw!("trigger") => InterfacePortsInfo::OutputsThenInputs,
+                            _ => unreachable!(),
+                        };
+
+                        let (name_span, name) =
+                            cursor.field_to_string(field!("name"), kind!("identifier"));
+                        let latency_specifier =
+                            self.flatten_latency_specifier(cursor).map(|(l, _)| l);
+
+                        let (left_ports, right_ports) =
+                            if cursor.optional_field(field!("interface_ports")) {
+                                self.flatten_interface_ports(cursor, ports_direction)
+                            } else {
+                                (Vec::new(), Vec::new())
+                            };
+
+                        let (inputs, outputs) = match ports_direction {
+                            InterfacePortsInfo::InputsThenOutputs => (left_ports, right_ports),
+                            InterfacePortsInfo::OutputsThenInputs => (right_ports, left_ports),
+                            InterfacePortsInfo::ConditionalBinding { .. } => unreachable!(),
+                        };
+
+                        let action_id =
+                            self.instructions
+                                .alloc(Instruction::ActionTriggerDeclaration(
+                                    ActionTriggerDeclaration {
+                                        parent_condition: self.current_parent_condition,
+                                        name,
+                                        name_span,
+                                        latency_specifier,
+                                        is_local,
+                                        inputs,
+                                        outputs,
+                                        domain: DomainType::Physical(self.current_domain),
+                                        then_block: FlatIDRange::PLACEHOLDER,
+                                        else_block: FlatIDRange::PLACEHOLDER,
+                                    },
+                                ));
+
+                        let (then_block, else_block) =
+                            self.flatten_then_else_blocks(cursor, Some(action_id));
+
+                        let Instruction::ActionTriggerDeclaration(action_trigger) =
+                            &mut self.instructions[action_id]
+                        else {
+                            unreachable!()
+                        };
+
+                        action_trigger.then_block = then_block;
+                        action_trigger.else_block = else_block;
                     });
                 }
                 kind!("domain_statement") => {
@@ -1375,14 +1471,16 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     domain: self.current_domain,
                 },
             ),
-            InterfacePortsInfo::ConditionalBindings => (
-                DeclarationKind::RegularWire {
+            InterfacePortsInfo::ConditionalBinding { when_id } => (
+                DeclarationKind::ConditionalBinding {
+                    when_id,
+                    is_input: true,
                     is_state: false,
-                    read_only: true,
                 },
-                DeclarationKind::RegularWire {
+                DeclarationKind::ConditionalBinding {
+                    when_id,
+                    is_input: false,
                     is_state: false,
-                    read_only: false,
                 },
             ),
         };
@@ -1617,6 +1715,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
                             unreachable!("No Struct fields in Modules")
                         }
                         DeclarationKind::RegularWire { .. }
+                        | DeclarationKind::ConditionalBinding { .. }
                         | DeclarationKind::TemplateParameter(_)
                         | DeclarationKind::RegularGenerative { .. } => {}
                     }
@@ -1643,7 +1742,8 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
                         }
                         DeclarationKind::TemplateParameter(_)
                         | DeclarationKind::RegularGenerative { .. } => {}
-                        DeclarationKind::RegularWire { .. } => {
+                        DeclarationKind::RegularWire { .. }
+                        | DeclarationKind::ConditionalBinding { .. } => {
                             unreachable!(
                                 "If a declaration isn't generative, then it MUST be a struct field"
                             )
@@ -1680,4 +1780,11 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
     link_info.checkpoint(AFTER_FLATTEN_CP);
     link_info.instructions = instructions;
     link_info.template_parameters = parameters;
+
+    // If an instruction has itself as parent when, it would create a deadlock
+    for (id, instr) in &link_info.instructions {
+        if let Some(parent_when) = instr.get_parent_condition() {
+            assert_ne!(parent_when.parent_when, id);
+        }
+    }
 }

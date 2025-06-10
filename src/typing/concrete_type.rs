@@ -18,6 +18,11 @@ use super::value_unifier::UnifyableValue;
 
 pub type ConcreteTemplateArg = TemplateKind<ConcreteType, UnifyableValue>;
 
+pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
+    id: get_builtin_type!("bool"),
+    template_args: FlatAlloc::new(),
+});
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConcreteGlobalReference<ID> {
     pub id: ID,

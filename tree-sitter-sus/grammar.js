@@ -106,7 +106,8 @@ module.exports = grammar({
                 $.if_statement,
                 $.for_statement,
                 $.domain_statement,
-                $.interface_statement
+                $.interface_statement,
+                $.action_trigger_statement
             )),
             '}'
         ),
@@ -129,15 +130,19 @@ module.exports = grammar({
             field('item', 'initial')
         ),
 
+        _then_else_block: $ => seq(
+            field('then_block', $.block),
+            optional(field('else_block', $.else_block))
+        ),
+
         if_statement: $ => seq(
             field('statement_type',choice(
                 'when',
                 'if'
             )),
             field('condition', $._expression),
-            //optional(field('conditional_bindings', $.interface_ports)),
-            field('then_block', $.block),
-            optional(field('else_block', $.else_block))
+            optional(field('conditional_bindings', $.interface_ports)),
+            $._then_else_block
         ),
         else_block: $ => seq(
             'else',
@@ -163,11 +168,20 @@ module.exports = grammar({
             field('name', $.identifier),
         ),
 
+        // Deprecated. TODO move into module declaration and domain_statement
         interface_statement: $ => seq(
-            'interface',//field('interface_kind', choice('action', 'query', 'trigger')),
+            'interface',
             field('name', $.identifier),
             optional(field('interface_ports', $.interface_ports)),
-            //optional(field('block', $.block))
+        ),
+
+        action_trigger_statement: $ => seq(
+            optional(field('local', 'local')),
+            field('interface_kind', choice('action', 'trigger')),
+            field('name', $.identifier),
+            optional(field('latency_specifier', $.latency_specifier)),
+            optional(field('interface_ports', $.interface_ports)),
+            $._then_else_block
         ),
 
         interface_ports: $ => seq(

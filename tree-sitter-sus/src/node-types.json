@@ -1,5 +1,85 @@
 [
   {
+    "type": "action_trigger_statement",
+    "named": true,
+    "fields": {
+      "else_block": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "else_block",
+            "named": true
+          }
+        ]
+      },
+      "interface_kind": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "action",
+            "named": false
+          },
+          {
+            "type": "trigger",
+            "named": false
+          }
+        ]
+      },
+      "interface_ports": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "interface_ports",
+            "named": true
+          }
+        ]
+      },
+      "latency_specifier": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "latency_specifier",
+            "named": true
+          }
+        ]
+      },
+      "local": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "local",
+            "named": false
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "then_block": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "array_bracket_expression",
     "named": true,
     "fields": {
@@ -421,6 +501,10 @@
         "multiple": true,
         "required": false,
         "types": [
+          {
+            "type": "action_trigger_statement",
+            "named": true
+          },
           {
             "type": "assign_left_side",
             "named": true
@@ -997,6 +1081,16 @@
           },
           {
             "type": "unary_op",
+            "named": true
+          }
+        ]
+      },
+      "conditional_bindings": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "interface_ports",
             "named": true
           }
         ]
@@ -1645,6 +1739,10 @@
     "named": false
   },
   {
+    "type": "action",
+    "named": false
+  },
+  {
     "type": "const",
     "named": false
   },
@@ -1697,6 +1795,10 @@
     "named": false
   },
   {
+    "type": "local",
+    "named": false
+  },
+  {
     "type": "module",
     "named": false
   },
@@ -1726,6 +1828,10 @@
   },
   {
     "type": "struct",
+    "named": false
+  },
+  {
+    "type": "trigger",
     "named": false
   },
   {

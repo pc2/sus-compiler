@@ -71,7 +71,9 @@ fn finalize_domains(
                     .get_mut()
                     .fully_substitute(&domain_substitutor));
             }
-            Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
+            Instruction::IfStatement(_)
+            | Instruction::ForStatement(_)
+            | Instruction::ActionTriggerDeclaration(_) => {}
         }
     }
 
@@ -115,7 +117,9 @@ impl<'l> DomainCheckingContext<'l> {
                 self.written_type_must_be_generative(&declaration.typ_expr);
                 declaration.domain.set(match declaration.decl_kind {
                     DeclarationKind::Port { domain, .. } => DomainType::Physical(domain),
-                    DeclarationKind::StructField(..) | DeclarationKind::RegularWire { .. } => {
+                    DeclarationKind::StructField(..)
+                    | DeclarationKind::RegularWire { .. }
+                    | DeclarationKind::ConditionalBinding { .. } => {
                         self.domain_checker.alloc_unknown()
                     }
                     DeclarationKind::RegularGenerative { .. }
@@ -229,6 +233,7 @@ impl<'l> DomainCheckingContext<'l> {
                 self.must_be_generative(for_statement.start, "For Loop start");
                 self.must_be_generative(for_statement.end, "For Loop end");
             }
+            Instruction::ActionTriggerDeclaration(_) => {}
         }
     }
 

@@ -4,5 +4,7 @@
 
 
 module TEST {
-	assert #(C: 15 + 3 == 19)
+	action x : int a {
+        
+    }
 }

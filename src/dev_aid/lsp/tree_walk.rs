@@ -59,8 +59,9 @@ impl From<LocationInfo<'_>> for RefersTo {
                 InGlobal::NamedLocal(_) => {
                     let decl = link_info.instructions[flat_id].unwrap_declaration();
                     match decl.decl_kind {
-                        DeclarationKind::RegularWire { .. }
-                        | DeclarationKind::RegularGenerative { .. }
+                        DeclarationKind::RegularGenerative { .. }
+                        | DeclarationKind::ConditionalBinding { .. }
+                        | DeclarationKind::RegularWire { .. }
                         | DeclarationKind::StructField(..) => {}
                         DeclarationKind::Port { port_id, .. } => {
                             result.port = Some((obj_id.unwrap_module(), port_id));
@@ -444,6 +445,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                             }
                         }
                     }
+                    Instruction::ActionTriggerDeclaration(_) => {}
                     Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
                 };
             }

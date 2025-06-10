@@ -43,8 +43,8 @@ impl InitializationContext<'_> {
         cursor.go_down_no_check(|cursor| {
             cursor.field(field!("statement_type"));
             cursor.field(field!("condition"));
-            cursor.field(field!("then_block"));
-            self.gather_all_ports_in_block_and_else_block(cursor);
+            let _ = cursor.optional_field(field!("conditional_bindings"));
+            self.gather_all_ports_in_then_and_else_block(cursor);
         })
     }
 
@@ -91,7 +91,25 @@ impl InitializationContext<'_> {
                     cursor.go_down_no_check(|cursor| {
                         let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
 
-                        self.gather_func_call_ports(name_span, name, cursor);
+                        self.gather_func_call_ports(name_span, name, InterfaceKind::RegularInterface, cursor);
+                    });
+                }
+                kind!("action_trigger_statement") => {
+                    cursor.go_down_no_check(|cursor| {
+                        let is_local = cursor.optional_field(field!("local"));
+                        cursor.field(field!("interface_kind"));
+                        let interface_kind = match cursor.kind() {
+                            kw!("action") => if is_local {InterfaceKind::LocalAction} else {InterfaceKind::Action},
+                            kw!("trigger") => InterfaceKind::Trigger,
+                            _ => unreachable!()
+                        };
+
+                        let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
+                        let _ = cursor.optional_field(field!("latency_specifier"));
+
+                        self.gather_func_call_ports(name_span, name, interface_kind, cursor);
+
+                        self.gather_all_ports_in_then_and_else_block(cursor);
                     });
                 }
                 kind!("block") => {
@@ -121,7 +139,8 @@ impl InitializationContext<'_> {
         });
     }
 
-    fn gather_all_ports_in_block_and_else_block(&mut self, cursor: &mut Cursor) {
+    fn gather_all_ports_in_then_and_else_block(&mut self, cursor: &mut Cursor) {
+        cursor.field(field!("then_block"));
         self.gather_all_ports_in_block(cursor);
         if cursor.optional_field(field!("else_block")) {
             cursor.go_down_no_check(|cursor| {
@@ -143,6 +162,7 @@ impl InitializationContext<'_> {
         &mut self,
         interface_name_span: Span,
         name: String,
+        interface_kind: InterfaceKind,
         cursor: &mut Cursor,
     ) {
         let ports = if cursor.optional_field(field!("interface_ports")) {
@@ -171,6 +191,7 @@ impl InitializationContext<'_> {
         self.interfaces.alloc(Interface {
             func_call_inputs,
             func_call_outputs,
+            interface_kind,
             domain: self.domains.last_id(),
             name_span: interface_name_span,
             name,
