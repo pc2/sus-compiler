@@ -621,6 +621,34 @@ impl<'g> CodeGenerationContext<'g> {
                     writeln!(self.program_text, "\tassign value[{i}] = bits[{i}];").unwrap();
                 }
             }
+            "UIntToBits" => {
+                let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
+                let num_bits: usize = num_bits.try_into().unwrap();
+
+                let _value_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(0), true, "value");
+                let _bits_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(1), false, "bits");
+                for i in 0..num_bits {
+                    writeln!(self.program_text, "\tassign bits[{i}] = value[{i}];").unwrap();
+                }
+            }
+            "BitsToUInt" => {
+                let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
+                let num_bits: usize = num_bits.try_into().unwrap();
+
+                let _bits_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(0), true, "bits");
+                let _value_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(1), false, "value");
+                for i in 0..num_bits {
+                    writeln!(self.program_text, "\tassign value[{i}] = bits[{i}];").unwrap();
+                }
+            }
             other => {
                 panic!("Unknown Builtin: \"{other}\"! Do not mark modules as __builtin__ yourself!")
             }
