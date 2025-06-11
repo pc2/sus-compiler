@@ -1385,3 +1385,8 @@ module write_to_generative_through_when {
 		a = true
 	}
 }
+
+module SameNameAsType #(NUM_INPUTS) {
+    gen int NUM_INPUTS = 500
+}
+

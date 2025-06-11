@@ -425,9 +425,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     err_ref.info_obj_same_file(self.instructions[submod_id].unwrap_submodule());
                 }
                 NamedLocal::TemplateType(template_id) => {
-                    err_ref.info_obj_same_file(
-                        &self.working_on_link_info.template_parameters[template_id],
-                    );
+                    err_ref.info_obj_same_file(&self.parameters[template_id]);
                 }
                 NamedLocal::DomainDecl(domain_id) => {
                     err_ref.info_obj_same_file(&self.domains[domain_id]);
