@@ -55,6 +55,7 @@ humantime = "2.2.0"
 
 [build-dependencies]
 dirs-next = "2.0.0"
+chrono = "0.4.19"
 
 [features]
 default = ["lsp", "dot"]
