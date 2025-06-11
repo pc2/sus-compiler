@@ -149,7 +149,6 @@ struct FlatteningContext<'l, 'errs> {
     globals: &'l GlobalResolver<'l>,
     errors: &'errs ErrorCollector<'l>,
 
-    working_on_link_info: &'l LinkInfo,
     parameters: TVec<Parameter>,
     instructions: FlatAlloc<Instruction, FlatIDMarker>,
     domains: &'l FlatAlloc<DomainInfo, DomainIDMarker>,
@@ -936,11 +935,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 span,
                                 format!(
                                     "Expected a value, but instead found template type '{}'",
-                                    self.working_on_link_info.template_parameters[template_id].name
+                                    self.parameters[template_id].name
                                 ),
                             )
                             .info_obj_same_file(
-                                &self.working_on_link_info.template_parameters[template_id],
+                                &self.parameters[template_id],
                             );
                         PartialWireReference::WireReference(self.new_error(expr_span))
                     }
@@ -1679,7 +1678,6 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         domains,
         default_decl_kind,
         errors: &errors,
-        working_on_link_info: linker.get_link_info(global_obj),
         instructions: FlatAlloc::new(),
         parameters: FlatAlloc::new(),
         named_domain_alloc: UUIDAllocator::new(),
