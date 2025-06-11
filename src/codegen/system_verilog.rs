@@ -42,22 +42,23 @@ impl super::CodeGenBackend for VerilogCodegenBackend {
 /// IE for `int[15] myVar` it creates `[31:0] myVar[14:0]`
 fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
     let mut array_string = String::new();
-    while let ConcreteType::Array(arr) = typ {
-        let (content_typ, size) = arr.deref();
-        let sz = size.unwrap_integer();
-        write!(array_string, "[{}:0]", sz - 1).unwrap();
-        typ = content_typ;
-    }
-    match typ {
-        ConcreteType::Named(reference) => {
-            let sz = ConcreteType::sizeof_named(reference);
-            if sz == 1 {
+
+    loop {
+        if let Some(width) = typ.can_be_represented_as_packed_bits() {
+            return if width == 1 {
                 format!(" {var_name}{array_string}")
             } else {
-                format!("[{}:0] {var_name}{array_string}", sz - 1)
-            }
+                format!("[{}:0] {var_name}{array_string}", width - 1)
+            };
+        } else {
+            let ConcreteType::Array(arr) = typ else {
+                todo!("Structs")
+            };
+            let (content_typ, size) = arr.deref();
+            let sz = size.unwrap_integer();
+            write!(array_string, "[{}:0]", sz - 1).unwrap();
+            typ = content_typ;
         }
-        ConcreteType::Array(_) => unreachable!("All arrays have been used up already"),
     }
 }
 
@@ -133,7 +134,7 @@ impl<'g> CodeGenerationContext<'g> {
                 let clk_name = self.md.get_clock_name();
                 writeln!(
                     self.program_text,
-                    "/*latency*/ logic {var_decl}; always_ff @(posedge {clk_name}) begin {to} <= {from}; end"
+                    "/*latency*/ logic{var_decl}; always_ff @(posedge {clk_name}) begin {to} <= {from}; end"
                 ).unwrap();
             }
         }
@@ -246,39 +247,43 @@ impl<'g> CodeGenerationContext<'g> {
         &mut self,
         typ: &ConcreteType,
         in_always: bool,
-        mut operation: impl FnMut(&str, &ConcreteType) -> String,
+        mut operation: impl FnMut(&str, u64) -> String,
     ) {
         fn walk_type_to_generate_foreach_recurse(
             typ: &ConcreteType,
             in_always: bool,
             path: &str,
             var_idx: usize,
-            operation: &mut impl FnMut(&str, &ConcreteType) -> String,
+            operation: &mut impl FnMut(&str, u64) -> String,
         ) -> String {
             let for_should_declare_var = if in_always { "int " } else { "" };
-            match typ {
-                ConcreteType::Array(arr_box) => {
-                    let var_name = if in_always {
-                        format!("_v{var_idx}")
-                    } else {
-                        format!("_g{var_idx}")
-                    };
-                    let new_path = format!("{path}[{var_name}]");
-                    let (new_typ, sz) = arr_box.deref();
-                    let sz = sz.unwrap_integer();
-                    let content_str = walk_type_to_generate_foreach_recurse(
-                        new_typ,
-                        in_always,
-                        &new_path,
-                        var_idx + 1,
-                        operation,
-                    );
 
-                    format!(
-                        "for({for_should_declare_var}{var_name} = 0; {var_name} < {sz}; {var_name} = {var_name} + 1) begin\n{content_str}\tend\n"
-                    )
-                }
-                typ => operation(path, typ),
+            if let Some(fundamental_size) = typ.can_be_represented_as_packed_bits() {
+                operation(path, fundamental_size)
+            } else {
+                let ConcreteType::Array(arr_box) = typ else {
+                    todo!("Structs");
+                };
+
+                let var_name = if in_always {
+                    format!("_v{var_idx}")
+                } else {
+                    format!("_g{var_idx}")
+                };
+                let new_path = format!("{path}[{var_name}]");
+                let (new_typ, sz) = arr_box.deref();
+                let sz = sz.unwrap_integer();
+                let content_str = walk_type_to_generate_foreach_recurse(
+                    new_typ,
+                    in_always,
+                    &new_path,
+                    var_idx + 1,
+                    operation,
+                );
+
+                format!(
+                    "for({for_should_declare_var}{var_name} = 0; {var_name} < {sz}; {var_name} = {var_name} + 1) begin\n{content_str}\tend\n"
+                )
             }
         }
 
@@ -603,7 +608,7 @@ impl<'g> CodeGenerationContext<'g> {
             }
             "IntToBits" => {
                 let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
-                let num_bits: usize = num_bits.try_into().unwrap();
+                let _num_bits: usize = num_bits.try_into().unwrap();
 
                 let _value_port = self
                     .md
@@ -611,13 +616,11 @@ impl<'g> CodeGenerationContext<'g> {
                 let _bits_port = self
                     .md
                     .unwrap_port(PortID::from_hidden_value(1), false, "bits");
-                for i in 0..num_bits {
-                    writeln!(self.program_text, "\tassign bits[{i}] = value[{i}];").unwrap();
-                }
+                writeln!(self.program_text, "\tassign bits = value;").unwrap();
             }
             "BitsToInt" => {
                 let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
-                let num_bits: usize = num_bits.try_into().unwrap();
+                let _num_bits: usize = num_bits.try_into().unwrap();
 
                 let _bits_port = self
                     .md
@@ -625,13 +628,11 @@ impl<'g> CodeGenerationContext<'g> {
                 let _value_port = self
                     .md
                     .unwrap_port(PortID::from_hidden_value(1), false, "value");
-                for i in 0..num_bits {
-                    writeln!(self.program_text, "\tassign value[{i}] = bits[{i}];").unwrap();
-                }
+                writeln!(self.program_text, "\tassign value = bits;").unwrap();
             }
             "UIntToBits" => {
                 let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
-                let num_bits: usize = num_bits.try_into().unwrap();
+                let _num_bits: usize = num_bits.try_into().unwrap();
 
                 let _value_port = self
                     .md
@@ -639,13 +640,11 @@ impl<'g> CodeGenerationContext<'g> {
                 let _bits_port = self
                     .md
                     .unwrap_port(PortID::from_hidden_value(1), false, "bits");
-                for i in 0..num_bits {
-                    writeln!(self.program_text, "\tassign bits[{i}] = value[{i}];").unwrap();
-                }
+                writeln!(self.program_text, "\tassign bits = value;").unwrap();
             }
             "BitsToUInt" => {
                 let [num_bits] = self.instance.global_ref.template_args.cast_to_int_array();
-                let num_bits: usize = num_bits.try_into().unwrap();
+                let _num_bits: usize = num_bits.try_into().unwrap();
 
                 let _bits_port = self
                     .md
@@ -653,9 +652,7 @@ impl<'g> CodeGenerationContext<'g> {
                 let _value_port = self
                     .md
                     .unwrap_port(PortID::from_hidden_value(1), false, "value");
-                for i in 0..num_bits {
-                    writeln!(self.program_text, "\tassign value[{i}] = bits[{i}];").unwrap();
-                }
+                writeln!(self.program_text, "\tassign value = bits;").unwrap();
             }
             other => {
                 panic!("Unknown Builtin: \"{other}\"! Do not mark modules as __builtin__ yourself!")

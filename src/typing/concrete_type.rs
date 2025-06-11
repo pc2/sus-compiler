@@ -168,6 +168,26 @@ impl ConcreteType {
         }
     }
 
+    /// Returns the width of the packed bit vector
+    pub fn can_be_represented_as_packed_bits(&self) -> Option<u64> {
+        match self {
+            ConcreteType::Named(name) => Some(Self::sizeof_named(name)),
+            ConcreteType::Array(arr_box) => {
+                let (content, sz) = arr_box.deref();
+
+                if let ConcreteType::Named(ConcreteGlobalReference {
+                    id: get_builtin_type!("bool"),
+                    template_args: _,
+                }) = content
+                {
+                    Some(sz.unwrap_int())
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
     pub fn sizeof_named(type_ref: &ConcreteGlobalReference<TypeUUID>) -> u64 {
         match type_ref.id {
             get_builtin_type!("int") => {
