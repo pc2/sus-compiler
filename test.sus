@@ -1390,3 +1390,19 @@ module SameNameAsType #(NUM_INPUTS) {
     gen int NUM_INPUTS = 500
 }
 
+module InstantiateTransmutes {
+	transmute_from_bits #(T: type int[30]) a
+	transmute_to_bits #(T: type bool[60]) b
+	transmute_to_bits #(T: type int[3][3][5]) c
+}
+
+module StraightTransmute {
+	int#(MIN: 0, MAX: 255)[2] a
+
+	gen int SZ = sizeof #(T: type int#(MIN: 0, MAX: 256*256-1))
+
+	int b = transmute #(T2: type int#(MIN: 0, MAX: 256*256-1)) (a)
+
+	int #(MIN: 5, MAX: 3) v
+}
+

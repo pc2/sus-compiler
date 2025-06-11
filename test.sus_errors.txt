@@ -1,3 +1,10 @@
+Warning: The result of this expression is not used. Only function calls can return nothing. 
+    ╭─[ core.sus:46:5 ]
+    │
+ 46 │     assert #(C: SIZE == sizeof #(T: type T2))
+    │     ────────────────────┬────────────────────  
+    │                         ╰────────────────────── The result of this expression is not used. Only function calls can return nothing. 
+────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
@@ -2696,9 +2703,9 @@ Error: 'beep' is not a valid template argument of int
      │                              ──┬─  
      │                                ╰─── 'beep' is not a valid template argument of int
      │
-     ├─[ core.sus:39:20 ]
+     ├─[ core.sus:58:20 ]
      │
-  39 │ __builtin__ struct int #(int MIN, int MAX) {}
+  58 │ __builtin__ struct int #(int MIN, int MAX) {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -2709,9 +2716,9 @@ Error: 'BEEP' is not a valid template argument of int
      │                                            ──┬─  
      │                                              ╰─── 'BEEP' is not a valid template argument of int
      │
-     ├─[ core.sus:39:20 ]
+     ├─[ core.sus:58:20 ]
      │
-  39 │ __builtin__ struct int #(int MIN, int MAX) {}
+  58 │ __builtin__ struct int #(int MIN, int MAX) {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -2736,9 +2743,9 @@ Error: int is not a named wire: local or constant, it is a Struct instead!
      │                                                  ─┬─  
      │                                                   ╰─── int is not a named wire: local or constant, it is a Struct instead!
      │
-     ├─[ core.sus:39:20 ]
+     ├─[ core.sus:58:20 ]
      │
-  39 │ __builtin__ struct int #(int MIN, int MAX) {}
+  58 │ __builtin__ struct int #(int MIN, int MAX) {}
      │                    ─┬─  
      │                     ╰─── Defined here
 ─────╯
@@ -10546,9 +10553,9 @@ Error: 'ABC' is not a valid template argument of int
      │           ─┬─  
      │            ╰─── 'ABC' is not a valid template argument of int
      │
-     ├─[ core.sus:39:20 ]
+     ├─[ core.sus:58:20 ]
      │
-  39 │ __builtin__ struct int #(int MIN, int MAX) {}
+  58 │ __builtin__ struct int #(int MIN, int MAX) {}
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
@@ -10888,12 +10895,12 @@ Error: Could not infer the parameters of this submodule, some parameters were st
     FROM: 3
 )
 ──────╯
-Error: For executing compile-time constants, all arguments must be fully specified. In this case, the arguments 'T' were not specified
+Error: For executing compile-time constants, all arguments must be fully specified. The arguments 'T' were not valid
       ╭─[ test.sus:1077:25 ]
       │
  1077 │     gen int INT_ARR_SIZE = sizeof #(T: type int[10][10])
       │                            ──────────────┬──────────────  
-      │                                          ╰──────────────── For executing compile-time constants, all arguments must be fully specified. In this case, the arguments 'T' were not specified
+      │                                          ╰──────────────── For executing compile-time constants, all arguments must be fully specified. The arguments 'T' were not valid
 ──────╯
 Warning: The result of this expression is not used. Only function calls can return nothing. 
       ╭─[ test.sus:1079:2 ]
@@ -12541,4 +12548,109 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1390 │     gen int NUM_INPUTS = 500
       │             ─────┬────  
       │                  ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not infer the parameters of this submodule, some parameters were still unknown: transmute_from_bits #(
+    T: type int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[30]
+)
+      ╭─[ test.sus:1394:41 ]
+      │
+ 1394 │     transmute_from_bits #(T: type int[30]) a
+      │                                            ┬  
+      │                                            ╰── Could not infer the parameters of this submodule, some parameters were still unknown: transmute_from_bits #(
+    T: type int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[30]
+)
+──────╯
+Warning: Unused port 'bits'
+      ╭─[ test.sus:1395:2 ]
+      │
+ 1395 │     transmute_to_bits #(T: type bool[60]) b
+      │     ──────────────────┬────────────────── ┬  
+      │                       ╰────────────────────── Unused port 'bits'
+      │                                           │  
+      │                                           ╰── b declared here
+      │
+      ├─[ core.sus:34:66 ]
+      │
+   34 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+      │                                                                  ──┬─  
+      │                                                                    ╰─── Port 'bits' declared here
+──────╯
+Warning: Unused port 'value'
+      ╭─[ test.sus:1395:2 ]
+      │
+ 1395 │     transmute_to_bits #(T: type bool[60]) b
+      │     ──────────────────┬────────────────── ┬  
+      │                       ╰────────────────────── Unused port 'value'
+      │                                           │  
+      │                                           ╰── b declared here
+      │
+      ├─[ core.sus:34:37 ]
+      │
+   34 │     interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+      │                                     ──┬──  
+      │                                       ╰──── Port 'value' declared here
+──────╯
+Error: Could not infer the parameters of this submodule, some parameters were still unknown: transmute_to_bits #(
+    T: type int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[3][3][5]
+)
+      ╭─[ test.sus:1396:44 ]
+      │
+ 1396 │     transmute_to_bits #(T: type int[3][3][5]) c
+      │                                               ┬  
+      │                                               ╰── Could not infer the parameters of this submodule, some parameters were still unknown: transmute_to_bits #(
+    T: type int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[3][3][5]
+)
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1400:28 ]
+      │
+ 1400 │     int#(MIN: 0, MAX: 255)[2] a
+      │                               ┬  
+      │                               ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1402:10 ]
+      │
+ 1402 │     gen int SZ = sizeof #(T: type int#(MIN: 0, MAX: 256*256-1))
+      │             ─┬  
+      │              ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1404:6 ]
+      │
+ 1404 │     int b = transmute #(T2: type int#(MIN: 0, MAX: 256*256-1)) (a)
+      │         ┬  
+      │         ╰── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: The type of this wire is invalid! int #(
+    MIN: 5, 
+    MAX: 3
+)
+      ╭─[ test.sus:1406:2 ]
+      │
+ 1406 │     int #(MIN: 5, MAX: 3) v
+      │     ───────────┬───────────  
+      │                ╰───────────── The type of this wire is invalid! int #(
+    MIN: 5, 
+    MAX: 3
+)
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1406:24 ]
+      │
+ 1406 │     int #(MIN: 5, MAX: 3) v
+      │                           ┬  
+      │                           ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯

@@ -1,6 +1,9 @@
 use std::borrow::Cow;
 use std::ops::Deref;
 
+use ibig::IBig;
+use sus_proc_macro::get_builtin_type;
+
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
@@ -9,7 +12,9 @@ use crate::flattening::{DeclarationKind, Instruction, Module, Port};
 use crate::instantiation::{
     InstantiatedModule, MultiplexerSource, RealWire, RealWireDataSource, RealWirePathElem,
 };
-use crate::typing::concrete_type::ConcreteTemplateArg;
+use crate::typing::concrete_type::{
+    get_int_bitwidth, ConcreteGlobalReference, ConcreteTemplateArg,
+};
 use crate::typing::template::{TVec, TemplateKind};
 use crate::{typing::concrete_type::ConcreteType, value::Value};
 
@@ -44,20 +49,39 @@ fn typ_to_declaration(mut typ: &ConcreteType, var_name: &str) -> String {
     let mut array_string = String::new();
 
     loop {
-        if let Some(width) = typ.can_be_represented_as_packed_bits() {
-            return if width == 1 {
-                format!(" {var_name}{array_string}")
-            } else {
-                format!("[{}:0] {var_name}{array_string}", width - 1)
-            };
-        } else {
-            let ConcreteType::Array(arr) = typ else {
+        match typ {
+            ConcreteType::Named(ConcreteGlobalReference {
+                id: get_builtin_type!("int"),
+                template_args,
+            }) => {
+                let [min, max] = template_args.cast_to_int_array();
+                let bitwidth = get_int_bitwidth(min, max) - 1;
+                if min < &IBig::from(0) {
+                    return format!("signed [{bitwidth}:0] {var_name}{array_string}");
+                } else {
+                    return format!("[{bitwidth}:0] {var_name}{array_string}");
+                }
+            }
+            ConcreteType::Named(ConcreteGlobalReference {
+                id: get_builtin_type!("bool"),
+                ..
+            }) => return format!(" {var_name}{array_string}"),
+            ConcreteType::Named(ConcreteGlobalReference { id: _, .. }) => {
                 todo!("Structs")
-            };
-            let (content_typ, size) = arr.deref();
-            let sz = size.unwrap_integer();
-            write!(array_string, "[{}:0]", sz - 1).unwrap();
-            typ = content_typ;
+            }
+            ConcreteType::Array(arr) => {
+                let (content_typ, size) = arr.deref();
+                let sz = size.unwrap_integer() - 1;
+                if let ConcreteType::Named(ConcreteGlobalReference {
+                    id: get_builtin_type!("bool"),
+                    ..
+                }) = content_typ
+                {
+                    return format!("[{sz}:0] {var_name}{array_string}");
+                }
+                write!(array_string, "[{sz}:0]").unwrap();
+                typ = content_typ;
+            }
         }
     }
 }
@@ -73,6 +97,39 @@ struct CodeGenerationContext<'g> {
     use_latency: bool,
 
     needed_untils: FlatAlloc<i64, WireIDMarker>,
+}
+
+enum ForEachPathElement {
+    Array { var: String, arr_size: IBig },
+}
+
+impl ForEachPathElement {
+    /// [_v0][_v1][...]
+    fn to_string(path: &[Self]) -> String {
+        let mut result = String::new();
+        for p in path {
+            match p {
+                ForEachPathElement::Array { var, arr_size: _ } => {
+                    write!(result, "[{var}]").unwrap();
+                }
+            }
+        }
+        result
+    }
+    fn to_bit_index_formula(path: &[Self]) -> String {
+        let mut path_iter = path.iter();
+        let mut result = match path_iter.next().unwrap() {
+            ForEachPathElement::Array { var, arr_size: _ } => var.clone(),
+        };
+        for p in path {
+            match p {
+                ForEachPathElement::Array { var, arr_size } => {
+                    result = format!("({arr_size} * {result}) + {var}")
+                }
+            }
+        }
+        result
+    }
 }
 
 impl<'g> CodeGenerationContext<'g> {
@@ -247,52 +304,56 @@ impl<'g> CodeGenerationContext<'g> {
         &mut self,
         typ: &ConcreteType,
         in_always: bool,
-        mut operation: impl FnMut(&str, u64) -> String,
+        mut operation: impl FnMut(&[ForEachPathElement], u64) -> String,
     ) {
         fn walk_type_to_generate_foreach_recurse(
             typ: &ConcreteType,
             in_always: bool,
-            path: &str,
+            mut path: Vec<ForEachPathElement>,
             var_idx: usize,
-            operation: &mut impl FnMut(&str, u64) -> String,
+            operation: &mut impl FnMut(&[ForEachPathElement], u64) -> String,
         ) -> String {
             let for_should_declare_var = if in_always { "int " } else { "" };
 
             if let Some(fundamental_size) = typ.can_be_represented_as_packed_bits() {
-                operation(path, fundamental_size)
+                operation(&path, fundamental_size)
             } else {
                 let ConcreteType::Array(arr_box) = typ else {
                     todo!("Structs");
                 };
 
-                let var_name = if in_always {
+                let var = if in_always {
                     format!("_v{var_idx}")
                 } else {
                     format!("_g{var_idx}")
                 };
-                let new_path = format!("{path}[{var_name}]");
                 let (new_typ, sz) = arr_box.deref();
+                path.push(ForEachPathElement::Array {
+                    var: var.clone(),
+                    arr_size: sz.unwrap_integer().clone(),
+                });
                 let sz = sz.unwrap_integer();
                 let content_str = walk_type_to_generate_foreach_recurse(
                     new_typ,
                     in_always,
-                    &new_path,
+                    path,
                     var_idx + 1,
                     operation,
                 );
 
                 format!(
-                    "for({for_should_declare_var}{var_name} = 0; {var_name} < {sz}; {var_name} = {var_name} + 1) begin\n{content_str}\tend\n"
+                    "for({for_should_declare_var}{var} = 0; {var} < {sz}; {var} = {var} + 1) begin\n{content_str}end\n"
                 )
             }
         }
 
-        let content = walk_type_to_generate_foreach_recurse(typ, in_always, "", 0, &mut operation);
+        let content =
+            walk_type_to_generate_foreach_recurse(typ, in_always, Vec::new(), 0, &mut operation);
 
         if in_always {
             self.program_text.write_str(&content).unwrap();
         } else {
-            write!(self.program_text, "generate\n{content}\nendgenerate;").unwrap()
+            write!(self.program_text, "generate\n{content}endgenerate;\n").unwrap()
         }
     }
 
@@ -345,6 +406,7 @@ impl<'g> CodeGenerationContext<'g> {
                         writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
 
                         self.walk_typ_to_generate_foreach(&w.typ, false, |path, _| {
+                            let path = ForEachPathElement::to_string(path);
                             format!("assign {}{path} = {from_string}{path};\n", &w.name)
                         });
                     } else {
@@ -422,7 +484,8 @@ impl<'g> CodeGenerationContext<'g> {
                     // Trivial constants (bools & ints) should have been inlined already
                     // So appearences of this are always arrays or other compound types
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
-                    self.write_constant(&wire_name, value);
+                    let to = format!("assign {wire_name}");
+                    self.write_constant(&to, value);
                 }
                 RealWireDataSource::ReadOnly => {
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
@@ -436,6 +499,7 @@ impl<'g> CodeGenerationContext<'g> {
                             wire_name_self_latency(element_wire, self.use_latency);
 
                         self.walk_typ_to_generate_foreach(&element_wire.typ, false, |path, _| {
+                            let path = ForEachPathElement::to_string(path);
                             format!(
                                 "assign {wire_name}[{arr_idx}]{path} = {element_wire_name}{path};\n"
                             )
@@ -548,6 +612,7 @@ impl<'g> CodeGenerationContext<'g> {
         }
         let to_path = format!("{if_stack}{output_name}{path}");
         self.walk_typ_to_generate_foreach(&from_wire.typ, true, |path, _| {
+            let path = ForEachPathElement::to_string(path);
             format!("{to_path}{path} {arrow_str} {from_name}{path};\n")
         });
     }
@@ -653,6 +718,48 @@ impl<'g> CodeGenerationContext<'g> {
                     .md
                     .unwrap_port(PortID::from_hidden_value(1), false, "value");
                 writeln!(self.program_text, "\tassign value = bits;").unwrap();
+            }
+            "transmute_to_bits" => {
+                let [typ] = self.instance.global_ref.template_args.cast_to_array();
+                let typ = typ.unwrap_type();
+
+                let _value_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(0), true, "value");
+                let _bits_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(1), false, "bits");
+
+                self.walk_typ_to_generate_foreach(typ, false, |path, num_bits| {
+                    let path_str = ForEachPathElement::to_string(path);
+                    if path.is_empty() {
+                        format!("assign bits = value{path_str};\n")
+                    } else {
+                        let path_formula = ForEachPathElement::to_bit_index_formula(path);
+                        format!("assign bits[{path_formula} +: {num_bits}] = value{path_str};\n")
+                    }
+                });
+            }
+            "transmute_from_bits" => {
+                let [typ] = self.instance.global_ref.template_args.cast_to_array();
+                let typ = typ.unwrap_type();
+
+                let _bits_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(0), true, "bits");
+                let _value_port = self
+                    .md
+                    .unwrap_port(PortID::from_hidden_value(1), false, "value");
+
+                self.walk_typ_to_generate_foreach(typ, false, |path, num_bits| {
+                    let path_str = ForEachPathElement::to_string(path);
+                    if path.is_empty() {
+                        format!("assign value{path_str} = bits;\n")
+                    } else {
+                        let path_formula = ForEachPathElement::to_bit_index_formula(path);
+                        format!("assign value{path_str} = bits[{path_formula} +: {num_bits}];\n")
+                    }
+                });
             }
             other => {
                 panic!("Unknown Builtin: \"{other}\"! Do not mark modules as __builtin__ yourself!")

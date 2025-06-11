@@ -30,6 +30,25 @@ __builtin__ module BitsToUInt #(int NUM_BITS) {
     interface BitsToUInt : bool[NUM_BITS] bits'0 -> int #(MIN: 0, MAX: pow2 #(E: NUM_BITS) - 1) value'0
 }
 
+__builtin__ module transmute_to_bits #(T) {
+    interface transmute_to_bits : T value'0 -> bool[sizeof #(T)] bits'0
+}
+
+__builtin__ module transmute_from_bits #(T) {
+    interface transmute_from_bits : bool[sizeof #(T)] bits'0 -> T value'0
+}
+
+module transmute #(T1, T2) {
+    interface transmute : T1 a'0 -> T2 b'0
+
+    gen int SIZE = sizeof #(T: type T1)
+    
+    assert #(C: SIZE == sizeof #(T: type T2))
+
+    bool[SIZE] as_bits = transmute_to_bits #(T: type T1)(a)
+    b = transmute_from_bits #(T: type T2)(as_bits)
+}
+
 // For now these builtin declarations must be in this order, because they're constants in the code. 
 // We'll get a better system for this at some point
 

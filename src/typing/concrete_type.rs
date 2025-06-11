@@ -1,10 +1,9 @@
-use ibig::ibig;
-use ibig::ops::Abs;
 use ibig::IBig;
 use ibig::UBig;
 use sus_proc_macro::get_builtin_type;
 
 use crate::instantiation::RealWirePathElem;
+use crate::linker::GlobalUUID;
 use crate::prelude::*;
 use crate::util::all_equal;
 use std::ops::Deref;
@@ -35,15 +34,6 @@ impl ConcreteTemplateArg {
             TemplateKind::Type(t) => t.contains_unknown(),
             TemplateKind::Value(v) => v.is_unknown(),
         }
-    }
-}
-
-impl<ID> ConcreteGlobalReference<ID> {
-    /// Means that the ConcreteGlobalReference contains no Unknowns
-    ///
-    /// If true, then this is a unique ID for a specific instantiated object
-    pub fn is_final(&self) -> bool {
-        !self.template_args.iter().any(|(_, v)| v.contains_unknown())
     }
 }
 
@@ -192,7 +182,7 @@ impl ConcreteType {
         match type_ref.id {
             get_builtin_type!("int") => {
                 let [min, max] = type_ref.template_args.cast_to_int_array();
-                bound_to_bits(min, &(max - 1))
+                get_int_bitwidth(min, max)
             }
             get_builtin_type!("bool") => 1,
             get_builtin_type!("float") => 32,
@@ -221,68 +211,118 @@ impl ConcreteType {
     }
 }
 
-fn bits_negative(value: &IBig) -> u64 {
-    (UBig::try_from(value.abs() - 1).unwrap().bit_len() + 1)
-        .try_into()
-        .unwrap()
-}
+impl ConcreteType {
+    pub fn is_valid(&self) -> bool {
+        match self {
+            ConcreteType::Named(global_ref) => {
+                if !global_ref.find_invalid_template_args().is_empty() {
+                    return false;
+                }
 
-fn bits_positive(value: &IBig) -> u64 {
-    (UBig::try_from(value).unwrap().bit_len() + 1)
-        .try_into()
-        .unwrap()
-}
+                if global_ref.id == get_builtin_type!("int") {
+                    let [min, max] = global_ref.template_args.cast_to_int_array();
+                    if min > max {
+                        return false;
+                    }
+                }
 
-fn bound_to_bits(min: &IBig, max: &IBig) -> u64 {
-    [min, max]
-        .iter()
-        .map(|&num| {
-            if num >= &ibig!(0) {
-                bits_positive(num)
-            } else {
-                bits_negative(num)
+                true
             }
-        })
-        .max()
-        .unwrap()
+            ConcreteType::Array(arr_box) => {
+                let (content, size) = arr_box.deref();
+
+                if size.is_unknown() {
+                    return false;
+                }
+
+                content.is_valid() && size.unwrap_integer() > &IBig::from(0)
+            }
+        }
+    }
+}
+
+impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
+    pub fn find_invalid_template_args(&self) -> Vec<TemplateID> {
+        let mut failures = Vec::new();
+        for (id, arg) in &self.template_args {
+            let is_okay = match arg {
+                TemplateKind::Type(t) => t.is_valid(),
+                TemplateKind::Value(v) => !v.is_unknown(),
+            };
+            if !is_okay {
+                failures.push(id);
+            }
+        }
+        failures
+    }
+
+    pub fn report_if_errors(&self, linker: &Linker, context: &str) -> Result<(), String> {
+        let error_parameters = self.find_invalid_template_args();
+        if !error_parameters.is_empty() {
+            let mut resulting_error = format!("{context} The arguments ");
+            for id in error_parameters {
+                use std::fmt::Write;
+                write!(
+                    resulting_error,
+                    "'{}', ",
+                    &linker.get_link_info(self.id.into()).template_parameters[id].name
+                )
+                .unwrap();
+            }
+
+            resulting_error.pop();
+            resulting_error.pop();
+            resulting_error.push_str(" were not valid");
+
+            Err(resulting_error)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub fn get_int_bitwidth(min: &IBig, max: &IBig) -> u64 {
+    assert!(
+        min <= max,
+        "Integer Min is not less than max! Min: {min}, Max: {max}"
+    );
+    if min < &IBig::from(0) {
+        let min_abs: UBig = UBig::try_from(-min).unwrap() - 1;
+
+        let bits_for_min = min_abs.bit_len();
+
+        let bits_for_max = if max > &IBig::from(0) {
+            let max = UBig::try_from(max).unwrap();
+
+            max.bit_len()
+        } else {
+            0
+        };
+
+        (usize::max(bits_for_min, bits_for_max) + 1) as u64
+    } else {
+        let max = UBig::try_from(max).unwrap();
+
+        max.bit_len() as u64
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn test_bits_negative() {
-        assert_eq!(bits_negative(&ibig!(-1)), 1);
-        assert_eq!(bits_negative(&ibig!(-2)), 2);
-        assert_eq!(bits_negative(&ibig!(-3)), 3);
-        assert_eq!(bits_negative(&ibig!(-4)), 3);
-        assert_eq!(bits_negative(&ibig!(-5)), 4);
-        assert_eq!(bits_negative(&ibig!(-8)), 4);
-        assert_eq!(bits_negative(&ibig!(-9)), 5);
-        assert_eq!(bits_negative(&ibig!(-16)), 5);
-    }
-    #[test]
-    fn test_bits_positive() {
-        assert_eq!(bits_positive(&ibig!(0)), 1);
-        assert_eq!(bits_positive(&ibig!(1)), 2);
-        assert_eq!(bits_positive(&ibig!(2)), 3);
-        assert_eq!(bits_positive(&ibig!(3)), 3);
-        assert_eq!(bits_positive(&ibig!(4)), 4);
-        assert_eq!(bits_positive(&ibig!(7)), 4);
-        assert_eq!(bits_positive(&ibig!(8)), 5);
-        assert_eq!(bits_positive(&ibig!(15)), 5);
-        assert_eq!(bits_positive(&ibig!(16)), 6);
-        assert_eq!(bits_positive(&ibig!(31)), 6);
-    }
+
     #[test]
     fn test_bound_to_bits() {
-        assert_eq!(bound_to_bits(&ibig!(-1), &ibig!(0)), 1);
-        assert_eq!(bound_to_bits(&ibig!(-2), &ibig!(0)), 2);
-        assert_eq!(bound_to_bits(&ibig!(-1), &ibig!(1)), 2);
-        assert_eq!(bound_to_bits(&ibig!(-2), &ibig!(2)), 3);
-        assert_eq!(bound_to_bits(&ibig!(2), &ibig!(8)), 5);
-        assert_eq!(bound_to_bits(&ibig!(-1000), &ibig!(0)), 11);
-        assert_eq!(bound_to_bits(&ibig!(-2000), &ibig!(-1000)), 12);
-        assert_eq!(bound_to_bits(&ibig!(-256), &ibig!(255)), 9);
+        assert_eq!(get_int_bitwidth(&IBig::from(-1), &IBig::from(0)), 1);
+        assert_eq!(get_int_bitwidth(&IBig::from(-2), &IBig::from(0)), 2);
+        assert_eq!(get_int_bitwidth(&IBig::from(-1), &IBig::from(1)), 2);
+        assert_eq!(get_int_bitwidth(&IBig::from(-2), &IBig::from(2)), 3);
+        assert_eq!(get_int_bitwidth(&IBig::from(2), &IBig::from(8)), 4);
+        assert_eq!(get_int_bitwidth(&IBig::from(-1000), &IBig::from(0)), 11);
+        assert_eq!(get_int_bitwidth(&IBig::from(-2000), &IBig::from(-1000)), 12);
+        assert_eq!(get_int_bitwidth(&IBig::from(-256), &IBig::from(255)), 9);
+        assert_eq!(get_int_bitwidth(&IBig::from(0), &IBig::from(255)), 8);
+        assert_eq!(get_int_bitwidth(&IBig::from(20), &IBig::from(256)), 9);
+        assert_eq!(get_int_bitwidth(&IBig::from(0), &IBig::from(0)), 0);
     }
 }

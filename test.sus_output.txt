@@ -4,6 +4,9 @@ Flattening IntToBits
 Flattening BitsToInt
 Flattening UIntToBits
 Flattening BitsToUInt
+Flattening transmute_to_bits
+Flattening transmute_from_bits
+Flattening transmute
 Flattening bool
 Flattening int
 Flattening float
@@ -163,6 +166,8 @@ Flattening testInts
 Flattening use_FIFO
 Flattening write_to_generative_through_when
 Flattening SameNameAsType
+Flattening InstantiateTransmutes
+Flattening StraightTransmute
 Typechecking LatencyOffset
 Report Type Errors LatencyOffset
 Typechecking CrossDomain
@@ -175,6 +180,12 @@ Typechecking UIntToBits
 Report Type Errors UIntToBits
 Typechecking BitsToUInt
 Report Type Errors BitsToUInt
+Typechecking transmute_to_bits
+Report Type Errors transmute_to_bits
+Typechecking transmute_from_bits
+Report Type Errors transmute_from_bits
+Typechecking transmute
+Report Type Errors transmute
 Typechecking DualPortMem
 Report Type Errors DualPortMem
 Typechecking FIFO
@@ -461,6 +472,10 @@ Typechecking write_to_generative_through_when
 Report Type Errors write_to_generative_through_when
 Typechecking SameNameAsType
 Report Type Errors SameNameAsType
+Typechecking InstantiateTransmutes
+Report Type Errors InstantiateTransmutes
+Typechecking StraightTransmute
+Report Type Errors StraightTransmute
 Typechecking bool
 Report Type Errors bool
 Typechecking int
@@ -499,6 +514,9 @@ Domain Check IntToBits
 Domain Check BitsToInt
 Domain Check UIntToBits
 Domain Check BitsToUInt
+Domain Check transmute_to_bits
+Domain Check transmute_from_bits
+Domain Check transmute
 Domain Check DualPortMem
 Domain Check FIFO
 Domain Check JoinDomains
@@ -642,6 +660,8 @@ Domain Check testInts
 Domain Check use_FIFO
 Domain Check write_to_generative_through_when
 Domain Check SameNameAsType
+Domain Check InstantiateTransmutes
+Domain Check StraightTransmute
 Domain Check bool
 Domain Check int
 Domain Check float
@@ -664,6 +684,9 @@ Lints IntToBits
 Lints BitsToInt
 Lints UIntToBits
 Lints BitsToUInt
+Lints transmute_to_bits
+Lints transmute_from_bits
+Lints transmute
 Lints DualPortMem
 Lints FIFO
 Lints JoinDomains
@@ -807,6 +830,8 @@ Lints testInts
 Lints use_FIFO
 Lints write_to_generative_through_when
 Lints SameNameAsType
+Lints InstantiateTransmutes
+Lints StraightTransmute
 Lints bool
 Lints int
 Lints float
@@ -1134,3 +1159,19 @@ Checking array accesses LatencyOffset #(T: type bool, OFFSET: -4)
 Checking array accesses FIFO #(T: type int #(MIN: 3, MAX: 3), DEPTH: 53, READY_SLACK: 3)
 Checking array accesses use_FIFO
 Not Instantiating write_to_generative_through_when due to flattening errors
+Instantiating InstantiateTransmutes
+Concrete Typechecking InstantiateTransmutes
+Instantiating transmute_to_bits #(T: type bool[60])
+Concrete Typechecking transmute_to_bits #(T: type bool[60])
+Checking array accesses transmute_to_bits #(T: type bool[60])
+Instantiating StraightTransmute
+Concrete Typechecking StraightTransmute
+Instantiating transmute #(T1: type int #(MIN: 0, MAX: 255)[2], T2: type int #(MIN: 0, MAX: 65535))
+Concrete Typechecking transmute #(T1: type int #(MIN: 0, MAX: 255)[2], T2: type int #(MIN: 0, MAX: 65535))
+Instantiating transmute_to_bits #(T: type int #(MIN: 0, MAX: 255)[2])
+Concrete Typechecking transmute_to_bits #(T: type int #(MIN: 0, MAX: 255)[2])
+Checking array accesses transmute_to_bits #(T: type int #(MIN: 0, MAX: 255)[2])
+Instantiating transmute_from_bits #(T: type int #(MIN: 0, MAX: 65535))
+Concrete Typechecking transmute_from_bits #(T: type int #(MIN: 0, MAX: 65535))
+Checking array accesses transmute_from_bits #(T: type int #(MIN: 0, MAX: 65535))
+Checking array accesses transmute #(T1: type int #(MIN: 0, MAX: 255)[2], T2: type int #(MIN: 0, MAX: 65535))

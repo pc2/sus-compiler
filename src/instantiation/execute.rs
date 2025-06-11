@@ -613,25 +613,12 @@ impl<'l> ExecutionContext<'l> {
         let linker_cst = &self.linker.constants[cst_ref.id];
         let concrete_ref = self.execute_global_ref(cst_ref)?;
 
-        if !concrete_ref.is_final() {
-            let mut resulting_error = String::from("For executing compile-time constants, all arguments must be fully specified. In this case, the arguments ");
-            for (id, arg) in &concrete_ref.template_args {
-                if arg.contains_unknown() {
-                    use std::fmt::Write;
-                    write!(
-                        resulting_error,
-                        "'{}', ",
-                        &linker_cst.link_info.template_parameters[id].name
-                    )
-                    .unwrap();
-                }
-            }
-            resulting_error.pop();
-            resulting_error.pop();
-            resulting_error.push_str(" were not specified");
-
-            return Err((cst_ref.get_total_span(), resulting_error));
-        }
+        concrete_ref
+            .report_if_errors(
+                self.linker,
+                "For executing compile-time constants, all arguments must be fully specified.",
+            )
+            .map_err(|e| (cst_ref.get_total_span(), e))?;
 
         if linker_cst.link_info.is_extern == IsExtern::Builtin {
             cst_ref.get_total_span().debug();

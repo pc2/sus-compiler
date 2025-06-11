@@ -428,6 +428,14 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         w.typ.display(&self.linker.types, true)
                     ),
                 );
+            } else if !w.typ.is_valid() {
+                self.errors.error(
+                    w.get_span(self.link_info),
+                    format!(
+                        "The type of this wire is invalid! {}",
+                        w.typ.display(&self.linker.types, true)
+                    ),
+                );
             }
             match &mut w.source {
                 RealWireDataSource::UnaryOp { rank, .. }
@@ -444,8 +452,13 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
         for (_, sm) in &mut self.submodules {
             if !sm.refers_to.template_args.fully_substitute(substitutor) {
                 self.errors.error(sm.get_span(self.link_info), format!("Could not infer the parameters of this submodule, some parameters were still unknown: {}", 
-                sm.refers_to.display(self.linker, true)
-            ));
+                    sm.refers_to.display(self.linker, true)
+                ));
+            } else if let Err(reason) = sm.refers_to.report_if_errors(
+                self.linker,
+                "Invalid arguments found in a submodule's template arguments.",
+            ) {
+                self.errors.error(sm.get_span(self.link_info), reason);
             }
             if let Some(instance) = sm.instance.get() {
                 for (_port_id, concrete_port, connecting_wire) in

@@ -4,7 +4,6 @@
 
 
 module TEST {
-	action x : int a {
-        
-    }
+    bool[42] x = transmute_to_bits([2,9,5,3,58,9])
+    int y = transmute_from_bits #(T: type int #(MIN:10, MAX: 2000000000000))(x)
 }
