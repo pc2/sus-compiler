@@ -12525,3 +12525,20 @@ Error: Cannot write to compiletime variable through runtime 'when' blocks
       │        ┬  
       │        ╰── Cannot write to compiletime variable through runtime 'when' blocks
 ──────╯
+Error: This declaration conflicts with a previous declaration in the same scope
+      ╭─[ test.sus:1390:13 ]
+      │
+ 1389 │ module SameNameAsType #(NUM_INPUTS) {
+      │                         ─────┬────  
+      │                              ╰────── Parameter 'NUM_INPUTS' declared here
+ 1390 │     gen int NUM_INPUTS = 500
+      │             ─────┬────  
+      │                  ╰────── This declaration conflicts with a previous declaration in the same scope
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1390:13 ]
+      │
+ 1390 │     gen int NUM_INPUTS = 500
+      │             ─────┬────  
+      │                  ╰────── Unused Variable: This variable does not affect the output ports of this module
+──────╯

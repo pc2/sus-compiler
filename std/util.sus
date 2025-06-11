@@ -149,12 +149,33 @@ module Abs #(int MAX) {
 	}
 }
 
-// Temporary, to be replaced with slice syntax : result = vals[FROM +: OUT_SIZE]
+/// Temporary, to be replaced with slice syntax : result = vals[FROM +: OUT_SIZE]
 module Slice #(T, int SIZE, int OUT_SIZE, int FROM) {
 	interface Slice : T[SIZE] vals -> T[OUT_SIZE] result
 
 	for int I in 0..OUT_SIZE {
 		result[I] = vals[I + FROM]
+	}
+}
+
+/// Concatenate two arrays, such that the elements of b come after the elements of a
+module Concat #(T, int SIZE_A, int SIZE_B) {
+	interface Concat : T[SIZE_A] a, T[SIZE_B] b -> T[SIZE_A + SIZE_B] result
+
+	for int I in 0..SIZE_A {
+		result[I] = a[I]
+	}
+	for int I in 0..SIZE_B {
+		result[I + SIZE_A] = b[I]
+	}
+}
+
+/// Concatenate two arrays, such that the elements of b come after the elements of a
+module Repeat #(T, int SIZE) {
+	interface Repeat : T v -> T[SIZE] result
+
+	for int I in 0..SIZE {
+		result[I] = v
 	}
 }
 

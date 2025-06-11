@@ -27,6 +27,8 @@ Flattening SlowClockGenerator
 Flattening SplitAt
 Flattening Abs
 Flattening Slice
+Flattening Concat
+Flattening Repeat
 Flattening BitSelect
 Flattening PopCount
 Flattening TreeAdd
@@ -160,6 +162,7 @@ Flattening use_ranks
 Flattening testInts
 Flattening use_FIFO
 Flattening write_to_generative_through_when
+Flattening SameNameAsType
 Typechecking LatencyOffset
 Report Type Errors LatencyOffset
 Typechecking CrossDomain
@@ -190,6 +193,10 @@ Typechecking Abs
 Report Type Errors Abs
 Typechecking Slice
 Report Type Errors Slice
+Typechecking Concat
+Report Type Errors Concat
+Typechecking Repeat
+Report Type Errors Repeat
 Typechecking BitSelect
 Report Type Errors BitSelect
 Typechecking PopCount
@@ -452,6 +459,8 @@ Typechecking use_FIFO
 Report Type Errors use_FIFO
 Typechecking write_to_generative_through_when
 Report Type Errors write_to_generative_through_when
+Typechecking SameNameAsType
+Report Type Errors SameNameAsType
 Typechecking bool
 Report Type Errors bool
 Typechecking int
@@ -499,6 +508,8 @@ Domain Check SlowClockGenerator
 Domain Check SplitAt
 Domain Check Abs
 Domain Check Slice
+Domain Check Concat
+Domain Check Repeat
 Domain Check BitSelect
 Domain Check PopCount
 Domain Check TreeAdd
@@ -630,6 +641,7 @@ Domain Check use_ranks
 Domain Check testInts
 Domain Check use_FIFO
 Domain Check write_to_generative_through_when
+Domain Check SameNameAsType
 Domain Check bool
 Domain Check int
 Domain Check float
@@ -661,6 +673,8 @@ Lints SlowClockGenerator
 Lints SplitAt
 Lints Abs
 Lints Slice
+Lints Concat
+Lints Repeat
 Lints BitSelect
 Lints PopCount
 Lints TreeAdd
@@ -792,6 +806,7 @@ Lints use_ranks
 Lints testInts
 Lints use_FIFO
 Lints write_to_generative_through_when
+Lints SameNameAsType
 Lints bool
 Lints int
 Lints float
