@@ -67,9 +67,15 @@ pub trait CodeGenBackend {
     }
 
     fn codegen_to_file(&self, id: ModuleUUID, md: &Module, linker: &Linker) {
-        let mut out_file = self.make_output_file(&md.link_info.name);
-        for (_global_ref, inst) in linker.instantiator.borrow().iter_for_module(id) {
-            self.codegen_instance(inst.as_ref(), md, linker, &mut out_file)
+        let instantiatior_borrow = linker.instantiator.borrow();
+        if instantiatior_borrow
+            .iter_for_module(id)
+            .any(|(_, inst)| !inst.errors.did_error)
+        {
+            let mut out_file = self.make_output_file(&md.link_info.name);
+            for (_global_ref, inst) in instantiatior_borrow.iter_for_module(id) {
+                self.codegen_instance(inst.as_ref(), md, linker, &mut out_file)
+            }
         }
     }
 

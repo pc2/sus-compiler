@@ -229,54 +229,65 @@ impl<'g> CodeGenerationContext<'g> {
         }
     }
 
-    fn write_assign_wires_to_wires(
+    /// Generates code to walk arrays (and in the future structs)
+    ///
+    /// `int[3][7] a`
+    ///
+    /// ```Verilog
+    /// generate
+    /// for(_g0 = 0; _g0 < 7; _g0 = _g0 + 1) begin
+    /// for(_g1 = 0; _g1 < 3; _g1 = _g1 + 1) begin
+    /// a[_g0][_g1] = ...
+    /// end
+    /// end
+    /// endgenerate
+    /// ```
+    fn walk_typ_to_generate_foreach(
         &mut self,
-        to_wire_and_path: &str,
-        arrow_str: &'static str,
-        from_wire_and_path: &str,
-        mut typ: &ConcreteType,
-        // Generation rules are different outside and inside always blocks.
+        typ: &ConcreteType,
         in_always: bool,
+        mut operation: impl FnMut(&str, &ConcreteType) -> String,
     ) {
-        let for_should_declare_var = if in_always { "int " } else { "" };
-        let mut for_stack = String::new();
-        let mut array_accesses_stack = String::new();
-        let mut idx = 0;
-        while let ConcreteType::Array(arr_box) = typ {
-            let var_name = if in_always {
-                format!("_v{idx}")
-            } else {
-                format!("_g{idx}")
-            };
-            idx += 1;
-            let (new_typ, sz) = arr_box.deref();
-            typ = new_typ;
-            let sz = sz.unwrap_integer();
-            write!(
-                for_stack,
-                "for({for_should_declare_var}{var_name} = 0; {var_name} < {sz}; {var_name} = {var_name} + 1) "
-            )
-            .unwrap();
-            write!(array_accesses_stack, "[{var_name}]").unwrap();
+        fn walk_type_to_generate_foreach_recurse(
+            typ: &ConcreteType,
+            in_always: bool,
+            path: &str,
+            var_idx: usize,
+            operation: &mut impl FnMut(&str, &ConcreteType) -> String,
+        ) -> String {
+            let for_should_declare_var = if in_always { "int " } else { "" };
+            match typ {
+                ConcreteType::Array(arr_box) => {
+                    let var_name = if in_always {
+                        format!("_v{var_idx}")
+                    } else {
+                        format!("_g{var_idx}")
+                    };
+                    let new_path = format!("{path}[{var_name}]");
+                    let (new_typ, sz) = arr_box.deref();
+                    let sz = sz.unwrap_integer();
+                    let content_str = walk_type_to_generate_foreach_recurse(
+                        new_typ,
+                        in_always,
+                        &new_path,
+                        var_idx + 1,
+                        operation,
+                    );
+
+                    format!(
+                        "for({for_should_declare_var}{var_name} = 0; {var_name} < {sz}; {var_name} = {var_name} + 1) begin\n{content_str}\tend\n"
+                    )
+                }
+                typ => operation(path, typ),
+            }
         }
-        if idx == 0 {
-            writeln!(
-                self.program_text,
-                "{to_wire_and_path} {arrow_str} {from_wire_and_path};"
-            )
-            .unwrap();
-        } else if in_always {
-            writeln!(
-                self.program_text,
-                "{for_stack}{to_wire_and_path}{array_accesses_stack} {arrow_str} {from_wire_and_path}{array_accesses_stack};"
-            )
-            .unwrap();
+
+        let content = walk_type_to_generate_foreach_recurse(typ, in_always, "", 0, &mut operation);
+
+        if in_always {
+            self.program_text.write_str(&content).unwrap();
         } else {
-            writeln!(
-                self.program_text,
-                "generate {for_stack}{to_wire_and_path}{array_accesses_stack} {arrow_str} {from_wire_and_path}{array_accesses_stack}; endgenerate"
-            )
-            .unwrap();
+            write!(self.program_text, "generate\n{content}\nendgenerate;").unwrap()
         }
     }
 
@@ -327,13 +338,10 @@ impl<'g> CodeGenerationContext<'g> {
 
                     if let ConcreteType::Array(_) = &w.typ {
                         writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
-                        self.write_assign_wires_to_wires(
-                            &format!("assign {}", w.name),
-                            "=",
-                            &from_string,
-                            &w.typ,
-                            false,
-                        );
+
+                        self.walk_typ_to_generate_foreach(&w.typ, false, |path, _| {
+                            format!("assign {}{path} = {from_string}{path};\n", &w.name)
+                        });
                     } else {
                         writeln!(
                             self.program_text,
@@ -355,7 +363,7 @@ impl<'g> CodeGenerationContext<'g> {
 
                     writeln!(
                         self.program_text,
-                        "{wire_name}{path} = {}{}{path};",
+                        "assign {wire_name}{path} = {}{}{path};",
                         op.op_text(),
                         self.wire_name(right_wire, w.absolute_latency)
                     )
@@ -394,7 +402,7 @@ impl<'g> CodeGenerationContext<'g> {
 
                     writeln!(
                         self.program_text,
-                        "{wire_name}{path} = {}{path} {} {}{path};",
+                        "assign {wire_name}{path} = {}{path} {} {}{path};",
                         self.wire_name(left_wire, w.absolute_latency),
                         op.op_text(),
                         self.wire_name(right_wire, w.absolute_latency)
@@ -422,13 +430,11 @@ impl<'g> CodeGenerationContext<'g> {
                         let element_wire_name =
                             wire_name_self_latency(element_wire, self.use_latency);
 
-                        self.write_assign_wires_to_wires(
-                            &format!("assign {}[{arr_idx}]", wire_name),
-                            "=",
-                            &element_wire_name,
-                            &element_wire.typ,
-                            false,
-                        );
+                        self.walk_typ_to_generate_foreach(&element_wire.typ, false, |path, _| {
+                            format!(
+                                "assign {wire_name}[{arr_idx}]{path} = {element_wire_name}{path};\n"
+                            )
+                        });
                     }
                 }
                 RealWireDataSource::Multiplexer {
@@ -536,7 +542,9 @@ impl<'g> CodeGenerationContext<'g> {
             write!(if_stack, "if({invert}{cond_name}) ").unwrap();
         }
         let to_path = format!("{if_stack}{output_name}{path}");
-        self.write_assign_wires_to_wires(&to_path, arrow_str, &from_name, &from_wire.typ, true);
+        self.walk_typ_to_generate_foreach(&from_wire.typ, true, |path, _| {
+            format!("{to_path}{path} {arrow_str} {from_name}{path};\n")
+        });
     }
 
     fn write_multiplexers(&mut self) {
