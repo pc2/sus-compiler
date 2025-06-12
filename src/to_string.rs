@@ -8,65 +8,34 @@ use crate::typing::set_unifier::Unifyable;
 use crate::typing::template::{Parameter, TVec, TemplateKind};
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
-use crate::flattening::{
-    DomainInfo, Interface, InterfaceToDomainMap, Module, StructType, WrittenType,
-};
+use crate::flattening::{DomainInfo, Interface, InterfaceToDomainMap, Module, WrittenType};
 use crate::linker::{FileData, GlobalUUID, LinkInfo};
 use crate::typing::{abstract_type::AbstractRankedType, concrete_type::ConcreteType};
 
-use std::{
-    fmt::{Display, Formatter},
-    ops::Index,
-};
+use std::fmt::{Display, Formatter};
 
 use std::fmt::Write;
 use std::ops::Deref;
 
-/// For [Display::fmt] implementations on types: [ConcreteType], [WrittenType], [AbstractType]
-pub trait TemplateNameGetter {
-    fn get_template_name(&self, id: TemplateID) -> &str;
-}
-
-impl TemplateNameGetter for FlatAlloc<String, TemplateIDMarker> {
-    fn get_template_name(&self, id: TemplateID) -> &str {
-        &self[id]
-    }
-}
-impl TemplateNameGetter for TVec<Parameter> {
-    fn get_template_name(&self, id: TemplateID) -> &str {
-        &self[id].name
-    }
-}
-
-pub struct WrittenTypeDisplay<
-    'a,
-    TypVec: Index<TypeUUID, Output = StructType>,
-    TemplateVec: TemplateNameGetter,
-> {
+pub struct WrittenTypeDisplay<'a> {
     inner: &'a WrittenType,
-    linker_types: &'a TypVec,
-    template_names: &'a TemplateVec,
+    linker: &'a Linker,
+    template_names: &'a TVec<Parameter>,
 }
 
-impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
-    for WrittenTypeDisplay<'_, TypVec, TemplateVec>
-{
+impl Display for WrittenTypeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner {
             WrittenType::Error(_) => f.write_str("{error}"),
-            WrittenType::TemplateVariable(_, id) => {
-                f.write_str(self.template_names.get_template_name(*id))
-            }
+            WrittenType::TemplateVariable(_, id) => f.write_str(&self.template_names[*id].name),
             WrittenType::Named(named_type) => {
-                f.write_str(&self.linker_types[named_type.id].link_info.get_full_name())
+                f.write_str(&self.linker.types[named_type.id].link_info.get_full_name())
             }
             WrittenType::Array(_, sub) => {
                 write!(
                     f,
                     "{}[]",
-                    sub.deref()
-                        .0
-                        .display(self.linker_types, self.template_names)
+                    sub.deref().0.display(self.linker, self.template_names)
                 )
             }
         }
@@ -76,34 +45,30 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
 impl WrittenType {
     pub fn display<'a>(
         &'a self,
-        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
-        template_names: &'a impl TemplateNameGetter,
+        linker: &'a Linker,
+        template_names: &'a TVec<Parameter>,
     ) -> impl Display + 'a {
         WrittenTypeDisplay {
             inner: self,
-            linker_types,
+            linker,
             template_names,
         }
     }
 }
 
-pub struct AbstractRankedTypeDisplay<'a, TypVec, TemplateVec: TemplateNameGetter> {
+pub struct AbstractRankedTypeDisplay<'a> {
     typ: &'a AbstractRankedType,
-    linker_types: &'a TypVec,
-    template_names: &'a TemplateVec,
+    linker: &'a Linker,
+    template_names: &'a TVec<Parameter>,
 }
 
-impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGetter> Display
-    for AbstractRankedTypeDisplay<'_, TypVec, TemplateVec>
-{
+impl Display for AbstractRankedTypeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.typ.inner {
             AbstractInnerType::Unknown(_) => write!(f, "?"),
-            AbstractInnerType::Template(id) => {
-                f.write_str(self.template_names.get_template_name(*id))
-            }
+            AbstractInnerType::Template(id) => f.write_str(&self.template_names[*id].name),
             AbstractInnerType::Named(id) => {
-                f.write_str(&self.linker_types[*id].link_info.get_full_name())
+                f.write_str(&self.linker.types[*id].link_info.get_full_name())
             }
         }
         .and_then(|_| f.write_fmt(format_args!("{}", &self.typ.rank)))
@@ -113,12 +78,12 @@ impl<TypVec: Index<TypeUUID, Output = StructType>, TemplateVec: TemplateNameGett
 impl AbstractRankedType {
     pub fn display<'a>(
         &'a self,
-        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
-        template_names: &'a impl TemplateNameGetter,
+        linker: &'a Linker,
+        template_names: &'a TVec<Parameter>,
     ) -> impl Display + 'a {
         AbstractRankedTypeDisplay {
             typ: self,
-            linker_types,
+            linker,
             template_names,
         }
     }

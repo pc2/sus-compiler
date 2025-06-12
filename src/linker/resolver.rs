@@ -46,7 +46,7 @@ struct LinkingErrorLocation {
 /// This struct encapsulates the concept of name resolution. It reports name-not-found errors,
 /// and remembers all of the requested globals in preparation for #49
 pub struct GlobalResolver<'linker> {
-    linker: &'linker Linker,
+    pub linker: &'linker Linker,
     resolved_globals: RefCell<ResolvedGlobals>,
 }
 

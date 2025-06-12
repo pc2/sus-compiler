@@ -63,10 +63,10 @@ pub fn typecheck_all_modules(linker: &mut Linker, global_ids: &[GlobalUUID]) {
                 let _ = expected.fully_substitute(&finalize_ctx.type_checker);
 
                 let expected_name = expected
-                    .display(globals.globals, &link_info.template_parameters)
+                    .display(globals.globals.linker, &link_info.template_parameters)
                     .to_string();
                 let found_name = found
-                    .display(globals.globals, &link_info.template_parameters)
+                    .display(globals.globals.linker, &link_info.template_parameters)
                     .to_string();
                 errors
                 .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
@@ -85,7 +85,7 @@ pub fn typecheck_all_modules(linker: &mut Linker, global_ids: &[GlobalUUID]) {
                     span,
                     format!(
                         "Could not fully figure out the type of this object. {}",
-                        typ.display(globals.globals, &link_info.template_parameters)
+                        typ.display(globals.globals.linker, &link_info.template_parameters)
                     ),
                 );
             }
