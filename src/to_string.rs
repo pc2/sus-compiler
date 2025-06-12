@@ -70,6 +70,14 @@ impl Display for AbstractRankedTypeDisplay<'_> {
             AbstractInnerType::Named(id) => {
                 f.write_str(&self.linker.types[*id].link_info.get_full_name())
             }
+            AbstractInnerType::Interface(md_id, interface_id) => {
+                let md = &self.linker.modules[*md_id];
+                f.write_fmt(format_args!(
+                    "Interface {} of {}",
+                    md.interfaces[*interface_id].name,
+                    md.link_info.get_full_name()
+                ))
+            }
         }
         .and_then(|_| f.write_fmt(format_args!("{}", &self.typ.rank)))
     }

@@ -23,6 +23,7 @@ use super::type_inference::{InnerTypeVariableID, PeanoVariableID};
 pub enum AbstractInnerType {
     Template(TemplateID),
     Named(TypeUUID),
+    Interface(ModuleUUID, InterfaceID),
     /// Referencing [AbstractType::Unknown] is a strong code smell.
     /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
     ///

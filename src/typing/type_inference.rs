@@ -308,6 +308,7 @@ pub trait HindleyMilner: Sized + Clone {
 pub enum AbstractTypeHMInfo {
     Template(TemplateID),
     Named(TypeUUID),
+    Interface(ModuleUUID, InterfaceID),
 }
 
 impl HindleyMilner for AbstractInnerType {
@@ -322,6 +323,9 @@ impl HindleyMilner for AbstractInnerType {
             }
             AbstractInnerType::Named(named_id) => {
                 HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Named(*named_id))
+            }
+            AbstractInnerType::Interface(md_id, interface_id) => {
+                HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Interface(*md_id, *interface_id))
             }
         }
     }
@@ -346,7 +350,9 @@ impl HindleyMilner for AbstractInnerType {
 
     fn for_each_unknown(&self, f: &mut impl FnMut(InnerTypeVariableID)) {
         match self {
-            AbstractInnerType::Template(_) | AbstractInnerType::Named(_) => {}
+            AbstractInnerType::Template(_)
+            | AbstractInnerType::Named(_)
+            | AbstractInnerType::Interface(_, _) => {}
             AbstractInnerType::Unknown(uuid) => f(*uuid),
         }
     }
@@ -511,7 +517,9 @@ impl PeanoType {
 impl AbstractRankedType {
     pub fn fully_substitute(&mut self, substitutor: &AbstractTypeSubstitutor) -> bool {
         let inner_success = match &mut self.inner {
-            AbstractInnerType::Named(_) | AbstractInnerType::Template(_) => true, // Template Name & Name is included in get_hm_info
+            AbstractInnerType::Named(_)
+            | AbstractInnerType::Template(_)
+            | AbstractInnerType::Interface(_, _) => true, // Template Name & Name is included in get_hm_info
             AbstractInnerType::Unknown(var) => {
                 if let Some(replacement) = substitutor.inner_substitutor[*var].get() {
                     assert!(!std::ptr::eq(&self.inner, replacement));

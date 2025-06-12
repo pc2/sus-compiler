@@ -399,6 +399,7 @@ fn concretize_type_recurse(
             AbstractInnerType::Unknown(_) => {
                 unreachable!("Should have been resolved already!")
             }
+            AbstractInnerType::Interface(_, _) => unreachable!("Cannot concretize an interface type. Only proper wire types are concretizeable! Should have been caught by typecheck!")
         },
         PeanoType::Succ(one_down) => {
             let (new_wr_typ, size) = match wr_typ {
