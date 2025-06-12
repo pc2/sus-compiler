@@ -19,8 +19,8 @@ impl<'l> ModuleTypingContext<'l> {
                 wire.get_span(self.link_info),
                 format!(
                     "Typecheck error: Found {}, which is not a subtype of the expected type {}",
-                    wire.typ.display(&self.linker.types, true),
-                    expected.display(&self.linker.types, true)
+                    wire.typ.display(self.linker, true),
+                    expected.display(self.linker, true)
                 ),
             )
         })
@@ -68,7 +68,7 @@ impl<'l> ModuleTypingContext<'l> {
                                     write_to.to_span,
                                     format!(
                                         "Writing to this, which has type {}",
-                                        target_typ.display(&self.linker.types, true)
+                                        target_typ.display(self.linker, true)
                                     ),
                                 );
                             }

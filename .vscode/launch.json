@@ -5,6 +5,23 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Debug (GBD) tinyTestFile.sus in 'sus_compiler'",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/target/debug/sus_compiler",
+            "preLaunchTask": "Build for Debugging",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/home/lennart/tools/gdb/gdb",
+            "args": [
+                "--debug-whitelist", "TEST",
+                "--debug", "TEST", // Temporary to add in code when debugging
+                "tinyTestFile.sus",
+            ],
+            "cwd": "${workspaceFolder}",
+            // For those venturing into this file: setting up breakpoints (rust_panic and __rust_start_panic)
+            // with "setupCommands" does not work. You've got to add them manually to the list of breakpoints
+        },
+        {
             "type": "lldb",
             "request": "launch",
             "name": "Debug tinyTestFile.sus in 'sus_compiler'",
@@ -21,8 +38,6 @@
             },
             "sourceLanguages": ["rust"],
             "args": [
-                //"--debug", "dot-latency-problem",
-                //"--debug", "dot-latency-infer",
                 "--debug-whitelist", "TEST",
                 "--debug", "TEST", // Temporary to add in code when debugging
                 "tinyTestFile.sus",

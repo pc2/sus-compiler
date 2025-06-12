@@ -17,6 +17,15 @@ fn main() {
         "cargo:rustc-env=SUS_COMPILER_STD_LIB_PATH={}",
         install_dir.display()
     );
+
+    // note: add error checking yourself.
+    let output = std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .unwrap();
+    let git_hash = String::from_utf8(output.stdout).unwrap();
+    println!("cargo:rustc-env=GIT_HASH={}", git_hash);
+    println!("cargo:rustc-env=BUILD_DATE={}", chrono::Local::now());
 }
 
 fn get_sus_dir() -> PathBuf {

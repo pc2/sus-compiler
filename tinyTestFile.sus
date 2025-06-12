@@ -1,3 +1,9 @@
 // USE THIS FILE TO TEST SMALL SAMPLES OF SUS CODE IN ISOLATION. 
 // DO NOT COMMIT
 // To use with VSCode debugger, name the module "TEST", and in the code use `if crate::debug::is_enabled("TEST") {}` to enable breakpoint code
+
+
+module TEST {
+    bool[42] x = transmute_to_bits([2,9,5,3,58,9])
+    int y = transmute_from_bits #(T: type int #(MIN:10, MAX: 2000000000000))(x)
+}

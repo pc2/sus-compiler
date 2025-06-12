@@ -1,22 +1,16 @@
 use sus_proc_macro::{field, kind, kw};
 
 use crate::errors::ErrorStore;
-use crate::linker::{IsExtern, AFTER_INITIAL_PARSE_CP};
+use crate::linker::IsExtern;
 use crate::prelude::*;
 
 use crate::flattening::Module;
 use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
 
-use crate::typing::template::{
-    GenerativeParameterKind, Parameter, TVec, TemplateKind, TypeParameterKind,
-};
-
 use super::parser::Cursor;
 use super::*;
 
 struct InitializationContext<'linker> {
-    parameters: TVec<Parameter>,
-
     // module-only stuff
     ports: FlatAlloc<Port, PortIDMarker>,
     interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
@@ -37,39 +31,7 @@ impl InitializationContext<'_> {
             name: "clk".to_string(),
             name_span: None,
         });
-        if cursor.optional_field(field!("template_declaration_arguments")) {
-            cursor.list(kind!("template_declaration_arguments"), |cursor| {
-                let (kind, decl_span) = cursor.kind_span();
-                match kind {
-                    kind!("template_declaration_type") => cursor.go_down_no_check(|cursor| {
-                        let (name_span, name) =
-                            cursor.field_to_string(field!("name"), kind!("identifier"));
-                        self.parameters.alloc(Parameter {
-                            name,
-                            name_span,
-                            kind: TemplateKind::Type(TypeParameterKind {}),
-                        });
-                    }),
-                    kind!("declaration") => cursor.go_down_no_check(|cursor| {
-                        let _ = cursor.optional_field(field!("io_port_modifiers"));
-                        let _ = cursor.optional_field(field!("declaration_modifiers"));
-                        cursor.field(field!("type"));
-                        let (name_span, name) =
-                            cursor.field_to_string(field!("name"), kind!("identifier"));
-
-                        self.parameters.alloc(Parameter {
-                            name,
-                            name_span,
-                            kind: TemplateKind::Value(GenerativeParameterKind {
-                                decl_span,
-                                declaration_instruction: FlatID::PLACEHOLDER,
-                            }),
-                        });
-                    }),
-                    _other => cursor.could_not_match(),
-                }
-            });
-        }
+        let _ = cursor.optional_field(field!("template_declaration_arguments"));
 
         cursor.field(field!("block"));
         self.gather_all_ports_in_block(cursor);
@@ -81,8 +43,8 @@ impl InitializationContext<'_> {
         cursor.go_down_no_check(|cursor| {
             cursor.field(field!("statement_type"));
             cursor.field(field!("condition"));
-            cursor.field(field!("then_block"));
-            self.gather_all_ports_in_block_and_else_block(cursor);
+            let _ = cursor.optional_field(field!("conditional_bindings"));
+            self.gather_all_ports_in_then_and_else_block(cursor);
         })
     }
 
@@ -95,14 +57,7 @@ impl InitializationContext<'_> {
                 if cursor.kind() == kind!("declaration") {
                     let whole_decl_span = cursor.span();
                     cursor.go_down_no_check(|cursor| {
-                        let is_input = cursor.optional_field(field!("io_port_modifiers")).then(
-                            || match cursor.kind() {
-                                kw!("input") => true,
-                                kw!("output") => false,
-                                _ => cursor.could_not_match(),
-                            },
-                        );
-                        self.finish_gather_decl(is_input, whole_decl_span, cursor);
+                        self.gather_decl(None, whole_decl_span, cursor);
                     });
                 }
             });
@@ -136,7 +91,25 @@ impl InitializationContext<'_> {
                     cursor.go_down_no_check(|cursor| {
                         let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
 
-                        self.gather_func_call_ports(name_span, name, cursor);
+                        self.gather_func_call_ports(name_span, name, InterfaceKind::RegularInterface, cursor);
+                    });
+                }
+                kind!("action_trigger_statement") => {
+                    cursor.go_down_no_check(|cursor| {
+                        let is_local = cursor.optional_field(field!("local"));
+                        cursor.field(field!("interface_kind"));
+                        let interface_kind = match cursor.kind() {
+                            kw!("action") => if is_local {InterfaceKind::LocalAction} else {InterfaceKind::Action},
+                            kw!("trigger") => InterfaceKind::Trigger,
+                            _ => unreachable!()
+                        };
+
+                        let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
+                        let _ = cursor.optional_field(field!("latency_specifier"));
+
+                        self.gather_func_call_ports(name_span, name, interface_kind, cursor);
+
+                        self.gather_all_ports_in_then_and_else_block(cursor);
                     });
                 }
                 kind!("block") => {
@@ -166,7 +139,8 @@ impl InitializationContext<'_> {
         });
     }
 
-    fn gather_all_ports_in_block_and_else_block(&mut self, cursor: &mut Cursor) {
+    fn gather_all_ports_in_then_and_else_block(&mut self, cursor: &mut Cursor) {
+        cursor.field(field!("then_block"));
         self.gather_all_ports_in_block(cursor);
         if cursor.optional_field(field!("else_block")) {
             cursor.go_down_no_check(|cursor| {
@@ -188,6 +162,7 @@ impl InitializationContext<'_> {
         &mut self,
         interface_name_span: Span,
         name: String,
+        interface_kind: InterfaceKind,
         cursor: &mut Cursor,
     ) {
         let ports = if cursor.optional_field(field!("interface_ports")) {
@@ -216,6 +191,7 @@ impl InitializationContext<'_> {
         self.interfaces.alloc(Interface {
             func_call_inputs,
             func_call_outputs,
+            interface_kind,
             domain: self.domains.last_id(),
             name_span: interface_name_span,
             name,
@@ -227,26 +203,41 @@ impl InitializationContext<'_> {
         cursor.list(kind!("declaration_list"), |cursor| {
             let whole_decl_span = cursor.span();
             cursor.go_down(kind!("declaration"), |cursor| {
-                // Skip fields if they exist
-                let _ = cursor.optional_field(field!("io_port_modifiers"));
-                self.finish_gather_decl(Some(is_input), whole_decl_span, cursor);
+                self.gather_decl(Some(is_input), whole_decl_span, cursor);
             });
         });
         self.ports.range_since(list_start_at)
     }
 
-    fn finish_gather_decl(
+    fn gather_decl(
         &mut self,
-        is_input: Option<bool>,
+        mut is_input: Option<bool>,
         whole_decl_span: Span,
         cursor: &mut Cursor,
     ) {
         // If generative input it's a template arg
-        let is_generative = if cursor.optional_field(field!("declaration_modifiers")) {
-            cursor.kind() == kw!("gen")
-        } else {
-            false
-        };
+        let mut is_generative = false;
+        if cursor.optional_field(field!("declaration_modifiers")) {
+            cursor.list(kind!("declaration_modifiers"), |cursor| {
+                match cursor.kind() {
+                    kw!("gen") => {
+                        is_generative = true;
+                    }
+                    kw!("state") => {}
+                    kw!("input") => {
+                        is_input = Some(true);
+                    }
+                    kw!("output") => {
+                        is_input = Some(false);
+                    }
+                    _ => {}
+                }
+            });
+        }
+
+        if is_generative {
+            is_input = None;
+        }
 
         cursor.field(field!("type"));
         let type_span = cursor.span();
@@ -280,7 +271,7 @@ impl InitializationContext<'_> {
 pub fn gather_initial_file_data(mut builder: FileBuilder) {
     assert!(builder.file_data.associated_values.is_empty());
 
-    let mut cursor = match Cursor::new_at_root(builder.tree, builder.file_data) {
+    let mut cursor = match Cursor::new_at_root(builder.file_data) {
         Ok(cursor) => cursor,
         Err(file_span) => {
             builder
@@ -341,7 +332,6 @@ fn initialize_global_object(
         interfaces: FlatAlloc::new(),
         domains: FlatAlloc::new(),
         implicit_clk_domain: true,
-        parameters: FlatAlloc::new(),
         fields: FlatAlloc::new(),
         errors: parsing_errors,
     };
@@ -349,8 +339,7 @@ fn initialize_global_object(
     let (name_span, name) = ctx.gather_initial_global_object(cursor);
 
     let mut link_info = LinkInfo {
-        type_variable_alloc: None,
-        template_parameters: ctx.parameters,
+        template_parameters: FlatAlloc::new(),
         instructions: FlatAlloc::new(),
         documentation: cursor.extract_gathered_comments(),
         file: builder.file_id,
@@ -363,10 +352,7 @@ fn initialize_global_object(
         checkpoints: Vec::new(),
     };
 
-    link_info.reabsorb_errors_globals(
-        (ctx.errors, ResolvedGlobals::empty()),
-        AFTER_INITIAL_PARSE_CP,
-    );
+    link_info.reabsorb_errors(ctx.errors.into_storage());
 
     match global_obj_kind {
         GlobalObjectKind::Module => {

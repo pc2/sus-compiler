@@ -54,9 +54,17 @@ pub struct ConfigStruct {
     pub files: Vec<PathBuf>,
 }
 
+pub const VERSION_INFO: &str = concat!(
+    env!("CARGO_PKG_VERSION"),
+    " (",
+    env!("GIT_HASH"),
+    ") built at ",
+    env!("BUILD_DATE")
+);
+
 fn command_builder() -> Command {
     Command::new("SUS Compiler")
-        .version(env!("CARGO_PKG_VERSION"))
+        .version(VERSION_INFO)
         .author(env!("CARGO_PKG_AUTHORS"))
         .about("The compiler for the SUS Hardware Design Language. This compiler takes in .sus files, and produces equivalent SystemVerilog files")
         .arg(Arg::new("socket")
