@@ -390,7 +390,7 @@ impl ConcreteType {
     pub fn display_substitute(&self, linker: &Linker, substitutor: &ValueUnifierStore) -> String {
         let mut typ_copy = self.clone();
         typ_copy.fully_substitute(substitutor);
-        let as_display = typ_copy.display(&linker.types, true);
+        let as_display = typ_copy.display(linker, true);
         as_display.to_string()
     }
 }

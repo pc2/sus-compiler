@@ -1,4 +1,4 @@
-use crate::alloc::{zip_eq, ArenaAllocator};
+use crate::alloc::zip_eq;
 use crate::prelude::*;
 
 use crate::typing::abstract_type::{AbstractInnerType, PeanoType};
@@ -143,19 +143,19 @@ impl Display for PeanoType {
     }
 }
 
-pub struct ConcreteTypeDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
+pub struct ConcreteTypeDisplay<'a> {
     inner: &'a ConcreteType,
-    linker_types: &'a T,
+    linker: &'a Linker,
     use_newlines: bool,
 }
 
-impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_, T> {
+impl Display for ConcreteTypeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner {
             ConcreteType::Named(global_ref) => ConcreteGlobalReferenceDisplay {
-                target_link_info: &self.linker_types[global_ref.id].link_info,
+                target_link_info: &self.linker.types[global_ref.id].link_info,
                 template_args: &global_ref.template_args,
-                linker_types: self.linker_types,
+                linker: self.linker,
                 use_newlines: self.use_newlines,
             }
             .fmt(f),
@@ -164,7 +164,7 @@ impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_
                 write!(
                     f,
                     "{}[{arr_size}]",
-                    elem_typ.display(self.linker_types, self.use_newlines)
+                    elem_typ.display(self.linker, self.use_newlines)
                 )
             }
         }
@@ -172,14 +172,10 @@ impl<T: Index<TypeUUID, Output = StructType>> Display for ConcreteTypeDisplay<'_
 }
 
 impl ConcreteType {
-    pub fn display<'a>(
-        &'a self,
-        linker_types: &'a impl Index<TypeUUID, Output = StructType>,
-        use_newlines: bool,
-    ) -> impl Display + 'a {
+    pub fn display<'a>(&'a self, linker: &'a Linker, use_newlines: bool) -> impl Display + 'a {
         ConcreteTypeDisplay {
             inner: self,
-            linker_types,
+            linker,
             use_newlines,
         }
     }
@@ -306,17 +302,15 @@ impl Module {
     }
 }
 
-pub struct ConcreteGlobalReferenceDisplay<'a, T: Index<TypeUUID, Output = StructType>> {
+pub struct ConcreteGlobalReferenceDisplay<'a> {
     template_args: &'a TVec<ConcreteTemplateArg>,
     target_link_info: &'a LinkInfo,
-    linker_types: &'a T,
+    linker: &'a Linker,
     /// If there should be newlines: "\n", otherwise ""
     use_newlines: bool,
 }
 
-impl<'a, T: Index<TypeUUID, Output = StructType>> Display
-    for ConcreteGlobalReferenceDisplay<'a, T>
-{
+impl<'a> Display for ConcreteGlobalReferenceDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let nl = if self.use_newlines { "\n    " } else { "" };
         assert!(self.template_args.len() == self.target_link_info.template_parameters.len());
@@ -343,7 +337,7 @@ impl<'a, T: Index<TypeUUID, Output = StructType>> Display
                 TemplateKind::Type(typ_arg) => {
                     f.write_fmt(format_args!(
                         "type {}",
-                        typ_arg.display(self.linker_types, self.use_newlines)
+                        typ_arg.display(self.linker, self.use_newlines)
                     ))?;
                 }
                 TemplateKind::Value(v) => match v {
@@ -363,12 +357,12 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
         &'v self,
         linker: &'v Linker,
         use_newlines: bool,
-    ) -> ConcreteGlobalReferenceDisplay<'v, ArenaAllocator<StructType, TypeUUIDMarker>> {
+    ) -> ConcreteGlobalReferenceDisplay<'v> {
         let target_link_info = linker.get_link_info(self.id.into());
         ConcreteGlobalReferenceDisplay {
             template_args: &self.template_args,
             target_link_info,
-            linker_types: &linker.types,
+            linker,
             use_newlines,
         }
     }

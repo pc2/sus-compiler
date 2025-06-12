@@ -63,7 +63,7 @@ impl HoverCollector<'_> {
                         if wire.original_instruction != id {
                             continue;
                         }
-                        let typ_str = wire.typ.display(&self.linker.types, true);
+                        let typ_str = wire.typ.display(self.linker, true);
                         let name_str = &wire.name;
                         let latency_str = if wire.absolute_latency != CALCULATE_LATENCY_LATER {
                             wire.absolute_latency.to_string()

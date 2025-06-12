@@ -425,7 +425,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     span,
                     format!(
                         "Could not finalize this type, some parameters were still unknown: {}",
-                        w.typ.display(&self.linker.types, true)
+                        w.typ.display(self.linker, true)
                     ),
                 );
             } else if !w.typ.is_valid() {
@@ -433,7 +433,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                     w.get_span(self.link_info),
                     format!(
                         "The type of this wire is invalid! {}",
-                        w.typ.display(&self.linker.types, true)
+                        w.typ.display(self.linker, true)
                     ),
                 );
             }
