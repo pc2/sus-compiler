@@ -1,7 +1,8 @@
 use std::cell::OnceCell;
 
-use crate::alloc::{ArenaAllocator, UUIDAllocator, UUIDRange, UUID};
-use crate::{alloc::UUIDRangeIter, prelude::*};
+use crate::alloc::{ArenaAllocator, UUIDRange, UUID};
+
+use crate::prelude::*;
 
 use ibig::IBig;
 use sus_proc_macro::{field, kind, kw};
@@ -120,26 +121,20 @@ enum ModuleOrWrittenType {
     Module(GlobalReference<ModuleUUID>),
 }
 
-#[derive(Clone, Copy)]
-#[allow(unused)]
-enum InterfacePortsInfo {
-    InputsThenOutputs,
-    OutputsThenInputs,
-    ConditionalBinding { when_id: FlatID },
-}
-
 struct FlatteningContext<'l, 'errs> {
     globals: &'l GlobalResolver<'l>,
     errors: &'errs ErrorCollector<'l>,
 
+    name: &'l str,
     parameters: TVec<Parameter>,
     instructions: FlatAlloc<Instruction, FlatIDMarker>,
-    domains: &'l FlatAlloc<DomainInfo, DomainIDMarker>,
-    named_domain_alloc: UUIDAllocator<DomainIDMarker>,
+
+    domains: FlatAlloc<DomainInfo, DomainIDMarker>,
     current_domain: DomainID,
 
-    fields_to_visit: UUIDRangeIter<FieldIDMarker>,
-    ports_to_visit: UUIDRangeIter<PortIDMarker>,
+    fields: FlatAlloc<StructField, FieldIDMarker>,
+    ports: FlatAlloc<Port, PortIDMarker>,
+    interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
 
     local_variable_context: LocalVariableContext<'l, NamedLocal>,
 
@@ -525,7 +520,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         DeclarationKind::Port {
                             is_input: true,
                             is_state: false,
-                            port_id: self.ports_to_visit.next().unwrap(),
+                            port_id: self.ports.get_next_alloc_id(),
                             domain: self.current_domain,
                         }
                     } else {
@@ -534,7 +529,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             DeclarationKind::Port {
                                 is_input: false,
                                 is_state,
-                                port_id: self.ports_to_visit.next().unwrap(),
+                                port_id: self.ports.get_next_alloc_id(),
                                 domain: self.current_domain,
                             }
                         } else {
@@ -552,7 +547,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     if gen_kw.is_some() {
                         DeclarationKind::RegularGenerative { read_only: false }
                     } else {
-                        DeclarationKind::StructField(self.fields_to_visit.next().unwrap())
+                        DeclarationKind::StructField(self.fields.get_next_alloc_id())
                     }
                 }
                 DeclarationKind::ConditionalBinding {
@@ -596,7 +591,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     DeclarationKind::Port {
                         is_input,
                         is_state,
-                        port_id: self.ports_to_visit.next().unwrap(),
+                        port_id: self.ports.get_next_alloc_id(),
                         domain,
                     }
                 }
@@ -637,6 +632,39 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     latency_specifier: span_latency_specifier.map(|(ls, _)| ls),
                     documentation,
                 }));
+
+            match decl_kind {
+                DeclarationKind::StructField(field_id) => {
+                    assert_eq!(
+                        self.fields.alloc(StructField {
+                            name: name.to_owned(),
+                            name_span,
+                            decl_span,
+                            declaration_instruction: decl_id,
+                        }),
+                        field_id
+                    );
+                }
+                DeclarationKind::Port {
+                    is_input,
+                    port_id,
+                    domain,
+                    ..
+                } => {
+                    assert_eq!(
+                        self.ports.alloc(Port {
+                            name: name.to_owned(),
+                            name_span,
+                            decl_span,
+                            is_input,
+                            domain,
+                            declaration_instruction: decl_id,
+                        }),
+                        port_id
+                    );
+                }
+                _ => {}
+            }
 
             self.alloc_local_name(name_span, name, NamedLocal::Declaration(decl_id));
 
@@ -980,10 +1008,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
             let (conditional_bindings_inputs, conditional_bindings_outputs) =
                 if cursor.optional_field(field!("conditional_bindings")) {
-                    self.flatten_interface_ports(
-                        cursor,
-                        InterfacePortsInfo::ConditionalBinding { when_id: if_id },
-                    )
+                    self.flatten_conditional_bindings(if_id, cursor)
                 } else {
                     (Vec::new(), Vec::new())
                 };
@@ -1077,14 +1102,18 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 kind!("interface_statement") => {
                     cursor.go_down_no_check(|cursor| {
                         // Skip name
-                        cursor.field(field!("name"));
+                        let (name_span, name) =
+                            cursor.field_to_string(field!("name"), kind!("identifier"));
 
-                        if cursor.optional_field(field!("interface_ports")) {
-                            self.flatten_interface_ports(
-                                cursor,
-                                InterfacePortsInfo::InputsThenOutputs,
-                            );
-                        }
+                        let (inputs, outputs) = self.flatten_interface_ports(true, cursor);
+
+                        self.alloc_interface(
+                            name.clone(),
+                            name_span,
+                            InterfaceKind::RegularInterface,
+                            inputs,
+                            outputs,
+                        );
                     });
                 }
                 kind!("action_trigger_statement") => {
@@ -1092,9 +1121,9 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         // Skip interface kind
                         let is_local = cursor.optional_field(field!("local"));
                         cursor.field(field!("interface_kind"));
-                        let ports_direction = match cursor.kind() {
-                            kw!("action") => InterfacePortsInfo::InputsThenOutputs,
-                            kw!("trigger") => InterfacePortsInfo::OutputsThenInputs,
+                        let (inputs_come_first, interface_kind) = match cursor.kind() {
+                            kw!("action") => (true, InterfaceKind::Action),
+                            kw!("trigger") => (false, InterfaceKind::Trigger),
                             _ => unreachable!(),
                         };
 
@@ -1103,18 +1132,16 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         let latency_specifier =
                             self.flatten_latency_specifier(cursor).map(|(l, _)| l);
 
-                        let (left_ports, right_ports) =
-                            if cursor.optional_field(field!("interface_ports")) {
-                                self.flatten_interface_ports(cursor, ports_direction)
-                            } else {
-                                (Vec::new(), Vec::new())
-                            };
+                        let (inputs, outputs) =
+                            self.flatten_interface_ports(inputs_come_first, cursor);
 
-                        let (inputs, outputs) = match ports_direction {
-                            InterfacePortsInfo::InputsThenOutputs => (left_ports, right_ports),
-                            InterfacePortsInfo::OutputsThenInputs => (right_ports, left_ports),
-                            InterfacePortsInfo::ConditionalBinding { .. } => unreachable!(),
-                        };
+                        self.alloc_interface(
+                            name.clone(),
+                            name_span,
+                            interface_kind,
+                            inputs,
+                            outputs,
+                        );
 
                         let action_id =
                             self.instructions
@@ -1147,10 +1174,24 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     });
                 }
                 kind!("domain_statement") => {
-                    // Skip, because we already covered domains in initialization.
-                    // TODO synchronous & async clocks
+                    let whole_domain_statement_span = cursor.span();
+                    cursor.go_down_no_check(|cursor| {
+                        let (domain_name_span, domain_name) =
+                            cursor.field_span(field!("name"), kind!("identifier"));
+                        if self.domains.is_empty() {
+                            if let Some(existing_port) = self.ports.iter().next() {
+                                // Sad Path: Having ports on the implicit clk domain is not allowed.
+                                self.errors.error(whole_domain_statement_span, "When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.")
+                                    .info_same_file(existing_port.1.decl_span, "A domain should be explicitly defined before this port");
+                            }
+                        }
+                        let domain_id = self.domains.alloc(DomainInfo {
+                            name: domain_name.to_owned(),
+                            name_span: Some(domain_name_span),
+                        });
 
-                    self.current_domain = self.named_domain_alloc.alloc();
+                        self.alloc_local_name(domain_name_span, domain_name, NamedLocal::DomainDecl(domain_id));
+                    });
                 }
                 _other => cursor.could_not_match(),
             }
@@ -1159,6 +1200,33 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         let end_of_code = self.instructions.get_next_alloc_id();
         FlatIDRange::new(start_of_code, end_of_code)
+    }
+
+    fn alloc_interface(
+        &mut self,
+        name: String,
+        name_span: Span,
+        interface_kind: InterfaceKind,
+        func_call_inputs: PortIDRange,
+        func_call_outputs: PortIDRange,
+    ) {
+        if name == self.name {
+            let main_interface = &mut self.interfaces[InterfaceID::MAIN_INTERFACE];
+            main_interface.func_call_inputs = func_call_inputs;
+            main_interface.func_call_outputs = func_call_outputs;
+            main_interface.interface_kind = interface_kind;
+            main_interface.domain = self.current_domain;
+            main_interface.name_span = name_span;
+        } else {
+            self.interfaces.alloc(Interface {
+                func_call_inputs,
+                func_call_outputs,
+                interface_kind,
+                domain: self.current_domain,
+                name_span,
+                name,
+            });
+        }
     }
 
     fn flatten_write_modifiers(&self, cursor: &mut Cursor<'c>) -> WriteModifiers {
@@ -1269,79 +1337,85 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
     fn flatten_interface_ports(
         &mut self,
+        inputs_come_first: bool,
         cursor: &mut Cursor<'c>,
-        ctx: InterfacePortsInfo,
-    ) -> (Vec<FlatID>, Vec<FlatID>) {
-        let (inputs_ctx, outputs_ctx) = match ctx {
-            InterfacePortsInfo::InputsThenOutputs => (
-                DeclarationKind::Port {
-                    is_input: true,
-                    is_state: false,
-                    port_id: UUID::PLACEHOLDER,
-                    domain: self.current_domain,
-                },
-                DeclarationKind::Port {
-                    is_input: false,
-                    is_state: false,
-                    port_id: UUID::PLACEHOLDER,
-                    domain: self.current_domain,
-                },
-            ),
-            InterfacePortsInfo::OutputsThenInputs => (
-                DeclarationKind::Port {
-                    is_input: false,
-                    is_state: false,
-                    port_id: UUID::PLACEHOLDER,
-                    domain: self.current_domain,
-                },
-                DeclarationKind::Port {
-                    is_input: true,
-                    is_state: false,
-                    port_id: UUID::PLACEHOLDER,
-                    domain: self.current_domain,
-                },
-            ),
-            InterfacePortsInfo::ConditionalBinding { when_id } => (
-                DeclarationKind::ConditionalBinding {
-                    when_id,
-                    is_input: true,
-                    is_state: false,
-                },
-                DeclarationKind::ConditionalBinding {
-                    when_id,
-                    is_input: false,
-                    is_state: false,
-                },
-            ),
-        };
-
+    ) -> (PortIDRange, PortIDRange) {
+        if !cursor.optional_field(field!("interface_ports")) {
+            return (PortIDRange::EMPTY, PortIDRange::EMPTY);
+        }
         cursor.go_down(kind!("interface_ports"), |cursor| {
-            (
-                if cursor.optional_field(field!("inputs")) {
-                    self.flatten_declaration_list(inputs_ctx, cursor)
-                } else {
-                    Vec::new()
-                },
-                if cursor.optional_field(field!("outputs")) {
-                    self.flatten_declaration_list(outputs_ctx, cursor)
-                } else {
-                    Vec::new()
-                },
-            )
+            let ports_start = self.ports.get_next_alloc_id();
+            if cursor.optional_field(field!("inputs")) {
+                self.flatten_declaration_list(
+                    DeclarationKind::Port {
+                        is_input: inputs_come_first,
+                        is_state: false,
+                        port_id: UUID::PLACEHOLDER,
+                        domain: self.current_domain,
+                    },
+                    cursor,
+                );
+            }
+            let mid = self.ports.get_next_alloc_id();
+            if cursor.optional_field(field!("outputs")) {
+                self.flatten_declaration_list(
+                    DeclarationKind::Port {
+                        is_input: !inputs_come_first,
+                        is_state: false,
+                        port_id: UUID::PLACEHOLDER,
+                        domain: self.current_domain,
+                    },
+                    cursor,
+                );
+            }
+            let ports_end = self.ports.get_next_alloc_id();
+
+            if inputs_come_first {
+                (UUIDRange(ports_start, mid), UUIDRange(mid, ports_end))
+            } else {
+                (UUIDRange(mid, ports_end), UUIDRange(ports_start, mid))
+            }
         })
     }
 
-    fn flatten_global(&mut self, cursor: &mut Cursor<'c>) {
-        // Skip because we covered it in initialization.
-        let _ = cursor.optional_field(field!("extern_marker"));
-        // Skip because we know this from initialization.
-        cursor.field(field!("object_type"));
+    fn flatten_conditional_bindings(
+        &mut self,
+        when_id: FlatID,
+        cursor: &mut Cursor<'c>,
+    ) -> (Vec<FlatID>, Vec<FlatID>) {
+        let left_bindings = if cursor.optional_field(field!("inputs")) {
+            self.flatten_declaration_list(
+                DeclarationKind::ConditionalBinding {
+                    when_id,
+                    is_input: true,
+                    is_state: false,
+                },
+                cursor,
+            )
+        } else {
+            Vec::new()
+        };
+        let right_bindings = if cursor.optional_field(field!("outputs")) {
+            self.flatten_declaration_list(
+                DeclarationKind::ConditionalBinding {
+                    when_id,
+                    is_input: false,
+                    is_state: false,
+                },
+                cursor,
+            )
+        } else {
+            Vec::new()
+        };
+        (left_bindings, right_bindings)
+    }
 
+    fn flatten_global(&mut self, cursor: &mut Cursor<'c>) {
         // We parse this one a bit strangely. Just because visually it looks nicer to have the template arguments after
         // const int[SIZE] range #(int SIZE) {}
         let const_type_cursor = (cursor.kind() == kind!("const_and_type")).then(|| cursor.clone());
 
-        let (name_span, module_name) = cursor.field_span(field!("name"), kind!("identifier"));
+        let (name_span, name) = cursor.field_span(field!("name"), kind!("identifier"));
         if cursor.optional_field(field!("template_declaration_arguments")) {
             cursor.list(
                 kind!("template_declaration_arguments"),
@@ -1396,20 +1470,25 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             domain: Cell::new(DomainType::PLACEHOLDER),
                             decl_span,
                             name_span,
-                            name: module_name.to_string(),
+                            name: name.to_string(),
                             declaration_itself_is_not_written_to: true,
                             decl_kind: DeclarationKind::RegularGenerative { read_only: false },
                             latency_specifier: None,
                             documentation: const_type_cursor.extract_gathered_comments(),
                         }));
 
-                self.alloc_local_name(
-                    name_span,
-                    module_name,
-                    NamedLocal::Declaration(module_output_decl),
-                );
+                self.alloc_local_name(name_span, name, NamedLocal::Declaration(module_output_decl));
             });
         }
+
+        self.interfaces.alloc(Interface {
+            name_span,
+            name: name.to_owned(),
+            interface_kind: InterfaceKind::RegularInterface,
+            domain: DomainID::MAIN_DOMAIN,
+            func_call_inputs: PortIDRange::EMPTY,
+            func_call_outputs: PortIDRange::EMPTY,
+        });
 
         cursor.field(field!("block"));
         self.flatten_code(cursor);
@@ -1458,98 +1537,60 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
     println!("Flattening {obj_name}");
     let _panic_guard = SpanDebugger::new("flatten_global", obj_name, cursor.file_data);
 
-    let mut local_variable_context = LocalVariableContext::new_initial();
+    // Skip because we covered it in initialization.
+    let _ = cursor.optional_field(field!("extern_marker"));
+    // Skip because we know this from initialization.
+    cursor.field(field!("object_type"));
 
-    let (ports_to_visit, fields_to_visit, default_decl_kind, domains) = match global_obj {
-        GlobalUUID::Module(module_uuid) => {
-            let md = &globals[module_uuid];
-            for (id, domain) in &md.domains {
-                if let Err(conflict) =
-                    local_variable_context.add_declaration(&domain.name, NamedLocal::DomainDecl(id))
-                {
-                    let NamedLocal::DomainDecl(conflict) = conflict else {
-                        unreachable!()
-                    };
-
-                    errors.error(domain.name_span.unwrap(), format!("Conflicting domain declaration. Domain '{}' was already declared earlier", domain.name))
-                    .info_obj_same_file(&md.domains[conflict]);
-                }
-            }
-
-            (
-                md.ports.id_range().into_iter(),
-                UUIDRange::EMPTY.into_iter(),
-                DeclarationKind::RegularWire {
-                    is_state: false,
-                    read_only: false,
-                },
-                &md.domains,
-            )
-        }
-        GlobalUUID::Type(type_uuid) => {
-            let typ = &globals[type_uuid];
-            (
-                UUIDRange::EMPTY.into_iter(),
-                typ.fields.id_range().into_iter(),
-                DeclarationKind::StructField(UUID::PLACEHOLDER),
-                &FlatAlloc::EMPTY_FLAT_ALLOC,
-            )
-        }
-        GlobalUUID::Constant(_const_uuid) => (
-            UUIDRange::EMPTY.into_iter(),
-            UUIDRange::EMPTY.into_iter(),
-            DeclarationKind::RegularGenerative { read_only: false },
-            &FlatAlloc::EMPTY_FLAT_ALLOC,
-        ),
+    let default_decl_kind = match cursor.kind() {
+        kw!("module") => DeclarationKind::RegularWire {
+            is_state: false,
+            read_only: false,
+        },
+        kind!("const_and_type") => DeclarationKind::RegularGenerative { read_only: false },
+        kw!("struct") => DeclarationKind::StructField(UUID::PLACEHOLDER),
+        _other => cursor.could_not_match(),
     };
 
     let mut context = FlatteningContext {
+        name: obj_name,
         current_parent_condition: None,
         globals: &globals,
-        ports_to_visit,
-        fields_to_visit,
-        domains,
+        fields: FlatAlloc::new(),
+        ports: FlatAlloc::new(),
+        interfaces: FlatAlloc::new(),
+        domains: FlatAlloc::new(),
         default_decl_kind,
         errors: &errors,
         instructions: FlatAlloc::new(),
         parameters: FlatAlloc::new(),
-        named_domain_alloc: UUIDAllocator::new(),
         current_domain: UUID::from_hidden_value(0),
-        local_variable_context,
+        local_variable_context: LocalVariableContext::new_initial(),
     };
 
     context.flatten_global(cursor);
 
-    // Make sure all ports have been visited
-    assert!(context.ports_to_visit.is_empty());
-
     let instructions = context.instructions;
     let parameters = context.parameters;
+    let mut domains = context.domains;
+    let interfaces = context.interfaces;
+    let ports = context.ports;
+    let fields = context.fields;
 
     let globals = globals.decommission();
 
     let link_info: &mut LinkInfo = match global_obj {
         GlobalUUID::Module(module_uuid) => {
-            let md = &mut linker.modules[module_uuid];
-            // Set all declaration_instruction values
-            for (decl_id, instr) in &instructions {
-                if let Instruction::Declaration(decl) = instr {
-                    match decl.decl_kind {
-                        DeclarationKind::Port { port_id, .. } => {
-                            let port = &mut md.ports[port_id];
-                            assert_eq!(port.name_span, decl.name_span);
-                            port.declaration_instruction = decl_id;
-                        }
-                        DeclarationKind::StructField(..) => {
-                            unreachable!("No Struct fields in Modules")
-                        }
-                        DeclarationKind::RegularWire { .. }
-                        | DeclarationKind::ConditionalBinding { .. }
-                        | DeclarationKind::TemplateParameter(_)
-                        | DeclarationKind::RegularGenerative { .. } => {}
-                    }
-                }
+            if domains.is_empty() {
+                domains.alloc(DomainInfo {
+                    name: "clk".to_string(),
+                    name_span: None,
+                });
             }
+            let md = &mut linker.modules[module_uuid];
+            md.domains = domains;
+            md.interfaces = interfaces;
+            md.ports = ports;
 
             if crate::debug::is_enabled("print-flattened-pre-typecheck") {
                 md.print_flattened_module(&linker.files[md.link_info.file]);
@@ -1559,30 +1600,8 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         }
         GlobalUUID::Type(type_uuid) => {
             let typ = &mut linker.types[type_uuid];
+            typ.fields = fields;
 
-            // Set all declaration_instruction values
-            for (decl_id, instr) in &instructions {
-                if let Instruction::Declaration(decl) = instr {
-                    match decl.decl_kind {
-                        DeclarationKind::StructField(field_id) => {
-                            let field = &mut typ.fields[field_id];
-                            assert_eq!(field.name_span, decl.name_span);
-                            field.declaration_instruction = decl_id;
-                        }
-                        DeclarationKind::TemplateParameter(_)
-                        | DeclarationKind::RegularGenerative { .. } => {}
-                        DeclarationKind::RegularWire { .. }
-                        | DeclarationKind::ConditionalBinding { .. } => {
-                            unreachable!(
-                                "If a declaration isn't generative, then it MUST be a struct field"
-                            )
-                        }
-                        DeclarationKind::Port { .. } => {
-                            unreachable!("No ports in structs")
-                        }
-                    }
-                }
-            }
             &mut typ.link_info
         }
         GlobalUUID::Constant(const_uuid) => {

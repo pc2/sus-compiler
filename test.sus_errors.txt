@@ -10338,13 +10338,6 @@ Error: Excess output targets. Function returns 0 results, but 1 targets were giv
      │          ────────┬────────  
      │                  ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:894:31 ]
-     │
- 894 │     when decoder.is_jump() : int target_addr {
-     │                                  ─────┬─────  
-     │                                       ╰─────── Unused Variable: This variable does not affect the output ports of this module
-─────╯
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:897:7 ]
      │
@@ -10356,20 +10349,6 @@ Error: Excess output targets. Function returns 0 results, but 1 targets were giv
      │          ────────┬────────  
      │                  ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
 ─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:897:31 ]
-     │
- 897 │     when decoder.is_load() : int reg_to, int addr {
-     │                                  ───┬──  
-     │                                     ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:897:43 ]
-     │
- 897 │     when decoder.is_load() : int reg_to, int addr {
-     │                                              ──┬─  
-     │                                                ╰─── Unused Variable: This variable does not affect the output ports of this module
-─────╯
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:900:7 ]
      │
@@ -10380,41 +10359,6 @@ Error: Excess output targets. Function returns 0 results, but 1 targets were giv
  900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
      │          ─────────┬────────  
      │                   ╰────────── Excess output targets. Function returns 0 results, but 1 targets were given.
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:900:32 ]
-     │
- 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │                                   ──┬──  
-     │                                     ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:900:43 ]
-     │
- 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │                                              ──┬──  
-     │                                                ╰──── Unused Variable: This variable does not affect the output ports of this module
-─────╯
-Error: No Global of the name 'Operator' was found. Did you forget to import it?
-     ╭─[ test.sus:900:50 ]
-     │
- 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │                                                     ────┬───  
-     │                                                         ╰───── No Global of the name 'Operator' was found. Did you forget to import it?
-─────╯
-Error: Could not fully figure out the type of this object. ?[...]
-     ╭─[ test.sus:900:59 ]
-     │
- 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │                                                              ─┬  
-     │                                                               ╰── Could not fully figure out the type of this object. ?[...]
-─────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-     ╭─[ test.sus:900:59 ]
-     │
- 900 │     when decoder.is_arith() : int reg_a, int reg_b, Operator op {
-     │                                                              ─┬  
-     │                                                               ╰── Unused Variable: This variable does not affect the output ports of this module
 ─────╯
 Error: Excess output targets. Function returns 0 results, but 1 targets were given.
      ╭─[ test.sus:913:2 ]
@@ -10698,7 +10642,7 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │               ────┬────  
       │                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Conflicting domain declaration. Domain 'my_domain' was already declared earlier
+Error: This declaration conflicts with a previous declaration in the same scope
       ╭─[ test.sus:1017:9 ]
       │
  1014 │     domain my_domain
@@ -10707,7 +10651,7 @@ Error: Conflicting domain declaration. Domain 'my_domain' was already declared e
       │ 
  1017 │     domain my_domain
       │            ────┬────  
-      │                ╰────── Conflicting domain declaration. Domain 'my_domain' was already declared earlier
+      │                ╰────── This declaration conflicts with a previous declaration in the same scope
 ──────╯
 Error: Could not fully figure out the type of this object. ?[...]
       ╭─[ test.sus:1027:2 ]
@@ -12040,13 +11984,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                                ─┬  
       │                                 ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1246:28 ]
-      │
- 1246 │     trigger may_process'0 : T cur_state {
-      │                               ────┬────  
-      │                                   ╰────── Unused Variable: This variable does not affect the output ports of this module
-──────╯
 Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
       ╭─[ test.sus:1247:3 ]
       │
@@ -12128,13 +12065,6 @@ Error: While parsing 'action_trigger_statement', parser found a syntax error in 
       │ │           
       │ ╰─────────── Parent node 'action_trigger_statement'
 ──────╯
-Warning: Unused Variable: This variable does not affect the output ports of this module
-      ╭─[ test.sus:1263:28 ]
-      │
- 1263 │     when loop.process : float cur_state {
-      │                               ────┬────  
-      │                                   ╰────── Unused Variable: This variable does not affect the output ports of this module
-──────╯
 Error: Typing Error: writing the output of this expression expects a float but was given a int
       ╭─[ test.sus:1264:3 ]
       │
@@ -12149,26 +12079,33 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │              ─────┬────  
       │                   ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Typing Error: binop left side expects a int but was given a float
+Error: No Global of the name 'cur_state' was found. Did you forget to import it?
       ╭─[ test.sus:1264:22 ]
       │
  1264 │        float next_state = cur_state * cur_state
       │                           ────┬────  
-      │                               ╰────── Typing Error: binop left side expects a int but was given a float
+      │                               ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
 ──────╯
-Error: Typing Error: binop right side expects a int but was given a float
+Error: No Global of the name 'cur_state' was found. Did you forget to import it?
       ╭─[ test.sus:1264:34 ]
       │
  1264 │        float next_state = cur_state * cur_state
       │                                       ────┬────  
-      │                                           ╰────── Typing Error: binop right side expects a int but was given a float
+      │                                           ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
 ──────╯
-Error: Typing Error: binop left side expects a int but was given a float
+Warning: Used 'when' in a generative context, use 'if' instead
+      ╭─[ test.sus:1265:3 ]
+      │
+ 1265 │        when cur_state >= 2.0 {
+      │        ──┬─  
+      │          ╰─── Used 'when' in a generative context, use 'if' instead
+──────╯
+Error: No Global of the name 'cur_state' was found. Did you forget to import it?
       ╭─[ test.sus:1265:8 ]
       │
  1265 │        when cur_state >= 2.0 {
       │             ────┬────  
-      │                 ╰────── Typing Error: binop left side expects a int but was given a float
+      │                 ╰────── No Global of the name 'cur_state' was found. Did you forget to import it?
 ──────╯
 Error: While parsing 'if_statement', parser found a syntax error in a node of type 'ERROR'
       ╭─[ test.sus:1265:22 ]
