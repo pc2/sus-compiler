@@ -1,7 +1,7 @@
 use crate::alloc::zip_eq;
 use crate::prelude::*;
 
-use crate::typing::abstract_type::{AbstractInnerType, PeanoType};
+use crate::typing::abstract_type::{AbstractGlobalReference, AbstractInnerType, PeanoType};
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteTemplateArg};
 use crate::typing::domain_type::DomainType;
 use crate::typing::set_unifier::Unifyable;
@@ -71,15 +71,58 @@ impl Display for AbstractRankedTypeDisplay<'_> {
                 f.write_str(&self.linker.types[*id].link_info.get_full_name())
             }
             AbstractInnerType::Interface(md_id, interface_id) => {
-                let md = &self.linker.modules[*md_id];
+                let md = &self.linker.modules[md_id.id];
                 f.write_fmt(format_args!(
                     "Interface {} of {}",
                     md.interfaces[*interface_id].name,
-                    md.link_info.get_full_name()
+                    md_id.display(self.linker, self.template_names)
                 ))
             }
         }
         .and_then(|_| f.write_fmt(format_args!("{}", &self.typ.rank)))
+    }
+}
+
+pub struct AbstractGlobalReferenceDisplay<'a, ID> {
+    typ: &'a AbstractGlobalReference<ID>,
+    linker: &'a Linker,
+    template_names: &'a TVec<Parameter>,
+}
+
+impl<ID: Into<GlobalUUID> + Copy> Display for AbstractGlobalReferenceDisplay<'_, ID> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let target_link_info = self.linker.get_link_info(self.typ.id.into());
+
+        f.write_str(&target_link_info.name)?;
+        f.write_str(" #(")?;
+
+        let args_iter = zip_eq(
+            &self.typ.template_arg_types,
+            &target_link_info.template_parameters,
+        );
+
+        join_string_iter(", ", f, args_iter, |(_, typ, param), f| {
+            f.write_fmt(format_args!(
+                "{}: {}",
+                param.name,
+                typ.display(self.linker, self.template_names)
+            ))
+        })?;
+        f.write_str(")")
+    }
+}
+
+impl<ID: Into<GlobalUUID> + Copy> AbstractGlobalReference<ID> {
+    pub fn display<'a>(
+        &'a self,
+        linker: &'a Linker,
+        template_names: &'a TVec<Parameter>,
+    ) -> impl Display + 'a {
+        AbstractGlobalReferenceDisplay {
+            typ: self,
+            linker,
+            template_names,
+        }
     }
 }
 
@@ -161,15 +204,7 @@ impl Display for Value {
             Value::Integer(i) => i.fmt(f),
             Value::Array(arr_box) => {
                 f.write_str("[")?;
-                let mut iter = arr_box.iter();
-                if let Some(v) = iter.next() {
-                    v.fmt(f)?;
-
-                    for v in iter {
-                        f.write_str(", ")?;
-                        v.fmt(f)?;
-                    }
-                }
+                join_string_iter(", ", f, arr_box.iter(), |v, f| v.fmt(f))?;
                 f.write_str("]")
             }
             Value::Unset => f.write_str("{value_unset}"),
@@ -339,4 +374,20 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
             use_newlines,
         }
     }
+}
+
+pub fn join_string_iter<'fmt, T>(
+    sep: &str,
+    f: &mut Formatter<'fmt>,
+    mut iter: impl Iterator<Item = T>,
+    mut func: impl FnMut(T, &mut Formatter<'fmt>) -> std::fmt::Result,
+) -> std::fmt::Result {
+    if let Some(first) = iter.next() {
+        func(first, f)?;
+        for item in iter {
+            f.write_str(sep)?;
+            func(item, f)?;
+        }
+    }
+    Ok(())
 }

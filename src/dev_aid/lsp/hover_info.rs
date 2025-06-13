@@ -158,11 +158,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             hover.sus_code(format!(
                 "{} {}",
                 submodule.link_info.get_full_name(),
-                submod
-                    .name
-                    .as_ref()
-                    .expect("Impossible to select an unnamed submodule")
-                    .0
+                submod.name
             ));
 
             hover.sus_code(submodule.make_all_ports_info_string(

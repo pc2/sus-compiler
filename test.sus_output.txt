@@ -945,7 +945,8 @@ Checking array accesses submodule
 Instantiating doNothing
 Concrete Typechecking doNothing
 Checking array accesses doNothing
-Not Instantiating contains_submodule_submodule due to flattening errors
+Instantiating contains_submodule_submodule
+Concrete Typechecking contains_submodule_submodule
 Instantiating xor
 Concrete Typechecking xor
 Checking array accesses xor
@@ -972,7 +973,8 @@ Concrete Typechecking submodule_named_ports
 Checking array accesses submodule_named_ports
 Instantiating use_submodule_named_ports
 Concrete Typechecking use_submodule_named_ports
-Not Instantiating contains_submodule_submodule due to flattening errors
+Instantiating contains_submodule_submodule
+Concrete Typechecking contains_submodule_submodule
 Instantiating cross_bool
 Concrete Typechecking cross_bool
 Checking array accesses cross_bool
@@ -1001,8 +1003,7 @@ Instantiating mod_with_unused_interface
 Concrete Typechecking mod_with_unused_interface
 Checking array accesses mod_with_unused_interface
 Not Instantiating test_write_to_gen_var due to flattening errors
-Instantiating use_bad_interface
-Concrete Typechecking use_bad_interface
+Not Instantiating use_bad_interface due to flattening errors
 Instantiating sequenceDownFrom
 Concrete Typechecking sequenceDownFrom
 Instantiating sumUpTo

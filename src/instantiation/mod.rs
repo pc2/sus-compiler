@@ -15,7 +15,10 @@ use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 use std::cell::OnceCell;
 use std::rc::Rc;
 
-use crate::flattening::{BinaryOperator, ExpressionOutput, Module, Port, UnaryOperator, WriteTo};
+use crate::flattening::{
+    BinaryOperator, ExpressionOutput, ExpressionSource, Instruction, Module, Port, UnaryOperator,
+    WriteTo,
+};
 use crate::{errors::ErrorStore, value::Value};
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
@@ -143,9 +146,16 @@ pub struct SubModule {
 }
 impl SubModule {
     fn get_span(&self, link_info: &LinkInfo) -> Span {
-        link_info.instructions[self.original_instruction]
-            .unwrap_submodule()
-            .get_most_relevant_span()
+        match &link_info.instructions[self.original_instruction] {
+            Instruction::SubModule(sub_module_instance) => sub_module_instance.name_span,
+            Instruction::Expression(expression) => {
+                let ExpressionSource::FuncCall(fc) = &expression.source else {
+                    unreachable!()
+                };
+                fc.func.get_total_span()
+            }
+            _ => unreachable!(),
+        }
     }
 }
 

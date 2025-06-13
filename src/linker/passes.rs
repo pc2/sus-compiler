@@ -2,29 +2,37 @@ use super::*;
 use crate::{
     errors::{ErrorInfoObject, FileKnowingErrorInfoObject},
     flattening::{Declaration, GlobalReference, Interface, Port, SubModuleInstance},
-    typing::{abstract_type::AbstractRankedType, domain_type::DomainType},
+    typing::abstract_type::{AbstractGlobalReference, AbstractInnerType, AbstractRankedType},
 };
 
-#[derive(Clone, Copy)]
-pub struct ImmutableContext<'l> {
-    pub globals: &'l GlobalResolver<'l>,
-    instructions: &'l FlatAlloc<Instruction, FlatIDMarker>,
-}
-
-impl<'l> ImmutableContext<'l> {
-    pub fn get_submodule(&self, submod_instr: FlatID) -> RemoteSubModule<'l> {
-        let submodule = self.instructions[submod_instr].unwrap_submodule();
+impl<'l> GlobalResolver<'l> {
+    pub fn get_submodule(
+        &'l self,
+        sm_ref: &'l AbstractGlobalReference<ModuleUUID>,
+    ) -> RemoteSubModule<'l> {
         RemoteSubModule {
-            submodule,
-            md: &self.globals[submodule.module_ref.id],
+            template_args: &sm_ref.template_arg_types,
+            md: &self[sm_ref.id],
+        }
+    }
+    pub fn get_declared_submodule(
+        &'l self,
+        submod_instr: &'l SubModuleInstance,
+    ) -> RemoteSubModule<'l> {
+        let AbstractInnerType::Interface(md_ref, _interface) = &submod_instr.typ.inner else {
+            unreachable!("Must be an interface!")
+        };
+        RemoteSubModule {
+            template_args: &md_ref.template_arg_types,
+            md: &self[md_ref.id],
         }
     }
     pub fn get_global_constant(
-        &self,
+        &'l self,
         cst: &'l GlobalReference<ConstantUUID>,
     ) -> RemoteGlobalConstant<'l> {
         RemoteGlobalConstant {
-            cst: &self.globals[cst.id],
+            cst: &self[cst.id],
             template_args: &cst.template_arg_types,
         }
     }
@@ -46,8 +54,8 @@ impl<'l> RemoteGlobalConstant<'l> {
 }
 #[derive(Clone, Copy)]
 pub struct RemoteSubModule<'l> {
-    pub submodule: &'l SubModuleInstance,
     pub md: &'l Module,
+    pub template_args: &'l TVec<AbstractRankedType>,
 }
 impl<'l> RemoteSubModule<'l> {
     pub fn get_port(self, port_id: PortID) -> RemotePort<'l> {
@@ -73,9 +81,6 @@ impl<'l> RemoteInterface<'l> {
     pub fn get_port(self, port_id: PortID) -> RemotePort<'l> {
         self.parent.get_port(port_id)
     }
-    pub fn get_local_domain(self) -> DomainType {
-        self.parent.submodule.local_interface_domains[self.interface.domain]
-    }
 }
 /// For interfaces of this module
 impl FileKnowingErrorInfoObject for RemoteInterface<'_> {
@@ -94,21 +99,15 @@ pub struct RemotePort<'l> {
     pub port: &'l Port,
 }
 impl<'l> RemotePort<'l> {
-    pub fn get_local_domain(&self) -> DomainType {
-        self.parent.submodule.local_interface_domains[self.port.domain]
-    }
     pub fn get_decl(&self) -> RemoteDeclaration<'l> {
         RemoteDeclaration::new(
             &self.parent.md.link_info,
             self.port.declaration_instruction,
-            &self.parent.submodule.module_ref.template_arg_types,
+            self.parent.template_args,
         )
     }
     pub fn make_info(&self) -> ErrorInfo {
         self.get_decl().make_info()
-    }
-    pub fn is_input(&self) -> bool {
-        self.port.is_input
     }
 }
 impl FileKnowingErrorInfoObject for RemotePort<'_> {
@@ -164,7 +163,7 @@ impl Linker {
         &mut self,
         pass_name: &'static str,
         obj_id: GlobalUUID,
-        f: impl FnOnce(&LinkInfo, &ErrorCollector, ImmutableContext<'_>) -> OT,
+        f: impl FnOnce(&LinkInfo, &ErrorCollector, &GlobalResolver<'_>) -> OT,
     ) -> OT {
         let working_on_mut = Self::get_link_info_mut(
             &mut self.modules,
@@ -183,12 +182,7 @@ impl Linker {
 
         let globals = GlobalResolver::new(self, globals);
 
-        let context = ImmutableContext {
-            globals: &globals,
-            instructions: &link_info.instructions,
-        };
-
-        let result = f(link_info, &errors, context);
+        let result = f(link_info, &errors, &globals);
 
         let errors = errors.into_storage();
         let globals = globals.decommission();

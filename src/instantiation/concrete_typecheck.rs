@@ -314,8 +314,8 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                 .gather_all_substitutables(&mut substitutables);
 
             unifier.add_constraint(substitutables, |unifier| {
-                let submod_instr =
-                    self.link_info.instructions[sm.original_instruction].unwrap_submodule();
+                let submod_instr =&
+                    self.link_info.instructions[sm.original_instruction];
 
                 let mut refers_to_clone = sm.refers_to.clone();
                 refers_to_clone.template_args.fully_substitute(&unifier.store);
@@ -347,7 +347,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                                 // Port is enabled, but not used
                                 self.errors
                                     .warn(
-                                        submod_instr.module_ref.get_total_span(),
+                                        submod_instr.get_span(),
                                         format!("Unused port '{}'", source_code_port.name),
                                     )
                                     .info_obj_different_file(
@@ -407,7 +407,7 @@ impl<'inst, 'l: 'inst> ModuleTypingContext<'l> {
                         .expect("Can only set an InstantiatedModule once");
                 } else {
                     self.errors.error(
-                        submod_instr.module_ref.get_total_span(),
+                        submod_instr.get_span(),
                         "Error instantiating submodule",
                     );
                 }

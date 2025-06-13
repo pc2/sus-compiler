@@ -389,8 +389,7 @@ fn handle_request(
                         link_info,
                         _decl_id,
                         InGlobal::NamedSubmodule(submod_decl),
-                    ) => goto_definition_list
-                        .push((submod_decl.name.as_ref().unwrap().1, link_info.file)),
+                    ) => goto_definition_list.push((submod_decl.name_span, link_info.file)),
                     LocationInfo::InGlobal(_, _, _, InGlobal::Temporary(_)) => {}
                     LocationInfo::Type(_, _) => {}
                     LocationInfo::Parameter(_, link_info, _, template_arg) => {

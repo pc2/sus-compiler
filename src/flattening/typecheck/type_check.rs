@@ -28,6 +28,7 @@ pub fn typecheck_all_modules(linker: &mut Linker, global_ids: &[GlobalUUID]) {
                     errors,
                     type_checker: TypeUnifier::from(AbstractTypeSubstitutor::default()),
                     instructions: &working_on.instructions,
+                    template_args: &working_on.template_parameters,
                 };
 
                 context.typecheck();
@@ -63,10 +64,10 @@ pub fn typecheck_all_modules(linker: &mut Linker, global_ids: &[GlobalUUID]) {
                 let _ = expected.fully_substitute(&finalize_ctx.type_checker);
 
                 let expected_name = expected
-                    .display(globals.globals.linker, &link_info.template_parameters)
+                    .display(globals.linker, &link_info.template_parameters)
                     .to_string();
                 let found_name = found
-                    .display(globals.globals.linker, &link_info.template_parameters)
+                    .display(globals.linker, &link_info.template_parameters)
                     .to_string();
                 errors
                 .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
@@ -85,7 +86,7 @@ pub fn typecheck_all_modules(linker: &mut Linker, global_ids: &[GlobalUUID]) {
                     span,
                     format!(
                         "Could not fully figure out the type of this object. {}",
-                        typ.display(globals.globals.linker, &link_info.template_parameters)
+                        typ.display(globals.linker, &link_info.template_parameters)
                     ),
                 );
             }
@@ -113,6 +114,10 @@ impl<'l> TypeCheckingContext<'l> {
                 let decl = self.instructions[*decl_id].unwrap_declaration();
                 decl.typ.clone()
             }
+            WireReferenceRoot::LocalSubmodule(submod_decl) => {
+                let submod = self.instructions[*submod_decl].unwrap_submodule();
+                submod.typ.clone()
+            }
             WireReferenceRoot::NamedConstant(cst) => {
                 self.typecheck_template_global(cst);
 
@@ -121,22 +126,16 @@ impl<'l> TypeCheckingContext<'l> {
                     .get_target_decl()
                     .get_local_type(&mut self.type_checker)
             }
-            WireReferenceRoot::SubModulePort(port) => {
-                let submod_port = self
-                    .globals
-                    .get_submodule(port.submodule_decl)
-                    .get_port(port.port)
-                    .get_decl();
-                if submod_port.remote_decl.domain.get() == DomainType::Generative {
-                    self.errors
-                        .error(
-                            wire_ref.root_span,
-                            "Invalid Submodule port: It is marked as generative!",
-                        )
-                        .info_obj(&submod_port);
-                }
+            WireReferenceRoot::NamedModule(md) => {
+                self.typecheck_template_global(md);
 
-                submod_port.get_local_type(&mut self.type_checker)
+                AbstractRankedType {
+                    inner: AbstractInnerType::Interface(
+                        md.as_abstract_global_ref(),
+                        InterfaceID::MAIN_INTERFACE,
+                    ),
+                    rank: PeanoType::Zero,
+                }
             }
             WireReferenceRoot::Error => self.type_checker.alloc_unknown(),
         };
@@ -167,6 +166,67 @@ impl<'l> TypeCheckingContext<'l> {
 
                     walking_typ = output_typ;
                 }
+                WireReferencePathElement::FieldAccess {
+                    name,
+                    name_span,
+                    refers_to,
+                    output_typ,
+                } => match &walking_typ.inner {
+                    AbstractInnerType::Template(template_id) => {
+                        let template_arg = &self.template_args[*template_id];
+                        self.errors
+                            .error(
+                                *name_span,
+                                format!(
+                                    "The type of this object is the template parameter '{}'. You cannot use struct fields on template args",
+                                    template_arg.name
+                                ),
+                            )
+                            .info_obj_same_file(template_arg);
+                    }
+                    AbstractInnerType::Named(_) => todo!("Structs"),
+                    // TODO "subinterfaces"
+                    AbstractInnerType::Interface(md_ref, _interface) => {
+                        let md = self.globals.get_submodule(md_ref);
+                        let new_typ = if let Some(interface) = md
+                            .md
+                            .interfaces
+                            .find(|_, interface| &interface.name == name)
+                        {
+                            refers_to
+                                .set(PathElemRefersTo::Interface(interface))
+                                .unwrap();
+
+                            AbstractRankedType {
+                                inner: AbstractInnerType::Interface(md_ref.clone(), interface),
+                                rank: PeanoType::Zero,
+                            }
+                        } else if let Some(port) =
+                            md.md.ports.find(|_, interface| &interface.name == name)
+                        {
+                            refers_to.set(PathElemRefersTo::Port(port)).unwrap();
+
+                            let port_decl = md.get_port(port).get_decl();
+
+                            if port_decl.remote_decl.domain.get() == DomainType::Generative {
+                                self.errors
+                                    .error(
+                                        wire_ref.root_span,
+                                        "Invalid Submodule port: It is marked as generative!",
+                                    )
+                                    .info_obj(&port_decl);
+                            }
+                            port_decl.get_local_type(&mut self.type_checker)
+                        } else {
+                            self.type_checker.alloc_unknown()
+                        };
+
+                        output_typ.set(new_typ);
+
+                        walking_typ = output_typ;
+                    }
+                    AbstractInnerType::Unknown(_) => {} // todo!("Structs")
+                },
             }
         }
     }
@@ -176,7 +236,7 @@ impl<'l> TypeCheckingContext<'l> {
         global_ref: &GlobalReference<ID>,
     ) {
         let global_obj: GlobalUUID = global_ref.id.into();
-        let target_link_info = self.globals.globals.get_link_info(global_obj);
+        let target_link_info = self.globals.get_link_info(global_obj);
 
         global_ref.resolve_template_args(self.errors, target_link_info);
 
@@ -326,12 +386,24 @@ impl<'l> TypeCheckingContext<'l> {
         }
     }
 
-    fn typecheck_func_call(&mut self, func_call: &FuncCall) -> RemoteInterface<'l> {
-        let interface = self
-            .globals
-            .get_submodule(func_call.interface_reference.submodule_decl)
-            .get_interface_reference(func_call.interface_reference.submodule_interface);
+    fn typecheck_func_func(&mut self, wire_ref: &'l WireReference) -> Option<RemoteInterface<'l>> {
+        self.typecheck_wire_reference(wire_ref);
+        if let AbstractInnerType::Interface(sm_ref, interface) = &wire_ref.get_output_typ().inner {
+            Some(
+                self.globals
+                    .get_submodule(sm_ref)
+                    .get_interface_reference(*interface),
+            )
+        } else {
+            self.errors.error(
+                wire_ref.get_total_span(),
+                "A Function call expects this to be an interface, but found a regular wire",
+            );
+            None
+        }
+    }
 
+    fn typecheck_func_call_args(&mut self, func_call: &FuncCall, interface: RemoteInterface<'l>) {
         for (port, arg) in
             std::iter::zip(interface.interface.func_call_inputs, &func_call.arguments)
         {
@@ -346,11 +418,9 @@ impl<'l> TypeCheckingContext<'l> {
                     ("function argument".to_string(), vec![port_decl.make_info()])
                 });
         }
-
-        interface
     }
 
-    fn typecheck_single_output_expr(&mut self, expr: &Expression) -> AbstractRankedType {
+    fn typecheck_single_output_expr(&mut self, expr: &'l Expression) -> AbstractRankedType {
         match &expr.source {
             ExpressionSource::WireRef(wire_ref) => {
                 self.typecheck_wire_reference(wire_ref);
@@ -385,19 +455,23 @@ impl<'l> TypeCheckingContext<'l> {
                 out_typ
             }
             ExpressionSource::FuncCall(func_call) => {
-                let interface = self.typecheck_func_call(func_call);
+                if let Some(interface) = self.typecheck_func_func(&func_call.func) {
+                    self.typecheck_func_call_args(func_call, interface);
 
-                self.report_errors_for_bad_function_call(
-                    func_call,
-                    &interface,
-                    expr.span,
-                    std::iter::once(expr.span),
-                );
+                    self.report_errors_for_bad_function_call(
+                        func_call,
+                        &interface,
+                        expr.span,
+                        std::iter::once(expr.span),
+                    );
 
-                if let Some(first_output) = interface.interface.func_call_outputs.first() {
-                    let port_decl = interface.get_port(first_output).get_decl();
+                    if let Some(first_output) = interface.interface.func_call_outputs.first() {
+                        let port_decl = interface.get_port(first_output).get_decl();
 
-                    port_decl.get_local_type(&mut self.type_checker)
+                        port_decl.get_local_type(&mut self.type_checker)
+                    } else {
+                        self.type_checker.alloc_unknown()
+                    }
                 } else {
                     self.type_checker.alloc_unknown()
                 }
@@ -438,32 +512,35 @@ impl<'l> TypeCheckingContext<'l> {
             }
         }
     }
-    fn typecheck_multi_output_expr(&mut self, expr: &Expression, multi_write: &[WriteTo]) {
+    fn typecheck_multi_output_expr(&mut self, expr: &'l Expression, multi_write: &'l [WriteTo]) {
         for wr in multi_write {
             self.typecheck_wire_reference(&wr.to);
         }
         match &expr.source {
             ExpressionSource::FuncCall(func_call) => {
-                let interface = self.typecheck_func_call(func_call);
+                if let Some(interface) = self.typecheck_func_func(&func_call.func) {
+                    self.typecheck_func_call_args(func_call, interface);
 
-                self.report_errors_for_bad_function_call(
-                    func_call,
-                    &interface,
-                    expr.span,
-                    multi_write.iter().map(|v| v.to_span),
-                );
-
-                for (port, to) in std::iter::zip(interface.interface.func_call_outputs, multi_write)
-                {
-                    let port_decl = interface.get_port(port).get_decl();
-                    let port_type = port_decl.get_local_type(&mut self.type_checker);
-
-                    self.type_checker.unify_report_error(
-                        to.to.get_output_typ(),
-                        &port_type,
-                        to.to_span,
-                        || ("function output".to_string(), vec![port_decl.make_info()]),
+                    self.report_errors_for_bad_function_call(
+                        func_call,
+                        &interface,
+                        expr.span,
+                        multi_write.iter().map(|v| v.to_span),
                     );
+
+                    for (port, to) in
+                        std::iter::zip(interface.interface.func_call_outputs, multi_write)
+                    {
+                        let port_decl = interface.get_port(port).get_decl();
+                        let port_type = port_decl.get_local_type(&mut self.type_checker);
+
+                        self.type_checker.unify_report_error(
+                            to.to.get_output_typ(),
+                            &port_type,
+                            to.to_span,
+                            || ("function output".to_string(), vec![port_decl.make_info()]),
+                        );
+                    }
                 }
             }
             ExpressionSource::WireRef(..)
@@ -499,6 +576,13 @@ impl<'l> TypeCheckingContext<'l> {
         match &self.instructions[instr_id] {
             Instruction::SubModule(sm) => {
                 self.typecheck_template_global(&sm.module_ref);
+                sm.typ.set(AbstractRankedType {
+                    inner: AbstractInnerType::Interface(
+                        sm.module_ref.as_abstract_global_ref(),
+                        InterfaceID::MAIN_INTERFACE,
+                    ),
+                    rank: PeanoType::Zero,
+                });
             }
             Instruction::Declaration(decl) => {
                 self.typecheck_visit_latency_specifier(decl.latency_specifier);
@@ -726,6 +810,7 @@ impl FinalizationContext {
                                 .fully_substitute(&self.type_checker.rank_substitutor);
                             // No need to report incomplete peano error, as one of the ports would have reported it
                         }
+                        ExpressionSource::FuncCall(fc) => self.finalize_wire_ref(&mut fc.func),
                         _ => {}
                     }
                 }
@@ -747,7 +832,7 @@ impl FinalizationContext {
         }
     }
 
-    pub fn finalize_global_ref<ID>(&mut self, global_ref: &mut GlobalReference<ID>) {
+    pub fn finalize_global_ref<ID: Copy>(&mut self, global_ref: &mut GlobalReference<ID>) {
         let global_ref_span = global_ref.get_total_span();
         for (_template_id, arg) in global_ref.template_arg_types.get_mut() {
             self.finalize_abstract_type(arg, global_ref_span);
@@ -755,8 +840,14 @@ impl FinalizationContext {
     }
 
     pub fn finalize_wire_ref(&mut self, wire_ref: &mut WireReference) {
-        if let WireReferenceRoot::NamedConstant(cst) = &mut wire_ref.root {
-            self.finalize_global_ref(cst);
+        match &mut wire_ref.root {
+            WireReferenceRoot::NamedConstant(cst) => {
+                self.finalize_global_ref(cst);
+            }
+            WireReferenceRoot::NamedModule(md) => {
+                self.finalize_global_ref(md);
+            }
+            _ => {}
         }
         self.finalize_abstract_type(wire_ref.root_typ.get_mut(), wire_ref.root_span);
         for path_elem in &mut wire_ref.path {
@@ -767,6 +858,13 @@ impl FinalizationContext {
                     ..
                 } => {
                     self.finalize_abstract_type(output_typ.get_mut(), bracket_span.outer_span());
+                }
+                WireReferencePathElement::FieldAccess {
+                    output_typ,
+                    name_span,
+                    ..
+                } => {
+                    self.finalize_abstract_type(output_typ.get_mut(), *name_span);
                 }
             }
         }

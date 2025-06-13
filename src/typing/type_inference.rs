@@ -325,7 +325,7 @@ impl HindleyMilner for AbstractInnerType {
                 HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Named(*named_id))
             }
             AbstractInnerType::Interface(md_id, interface_id) => {
-                HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Interface(*md_id, *interface_id))
+                HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Interface(md_id.id, *interface_id))
             }
         }
     }
@@ -473,6 +473,11 @@ impl Substitutor for AbstractTypeSubstitutor {
     fn unify_total(&mut self, from: &AbstractRankedType, to: &AbstractRankedType) -> UnifyResult {
         self.inner_substitutor.unify(&from.inner, &to.inner)
             & self.rank_substitutor.unify(&from.rank, &to.rank)
+    }
+}
+impl TypeSubstitutor<AbstractInnerType> {
+    pub fn alloc_unknown(&mut self) -> AbstractInnerType {
+        AbstractInnerType::Unknown(self.alloc(OnceCell::new()))
     }
 }
 

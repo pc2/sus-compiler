@@ -13,16 +13,18 @@ impl ExpressionSource {
         match self {
             ExpressionSource::WireRef(wire_ref) => match &wire_ref.root {
                 WireReferenceRoot::LocalDecl(decl_id) => collect(*decl_id),
+                WireReferenceRoot::LocalSubmodule(submod_decl) => collect(*submod_decl),
                 WireReferenceRoot::NamedConstant(cst) => {
                     cst.for_each_generative_input(collect);
                 }
-                WireReferenceRoot::SubModulePort(submod_port) => {
-                    collect(submod_port.submodule_decl)
+                WireReferenceRoot::NamedModule(md_ref) => {
+                    md_ref.for_each_generative_input(collect);
                 }
+
                 WireReferenceRoot::Error => {}
             },
             ExpressionSource::FuncCall(func_call) => {
-                collect(func_call.interface_reference.submodule_decl);
+                func_call.func.for_each_generative_input(collect);
             }
             _ => {}
         }
@@ -44,6 +46,7 @@ impl ExpressionSource {
                 collect(*right)
             }
             ExpressionSource::FuncCall(func_call) => {
+                func_call.func.for_each_input_wire_in_path(collect);
                 for arg in &func_call.arguments {
                     collect(*arg)
                 }
@@ -62,10 +65,13 @@ impl WireReference {
     pub fn for_each_generative_input(&self, collect: &mut impl FnMut(FlatID)) {
         match &self.root {
             WireReferenceRoot::LocalDecl(decl_id) => collect(*decl_id),
+            WireReferenceRoot::LocalSubmodule(submod_decl) => collect(*submod_decl),
             WireReferenceRoot::NamedConstant(cst) => {
                 cst.for_each_generative_input(collect);
             }
-            WireReferenceRoot::SubModulePort(submod_port) => collect(submod_port.submodule_decl),
+            WireReferenceRoot::NamedModule(md) => {
+                md.for_each_generative_input(collect);
+            }
             WireReferenceRoot::Error => {}
         }
         self.for_each_input_wire_in_path(collect);
@@ -73,6 +79,7 @@ impl WireReference {
     pub fn for_each_input_wire_in_path(&self, collect: &mut impl FnMut(FlatID)) {
         for p in &self.path {
             match p {
+                WireReferencePathElement::FieldAccess { .. } => {}
                 WireReferencePathElement::ArrayAccess { idx, .. } => collect(*idx),
             }
         }

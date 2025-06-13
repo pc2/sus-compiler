@@ -4,8 +4,11 @@ mod type_check;
 
 use crate::{
     flattening::typecheck::{domain_check::domain_check_all, type_check::typecheck_all_modules},
-    linker::{passes::ImmutableContext, GlobalUUID},
-    typing::type_inference::{AbstractTypeSubstitutor, TypeSubstitutor, TypeUnifier},
+    linker::{GlobalResolver, GlobalUUID},
+    typing::{
+        template::Parameter,
+        type_inference::{AbstractTypeSubstitutor, TypeSubstitutor, TypeUnifier},
+    },
 };
 
 use super::*;
@@ -19,16 +22,17 @@ pub fn typecheck_all(linker: &mut Linker, global_ids: &[GlobalUUID]) {
 }
 
 struct DomainCheckingContext<'l> {
-    globals: ImmutableContext<'l>,
+    globals: &'l GlobalResolver<'l>,
     errors: &'l ErrorCollector<'l>,
     instructions: &'l FlatAlloc<Instruction, FlatIDMarker>,
     domain_checker: TypeUnifier<TypeSubstitutor<DomainType>>,
 }
 
 struct TypeCheckingContext<'l> {
-    globals: ImmutableContext<'l>,
+    globals: &'l GlobalResolver<'l>,
     errors: &'l ErrorCollector<'l>,
     instructions: &'l FlatAlloc<Instruction, FlatIDMarker>,
+    template_args: &'l TVec<Parameter>,
     type_checker: TypeUnifier<AbstractTypeSubstitutor>,
 }
 

@@ -7,7 +7,7 @@ mod walk;
 
 use crate::flattening::typecheck::TyCell;
 use crate::prelude::*;
-use crate::typing::abstract_type::{AbstractRankedType, PeanoType};
+use crate::typing::abstract_type::{AbstractGlobalReference, AbstractRankedType, PeanoType};
 use crate::typing::domain_type::DomainType;
 
 use std::cell::{Cell, OnceCell};
@@ -61,43 +61,6 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn get_main_interface(&self) -> Option<(InterfaceID, &Interface)> {
-        self.interfaces
-            .iter()
-            .find(|(_, interf)| interf.name == self.link_info.name)
-    }
-
-    /// Get a port by the given name. Reports non existing ports errors
-    ///
-    /// Prefer interfaces over ports in name conflicts
-    pub fn get_port_or_interface_by_name(
-        &self,
-        name_span: Span,
-        name: &str,
-        errors: &ErrorCollector,
-    ) -> Option<PortOrInterface> {
-        for (id, data) in &self.interfaces {
-            if data.name == name {
-                return Some(PortOrInterface::Interface(id));
-            }
-        }
-        for (id, data) in &self.ports {
-            if data.name == name {
-                return Some(PortOrInterface::Port(id));
-            }
-        }
-        errors
-            .error(
-                name_span,
-                format!(
-                    "There is no port or interface of name '{name}' on module {}",
-                    self.link_info.name
-                ),
-            )
-            .info_obj(self);
-        None
-    }
-
     /// Temporary upgrade such that we can name the singular clock of the module, such that weirdly-named external module clocks can be used
     ///
     /// See #7
@@ -145,15 +108,6 @@ pub struct StructField {
 pub struct NamedConstant {
     pub link_info: LinkInfo,
     pub output_decl: FlatID,
-}
-
-/// In SUS, when you write `my_submodule.abc`, `abc` could refer to an interface or to a port.
-///
-/// See [Module::get_port_or_interface_by_name]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PortOrInterface {
-    Port(PortID),
-    Interface(InterfaceID),
 }
 
 /// Information about a (clock) domain.
@@ -249,16 +203,37 @@ impl Interface {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum PathElemRefersTo {
+    Port(PortID),
+    Interface(InterfaceID),
+}
+
 /// An element in a [WireReference] path. Could be array accesses, slice accesses, field accesses, etc
 ///
 /// When executing, this turns into [crate::instantiation::RealWirePathElem]
 #[derive(Debug)]
 pub enum WireReferencePathElement {
+    FieldAccess {
+        name: String,
+        name_span: Span,
+        refers_to: OnceCell<PathElemRefersTo>,
+        output_typ: TyCell<AbstractRankedType>,
+    },
     ArrayAccess {
         idx: FlatID,
         bracket_span: BracketSpan,
         output_typ: TyCell<AbstractRankedType>,
     },
+}
+
+impl WireReferencePathElement {
+    pub fn get_span(&self) -> Span {
+        match self {
+            WireReferencePathElement::FieldAccess { name_span, .. } => *name_span,
+            WireReferencePathElement::ArrayAccess { bracket_span, .. } => bracket_span.outer_span(),
+        }
+    }
 }
 
 /// The root of a [WireReference]. Basically where the wire reference starts.
@@ -274,14 +249,20 @@ pub enum WireReferenceRoot {
     /// [FlatID] points to [Instruction::Declaration]
     LocalDecl(FlatID),
     /// ```sus
+    /// FIFO fifo
+    /// fifo = 3
+    /// ```
+    ///
+    /// [FlatID] points to [Instruction::SubModule]
+    LocalSubmodule(FlatID),
+    /// ```sus
     /// bool b = true // root is global constant `true`
     /// ```
     NamedConstant(GlobalReference<ConstantUUID>),
     /// ```sus
-    /// FIFO local_submodule
-    /// local_submodule.data_in = 3 // root is local_submodule.data_in (yes, both)
+    /// Repeat(...) // root is global constant `Repeat`
     /// ```
-    SubModulePort(PortReference),
+    NamedModule(GlobalReference<ModuleUUID>),
     /// Used to conveniently represent errors
     Error,
 }
@@ -290,8 +271,9 @@ impl WireReferenceRoot {
     pub fn get_root_flat(&self) -> Option<FlatID> {
         match self {
             WireReferenceRoot::LocalDecl(f) => Some(*f),
+            WireReferenceRoot::LocalSubmodule(f) => Some(*f),
             WireReferenceRoot::NamedConstant(_) => None,
-            WireReferenceRoot::SubModulePort(port) => Some(port.submodule_decl),
+            WireReferenceRoot::NamedModule(_) => None,
             WireReferenceRoot::Error => None,
         }
     }
@@ -326,10 +308,18 @@ impl WireReference {
     pub fn get_output_typ(&self) -> &AbstractRankedType {
         if let Some(last) = self.path.last() {
             match last {
-                WireReferencePathElement::ArrayAccess { output_typ, .. } => output_typ,
+                WireReferencePathElement::ArrayAccess { output_typ, .. }
+                | WireReferencePathElement::FieldAccess { output_typ, .. } => output_typ,
             }
         } else {
             &self.root_typ
+        }
+    }
+    pub fn get_total_span(&self) -> Span {
+        if let Some(last) = self.path.last() {
+            Span::new_overarching(self.root_span, last.get_span())
+        } else {
+            self.root_span
         }
     }
 }
@@ -420,21 +410,6 @@ pub enum BinaryOperator {
     GreaterEq,
     Lesser,
     LesserEq,
-}
-
-/// A reference to a port within a submodule.
-/// Not to be confused with [Port], which is the declaration of the port itself in the [Module]
-#[derive(Debug, Clone, Copy)]
-pub struct PortReference {
-    pub submodule_decl: FlatID,
-    pub port: PortID,
-    pub is_input: bool,
-    /// Only set if the port is named as an explicit field. If the port name is implicit, such as in the function call syntax, then it is not present.
-    pub port_name_span: Option<Span>,
-    /// Even this can be implicit. In the inline function call instantiation syntax there's no named submodule. my_mod(a, b, c)
-    ///
-    /// Finally, if [Self::port_name_span].is_none(), then for highlighting and renaming, this points to a duplicate of a Function Call
-    pub submodule_name_span: Option<Span>,
 }
 
 /// See [Expression]
@@ -617,46 +592,15 @@ pub struct Declaration {
 pub struct SubModuleInstance {
     pub parent_condition: Option<ParentCondition>,
     pub module_ref: GlobalReference<ModuleUUID>,
-    /// Name is not always present in source code. Such as in inline function call syntax: my_mod(a, b, c)
-    pub name: Option<(String, Span)>,
+
+    pub name: String,
+    pub name_span: Span,
     /// Maps each of the module's local domains to the domain that it is used in.
     ///
     /// These are *always* [DomainType::Physical] (of course, start out as [DomainType::Unknown] before typing)
     pub local_interface_domains: TyCell<FlatAlloc<DomainType, DomainIDMarker>>,
+    pub typ: TyCell<AbstractRankedType>,
     pub documentation: Documentation,
-}
-
-impl SubModuleInstance {
-    pub fn get_name<'o, 's: 'o, 'l: 'o>(&'s self, corresponding_module: &'l Module) -> &'o str {
-        if let Some((n, _span)) = &self.name {
-            n
-        } else {
-            &corresponding_module.link_info.name
-        }
-    }
-    /// If it is named, then return the [Span] of the name, otherwise return the span of the module ref
-    pub fn get_most_relevant_span(&self) -> Span {
-        if let Some((_name, span)) = &self.name {
-            *span
-        } else {
-            self.module_ref.get_total_span()
-        }
-    }
-}
-
-/// See [FuncCallInstruction]
-#[derive(Debug)]
-pub struct ModuleInterfaceReference {
-    pub submodule_decl: FlatID,
-    pub submodule_interface: InterfaceID,
-
-    /// If this is None, that means the submodule was declared implicitly. Hence it could also be used at compiletime
-    pub name_span: Option<Span>,
-
-    /// Best-effort span for the interface that is called. [my_mod<abc>](), my_mod<abc> mm; [mm]() or mm.[my_interface]()
-    ///
-    /// if interface_span == name_span then no specific interface is selected, so the main interface is used
-    pub interface_span: Span,
 }
 
 /// An [Expression] that represents the calling on an interface of a [SubModuleInstance].
@@ -696,7 +640,7 @@ pub struct ModuleInterfaceReference {
 /// ```
 #[derive(Debug)]
 pub struct FuncCall {
-    pub interface_reference: ModuleInterfaceReference,
+    pub func: WireReference,
 
     /// Points to a list of [Expression]
     pub arguments: Vec<FlatID>,
@@ -726,13 +670,20 @@ pub struct GlobalReference<ID> {
     pub template_span: Option<BracketSpan>,
 }
 
-impl<ID> GlobalReference<ID> {
+impl<ID: Copy> GlobalReference<ID> {
     pub fn get_total_span(&self) -> Span {
         let mut result = self.name_span;
         if let Some(template_span) = self.template_span {
             result = Span::new_overarching(result, template_span.outer_span());
         }
         result
+    }
+
+    pub fn as_abstract_global_ref(&self) -> AbstractGlobalReference<ID> {
+        AbstractGlobalReference {
+            id: self.id,
+            template_arg_types: self.template_arg_types.clone(),
+        }
     }
 
     pub fn resolve_template_args(&self, errors: &ErrorCollector, target: &LinkInfo) {
@@ -1005,9 +956,7 @@ impl Instruction {
     }
     pub fn get_span(&self) -> Span {
         match self {
-            Instruction::SubModule(sub_module_instance) => {
-                sub_module_instance.get_most_relevant_span()
-            }
+            Instruction::SubModule(sub_module_instance) => sub_module_instance.name_span,
             Instruction::Declaration(declaration) => declaration.decl_span,
             Instruction::ActionTriggerDeclaration(act_trig) => act_trig.name_span,
             Instruction::Expression(expression) => expression.span,

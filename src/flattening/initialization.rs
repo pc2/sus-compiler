@@ -11,6 +11,8 @@ use super::parser::Cursor;
 use super::*;
 
 struct InitializationContext<'linker> {
+    name: String,
+    name_span: Span,
     // module-only stuff
     ports: FlatAlloc<Port, PortIDMarker>,
     interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
@@ -25,18 +27,25 @@ struct InitializationContext<'linker> {
 }
 
 impl InitializationContext<'_> {
-    fn gather_initial_global_object(&mut self, cursor: &mut Cursor) -> (Span, String) {
-        let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
+    fn gather_initial_global_object(&mut self, cursor: &mut Cursor) {
         self.domains.alloc(DomainInfo {
             name: "clk".to_string(),
             name_span: None,
         });
+
         let _ = cursor.optional_field(field!("template_declaration_arguments"));
+
+        self.interfaces.alloc(Interface {
+            name_span: self.name_span,
+            name: self.name.clone(),
+            interface_kind: InterfaceKind::RegularInterface,
+            domain: DomainID::MAIN_DOMAIN,
+            func_call_inputs: PortIDRange::EMPTY,
+            func_call_outputs: PortIDRange::EMPTY,
+        });
 
         cursor.field(field!("block"));
         self.gather_all_ports_in_block(cursor);
-
-        (name_span, name)
     }
 
     fn gather_ports_in_if_stmt(&mut self, cursor: &mut Cursor) {
@@ -180,7 +189,7 @@ impl InitializationContext<'_> {
         };
 
         let (func_call_inputs, func_call_outputs) = match ports {
-            (None, None) => (PortIDRange::empty(), PortIDRange::empty()),
+            (None, None) => (PortIDRange::EMPTY, PortIDRange::EMPTY),
             (None, Some(fouts)) => (PortIDRange::new(fouts.0, fouts.0), fouts),
             (Some(fins), None) => (fins, PortIDRange::new(fins.1, fins.1)),
             (Some(fins), Some(fouts)) => (fins, fouts),
@@ -188,14 +197,24 @@ impl InitializationContext<'_> {
         // All ports are consecutive
         assert_eq!(func_call_inputs.1, func_call_outputs.0);
 
-        self.interfaces.alloc(Interface {
-            func_call_inputs,
-            func_call_outputs,
-            interface_kind,
-            domain: self.domains.last_id(),
-            name_span: interface_name_span,
-            name,
-        });
+        if name == self.name {
+            let main_interface = &mut self.interfaces[InterfaceID::MAIN_INTERFACE];
+
+            main_interface.func_call_inputs = func_call_inputs;
+            main_interface.func_call_outputs = func_call_outputs;
+            main_interface.interface_kind = interface_kind;
+            main_interface.domain = self.domains.last_id();
+            main_interface.name_span = interface_name_span;
+        } else {
+            self.interfaces.alloc(Interface {
+                func_call_inputs,
+                func_call_outputs,
+                interface_kind,
+                domain: self.domains.last_id(),
+                name_span: interface_name_span,
+                name,
+            });
+        }
     }
 
     fn gather_decl_names_in_list(&mut self, is_input: bool, cursor: &mut Cursor) -> PortIDRange {
@@ -327,7 +346,10 @@ fn initialize_global_object(
         _other => cursor.could_not_match(),
     };
 
+    let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
     let mut ctx = InitializationContext {
+        name,
+        name_span,
         ports: FlatAlloc::new(),
         interfaces: FlatAlloc::new(),
         domains: FlatAlloc::new(),
@@ -336,14 +358,14 @@ fn initialize_global_object(
         errors: parsing_errors,
     };
 
-    let (name_span, name) = ctx.gather_initial_global_object(cursor);
+    ctx.gather_initial_global_object(cursor);
 
     let mut link_info = LinkInfo {
         template_parameters: FlatAlloc::new(),
         instructions: FlatAlloc::new(),
         documentation: cursor.extract_gathered_comments(),
         file: builder.file_id,
-        name,
+        name: ctx.name,
         name_span,
         span,
         errors: ErrorStore::new(),

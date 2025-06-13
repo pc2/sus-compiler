@@ -1,8 +1,11 @@
 use sus_proc_macro::get_builtin_type;
 
-use crate::prelude::*;
+use crate::{prelude::*, typing::template::TVec};
 
 use super::type_inference::{InnerTypeVariableID, PeanoVariableID};
+
+pub const BOOL_TYPE: AbstractInnerType = AbstractInnerType::Named(get_builtin_type!("bool"));
+pub const INT_TYPE: AbstractInnerType = AbstractInnerType::Named(get_builtin_type!("int"));
 
 /// This contains only the information that can be type-checked before template instantiation.
 ///
@@ -23,7 +26,7 @@ use super::type_inference::{InnerTypeVariableID, PeanoVariableID};
 pub enum AbstractInnerType {
     Template(TemplateID),
     Named(TypeUUID),
-    Interface(ModuleUUID, InterfaceID),
+    Interface(AbstractGlobalReference<ModuleUUID>, InterfaceID),
     /// Referencing [AbstractType::Unknown] is a strong code smell.
     /// It is likely you should use [TypeSubstitutor::unify_must_succeed] or [TypeSubstitutor::unify_report_error] instead
     ///
@@ -81,5 +84,8 @@ impl PeanoType {
     }
 }
 
-pub const BOOL_TYPE: AbstractInnerType = AbstractInnerType::Named(get_builtin_type!("bool"));
-pub const INT_TYPE: AbstractInnerType = AbstractInnerType::Named(get_builtin_type!("int"));
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AbstractGlobalReference<ID> {
+    pub id: ID,
+    pub template_arg_types: TVec<AbstractRankedType>,
+}

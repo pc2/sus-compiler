@@ -34,23 +34,6 @@ enum LocalOrGlobal {
     NotFound(Span),
 }
 
-#[derive(Debug)]
-enum PartialWireReference {
-    /// A module that is implicitly declared in a function call.
-    GlobalModuleName(GlobalReference<ModuleUUID>),
-    /// Partial result, waiting for a port to be grabbed
-    ModuleButNoPort(FlatID, Span),
-    /// A module with an interface specified
-    ModuleWithInterface {
-        submodule_decl: FlatID,
-        submodule_name_span: Span,
-        interface: InterfaceID,
-        interface_name_span: Span,
-    },
-    /// It's ready for use higher up
-    WireReference(WireReference),
-}
-
 impl UnaryOperator {
     pub fn from_kind_id(kind_id: u16) -> Self {
         match kind_id {
@@ -436,15 +419,18 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
     fn alloc_submodule_instruction(
         &mut self,
         module_ref: GlobalReference<ModuleUUID>,
-        name: Option<(String, Span)>,
+        name: String,
+        name_span: Span,
         documentation: Documentation,
     ) -> FlatID {
         self.instructions
             .alloc(Instruction::SubModule(SubModuleInstance {
                 parent_condition: self.current_parent_condition,
                 name,
+                name_span,
                 module_ref,
                 local_interface_domains: TyCell::new(),
+                typ: TyCell::new(),
                 documentation,
             }))
     }
@@ -512,7 +498,8 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     }
                     let submod_id = self.alloc_submodule_instruction(
                         module_ref,
-                        Some((name.to_owned(), name_span)),
+                        name.to_owned(),
+                        name_span,
                         documentation,
                     );
 
@@ -665,74 +652,6 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         })
     }
 
-    fn get_main_interface(
-        &self,
-        submodule_decl: FlatID,
-        span: Span,
-    ) -> Option<(InterfaceID, &Interface)> {
-        let sm = self.instructions[submodule_decl].unwrap_submodule();
-
-        let md = &self.globals[sm.module_ref.id];
-
-        let result = md.get_main_interface();
-
-        if result.is_none() {
-            self.errors.error(span, format!("{} does not have a main interface. You should explicitly specify an interface to access", md.link_info.get_full_name()))
-                .info_obj(md);
-        }
-
-        result
-    }
-
-    /// Produces a new [SubModuleInstance] if a global was passed, or a reference to the existing instance if it's referenced by name
-    fn get_or_alloc_module(&mut self, cursor: &mut Cursor<'c>) -> Option<ModuleInterfaceReference> {
-        let outer_span = cursor.span();
-
-        match self.flatten_partial_wire_reference(cursor) {
-            PartialWireReference::GlobalModuleName(module_ref) => {
-                let documentation = cursor.extract_gathered_comments();
-                let interface_span = module_ref.get_total_span();
-                let submodule_decl =
-                    self.alloc_submodule_instruction(module_ref, None, documentation);
-                Some(ModuleInterfaceReference {
-                    submodule_decl,
-                    submodule_interface: self.get_main_interface(submodule_decl, interface_span)?.0,
-                    name_span: None,
-                    interface_span,
-                })
-            }
-            PartialWireReference::ModuleButNoPort(submodule_decl, name_span) => {
-                Some(ModuleInterfaceReference {
-                    submodule_decl,
-                    submodule_interface: self.get_main_interface(submodule_decl, name_span)?.0,
-                    name_span: Some(name_span),
-                    interface_span: name_span,
-                })
-            }
-            PartialWireReference::ModuleWithInterface {
-                submodule_decl,
-                submodule_name_span,
-                interface,
-                interface_name_span,
-            } => Some(ModuleInterfaceReference {
-                submodule_decl,
-                submodule_interface: interface,
-                name_span: Some(submodule_name_span),
-                interface_span: interface_name_span,
-            }),
-            PartialWireReference::WireReference(wire_ref) => {
-                if !wire_ref.is_error() {
-                    // Error already reported
-                    self.errors.error(
-                        outer_span,
-                        "Function call syntax is only possible on modules or interfaces of modules",
-                    );
-                }
-                None
-            }
-        }
-    }
-
     fn flatten_subexpr(&mut self, cursor: &mut Cursor<'c>) -> FlatID {
         let (source, span) = self.flatten_expr_source(cursor);
 
@@ -820,7 +739,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             }),
             kind!("func_call") => cursor.go_down_no_check(|cursor| {
                 cursor.field(field!("name"));
-                let interface_reference = self.get_or_alloc_module(cursor);
+                let func = self.flatten_wire_reference(cursor);
 
                 cursor.field(field!("arguments"));
                 let arguments_span = BracketSpan::from_outer(cursor.span());
@@ -830,14 +749,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         self.flatten_subexpr(cursor)
                     });
 
-                match interface_reference {
-                    Some(interface_reference) => ExpressionSource::FuncCall(FuncCall {
-                        interface_reference,
-                        arguments,
-                        arguments_span,
-                    }),
-                    None => ExpressionSource::WireRef(self.new_error(expr_span)),
-                }
+                ExpressionSource::FuncCall(FuncCall {
+                    func,
+                    arguments,
+                    arguments_span,
+                })
             }),
             kind!("parenthesis_expression") => {
                 // Explicitly return so we don't alloc another WireInstance Instruction
@@ -851,232 +767,148 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 });
                 ExpressionSource::ArrayConstruct(list)
             }
-            _other => ExpressionSource::WireRef(self.flatten_wire_reference(cursor, expr_span)),
+            _other => ExpressionSource::WireRef(self.flatten_wire_reference(cursor)),
         };
         (source, expr_span)
     }
 
-    fn flatten_wire_reference(&mut self, cursor: &mut Cursor<'c>, span: Span) -> WireReference {
-        match self.flatten_partial_wire_reference(cursor) {
-            PartialWireReference::ModuleButNoPort(submod_decl, span) => {
-                let md_uuid = self.instructions[submod_decl]
-                    .unwrap_submodule()
-                    .module_ref
-                    .id;
-                self.errors
-                    .error(
-                        span,
-                        "cannot operate on modules directly. Should use ports instead",
-                    )
-                    .info_obj(&self.globals[md_uuid]);
-                self.new_error(span)
-            }
-            PartialWireReference::GlobalModuleName(md_ref) => {
-                let md = &self.globals[md_ref.id];
-                self.errors
-                    .error(
-                        md_ref.name_span,
-                        format!(
-                            "Expected a Wire Reference, but found module '{}' instead",
-                            md.link_info.name
-                        ),
-                    )
-                    .info_obj(md);
-                self.new_error(span)
-            }
-            PartialWireReference::ModuleWithInterface {
-                submodule_decl: submod_decl,
-                submodule_name_span: _,
-                interface,
-                interface_name_span,
-            } => {
-                let md_uuid = self.instructions[submod_decl]
-                    .unwrap_submodule()
-                    .module_ref
-                    .id;
-                let md = &self.globals[md_uuid];
-                let interf = &md.interfaces[interface];
-                self.errors
-                    .error(
-                        interface_name_span,
-                        format!(
-                            "Expected a port, but found module interface '{}' instead",
-                            &interf.name
-                        ),
-                    )
-                    .info((interf.name_span, md.link_info.file), "Declared here");
-                self.new_error(span)
-            }
-            PartialWireReference::WireReference(wr) => wr,
-        }
-    }
-
-    fn flatten_partial_wire_reference(&mut self, cursor: &mut Cursor<'c>) -> PartialWireReference {
+    fn flatten_wire_reference(&mut self, cursor: &mut Cursor<'c>) -> WireReference {
         let (kind, expr_span) = cursor.kind_span();
         match kind {
-        kind!("template_global") => {
-            match self.flatten_local_or_template_global(cursor) {
-                LocalOrGlobal::Local(span, named_obj) => match named_obj {
-                    NamedLocal::Declaration(decl_id) => {
-                        let root = WireReferenceRoot::LocalDecl(decl_id);
-                        PartialWireReference::WireReference(WireReference {
+            kind!("template_global") => {
+                match self.flatten_local_or_template_global(cursor) {
+                    LocalOrGlobal::Local(span, named_obj) => match named_obj {
+                        NamedLocal::Declaration(decl_id) => {
+                            let root = WireReferenceRoot::LocalDecl(decl_id);
+                            WireReference {
+                                root,
+                                root_typ: TyCell::new(),
+                                root_span: expr_span,
+                                path: Vec::new(),
+                            }
+                        }
+                        NamedLocal::SubModule(submod_id) => {
+                            let root = WireReferenceRoot::LocalSubmodule(submod_id);
+                            WireReference {
+                                root,
+                                root_typ: TyCell::new(),
+                                root_span: expr_span,
+                                path: Vec::new(),
+                            }
+                        }
+                        NamedLocal::TemplateType(template_id) => {
+                            self.errors
+                                .error(
+                                    span,
+                                    format!(
+                                        "Expected a value, but instead found template type '{}'",
+                                        self.parameters[template_id].name
+                                    ),
+                                )
+                                .info_obj_same_file(&self.parameters[template_id]);
+                            self.new_error(expr_span)
+                        }
+                        NamedLocal::DomainDecl(domain_id) => {
+                            let domain = &self.domains[domain_id];
+                            self.errors
+                                .error(
+                                    span,
+                                    format!(
+                                        "Expected a value, but instead found domain '{}'",
+                                        domain.name
+                                    ),
+                                )
+                                .info_same_file(
+                                    span,
+                                    format!("Domain {} declared here", domain.name),
+                                );
+                            self.new_error(expr_span)
+                        }
+                    },
+                    LocalOrGlobal::Constant(cst_ref) => {
+                        let root = WireReferenceRoot::NamedConstant(cst_ref);
+                        WireReference {
                             root,
                             root_typ: TyCell::new(),
                             root_span: expr_span,
                             path: Vec::new(),
-                        })
-                    }
-                    NamedLocal::SubModule(submod_id) => {
-                        PartialWireReference::ModuleButNoPort(submod_id, expr_span)
-                    }
-                    NamedLocal::TemplateType(template_id) => {
-                        self.errors
-                            .error(
-                                span,
-                                format!(
-                                    "Expected a value, but instead found template type '{}'",
-                                    self.parameters[template_id].name
-                                ),
-                            )
-                            .info_obj_same_file(
-                                &self.parameters[template_id],
-                            );
-                        PartialWireReference::WireReference(self.new_error(expr_span))
-                    }
-                    NamedLocal::DomainDecl(domain_id) => {
-                        let domain = &self.domains[domain_id];
-                        self.errors
-                            .error(
-                                span,
-                                format!(
-                                    "Expected a value, but instead found domain '{}'",
-                                    domain.name
-                                ),
-                            )
-                            .info_same_file(span, format!("Domain {} declared here", domain.name));
-                        PartialWireReference::WireReference(self.new_error(expr_span))
-                    }
-                },
-                LocalOrGlobal::Constant(cst_ref) => {
-                    let root_span = cst_ref.get_total_span();
-                    let root = WireReferenceRoot::NamedConstant(cst_ref);
-                    PartialWireReference::WireReference(WireReference {
-                        root,
-                        root_typ: TyCell::new(),
-                        root_span,
-                        path: Vec::new(),
-                    })
-                }
-                LocalOrGlobal::Module(md_ref) => PartialWireReference::GlobalModuleName(md_ref),
-                LocalOrGlobal::Type(type_ref) => {
-                    self.globals
-                        .not_expected_global_error(&type_ref, "named wire: local or constant", self.errors);
-                    PartialWireReference::WireReference(self.new_error(expr_span))
-                }
-                LocalOrGlobal::NotFound(_) => PartialWireReference::WireReference(self.new_error(expr_span)), // Error handled by [flatten_local_or_template_global]
-            }
-        } kind!("array_op") => {
-            cursor.go_down_no_check(|cursor| {
-                cursor.field(field!("arr"));
-                let mut flattened_arr_expr = self.flatten_partial_wire_reference(cursor);
-
-                cursor.field(field!("arr_idx"));
-                let arr_idx_span = cursor.span();
-                let (idx, bracket_span) = self.flatten_array_bracket(cursor);
-
-                // only unpack the subexpr after flattening the idx, so we catch all errors
-                match &mut flattened_arr_expr {
-                    PartialWireReference::ModuleButNoPort(_, _)
-                    | PartialWireReference::GlobalModuleName(_)
-                    | PartialWireReference::ModuleWithInterface {
-                        submodule_decl: _,
-                        submodule_name_span: _,
-                        interface: _,
-                        interface_name_span: _,
-                    } => {
-                        self.errors.todo(arr_idx_span, "Module Arrays");
-                    }
-                    PartialWireReference::WireReference(wire_ref) => {
-                        wire_ref.path
-                            .push(WireReferencePathElement::ArrayAccess { idx, bracket_span, output_typ: TyCell::new() });
-                    }
-                }
-
-                flattened_arr_expr
-            })
-        } kind!("field_access") => {
-            cursor.go_down_no_check(|cursor| {
-                cursor.field(field!("left"));
-                let flattened_arr_expr = self.flatten_partial_wire_reference(cursor);
-
-                let (port_name_span, port_name) = cursor.field_span(field!("name"), kind!("identifier"));
-
-                match flattened_arr_expr {
-                    PartialWireReference::GlobalModuleName(md_ref) => {
-                        self.errors.error(md_ref.get_total_span(), "Ports or interfaces can only be accessed on modules that have been explicitly declared. Declare this submodule on its own line");
-                        PartialWireReference::WireReference(self.new_error(expr_span))
-                    }
-                    PartialWireReference::ModuleWithInterface { submodule_decl:_, submodule_name_span, interface:_, interface_name_span } => {
-                        self.errors.error(port_name_span, "Omit the interface when accessing a port")
-                            .suggest_remove(Span::new_overarching(submodule_name_span.empty_span_at_end(), interface_name_span));
-
-                        PartialWireReference::WireReference(self.new_error(expr_span))
-                    }
-                    PartialWireReference::ModuleButNoPort(submodule_decl, submodule_name_span) => {
-                        let submodule = self.instructions[submodule_decl].unwrap_submodule();
-
-                        let submod = &self.globals[submodule.module_ref.id];
-
-                        match submod.get_port_or_interface_by_name(port_name_span, port_name, self.errors) {
-                            Some(PortOrInterface::Port(port)) => {
-                                let port_info = PortReference{
-                                    submodule_name_span : Some(submodule_name_span),
-                                    submodule_decl,
-                                    port,
-                                    port_name_span : Some(port_name_span),
-                                    is_input: submod.ports[port].is_input
-                                };
-                                PartialWireReference::WireReference(WireReference{
-                                    root : WireReferenceRoot::SubModulePort(port_info),
-                                    root_typ: TyCell::new(),
-                                    root_span: expr_span,
-                                    path : Vec::new()
-                                })
-                            }
-                            Some(PortOrInterface::Interface(interface)) => {
-                                PartialWireReference::ModuleWithInterface { submodule_decl, submodule_name_span, interface, interface_name_span: port_name_span }
-                            }
-                            None => PartialWireReference::WireReference(self.new_error(expr_span))
                         }
                     }
-                    PartialWireReference::WireReference(_) => {
-                        self.errors.error(port_name_span, "TODO: Struct fields");
-                        PartialWireReference::WireReference(self.new_error(expr_span))
+                    LocalOrGlobal::Module(md_ref) => {
+                        let root = WireReferenceRoot::NamedModule(md_ref);
+                        WireReference {
+                            root,
+                            root_typ: TyCell::new(),
+                            root_span: expr_span,
+                            path: Vec::new(),
+                        }
                     }
+                    LocalOrGlobal::Type(type_ref) => {
+                        self.globals.not_expected_global_error(
+                            &type_ref,
+                            "named wire: local or constant",
+                            self.errors,
+                        );
+                        self.new_error(expr_span)
+                    }
+                    LocalOrGlobal::NotFound(_) => self.new_error(expr_span), // Error handled by [flatten_local_or_template_global]
                 }
-            })
-        } kind!("number") => {
-            self.errors
-                .error(expr_span, "A constant is not a wire reference");
-            PartialWireReference::WireReference(self.new_error(expr_span))
-        } kind!("unary_op") | kind!("binary_op") => {
-            self.errors.error(
-                expr_span,
-                "The result of an operator is not a wire reference",
-            );
-            PartialWireReference::WireReference(self.new_error(expr_span))
-        } kind!("func_call") => {
-            self.errors
-                .error(expr_span, "A submodule call is not a wire reference");
-            PartialWireReference::WireReference(self.new_error(expr_span))
-        } kind!("parenthesis_expression") => {
-            self.errors.error(
-                expr_span,
-                "Parentheses are not allowed within a wire reference",
-            );
-            PartialWireReference::WireReference(self.new_error(expr_span))
-        } _other =>
-            cursor.could_not_match()
+            }
+            kind!("array_op") => cursor.go_down_no_check(|cursor| {
+                cursor.field(field!("arr"));
+                let mut wire_ref = self.flatten_wire_reference(cursor);
+
+                cursor.field(field!("arr_idx"));
+                let (idx, bracket_span) = self.flatten_array_bracket(cursor);
+
+                wire_ref.path.push(WireReferencePathElement::ArrayAccess {
+                    idx,
+                    bracket_span,
+                    output_typ: TyCell::new(),
+                });
+
+                wire_ref
+            }),
+            kind!("field_access") => cursor.go_down_no_check(|cursor| {
+                cursor.field(field!("left"));
+                let mut wire_ref = self.flatten_wire_reference(cursor);
+
+                let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
+
+                wire_ref.path.push(WireReferencePathElement::FieldAccess {
+                    name,
+                    name_span,
+                    refers_to: OnceCell::new(),
+                    output_typ: TyCell::new(),
+                });
+
+                wire_ref
+            }),
+            kind!("number") => {
+                self.errors
+                    .error(expr_span, "A constant is not a wire reference");
+                self.new_error(expr_span)
+            }
+            kind!("unary_op") | kind!("binary_op") => {
+                self.errors.error(
+                    expr_span,
+                    "The result of an operator is not a wire reference",
+                );
+                self.new_error(expr_span)
+            }
+            kind!("func_call") => {
+                self.errors
+                    .error(expr_span, "A submodule call is not a wire reference");
+                self.new_error(expr_span)
+            }
+            kind!("parenthesis_expression") => {
+                self.errors.error(
+                    expr_span,
+                    "Parentheses are not allowed within a wire reference",
+                );
+                self.new_error(expr_span)
+            }
+            _other => cursor.could_not_match(),
         }
     }
 
@@ -1385,7 +1217,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     }
                 } else {
                     // It's _expression
-                    self.flatten_wire_reference(cursor, to_span)
+                    self.flatten_wire_reference(cursor)
                 };
                 WriteTo {
                     to,
@@ -1646,7 +1478,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
 
             (
                 md.ports.id_range().into_iter(),
-                UUIDRange::empty().into_iter(),
+                UUIDRange::EMPTY.into_iter(),
                 DeclarationKind::RegularWire {
                     is_state: false,
                     read_only: false,
@@ -1657,15 +1489,15 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         GlobalUUID::Type(type_uuid) => {
             let typ = &globals[type_uuid];
             (
-                UUIDRange::empty().into_iter(),
+                UUIDRange::EMPTY.into_iter(),
                 typ.fields.id_range().into_iter(),
                 DeclarationKind::StructField(UUID::PLACEHOLDER),
                 &FlatAlloc::EMPTY_FLAT_ALLOC,
             )
         }
         GlobalUUID::Constant(_const_uuid) => (
-            UUIDRange::empty().into_iter(),
-            UUIDRange::empty().into_iter(),
+            UUIDRange::EMPTY.into_iter(),
+            UUIDRange::EMPTY.into_iter(),
             DeclarationKind::RegularGenerative { read_only: false },
             &FlatAlloc::EMPTY_FLAT_ALLOC,
         ),

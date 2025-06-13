@@ -118,7 +118,7 @@ impl<'l> DomainCheckingContext<'l> {
         match instr {
             Instruction::SubModule(sub_module_instance) => {
                 sub_module_instance.local_interface_domains.set(
-                    self.globals.globals[sub_module_instance.module_ref.id]
+                    self.globals[sub_module_instance.module_ref.id]
                         .domains
                         .map(|_| self.domain_checker.alloc_unknown()),
                 );
@@ -141,18 +141,17 @@ impl<'l> DomainCheckingContext<'l> {
             }
             Instruction::Expression(expression) => {
                 let mut total_domain = match &expression.source {
-                    ExpressionSource::WireRef(wire_ref) => self.get_wireref_root_domain(wire_ref),
+                    ExpressionSource::WireRef(wire_ref) => {
+                        let domain = self
+                            .get_wireref_root_domain(wire_ref)
+                            .unwrap_or(DomainType::Generative);
+                        (domain, wire_ref.root_span)
+                    }
                     ExpressionSource::FuncCall(func_call) => {
-                        let interface = self
-                            .globals
-                            .get_submodule(func_call.interface_reference.submodule_decl)
-                            .get_interface_reference(
-                                func_call.interface_reference.submodule_interface,
-                            );
-                        (
-                            interface.get_local_domain(),
-                            func_call.interface_reference.interface_span,
-                        )
+                        let domain = self
+                            .get_wireref_root_domain(&func_call.func)
+                            .unwrap_or(DomainType::Generative);
+                        (domain, func_call.func.root_span)
                     }
                     _ => (DomainType::Generative, Span::MAX_POSSIBLE_SPAN),
                 };
@@ -172,7 +171,11 @@ impl<'l> DomainCheckingContext<'l> {
 
                 if let ExpressionOutput::MultiWrite(writes) = &expression.output {
                     for wr in writes {
-                        let mut target_domain = self.get_wireref_root_domain(&wr.to);
+                        let mut target_domain = (
+                            self.get_wireref_root_domain(&wr.to)
+                                .unwrap_or_else(|| self.domain_checker.alloc_unknown()),
+                            wr.to.root_span,
+                        );
 
                         match wr.write_modifiers {
                             WriteModifiers::Connection { .. } => {
@@ -278,24 +281,48 @@ impl<'l> DomainCheckingContext<'l> {
     /// - Writing:
     ///     The output_typ domain should be generative when wire_ref.root is generative, or a generative value is required such as with "initial"
     ///     When wire_ref.root is not generative, it should be an unknown domain variable
-    fn get_wireref_root_domain(&mut self, wire_ref: &WireReference) -> (DomainType, Span) {
-        let root_domain = match &wire_ref.root {
+    fn get_wireref_root_domain(&mut self, wire_ref: &WireReference) -> Option<DomainType> {
+        match &wire_ref.root {
             WireReferenceRoot::LocalDecl(id) => {
-                self.instructions[*id].unwrap_declaration().domain.get()
+                Some(self.instructions[*id].unwrap_declaration().domain.get())
             }
             WireReferenceRoot::NamedConstant(global_ref) => {
                 self.global_ref_must_be_generative(global_ref);
-                DomainType::Generative
+                Some(DomainType::Generative)
             }
-            WireReferenceRoot::SubModulePort(port_ref) => self
-                .globals
-                .get_submodule(port_ref.submodule_decl)
-                .get_port(port_ref.port)
-                .get_local_domain(),
-            WireReferenceRoot::Error => DomainType::Generative,
-        };
+            WireReferenceRoot::NamedModule(global_ref) => {
+                self.global_ref_must_be_generative(global_ref);
+                Some(self.domain_checker.alloc_unknown())
+            }
+            WireReferenceRoot::LocalSubmodule(local_submod) => {
+                let submod = self.instructions[*local_submod].unwrap_submodule();
+                let submod_ref = self.globals.get_declared_submodule(submod);
+                if submod.local_interface_domains.len() == 1 {
+                    let [singular_domain] = submod.local_interface_domains.cast_to_array();
+                    return Some(*singular_domain);
+                }
 
-        (root_domain, wire_ref.root_span)
+                for p in &wire_ref.path {
+                    if let WireReferencePathElement::FieldAccess { refers_to, .. } = p {
+                        return match refers_to.get() {
+                            Some(PathElemRefersTo::Interface(interface)) => Some(
+                                submod.local_interface_domains[submod_ref
+                                    .get_interface_reference(*interface)
+                                    .interface
+                                    .domain],
+                            ),
+                            Some(PathElemRefersTo::Port(port)) => Some(
+                                submod.local_interface_domains
+                                    [submod_ref.get_port(*port).port.domain],
+                            ),
+                            None => None,
+                        };
+                    }
+                }
+                None
+            }
+            WireReferenceRoot::Error => None,
+        }
     }
 
     /// Used to quickly combine domains with each other. Also performs unification

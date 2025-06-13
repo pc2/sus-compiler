@@ -31,7 +31,7 @@ pub enum LocationInfo<'linker> {
     Global(GlobalUUID),
     /// The contained module only refers to the module on which the port is defined
     /// No reference to the module in which the reference was found is provided
-    Port(&'linker SubModuleInstance, &'linker Module, PortID),
+    Port(ModuleUUID, &'linker Module, PortID),
     Interface(ModuleUUID, &'linker Module, InterfaceID, &'linker Interface),
 }
 
@@ -93,12 +93,12 @@ impl From<LocationInfo<'_>> for RefersTo {
             LocationInfo::Global(name_elem) => {
                 result.global = Some(name_elem);
             }
-            LocationInfo::Port(sm, md, p_id) => {
+            LocationInfo::Port(md_id, md, p_id) => {
                 result.local = Some((
-                    GlobalUUID::Module(sm.module_ref.id),
+                    GlobalUUID::Module(md_id),
                     md.ports[p_id].declaration_instruction,
                 ));
-                result.port = Some((sm.module_ref.id, p_id))
+                result.port = Some((md_id, p_id))
             }
             LocationInfo::Interface(md_id, _md, i_id, _interface) => {
                 result.interface = Some((md_id, i_id))
@@ -117,7 +117,7 @@ impl RefersTo {
             }
             LocationInfo::Type(_, _) => false,
             LocationInfo::Global(ne) => self.global == Some(ne),
-            LocationInfo::Port(sm, _, p_id) => self.port == Some((sm.module_ref.id, p_id)),
+            LocationInfo::Port(md_id, _, p_id) => self.port == Some((md_id, p_id)),
             LocationInfo::Interface(md_id, _, i_id, _) => self.interface == Some((md_id, i_id)),
         }
     }
@@ -256,36 +256,72 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                     ),
                 );
             }
+            WireReferenceRoot::LocalSubmodule(submod_decl) => {
+                self.visit(
+                    wire_ref.root_span,
+                    LocationInfo::InGlobal(
+                        obj_id,
+                        link_info,
+                        *submod_decl,
+                        InGlobal::NamedSubmodule(
+                            link_info.instructions[*submod_decl].unwrap_submodule(),
+                        ),
+                    ),
+                );
+            }
             WireReferenceRoot::NamedConstant(cst) => {
                 self.walk_global_reference(obj_id, link_info, cst);
             }
-            WireReferenceRoot::SubModulePort(port) => {
-                if let Some(span) = port.port_name_span {
-                    let sm_instruction =
-                        link_info.instructions[port.submodule_decl].unwrap_submodule();
-                    let submodule = &self.linker.modules[sm_instruction.module_ref.id];
-                    self.visit(
-                        span,
-                        LocationInfo::Port(sm_instruction, submodule, port.port),
-                    );
-
-                    // port_name_span being enabled means submodule_name_span is for sure
-                    // And if port_name_span is invalid, then submodule_name_span points to a duplicate!
-                    // So in effect, port_name_span validity is a proxy for non-duplicate-ness of submodule_name_span
-                    self.visit(
-                        port.submodule_name_span.unwrap(),
-                        LocationInfo::InGlobal(
-                            obj_id,
-                            link_info,
-                            port.submodule_decl,
-                            InGlobal::NamedSubmodule(
-                                link_info.instructions[port.submodule_decl].unwrap_submodule(),
-                            ),
-                        ),
-                    );
-                }
+            WireReferenceRoot::NamedModule(md) => {
+                self.walk_global_reference(obj_id, link_info, md);
             }
             WireReferenceRoot::Error => {}
+        }
+
+        let module_id = match &wire_ref.root {
+            WireReferenceRoot::LocalDecl(_) => None,
+            WireReferenceRoot::LocalSubmodule(submod_decl) => Some(
+                link_info.instructions[*submod_decl]
+                    .unwrap_submodule()
+                    .module_ref
+                    .id,
+            ),
+            WireReferenceRoot::NamedConstant(_) => None,
+            WireReferenceRoot::NamedModule(global_reference) => Some(global_reference.id),
+            WireReferenceRoot::Error => None,
+        };
+
+        for p in &wire_ref.path {
+            match p {
+                WireReferencePathElement::FieldAccess {
+                    name: _,
+                    name_span,
+                    refers_to,
+                    output_typ: _,
+                } => {
+                    let Some(refers_to) = refers_to.get() else {
+                        continue;
+                    };
+
+                    let target = match refers_to {
+                        PathElemRefersTo::Interface(interface) => {
+                            let submodule = &self.linker.modules[module_id.unwrap()];
+                            LocationInfo::Interface(
+                                module_id.unwrap(),
+                                submodule,
+                                *interface,
+                                &submodule.interfaces[*interface],
+                            )
+                        }
+                        PathElemRefersTo::Port(port) => {
+                            let submodule = &self.linker.modules[module_id.unwrap()];
+                            LocationInfo::Port(module_id.unwrap(), submodule, *port)
+                        }
+                    };
+                    self.visit(*name_span, target);
+                }
+                WireReferencePathElement::ArrayAccess { .. } => {}
+            }
         }
     }
 
@@ -323,40 +359,6 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
         }
     }
 
-    fn walk_interface_reference(
-        &mut self,
-        obj_id: GlobalUUID,
-        link_info: &'linker LinkInfo,
-        iref: &ModuleInterfaceReference,
-    ) {
-        if let Some(submod_name_span) = iref.name_span {
-            let submodule_instruction = iref.submodule_decl;
-            let submodule = link_info.instructions[submodule_instruction].unwrap_submodule();
-            self.visit(
-                submod_name_span,
-                LocationInfo::InGlobal(
-                    obj_id,
-                    link_info,
-                    submodule_instruction,
-                    InGlobal::NamedSubmodule(submodule),
-                ),
-            );
-            if iref.interface_span != submod_name_span {
-                let submod_md = &self.linker.modules[submodule.module_ref.id];
-                let interface = &submod_md.interfaces[iref.submodule_interface];
-                self.visit(
-                    iref.interface_span,
-                    LocationInfo::Interface(
-                        submodule.module_ref.id,
-                        submod_md,
-                        iref.submodule_interface,
-                        interface,
-                    ),
-                );
-            }
-        }
-    }
-
     fn walk_name_and_template_arguments(
         &mut self,
         name_elem: GlobalUUID,
@@ -383,17 +385,15 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                 match inst {
                     Instruction::SubModule(sm) => {
                         self.walk_global_reference(obj_id, link_info, &sm.module_ref);
-                        if let Some((_sm_name, sm_name_span)) = &sm.name {
-                            self.visit(
-                                *sm_name_span,
-                                LocationInfo::InGlobal(
-                                    obj_id,
-                                    link_info,
-                                    id,
-                                    InGlobal::NamedSubmodule(sm),
-                                ),
-                            );
-                        }
+                        self.visit(
+                            sm.name_span,
+                            LocationInfo::InGlobal(
+                                obj_id,
+                                link_info,
+                                id,
+                                InGlobal::NamedSubmodule(sm),
+                            ),
+                        );
                     }
                     Instruction::Declaration(decl) => {
                         self.walk_type(obj_id, link_info, &decl.typ_expr);
@@ -415,11 +415,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                                 self.walk_wire_ref(obj_id, link_info, wire_ref)
                             }
                             ExpressionSource::FuncCall(func_call) => {
-                                self.walk_interface_reference(
-                                    obj_id,
-                                    link_info,
-                                    &func_call.interface_reference,
-                                );
+                                self.walk_wire_ref(obj_id, link_info, &func_call.func);
                             }
                             _ => {
                                 if let Some(single_output_expr) = expr.as_single_output_expr() {

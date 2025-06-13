@@ -325,15 +325,10 @@ impl ErrorInfoObject for Declaration {
 
 impl ErrorInfoObject for SubModuleInstance {
     fn make_info(&self, file: FileUUID) -> Option<ErrorInfo> {
-        let (position, info) = if let Some((name, span)) = &self.name {
-            (*span, format!("{name} declared here"))
-        } else {
-            (self.module_ref.name_span, "Used here".to_owned())
-        };
         Some(ErrorInfo {
-            position,
+            position: self.name_span,
             file,
-            info,
+            info: format!("{} declared here", self.name),
         })
     }
 }
@@ -343,6 +338,7 @@ impl ErrorInfoObject for Instruction {
         match self {
             Instruction::SubModule(sm) => sm.make_info(file),
             Instruction::Declaration(decl) => decl.make_info(file),
+            Instruction::Expression(_) => None,
             _ => unreachable!("At least there shouldn't be cases where we're referring to something other than SubModule or Declaration")
         }
     }
