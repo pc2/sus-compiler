@@ -1391,6 +1391,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     to,
                     to_span,
                     write_modifiers,
+                    target_domain: Cell::new(DomainType::PLACEHOLDER),
                 }
             })
         })

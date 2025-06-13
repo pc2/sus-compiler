@@ -239,20 +239,6 @@ fn factorial(mut n: UBig) -> UBig {
     n
 }
 
-/// Temporary intermediary struct
-///
-/// See [WireReferenceRoot]
-#[derive(Debug, Clone)]
-enum RealWireRefRoot<'t> {
-    /// The preamble isn't really used yet, but it's there for when we have submodule arrays (soon)
-    Wire {
-        wire_id: WireID,
-        preamble: Vec<RealWirePathElem>,
-    },
-    Generative(FlatID),
-    Constant(Value, &'t AbstractRankedType),
-}
-
 trait Concretizer {
     fn get_type(&mut self, id: TemplateID) -> ConcreteType;
     fn get_value(&mut self, expr: FlatID) -> ExecutionResult<UnifyableValue>;
@@ -500,20 +486,6 @@ impl<'l> ExecutionContext<'l> {
         .unwrap()
     }
 
-    fn instantiate_port_wire_ref_root(
-        &mut self,
-        port: PortID,
-        submodule_instr: FlatID,
-        port_name_span: Option<Span>,
-    ) -> RealWireRefRoot<'l> {
-        let submod_id = self.generation_state[submodule_instr].unwrap_submodule_instance();
-        let wire_id = self.get_submodule_port(submod_id, port, port_name_span);
-        RealWireRefRoot::Wire {
-            wire_id,
-            preamble: Vec::new(),
-        }
-    }
-
     fn evaluate_builtin_constant(
         &self,
         cst_ref: &ConcreteGlobalReference<ConstantUUID>,
@@ -631,58 +603,50 @@ impl<'l> ExecutionContext<'l> {
     }
 
     // Points to the wire in the hardware that corresponds to the root of this.
-    fn determine_wire_ref_root(
+    fn wire_ref_to_real_path(
         &mut self,
         wire_ref: &'l WireReference,
-    ) -> ExecutionResult<RealWireRefRoot<'l>> {
-        Ok(match &wire_ref.root {
-            &WireReferenceRoot::LocalDecl(decl_id) => match &self.generation_state[decl_id] {
-                SubModuleOrWire::Wire(w) => RealWireRefRoot::Wire {
-                    wire_id: *w,
-                    preamble: Vec::new(),
-                },
-                SubModuleOrWire::CompileTimeValue(_) => RealWireRefRoot::Generative(decl_id),
-                SubModuleOrWire::SubModule(_) => unreachable!(),
-                SubModuleOrWire::Unnasigned => unreachable!(),
-            },
-            WireReferenceRoot::NamedConstant(cst) => {
-                RealWireRefRoot::Constant(self.get_named_constant_value(cst)?, &wire_ref.root_typ)
-            }
-            WireReferenceRoot::SubModulePort(port) => {
-                return Ok(self.instantiate_port_wire_ref_root(
-                    port.port,
-                    port.submodule_decl,
-                    port.port_name_span,
-                ));
-            }
-            WireReferenceRoot::Error => unreachable!(),
-        })
-    }
-
-    /// [Self::determine_wire_ref_root] may have included a preamble path already, this must be built upon by this function
-    fn instantiate_wire_ref_path(
-        &mut self,
-        mut preamble: Vec<RealWirePathElem>,
-        path: &[WireReferencePathElement],
+        original_instruction: FlatID,
         domain: DomainID,
-    ) -> ExecutionResult<Vec<RealWirePathElem>> {
-        for v in path {
-            match v {
+    ) -> ExecutionResult<(WireID, Vec<RealWirePathElem>)> {
+        let mut path = Vec::new();
+        for p in &wire_ref.path {
+            match p {
                 &WireReferencePathElement::ArrayAccess {
                     idx,
                     bracket_span,
                     output_typ: _,
                 } => {
                     let idx_wire = self.get_wire_or_constant_as_wire(idx, domain)?;
-                    preamble.push(RealWirePathElem::ArrayAccess {
+                    path.push(RealWirePathElem::ArrayAccess {
                         span: bracket_span,
                         idx_wire,
                     });
                 }
             }
         }
+        let wire_id = match &wire_ref.root {
+            &WireReferenceRoot::LocalDecl(decl_id) => self.generation_state[decl_id].unwrap_wire(),
+            WireReferenceRoot::NamedConstant(cst) => {
+                let value = self.get_named_constant_value(cst)?;
 
-        Ok(preamble)
+                self.alloc_wire_for_const(
+                    value,
+                    &wire_ref.root_typ,
+                    original_instruction,
+                    domain,
+                    wire_ref.root_span,
+                )?
+            }
+            WireReferenceRoot::SubModulePort(port) => {
+                let submodule_instr = port.submodule_decl;
+                let port_name_span = port.port_name_span;
+                let submod_id = self.generation_state[submodule_instr].unwrap_submodule_instance();
+                self.get_submodule_port(submod_id, port.port, port_name_span)
+            }
+            WireReferenceRoot::Error => caught_by_typecheck!(),
+        };
+        Ok((wire_id, path))
     }
 
     fn instantiate_write_to_wire(
@@ -715,6 +679,7 @@ impl<'l> ExecutionContext<'l> {
         write_to: &'l WriteTo,
         from: WireID,
         wr_ref: WriteReference,
+        domain: DomainID,
     ) -> ExecutionResult<()> {
         let_unwrap!(
             WriteModifiers::Connection {
@@ -723,85 +688,34 @@ impl<'l> ExecutionContext<'l> {
             },
             &write_to.write_modifiers
         );
-        let_unwrap!(
-            RealWireRefRoot::Wire {
-                wire_id: target_wire,
-                preamble,
-            },
-            self.determine_wire_ref_root(&write_to.to)?
-        );
-        let domain = self.wires[target_wire].domain;
-        let instantiated_path =
-            self.instantiate_wire_ref_path(preamble, &write_to.to.path, domain)?;
-        self.instantiate_write_to_wire(target_wire, instantiated_path, from, *num_regs, wr_ref);
+        let (target_wire, path) =
+            self.wire_ref_to_real_path(&write_to.to, wr_ref.original_expression, domain)?;
+
+        self.instantiate_write_to_wire(target_wire, path, from, *num_regs, wr_ref);
         Ok(())
     }
 
-    fn write_generative(
-        &mut self,
-        write_to: &'l WriteTo,
-        value: Value,
-        original_expression: FlatID,
-    ) -> ExecutionResult<()> {
+    fn write_generative(&mut self, write_to: &'l WriteTo, value: Value) -> ExecutionResult<()> {
+        let root_decl_id = write_to.to.root.unwrap_local_decl();
         match &write_to.write_modifiers {
-            WriteModifiers::Connection {
-                num_regs,
-                regs_span: _,
-            } => match self.determine_wire_ref_root(&write_to.to)? {
-                RealWireRefRoot::Wire {
-                    wire_id: target_wire,
-                    preamble,
-                } => {
-                    let domain = self.wires[target_wire].domain;
-                    let from = self.alloc_wire_for_const(
-                        value,
-                        write_to.to.get_output_typ(),
-                        original_expression,
-                        domain,
-                        self.link_info.instructions[original_expression]
-                            .unwrap_expression()
-                            .span,
-                    )?;
-                    let instantiated_path =
-                        self.instantiate_wire_ref_path(preamble, &write_to.to.path, domain)?;
-                    self.instantiate_write_to_wire(
-                        target_wire,
-                        instantiated_path,
-                        from,
-                        *num_regs,
-                        WriteReference {
-                            original_expression,
-                            write_idx: 0,
-                        },
-                    );
-                }
-                RealWireRefRoot::Generative(target_decl) => {
-                    let SubModuleOrWire::CompileTimeValue(v_writable) =
-                        &mut self.generation_state[target_decl]
-                    else {
-                        unreachable!()
-                    };
-                    let mut new_val = std::mem::replace(v_writable, Value::Unset);
-                    self.generation_state.write_gen_variable(
-                        &mut new_val,
-                        &write_to.to.path,
-                        value,
-                    )?;
+            WriteModifiers::Connection { .. } => {
+                let_unwrap!(
+                    SubModuleOrWire::CompileTimeValue(v_writable),
+                    &mut self.generation_state[root_decl_id]
+                );
 
-                    let SubModuleOrWire::CompileTimeValue(v_writable) =
-                        &mut self.generation_state[target_decl]
-                    else {
-                        unreachable!()
-                    };
-                    *v_writable = new_val;
-                }
-                RealWireRefRoot::Constant(_cst, _) => {
-                    caught_by_typecheck!("Cannot assign to constants");
-                }
-            },
+                let mut new_val = std::mem::replace(v_writable, Value::Unset);
+                self.generation_state
+                    .write_gen_variable(&mut new_val, &write_to.to.path, value)?;
+
+                let_unwrap!(
+                    SubModuleOrWire::CompileTimeValue(v_writable),
+                    &mut self.generation_state[root_decl_id]
+                );
+                *v_writable = new_val;
+            }
             WriteModifiers::Initial { initial_kw_span: _ } => {
-                let root_wire =
-                    self.generation_state[write_to.to.root.unwrap_local_decl()].unwrap_wire();
+                let root_wire = self.generation_state[root_decl_id].unwrap_wire();
                 let RealWireDataSource::Multiplexer {
                     is_state: Some(initial_value),
                     sources: _,
@@ -934,44 +848,6 @@ impl<'l> ExecutionContext<'l> {
         }
     }
 
-    fn get_wire_ref_root_as_wire(
-        &mut self,
-        wire_ref: &'l WireReference,
-        original_instruction: FlatID,
-        domain: DomainID,
-    ) -> ExecutionResult<(WireID, Vec<RealWirePathElem>)> {
-        let root = self.determine_wire_ref_root(wire_ref)?;
-        Ok(match root {
-            RealWireRefRoot::Wire { wire_id, preamble } => (wire_id, preamble),
-            RealWireRefRoot::Generative(decl_id) => {
-                let decl = self.link_info.instructions[decl_id].unwrap_declaration();
-                let value = self.generation_state[decl_id]
-                    .unwrap_generation_value()
-                    .clone();
-                (
-                    self.alloc_wire_for_const(
-                        value,
-                        &decl.typ,
-                        decl_id,
-                        domain,
-                        wire_ref.root_span,
-                    )?,
-                    Vec::new(),
-                )
-            }
-            RealWireRefRoot::Constant(value, typ) => (
-                self.alloc_wire_for_const(
-                    value,
-                    typ,
-                    original_instruction,
-                    domain,
-                    wire_ref.root_span,
-                )?,
-                Vec::new(),
-            ),
-        })
-    }
-
     fn expression_to_real_wire(
         &mut self,
         expression: &'l Expression,
@@ -980,9 +856,8 @@ impl<'l> ExecutionContext<'l> {
     ) -> ExecutionResult<Vec<WireID>> {
         let source = match &expression.source {
             ExpressionSource::WireRef(wire_ref) => {
-                let (root_wire, path_preamble) =
-                    self.get_wire_ref_root_as_wire(wire_ref, original_instruction, domain)?;
-                let path = self.instantiate_wire_ref_path(path_preamble, &wire_ref.path, domain)?;
+                let (root_wire, path) =
+                    self.wire_ref_to_real_path(wire_ref, original_instruction, domain)?;
 
                 if path.is_empty() {
                     // Little optimization reduces instructions
@@ -1293,11 +1168,33 @@ impl<'l> ExecutionContext<'l> {
                                 ExpressionOutput::SubExpression(_full_type) => {} // Simply returning value_computed is enough
                                 ExpressionOutput::MultiWrite(write_tos) => {
                                     if let Some(single_write) = write_tos.first() {
-                                        self.write_generative(
-                                            single_write,
-                                            value_computed.clone(), // We do an extra clone, maybe not needed, such that we can show the value in GenerationState
-                                            original_instruction,
-                                        )?;
+                                        match single_write.target_domain.get() {
+                                            DomainType::Generative => {
+                                                self.write_generative(
+                                                    single_write,
+                                                    value_computed.clone(), // We do an extra clone, maybe not needed, such that we can show the value in GenerationState
+                                                )?;
+                                            }
+                                            DomainType::Physical(domain) => {
+                                                let value_as_wire = self.alloc_wire_for_const(
+                                                    value_computed.clone(),
+                                                    single_write.to.get_output_typ(),
+                                                    original_instruction,
+                                                    domain,
+                                                    expr.span,
+                                                )?;
+                                                self.write_non_generative(
+                                                    single_write,
+                                                    value_as_wire,
+                                                    WriteReference {
+                                                        original_expression: original_instruction,
+                                                        write_idx: 0,
+                                                    },
+                                                    domain,
+                                                )?;
+                                            }
+                                            DomainType::Unknown(_) => caught_by_typecheck!(),
+                                        }
                                     }
                                 }
                             }
@@ -1325,6 +1222,7 @@ impl<'l> ExecutionContext<'l> {
                                                 original_expression: original_instruction,
                                                 write_idx,
                                             },
+                                            domain,
                                         )?;
                                     }
                                     continue;

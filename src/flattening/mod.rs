@@ -375,6 +375,7 @@ pub struct WriteTo {
     pub to: WireReference,
     pub to_span: Span,
     pub write_modifiers: WriteModifiers,
+    pub target_domain: Cell<DomainType>,
 }
 
 /// -x

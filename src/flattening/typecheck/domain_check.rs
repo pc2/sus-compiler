@@ -69,11 +69,17 @@ fn finalize_domains(
                     .get_mut()
                     .fully_substitute(&domain_substitutor));
             }
-            Instruction::Expression(expression) => {
-                assert!(expression
-                    .domain
-                    .get_mut()
-                    .fully_substitute(&domain_substitutor));
+            Instruction::Expression(expr) => {
+                assert!(expr.domain.get_mut().fully_substitute(&domain_substitutor));
+
+                if let ExpressionOutput::MultiWrite(writes) = &mut expr.output {
+                    for w in writes {
+                        assert!(w
+                            .target_domain
+                            .get_mut()
+                            .fully_substitute(&domain_substitutor));
+                    }
+                }
             }
             Instruction::IfStatement(_)
             | Instruction::ForStatement(_)
@@ -186,6 +192,8 @@ impl<'l> DomainCheckingContext<'l> {
                                 target_domain = (DomainType::Generative, initial_kw_span);
                             }
                         }
+
+                        wr.target_domain.set(target_domain.0);
 
                         wr.to.for_each_input_wire_in_path(&mut |id| {
                             let expr = self.instructions[id].unwrap_subexpression();
