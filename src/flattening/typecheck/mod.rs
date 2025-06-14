@@ -85,32 +85,30 @@ pub fn typecheck_all(linker: &mut Linker, global_ids: &[GlobalUUID]) {
         finalize_ctx.apply_domains(&mut link_info.instructions);
 
         linker.immutable_pass("Report Type Errors", *global_id, |link_info, errors, globals| {
+            for FailedUnification {
+                mut found,
+                mut expected,
+                span,
+                context,
+                infos,
+            } in finalize_ctx.domain_checker.extract_errors()
+            {
+                let _ = found.fully_substitute(&finalize_ctx.domain_checker);
+                let _ = expected.fully_substitute(&finalize_ctx.domain_checker);
 
+                let expected_name = format!("{expected:?}");
+                let found_name = format!("{found:?}");
+                errors
+                    .error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"))
+                    .add_info_list(infos);
 
-        for FailedUnification {
-            mut found,
-            mut expected,
-            span,
-            context,
-            infos,
-        } in finalize_ctx.domain_checker.extract_errors()
-        {
-            let _ = found.fully_substitute(&finalize_ctx.domain_checker);
-            let _ = expected.fully_substitute(&finalize_ctx.domain_checker);
+                assert_ne!(found, expected);
 
-            let expected_name = format!("{expected:?}");
-            let found_name = format!("{found:?}");
-            errors
-            .error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"))
-            .add_info_list(infos);
-
-            assert_ne!(found, expected);
-
-            /*assert!(
-                expected_name != found_name,
-                "{expected_name} != {found_name}"
-            );*/
-        }
+                /*assert!(
+                    expected_name != found_name,
+                    "{expected_name} != {found_name}"
+                );*/
+            }
             // Print all errors
             for FailedUnification {
                 mut found,
@@ -131,8 +129,8 @@ pub fn typecheck_all(linker: &mut Linker, global_ids: &[GlobalUUID]) {
                     .display(globals.linker, &link_info.template_parameters)
                     .to_string();
                 errors
-                .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
-                .add_info_list(infos);
+                    .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
+                    .add_info_list(infos);
 
                 assert_ne!(found, expected);
 
@@ -142,6 +140,10 @@ pub fn typecheck_all(linker: &mut Linker, global_ids: &[GlobalUUID]) {
                 );*/
             }
 
+            // Skip printing not fully figured out types of there are type errors to reduce visual overhead. 
+            if errors.did_error() {
+                return;
+            }
             for (typ, span) in finalize_ctx.substitution_failures {
                 errors.error(
                     span,

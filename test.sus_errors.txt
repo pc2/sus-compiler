@@ -276,13 +276,6 @@ Error: A Function call expects this to be an interface, but found a regular wire
      │                 ────┬───  
      │                     ╰───── A Function call expects this to be an interface, but found a regular wire
 ─────╯
-Error: Could not fully figure out the type of this object. ?[...]
-     ╭─[ test.sus:219:17 ]
-     │
- 219 │     int tmp'1 = multiply(a, b)
-     │                 ────┬───  
-     │                     ╰───── Could not fully figure out the type of this object. ?[...]
-─────╯
 Error: No Global of the name 'multiply' was found. Did you forget to import it?
      ╭─[ test.sus:219:17 ]
      │
@@ -2719,20 +2712,6 @@ Error: 'BEEP' is not a valid template argument of int
      │                    ─┬─  
      │                     ╰─── 'int' defined here
 ─────╯
-Error: Could not fully figure out the type of this object. ?[...]
-     ╭─[ test.sus:767:50 ]
-     │
- 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
-     │                                                  ─┬─  
-     │                                                   ╰─── Could not fully figure out the type of this object. ?[...]
-─────╯
-Error: Could not fully figure out the type of this object. ?[...]
-     ╭─[ test.sus:767:50 ]
-     │
- 767 │     interface test : ::int #(beep: 20 > 3, BEEP: int) ab
-     │                                                  ─┬─  
-     │                                                   ╰─── Could not fully figure out the type of this object. ?[...]
-─────╯
 Error: int is not a named wire: local or constant, it is a Struct instead!
      ╭─[ test.sus:767:50 ]
      │
@@ -2781,13 +2760,6 @@ Error: 'beep' is read-only
  773 │     beep = 3
      │     ──┬─  
      │       ╰─── 'beep' is read-only
-─────╯
-Error: Could not fully figure out the type of this object. ?[...]
-     ╭─[ test.sus:775:2 ]
-     │
- 775 │     FIFO #(BITWIDTH: 4) badoop
-     │     ─────────┬─────────  
-     │              ╰─────────── Could not fully figure out the type of this object. ?[...]
 ─────╯
 Error: 'BITWIDTH' is not a valid template argument of FIFO
      ╭─[ test.sus:775:9 ]
@@ -10653,33 +10625,12 @@ Error: This declaration conflicts with a previous declaration in the same scope
       │            ────┬────  
       │                ╰────── This declaration conflicts with a previous declaration in the same scope
 ──────╯
-Error: Could not fully figure out the type of this object. ?[...]
-      ╭─[ test.sus:1027:2 ]
-      │
- 1027 │     make_infinite_type_help mtinf
-      │     ───────────┬───────────  
-      │                ╰───────────── Could not fully figure out the type of this object. ?[...]
-──────╯
-Error: Could not fully figure out the type of this object. ?[][...]
-      ╭─[ test.sus:1029:2 ]
-      │
- 1029 │     mtinf.a = mtinf.b
-      │     ───┬───  
-      │        ╰───── Could not fully figure out the type of this object. ?[][...]
-──────╯
 Error: Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects a ?[][...] but was given a ?[...]
       ╭─[ test.sus:1029:2 ]
       │
  1029 │     mtinf.a = mtinf.b
       │     ───┬───  
       │        ╰───── Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects a ?[][...] but was given a ?[...]
-──────╯
-Error: Could not fully figure out the type of this object. ?[...]
-      ╭─[ test.sus:1029:12 ]
-      │
- 1029 │     mtinf.a = mtinf.b
-      │               ───┬───  
-      │                  ╰───── Could not fully figure out the type of this object. ?[...]
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1036:8 ]
@@ -11996,13 +11947,6 @@ Error: While parsing 'block', parser found a syntax error in a node of type 'ERR
       │ │       
       │ ╰─────── Parent node 'block'
 ──────╯
-Error: Could not fully figure out the type of this object. ?[...]
-      ╭─[ test.sus:1254:2 ]
-      │
- 1254 │     MultiStateLoop loop
-      │     ───────┬──────  
-      │            ╰──────── Could not fully figure out the type of this object. ?[...]
-──────╯
 Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
       ╭─[ test.sus:1256:2 ]
       │
@@ -12035,13 +11979,6 @@ Error: No Global of the name 'trigger' was found. Did you forget to import it?
  1259 │     action request_result : -> trigger result_valid : {
       │                                ───┬───  
       │                                   ╰───── No Global of the name 'trigger' was found. Did you forget to import it?
-──────╯
-Error: Could not fully figure out the type of this object. ?[...]
-      ╭─[ test.sus:1259:37 ]
-      │
- 1259 │     action request_result : -> trigger result_valid : {
-      │                                        ──────┬─────  
-      │                                              ╰─────── Could not fully figure out the type of this object. ?[...]
 ──────╯
 Error: While parsing 'action_trigger_statement', parser found a syntax error in a node of type 'ERROR'
       ╭─[ test.sus:1259:50 ]
