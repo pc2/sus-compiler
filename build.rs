@@ -25,7 +25,10 @@ fn main() {
         .unwrap();
     let git_hash = String::from_utf8(output.stdout).unwrap();
     println!("cargo:rustc-env=GIT_HASH={}", git_hash);
-    println!("cargo:rustc-env=BUILD_DATE={}", chrono::Local::now());
+    println!(
+        "cargo:rustc-env=BUILD_DATE={}",
+        chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+    );
 }
 
 fn get_sus_dir() -> PathBuf {
