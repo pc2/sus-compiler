@@ -11006,17 +11006,6 @@ Error: Excess argument. Function takes 1 args, but 2 were passed.
       │               ────┬───  
       │                   ╰───── Interface 'infer_me' defined here
 ──────╯
-Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(
-    A: /* Could not infer */
-)
-      ╭─[ test.sus:1155:12 ]
-      │
- 1155 │     out_val = infer_me(in_val) | heavily_pipelined_computation
-      │               ────┬───  
-      │                   ╰───── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(
-    A: /* Could not infer */
-)
-──────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
@@ -12222,17 +12211,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_delta #(
-    V: /* Could not infer */
-)
-      ╭─[ test.sus:1317:22 ]
-      │
- 1317 │     infer_me_with_delta inf
-      │                         ─┬─  
-      │                          ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_delta #(
-    V: /* Could not infer */
-)
-──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1324:20 ]
       │
@@ -12246,17 +12224,6 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1326 │     interface b: bool p'0 -> bool q'-V+30
       │                       ┬  
       │                       ╰── Unused Variable: This variable does not affect the output ports of this module
-──────╯
-Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_negative_delta #(
-    V: /* Could not infer */
-)
-      ╭─[ test.sus:1332:31 ]
-      │
- 1332 │     infer_me_with_negative_delta inf
-      │                                  ─┬─  
-      │                                   ╰─── Could not infer the parameters of this submodule, some parameters were still unknown: infer_me_with_negative_delta #(
-    V: /* Could not infer */
-)
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1338:35 ]

@@ -1,120 +1,45 @@
-use crate::alloc::UUIDAllocator;
 use crate::errors::ErrorInfo;
-use crate::linker::GlobalUUID;
 use crate::prelude::*;
-use crate::typing::type_inference::{FailedUnification, TypeSubstitutor, TypeUnifier};
 
 use super::*;
 
-pub fn domain_check_all(linker: &mut Linker, global_ids: &[GlobalUUID]) {
-    for global_id in global_ids {
-        let domain_substitutor =
-            linker.immutable_pass("Domain Check", *global_id, |link_info, errors, globals| {
-                let mut ctx = DomainCheckingContext {
-                    globals,
-                    errors,
-                    domain_checker: TypeUnifier::default(),
-                    instructions: &link_info.instructions,
-                };
-
-                for (_, instr) in ctx.instructions {
-                    ctx.check_instr(instr);
-                }
-
-                ctx.domain_checker
-            });
-
-        if let GlobalUUID::Module(md_id) = *global_id {
-            let md = &mut linker.modules[md_id];
-            // Set the remaining domain variables that aren't associated with a module port.
-            // We just find domain IDs that haven't been
-            let mut leftover_domain_alloc =
-                UUIDAllocator::new_start_from(md.domains.get_next_alloc_id());
-            for (_, d) in domain_substitutor.iter() {
-                if d.get().is_none() {
-                    assert!(d
-                        .set(DomainType::Physical(leftover_domain_alloc.alloc()))
-                        .is_ok());
-                }
-            }
-        }
-
-        let link_info = Linker::get_link_info_mut(
-            &mut linker.modules,
-            &mut linker.types,
-            &mut linker.constants,
-            *global_id,
-        );
-        let errors = link_info.take_errors(&linker.files);
-        finalize_domains(&errors, &mut link_info.instructions, domain_substitutor);
-        link_info.reabsorb_errors(errors.into_storage());
-    }
-}
-
-fn finalize_domains(
-    errors: &ErrorCollector,
-    instructions: &mut FlatAlloc<Instruction, FlatIDMarker>,
-    mut domain_substitutor: TypeUnifier<TypeSubstitutor<DomainType>>,
-) {
-    for (_, instr) in instructions {
-        match instr {
-            Instruction::SubModule(sm) => {
-                for (_, d) in sm.local_interface_domains.get_mut() {
-                    assert!(d.fully_substitute(&domain_substitutor));
-                }
-            }
-            Instruction::Declaration(declaration) => {
-                assert!(declaration
-                    .domain
-                    .get_mut()
-                    .fully_substitute(&domain_substitutor));
-            }
-            Instruction::Expression(expr) => {
-                assert!(expr.domain.get_mut().fully_substitute(&domain_substitutor));
-
-                if let ExpressionOutput::MultiWrite(writes) = &mut expr.output {
-                    for w in writes {
-                        assert!(w
-                            .target_domain
-                            .get_mut()
-                            .fully_substitute(&domain_substitutor));
+impl FinalizationContext {
+    pub fn apply_domains(&self, instructions: &mut FlatAlloc<Instruction, FlatIDMarker>) {
+        for (_, instr) in instructions {
+            match instr {
+                Instruction::SubModule(sm) => {
+                    for (_, d) in sm.local_interface_domains.get_mut() {
+                        assert!(d.fully_substitute(&self.domain_checker));
                     }
                 }
+                Instruction::Declaration(declaration) => {
+                    assert!(declaration
+                        .domain
+                        .get_mut()
+                        .fully_substitute(&self.domain_checker));
+                }
+                Instruction::Expression(expr) => {
+                    assert!(expr.domain.get_mut().fully_substitute(&self.domain_checker));
+
+                    if let ExpressionOutput::MultiWrite(writes) = &mut expr.output {
+                        for w in writes {
+                            assert!(w
+                                .target_domain
+                                .get_mut()
+                                .fully_substitute(&self.domain_checker));
+                        }
+                    }
+                }
+                Instruction::IfStatement(_)
+                | Instruction::ForStatement(_)
+                | Instruction::ActionTriggerDeclaration(_) => {}
             }
-            Instruction::IfStatement(_)
-            | Instruction::ForStatement(_)
-            | Instruction::ActionTriggerDeclaration(_) => {}
         }
-    }
-
-    for FailedUnification {
-        mut found,
-        mut expected,
-        span,
-        context,
-        infos,
-    } in domain_substitutor.extract_errors()
-    {
-        let _ = found.fully_substitute(&domain_substitutor);
-        let _ = expected.fully_substitute(&domain_substitutor);
-
-        let expected_name = format!("{expected:?}");
-        let found_name = format!("{found:?}");
-        errors
-            .error(span, format!("Domain error: Attempting to combine domains {found_name} and {expected_name} in {context}"))
-            .add_info_list(infos);
-
-        assert_ne!(found, expected);
-
-        /*assert!(
-            expected_name != found_name,
-            "{expected_name} != {found_name}"
-        );*/
     }
 }
 
-impl<'l> DomainCheckingContext<'l> {
-    fn check_instr(&mut self, instr: &Instruction) {
+impl<'l> TypeCheckingContext<'l> {
+    pub fn domain_check_instr(&mut self, instr: &Instruction) {
         match instr {
             Instruction::SubModule(sub_module_instance) => {
                 sub_module_instance.local_interface_domains.set(

@@ -6,9 +6,7 @@ use crate::linker::passes::{RemoteDeclaration, RemoteInterface};
 use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType};
 use crate::typing::template::TVec;
-use crate::typing::type_inference::{
-    AbstractTypeSubstitutor, FailedUnification, TypeUnifier, UnifyErrorReport,
-};
+use crate::typing::type_inference::{AbstractTypeSubstitutor, TypeUnifier, UnifyErrorReport};
 
 use crate::linker::GlobalUUID;
 
@@ -18,94 +16,6 @@ use crate::typing::{
 };
 
 use super::*;
-
-pub fn typecheck_all_modules(linker: &mut Linker, global_ids: &[GlobalUUID]) {
-    for global_id in global_ids {
-        let type_checker =
-            linker.immutable_pass("Typechecking", *global_id, |working_on, errors, globals| {
-                let mut context = TypeCheckingContext {
-                    globals,
-                    errors,
-                    type_checker: TypeUnifier::from(AbstractTypeSubstitutor::default()),
-                    instructions: &working_on.instructions,
-                    template_args: &working_on.template_parameters,
-                };
-
-                context.typecheck();
-
-                context.type_checker
-            });
-
-        let link_info = Linker::get_link_info_mut(
-            &mut linker.modules,
-            &mut linker.types,
-            &mut linker.constants,
-            *global_id,
-        );
-        // Grab another mutable copy of md so it doesn't force a borrow conflict
-        let mut finalize_ctx = FinalizationContext {
-            type_checker,
-            substitution_failures: Vec::new(),
-        };
-        finalize_ctx.apply_types(&mut link_info.instructions);
-
-        linker.immutable_pass("Report Type Errors", *global_id, |link_info, errors, globals| {
-            // Print all errors
-            for FailedUnification {
-                mut found,
-                mut expected,
-                span,
-                context,
-                infos,
-            } in finalize_ctx.type_checker.extract_errors()
-            {
-                // Not being able to fully substitute is not an issue. We just display partial types
-                let _ = found.fully_substitute(&finalize_ctx.type_checker);
-                let _ = expected.fully_substitute(&finalize_ctx.type_checker);
-
-                let expected_name = expected
-                    .display(globals.linker, &link_info.template_parameters)
-                    .to_string();
-                let found_name = found
-                    .display(globals.linker, &link_info.template_parameters)
-                    .to_string();
-                errors
-                .error(span, format!("Typing Error: {context} expects a {expected_name} but was given a {found_name}"))
-                .add_info_list(infos);
-
-                assert_ne!(found, expected);
-
-                /*assert!(
-                    expected_name != found_name,
-                    "{expected_name} != {found_name}"
-                );*/
-            }
-
-            for (typ, span) in finalize_ctx.substitution_failures {
-                errors.error(
-                    span,
-                    format!(
-                        "Could not fully figure out the type of this object. {}",
-                        typ.display(globals.linker, &link_info.template_parameters)
-                    ),
-                );
-            }
-        });
-
-        if let GlobalUUID::Module(md_id) = *global_id {
-            let md = &mut linker.modules[md_id];
-            // Also create the inference info now.
-            md.latency_inference_info = PortLatencyInferenceInfo::make(
-                &md.ports,
-                &md.link_info.instructions,
-                md.link_info.template_parameters.len(),
-            );
-            if crate::debug::is_enabled("print-flattened") {
-                md.print_flattened_module(&linker.files[md.link_info.file]);
-            }
-        }
-    }
-}
 
 impl<'l> TypeCheckingContext<'l> {
     fn typecheck_wire_reference(&mut self, wire_ref: &WireReference) {
@@ -573,8 +483,8 @@ impl<'l> TypeCheckingContext<'l> {
         }
     }
 
-    fn typecheck_visit_instruction(&mut self, instr_id: FlatID) {
-        match &self.instructions[instr_id] {
+    pub fn type_check_instr(&mut self, instr: &'l Instruction) {
+        match instr {
             Instruction::SubModule(sm) => {
                 self.typecheck_template_global(&sm.module_ref);
                 sm.typ.set(AbstractRankedType {
@@ -626,13 +536,6 @@ impl<'l> TypeCheckingContext<'l> {
                 }
             },
             Instruction::ActionTriggerDeclaration(_act_trig) => {}
-        }
-    }
-
-    /// Should be followed up by a [apply_types] call to actually apply all the checked types.
-    fn typecheck(&mut self) {
-        for elem_id in self.instructions.id_range() {
-            self.typecheck_visit_instruction(elem_id);
         }
     }
 }
@@ -779,11 +682,6 @@ impl TypeUnifier<AbstractTypeSubstitutor> {
     }
 }
 
-struct FinalizationContext {
-    type_checker: TypeUnifier<AbstractTypeSubstitutor>,
-    substitution_failures: Vec<(AbstractRankedType, Span)>,
-}
-
 impl FinalizationContext {
     pub fn apply_types(&mut self, instructions: &mut FlatAlloc<Instruction, FlatIDMarker>) {
         // Post type application. Solidify types and flag any remaining AbstractType::Unknown
@@ -827,20 +725,20 @@ impl FinalizationContext {
         }
     }
 
-    pub fn finalize_abstract_type(&mut self, typ: &mut AbstractRankedType, span: Span) {
+    fn finalize_abstract_type(&mut self, typ: &mut AbstractRankedType, span: Span) {
         if !typ.fully_substitute(&self.type_checker) {
             self.substitution_failures.push((typ.clone(), span));
         }
     }
 
-    pub fn finalize_global_ref<ID: Copy>(&mut self, global_ref: &mut GlobalReference<ID>) {
+    fn finalize_global_ref<ID: Copy>(&mut self, global_ref: &mut GlobalReference<ID>) {
         let global_ref_span = global_ref.get_total_span();
         for (_template_id, arg) in global_ref.template_arg_types.get_mut() {
             self.finalize_abstract_type(arg, global_ref_span);
         }
     }
 
-    pub fn finalize_wire_ref(&mut self, wire_ref: &mut WireReference) {
+    fn finalize_wire_ref(&mut self, wire_ref: &mut WireReference) {
         match &mut wire_ref.root {
             WireReferenceRoot::NamedConstant(cst) => {
                 self.finalize_global_ref(cst);
