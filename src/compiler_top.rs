@@ -88,6 +88,16 @@ impl Linker {
         );
     }
 
+    pub fn add_file<ExtraInfoManager: LinkerExtraFileInfoManager>(
+        &mut self,
+        file_path: &Path,
+        info_mngr: &mut ExtraInfoManager,
+    ) {
+        let file_text = std::fs::read_to_string(file_path).unwrap();
+        let file_identifier: String = info_mngr.convert_filename(file_path);
+        self.add_file_text(file_identifier, file_text, info_mngr);
+    }
+
     pub fn add_all_files_in_directory<ExtraInfoManager: LinkerExtraFileInfoManager>(
         &mut self,
         directory: &PathBuf,
@@ -102,14 +112,12 @@ impl Linker {
         for file in files {
             let file_path = file.canonicalize().unwrap();
             if file_path.is_file() && file_path.extension() == Some(OsStr::new("sus")) {
-                let file_text = std::fs::read_to_string(&file_path).unwrap();
-                let file_identifier: String = info_mngr.convert_filename(&file_path);
-                self.add_file(file_identifier, file_text, info_mngr);
+                self.add_file(&file_path, info_mngr);
             }
         }
     }
 
-    pub fn add_file<ExtraInfoManager: LinkerExtraFileInfoManager>(
+    pub fn add_file_text<ExtraInfoManager: LinkerExtraFileInfoManager>(
         &mut self,
         file_identifier: String,
         text: String,
@@ -181,7 +189,7 @@ impl Linker {
 
             info_mngr.on_file_updated(file_id, self);
         } else {
-            self.add_file(file_identifier.to_owned(), text, info_mngr);
+            self.add_file_text(file_identifier.to_owned(), text, info_mngr);
         }
     }
 

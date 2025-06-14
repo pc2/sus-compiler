@@ -91,7 +91,7 @@ impl Linker {
         } else {
             let file_text = std::fs::read_to_string(uri.to_file_path().unwrap()).unwrap();
 
-            let file_uuid = self.add_file(uri.to_string(), file_text, manager);
+            let file_uuid = self.add_file_text(uri.to_string(), file_text, manager);
             self.recompile_all();
             file_uuid
         }
@@ -201,7 +201,13 @@ fn initialize_all_files(init_params: &InitializeParams) -> (Linker, LSPFileManag
 
     linker.add_standard_library(&mut manager);
 
-    if let Some(workspace_folder) = &init_params.workspace_folders {
+    let files = &config().files;
+    if !files.is_empty() {
+        for f in files {
+            let path = f.canonicalize().unwrap();
+            linker.add_file(&path, &mut manager);
+        }
+    } else if let Some(workspace_folder) = &init_params.workspace_folders {
         for folder in workspace_folder {
             let Ok(path) = folder.uri.to_file_path() else {
                 continue;
@@ -210,6 +216,7 @@ fn initialize_all_files(init_params: &InitializeParams) -> (Linker, LSPFileManag
             linker.add_all_files_in_directory(&path, &mut manager);
         }
     }
+
     linker.recompile_all();
     (linker, manager)
 }
