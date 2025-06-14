@@ -535,7 +535,7 @@ impl<'l> TypeCheckingContext<'l> {
                     self.typecheck_multi_output_expr(expr, write_tos);
                 }
             },
-            Instruction::ActionTriggerDeclaration(_act_trig) => {}
+            Instruction::Interface(_act_trig) => {}
         }
     }
 }

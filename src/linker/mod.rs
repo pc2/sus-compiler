@@ -133,7 +133,7 @@ impl LinkInfo {
             Instruction::Declaration(decl) => decl.decl_span,
             Instruction::Expression(w) => w.span,
             Instruction::IfStatement(if_stmt) => if_stmt.if_keyword_span,
-            Instruction::ActionTriggerDeclaration(act_trig) => act_trig.name_span,
+            Instruction::Interface(act_trig) => act_trig.name_span,
             Instruction::ForStatement(for_stmt) => {
                 self.get_instruction_span(for_stmt.loop_var_decl)
             }

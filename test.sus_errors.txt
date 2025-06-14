@@ -10587,15 +10587,15 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                   ╰───── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
-      ╭─[ test.sus:1008:2 ]
+      ╭─[ test.sus:1008:9 ]
       │
  1006 │     input int bad_port
       │           ──────┬─────  
       │                 ╰─────── A domain should be explicitly defined before this port
       │ 
  1008 │     domain bad_domain
-      │     ────────┬────────  
-      │             ╰────────── When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
+      │            ─────┬────  
+      │                 ╰────── When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.
 ──────╯
 Error: This declaration conflicts with a previous declaration in the same scope
       ╭─[ test.sus:1015:12 ]
@@ -11924,54 +11924,56 @@ Warning: Unused Variable: This variable does not affect the output ports of this
       │                                ─┬  
       │                                 ╰── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
-Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+Error: An action requires a block
       ╭─[ test.sus:1247:3 ]
       │
- 1246 │ ╭─▶     trigger may_process'0 : T cur_state {
- 1247 │ │          action next_state'II : T next_state_value
-      │ │          ────────────────────┬────────────────────  
-      │ │                              ╰────────────────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
- 1248 │ ├─▶     }
-      │ │           
-      │ ╰─────────── Parent node 'block'
+ 1247 │        action next_state'II : T next_state_value
+      │        ───┬──  
+      │           ╰──── An action requires a block
 ──────╯
-Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1247:28 ]
+      │
+ 1247 │        action next_state'II : T next_state_value
+      │                                 ────────┬───────  
+      │                                         ╰───────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: An action requires a block
       ╭─[ test.sus:1250:2 ]
       │
- 1245 │ ╭─▶ module MultiStateLoop #(T, int II) {
-      ┆ ┆   
- 1250 │ │       action request_output : -> trigger output_valid : T result
-      │ │       ─────────────────────────────┬────────────────────────────  
-      │ │                                    ╰────────────────────────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
- 1251 │ ├─▶ }
-      │ │       
-      │ ╰─────── Parent node 'block'
+ 1250 │     action request_output : -> trigger output_valid : T result
+      │     ───┬──  
+      │        ╰──── An action requires a block
 ──────╯
-Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
-      ╭─[ test.sus:1256:2 ]
+Error: While parsing 'interface_statement', parser found a syntax error in a node of type 'ERROR'
+      ╭─[ test.sus:1250:24 ]
       │
- 1253 │ ╭─▶ module use_MultiStateLoop {
-      ┆ ┆   
- 1256 │ │       trigger request_input
-      │ │       ──────────┬──────────  
-      │ │                 ╰──────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
-      ┆ ┆   
- 1269 │ ├─▶ }
-      │ │       
-      │ ╰─────── Parent node 'block'
+ 1250 │     action request_output : -> trigger output_valid : T result
+      │     ─────────────────────────────┬────┬───────────────────────  
+      │                                  ╰────────────────────────────── Parent node 'interface_statement'
+      │                                       │                         
+      │                                       ╰───────────────────────── While parsing 'interface_statement', parser found a syntax error in a node of type 'ERROR'
 ──────╯
-Error: While parsing 'block', parser found a syntax error in a node of type 'ERROR'
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1250:54 ]
+      │
+ 1250 │     action request_output : -> trigger output_valid : T result
+      │                                                         ───┬──  
+      │                                                            ╰──── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: An action requires a block
       ╭─[ test.sus:1257:3 ]
       │
- 1253 │ ╭─▶ module use_MultiStateLoop {
-      ┆ ┆   
- 1257 │ │          action input_valid : float new_input
-      │ │          ──────────────────┬─────────────────  
-      │ │                            ╰─────────────────── While parsing 'block', parser found a syntax error in a node of type 'ERROR'
-      ┆ ┆   
- 1269 │ ├─▶ }
-      │ │       
-      │ ╰─────── Parent node 'block'
+ 1257 │        action input_valid : float new_input
+      │        ───┬──  
+      │           ╰──── An action requires a block
+──────╯
+Warning: Unused Variable: This variable does not affect the output ports of this module
+      ╭─[ test.sus:1257:30 ]
+      │
+ 1257 │        action input_valid : float new_input
+      │                                   ────┬────  
+      │                                       ╰────── Unused Variable: This variable does not affect the output ports of this module
 ──────╯
 Error: No Global of the name 'trigger' was found. Did you forget to import it?
       ╭─[ test.sus:1259:29 ]
@@ -11980,16 +11982,16 @@ Error: No Global of the name 'trigger' was found. Did you forget to import it?
       │                                ───┬───  
       │                                   ╰───── No Global of the name 'trigger' was found. Did you forget to import it?
 ──────╯
-Error: While parsing 'action_trigger_statement', parser found a syntax error in a node of type 'ERROR'
+Error: While parsing 'interface_statement', parser found a syntax error in a node of type 'ERROR'
       ╭─[ test.sus:1259:50 ]
       │
  1259 │ ╭─▶     action request_result : -> trigger result_valid : {
       │ │                                                       ┬  
-      │ │                                                       ╰── While parsing 'action_trigger_statement', parser found a syntax error in a node of type 'ERROR'
+      │ │                                                       ╰── While parsing 'interface_statement', parser found a syntax error in a node of type 'ERROR'
       ┆ ┆   
  1261 │ ├─▶     }
       │ │           
-      │ ╰─────────── Parent node 'action_trigger_statement'
+      │ ╰─────────── Parent node 'interface_statement'
 ──────╯
 Error: Typing Error: writing the output of this expression expects a float but was given a int
       ╭─[ test.sus:1264:3 ]

@@ -944,7 +944,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         &mut self,
         cursor: &mut Cursor<'c>,
         parent_when: Option<FlatID>,
-    ) -> (FlatIDRange, FlatIDRange) {
+    ) -> (FlatIDRange, FlatIDRange, Option<Span>, Option<Span>) {
         let prev_parent_condition = self.current_parent_condition;
         if let Some(parent_when) = parent_when {
             self.current_parent_condition = Some(ParentCondition {
@@ -953,7 +953,10 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             });
         }
 
-        cursor.field(field!("then_block"));
+        if !cursor.optional_field(field!("then_block")) {
+            return (UUIDRange::EMPTY, UUIDRange::EMPTY, None, None);
+        }
+        let then_block_span = cursor.span();
         let then_block = self.flatten_code(cursor);
 
         if let Some(parent_when) = parent_when {
@@ -964,7 +967,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         }
 
         let else_start = self.instructions.get_next_alloc_id();
-        if cursor.optional_field(field!("else_block")) {
+        let else_span = if cursor.optional_field(field!("else_block")) {
             cursor.go_down(kind!("else_block"), |cursor| {
                 cursor.field(field!("content"));
                 if cursor.kind() == kind!("if_statement") {
@@ -972,14 +975,17 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 } else {
                     self.flatten_code(cursor);
                 }
-            })
+            });
+            Some(cursor.span())
+        } else {
+            None
         };
         let else_end = self.instructions.get_next_alloc_id();
         let else_block = FlatIDRange::new(else_start, else_end);
 
         self.current_parent_condition = prev_parent_condition;
 
-        (then_block, else_block)
+        (then_block, else_block, Some(then_block_span), else_span)
     }
 
     fn flatten_if_statement(&mut self, cursor: &mut Cursor<'c>) {
@@ -1013,8 +1019,10 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     (Vec::new(), Vec::new())
                 };
 
-            let (then_block, else_block) =
+            let (then_block, else_block, then_block_span, _else_span) =
                 self.flatten_then_else_blocks(cursor, (!expects_generative).then_some(if_id));
+
+            assert!(then_block_span.is_some());
 
             let_unwrap!(
                 Instruction::IfStatement(if_stmt),
@@ -1099,7 +1107,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         self.local_variable_context.pop_frame(loop_var_decl_frame);
                     })
                 }
-                kind!("interface_statement") => {
+                /*kind!("interface_statement") => {
                     cursor.go_down_no_check(|cursor| {
                         // Skip name
                         let (name_span, name) =
@@ -1115,84 +1123,13 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             outputs,
                         );
                     });
-                }
-                kind!("action_trigger_statement") => {
-                    cursor.go_down_no_check(|cursor| {
-                        // Skip interface kind
-                        let is_local = cursor.optional_field(field!("local"));
-                        cursor.field(field!("interface_kind"));
-                        let (inputs_come_first, interface_kind) = match cursor.kind() {
-                            kw!("action") => (true, InterfaceKind::Action),
-                            kw!("trigger") => (false, InterfaceKind::Trigger),
-                            _ => unreachable!(),
-                        };
-
-                        let (name_span, name) =
-                            cursor.field_to_string(field!("name"), kind!("identifier"));
-                        let latency_specifier =
-                            self.flatten_latency_specifier(cursor).map(|(l, _)| l);
-
-                        let (inputs, outputs) =
-                            self.flatten_interface_ports(inputs_come_first, cursor);
-
-                        self.alloc_interface(
-                            name.clone(),
-                            name_span,
-                            interface_kind,
-                            inputs,
-                            outputs,
-                        );
-
-                        let action_id =
-                            self.instructions
-                                .alloc(Instruction::ActionTriggerDeclaration(
-                                    ActionTriggerDeclaration {
-                                        parent_condition: self.current_parent_condition,
-                                        name,
-                                        name_span,
-                                        latency_specifier,
-                                        is_local,
-                                        inputs,
-                                        outputs,
-                                        domain: DomainType::Physical(self.current_domain),
-                                        then_block: FlatIDRange::PLACEHOLDER,
-                                        else_block: FlatIDRange::PLACEHOLDER,
-                                    },
-                                ));
-
-                        let (then_block, else_block) =
-                            self.flatten_then_else_blocks(cursor, Some(action_id));
-
-                        let Instruction::ActionTriggerDeclaration(action_trigger) =
-                            &mut self.instructions[action_id]
-                        else {
-                            unreachable!()
-                        };
-
-                        action_trigger.then_block = then_block;
-                        action_trigger.else_block = else_block;
-                    });
-                }
-                kind!("domain_statement") => {
-                    let whole_domain_statement_span = cursor.span();
-                    cursor.go_down_no_check(|cursor| {
-                        let (domain_name_span, domain_name) =
-                            cursor.field_span(field!("name"), kind!("identifier"));
-                        if self.domains.is_empty() {
-                            if let Some(existing_port) = self.ports.iter().next() {
-                                // Sad Path: Having ports on the implicit clk domain is not allowed.
-                                self.errors.error(whole_domain_statement_span, "When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.")
-                                    .info_same_file(existing_port.1.decl_span, "A domain should be explicitly defined before this port");
-                            }
-                        }
-                        let domain_id = self.domains.alloc(DomainInfo {
-                            name: domain_name.to_owned(),
-                            name_span: Some(domain_name_span),
-                        });
-
-                        self.alloc_local_name(domain_name_span, domain_name, NamedLocal::DomainDecl(domain_id));
-                    });
-                }
+                }*/
+                kind!("interface_statement") => cursor.go_down_no_check(|cursor| {
+                    self.parse_interface(cursor);
+                }),
+                kind!("domain_statement") => cursor.go_down_no_check(|cursor| {
+                    self.parse_domain(cursor);
+                }),
                 _other => cursor.could_not_match(),
             }
             cursor.clear_gathered_comments(); // Clear comments after every statement, so comments don't bleed over
@@ -1200,6 +1137,99 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         let end_of_code = self.instructions.get_next_alloc_id();
         FlatIDRange::new(start_of_code, end_of_code)
+    }
+
+    fn parse_interface(&mut self, cursor: &mut Cursor<'c>) {
+        // Skip interface kind
+        let is_local = cursor.optional_field(field!("local"));
+        cursor.field(field!("interface_kind"));
+        let (interface_kw, interface_kw_span) = cursor.kind_span();
+        let (inputs_come_first, interface_kind) = match interface_kw {
+            kw!("interface") => (true, InterfaceKind::RegularInterface),
+            kw!("action") => (true, InterfaceKind::Action),
+            kw!("trigger") => (false, InterfaceKind::Trigger),
+            _ => unreachable!(),
+        };
+
+        let (name_span, name) = cursor.field_to_string(field!("name"), kind!("identifier"));
+        let latency_specifier = self.flatten_latency_specifier(cursor);
+
+        let (inputs, outputs) = self.flatten_interface_ports(inputs_come_first, cursor);
+
+        self.alloc_interface(name.clone(), name_span, interface_kind, inputs, outputs);
+
+        let interface_id = self
+            .instructions
+            .alloc(Instruction::Interface(InterfaceDeclaration {
+                parent_condition: self.current_parent_condition,
+                name,
+                name_span,
+                interface_kw_span,
+                interface_kind,
+                latency_specifier: latency_specifier.map(|(l, _)| l),
+                is_local,
+                inputs,
+                outputs,
+                domain: DomainType::Physical(self.current_domain),
+                then_block: FlatIDRange::EMPTY,
+                else_block: FlatIDRange::EMPTY,
+            }));
+
+        let (then_block, else_block, then_block_span, else_span) = self.flatten_then_else_blocks(
+            cursor,
+            interface_kind.is_conditional().then_some(interface_id),
+        );
+        let_unwrap!(
+            Instruction::Interface(interface),
+            &mut self.instructions[interface_id]
+        );
+
+        interface.then_block = then_block;
+        interface.else_block = else_block;
+
+        match interface_kind {
+            InterfaceKind::RegularInterface => {
+                if let Some((_, lat_spec_span)) = latency_specifier {
+                    self.errors.error(
+                        lat_spec_span,
+                        "Can only add latency specifiers to actions or triggers",
+                    );
+                }
+                if let Some(else_span) = else_span {
+                    self.errors
+                        .error(else_span, "Regular interfaces cannot take else blocks");
+                }
+            }
+            InterfaceKind::Action => {
+                if then_block_span.is_none() {
+                    self.errors
+                        .error(interface_kw_span, "An action requires a block");
+                }
+            }
+            InterfaceKind::Trigger => {}
+        }
+    }
+
+    fn parse_domain(&mut self, cursor: &mut Cursor<'c>) {
+        let (domain_name_span, domain_name) =
+            cursor.field_span(field!("name"), kind!("identifier"));
+        if self.domains.is_empty() {
+            if let Some(existing_port) = self.ports.iter().next() {
+                // Sad Path: Having ports on the implicit clk domain is not allowed.
+                self.errors.error(domain_name_span, "When using explicit domains, no port is allowed to be declared on the implicit 'clk' domain.")
+                        .info_same_file(existing_port.1.decl_span, "A domain should be explicitly defined before this port");
+            }
+        }
+        let domain_id = self.domains.alloc(DomainInfo {
+            name: domain_name.to_owned(),
+            name_span: Some(domain_name_span),
+        });
+
+        self.alloc_local_name(
+            domain_name_span,
+            domain_name,
+            NamedLocal::DomainDecl(domain_id),
+        );
     }
 
     fn alloc_interface(

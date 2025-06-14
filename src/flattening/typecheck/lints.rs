@@ -3,7 +3,6 @@ use sus_proc_macro::get_builtin_const;
 use crate::flattening::WriteModifiers;
 use crate::linker::{GlobalUUID, IsExtern, LinkInfo};
 use crate::prelude::*;
-use crate::typing::domain_type::DomainType;
 use crate::typing::template::TemplateKind;
 
 use super::*;
@@ -126,62 +125,88 @@ impl LintContext<'_> {
                         self.lint_wire_ref(&wr.to, true);
                         if let WireReferenceRoot::LocalDecl(decl_id) = &wr.to.root {
                             let decl = self.link_info.instructions[*decl_id].unwrap_declaration();
-                            match wr.write_modifiers {
-                                WriteModifiers::Connection { .. } => {
-                                    if decl.decl_kind.is_generative() {
-                                        // Check that this generative declaration isn't used in a non-compiletime if
-                                        if let Some(root_flat) = wr.to.root.get_root_flat() {
-                                            let to_decl = self.link_info.instructions[root_flat]
-                                                .unwrap_declaration();
-
-                                            if *parent_condition != to_decl.parent_condition {
-                                                let mut err_ref = self.errors.error(wr.to_span, "Cannot write to compiletime variable through runtime 'when' blocks");
-                                                err_ref = err_ref.info_obj_same_file(decl);
-
-                                                let mut cur_parent = *parent_condition;
-
-                                                while cur_parent != decl.parent_condition {
-                                                    let parent_when = self.link_info.instructions
-                                                        [cur_parent.unwrap().parent_when]
-                                                        .unwrap_if();
-
-                                                    err_ref = err_ref.info_same_file(
-                                                        parent_when.if_keyword_span,
-                                                        "Assignment passes through this 'when'",
-                                                    );
-
-                                                    cur_parent = parent_when.parent_condition;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                WriteModifiers::Initial { initial_kw_span } => {
-                                    if decl.domain.get() == DomainType::Generative {
-                                        self.errors
-                                            .error(
-                                                initial_kw_span,
-                                                "'initial' cannot be used with generative variables! Just assign a generative value as normal",
-                                            )
-                                            .info_obj_same_file(decl);
-                                    }
-
-                                    if !decl.decl_kind.is_state() {
-                                        self.errors
-                                            .error(
-                                                initial_kw_span,
-                                                "Initial values can only be given to state registers",
-                                            )
-                                            .info_obj_same_file(decl);
-                                    }
-                                }
-                            }
+                            self.lint_write(parent_condition, wr, decl);
                         }
                     }
                 }
                 Instruction::IfStatement(_)
                 | Instruction::ForStatement(_)
-                | Instruction::ActionTriggerDeclaration(_) => {}
+                | Instruction::Interface(_) => {}
+            }
+        }
+    }
+
+    fn lint_write(
+        &self,
+        parent_condition: &Option<ParentCondition>,
+        wr: &WriteTo,
+        decl: &Declaration,
+    ) {
+        match wr.write_modifiers {
+            WriteModifiers::Connection { .. } => {
+                if decl.decl_kind.is_generative() {
+                    // Check that this generative declaration isn't used in a non-compiletime if
+                    if let Some(root_flat) = wr.to.root.get_root_flat() {
+                        let to_decl = self.link_info.instructions[root_flat].unwrap_declaration();
+
+                        if *parent_condition != to_decl.parent_condition {
+                            let mut err_ref = self.errors.error(wr.to_span, "Cannot write to compiletime variable through runtime 'when' blocks");
+                            err_ref = err_ref.info_obj_same_file(decl);
+
+                            let mut cur = *parent_condition;
+
+                            while cur != decl.parent_condition {
+                                match &self.link_info.instructions[cur.unwrap().parent_when] {
+                                    Instruction::IfStatement(parent_when) => {
+                                        err_ref = err_ref.info_same_file(
+                                            parent_when.if_keyword_span,
+                                            "Assignment passes through this 'when'",
+                                        );
+
+                                        cur = parent_when.parent_condition;
+                                    }
+                                    Instruction::Interface(interface_declaration) => {
+                                        let msg = match interface_declaration.interface_kind {
+                                            InterfaceKind::RegularInterface => unreachable!(),
+                                            InterfaceKind::Action => {
+                                                "Assignment passes through this 'action'"
+                                            }
+                                            InterfaceKind::Trigger => {
+                                                "Assignment passes through this 'trigger'"
+                                            }
+                                        };
+                                        err_ref = err_ref.info_same_file(
+                                            interface_declaration.interface_kw_span,
+                                            msg,
+                                        );
+
+                                        cur = interface_declaration.parent_condition;
+                                    }
+                                    _ => unreachable!(),
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            WriteModifiers::Initial { initial_kw_span } => {
+                if decl.decl_kind.is_generative() {
+                    self.errors
+                        .error(
+                            initial_kw_span,
+                            "'initial' cannot be used with generative variables! Just assign a generative value as normal",
+                        )
+                        .info_obj_same_file(decl);
+                }
+
+                if !decl.decl_kind.is_state() {
+                    self.errors
+                        .error(
+                            initial_kw_span,
+                            "Initial values can only be given to state registers",
+                        )
+                        .info_obj_same_file(decl);
+                }
             }
         }
     }
@@ -322,7 +347,7 @@ impl LintContext<'_> {
                         }
                     }
                 }
-                Instruction::ActionTriggerDeclaration(stm) => {
+                Instruction::Interface(stm) => {
                     for id in FlatIDRange::new(stm.then_block.0, stm.else_block.1) {
                         if let Instruction::Expression(Expression {
                             output: ExpressionOutput::MultiWrite(writes),

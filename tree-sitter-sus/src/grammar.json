@@ -348,10 +348,6 @@
                           {
                             "type": "SYMBOL",
                             "name": "interface_statement"
-                          },
-                          {
-                            "type": "SYMBOL",
-                            "name": "action_trigger_statement"
                           }
                         ]
                       }
@@ -398,10 +394,6 @@
                                 {
                                   "type": "SYMBOL",
                                   "name": "interface_statement"
-                                },
-                                {
-                                  "type": "SYMBOL",
-                                  "name": "action_trigger_statement"
                                 }
                               ]
                             }
@@ -731,39 +723,6 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "STRING",
-          "value": "interface"
-        },
-        {
-          "type": "FIELD",
-          "name": "name",
-          "content": {
-            "type": "SYMBOL",
-            "name": "identifier"
-          }
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "FIELD",
-              "name": "interface_ports",
-              "content": {
-                "type": "SYMBOL",
-                "name": "interface_ports"
-              }
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        }
-      ]
-    },
-    "action_trigger_statement": {
-      "type": "SEQ",
-      "members": [
-        {
           "type": "CHOICE",
           "members": [
             {
@@ -785,6 +744,10 @@
           "content": {
             "type": "CHOICE",
             "members": [
+              {
+                "type": "STRING",
+                "value": "interface"
+              },
               {
                 "type": "STRING",
                 "value": "action"
@@ -837,8 +800,16 @@
           ]
         },
         {
-          "type": "SYMBOL",
-          "name": "_then_else_block"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_then_else_block"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },

@@ -32,7 +32,7 @@ impl FinalizationContext {
                 }
                 Instruction::IfStatement(_)
                 | Instruction::ForStatement(_)
-                | Instruction::ActionTriggerDeclaration(_) => {}
+                | Instruction::Interface(_) => {}
             }
         }
     }
@@ -171,7 +171,7 @@ impl<'l> TypeCheckingContext<'l> {
                 self.must_be_generative(for_statement.start, "For Loop start");
                 self.must_be_generative(for_statement.end, "For Loop end");
             }
-            Instruction::ActionTriggerDeclaration(_) => {}
+            Instruction::Interface(_) => {}
         }
     }
 
@@ -181,12 +181,17 @@ impl<'l> TypeCheckingContext<'l> {
         mut parent_condition: Option<ParentCondition>,
     ) -> Option<(DomainType, Span)> {
         while let Some(p_cond) = parent_condition {
-            let when = self.instructions[p_cond.parent_when].unwrap_if();
-            let when_cond_expr = self.instructions[when.condition].unwrap_subexpression();
-            if when_cond_expr.domain != DomainType::Generative {
-                return Some((when_cond_expr.domain, when_cond_expr.span));
+            match &self.instructions[p_cond.parent_when] {
+                Instruction::Interface(decl) => return Some((decl.domain, decl.name_span)),
+                Instruction::IfStatement(when) => {
+                    let when_cond_expr = self.instructions[when.condition].unwrap_subexpression();
+                    if when_cond_expr.domain != DomainType::Generative {
+                        return Some((when_cond_expr.domain, when_cond_expr.span));
+                    }
+                    parent_condition = when.parent_condition;
+                }
+                _ => unreachable!(),
             }
-            parent_condition = when.parent_condition;
         }
         None
     }

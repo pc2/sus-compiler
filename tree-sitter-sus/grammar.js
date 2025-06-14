@@ -106,8 +106,7 @@ module.exports = grammar({
                 $.if_statement,
                 $.for_statement,
                 $.domain_statement,
-                $.interface_statement,
-                $.action_trigger_statement
+                $.interface_statement
             )),
             '}'
         ),
@@ -168,20 +167,13 @@ module.exports = grammar({
             field('name', $.identifier),
         ),
 
-        // Deprecated. TODO move into module declaration and domain_statement
         interface_statement: $ => seq(
-            'interface',
-            field('name', $.identifier),
-            optional(field('interface_ports', $.interface_ports)),
-        ),
-
-        action_trigger_statement: $ => seq(
             optional(field('local', 'local')),
-            field('interface_kind', choice('action', 'trigger')),
+            field('interface_kind', choice('interface', 'action', 'trigger')),
             field('name', $.identifier),
             optional(field('latency_specifier', $.latency_specifier)),
             optional(field('interface_ports', $.interface_ports)),
-            $._then_else_block
+            optional($._then_else_block)
         ),
 
         interface_ports: $ => seq(

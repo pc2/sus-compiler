@@ -158,12 +158,20 @@ pub struct Port {
     pub declaration_instruction: FlatID,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InterfaceKind {
     RegularInterface,
     Action,
     Trigger,
-    LocalAction,
+}
+
+impl InterfaceKind {
+    pub fn is_conditional(&self) -> bool {
+        match self {
+            InterfaceKind::RegularInterface => false,
+            InterfaceKind::Action | InterfaceKind::Trigger => true,
+        }
+    }
 }
 
 /// An interface, like:
@@ -844,12 +852,14 @@ pub struct ParentCondition {
 }
 
 #[derive(Debug)]
-pub struct ActionTriggerDeclaration {
+pub struct InterfaceDeclaration {
     pub parent_condition: Option<ParentCondition>,
     pub name: String,
     pub name_span: Span,
+    pub interface_kw_span: Span,
     pub latency_specifier: Option<FlatID>,
     pub is_local: bool,
+    pub interface_kind: InterfaceKind,
     pub inputs: PortIDRange,
     pub outputs: PortIDRange,
     pub then_block: FlatIDRange,
@@ -871,7 +881,7 @@ pub struct ActionTriggerDeclaration {
 pub enum Instruction {
     SubModule(SubModuleInstance),
     Declaration(Declaration),
-    ActionTriggerDeclaration(ActionTriggerDeclaration),
+    Interface(InterfaceDeclaration),
     Expression(Expression),
     IfStatement(IfStatement),
     ForStatement(ForStatement),
@@ -946,9 +956,8 @@ impl Instruction {
             | Instruction::ForStatement(ForStatement {
                 parent_condition, ..
             })
-            | Instruction::ActionTriggerDeclaration(ActionTriggerDeclaration {
-                parent_condition,
-                ..
+            | Instruction::Interface(InterfaceDeclaration {
+                parent_condition, ..
             }) => *parent_condition,
         }
     }
@@ -956,7 +965,7 @@ impl Instruction {
         match self {
             Instruction::SubModule(sub_module_instance) => sub_module_instance.name_span,
             Instruction::Declaration(declaration) => declaration.decl_span,
-            Instruction::ActionTriggerDeclaration(act_trig) => act_trig.name_span,
+            Instruction::Interface(act_trig) => act_trig.name_span,
             Instruction::Expression(expression) => expression.span,
             Instruction::IfStatement(_) => unreachable!(),
             Instruction::ForStatement(_) => unreachable!(),

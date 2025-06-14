@@ -1334,36 +1334,40 @@ impl<'l> ExecutionContext<'l> {
                     instruction_range.skip_to(stm.else_block.1);
                     continue;
                 }
-                Instruction::ActionTriggerDeclaration(act_trig) => {
+                Instruction::Interface(interface) => {
                     let specified_latency =
-                        self.get_specified_latency(act_trig.latency_specifier)?;
+                        self.get_specified_latency(interface.latency_specifier)?;
                     let condition_wire = self.wires.alloc(RealWire {
-                        name: self.unique_name_producer.get_unique_name(&act_trig.name),
+                        name: self.unique_name_producer.get_unique_name(&interface.name),
                         typ: ConcreteType::BOOL,
                         original_instruction,
-                        domain: act_trig.domain.unwrap_physical(),
+                        domain: interface.domain.unwrap_physical(),
                         source: RealWireDataSource::ReadOnly,
                         specified_latency,
                         absolute_latency: CALCULATE_LATENCY_LATER,
                     });
 
-                    self.condition_stack.push(ConditionStackElem {
-                        condition_wire,
-                        inverse: false,
-                    });
-                    self.instantiate_code_block(act_trig.then_block)?;
+                    if interface.interface_kind.is_conditional() {
+                        self.condition_stack.push(ConditionStackElem {
+                            condition_wire,
+                            inverse: false,
+                        });
+                        self.instantiate_code_block(interface.then_block)?;
 
-                    if !act_trig.else_block.is_empty() {
-                        self.condition_stack.last_mut().unwrap().inverse = true;
-                        self.instantiate_code_block(act_trig.else_block)?;
+                        if !interface.else_block.is_empty() {
+                            self.condition_stack.last_mut().unwrap().inverse = true;
+                            self.instantiate_code_block(interface.else_block)?;
+                        }
+
+                        // Get rid of the condition
+                        let _ = self.condition_stack.pop().unwrap();
+
+                        instruction_range.skip_to(interface.else_block.1);
+
+                        SubModuleOrWire::Wire(condition_wire)
+                    } else {
+                        SubModuleOrWire::Unnasigned
                     }
-
-                    // Get rid of the condition
-                    let _ = self.condition_stack.pop().unwrap();
-
-                    instruction_range.skip_to(act_trig.else_block.1);
-
-                    SubModuleOrWire::Wire(condition_wire)
                 }
                 Instruction::ForStatement(stm) => {
                     // TODO Non integer for loops?

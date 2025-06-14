@@ -431,7 +431,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
                             }
                         }
                     }
-                    Instruction::ActionTriggerDeclaration(_) => {}
+                    Instruction::Interface(_) => {}
                     Instruction::IfStatement(_) | Instruction::ForStatement(_) => {}
                 };
             }
