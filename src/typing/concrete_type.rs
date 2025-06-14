@@ -17,11 +17,6 @@ use super::value_unifier::UnifyableValue;
 
 pub type ConcreteTemplateArg = TemplateKind<ConcreteType, UnifyableValue>;
 
-pub const BOOL_CONCRETE_TYPE: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
-    id: get_builtin_type!("bool"),
-    template_args: FlatAlloc::new(),
-});
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConcreteGlobalReference<ID> {
     pub id: ID,
@@ -51,6 +46,11 @@ pub enum ConcreteType {
 }
 
 impl ConcreteType {
+    pub const BOOL: ConcreteType = ConcreteType::Named(ConcreteGlobalReference {
+        id: get_builtin_type!("bool"),
+        template_args: FlatAlloc::new(),
+    });
+
     pub fn stack_arrays_usize(self, tensor_sizes: &[usize]) -> Self {
         let mut result = self;
         for s in tensor_sizes.iter().rev() {

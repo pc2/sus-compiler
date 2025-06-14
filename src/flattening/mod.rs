@@ -43,9 +43,7 @@ pub struct Module {
     /// Created in Stage 1: Initialization
     pub link_info: LinkInfo,
 
-    /// Created in Stage 1: Initialization
-    ///
-    /// [Port::declaration_instruction] are set in Stage 2: Flattening
+    /// Created in Stage 2: Initialization
     ///
     /// Ports can only use domains in [Self::named_domains]
     pub ports: FlatAlloc<Port, PortIDMarker>,
@@ -53,10 +51,10 @@ pub struct Module {
     /// Created in Stage 2: Flattening
     pub latency_inference_info: PortLatencyInferenceInfo,
 
-    /// Created in Stage 1: Initialization
+    /// Created in Stage 2: Initialization
     pub domains: FlatAlloc<DomainInfo, DomainIDMarker>,
 
-    /// Created in Stage 1: Initialization
+    /// Created in Stage 2: Initialization
     pub interfaces: FlatAlloc<Interface, InterfaceIDMarker>,
 }
 
@@ -97,7 +95,7 @@ pub struct StructField {
     pub name_span: Span,
     #[allow(unused)]
     pub decl_span: Span,
-    /// This is only set after flattening is done. Initially just [UUID::PLACEHOLDER]
+
     pub declaration_instruction: FlatID,
 }
 
@@ -156,7 +154,7 @@ pub struct Port {
     pub decl_span: Span,
     pub is_input: bool,
     pub domain: DomainID,
-    /// This is only set after flattening is done. Initially just [crate::alloc::UUID::PLACEHOLDER]
+    /// Points to a [Declaration]
     pub declaration_instruction: FlatID,
 }
 

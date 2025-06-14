@@ -12,7 +12,7 @@ use crate::linker::IsExtern;
 use crate::linker::{GlobalUUID, LinkInfo};
 use crate::prelude::*;
 use crate::typing::abstract_type::{AbstractInnerType, AbstractRankedType, PeanoType};
-use crate::typing::concrete_type::{ConcreteTemplateArg, BOOL_CONCRETE_TYPE};
+use crate::typing::concrete_type::ConcreteTemplateArg;
 use crate::typing::domain_type::DomainType;
 use crate::typing::template::TVec;
 use crate::util::{unwrap_single_element, zip_eq};
@@ -1339,7 +1339,7 @@ impl<'l> ExecutionContext<'l> {
                         self.get_specified_latency(act_trig.latency_specifier)?;
                     let condition_wire = self.wires.alloc(RealWire {
                         name: self.unique_name_producer.get_unique_name(&act_trig.name),
-                        typ: BOOL_CONCRETE_TYPE,
+                        typ: ConcreteType::BOOL,
                         original_instruction,
                         domain: act_trig.domain.unwrap_physical(),
                         source: RealWireDataSource::ReadOnly,
