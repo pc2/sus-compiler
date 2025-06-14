@@ -5,6 +5,7 @@ use crate::prelude::*;
 
 use crate::linker::{FileData, GlobalUUID, LinkInfo};
 
+use crate::typing::abstract_type::AbstractInnerType;
 use crate::typing::template::{
     GenerativeParameterKind, Parameter, TemplateKind, TypeParameterKind,
 };
@@ -278,26 +279,13 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
             WireReferenceRoot::Error => {}
         }
 
-        let module_id = match &wire_ref.root {
-            WireReferenceRoot::LocalDecl(_) => None,
-            WireReferenceRoot::LocalSubmodule(submod_decl) => Some(
-                link_info.instructions[*submod_decl]
-                    .unwrap_submodule()
-                    .module_ref
-                    .id,
-            ),
-            WireReferenceRoot::NamedConstant(_) => None,
-            WireReferenceRoot::NamedModule(global_reference) => Some(global_reference.id),
-            WireReferenceRoot::Error => None,
-        };
-
         for p in &wire_ref.path {
             match p {
                 WireReferencePathElement::FieldAccess {
                     name: _,
                     name_span,
                     refers_to,
-                    output_typ: _,
+                    input_typ,
                 } => {
                     let Some(refers_to) = refers_to.get() else {
                         continue;
@@ -305,17 +293,19 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
 
                     let target = match refers_to {
                         PathElemRefersTo::Interface(interface) => {
-                            let submodule = &self.linker.modules[module_id.unwrap()];
+                            let_unwrap!(AbstractInnerType::Interface(module, _), &input_typ.inner);
+                            let submodule = &self.linker.modules[module.id];
                             LocationInfo::Interface(
-                                module_id.unwrap(),
+                                module.id,
                                 submodule,
                                 *interface,
                                 &submodule.interfaces[*interface],
                             )
                         }
                         PathElemRefersTo::Port(port) => {
-                            let submodule = &self.linker.modules[module_id.unwrap()];
-                            LocationInfo::Port(module_id.unwrap(), submodule, *port)
+                            let_unwrap!(AbstractInnerType::Interface(module, _), &input_typ.inner);
+                            let submodule = &self.linker.modules[module.id];
+                            LocationInfo::Port(module.id, submodule, *port)
                         }
                     };
                     self.visit(*name_span, target);

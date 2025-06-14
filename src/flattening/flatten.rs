@@ -180,7 +180,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                                 source: ExpressionSource::WireRef(WireReference {
                                     root: WireReferenceRoot::LocalDecl(decl_id),
                                     root_span: name_span,
-                                    root_typ: TyCell::new(),
+                                    output_typ: TyCell::new(),
                                     path: Vec::new(),
                                 })
                             }));
@@ -722,7 +722,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             root: WireReferenceRoot::Error,
             path: Vec::new(),
             root_span,
-            root_typ: TyCell::new(),
+            output_typ: TyCell::new(),
         }
     }
 
@@ -810,7 +810,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             let root = WireReferenceRoot::LocalDecl(decl_id);
                             WireReference {
                                 root,
-                                root_typ: TyCell::new(),
+                                output_typ: TyCell::new(),
                                 root_span: expr_span,
                                 path: Vec::new(),
                             }
@@ -819,7 +819,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             let root = WireReferenceRoot::LocalSubmodule(submod_id);
                             WireReference {
                                 root,
-                                root_typ: TyCell::new(),
+                                output_typ: TyCell::new(),
                                 root_span: expr_span,
                                 path: Vec::new(),
                             }
@@ -857,7 +857,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         let root = WireReferenceRoot::NamedConstant(cst_ref);
                         WireReference {
                             root,
-                            root_typ: TyCell::new(),
+                            output_typ: TyCell::new(),
                             root_span: expr_span,
                             path: Vec::new(),
                         }
@@ -866,7 +866,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                         let root = WireReferenceRoot::NamedModule(md_ref);
                         WireReference {
                             root,
-                            root_typ: TyCell::new(),
+                            output_typ: TyCell::new(),
                             root_span: expr_span,
                             path: Vec::new(),
                         }
@@ -892,7 +892,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 wire_ref.path.push(WireReferencePathElement::ArrayAccess {
                     idx,
                     bracket_span,
-                    output_typ: TyCell::new(),
+                    input_typ: TyCell::new(),
                 });
 
                 wire_ref
@@ -907,7 +907,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     name,
                     name_span,
                     refers_to: OnceCell::new(),
-                    output_typ: TyCell::new(),
+                    input_typ: TyCell::new(),
                 });
 
                 wire_ref
@@ -1279,7 +1279,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                     let flat_root_decl = self.instructions[root].unwrap_declaration();
                     WireReference {
                         root: WireReferenceRoot::LocalDecl(root),
-                        root_typ: TyCell::new(),
+                        output_typ: TyCell::new(),
                         root_span: flat_root_decl.name_span,
                         path: Vec::new(),
                     }

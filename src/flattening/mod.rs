@@ -218,12 +218,12 @@ pub enum WireReferencePathElement {
         name: String,
         name_span: Span,
         refers_to: OnceCell<PathElemRefersTo>,
-        output_typ: TyCell<AbstractRankedType>,
+        input_typ: TyCell<AbstractRankedType>,
     },
     ArrayAccess {
         idx: FlatID,
         bracket_span: BracketSpan,
-        output_typ: TyCell<AbstractRankedType>,
+        input_typ: TyCell<AbstractRankedType>,
     },
 }
 
@@ -297,7 +297,7 @@ impl WireReferenceRoot {
 pub struct WireReference {
     pub root: WireReferenceRoot,
     pub path: Vec<WireReferencePathElement>,
-    pub root_typ: TyCell<AbstractRankedType>,
+    pub output_typ: TyCell<AbstractRankedType>,
     pub root_span: Span,
 }
 
@@ -305,14 +305,14 @@ impl WireReference {
     pub fn is_error(&self) -> bool {
         matches!(&self.root, WireReferenceRoot::Error)
     }
-    pub fn get_output_typ(&self) -> &AbstractRankedType {
-        if let Some(last) = self.path.last() {
-            match last {
-                WireReferencePathElement::ArrayAccess { output_typ, .. }
-                | WireReferencePathElement::FieldAccess { output_typ, .. } => output_typ,
+    pub fn get_root_typ(&self) -> &AbstractRankedType {
+        if let Some(first) = self.path.first() {
+            match first {
+                WireReferencePathElement::ArrayAccess { input_typ, .. }
+                | WireReferencePathElement::FieldAccess { input_typ, .. } => input_typ,
             }
         } else {
-            &self.root_typ
+            &self.output_typ
         }
     }
     pub fn get_total_span(&self) -> Span {
@@ -471,7 +471,7 @@ impl Expression {
                 let [single_write] = write_tos.as_slice() else {
                     return None;
                 };
-                single_write.to.get_output_typ()
+                &single_write.to.output_typ
             }
         };
         Some(SingleOutputExpression {

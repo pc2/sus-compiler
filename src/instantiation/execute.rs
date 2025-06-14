@@ -124,9 +124,7 @@ impl GenerationState<'_> {
                     }
                 }
                 WireReferencePathElement::ArrayAccess {
-                    idx,
-                    bracket_span,
-                    output_typ: _,
+                    idx, bracket_span, ..
                 } => {
                     let idx = self.get_generation_integer(*idx)?; // Caught by typecheck
                     let Value::Array(a_box) = target else {
@@ -626,9 +624,7 @@ impl<'l> ExecutionContext<'l> {
         for p in &wire_ref.path {
             match p {
                 WireReferencePathElement::ArrayAccess {
-                    idx,
-                    bracket_span,
-                    output_typ: _,
+                    idx, bracket_span, ..
                 } => {
                     let idx_wire = self.get_wire_or_constant_as_wire(*idx, domain)?;
                     path.push(RealWirePathElem::ArrayAccess {
@@ -676,7 +672,7 @@ impl<'l> ExecutionContext<'l> {
 
                 self.alloc_wire_for_const(
                     value,
-                    &wire_ref.root_typ,
+                    wire_ref.get_root_typ(),
                     original_instruction,
                     domain,
                     wire_ref.root_span,
@@ -1101,9 +1097,7 @@ impl<'l> ExecutionContext<'l> {
                     }
                 }
                 WireReferencePathElement::ArrayAccess {
-                    idx,
-                    bracket_span,
-                    output_typ: _,
+                    idx, bracket_span, ..
                 } => {
                     let idx = self.generation_state.get_generation_integer(*idx)?;
 
@@ -1257,7 +1251,7 @@ impl<'l> ExecutionContext<'l> {
                                             DomainType::Physical(domain) => {
                                                 let value_as_wire = self.alloc_wire_for_const(
                                                     value_computed.clone(),
-                                                    single_write.to.get_output_typ(),
+                                                    &single_write.to.output_typ,
                                                     original_instruction,
                                                     domain,
                                                     expr.span,

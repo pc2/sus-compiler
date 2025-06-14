@@ -10660,6 +10660,13 @@ Error: Could not fully figure out the type of this object. ?[...]
       │     ───────────┬───────────  
       │                ╰───────────── Could not fully figure out the type of this object. ?[...]
 ──────╯
+Error: Could not fully figure out the type of this object. ?[][...]
+      ╭─[ test.sus:1029:2 ]
+      │
+ 1029 │     mtinf.a = mtinf.b
+      │     ───┬───  
+      │        ╰───── Could not fully figure out the type of this object. ?[][...]
+──────╯
 Error: Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects a ?[][...] but was given a ?[...]
       ╭─[ test.sus:1029:2 ]
       │
@@ -10667,19 +10674,12 @@ Error: Typing Error: writing the output of this expression: Creating Infinite Ty
       │     ───┬───  
       │        ╰───── Typing Error: writing the output of this expression: Creating Infinite Types is Forbidden! expects a ?[][...] but was given a ?[...]
 ──────╯
-Error: Could not fully figure out the type of this object. ?[][...]
-      ╭─[ test.sus:1029:8 ]
-      │
- 1029 │     mtinf.a = mtinf.b
-      │           ┬  
-      │           ╰── Could not fully figure out the type of this object. ?[][...]
-──────╯
 Error: Could not fully figure out the type of this object. ?[...]
-      ╭─[ test.sus:1029:18 ]
+      ╭─[ test.sus:1029:12 ]
       │
  1029 │     mtinf.a = mtinf.b
-      │                     ┬  
-      │                     ╰── Could not fully figure out the type of this object. ?[...]
+      │               ───┬───  
+      │                  ╰───── Could not fully figure out the type of this object. ?[...]
 ──────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
       ╭─[ test.sus:1036:8 ]

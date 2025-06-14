@@ -139,16 +139,16 @@ impl<'l> TypeCheckingContext<'l> {
             }
             WireReferenceRoot::Error => self.type_checker.alloc_unknown(),
         };
-        wire_ref.root_typ.set(root_typ);
 
-        let mut walking_typ: &AbstractRankedType = &wire_ref.root_typ;
+        let mut walking_typ = root_typ;
         for p in &wire_ref.path {
             match p {
                 WireReferencePathElement::ArrayAccess {
                     idx,
                     bracket_span,
-                    output_typ,
+                    input_typ,
                 } => {
+                    input_typ.set(walking_typ);
                     let idx_expr = self.instructions[*idx].unwrap_subexpression();
 
                     self.type_checker.unify_report_error(
@@ -158,77 +158,78 @@ impl<'l> TypeCheckingContext<'l> {
                         "array index",
                     );
 
-                    output_typ.set(self.type_checker.rank_down(
-                        walking_typ,
+                    walking_typ = self.type_checker.rank_down(
+                        input_typ,
                         bracket_span.outer_span(),
                         "array access",
-                    ));
-
-                    walking_typ = output_typ;
+                    );
                 }
                 WireReferencePathElement::FieldAccess {
                     name,
                     name_span,
                     refers_to,
-                    output_typ,
-                } => match &walking_typ.inner {
-                    AbstractInnerType::Template(template_id) => {
-                        let template_arg = &self.template_args[*template_id];
-                        self.errors
-                            .error(
-                                *name_span,
-                                format!(
-                                    "The type of this object is the template parameter '{}'. You cannot use struct fields on template args",
-                                    template_arg.name
-                                ),
-                            )
-                            .info_obj_same_file(template_arg);
-                    }
-                    AbstractInnerType::Named(_) => todo!("Structs"),
-                    // TODO "subinterfaces"
-                    AbstractInnerType::Interface(md_ref, _interface) => {
-                        let md = self.globals.get_submodule(md_ref);
-                        let new_typ = if let Some(interface) = md
-                            .md
-                            .interfaces
-                            .find(|_, interface| &interface.name == name)
-                        {
-                            refers_to
-                                .set(PathElemRefersTo::Interface(interface))
-                                .unwrap();
-
-                            AbstractRankedType {
-                                inner: AbstractInnerType::Interface(md_ref.clone(), interface),
-                                rank: PeanoType::Zero,
-                            }
-                        } else if let Some(port) =
-                            md.md.ports.find(|_, interface| &interface.name == name)
-                        {
-                            refers_to.set(PathElemRefersTo::Port(port)).unwrap();
-
-                            let port_decl = md.get_port(port).get_decl();
-
-                            if port_decl.remote_decl.domain.get() == DomainType::Generative {
-                                self.errors
-                                    .error(
-                                        wire_ref.root_span,
-                                        "Invalid Submodule port: It is marked as generative!",
-                                    )
-                                    .info_obj(&port_decl);
-                            }
-                            port_decl.get_local_type(&mut self.type_checker)
-                        } else {
+                    input_typ,
+                } => {
+                    input_typ.set(walking_typ);
+                    walking_typ = match &input_typ.inner {
+                        AbstractInnerType::Template(template_id) => {
+                            let template_arg = &self.template_args[*template_id];
+                            self.errors
+                                            .error(
+                                                *name_span,
+                                                format!(
+                                                    "The type of this object is the template parameter '{}'. You cannot use struct fields on template args",
+                                                    template_arg.name
+                                                ),
+                                            )
+                                            .info_obj_same_file(template_arg);
                             self.type_checker.alloc_unknown()
-                        };
+                        }
+                        AbstractInnerType::Named(_) => todo!("Structs"),
+                        // TODO "subinterfaces"
+                        AbstractInnerType::Interface(md_ref, _interface) => {
+                            let md = self.globals.get_submodule(md_ref);
+                            let new_typ = if let Some(interface) = md
+                                .md
+                                .interfaces
+                                .find(|_, interface| &interface.name == name)
+                            {
+                                refers_to
+                                    .set(PathElemRefersTo::Interface(interface))
+                                    .unwrap();
 
-                        output_typ.set(new_typ);
+                                AbstractRankedType {
+                                    inner: AbstractInnerType::Interface(md_ref.clone(), interface),
+                                    rank: PeanoType::Zero,
+                                }
+                            } else if let Some(port) =
+                                md.md.ports.find(|_, interface| &interface.name == name)
+                            {
+                                refers_to.set(PathElemRefersTo::Port(port)).unwrap();
 
-                        walking_typ = output_typ;
+                                let port_decl = md.get_port(port).get_decl();
+
+                                if port_decl.remote_decl.domain.get() == DomainType::Generative {
+                                    self.errors
+                                        .error(
+                                            wire_ref.root_span,
+                                            "Invalid Submodule port: It is marked as generative!",
+                                        )
+                                        .info_obj(&port_decl);
+                                }
+                                port_decl.get_local_type(&mut self.type_checker)
+                            } else {
+                                self.type_checker.alloc_unknown()
+                            };
+
+                            new_typ
+                        }
+                        AbstractInnerType::Unknown(_) => self.type_checker.alloc_unknown(), // todo!("Structs")
                     }
-                    AbstractInnerType::Unknown(_) => {} // todo!("Structs")
-                },
+                }
             }
         }
+        wire_ref.output_typ.set(walking_typ);
     }
 
     fn typecheck_template_global<ID: Copy + Into<GlobalUUID>>(
@@ -388,7 +389,7 @@ impl<'l> TypeCheckingContext<'l> {
 
     fn typecheck_func_func(&mut self, wire_ref: &'l WireReference) -> Option<RemoteInterface<'l>> {
         self.typecheck_wire_reference(wire_ref);
-        if let AbstractInnerType::Interface(sm_ref, interface) = &wire_ref.get_output_typ().inner {
+        if let AbstractInnerType::Interface(sm_ref, interface) = &wire_ref.output_typ.inner {
             Some(
                 self.globals
                     .get_submodule(sm_ref)
@@ -424,7 +425,7 @@ impl<'l> TypeCheckingContext<'l> {
         match &expr.source {
             ExpressionSource::WireRef(wire_ref) => {
                 self.typecheck_wire_reference(wire_ref);
-                wire_ref.get_output_typ().clone()
+                wire_ref.output_typ.clone()
             }
             ExpressionSource::UnaryOp { op, rank, right } => {
                 let right_expr = self.instructions[*right].unwrap_subexpression();
@@ -535,7 +536,7 @@ impl<'l> TypeCheckingContext<'l> {
                         let port_type = port_decl.get_local_type(&mut self.type_checker);
 
                         self.type_checker.unify_report_error(
-                            to.to.get_output_typ(),
+                            &to.to.output_typ,
                             &port_type,
                             to.to_span,
                             || ("function output".to_string(), vec![port_decl.make_info()]),
@@ -552,7 +553,7 @@ impl<'l> TypeCheckingContext<'l> {
                 if let Some(first_write) = multi_write.first() {
                     self.type_checker.unify_report_error(
                         &expr_out_typ,
-                        first_write.to.get_output_typ(),
+                        &first_write.to.output_typ,
                         first_write.to_span,
                         "writing the output of this expression",
                     );
@@ -849,24 +850,25 @@ impl FinalizationContext {
             }
             _ => {}
         }
-        self.finalize_abstract_type(wire_ref.root_typ.get_mut(), wire_ref.root_span);
         for path_elem in &mut wire_ref.path {
             match path_elem {
                 WireReferencePathElement::ArrayAccess {
-                    output_typ,
+                    input_typ,
                     bracket_span,
                     ..
                 } => {
-                    self.finalize_abstract_type(output_typ.get_mut(), bracket_span.outer_span());
+                    self.finalize_abstract_type(input_typ.get_mut(), bracket_span.outer_span());
                 }
                 WireReferencePathElement::FieldAccess {
-                    output_typ,
+                    input_typ,
                     name_span,
                     ..
                 } => {
-                    self.finalize_abstract_type(output_typ.get_mut(), *name_span);
+                    self.finalize_abstract_type(input_typ.get_mut(), *name_span);
                 }
             }
         }
+        let total_span = wire_ref.get_total_span();
+        self.finalize_abstract_type(wire_ref.output_typ.get_mut(), total_span);
     }
 }
