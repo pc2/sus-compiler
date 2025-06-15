@@ -1,7 +1,7 @@
 use sus_proc_macro::get_builtin_const;
 
 use crate::flattening::WriteModifiers;
-use crate::linker::{GlobalUUID, IsExtern, LinkInfo};
+use crate::linker::{GlobalRef, IsExtern};
 use crate::prelude::*;
 use crate::typing::template::TemplateKind;
 
@@ -9,34 +9,29 @@ use super::*;
 
 use super::{Expression, ExpressionOutput, ExpressionSource, Instruction, WireReferenceRoot};
 
-pub fn perform_lints(linker: &mut Linker, global_ids: &[GlobalUUID]) {
-    for id in global_ids {
-        linker.immutable_pass("Lints", *id, |link_info, errors, globals| {
-            let ctx = LintContext {
-                link_info,
-                global_id: *id,
-                errors,
-                globals,
-            };
-            ctx.extern_objects_may_not_have_type_template_args();
-            ctx.lint_instructions();
-            ctx.find_unused_variables();
-        });
-    }
+pub fn perform_lints(pass: &mut LinkerPass, errors: &ErrorCollector) {
+    let (working_on, globals) = pass.get_with_context();
+    let ctx = LintContext {
+        working_on,
+        errors,
+        globals,
+    };
+    ctx.extern_objects_may_not_have_type_template_args();
+    ctx.lint_instructions();
+    ctx.find_unused_variables();
 }
 
 struct LintContext<'l> {
-    link_info: &'l LinkInfo,
-    global_id: GlobalUUID,
+    working_on: GlobalRef<'l>,
     errors: &'l ErrorCollector<'l>,
-    globals: &'l GlobalResolver<'l>,
+    globals: GlobalResolver<'l, 'l>,
 }
 
 impl LintContext<'_> {
     fn lint_wire_ref(&self, wire_ref: &WireReference, is_writing_to: bool) {
         match &wire_ref.root {
             WireReferenceRoot::LocalDecl(decl_id) => {
-                let decl = self.link_info.instructions[*decl_id].unwrap_declaration();
+                let decl = self.working_on.instructions[*decl_id].unwrap_declaration();
                 if is_writing_to && decl.decl_kind.is_read_only() {
                     self.errors
                         .error(wire_ref.root_span, format!("'{}' is read-only", decl.name))
@@ -55,7 +50,8 @@ impl LintContext<'_> {
                             let module_port_decl = self
                                 .globals
                                 .get_declared_submodule(
-                                    self.link_info.instructions[*submod_decl_id].unwrap_submodule(),
+                                    self.working_on.instructions[*submod_decl_id]
+                                        .unwrap_submodule(),
                                 )
                                 .get_port(*port);
 
@@ -80,7 +76,7 @@ impl LintContext<'_> {
                 if is_writing_to {
                     self.errors
                         .error(cst.name_span, "Cannot write to a global constant!")
-                        .info_obj(&self.globals[cst.id].link_info);
+                        .info_obj(&self.globals.get_constant(cst.id).link_info);
                 }
             }
             WireReferenceRoot::NamedModule(_global_md) => {
@@ -103,7 +99,7 @@ impl LintContext<'_> {
         }
     }
     fn lint_instructions(&self) {
-        for (_, instr) in &self.link_info.instructions {
+        for (_, instr) in &self.working_on.instructions {
             match instr {
                 Instruction::SubModule(_) => {}
                 Instruction::Declaration(_) => {}
@@ -124,7 +120,7 @@ impl LintContext<'_> {
                     for wr in writes {
                         self.lint_wire_ref(&wr.to, true);
                         if let WireReferenceRoot::LocalDecl(decl_id) = &wr.to.root {
-                            let decl = self.link_info.instructions[*decl_id].unwrap_declaration();
+                            let decl = self.working_on.instructions[*decl_id].unwrap_declaration();
                             self.lint_write(parent_condition, wr, decl);
                         }
                     }
@@ -147,7 +143,7 @@ impl LintContext<'_> {
                 if decl.decl_kind.is_generative() {
                     // Check that this generative declaration isn't used in a non-compiletime if
                     if let Some(root_flat) = wr.to.root.get_root_flat() {
-                        let to_decl = self.link_info.instructions[root_flat].unwrap_declaration();
+                        let to_decl = self.working_on.instructions[root_flat].unwrap_declaration();
 
                         if *parent_condition != to_decl.parent_condition {
                             let mut err_ref = self.errors.error(wr.to_span, "Cannot write to compiletime variable through runtime 'when' blocks");
@@ -156,7 +152,7 @@ impl LintContext<'_> {
                             let mut cur = *parent_condition;
 
                             while cur != decl.parent_condition {
-                                match &self.link_info.instructions[cur.unwrap().parent_when] {
+                                match &self.working_on.instructions[cur.unwrap().parent_when] {
                                     Instruction::IfStatement(parent_when) => {
                                         err_ref = err_ref.info_same_file(
                                             parent_when.if_keyword_span,
@@ -212,8 +208,8 @@ impl LintContext<'_> {
     }
 
     fn extern_objects_may_not_have_type_template_args(&self) {
-        if self.link_info.is_extern == IsExtern::Extern {
-            for (_id, arg) in &self.link_info.template_parameters {
+        if self.working_on.is_extern == IsExtern::Extern {
+            for (_id, arg) in &self.working_on.template_parameters {
                 if let TemplateKind::Type(_) = &arg.kind {
                     self.errors.error(
                         arg.name_span,
@@ -225,7 +221,7 @@ impl LintContext<'_> {
     }
 
     fn find_unused_variables(&self) {
-        match self.link_info.is_extern {
+        match self.working_on.is_extern {
             IsExtern::Normal => {}
             IsExtern::Extern | IsExtern::Builtin => return, // Don't report unused variables for extern modules.
         }
@@ -233,13 +229,12 @@ impl LintContext<'_> {
         let instruction_fanins = self.make_fanins();
 
         let mut is_instance_used_map: FlatAlloc<bool, FlatIDMarker> =
-            self.link_info.instructions.map(|_| false);
+            self.working_on.instructions.map(|_| false);
 
         let mut wire_to_explore_queue: Vec<FlatID> = Vec::new();
 
-        match self.global_id {
-            GlobalUUID::Module(md_id) => {
-                let md = &self.globals.linker.modules[md_id];
+        match self.working_on {
+            GlobalObj::Module(md) => {
                 // Output ports
                 for (_id, port) in &md.ports {
                     if !port.is_input {
@@ -248,22 +243,20 @@ impl LintContext<'_> {
                     }
                 }
             }
-            GlobalUUID::Type(typ_id) => {
-                let typ = &self.globals.linker.types[typ_id];
+            GlobalObj::Type(typ) => {
                 for (_, field) in &typ.fields {
                     is_instance_used_map[field.declaration_instruction] = true;
                     wire_to_explore_queue.push(field.declaration_instruction);
                 }
             }
-            GlobalUUID::Constant(cst_id) => {
-                let cst = &self.globals.linker.constants[cst_id];
+            GlobalObj::Constant(cst) => {
                 is_instance_used_map[cst.output_decl] = true;
                 wire_to_explore_queue.push(cst.output_decl);
             }
         }
 
         // All asserts are also terminals
-        for (assert_instr_id, instr) in &self.link_info.instructions {
+        for (assert_instr_id, instr) in &self.working_on.instructions {
             if let Instruction::Expression(expr) = instr {
                 if let ExpressionSource::WireRef(wr) = &expr.source {
                     if let WireReferenceRoot::NamedConstant(cst) = &wr.root {
@@ -286,7 +279,7 @@ impl LintContext<'_> {
         }
 
         // Now produce warnings from the unused list
-        for (id, inst) in self.link_info.instructions.iter() {
+        for (id, inst) in self.working_on.instructions.iter() {
             if !is_instance_used_map[id] {
                 if let Instruction::Declaration(decl) = inst {
                     self.errors.warn(decl.name_span, "Unused Variable: This variable does not affect the output ports of this module");
@@ -297,9 +290,9 @@ impl LintContext<'_> {
     fn make_fanins(&self) -> FlatAlloc<Vec<FlatID>, FlatIDMarker> {
         // Setup Wire Fanouts List for faster processing
         let mut instruction_fanins: FlatAlloc<Vec<FlatID>, FlatIDMarker> =
-            self.link_info.instructions.map(|_| Vec::new());
+            self.working_on.instructions.map(|_| Vec::new());
 
-        for (instr_id, inst) in self.link_info.instructions.iter() {
+        for (instr_id, inst) in self.working_on.instructions.iter() {
             match inst {
                 Instruction::SubModule(sm) => {
                     sm.module_ref.for_each_generative_input(&mut |id| {
@@ -337,7 +330,7 @@ impl LintContext<'_> {
                         if let Instruction::Expression(Expression {
                             output: ExpressionOutput::MultiWrite(writes),
                             ..
-                        }) = &self.link_info.instructions[id]
+                        }) = &self.working_on.instructions[id]
                         {
                             for wr in writes {
                                 if let Some(flat_root) = wr.to.root.get_root_flat() {
@@ -352,7 +345,7 @@ impl LintContext<'_> {
                         if let Instruction::Expression(Expression {
                             output: ExpressionOutput::MultiWrite(writes),
                             ..
-                        }) = &self.link_info.instructions[id]
+                        }) = &self.working_on.instructions[id]
                         {
                             for wr in writes {
                                 if let Some(flat_root) = wr.to.root.get_root_flat() {

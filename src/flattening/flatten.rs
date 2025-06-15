@@ -2,13 +2,14 @@ use std::cell::OnceCell;
 
 use crate::alloc::{ArenaAllocator, UUIDRange, UUID};
 
+use crate::linker::passes::{GlobalResolver, LinkerPass};
 use crate::prelude::*;
 
 use ibig::IBig;
 use sus_proc_macro::{field, kind, kw};
 
-use crate::linker::{FileData, GlobalResolver, GlobalUUID};
-use crate::{debug::SpanDebugger, value::Value};
+use crate::linker::{FileData, GlobalObj, GlobalUUID};
+use crate::value::Value;
 
 use super::name_context::LocalVariableContext;
 use super::parser::Cursor;
@@ -122,7 +123,7 @@ enum ModuleOrWrittenType {
 }
 
 struct FlatteningContext<'l, 'errs> {
-    globals: &'l GlobalResolver<'l>,
+    globals: GlobalResolver<'l, 'l>,
     errors: &'errs ErrorCollector<'l>,
 
     name: &'l str,
@@ -1440,12 +1441,14 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         (left_bindings, right_bindings)
     }
 
-    fn flatten_global(&mut self, cursor: &mut Cursor<'c>) {
-        // We parse this one a bit strangely. Just because visually it looks nicer to have the template arguments after
-        // const int[SIZE] range #(int SIZE) {}
-        let const_type_cursor = (cursor.kind() == kind!("const_and_type")).then(|| cursor.clone());
-
-        let (name_span, name) = cursor.field_span(field!("name"), kind!("identifier"));
+    /// Expects to begin at `field!("template_declaration_arguments")`
+    fn flatten_global(
+        &mut self,
+        cursor: &mut Cursor<'c>,
+        const_type_cursor: Option<Cursor<'c>>,
+        name: &'c str,
+        name_span: Span,
+    ) {
         if cursor.optional_field(field!("template_declaration_arguments")) {
             cursor.list(
                 kind!("template_declaration_arguments"),
@@ -1500,7 +1503,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                             domain: Cell::new(DomainType::PLACEHOLDER),
                             decl_span,
                             name_span,
-                            name: name.to_string(),
+                            name: name.to_owned(),
                             declaration_itself_is_not_written_to: true,
                             decl_kind: DeclarationKind::RegularGenerative { read_only: false },
                             latency_specifier: None,
@@ -1545,27 +1548,16 @@ pub fn flatten_all_globals(linker: &mut Linker) {
                     .next()
                     .expect("Iterator cannot be exhausted");
 
-                flatten_global(linker, global_obj, cursor);
+                linker.pass("Flattening", global_obj, |pass, errors| {
+                    flatten_global(pass, errors, cursor);
+                });
             });
         });
     }
 }
 
-fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Cursor) {
-    let obj_link_info_mut = Linker::get_link_info_mut(
-        &mut linker.modules,
-        &mut linker.types,
-        &mut linker.constants,
-        global_obj,
-    );
-    let errors = obj_link_info_mut.take_errors(&linker.files);
-    let globals = obj_link_info_mut.resolved_globals.take();
-    let obj_link_info = linker.get_link_info(global_obj);
-    let globals = GlobalResolver::new(linker, globals);
-
-    let obj_name = &obj_link_info.name;
-    println!("Flattening {obj_name}");
-    let _panic_guard = SpanDebugger::new("flatten_global", obj_name, cursor.file_data);
+fn flatten_global(pass: &mut LinkerPass, errors: &ErrorCollector, cursor: &mut Cursor) {
+    let (working_on, globals) = pass.get_with_context();
 
     // Skip because we covered it in initialization.
     let _ = cursor.optional_field(field!("extern_marker"));
@@ -1582,23 +1574,31 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         _other => cursor.could_not_match(),
     };
 
+    // We parse this one a bit strangely. Just because visually it looks nicer to have the template arguments after
+    // const int[SIZE] range #(int SIZE) {}
+    let const_type_cursor = (cursor.kind() == kind!("const_and_type")).then(|| cursor.clone());
+
+    let (name_span, name) = cursor.field_span(field!("name"), kind!("identifier"));
+
+    assert_eq!(working_on.get_link_info().name, name);
+
     let mut context = FlatteningContext {
-        name: obj_name,
+        name,
         current_parent_condition: None,
-        globals: &globals,
+        globals,
         fields: FlatAlloc::new(),
         ports: FlatAlloc::new(),
         interfaces: FlatAlloc::new(),
         domains: FlatAlloc::new(),
         default_decl_kind,
-        errors: &errors,
+        errors,
         instructions: FlatAlloc::new(),
         parameters: FlatAlloc::new(),
         current_domain: UUID::from_hidden_value(0),
         local_variable_context: LocalVariableContext::new_initial(),
     };
 
-    context.flatten_global(cursor);
+    context.flatten_global(cursor, const_type_cursor, name, name_span);
 
     let instructions = context.instructions;
     let parameters = context.parameters;
@@ -1607,36 +1607,27 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
     let ports = context.ports;
     let fields = context.fields;
 
-    let globals = globals.decommission();
-
-    let link_info: &mut LinkInfo = match global_obj {
-        GlobalUUID::Module(module_uuid) => {
+    let mut working_on_mut = pass.get_mut();
+    match &mut working_on_mut {
+        GlobalObj::Module(md) => {
             if domains.is_empty() {
                 domains.alloc(DomainInfo {
                     name: "clk".to_string(),
                     name_span: None,
                 });
             }
-            let md = &mut linker.modules[module_uuid];
             md.domains = domains;
             md.interfaces = interfaces;
             md.ports = ports;
 
-            if crate::debug::is_enabled("print-flattened-pre-typecheck") {
-                md.print_flattened_module(&linker.files[md.link_info.file]);
-            }
-
             &mut md.link_info
         }
-        GlobalUUID::Type(type_uuid) => {
-            let typ = &mut linker.types[type_uuid];
+        GlobalObj::Type(typ) => {
             typ.fields = fields;
 
             &mut typ.link_info
         }
-        GlobalUUID::Constant(const_uuid) => {
-            let cst = &mut linker.constants[const_uuid];
-
+        GlobalObj::Constant(cst) => {
             cst.output_decl = instructions
                 .iter()
                 .find(|(_decl_id, instr)| {
@@ -1653,8 +1644,7 @@ fn flatten_global(linker: &mut Linker, global_obj: GlobalUUID, cursor: &mut Curs
         }
     };
 
-    link_info.reabsorb_errors(errors.into_storage());
-    link_info.reabsorb_globals(globals);
+    let link_info = working_on_mut.get_link_info();
     link_info.instructions = instructions;
     link_info.template_parameters = parameters;
 

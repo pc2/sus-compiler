@@ -147,7 +147,7 @@ impl<'l> TypeCheckingContext<'l> {
         global_ref: &GlobalReference<ID>,
     ) {
         let global_obj: GlobalUUID = global_ref.id.into();
-        let target_link_info = self.globals.get_link_info(global_obj);
+        let target_link_info = &self.globals.get(global_obj).get_link_info();
 
         global_ref.resolve_template_args(self.errors, target_link_info);
 

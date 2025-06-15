@@ -325,7 +325,7 @@ fn concretize_global_ref<ID: Copy + Into<GlobalUUID>>(
     global_ref: &GlobalReference<ID>,
     concretizer: &mut impl Concretizer,
 ) -> ExecutionResult<ConcreteGlobalReference<ID>> {
-    let target = linker.get_link_info(global_ref.id.into());
+    let target = &linker.globals[global_ref.id.into()];
     let template_args = target.template_parameters.try_map2(
         &global_ref.template_arg_types,
         |(param_id, param, abs_typ)| -> ExecutionResult<ConcreteTemplateArg> {

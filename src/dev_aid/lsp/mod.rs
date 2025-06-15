@@ -403,7 +403,7 @@ fn handle_request(
                         goto_definition_list.push((template_arg.name_span, link_info.file))
                     }
                     LocationInfo::Global(id) => {
-                        let link_info = linker.get_link_info(id);
+                        let link_info = &linker.globals[id];
                         goto_definition_list.push((link_info.name_span, link_info.file));
                     }
                     LocationInfo::Port(_sm, md, port_id) => {

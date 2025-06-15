@@ -223,7 +223,7 @@ pub fn hover(info: LocationInfo, linker: &Linker, file_data: &FileData) -> Vec<M
             }
         }
         LocationInfo::Global(global) => {
-            let link_info = linker.get_link_info(global);
+            let link_info = &linker.globals[global];
             hover.documentation_link_info(link_info);
             let file = &linker.files[link_info.file];
             hover.sus_code(

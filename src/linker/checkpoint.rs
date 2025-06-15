@@ -66,12 +66,7 @@ impl LinkInfo {
 impl Linker {
     pub fn checkpoint(&mut self, global_ids: &[GlobalUUID], checkpoint_id: usize) {
         for id in global_ids {
-            let link_info = Self::get_link_info_mut(
-                &mut self.modules,
-                &mut self.types,
-                &mut self.constants,
-                *id,
-            );
+            let link_info = &mut self.globals[*id];
 
             let expected_checkpoint = link_info.checkpoints.len();
             assert!(expected_checkpoint == checkpoint_id,

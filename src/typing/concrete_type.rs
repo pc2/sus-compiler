@@ -265,7 +265,7 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
                 write!(
                     resulting_error,
                     "'{}', ",
-                    &linker.get_link_info(self.id.into()).template_parameters[id].name
+                    &linker.globals[self.id.into()].template_parameters[id].name
                 )
                 .unwrap();
             }

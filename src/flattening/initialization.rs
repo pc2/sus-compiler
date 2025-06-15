@@ -1,10 +1,11 @@
 use sus_proc_macro::{field, kind, kw};
 
+use crate::linker::passes::ResolvedGlobals;
 use crate::linker::IsExtern;
 use crate::prelude::*;
 
 use crate::flattening::Module;
-use crate::linker::{FileBuilder, LinkInfo, ResolvedGlobals};
+use crate::linker::{FileBuilder, LinkInfo};
 
 use super::parser::Cursor;
 use super::*;
@@ -80,7 +81,7 @@ fn initialize_global_object(
         span,
         errors: parsing_errors.into_storage(),
         is_extern,
-        resolved_globals: ResolvedGlobals::empty(),
+        resolved_globals: ResolvedGlobals::default(),
         checkpoints: Vec::new(),
     };
 

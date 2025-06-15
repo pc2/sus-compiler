@@ -3,10 +3,11 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::config::EarlyExitUpTo;
-use crate::flattening::typecheck::{perform_lints, typecheck_all};
+use crate::flattening::typecheck::{perform_lints, typecheck};
 use crate::linker::checkpoint::{
     AFTER_FLATTEN_CP, AFTER_INITIAL_PARSE_CP, AFTER_LINTS_CP, AFTER_TYPE_CHECK_CP,
 };
+use crate::linker::GlobalObj;
 use crate::prelude::*;
 use crate::typing::concrete_type::ConcreteGlobalReference;
 
@@ -206,12 +207,7 @@ impl Linker {
         let global_ids = self.get_all_global_ids();
         // First reset all modules back to post-gather_initial_file_data
         for id in &global_ids {
-            let link_info = Self::get_link_info_mut(
-                &mut self.modules,
-                &mut self.types,
-                &mut self.constants,
-                *id,
-            );
+            let link_info = &mut self.globals[*id];
 
             link_info.reset_to(AFTER_INITIAL_PARSE_CP);
             link_info.instructions.clear();
@@ -221,19 +217,42 @@ impl Linker {
         }
 
         flatten_all_globals(self);
+
+        for global_id in &global_ids {
+            if let GlobalObj::Module(md) = &mut self.globals.get_mut(*global_id) {
+                if crate::debug::is_enabled("print-flattened-pre-typecheck") {
+                    md.print_flattened_module(&self.files[md.link_info.file]);
+                }
+            }
+        }
+
         self.checkpoint(&global_ids, AFTER_FLATTEN_CP);
         if config.early_exit == EarlyExitUpTo::Flatten {
             return;
         }
 
-        typecheck_all(self, &global_ids);
+        for global_id in &global_ids {
+            self.pass("Typechecking", *global_id, |pass, errors| {
+                typecheck(pass, errors);
+            });
+
+            if crate::debug::is_enabled("print-flattened") {
+                if let GlobalObj::Module(md) = &mut self.globals.get(*global_id) {
+                    md.print_flattened_module(&self.files[md.link_info.file]);
+                }
+            }
+        }
         self.checkpoint(&global_ids, AFTER_TYPE_CHECK_CP);
 
         if config.early_exit == EarlyExitUpTo::AbstractTypecheck {
             return;
         }
 
-        perform_lints(self, &global_ids);
+        for global_id in &global_ids {
+            self.pass("Lints", *global_id, |pass, errors| {
+                perform_lints(pass, errors);
+            });
+        }
         self.checkpoint(&global_ids, AFTER_LINTS_CP);
 
         if config.early_exit == EarlyExitUpTo::Lint {

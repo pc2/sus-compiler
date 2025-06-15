@@ -43,7 +43,8 @@ impl<'l> TypeCheckingContext<'l> {
         match instr {
             Instruction::SubModule(sub_module_instance) => {
                 sub_module_instance.local_interface_domains.set(
-                    self.globals[sub_module_instance.module_ref.id]
+                    self.globals
+                        .get_module(sub_module_instance.module_ref.id)
                         .domains
                         .map(|_| self.domain_checker.alloc_unknown()),
                 );

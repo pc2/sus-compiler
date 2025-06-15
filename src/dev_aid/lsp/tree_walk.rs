@@ -216,7 +216,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
     {
         let target_name_elem = GlobalUUID::from(global.id);
         self.visit(global.name_span, LocationInfo::Global(target_name_elem));
-        let target_link_info = self.linker.get_link_info(target_name_elem);
+        let target_link_info = &self.linker.globals[target_name_elem];
         for arg in &global.template_args {
             if let Some(&refers_to) = arg.refers_to.get() {
                 self.visit(
@@ -367,7 +367,7 @@ impl<'linker, Visitor: FnMut(Span, LocationInfo<'linker>), Pruner: Fn(Span) -> b
     }
 
     fn walk_link_info(&mut self, obj_id: GlobalUUID) {
-        let link_info = self.linker.get_link_info(obj_id);
+        let link_info = &self.linker.globals[obj_id];
         if !(self.should_prune)(link_info.span) {
             self.walk_name_and_template_arguments(obj_id, link_info);
 

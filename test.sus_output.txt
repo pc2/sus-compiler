@@ -169,345 +169,175 @@ Flattening SameNameAsType
 Flattening InstantiateTransmutes
 Flattening StraightTransmute
 Typechecking LatencyOffset
-Report Type Errors LatencyOffset
 Typechecking CrossDomain
-Report Type Errors CrossDomain
 Typechecking IntToBits
-Report Type Errors IntToBits
 Typechecking BitsToInt
-Report Type Errors BitsToInt
 Typechecking UIntToBits
-Report Type Errors UIntToBits
 Typechecking BitsToUInt
-Report Type Errors BitsToUInt
 Typechecking transmute_to_bits
-Report Type Errors transmute_to_bits
 Typechecking transmute_from_bits
-Report Type Errors transmute_from_bits
 Typechecking transmute
-Report Type Errors transmute
 Typechecking DualPortMem
-Report Type Errors DualPortMem
 Typechecking FIFO
-Report Type Errors FIFO
 Typechecking JoinDomains
-Report Type Errors JoinDomains
 Typechecking Iterator
-Report Type Errors Iterator
 Typechecking FixedSizeIterator
-Report Type Errors FixedSizeIterator
 Typechecking SlowClockGenerator
-Report Type Errors SlowClockGenerator
 Typechecking SplitAt
-Report Type Errors SplitAt
 Typechecking Abs
-Report Type Errors Abs
 Typechecking Slice
-Report Type Errors Slice
 Typechecking Concat
-Report Type Errors Concat
 Typechecking Repeat
-Report Type Errors Repeat
 Typechecking BitSelect
-Report Type Errors BitSelect
 Typechecking PopCount
-Report Type Errors PopCount
 Typechecking TreeAdd
-Report Type Errors TreeAdd
 Typechecking example_md
-Report Type Errors example_md
 Typechecking multiply_add
-Report Type Errors multiply_add
 Typechecking test_pow17
-Report Type Errors test_pow17
 Typechecking pow17
-Report Type Errors pow17
 Typechecking fibonnaci
-Report Type Errors fibonnaci
 Typechecking blur2
-Report Type Errors blur2
 Typechecking Tree_Multiply
-Report Type Errors Tree_Multiply
 Typechecking Accumulator
-Report Type Errors Accumulator
 Typechecking blur
-Report Type Errors blur
 Typechecking Unpack4
-Report Type Errors Unpack4
 Typechecking generative
-Report Type Errors generative
 Typechecking add_indices_to_array
-Report Type Errors add_indices_to_array
 Typechecking assignment_producer
-Report Type Errors assignment_producer
 Typechecking test_various_assignments
-Report Type Errors test_various_assignments
 Typechecking first_bit_idx_6
-Report Type Errors first_bit_idx_6
 Typechecking multiply_add_with_latencies
-Report Type Errors multiply_add_with_latencies
 Typechecking first_bit_idx_24
-Report Type Errors first_bit_idx_24
 Typechecking permute
-Report Type Errors permute
 Typechecking permute24
-Report Type Errors permute24
 Typechecking test_single_wire
-Report Type Errors test_single_wire
 Typechecking disjoint_ports
-Report Type Errors disjoint_ports
 Typechecking undeteriminable_input_latency
-Report Type Errors undeteriminable_input_latency
 Typechecking specified_input_latency
-Report Type Errors specified_input_latency
 Typechecking determinable_input_latency
-Report Type Errors determinable_input_latency
 Typechecking determinable_because_no_input_output_ports
-Report Type Errors determinable_because_no_input_output_ports
 Typechecking conflicting_latency_declarations
-Report Type Errors conflicting_latency_declarations
 Typechecking bad_cycle
-Report Type Errors bad_cycle
 Typechecking module_taking_time
-Report Type Errors module_taking_time
 Typechecking matrix_vector_mul
-Report Type Errors matrix_vector_mul
 Typechecking bad_cycle2
-Report Type Errors bad_cycle2
 Typechecking module_taking_a_lot_of_time
-Report Type Errors module_taking_a_lot_of_time
 Typechecking offset_latency
-Report Type Errors offset_latency
 Typechecking good_cycle
-Report Type Errors good_cycle
 Typechecking input_only
-Report Type Errors input_only
 Typechecking multiple_inputs_only
-Report Type Errors multiple_inputs_only
 Typechecking output_only
-Report Type Errors output_only
 Typechecking multiple_outputs_only
-Report Type Errors multiple_outputs_only
 Typechecking submodule
-Report Type Errors submodule
 Typechecking doNothing
-Report Type Errors doNothing
 Typechecking contains_submodule_submodule
-Report Type Errors contains_submodule_submodule
 Typechecking xor
-Report Type Errors xor
 Typechecking use_xor
-Report Type Errors use_xor
 Typechecking fizz_buzz
-Report Type Errors fizz_buzz
 Typechecking fizz_buzz_gen
-Report Type Errors fizz_buzz_gen
 Typechecking mbf_dual
-Report Type Errors mbf_dual
 Typechecking monotonize_down
-Report Type Errors monotonize_down
 Typechecking my_mod
-Report Type Errors my_mod
 Typechecking use_my_mod
-Report Type Errors use_my_mod
 Typechecking submodule_named_ports
-Report Type Errors submodule_named_ports
 Typechecking use_submodule_named_ports
-Report Type Errors use_submodule_named_ports
 Typechecking contains_submodule_submodule
-Report Type Errors contains_submodule_submodule
 Typechecking cross_bool
-Report Type Errors cross_bool
 Typechecking cross_int
-Report Type Errors cross_int
 Typechecking cross_memory
-Report Type Errors cross_memory
 Typechecking offset_backwards
-Report Type Errors offset_backwards
 Typechecking dual_port_mem
-Report Type Errors dual_port_mem
 Typechecking use_fifo
-Report Type Errors use_fifo
 Typechecking test_separated_domain
-Report Type Errors test_separated_domain
 Typechecking no_port_module
-Report Type Errors no_port_module
 Typechecking use_no_input_module
-Report Type Errors use_no_input_module
 Typechecking mod_with_unused_interface
-Report Type Errors mod_with_unused_interface
 Typechecking test_write_to_gen_var
-Report Type Errors test_write_to_gen_var
 Typechecking use_bad_interface
-Report Type Errors use_bad_interface
 Typechecking sequenceDownFrom
-Report Type Errors sequenceDownFrom
 Typechecking sumUpTo
-Report Type Errors sumUpTo
 Typechecking test
-Report Type Errors test
 Typechecking use_test
-Report Type Errors use_test
 Typechecking tinyTestMod
-Report Type Errors tinyTestMod
 Typechecking testTinyTestMod
-Report Type Errors testTinyTestMod
 Typechecking tree_add
-Report Type Errors tree_add
 Typechecking make_tree_add
-Report Type Errors make_tree_add
 Typechecking replicate
-Report Type Errors replicate
 Typechecking use_replicate
-Report Type Errors use_replicate
 Typechecking permute_t
-Report Type Errors permute_t
 Typechecking use_permute
-Report Type Errors use_permute
 Typechecking instruction_decoder
-Report Type Errors instruction_decoder
 Typechecking run_instruction
-Report Type Errors run_instruction
 Typechecking no_main_interface
-Report Type Errors no_main_interface
 Typechecking use_no_main_interface
-Report Type Errors use_no_main_interface
 Typechecking moduleWithBadDeclaration
-Report Type Errors moduleWithBadDeclaration
 Typechecking moduleWithBadInterface
-Report Type Errors moduleWithBadInterface
 Typechecking useModuleWithBadInterface
-Report Type Errors useModuleWithBadInterface
 Typechecking m
-Report Type Errors m
 Typechecking xyz
-Report Type Errors xyz
 Typechecking numbersToAddUp
-Report Type Errors numbersToAddUp
 Typechecking sized_int_add
-Report Type Errors sized_int_add
 Typechecking use_sized_int_add
-Report Type Errors use_sized_int_add
 Typechecking implicit_domain_forbidden
-Report Type Errors implicit_domain_forbidden
 Typechecking conflicting_domain_with_port_name
-Report Type Errors conflicting_domain_with_port_name
 Typechecking make_infinite_type_help
-Report Type Errors make_infinite_type_help
 Typechecking make_infinite_type
-Report Type Errors make_infinite_type
 Typechecking UseDualPortMem
-Report Type Errors UseDualPortMem
 Typechecking example_FIFO
-Report Type Errors example_FIFO
 Typechecking use_Iterator
-Report Type Errors use_Iterator
 Typechecking UseSlice
-Report Type Errors UseSlice
 Typechecking UseBuiltinConstants
-Report Type Errors UseBuiltinConstants
 Typechecking FailingAssert
-Report Type Errors FailingAssert
 Typechecking IfTesting
-Report Type Errors IfTesting
 Typechecking latency_counting_disjoint_blocks
-Report Type Errors latency_counting_disjoint_blocks
 Typechecking latency_counting_disjoint_blocks_merge_error
-Report Type Errors latency_counting_disjoint_blocks_merge_error
 Typechecking use_infer_me
-Report Type Errors use_infer_me
 Typechecking infer_me
-Report Type Errors infer_me
 Typechecking infer_from_local_context
-Report Type Errors infer_from_local_context
 Typechecking instantiate_fifo
-Report Type Errors instantiate_fifo
 Typechecking inference_edge_case
-Report Type Errors inference_edge_case
 Typechecking specified_latencies_not_ports_edge_case
-Report Type Errors specified_latencies_not_ports_edge_case
 Typechecking testArrayWrite
-Report Type Errors testArrayWrite
 Typechecking infer_me_with_poison_output
-Report Type Errors infer_me_with_poison_output
 Typechecking instantiate_infer_me_with_poison_output
-Report Type Errors instantiate_infer_me_with_poison_output
 Typechecking __add__
-Report Type Errors __add__
 Typechecking ShiftReg
-Report Type Errors ShiftReg
 Typechecking MultiStateLoop
-Report Type Errors MultiStateLoop
 Typechecking use_MultiStateLoop
-Report Type Errors use_MultiStateLoop
 Typechecking CombineArray
-Report Type Errors CombineArray
 Typechecking unknownLatency
-Report Type Errors unknownLatency
 Typechecking useUnknownLatency
-Report Type Errors useUnknownLatency
 Typechecking infer_me_conflicting_directions
-Report Type Errors infer_me_conflicting_directions
 Typechecking use_infer_me_conflicting_directions
-Report Type Errors use_infer_me_conflicting_directions
 Typechecking infer_me_with_delta
-Report Type Errors infer_me_with_delta
 Typechecking use_infer_me_with_delta
-Report Type Errors use_infer_me_with_delta
 Typechecking infer_me_with_negative_delta
-Report Type Errors infer_me_with_negative_delta
 Typechecking use_infer_me_with_negative_delta
-Report Type Errors use_infer_me_with_negative_delta
 Typechecking infer_me_inputs_only
-Report Type Errors infer_me_inputs_only
 Typechecking use_infer_me_inputs_only
-Report Type Errors use_infer_me_inputs_only
 Typechecking use_ranks
-Report Type Errors use_ranks
 Typechecking testInts
-Report Type Errors testInts
 Typechecking use_FIFO
-Report Type Errors use_FIFO
 Typechecking write_to_generative_through_when
-Report Type Errors write_to_generative_through_when
 Typechecking SameNameAsType
-Report Type Errors SameNameAsType
 Typechecking InstantiateTransmutes
-Report Type Errors InstantiateTransmutes
 Typechecking StraightTransmute
-Report Type Errors StraightTransmute
 Typechecking bool
-Report Type Errors bool
 Typechecking int
-Report Type Errors int
 Typechecking float
-Report Type Errors float
 Typechecking __crash_compiler
-Report Type Errors __crash_compiler
 Typechecking true
-Report Type Errors true
 Typechecking false
-Report Type Errors false
 Typechecking assert
-Report Type Errors assert
 Typechecking sizeof
-Report Type Errors sizeof
 Typechecking clog2
-Report Type Errors clog2
 Typechecking pow2
-Report Type Errors pow2
 Typechecking pow
-Report Type Errors pow
 Typechecking factorial
-Report Type Errors factorial
 Typechecking falling_factorial
-Report Type Errors falling_factorial
 Typechecking comb
-Report Type Errors comb
 Typechecking SUM_UP
-Report Type Errors SUM_UP
 Typechecking dont_care
-Report Type Errors dont_care
 Lints LatencyOffset
 Lints CrossDomain
 Lints IntToBits

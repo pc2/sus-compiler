@@ -9,7 +9,7 @@ use crate::typing::template::{Parameter, TVec, TemplateKind};
 use crate::{file_position::FileText, pretty_print_many_spans, value::Value};
 
 use crate::flattening::{DomainInfo, Interface, InterfaceToDomainMap, Module, WrittenType};
-use crate::linker::{FileData, GlobalUUID, LinkInfo};
+use crate::linker::{FileData, GlobalUUID, LinkInfo, LinkerGlobals};
 use crate::typing::{abstract_type::AbstractRankedType, concrete_type::ConcreteType};
 
 use std::fmt::{Display, Formatter};
@@ -19,7 +19,7 @@ use std::ops::Deref;
 
 pub struct WrittenTypeDisplay<'a> {
     inner: &'a WrittenType,
-    linker: &'a Linker,
+    globals: &'a LinkerGlobals,
     template_names: &'a TVec<Parameter>,
 }
 
@@ -29,13 +29,13 @@ impl Display for WrittenTypeDisplay<'_> {
             WrittenType::Error(_) => f.write_str("{error}"),
             WrittenType::TemplateVariable(_, id) => f.write_str(&self.template_names[*id].name),
             WrittenType::Named(named_type) => {
-                f.write_str(&self.linker.types[named_type.id].link_info.get_full_name())
+                f.write_str(&self.globals.types[named_type.id].link_info.get_full_name())
             }
             WrittenType::Array(_, sub) => {
                 write!(
                     f,
                     "{}[]",
-                    sub.deref().0.display(self.linker, self.template_names)
+                    sub.deref().0.display(self.globals, self.template_names)
                 )
             }
         }
@@ -45,12 +45,12 @@ impl Display for WrittenTypeDisplay<'_> {
 impl WrittenType {
     pub fn display<'a>(
         &'a self,
-        linker: &'a Linker,
+        globals: &'a LinkerGlobals,
         template_names: &'a TVec<Parameter>,
     ) -> impl Display + 'a {
         WrittenTypeDisplay {
             inner: self,
-            linker,
+            globals,
             template_names,
         }
     }
@@ -58,7 +58,7 @@ impl WrittenType {
 
 pub struct AbstractRankedTypeDisplay<'a> {
     typ: &'a AbstractRankedType,
-    linker: &'a Linker,
+    globals: &'a LinkerGlobals,
     template_names: &'a TVec<Parameter>,
 }
 
@@ -68,14 +68,14 @@ impl Display for AbstractRankedTypeDisplay<'_> {
             AbstractInnerType::Unknown(_) => write!(f, "?"),
             AbstractInnerType::Template(id) => f.write_str(&self.template_names[*id].name),
             AbstractInnerType::Named(id) => {
-                f.write_str(&self.linker.types[*id].link_info.get_full_name())
+                f.write_str(&self.globals.types[*id].link_info.get_full_name())
             }
             AbstractInnerType::Interface(md_id, interface_id) => {
-                let md = &self.linker.modules[md_id.id];
+                let md = &self.globals.modules[md_id.id];
                 f.write_fmt(format_args!(
                     "Interface {} of {}",
                     md.interfaces[*interface_id].name,
-                    md_id.display(self.linker, self.template_names)
+                    md_id.display(self.globals, self.template_names)
                 ))
             }
         }
@@ -85,13 +85,13 @@ impl Display for AbstractRankedTypeDisplay<'_> {
 
 pub struct AbstractGlobalReferenceDisplay<'a, ID> {
     typ: &'a AbstractGlobalReference<ID>,
-    linker: &'a Linker,
+    globals: &'a LinkerGlobals,
     template_names: &'a TVec<Parameter>,
 }
 
 impl<ID: Into<GlobalUUID> + Copy> Display for AbstractGlobalReferenceDisplay<'_, ID> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let target_link_info = self.linker.get_link_info(self.typ.id.into());
+        let target_link_info = &self.globals[self.typ.id.into()];
 
         f.write_str(&target_link_info.name)?;
         f.write_str(" #(")?;
@@ -105,7 +105,7 @@ impl<ID: Into<GlobalUUID> + Copy> Display for AbstractGlobalReferenceDisplay<'_,
             f.write_fmt(format_args!(
                 "{}: {}",
                 param.name,
-                typ.display(self.linker, self.template_names)
+                typ.display(self.globals, self.template_names)
             ))
         })?;
         f.write_str(")")
@@ -115,12 +115,12 @@ impl<ID: Into<GlobalUUID> + Copy> Display for AbstractGlobalReferenceDisplay<'_,
 impl<ID: Into<GlobalUUID> + Copy> AbstractGlobalReference<ID> {
     pub fn display<'a>(
         &'a self,
-        linker: &'a Linker,
+        globals: &'a LinkerGlobals,
         template_names: &'a TVec<Parameter>,
     ) -> impl Display + 'a {
         AbstractGlobalReferenceDisplay {
             typ: self,
-            linker,
+            globals,
             template_names,
         }
     }
@@ -129,12 +129,12 @@ impl<ID: Into<GlobalUUID> + Copy> AbstractGlobalReference<ID> {
 impl AbstractRankedType {
     pub fn display<'a>(
         &'a self,
-        linker: &'a Linker,
+        globals: &'a LinkerGlobals,
         template_names: &'a TVec<Parameter>,
     ) -> impl Display + 'a {
         AbstractRankedTypeDisplay {
             typ: self,
-            linker,
+            globals,
             template_names,
         }
     }
@@ -161,7 +161,7 @@ impl Display for PeanoType {
 
 pub struct ConcreteTypeDisplay<'a> {
     inner: &'a ConcreteType,
-    linker: &'a Linker,
+    globals: &'a LinkerGlobals,
     use_newlines: bool,
 }
 
@@ -169,9 +169,9 @@ impl Display for ConcreteTypeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.inner {
             ConcreteType::Named(global_ref) => ConcreteGlobalReferenceDisplay {
-                target_link_info: &self.linker.types[global_ref.id].link_info,
+                target_link_info: &self.globals.types[global_ref.id].link_info,
                 template_args: &global_ref.template_args,
-                linker: self.linker,
+                globals: self.globals,
                 use_newlines: self.use_newlines,
             }
             .fmt(f),
@@ -180,7 +180,7 @@ impl Display for ConcreteTypeDisplay<'_> {
                 write!(
                     f,
                     "{}[{arr_size}]",
-                    elem_typ.display(self.linker, self.use_newlines)
+                    elem_typ.display(self.globals, self.use_newlines)
                 )
             }
         }
@@ -188,10 +188,14 @@ impl Display for ConcreteTypeDisplay<'_> {
 }
 
 impl ConcreteType {
-    pub fn display<'a>(&'a self, linker: &'a Linker, use_newlines: bool) -> impl Display + 'a {
+    pub fn display<'a>(
+        &'a self,
+        globals: &'a LinkerGlobals,
+        use_newlines: bool,
+    ) -> impl Display + 'a {
         ConcreteTypeDisplay {
             inner: self,
-            linker,
+            globals,
             use_newlines,
         }
     }
@@ -313,7 +317,7 @@ impl Module {
 pub struct ConcreteGlobalReferenceDisplay<'a> {
     template_args: &'a TVec<ConcreteTemplateArg>,
     target_link_info: &'a LinkInfo,
-    linker: &'a Linker,
+    globals: &'a LinkerGlobals,
     /// If there should be newlines: "\n", otherwise ""
     use_newlines: bool,
 }
@@ -345,7 +349,7 @@ impl<'a> Display for ConcreteGlobalReferenceDisplay<'a> {
                 TemplateKind::Type(typ_arg) => {
                     f.write_fmt(format_args!(
                         "type {}",
-                        typ_arg.display(self.linker, self.use_newlines)
+                        typ_arg.display(self.globals, self.use_newlines)
                     ))?;
                 }
                 TemplateKind::Value(v) => match v {
@@ -363,14 +367,14 @@ impl<'a> Display for ConcreteGlobalReferenceDisplay<'a> {
 impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
     pub fn display<'v>(
         &'v self,
-        linker: &'v Linker,
+        globals: &'v LinkerGlobals,
         use_newlines: bool,
     ) -> ConcreteGlobalReferenceDisplay<'v> {
-        let target_link_info = linker.get_link_info(self.id.into());
+        let target_link_info = &globals[self.id.into()];
         ConcreteGlobalReferenceDisplay {
             template_args: &self.template_args,
             target_link_info,
-            linker,
+            globals,
             use_newlines,
         }
     }
