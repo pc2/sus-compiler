@@ -142,14 +142,16 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
         name: &str,
         errors: &ErrorCollector,
     ) -> Option<GlobalUUID> {
-        let mut resolved_globals = self.resolved_globals.borrow_mut();
         match self.global_namespace.get(name) {
             Some(NamespaceElement::Global(found)) => {
-                resolved_globals.referenced_globals.push(*found);
+                self.resolved_globals
+                    .borrow_mut()
+                    .referenced_globals
+                    .push(*found);
                 Some(*found)
             }
             Some(NamespaceElement::Colission(coll)) => {
-                resolved_globals.all_resolved = false;
+                self.resolved_globals.borrow_mut().all_resolved = false;
 
                 let mut err_ref = errors.error(name_span, format!("There were colliding imports for the name '{name}'. Pick one and import it by name."));
 
@@ -164,7 +166,7 @@ impl<'linker, 'from> GlobalResolver<'linker, 'from> {
                 None
             }
             None => {
-                resolved_globals.all_resolved = false;
+                self.resolved_globals.borrow_mut().all_resolved = false;
 
                 errors.error(
                     name_span,

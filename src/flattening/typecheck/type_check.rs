@@ -10,10 +10,7 @@ use crate::typing::type_inference::{AbstractTypeSubstitutor, TypeUnifier, UnifyE
 
 use crate::linker::GlobalUUID;
 
-use crate::typing::{
-    abstract_type::{BOOL_TYPE, INT_TYPE},
-    template::TemplateKind,
-};
+use crate::typing::template::TemplateKind;
 
 use super::*;
 
@@ -63,7 +60,7 @@ impl<'l> TypeCheckingContext<'l> {
 
                     self.type_checker.unify_report_error(
                         idx_expr.typ,
-                        &INT_TYPE.scalar(),
+                        &AbstractRankedType::INT,
                         idx_expr.span,
                         "array index",
                     );
@@ -220,7 +217,7 @@ impl<'l> TypeCheckingContext<'l> {
                 let idx_expr = self.instructions[*arr_idx].unwrap_subexpression();
                 self.type_checker.unify_report_error(
                     idx_expr.typ,
-                    &INT_TYPE.scalar(),
+                    &AbstractRankedType::INT,
                     idx_expr.span,
                     "array size",
                 );
@@ -235,7 +232,7 @@ impl<'l> TypeCheckingContext<'l> {
             let latency_specifier_expr = self.instructions[latency_spec].unwrap_subexpression();
             self.type_checker.unify_report_error(
                 latency_specifier_expr.typ,
-                &INT_TYPE.scalar(),
+                &AbstractRankedType::INT,
                 latency_specifier_expr.span,
                 "latency specifier",
             );
@@ -504,7 +501,7 @@ impl<'l> TypeCheckingContext<'l> {
                 let condition_expr = &self.instructions[stm.condition].unwrap_subexpression();
                 self.type_checker.unify_report_error(
                     condition_expr.typ,
-                    &BOOL_TYPE.scalar(),
+                    &AbstractRankedType::BOOL,
                     condition_expr.span,
                     "if statement condition",
                 );
@@ -616,29 +613,21 @@ impl TypeUnifier<AbstractTypeSubstitutor> {
     ) -> AbstractRankedType {
         let input_rank = input_typ.rank.clone();
         if op == UnaryOperator::Not {
-            self.unify_report_error(
-                input_typ,
-                &BOOL_TYPE.with_rank(input_rank.clone()),
-                span,
-                "! input",
-            );
+            let result_typ = AbstractInnerType::BOOL.with_rank(input_rank);
+            self.unify_report_error(input_typ, &result_typ, span, "! input");
 
-            BOOL_TYPE.with_rank(input_rank)
+            result_typ
         } else if op == UnaryOperator::Negate {
-            self.unify_report_error(
-                input_typ,
-                &INT_TYPE.with_rank(input_rank.clone()),
-                span,
-                "unary - input",
-            );
-            INT_TYPE.with_rank(input_rank)
+            let result_typ = AbstractInnerType::INT.with_rank(input_rank);
+            self.unify_report_error(input_typ, &result_typ, span, "unary - input");
+            result_typ
         } else {
             let reduction_type = match op {
-                UnaryOperator::And => BOOL_TYPE,
-                UnaryOperator::Or => BOOL_TYPE,
-                UnaryOperator::Xor => BOOL_TYPE,
-                UnaryOperator::Sum => INT_TYPE,
-                UnaryOperator::Product => INT_TYPE,
+                UnaryOperator::And => AbstractInnerType::BOOL,
+                UnaryOperator::Or => AbstractInnerType::BOOL,
+                UnaryOperator::Xor => AbstractInnerType::BOOL,
+                UnaryOperator::Sum => AbstractInnerType::INT,
+                UnaryOperator::Product => AbstractInnerType::INT,
                 _ => unreachable!(),
             };
             let reduction_type = reduction_type.with_rank(input_rank.clone());
@@ -655,6 +644,8 @@ impl TypeUnifier<AbstractTypeSubstitutor> {
         left_span: Span,
         right_span: Span,
     ) -> AbstractRankedType {
+        const BOOL_TYPE: AbstractInnerType = AbstractInnerType::BOOL;
+        const INT_TYPE: AbstractInnerType = AbstractInnerType::INT;
         let (exp_left, exp_right, out_typ) = match op {
             BinaryOperator::And => (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
             BinaryOperator::Or => (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),

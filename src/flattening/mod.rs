@@ -200,6 +200,7 @@ pub struct Interface {
     pub domain: DomainID,
     pub func_call_inputs: PortIDRange,
     pub func_call_outputs: PortIDRange,
+    pub declaration_instruction: FlatID,
 }
 
 impl Interface {

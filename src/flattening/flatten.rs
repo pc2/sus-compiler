@@ -1157,13 +1157,11 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
 
         let (inputs, outputs) = self.flatten_interface_ports(inputs_come_first, cursor);
 
-        self.alloc_interface(name.clone(), name_span, interface_kind, inputs, outputs);
-
         let interface_id = self
             .instructions
             .alloc(Instruction::Interface(InterfaceDeclaration {
                 parent_condition: self.current_parent_condition,
-                name,
+                name: name.clone(),
                 name_span,
                 interface_kw_span,
                 interface_kind,
@@ -1175,6 +1173,15 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 then_block: FlatIDRange::EMPTY,
                 else_block: FlatIDRange::EMPTY,
             }));
+
+        self.alloc_interface(
+            name,
+            name_span,
+            interface_kind,
+            inputs,
+            outputs,
+            interface_id,
+        );
 
         let (then_block, else_block, then_block_span, else_span) = self.flatten_then_else_blocks(
             cursor,
@@ -1240,6 +1247,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
         interface_kind: InterfaceKind,
         func_call_inputs: PortIDRange,
         func_call_outputs: PortIDRange,
+        declaration_instruction: FlatID,
     ) {
         if name == self.name {
             let main_interface = &mut self.interfaces[InterfaceID::MAIN_INTERFACE];
@@ -1256,6 +1264,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
                 domain: self.current_domain,
                 name_span,
                 name,
+                declaration_instruction,
             });
         }
     }
@@ -1521,6 +1530,7 @@ impl<'l, 'c: 'l> FlatteningContext<'l, '_> {
             domain: DomainID::MAIN_DOMAIN,
             func_call_inputs: PortIDRange::EMPTY,
             func_call_outputs: PortIDRange::EMPTY,
+            declaration_instruction: UUID::PLACEHOLDER,
         });
 
         cursor.field(field!("block"));

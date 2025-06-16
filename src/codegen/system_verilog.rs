@@ -4,14 +4,16 @@ use std::ops::Deref;
 use ibig::IBig;
 use sus_proc_macro::get_builtin_type;
 
+use crate::alloc::zip_eq;
 use crate::latency::CALCULATE_LATENCY_LATER;
 use crate::linker::{IsExtern, LinkInfo};
 use crate::prelude::*;
 
-use crate::flattening::{DeclarationKind, Instruction, Module, Port};
+use crate::flattening::{Module, Port};
 use crate::instantiation::{
     InstantiatedModule, MultiplexerSource, RealWire, RealWireDataSource, RealWirePathElem,
 };
+use crate::to_string::join_string_iter;
 use crate::typing::concrete_type::{
     get_int_bitwidth, ConcreteGlobalReference, ConcreteTemplateArg,
 };
@@ -121,7 +123,7 @@ impl ForEachPathElement {
         let mut result = match path_iter.next().unwrap() {
             ForEachPathElement::Array { var, arr_size: _ } => var.clone(),
         };
-        for p in path {
+        for p in path_iter {
             match p {
                 ForEachPathElement::Array { var, arr_size } => {
                     result = format!("({arr_size} * {result}) + {var}")
@@ -234,6 +236,7 @@ impl<'g> CodeGenerationContext<'g> {
             }
             IsExtern::Builtin => {
                 self.write_module_signature();
+                self.write_generative_declarations();
                 self.write_builtins();
                 self.write_endmodule();
             }
@@ -249,9 +252,12 @@ impl<'g> CodeGenerationContext<'g> {
             &self.instance.mangled_name
         )
         .unwrap();
-        for (_id, port) in self.instance.interface_ports.iter_valids() {
-            let port_wire = &self.instance.wires[port.wire];
-            let input_or_output = if port.is_input { "input" } else { "output" };
+        for (_id, port_wire) in &self.instance.wires {
+            let input_or_output = match port_wire.is_port {
+                Some(true) => "input",
+                Some(false) => "output",
+                None => continue,
+            };
             let wire_doc = port_wire.source.wire_or_reg();
             let wire_name = wire_name_self_latency(port_wire, self.use_latency);
             let wire_decl = typ_to_declaration(&port_wire.typ, &wire_name);
@@ -265,9 +271,10 @@ impl<'g> CodeGenerationContext<'g> {
 
         // Add latency registers for the interface declarations
         // Should not appear in the program text for extern modules
-        for (_id, port) in self.instance.interface_ports.iter_valids() {
-            let port_wire = &self.instance.wires[port.wire];
-            self.add_latency_registers(port.wire, port_wire).unwrap();
+        for (port_wire_id, port_wire) in &self.instance.wires {
+            if port_wire.is_port.is_some() {
+                self.add_latency_registers(port_wire_id, port_wire).unwrap();
+            }
         }
     }
 
@@ -382,13 +389,8 @@ impl<'g> CodeGenerationContext<'g> {
                 continue;
             }
 
-            if let Instruction::Declaration(wire_decl) =
-                &self.md.link_info.instructions[w.original_instruction]
-            {
-                // Don't print named inputs and outputs, already did that in interface
-                if let DeclarationKind::Port { .. } = wire_decl.decl_kind {
-                    continue;
-                }
+            if w.is_port.is_some() {
+                continue;
             }
             let wire_or_reg = w.source.wire_or_reg();
 
@@ -556,6 +558,20 @@ impl<'g> CodeGenerationContext<'g> {
                 };
                 write!(self.program_text, ",\n\t.{port_name}({wire_name})").unwrap();
             }
+            for (port_id, iport) in sm_inst.used_interfaces.iter_valids() {
+                let port_name =
+                    wire_name_self_latency(&sm_inst.wires[iport.wire], self.use_latency);
+                let wire_name = if let Some(port_wire) = &sm.interface_map[port_id] {
+                    wire_name_self_latency(
+                        &self.instance.wires[port_wire.maps_to_wire],
+                        self.use_latency,
+                    )
+                } else {
+                    // Ports that are defined on the submodule, but not used by impl
+                    Cow::Borrowed("")
+                };
+                write!(self.program_text, ",\n\t.{port_name}({wire_name})").unwrap();
+            }
             writeln!(self.program_text, "\n);").unwrap();
         }
     }
@@ -567,28 +583,25 @@ impl<'g> CodeGenerationContext<'g> {
     ) {
         self.program_text.write_str(&link_info.name).unwrap();
         self.program_text.write_str(" #(").unwrap();
-        let mut first = true;
-        concrete_template_args.iter().for_each(|(arg_id, arg)| {
-            let arg_name = &link_info.template_parameters[arg_id].name;
-            let arg_value = match arg {
-                TemplateKind::Type(_) => {
-                    unreachable!(
-                        "No extern module type arguments. Should have been caught by Lint"
-                    );
-                }
-                TemplateKind::Value(value) => value.inline_constant_to_string(),
-            };
-            if first {
-                self.program_text.write_char(',').unwrap();
-            } else {
-                first = false;
-            }
-            self.program_text.write_char('.').unwrap();
-            self.program_text.write_str(arg_name).unwrap();
-            self.program_text.write_char('(').unwrap();
-            self.program_text.write_str(&arg_value).unwrap();
-            self.program_text.write_char(')').unwrap();
-        });
+        self.program_text
+            .write_str(&join_string_iter(
+                ", ",
+                zip_eq(concrete_template_args, &link_info.template_parameters).map(
+                    |(_, arg, arg_name)| -> String {
+                        let arg_name = &arg_name.name;
+                        let arg_value = match arg {
+                            TemplateKind::Type(_) => {
+                                unreachable!(
+                                "No extern module type arguments. Should have been caught by Lint"
+                            );
+                            }
+                            TemplateKind::Value(value) => value.inline_constant_to_string(),
+                        };
+                        format!(".{arg_name}({arg_value})")
+                    },
+                ),
+            ))
+            .unwrap();
         self.program_text.write_char(')').unwrap();
     }
 
@@ -736,7 +749,7 @@ impl<'g> CodeGenerationContext<'g> {
                         format!("assign bits = value{path_str};\n")
                     } else {
                         let path_formula = ForEachPathElement::to_bit_index_formula(path);
-                        format!("assign bits[{path_formula} +: {num_bits}] = value{path_str};\n")
+                        format!("assign bits[({path_formula}) * {num_bits} +: {num_bits}] = value{path_str};\n")
                     }
                 });
             }
@@ -757,7 +770,7 @@ impl<'g> CodeGenerationContext<'g> {
                         format!("assign value{path_str} = bits;\n")
                     } else {
                         let path_formula = ForEachPathElement::to_bit_index_formula(path);
-                        format!("assign value{path_str} = bits[{path_formula} +: {num_bits}];\n")
+                        format!("assign value{path_str} = bits[({path_formula}) * {num_bits} +: {num_bits}];\n")
                     }
                 });
             }
@@ -805,7 +818,7 @@ impl RealWireDataSource {
                 is_state: None,
                 sources: _,
             } => "/*mux_wire*/ logic",
-            _ => "wire",
+            _ => "logic",
         }
     }
 }

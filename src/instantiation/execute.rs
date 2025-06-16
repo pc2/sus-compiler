@@ -795,6 +795,7 @@ impl<'l> ExecutionContext<'l> {
             name: self.unique_name_producer.get_unique_name(""),
             specified_latency: CALCULATE_LATENCY_LATER,
             absolute_latency: CALCULATE_LATENCY_LATER,
+            is_port: None,
         }))
     }
     fn get_wire_or_constant_as_wire(
@@ -866,6 +867,7 @@ impl<'l> ExecutionContext<'l> {
                     .get_unique_name(format!("{}_{}", submod_instance.name, port_data.name)),
                 specified_latency: CALCULATE_LATENCY_LATER,
                 absolute_latency: CALCULATE_LATENCY_LATER,
+                is_port: None,
             });
 
             let name_refs = if let Some(sp) = port_name_span {
@@ -877,6 +879,76 @@ impl<'l> ExecutionContext<'l> {
             *wire_found = Some(SubModulePort {
                 maps_to_wire: new_wire,
                 name_refs,
+            });
+            new_wire
+        }
+    }
+    /// Allocates ports on first use, to see which ports are used, and to determine instantiation based on this
+    fn get_submodule_condition(
+        &mut self,
+        sub_module_id: SubModuleID,
+        interface_id: InterfaceID,
+        interface_name_span: Span,
+        domain: DomainID,
+        original_expression: FlatID,
+    ) -> WireID {
+        let submod_instance = &mut self.submodules[sub_module_id]; // Separately grab the same submodule every time because we take a &mut in for get_wire_or_constant_as_wire
+
+        if let Some(wire_found) = &mut submod_instance.interface_map[interface_id] {
+            // Deduplicate these spans, so we don't produce overly huge errors, nor allocate more memory than needed
+            add_to_small_set(&mut wire_found.name_refs, interface_name_span);
+
+            wire_found.maps_to_wire
+        } else {
+            let submod_md = &self.linker.modules[submod_instance.refers_to.id];
+            let interface_data = &submod_md.interfaces[interface_id];
+            let name = self
+                .unique_name_producer
+                .get_unique_name(format!("{}_{}", submod_instance.name, interface_data.name));
+            let original_instruction = submod_instance.original_instruction;
+            let source = match interface_data.interface_kind {
+                InterfaceKind::Action => {
+                    let false_wire = self
+                        .alloc_wire_for_const(
+                            Value::Bool(false),
+                            &AbstractRankedType::BOOL,
+                            original_expression,
+                            domain,
+                            interface_name_span,
+                        )
+                        .unwrap();
+                    let single_mux_source = MultiplexerSource {
+                        to_path: Vec::new(),
+                        num_regs: 0,
+                        from: false_wire,
+                        condition: Box::new([]),
+                        wr_ref: WriteReference {
+                            original_expression,
+                            write_idx: 0,
+                        },
+                    };
+                    RealWireDataSource::Multiplexer {
+                        is_state: None,
+                        sources: vec![single_mux_source],
+                    }
+                }
+                InterfaceKind::Trigger => RealWireDataSource::ReadOnly,
+                InterfaceKind::RegularInterface => unreachable!(),
+            };
+            let new_wire = self.wires.alloc(RealWire {
+                source,
+                original_instruction,
+                domain,
+                typ: ConcreteType::BOOL,
+                name,
+                specified_latency: CALCULATE_LATENCY_LATER,
+                absolute_latency: CALCULATE_LATENCY_LATER,
+                is_port: None,
+            });
+
+            self.submodules[sub_module_id].interface_map[interface_id] = Some(SubModulePort {
+                maps_to_wire: new_wire,
+                name_refs: vec![interface_name_span],
             });
             new_wire
         }
@@ -969,6 +1041,33 @@ impl<'l> ExecutionContext<'l> {
                     interface_span,
                 );
 
+                if interface.interface_kind == InterfaceKind::Action {
+                    let condition_port_wire = self.get_submodule_condition(
+                        submod_id,
+                        interface_id,
+                        interface_span,
+                        domain,
+                        original_instruction,
+                    );
+                    let true_wire = self.alloc_wire_for_const(
+                        Value::Bool(true),
+                        &AbstractRankedType::BOOL,
+                        original_instruction,
+                        domain,
+                        interface_span,
+                    )?;
+                    self.instantiate_write_to_wire(
+                        condition_port_wire,
+                        Vec::new(),
+                        true_wire,
+                        0,
+                        WriteReference {
+                            original_expression: original_instruction,
+                            write_idx: 0,
+                        },
+                    );
+                }
+
                 for (write_idx, (port, arg)) in
                     zip_eq(interface.func_call_inputs, &fc.arguments).enumerate()
                 {
@@ -1014,6 +1113,7 @@ impl<'l> ExecutionContext<'l> {
             source,
             specified_latency: CALCULATE_LATENCY_LATER,
             absolute_latency: CALCULATE_LATENCY_LATER,
+            is_port: None,
         })])
     }
 
@@ -1061,6 +1161,13 @@ impl<'l> ExecutionContext<'l> {
             };
 
             let specified_latency = self.get_specified_latency(wire_decl.latency_specifier)?;
+
+            let is_port = if let DeclarationKind::Port { is_input, .. } = &wire_decl.decl_kind {
+                Some(*is_input)
+            } else {
+                None
+            };
+
             let wire_id = self.wires.alloc(RealWire {
                 name: self.unique_name_producer.get_unique_name(&wire_decl.name),
                 typ,
@@ -1069,6 +1176,7 @@ impl<'l> ExecutionContext<'l> {
                 source,
                 specified_latency,
                 absolute_latency: CALCULATE_LATENCY_LATER,
+                is_port,
             });
             SubModuleOrWire::Wire(wire_id)
         })
@@ -1201,6 +1309,7 @@ impl<'l> ExecutionContext<'l> {
         let sub_module = &self.linker.modules[module_ref.id];
 
         let port_map = sub_module.ports.map(|_| None);
+        let interface_map = sub_module.interfaces.map(|_| None);
         let interface_call_sites = sub_module.interfaces.map(|_| Vec::new());
 
         let refers_to = self.execute_global_ref(module_ref)?;
@@ -1210,6 +1319,7 @@ impl<'l> ExecutionContext<'l> {
             instance: OnceCell::new(),
             refers_to,
             port_map,
+            interface_map,
             interface_call_sites,
             name: self.unique_name_producer.get_unique_name(name_origin),
         }))
@@ -1335,19 +1445,26 @@ impl<'l> ExecutionContext<'l> {
                     continue;
                 }
                 Instruction::Interface(interface) => {
-                    let specified_latency =
-                        self.get_specified_latency(interface.latency_specifier)?;
-                    let condition_wire = self.wires.alloc(RealWire {
-                        name: self.unique_name_producer.get_unique_name(&interface.name),
-                        typ: ConcreteType::BOOL,
-                        original_instruction,
-                        domain: interface.domain.unwrap_physical(),
-                        source: RealWireDataSource::ReadOnly,
-                        specified_latency,
-                        absolute_latency: CALCULATE_LATENCY_LATER,
-                    });
-
                     if interface.interface_kind.is_conditional() {
+                        let specified_latency =
+                            self.get_specified_latency(interface.latency_specifier)?;
+
+                        let is_input = match interface.interface_kind {
+                            InterfaceKind::RegularInterface => unreachable!(),
+                            InterfaceKind::Action => true,
+                            InterfaceKind::Trigger => false,
+                        };
+                        let condition_wire = self.wires.alloc(RealWire {
+                            name: self.unique_name_producer.get_unique_name(&interface.name),
+                            typ: ConcreteType::BOOL,
+                            original_instruction,
+                            domain: interface.domain.unwrap_physical(),
+                            source: RealWireDataSource::ReadOnly,
+                            specified_latency,
+                            absolute_latency: CALCULATE_LATENCY_LATER,
+                            is_port: Some(is_input),
+                        });
+
                         self.condition_stack.push(ConditionStackElem {
                             condition_wire,
                             inverse: false,

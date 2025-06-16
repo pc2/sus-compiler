@@ -4,9 +4,6 @@ use crate::{prelude::*, typing::template::TVec};
 
 use super::type_inference::{InnerTypeVariableID, PeanoVariableID};
 
-pub const BOOL_TYPE: AbstractInnerType = AbstractInnerType::Named(get_builtin_type!("bool"));
-pub const INT_TYPE: AbstractInnerType = AbstractInnerType::Named(get_builtin_type!("int"));
-
 /// This contains only the information that can be type-checked before template instantiation.
 ///
 /// Its most important components are the names and structure of types.
@@ -35,6 +32,9 @@ pub enum AbstractInnerType {
 }
 
 impl AbstractInnerType {
+    pub const BOOL: AbstractInnerType = AbstractInnerType::Named(get_builtin_type!("bool"));
+    pub const INT: AbstractInnerType = AbstractInnerType::Named(get_builtin_type!("int"));
+
     pub fn scalar(self) -> AbstractRankedType {
         AbstractRankedType {
             inner: self,
@@ -53,6 +53,15 @@ pub struct AbstractRankedType {
 }
 
 impl AbstractRankedType {
+    pub const BOOL: AbstractRankedType = AbstractRankedType {
+        inner: AbstractInnerType::BOOL,
+        rank: PeanoType::Zero,
+    };
+    pub const INT: AbstractRankedType = AbstractRankedType {
+        inner: AbstractInnerType::INT,
+        rank: PeanoType::Zero,
+    };
+
     pub const fn scalar(inner: AbstractInnerType) -> Self {
         Self {
             inner,

@@ -101,7 +101,7 @@ impl<ID: Into<GlobalUUID> + Copy> Display for AbstractGlobalReferenceDisplay<'_,
             &target_link_info.template_parameters,
         );
 
-        join_string_iter(", ", f, args_iter, |(_, typ, param), f| {
+        join_string_iter_formatter(", ", f, args_iter, |(_, typ, param), f| {
             f.write_fmt(format_args!(
                 "{}: {}",
                 param.name,
@@ -208,7 +208,7 @@ impl Display for Value {
             Value::Integer(i) => i.fmt(f),
             Value::Array(arr_box) => {
                 f.write_str("[")?;
-                join_string_iter(", ", f, arr_box.iter(), |v, f| v.fmt(f))?;
+                join_string_iter_formatter(", ", f, arr_box.iter(), |v, f| v.fmt(f))?;
                 f.write_str("]")
             }
             Value::Unset => f.write_str("{value_unset}"),
@@ -380,7 +380,7 @@ impl<ID: Into<GlobalUUID> + Copy> ConcreteGlobalReference<ID> {
     }
 }
 
-pub fn join_string_iter<'fmt, T>(
+pub fn join_string_iter_formatter<'fmt, T>(
     sep: &str,
     f: &mut Formatter<'fmt>,
     mut iter: impl Iterator<Item = T>,
@@ -394,4 +394,18 @@ pub fn join_string_iter<'fmt, T>(
         }
     }
     Ok(())
+}
+
+pub fn join_string_iter(sep: &'static str, mut iter: impl Iterator<Item = String>) -> String {
+    let mut result = String::new();
+
+    if let Some(first) = iter.next() {
+        result.write_str(&first).unwrap();
+        for item in iter {
+            result.write_str(sep).unwrap();
+            result.write_str(&item).unwrap();
+        }
+    }
+
+    result
 }
