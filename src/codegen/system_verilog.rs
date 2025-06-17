@@ -424,23 +424,12 @@ impl<'g> CodeGenerationContext<'g> {
 
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
 
-                    let mut path = String::new();
-                    for n in 0..rank.len() {
-                        path.push_str(&format!("[_i{n}]"));
-                        writeln!(self.program_text, "foreach ({wire_name}{path}) begin").unwrap();
-                    }
-
-                    writeln!(
-                        self.program_text,
-                        "assign {wire_name}{path} = {}{}{path};",
-                        op.op_text(),
-                        self.wire_name(right_wire, w.absolute_latency)
-                    )
-                    .unwrap();
-
-                    for _n in rank {
-                        writeln!(self.program_text, "end").unwrap();
-                    }
+                    let op = op.op_text();
+                    let right_name = self.wire_name(right_wire, w.absolute_latency);
+                    self.walk_typ_to_generate_foreach(&right_wire.typ, false, |path, _| {
+                        let path = ForEachPathElement::to_string(path);
+                        format!("assign {wire_name}{path} = {op}{right_name}{path};\n")
+                    });
                 }
                 RealWireDataSource::BinaryOp {
                     op,
@@ -451,36 +440,17 @@ impl<'g> CodeGenerationContext<'g> {
                     let left_wire = &self.instance.wires[*left];
                     let right_wire = &self.instance.wires[*right];
 
-                    // want to write a program something like
-                    //
-                    // foreach (out[_i1]) begin
-                    //     foreach (out[_i1][_i2]) begin
-                    //         out = left[_i1][_i2] <op> right[_i1][_i2]];
-                    //     end
-                    // end
-
-                    // initial declaration
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
 
-                    let mut path = String::new();
-
-                    for n in 0..rank.len() {
-                        path.push_str(&format!("[_i{n}]"));
-                        writeln!(self.program_text, "foreach ({wire_name}{path}) begin").unwrap();
-                    }
-
-                    writeln!(
-                        self.program_text,
-                        "assign {wire_name}{path} = {}{path} {} {}{path};",
-                        self.wire_name(left_wire, w.absolute_latency),
-                        op.op_text(),
-                        self.wire_name(right_wire, w.absolute_latency)
-                    )
-                    .unwrap();
-
-                    for _n in rank {
-                        writeln!(self.program_text, "end").unwrap();
-                    }
+                    let op = op.op_text();
+                    let left_name = self.wire_name(left_wire, w.absolute_latency);
+                    let right_name = self.wire_name(right_wire, w.absolute_latency);
+                    self.walk_typ_to_generate_foreach(&right_wire.typ, false, |path, _| {
+                        let path = ForEachPathElement::to_string(path);
+                        format!(
+                            "assign {wire_name}{path} = {left_name}{path} {op} {right_name}{path};\n"
+                        )
+                    });
                 }
                 RealWireDataSource::Constant { value } => {
                     // Trivial constants (bools & ints) should have been inlined already
