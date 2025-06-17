@@ -8,22 +8,31 @@ use crate::{errors::ErrorReference, typing::concrete_type::ConcreteType};
 
 use super::{ModuleTypingContext, RealWire, RealWireDataSource, RealWirePathElem};
 
+use crate::prelude::*;
+
 impl<'l> ModuleTypingContext<'l> {
+    fn typecheck_error(
+        &self,
+        found: &ConcreteType,
+        expected: &ConcreteType,
+        span: Span,
+    ) -> ErrorReference<'_> {
+        self.errors.error(
+            span,
+            format!(
+                "Typecheck error: Found {}, which is not a subtype of the expected type {}",
+                found.display(self.linker, true),
+                expected.display(self.linker, true)
+            ),
+        )
+    }
     fn wire_must_be_subtype(
         &self,
         wire: &RealWire,
         expected: &ConcreteType,
     ) -> Option<ErrorReference<'_>> {
-        (!wire.typ.is_subtype_of(expected)).then(|| {
-            self.errors.error(
-                wire.get_span(self.link_info),
-                format!(
-                    "Typecheck error: Found {}, which is not a subtype of the expected type {}",
-                    wire.typ.display(self.linker, true),
-                    expected.display(self.linker, true)
-                ),
-            )
-        })
+        (!wire.typ.is_subtype_of(expected))
+            .then(|| self.typecheck_error(&wire.typ, expected, wire.get_span(self.link_info)))
     }
     fn check_wire_ref_bounds<'c>(
         &self,
@@ -89,8 +98,24 @@ impl<'l> ModuleTypingContext<'l> {
                 }
                 RealWireDataSource::Select { root, path } => {
                     let root_wire = &self.wires[*root];
-                    let result_typ = self.check_wire_ref_bounds(&root_wire.typ, path);
-                    assert_eq!(&w.typ, result_typ);
+                    let found_typ = self.check_wire_ref_bounds(&root_wire.typ, path);
+                    let expected_typ = &w.typ;
+
+                    // Yes, we do a comparison here, rather than found_typ.is_subtype_of(expected_typ).
+                    // That is because the value of subtype-able parameters should never be able to bubble up into a Select.
+                    // Of course, non-subtypeable parameters *can* bubble up, and so we need to check against these.
+                    if expected_typ != found_typ {
+                        assert!(!expected_typ.is_subtype_of(found_typ), "Subtype-able parameters should never be able to bubble up into a Select!");
+                        self.typecheck_error(found_typ, expected_typ, w.get_span(self.link_info))
+                            .info_same_file(
+                                root_wire.get_span(self.link_info),
+                                format!(
+                                    "{} declared here of type {}",
+                                    &root_wire.name,
+                                    root_wire.typ.display(&self.linker.globals, true)
+                                ),
+                            );
+                    }
                 }
                 _ => {}
             }
