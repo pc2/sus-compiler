@@ -235,7 +235,8 @@ impl ConcreteType {
                     return false;
                 }
 
-                content.is_valid() && size.unwrap_integer() > &IBig::from(0)
+                let size = size.unwrap_integer();
+                content.is_valid() && size >= &IBig::from(0) && size < &IBig::from(10000000)
             }
         }
     }
@@ -303,7 +304,7 @@ pub fn get_int_bitwidth(min: &IBig, max: &IBig) -> u64 {
     } else {
         let max = UBig::try_from(max).unwrap();
 
-        max.bit_len() as u64
+        u64::max(max.bit_len() as u64, 1) // Can't have 0-width wires
     }
 }
 

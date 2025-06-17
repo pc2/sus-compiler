@@ -193,10 +193,12 @@ module PopCount #(int WIDTH) {
 	// Should be chosen based on what's most efficient for the target architecture
 	gen int BASE_CASE_SIZE = 5
 
-	interface PopCount : bool[WIDTH] bits -> int#(MIN: 0, MAX: WIDTH) popcount
+	interface PopCount : bool[WIDTH] bits'0 -> int#(MIN: 0, MAX: WIDTH) popcount
 
-
-	if WIDTH <= BASE_CASE_SIZE {
+	if WIDTH == 0 {
+		int zero'0 = 0
+		popcount = zero
+	} else if WIDTH <= BASE_CASE_SIZE {
 		int[WIDTH] cvt
 		for int I in 0..WIDTH {
 			when bits[I] {
@@ -205,7 +207,19 @@ module PopCount #(int WIDTH) {
 				cvt[I] = 0
 			}
 		}
-		reg popcount = +cvt
+		if WIDTH == 1 {
+			popcount = cvt[0]
+		} else if WIDTH == 2 {
+			popcount = cvt[0] + cvt[1]
+		} else if WIDTH == 3 {
+			popcount = cvt[0] + cvt[1] + cvt[2]
+		} else if WIDTH == 4 {
+			popcount = cvt[0] + cvt[1] + cvt[2] + cvt[3]
+		} else if WIDTH == 5 {
+			popcount = cvt[0] + cvt[1] + cvt[2] + cvt[3]  + cvt[4]
+		} else {
+			assert#(C: false)
+		}
 	} else {
 		gen int LEFT_WIDTH = WIDTH / 2
 		gen int RIGHT_WIDTH = WIDTH - LEFT_WIDTH

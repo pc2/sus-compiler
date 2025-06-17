@@ -426,7 +426,7 @@ impl<'g> CodeGenerationContext<'g> {
 
                     let op = op.op_text();
                     let right_name = self.wire_name(right_wire, w.absolute_latency);
-                    self.walk_typ_to_generate_foreach(&right_wire.typ, false, |path, _| {
+                    self.walk_typ_to_generate_foreach(&w.typ, false, |path, _| {
                         let path = ForEachPathElement::to_string(path);
                         format!("assign {wire_name}{path} = {op}{right_name}{path};\n")
                     });
@@ -445,7 +445,7 @@ impl<'g> CodeGenerationContext<'g> {
                     let op = op.op_text();
                     let left_name = self.wire_name(left_wire, w.absolute_latency);
                     let right_name = self.wire_name(right_wire, w.absolute_latency);
-                    self.walk_typ_to_generate_foreach(&right_wire.typ, false, |path, _| {
+                    self.walk_typ_to_generate_foreach(&w.typ, false, |path, _| {
                         let path = ForEachPathElement::to_string(path);
                         format!(
                             "assign {wire_name}{path} = {left_name}{path} {op} {right_name}{path};\n"
