@@ -383,11 +383,11 @@ impl ModuleTypingContext<'_> {
     fn gather_all_mux_inputs(
         &self,
         latency_node_meanings: &[WireID],
-        conflict_iter: &[SpecifiedLatency],
+        conflicts: &[SpecifiedLatency],
     ) -> Vec<PathMuxSource<'_>> {
         let mut connection_list = Vec::new();
-        for window in conflict_iter.windows(2) {
-            let [from, to] = window else { unreachable!() };
+        for (idx, from) in conflicts.iter().enumerate() {
+            let to = &conflicts[(idx + 1) % conflicts.len()];
             let from_wire_id = latency_node_meanings[from.node];
             //let from_wire = &self.wires[from_wire_id];
             let to_wire_id = latency_node_meanings[to.node];

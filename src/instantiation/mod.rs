@@ -16,8 +16,7 @@ use std::cell::OnceCell;
 use std::rc::Rc;
 
 use crate::flattening::{
-    BinaryOperator, ExpressionOutput, ExpressionSource, Instruction, InterfaceKind, Module,
-    UnaryOperator, WriteTo,
+    BinaryOperator, ExpressionSource, Instruction, InterfaceKind, Module, UnaryOperator,
 };
 use crate::{errors::ErrorStore, value::Value};
 
@@ -31,25 +30,6 @@ pub enum RealWirePathElem {
     ArrayAccess { span: BracketSpan, idx_wire: WireID },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WriteReference {
-    /// The [crate::flattening::Instruction::Expression] that created this write
-    pub original_expression: FlatID,
-    /// Which write in a [crate::flattening::ExpressionOutput::MultiWrite] corresponds to [Self::to_path]
-    pub write_idx: usize,
-}
-
-impl WriteReference {
-    pub fn get<'l>(&self, link_info: &'l LinkInfo) -> Option<&'l WriteTo> {
-        let expr = link_info.instructions[self.original_expression].unwrap_expression();
-        if let ExpressionOutput::MultiWrite(writes) = &expr.output {
-            Some(&writes[self.write_idx])
-        } else {
-            None
-        }
-    }
-}
-
 /// One arm of a multiplexer. Each arm has an attached condition that is also stored here.
 ///
 /// See [RealWireDataSource::Multiplexer]
@@ -59,7 +39,7 @@ pub struct MultiplexerSource {
     pub num_regs: i64,
     pub from: WireID,
     pub condition: Box<[ConditionStackElem]>,
-    pub wr_ref: WriteReference,
+    pub write_span: Span,
 }
 
 /// Where a [RealWire] gets its data, be it an operator, read-only value, constant, etc.

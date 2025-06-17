@@ -118,8 +118,47 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     ╭─[ test.sus:85:20 ]
     │
  85 │     int new_tot = (tot + term) % 100
+    │                    ─┬─  
+    │                     ╰─── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+    ╭─[ test.sus:85:20 ]
+    │
+ 85 │     int new_tot = (tot + term) % 100
     │                    ─────┬────  
     │                         ╰────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+    ╭─[ test.sus:87:21 ]
+    │
+ 87 │         reg total = new_tot
+    │                     ───┬───  
+    │                        ╰───── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+    ╭─[ test.sus:90:15 ]
+    │
+ 90 │         tot = new_tot
+    │               ───┬───  
+    │                  ╰───── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -478,6 +517,58 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MAX: /* Could not infer */
 )
 ─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:235:16 ]
+     │
+ 235 │        offsets[i] = offset
+     │                     ───┬──  
+     │                        ╰──── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:235:16 ]
+     │
+ 235 │        offsets[i] = offset
+     │                     ───┬──  
+     │                        ╰──── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:235:16 ]
+     │
+ 235 │        offsets[i] = offset
+     │                     ───┬──  
+     │                        ╰──── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:235:16 ]
+     │
+ 235 │        offsets[i] = offset
+     │                     ───┬──  
+     │                        ╰──── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
 Error: This port is not strongly connected to the strongly connected port cluster 'mbf'.
 An input and output port are strongly connected if there is a direct dependency path from the input port to the output port.
 Strongly connected ports are also transitive.
@@ -656,8 +747,8 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
 ─────╯
 Error: This instruction is part of a net-positive latency cycle of +1
 
-state_reg'1
--> state_reg'2 (+1)
+state_reg'0
+-> state_reg'1 (+1)
 
 Which conflicts with the starting latency
      ╭─[ test.sus:332:8 ]
@@ -666,10 +757,36 @@ Which conflicts with the starting latency
      │           ──────┬──────  
      │                 ╰──────── This instruction is part of a net-positive latency cycle of +1
 
-state_reg'1
--> state_reg'2 (+1)
+state_reg'0
+-> state_reg'1 (+1)
 
 Which conflicts with the starting latency
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:335:6 ]
+     │
+ 335 │     r = state_reg
+     │         ────┬────  
+     │             ╰────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:337:18 ]
+     │
+ 337 │     reg state_reg = state_reg + a
+     │                     ────┬────  
+     │                         ╰────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
@@ -2086,9 +2203,9 @@ Error: Out of bounds! The array is of size 20, but the index has bounds 29..29
 ─────╯
 Error: This instruction is part of a net-positive latency cycle of +5
 
-_2_i'0
--> test'5 (+5)
--> _2_i'5 (+0)
+test'5
+-> _4_i'0 (-5)
+-> test'10 (+10)
 
 Which conflicts with the starting latency
      ╭─[ test.sus:360:8 ]
@@ -2097,17 +2214,17 @@ Which conflicts with the starting latency
      │           ────────────┬────────────  
      │                       ╰────────────── This instruction is part of a net-positive latency cycle of +5
 
-_2_i'0
--> test'5 (+5)
--> _2_i'5 (+0)
+test'5
+-> _4_i'0 (-5)
+-> test'10 (+10)
 
 Which conflicts with the starting latency
 ─────╯
 Error: This instruction is part of a net-positive latency cycle of +5
 
-_2_i'0
--> test'5 (+5)
--> _2_i'5 (+0)
+test'5
+-> _4_i'0 (-5)
+-> test'10 (+10)
 
 Which conflicts with the starting latency
      ╭─[ test.sus:363:9 ]
@@ -2116,9 +2233,9 @@ Which conflicts with the starting latency
      │            ─────────────┬────────────  
      │                         ╰────────────── This instruction is part of a net-positive latency cycle of +5
 
-_2_i'0
--> test'5 (+5)
--> _2_i'5 (+0)
+test'5
+-> _4_i'0 (-5)
+-> test'10 (+10)
 
 Which conflicts with the starting latency
 ─────╯
@@ -2232,6 +2349,19 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
      ╭─[ test.sus:446:10 ]
      │
  446 │     reg r = tmp + c
+     │             ─┬─  
+     │              ╰─── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:446:10 ]
+     │
+ 446 │     reg r = tmp + c
      │             ───┬───  
      │                ╰───── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
@@ -2267,6 +2397,19 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
  586 │     submodule_named_ports sm
      │                           ─┬  
      │                            ╰── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:594:6 ]
+     │
+ 594 │     o = sm.port_c
+     │         ────┬────  
+     │             ╰────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -2331,6 +2474,19 @@ Error: TODO: Using empty interface 'doNothing' (This is a TODO with Actions etc)
  601 │     doNothing()
      │     ────┬────  
      │         ╰────── TODO: Using empty interface 'doNothing' (This is a TODO with Actions etc)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:602:10 ]
+     │
+ 602 │     reg r = tmp + c
+     │             ─┬─  
+     │              ╰─── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
@@ -2569,9 +2725,48 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
+     ╭─[ test.sus:738:10 ]
+     │
+ 738 │     valid = index != 0
+     │             ──┬──  
+     │               ╰──── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
      ╭─[ test.sus:741:11 ]
      │
  741 │        index = index - 1
+     │                ──┬──  
+     │                  ╰──── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:741:11 ]
+     │
+ 741 │        index = index - 1
+     │                ────┬────  
+     │                    ╰────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:745:11 ]
+     │
+ 745 │        index = upTo_cr.o
      │                ────┬────  
      │                    ╰────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
@@ -2658,6 +2853,19 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  760 │        int idx = iter_index
      │            ─┬─  
      │             ╰─── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:760:13 ]
+     │
+ 760 │        int idx = iter_index
+     │                  ─────┬────  
+     │                       ╰────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
 ─────╯
 Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
@@ -9932,21 +10140,8 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
      ╭─[ test.sus:817:14 ]
      │
  817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: int #(
+     │                    ────┬───  
+     │                        ╰───── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -9984,21 +10179,8 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
      ╭─[ test.sus:817:14 ]
      │
  817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: int #(
+     │                    ────┬───  
+     │                        ╰───── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -10036,21 +10218,8 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
      ╭─[ test.sus:817:14 ]
      │
  817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ──────────┬─────────  
-     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-─────╯
-Error: Could not finalize this type, some parameters were still unknown: int #(
-    MIN: /* Could not infer */, 
-    MAX: /* Could not infer */
-)
-     ╭─[ test.sus:817:14 ]
-     │
- 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
-     │                    ────────────────────┬───────────────────  
-     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: int #(
+     │                    ────┬───  
+     │                        ╰───── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -10088,6 +10257,19 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
      ╭─[ test.sus:817:14 ]
      │
  817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────┬───  
+     │                        ╰───── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
      │                    ──────────┬─────────  
      │                              ╰─────────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
@@ -10103,6 +10285,214 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
  817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
      │                    ────────────────────┬───────────────────  
      │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────┬───  
+     │                        ╰───── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────┬───  
+     │                        ╰───── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────┬───  
+     │                        ╰───── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ──────────┬─────────  
+     │                              ╰─────────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:14 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                    ────────────────────┬───────────────────  
+     │                                        ╰───────────────────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:25 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                               ────┬────  
+     │                                   ╰────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:25 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                               ────┬────  
+     │                                   ╰────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:25 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                               ────┬────  
+     │                                   ╰────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:25 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                               ────┬────  
+     │                                   ╰────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:25 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                               ────┬────  
+     │                                   ╰────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:25 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                               ────┬────  
+     │                                   ╰────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:817:25 ]
+     │
+ 817 │          reg sum = left.sum + right.sum + values[WIDTH - 1]
+     │                               ────┬────  
+     │                                   ╰────── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -10227,6 +10617,19 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
  835 │     output int beep = tr.sum
      │            ────┬───  
      │                ╰───── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+     ╭─[ test.sus:835:20 ]
+     │
+ 835 │     output int beep = tr.sum
+     │                       ───┬──  
+     │                          ╰──── Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )
@@ -10549,6 +10952,19 @@ Error: Could not finalize this type, some parameters were still unknown: int #(
     MIN: /* Could not infer */, 
     MAX: /* Could not infer */
 )[5]
+     ╭─[ test.sus:960:10 ]
+     │
+ 960 │     cr.in = a
+     │             ┬  
+     │             ╰── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
      ╭─[ test.sus:961:2 ]
      │
  961 │     int[5] b = cr.out
@@ -10564,6 +10980,19 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  961 │     int[5] b = cr.out
      │            ┬  
      │            ╰── Unused Variable: This variable does not affect the output ports of this module
+─────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
+     ╭─[ test.sus:961:13 ]
+     │
+ 961 │     int[5] b = cr.out
+     │                ───┬──  
+     │                   ╰──── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[5]
 ─────╯
 Warning: Unused Variable: This variable does not affect the output ports of this module
      ╭─[ test.sus:965:9 ]
@@ -10658,6 +11087,32 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1038 │        bool[500] data'0 ->
       │                  ──┬─  
       │                    ╰─── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+      ╭─[ test.sus:1043:22 ]
+      │
+ 1043 │     mem.write(do_write, addr, data)
+      │                         ──┬─  
+      │                           ╰─── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+──────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+      ╭─[ test.sus:1045:23 ]
+      │
+ 1045 │     read_data = mem.read(addr)
+      │                          ──┬─  
+      │                            ╰─── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: FIFO #(
     T: type int #(
@@ -10782,6 +11237,19 @@ Error: Could not infer the parameters of this submodule, some parameters were st
     OUT_SIZE: 5, 
     FROM: 3
 )
+──────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[20]
+      ╭─[ test.sus:1072:71 ]
+      │
+ 1072 │     int[5] subArr = Slice #(SIZE: 20, OUT_SIZE: 5, FROM: 3, T: type int)(arr)
+      │                                                                          ─┬─  
+      │                                                                           ╰─── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)[20]
 ──────╯
 Error: For executing compile-time constants, all arguments must be fully specified. The arguments 'T' were not valid
       ╭─[ test.sus:1077:25 ]
@@ -11030,6 +11498,32 @@ Warning: Unused Variable: This variable does not affect the output ports of this
  1166 │        reg reg reg reg reg int heavy_computation = data_received
       │                                ────────┬────────  
       │                                        ╰────────── Unused Variable: This variable does not affect the output ports of this module
+──────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+      ╭─[ test.sus:1166:47 ]
+      │
+ 1166 │        reg reg reg reg reg int heavy_computation = data_received
+      │                                                    ──────┬──────  
+      │                                                          ╰──────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+──────╯
+Error: Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
+      ╭─[ test.sus:1168:19 ]
+      │
+ 1168 │        fifo.push(true, heavy_computation)
+      │                        ────────┬────────  
+      │                                ╰────────── Could not finalize this type, some parameters were still unknown: int #(
+    MIN: /* Could not infer */, 
+    MAX: /* Could not infer */
+)
 ──────╯
 Error: Could not infer the parameters of this submodule, some parameters were still unknown: infer_me #(
     A: /* Could not infer */

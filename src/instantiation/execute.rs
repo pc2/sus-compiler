@@ -692,7 +692,7 @@ impl<'l> ExecutionContext<'l> {
         to_path: Vec<RealWirePathElem>,
         from: WireID,
         num_regs: i64,
-        wr_ref: WriteReference,
+        write_span: Span,
     ) {
         let RealWireDataSource::Multiplexer {
             is_state: _,
@@ -707,15 +707,16 @@ impl<'l> ExecutionContext<'l> {
             num_regs,
             from,
             condition: self.condition_stack.clone().into_boxed_slice(),
-            wr_ref,
+            write_span,
         });
     }
 
     fn write_non_generative(
         &mut self,
         write_to: &'l WriteTo,
+        original_instruction: FlatID,
         from: WireID,
-        wr_ref: WriteReference,
+        write_span: Span,
         domain: DomainID,
     ) -> ExecutionResult<()> {
         let_unwrap!(
@@ -726,9 +727,9 @@ impl<'l> ExecutionContext<'l> {
             &write_to.write_modifiers
         );
         let (target_wire, path) =
-            self.wire_ref_to_real_path(&write_to.to, wr_ref.original_expression, domain)?;
+            self.wire_ref_to_real_path(&write_to.to, original_instruction, domain)?;
 
-        self.instantiate_write_to_wire(target_wire, path, from, *num_regs, wr_ref);
+        self.instantiate_write_to_wire(target_wire, path, from, *num_regs, write_span);
         Ok(())
     }
 
@@ -890,7 +891,6 @@ impl<'l> ExecutionContext<'l> {
         interface_id: InterfaceID,
         interface_name_span: Span,
         domain: DomainID,
-        original_expression: FlatID,
     ) -> WireID {
         let submod_instance = &mut self.submodules[sub_module_id]; // Separately grab the same submodule every time because we take a &mut in for get_wire_or_constant_as_wire
 
@@ -905,14 +905,15 @@ impl<'l> ExecutionContext<'l> {
             let name = self
                 .unique_name_producer
                 .get_unique_name(format!("{}_{}", submod_instance.name, interface_data.name));
-            let original_instruction = submod_instance.original_instruction;
+            let submod_instruction = submod_instance.original_instruction;
+            let original_submod_span = self.link_info.instructions[submod_instruction].get_span();
             let source = match interface_data.interface_kind {
                 InterfaceKind::Action => {
                     let false_wire = self
                         .alloc_wire_for_const(
                             Value::Bool(false),
                             &AbstractRankedType::BOOL,
-                            original_expression,
+                            submod_instruction,
                             domain,
                             interface_name_span,
                         )
@@ -922,10 +923,7 @@ impl<'l> ExecutionContext<'l> {
                         num_regs: 0,
                         from: false_wire,
                         condition: Box::new([]),
-                        wr_ref: WriteReference {
-                            original_expression,
-                            write_idx: 0,
-                        },
+                        write_span: original_submod_span,
                     };
                     RealWireDataSource::Multiplexer {
                         is_state: None,
@@ -937,7 +935,7 @@ impl<'l> ExecutionContext<'l> {
             };
             let new_wire = self.wires.alloc(RealWire {
                 source,
-                original_instruction,
+                original_instruction: submod_instruction,
                 domain,
                 typ: ConcreteType::BOOL,
                 name,
@@ -996,11 +994,6 @@ impl<'l> ExecutionContext<'l> {
                 let (root_wire, path) =
                     self.wire_ref_to_real_path(wire_ref, original_instruction, domain)?;
 
-                if path.is_empty() {
-                    // Little optimization reduces instructions
-                    return Ok(vec![root_wire]);
-                }
-
                 RealWireDataSource::Select {
                     root: root_wire,
                     path,
@@ -1047,7 +1040,6 @@ impl<'l> ExecutionContext<'l> {
                         interface_id,
                         interface_span,
                         domain,
-                        original_instruction,
                     );
                     let true_wire = self.alloc_wire_for_const(
                         Value::Bool(true),
@@ -1061,28 +1053,15 @@ impl<'l> ExecutionContext<'l> {
                         Vec::new(),
                         true_wire,
                         0,
-                        WriteReference {
-                            original_expression: original_instruction,
-                            write_idx: 0,
-                        },
+                        interface_span,
                     );
                 }
 
-                for (write_idx, (port, arg)) in
-                    zip_eq(interface.func_call_inputs, &fc.arguments).enumerate()
-                {
+                for (port, arg) in zip_eq(interface.func_call_inputs, &fc.arguments) {
+                    let arg_span = self.link_info.instructions[*arg].get_span();
                     let from = self.get_wire_or_constant_as_wire(*arg, domain)?;
                     let port_wire = self.get_submodule_port(submod_id, port, None, domain);
-                    self.instantiate_write_to_wire(
-                        port_wire,
-                        Vec::new(),
-                        from,
-                        0,
-                        WriteReference {
-                            original_expression: original_instruction,
-                            write_idx,
-                        },
-                    );
+                    self.instantiate_write_to_wire(port_wire, Vec::new(), from, 0, arg_span);
                 }
 
                 return Ok(interface
@@ -1368,11 +1347,9 @@ impl<'l> ExecutionContext<'l> {
                                                 )?;
                                                 self.write_non_generative(
                                                     single_write,
+                                                    original_instruction,
                                                     value_as_wire,
-                                                    WriteReference {
-                                                        original_expression: original_instruction,
-                                                        write_idx: 0,
-                                                    },
+                                                    single_write.to_span,
                                                     domain,
                                                 )?;
                                             }
@@ -1395,16 +1372,12 @@ impl<'l> ExecutionContext<'l> {
                                     if write_tos.is_empty() {
                                         continue; // See no errors on zero outputs (#79)
                                     }
-                                    for (write_idx, (expr_output, write)) in
-                                        zip_eq(output_wires, write_tos).enumerate()
-                                    {
+                                    for (expr_output, write) in zip_eq(output_wires, write_tos) {
                                         self.write_non_generative(
                                             write,
+                                            original_instruction,
                                             expr_output,
-                                            WriteReference {
-                                                original_expression: original_instruction,
-                                                write_idx,
-                                            },
+                                            write.to_span,
                                             domain,
                                         )?;
                                     }

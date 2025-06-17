@@ -63,15 +63,13 @@ impl<'l> ModuleTypingContext<'l> {
                         let target_typ = self.check_wire_ref_bounds(&w.typ, &s.to_path);
                         if let Some(e) = self.wire_must_be_subtype(&self.wires[s.from], target_typ)
                         {
-                            if let Some(write_to) = s.wr_ref.get(self.link_info) {
-                                e.info_same_file(
-                                    write_to.to_span,
-                                    format!(
-                                        "Writing to this, which has type {}",
-                                        target_typ.display(self.linker, true)
-                                    ),
-                                );
-                            }
+                            e.info_same_file(
+                                s.write_span,
+                                format!(
+                                    "Writing to this, which has type {}",
+                                    target_typ.display(self.linker, true)
+                                ),
+                            );
                         }
                     }
                 }
