@@ -357,10 +357,10 @@ impl<'g> CodeGenerationContext<'g> {
         let content =
             walk_type_to_generate_foreach_recurse(typ, in_always, Vec::new(), 0, &mut operation);
 
-        if in_always {
+        if in_always | typ.can_be_represented_as_packed_bits().is_some() {
             self.program_text.write_str(&content).unwrap();
         } else {
-            write!(self.program_text, "generate\n{content}endgenerate;\n").unwrap()
+            write!(self.program_text, "generate\n{content}endgenerate\n").unwrap()
         }
     }
 
