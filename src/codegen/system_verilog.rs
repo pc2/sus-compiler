@@ -467,8 +467,7 @@ impl<'g> CodeGenerationContext<'g> {
 
                     for (arr_idx, elem_id) in array_wires.iter().enumerate() {
                         let element_wire = &self.instance.wires[*elem_id];
-                        let element_wire_name =
-                            wire_name_self_latency(element_wire, self.use_latency);
+                        let element_wire_name = self.wire_name(element_wire, w.absolute_latency);
 
                         self.walk_typ_to_generate_foreach(&element_wire.typ, false, |path, _| {
                             let path = ForEachPathElement::to_string(path);
