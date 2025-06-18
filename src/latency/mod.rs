@@ -117,9 +117,11 @@ impl LatencyCountingProblem {
 
         // Ports
         let mut ports = LatencyCountingPorts::default();
-        for (_id, p) in ctx.interface_ports.iter_valids() {
-            let node = map_wire_to_latency_node[p.wire];
-            ports.push(node, p.is_input);
+        for (wire_id, w) in &ctx.wires {
+            if let Some(is_input) = w.is_port {
+                let node = map_wire_to_latency_node[wire_id];
+                ports.push(node, is_input);
+            }
         }
 
         // Basic wire-based edges
