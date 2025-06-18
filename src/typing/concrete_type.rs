@@ -324,6 +324,6 @@ mod tests {
         assert_eq!(get_int_bitwidth(&IBig::from(-256), &IBig::from(255)), 9);
         assert_eq!(get_int_bitwidth(&IBig::from(0), &IBig::from(255)), 8);
         assert_eq!(get_int_bitwidth(&IBig::from(20), &IBig::from(256)), 9);
-        assert_eq!(get_int_bitwidth(&IBig::from(0), &IBig::from(0)), 0);
+        assert_eq!(get_int_bitwidth(&IBig::from(0), &IBig::from(0)), 1); // Temporary fix, such that we never generate Length 0 wires (#86)
     }
 }
