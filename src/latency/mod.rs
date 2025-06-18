@@ -258,6 +258,11 @@ impl InstantiatedModule {
 
         for (_id, w) in &self.wires {
             w.source.iter_sources_with_min_latency(|other, _| {
+                let other = match &self.wires[other].source {
+                    // For inlining path-less Selects
+                    RealWireDataSource::Select { root, path } if path.is_empty() => *root,
+                    _ => other,
+                };
                 let nu = &mut result[other];
 
                 *nu = max(*nu, w.absolute_latency);

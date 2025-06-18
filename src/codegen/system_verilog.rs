@@ -222,27 +222,24 @@ impl<'g> CodeGenerationContext<'g> {
     fn can_inline(&self, wire: &RealWire) -> bool {
         match &wire.source {
             RealWireDataSource::Constant { .. } => true,
+            RealWireDataSource::Select { root: _, path } if path.is_empty() => true,
             _other => false,
         }
     }
 
-    fn operation_to_string(&self, wire: &'g RealWire) -> Cow<'g, str> {
-        assert!(self.can_inline(wire));
+    fn wire_name(&self, wire: &'g RealWire, requested_latency: i64) -> Cow<'g, str> {
         match &wire.source {
             RealWireDataSource::Constant { value } => {
                 let mut result = String::new();
                 Self::constant_to_str(&mut result, &wire.typ, value);
                 Cow::Owned(result)
             }
-            _other => unreachable!(),
-        }
-    }
-
-    fn wire_name(&self, wire: &'g RealWire, requested_latency: i64) -> Cow<'g, str> {
-        if self.can_inline(wire) {
-            self.operation_to_string(wire)
-        } else {
-            wire_name_with_latency(wire, requested_latency, self.use_latency)
+            RealWireDataSource::Select { root, path } if path.is_empty() => wire_name_with_latency(
+                &self.instance.wires[*root],
+                requested_latency,
+                self.use_latency,
+            ),
+            _other => wire_name_with_latency(wire, requested_latency, self.use_latency),
         }
     }
 
