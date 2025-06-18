@@ -135,12 +135,93 @@ impl ForEachPathElement {
 }
 
 impl<'g> CodeGenerationContext<'g> {
+    fn constant_to_str(result: &mut String, typ: &ConcreteType, cst: &Value) {
+        match typ {
+            ConcreteType::Named(global_ref) => match global_ref.id {
+                get_builtin_type!("bool") => {
+                    let b = match cst {
+                        Value::Bool(true) => "1'b1",
+                        Value::Bool(false) => "1'b0",
+                        Value::Unset => "1'bx",
+                        _ => unreachable!(),
+                    };
+                    result.write_str(b).unwrap();
+                }
+                get_builtin_type!("int") => {
+                    let [min, max] = global_ref.template_args.cast_to_int_array();
+
+                    let bitwidth = get_int_bitwidth(min, max);
+
+                    let cst_str = match cst {
+                        Value::Integer(ibig) => ibig.to_string(),
+                        Value::Unset => "x".to_string(),
+                        _ => unreachable!(),
+                    };
+                    if min < &IBig::from(0) {
+                        result
+                            .write_fmt(format_args!("{bitwidth}'sd{cst_str}"))
+                            .unwrap()
+                    } else {
+                        result
+                            .write_fmt(format_args!("{bitwidth}'d{cst_str}"))
+                            .unwrap()
+                    }
+                }
+                _ => todo!("Structs"),
+            },
+            ConcreteType::Array(arr_box) => {
+                let (content, size) = arr_box.deref();
+
+                let size: usize = size.unwrap_int();
+                if let ConcreteType::Named(ConcreteGlobalReference {
+                    id: get_builtin_type!("bool"),
+                    ..
+                }) = content
+                {
+                    result.write_fmt(format_args!("{size}'b")).unwrap();
+                    match cst {
+                        Value::Array(values) => {
+                            assert_eq!(values.len(), size);
+                            for elem in values.iter().rev() {
+                                let b = match elem {
+                                    Value::Bool(true) => '1',
+                                    Value::Bool(false) => '0',
+                                    Value::Unset => 'x',
+                                    _ => unreachable!(),
+                                };
+                                result.write_char(b).unwrap();
+                            }
+                        }
+                        Value::Unset => {
+                            for _ in 0..size {
+                                result.write_char('x').unwrap();
+                            }
+                        }
+                        _ => unreachable!(),
+                    }
+                } else {
+                    result.write_str("{").unwrap();
+                    match cst {
+                        Value::Array(values) => {
+                            assert_eq!(values.len(), size);
+                            join_string_iter(result, ", ", values.iter(), |result, v| {
+                                Self::constant_to_str(result, content, v);
+                            })
+                        }
+                        Value::Unset => join_string_iter(result, ", ", 0..size, |result, _| {
+                            Self::constant_to_str(result, content, &Value::Unset);
+                        }),
+                        _ => unreachable!(),
+                    }
+                    result.write_str("}").unwrap();
+                }
+            }
+        }
+    }
     /// This is for making the resulting Verilog a little nicer to read
     fn can_inline(&self, wire: &RealWire) -> bool {
         match &wire.source {
-            RealWireDataSource::Constant {
-                value: Value::Bool(_) | Value::Integer(_),
-            } => true,
+            RealWireDataSource::Constant { .. } => true,
             _other => false,
         }
     }
@@ -148,7 +229,11 @@ impl<'g> CodeGenerationContext<'g> {
     fn operation_to_string(&self, wire: &'g RealWire) -> Cow<'g, str> {
         assert!(self.can_inline(wire));
         match &wire.source {
-            RealWireDataSource::Constant { value } => value.inline_constant_to_string(),
+            RealWireDataSource::Constant { value } => {
+                let mut result = String::new();
+                Self::constant_to_str(&mut result, &wire.typ, value);
+                Cow::Owned(result)
+            }
             _other => unreachable!(),
         }
     }
@@ -274,22 +359,6 @@ impl<'g> CodeGenerationContext<'g> {
         for (port_wire_id, port_wire) in &self.instance.wires {
             if port_wire.is_port.is_some() {
                 self.add_latency_registers(port_wire_id, port_wire).unwrap();
-            }
-        }
-    }
-
-    /// Pass a `to` parameter to say to what the constant should be assigned.  
-    fn write_constant(&mut self, to: &str, value: &Value) {
-        match value {
-            Value::Bool(_) | Value::Integer(_) | Value::Unset => {
-                let v_str = value.inline_constant_to_string();
-                writeln!(self.program_text, "{to} = {v_str};").unwrap();
-            }
-            Value::Array(arr) => {
-                for (idx, v) in arr.iter().enumerate() {
-                    let new_to = format!("{to}[{idx}]");
-                    self.write_constant(&new_to, v);
-                }
             }
         }
     }
@@ -452,12 +521,8 @@ impl<'g> CodeGenerationContext<'g> {
                         )
                     });
                 }
-                RealWireDataSource::Constant { value } => {
-                    // Trivial constants (bools & ints) should have been inlined already
-                    // So appearences of this are always arrays or other compound types
-                    writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
-                    let to = format!("assign {wire_name}");
-                    self.write_constant(&to, value);
+                RealWireDataSource::Constant { .. } => {
+                    unreachable!("All constants are inlined!");
                 }
                 RealWireDataSource::ReadOnly => {
                     writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
@@ -481,11 +546,15 @@ impl<'g> CodeGenerationContext<'g> {
                     is_state,
                     sources: _,
                 } => {
-                    writeln!(self.program_text, "{wire_or_reg}{wire_decl};").unwrap();
-                    if let Some(initial_value) = is_state {
-                        let to = format!("initial {wire_name}");
-                        self.write_constant(&to, initial_value);
+                    write!(self.program_text, "{wire_or_reg}{wire_decl}").unwrap();
+                    match is_state {
+                        Some(initial_val) if !initial_val.is_unset() => {
+                            self.program_text.write_str(" = ").unwrap();
+                            Self::constant_to_str(&mut self.program_text, &w.typ, initial_val);
+                        }
+                        _ => {}
                     }
+                    self.program_text.write_str(";\n").unwrap();
                 }
             }
             self.add_latency_registers(wire_id, w).unwrap();
@@ -552,25 +621,26 @@ impl<'g> CodeGenerationContext<'g> {
     ) {
         self.program_text.write_str(&link_info.name).unwrap();
         self.program_text.write_str(" #(").unwrap();
-        self.program_text
-            .write_str(&join_string_iter(
-                ", ",
-                zip_eq(concrete_template_args, &link_info.template_parameters).map(
-                    |(_, arg, arg_name)| -> String {
-                        let arg_name = &arg_name.name;
-                        let arg_value = match arg {
-                            TemplateKind::Type(_) => {
-                                unreachable!(
-                                "No extern module type arguments. Should have been caught by Lint"
-                            );
-                            }
-                            TemplateKind::Value(value) => value.inline_constant_to_string(),
-                        };
-                        format!(".{arg_name}({arg_value})")
-                    },
-                ),
-            ))
-            .unwrap();
+        join_string_iter(
+            &mut self.program_text,
+            ", ",
+            zip_eq(concrete_template_args, &link_info.template_parameters),
+            |result, (_, arg, arg_name)| {
+                let arg_name = &arg_name.name;
+                match arg {
+                    TemplateKind::Type(_) => {
+                        unreachable!(
+                            "No extern module type arguments. Should have been caught by Lint"
+                        );
+                    }
+                    TemplateKind::Value(value) => {
+                        result
+                            .write_fmt(format_args!(".{arg_name}({value})"))
+                            .unwrap();
+                    }
+                };
+            },
+        );
         self.program_text.write_char(')').unwrap();
     }
 
@@ -611,9 +681,9 @@ impl<'g> CodeGenerationContext<'g> {
                         "<="
                     } else {
                         writeln!(self.program_text, "always_comb begin\n\t// Combinatorial wires are not defined when not valid. This is just so that the synthesis tool doesn't generate latches").unwrap();
-                        let invalid_val = w.typ.get_initial_val();
-                        let tabbed_name = format!("\t{output_name}");
-                        self.write_constant(&tabbed_name, &invalid_val);
+                        write!(self.program_text, "\t{output_name} = ").unwrap();
+                        Self::constant_to_str(&mut self.program_text, &w.typ, &Value::Unset);
+                        self.program_text.write_str(";\n").unwrap();
                         "="
                     };
 
@@ -751,17 +821,6 @@ impl<'g> CodeGenerationContext<'g> {
 
     fn write_endmodule(&mut self) {
         writeln!(self.program_text, "endmodule\n").unwrap();
-    }
-}
-
-impl Value {
-    fn inline_constant_to_string(&self) -> Cow<str> {
-        match self {
-            Value::Bool(b) => Cow::Borrowed(if *b { "1'b1" } else { "1'b0" }),
-            Value::Integer(v) => Cow::Owned(v.to_string()),
-            Value::Unset => Cow::Borrowed("'x"),
-            Value::Array(_) => unreachable!("Not an inline constant!"),
-        }
     }
 }
 

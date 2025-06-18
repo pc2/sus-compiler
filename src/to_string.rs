@@ -396,16 +396,17 @@ pub fn join_string_iter_formatter<'fmt, T>(
     Ok(())
 }
 
-pub fn join_string_iter(sep: &'static str, mut iter: impl Iterator<Item = String>) -> String {
-    let mut result = String::new();
-
+pub fn join_string_iter<T>(
+    result: &mut String,
+    sep: &'static str,
+    mut iter: impl Iterator<Item = T>,
+    mut f: impl FnMut(&mut String, T),
+) {
     if let Some(first) = iter.next() {
-        result.write_str(&first).unwrap();
+        f(result, first);
         for item in iter {
             result.write_str(sep).unwrap();
-            result.write_str(&item).unwrap();
+            f(result, item);
         }
     }
-
-    result
 }
