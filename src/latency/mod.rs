@@ -117,9 +117,11 @@ impl LatencyCountingProblem {
 
         // Ports
         let mut ports = LatencyCountingPorts::default();
-        for (_id, p) in ctx.interface_ports.iter_valids() {
-            let node = map_wire_to_latency_node[p.wire];
-            ports.push(node, p.is_input);
+        for (wire_id, w) in &ctx.wires {
+            if let Some(is_input) = w.is_port {
+                let node = map_wire_to_latency_node[wire_id];
+                ports.push(node, is_input);
+            }
         }
 
         // Basic wire-based edges
@@ -256,6 +258,11 @@ impl InstantiatedModule {
 
         for (_id, w) in &self.wires {
             w.source.iter_sources_with_min_latency(|other, _| {
+                let other = match &self.wires[other].source {
+                    // For inlining path-less Selects
+                    RealWireDataSource::Select { root, path } if path.is_empty() => *root,
+                    _ => other,
+                };
                 let nu = &mut result[other];
 
                 *nu = max(*nu, w.absolute_latency);
@@ -383,11 +390,11 @@ impl ModuleTypingContext<'_> {
     fn gather_all_mux_inputs(
         &self,
         latency_node_meanings: &[WireID],
-        conflict_iter: &[SpecifiedLatency],
+        conflicts: &[SpecifiedLatency],
     ) -> Vec<PathMuxSource<'_>> {
         let mut connection_list = Vec::new();
-        for window in conflict_iter.windows(2) {
-            let [from, to] = window else { unreachable!() };
+        for (idx, from) in conflicts.iter().enumerate() {
+            let to = &conflicts[(idx + 1) % conflicts.len()];
             let from_wire_id = latency_node_meanings[from.node];
             //let from_wire = &self.wires[from_wire_id];
             let to_wire_id = latency_node_meanings[to.node];

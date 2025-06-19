@@ -8,9 +8,10 @@ use crate::errors::ErrorInfo;
 use crate::prelude::*;
 
 use crate::alloc::{UUIDMarker, UUID};
+use crate::typing::domain_type::DomainType;
 
+use super::abstract_type::AbstractRankedType;
 use super::abstract_type::{AbstractInnerType, PeanoType};
-use super::abstract_type::{AbstractRankedType, DomainType};
 
 pub struct InnerTypeVariableIDMarker;
 impl UUIDMarker for InnerTypeVariableIDMarker {
@@ -307,6 +308,7 @@ pub trait HindleyMilner: Sized + Clone {
 pub enum AbstractTypeHMInfo {
     Template(TemplateID),
     Named(TypeUUID),
+    Interface(ModuleUUID, InterfaceID),
 }
 
 impl HindleyMilner for AbstractInnerType {
@@ -321,6 +323,9 @@ impl HindleyMilner for AbstractInnerType {
             }
             AbstractInnerType::Named(named_id) => {
                 HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Named(*named_id))
+            }
+            AbstractInnerType::Interface(md_id, interface_id) => {
+                HindleyMilnerInfo::TypeFunc(AbstractTypeHMInfo::Interface(md_id.id, *interface_id))
             }
         }
     }
@@ -345,7 +350,9 @@ impl HindleyMilner for AbstractInnerType {
 
     fn for_each_unknown(&self, f: &mut impl FnMut(InnerTypeVariableID)) {
         match self {
-            AbstractInnerType::Template(_) | AbstractInnerType::Named(_) => {}
+            AbstractInnerType::Template(_)
+            | AbstractInnerType::Named(_)
+            | AbstractInnerType::Interface(_, _) => {}
             AbstractInnerType::Unknown(uuid) => f(*uuid),
         }
     }
@@ -425,13 +432,6 @@ impl HindleyMilner for DomainType {
 pub trait Substitutor {
     type MyType: Clone + Debug;
     fn unify_total(&mut self, from: &Self::MyType, to: &Self::MyType) -> UnifyResult;
-
-    fn unify_must_succeed(&mut self, a: &Self::MyType, b: &Self::MyType) {
-        assert!(
-            self.unify_total(a, b) == UnifyResult::Success,
-            "This unification cannot fail. Usually because we're unifying with a Written Type: {a:?} <-> {b:?}"
-        );
-    }
 }
 
 impl Substitutor for TypeSubstitutor<DomainType> {
@@ -473,6 +473,11 @@ impl Substitutor for AbstractTypeSubstitutor {
     fn unify_total(&mut self, from: &AbstractRankedType, to: &AbstractRankedType) -> UnifyResult {
         self.inner_substitutor.unify(&from.inner, &to.inner)
             & self.rank_substitutor.unify(&from.rank, &to.rank)
+    }
+}
+impl TypeSubstitutor<AbstractInnerType> {
+    pub fn alloc_unknown(&mut self) -> AbstractInnerType {
+        AbstractInnerType::Unknown(self.alloc(OnceCell::new()))
     }
 }
 
@@ -517,7 +522,9 @@ impl PeanoType {
 impl AbstractRankedType {
     pub fn fully_substitute(&mut self, substitutor: &AbstractTypeSubstitutor) -> bool {
         let inner_success = match &mut self.inner {
-            AbstractInnerType::Named(_) | AbstractInnerType::Template(_) => true, // Template Name & Name is included in get_hm_info
+            AbstractInnerType::Named(_)
+            | AbstractInnerType::Template(_)
+            | AbstractInnerType::Interface(_, _) => true, // Template Name & Name is included in get_hm_info
             AbstractInnerType::Unknown(var) => {
                 if let Some(replacement) = substitutor.inner_substitutor[*var].get() {
                     assert!(!std::ptr::eq(&self.inner, replacement));

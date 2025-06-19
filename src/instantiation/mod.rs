@@ -15,7 +15,9 @@ use crate::typing::value_unifier::{UnifyableValue, ValueUnifierAlloc};
 use std::cell::OnceCell;
 use std::rc::Rc;
 
-use crate::flattening::{BinaryOperator, ExpressionOutput, Module, Port, UnaryOperator, WriteTo};
+use crate::flattening::{
+    BinaryOperator, ExpressionSource, Instruction, InterfaceKind, Module, UnaryOperator,
+};
 use crate::{errors::ErrorStore, value::Value};
 
 use crate::typing::concrete_type::{ConcreteGlobalReference, ConcreteType};
@@ -28,25 +30,6 @@ pub enum RealWirePathElem {
     ArrayAccess { span: BracketSpan, idx_wire: WireID },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WriteReference {
-    /// The [crate::flattening::Instruction::Expression] that created this write
-    pub original_expression: FlatID,
-    /// Which write in a [crate::flattening::ExpressionOutput::MultiWrite] corresponds to [Self::to_path]
-    pub write_idx: usize,
-}
-
-impl WriteReference {
-    pub fn get<'l>(&self, link_info: &'l LinkInfo) -> Option<&'l WriteTo> {
-        let expr = link_info.instructions[self.original_expression].unwrap_expression();
-        if let ExpressionOutput::MultiWrite(writes) = &expr.output {
-            Some(&writes[self.write_idx])
-        } else {
-            None
-        }
-    }
-}
-
 /// One arm of a multiplexer. Each arm has an attached condition that is also stored here.
 ///
 /// See [RealWireDataSource::Multiplexer]
@@ -56,7 +39,7 @@ pub struct MultiplexerSource {
     pub num_regs: i64,
     pub from: WireID,
     pub condition: Box<[ConditionStackElem]>,
-    pub wr_ref: WriteReference,
+    pub write_span: Span,
 }
 
 /// Where a [RealWire] gets its data, be it an operator, read-only value, constant, etc.
@@ -109,6 +92,7 @@ pub struct RealWire {
     pub specified_latency: i64,
     /// The computed latencies after latency counting
     pub absolute_latency: i64,
+    pub is_port: Option<bool>,
 }
 impl RealWire {
     fn get_span(&self, link_info: &LinkInfo) -> Span {
@@ -138,14 +122,22 @@ pub struct SubModule {
     pub instance: OnceCell<Rc<InstantiatedModule>>,
     pub refers_to: ConcreteGlobalReference<ModuleUUID>,
     pub port_map: FlatAlloc<Option<SubModulePort>, PortIDMarker>,
+    pub interface_map: FlatAlloc<Option<SubModulePort>, InterfaceIDMarker>,
     pub interface_call_sites: FlatAlloc<Vec<Span>, InterfaceIDMarker>,
     pub name: String,
 }
 impl SubModule {
     fn get_span(&self, link_info: &LinkInfo) -> Span {
-        link_info.instructions[self.original_instruction]
-            .unwrap_submodule()
-            .get_most_relevant_span()
+        match &link_info.instructions[self.original_instruction] {
+            Instruction::SubModule(sub_module_instance) => sub_module_instance.name_span,
+            Instruction::Expression(expression) => {
+                let ExpressionSource::FuncCall(fc) = &expression.source else {
+                    unreachable!()
+                };
+                fc.func.get_total_span()
+            }
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -175,6 +167,8 @@ pub struct InstantiatedModule {
     pub errors: ErrorStore,
     /// This matches the ports in [Module::ports]. Ports are not `None` when they are not part of this instantiation.
     pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
+    /// This matches the interfaces in [Module::interfaces]. Only
+    pub used_interfaces: FlatAlloc<Option<InstantiatedPort>, InterfaceIDMarker>,
     pub wires: FlatAlloc<RealWire, WireIDMarker>,
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
     /// See [GenerationState]
@@ -310,23 +304,45 @@ struct Executed {
 impl Executed {
     fn make_interface(
         &self,
-        ports: &FlatAlloc<Port, PortIDMarker>,
-    ) -> FlatAlloc<Option<InstantiatedPort>, PortIDMarker> {
-        ports.map(|(_, port)| {
+        md: &Module,
+    ) -> (
+        FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
+        FlatAlloc<Option<InstantiatedPort>, InterfaceIDMarker>,
+    ) {
+        let interface_ports = md.ports.map(|(_, port)| {
             let port_decl_id = port.declaration_instruction;
-            if let SubModuleOrWire::Wire(wire_id) = &self.generation_state[port_decl_id] {
-                let wire = &self.wires[*wire_id];
-                Some(InstantiatedPort {
-                    wire: *wire_id,
-                    is_input: port.is_input,
-                    absolute_latency: CALCULATE_LATENCY_LATER,
-                    typ: wire.typ.clone(),
-                    domain: wire.domain,
-                })
-            } else {
-                None
-            }
-        })
+            let SubModuleOrWire::Wire(wire_id) = &self.generation_state[port_decl_id] else {
+                return None;
+            };
+            let wire = &self.wires[*wire_id];
+            Some(InstantiatedPort {
+                wire: *wire_id,
+                is_input: port.is_input,
+                absolute_latency: CALCULATE_LATENCY_LATER,
+                typ: wire.typ.clone(),
+                domain: wire.domain,
+            })
+        });
+        let interfaces = md.interfaces.map(|(_, interface)| {
+            let is_input = match interface.interface_kind {
+                InterfaceKind::RegularInterface => return None,
+                InterfaceKind::Action => true,
+                InterfaceKind::Trigger => false,
+            };
+            let port_decl_id = interface.declaration_instruction;
+            let SubModuleOrWire::Wire(wire_id) = &self.generation_state[port_decl_id] else {
+                return None;
+            };
+            let wire = &self.wires[*wire_id];
+            Some(InstantiatedPort {
+                wire: *wire_id,
+                is_input,
+                absolute_latency: CALCULATE_LATENCY_LATER,
+                typ: wire.typ.clone(),
+                domain: wire.domain,
+            })
+        });
+        (interface_ports, interfaces)
     }
 
     pub fn into_module_typing_context<'l>(
@@ -335,7 +351,7 @@ impl Executed {
         md: &'l Module,
         global_ref: Rc<ConcreteGlobalReference<ModuleUUID>>,
     ) -> (ModuleTypingContext<'l>, ValueUnifierAlloc) {
-        let interface_ports = self.make_interface(&md.ports);
+        let (interface_ports, interfaces) = self.make_interface(md);
         let errors = ErrorCollector::new_empty(md.link_info.file, &linker.files);
         if let Err((position, reason)) = self.execution_status {
             errors.error(position, reason);
@@ -350,6 +366,7 @@ impl Executed {
             linker,
             errors,
             interface_ports,
+            interfaces,
         };
         (ctx, self.type_var_alloc)
     }
@@ -361,6 +378,7 @@ pub struct ModuleTypingContext<'l> {
     pub submodules: FlatAlloc<SubModule, SubModuleIDMarker>,
     pub generation_state: FlatAlloc<SubModuleOrWire, FlatIDMarker>,
     pub interface_ports: FlatAlloc<Option<InstantiatedPort>, PortIDMarker>,
+    pub interfaces: FlatAlloc<Option<InstantiatedPort>, InterfaceIDMarker>,
     pub link_info: &'l LinkInfo,
     /// Yes I know it's redundant, but it's easier to both have link_info and md
     pub linker: &'l Linker,
@@ -377,6 +395,7 @@ impl<'l> ModuleTypingContext<'l> {
             mangled_name,
             errors: self.errors.into_storage(),
             interface_ports: self.interface_ports,
+            used_interfaces: self.interfaces,
             wires: self.wires,
             submodules: self.submodules,
             generation_state: self.generation_state,
@@ -415,6 +434,7 @@ fn perform_instantiation(
             name,
             errors: ErrorStore::new_did_error(),
             interface_ports: Default::default(),
+            used_interfaces: Default::default(),
             wires: Default::default(),
             submodules: Default::default(),
             generation_state: md
